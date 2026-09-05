@@ -832,7 +832,7 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.12) — server.js store w
     assert.match(ROUTE_SRC, /LIN-2437/);
   });
 
-  test('createFlightCompanionRoutes creates no new store — every param wired is also a param createTaskChatRoutes already receives (mirrors it, adds nothing new)', () => {
+  test('createFlightCompanionRoutes creates no new store — every param wired is an EXISTING server-level store, and the LIN-2432 set still mirrors createTaskChatRoutes', () => {
     const flightLine = flightCompanionCallLine();
     const taskChatLine = SERVER_SRC.split('\n').find(l => l.includes('createTaskChatRoutes({'));
     assert.ok(taskChatLine, 'expected the createTaskChatRoutes(...) call site to exist');
@@ -841,6 +841,20 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.12) — server.js store w
         assert.match(taskChatLine, new RegExp(`\\b${store}\\b`), `${store} is a pre-existing store — createTaskChatRoutes must already receive it too`);
       }
     }
+    // LIN-2617 adds two stores this route receives and Task Chat does not, so
+    // the mirror above is no longer total. The claim that still holds — and the
+    // one that actually matters — is that NEITHER is a new store: both are
+    // constructed at server level for the rulings feed and merely threaded here.
+    for (const store of ['taskDecisionsStore', 'shelvedRulingsStore']) {
+      assert.match(flightLine, new RegExp(`\\b${store}\\b`), `${store} must be threaded (LIN-2617)`);
+      assert.match(
+        SERVER_SRC, new RegExp(`const ${store} = new `),
+        `${store} must already be constructed at server level — this route creates no store`
+      );
+    }
+    // The asymmetry is argued in server.js, not silent: Task Chat is outside the
+    // file carve of the change that added them.
+    assert.match(SERVER_SRC, /LIN-2617 adds taskDecisionsStore \+ shelvedRulingsStore/);
   });
 });
 
@@ -870,6 +884,105 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // recompute/restate these numbers itself.
     assert.match(text, /authoritative/i);
     assert.match(text, /never recompute or restate/i);
+  });
+
+  test('LIN-2617: every attention row of the census doc is rendered field-for-field, not summarised into its count', () => {
+    const attention = [
+      { loopId: 'loop-a', issue: 'LIN-2515', lane: 'blocked', stage: 'close-out', since: '2026-09-05T01:35:00.000Z' },
+      { loopId: 'loop-b', issue: 'LIN-2604', lane: 'silent', stage: 'plan', since: '2026-09-05T03:10:00.000Z' },
+    ];
+    const censusDoc = {
+      rev: 2272, stateHash: 'h',
+      state: {
+        lanes: { working: 17, silent: 313, blocked: 52, terminal: 2197, queued: 0, resolved: 3, unknown: 0 },
+        attention, truncated: false,
+      },
+    };
+    const text = buildCensusSeedText(censusDoc);
+    const lines = text.split('\n');
+
+    // Byte-for-byte on the RENDERED LINE, not per-field containment. Asserting
+    // only that each value appears *somewhere* passes even when the lane and
+    // stage are swapped — which, inside a block the prompt calls ground truth,
+    // is exactly the failure this ticket exists to prevent.
+    const expected = [
+      '  - LIN-2515 · blocked · stage close-out · since 2026-09-05T01:35:00.000Z · loop loop-a',
+      '  - LIN-2604 · silent · stage plan · since 2026-09-05T03:10:00.000Z · loop loop-b',
+    ];
+    for (const line of expected) {
+      assert.ok(lines.includes(line), `expected exactly this line:\n${line}\ngot:\n${text}`);
+    }
+    // Each row exactly once — a duplicated row would double-count the fleet.
+    for (const line of expected) {
+      assert.strictEqual(lines.filter(l => l === line).length, 1, 'each attention row renders once');
+    }
+    // Rows appear in the census doc's own order, never re-sorted here: the sweep
+    // already sorted them and this function's contract is no-recompute.
+    assert.ok(lines.indexOf(expected[0]) < lines.indexOf(expected[1]));
+    // The count survives alongside the rows — this is additive, not a swap.
+    assert.match(text, /attention items: 2\b/);
+  });
+
+  test('LIN-2617: a partial or malformed attention row degrades instead of rendering "undefined" or throwing', () => {
+    const base = { working: 0, silent: 0, blocked: 2, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
+    // The census doc is persisted store state read back at turn time, and this
+    // function is called with no try/catch around it — one bad row from an
+    // older sweep revision must not take out the whole companion turn.
+    //
+    // A literal `null` row IS covered: `buildCompanionSnapshot` throws on one
+    // (lib/flight-companion-gate.js:219, `attention.map(row => [row.loopId, …])`),
+    // and it runs before any rendering here, so defending only the rendering
+    // would have been dead code. The array is sanitised before that call
+    // instead — which fixes it entirely inside this route, without editing the
+    // gate file, whose own latent fault on that input is reported separately.
+    const text = buildCensusSeedText({
+      rev: 3, stateHash: 'h',
+      state: {
+        lanes: base, truncated: false,
+        attention: [null, 'nonsense', { lane: 'blocked' }, { loopId: 'l9' }, { loopId: 'l8', issue: 'LIN-1', lane: 'blocked', stage: 'plan', since: '2026-09-05T00:00:00.000Z' }],
+      },
+    });
+    assert.doesNotMatch(text, /undefined/, 'never the literal string "undefined" inside a ground-truth block');
+    // A row with no loopId cannot be drilled into, so it is dropped outright
+    // rather than rendered as a half-row.
+    assert.doesNotMatch(text, /\(no task\) · blocked/);
+    // A row with an id but missing fields still renders, honestly labelled.
+    assert.ok(text.includes('  - (no task) · unknown lane · stage unknown · since unknown · loop l9'));
+    // ...and the well-formed row is unaffected.
+    assert.ok(text.includes('  - LIN-1 · blocked · stage plan · since 2026-09-05T00:00:00.000Z · loop l8'));
+    // The count and the rendered rows count the SAME set — a header claiming
+    // five attention items above two rendered rows is its own small lie.
+    assert.match(text, /attention items: 2\b/);
+  });
+
+  test('LIN-2617: the seed states what a lane actually counts, so a loop total is never narrated as tasks', () => {
+    const censusDoc = {
+      rev: 1, stateHash: 'h',
+      state: { lanes: { working: 0, silent: 0, blocked: 0, terminal: 2197, queued: 0, resolved: 0, unknown: 0 }, attention: [], truncated: false },
+    };
+    const text = buildCensusSeedText(censusDoc);
+    // The 2026-09-05 transcript's actual failure was "2,197 tasks terminal".
+    assert.match(text, /dispatch loops \(runs\)/i);
+    assert.match(text, /not sessions/i);
+    assert.match(text, /not tasks/i);
+    // `blocked` is an alive lane, not a dead one — the companion must not
+    // report a parked run as finished.
+    assert.match(text, /alive, not dead/i);
+  });
+
+  test('LIN-2617: an empty attention list renders no rows section at all, and LIN-2619\'s stale count rides only when the doc carries it', () => {
+    const base = { working: 0, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
+    const withoutRows = buildCensusSeedText({ rev: 1, stateHash: 'h', state: { lanes: base, attention: [], truncated: false } });
+    assert.doesNotMatch(withoutRows, /ATTENTION ROWS/);
+
+    // LIN-2619 has not landed, so the field is absent and nothing is rendered —
+    // that ticket never has to touch this function.
+    assert.doesNotMatch(withoutRows, /stale attention rows/i);
+    const withStale = buildCensusSeedText({
+      rev: 1, stateHash: 'h',
+      state: { lanes: base, attention: [], truncated: false, staleAttentionCount: 9 },
+    });
+    assert.match(withStale, /stale attention rows[^\n]*: 9\b/i);
   });
 
   test('a truncated attention list is noted, not silently dropped', () => {

@@ -74,7 +74,7 @@ import { COMPANION_INSTANCE_PREFIX, COMPANION_SEED_STATE, shouldSpendTurn, build
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
-import { sessionIsTerminal } from './dashboard.js';
+import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
@@ -128,14 +128,69 @@ export function buildCensusSeedText(currentCensusDoc) {
   if (!currentCensusDoc) {
     return 'CURRENT CENSUS: not available yet for this workspace (no sweep has run).';
   }
-  const snapshot = buildCompanionSnapshot(currentCensusDoc);
+  // Sanitised BEFORE `buildCompanionSnapshot`, not after. That function maps
+  // `attention` straight to `[row.loopId, …]` (lib/flight-companion-gate.js:219)
+  // and throws on a null row — so defending only the rendering below would be
+  // dead code, because the snapshot call happens first. Dropping the unusable
+  // rows here fixes it entirely inside this route, without editing the gate
+  // file (which this change's carve does not permit), and keeps the count and
+  // the rendered rows counting the same set. A row with no `loopId` cannot be
+  // drilled into and is not an attention row anyone can act on.
+  const attention = (Array.isArray(currentCensusDoc.state?.attention) ? currentCensusDoc.state.attention : [])
+    .filter((row) => row && typeof row === 'object' && row.loopId);
+  const usableDoc = attention.length === (currentCensusDoc.state?.attention?.length ?? 0)
+    ? currentCensusDoc
+    : { ...currentCensusDoc, state: { ...currentCensusDoc.state, attention } };
+  const snapshot = buildCompanionSnapshot(usableDoc);
   const laneLines = CENSUS_LANE_KEYS.map((key) => `  ${key}: ${snapshot.lanes[key]}`).join('\n');
-  return [
+
+  // LIN-2617: the ROWS, not just the count. Read straight off the census doc's
+  // own `state.attention` (written by lib/observer-sweep.js:161-170), copied
+  // field-for-field under the same no-recompute discipline the counts above
+  // already carry — never re-sorted, re-dated or re-derived here.
+  //
+  // Deliberately NOT `buildCompanionSnapshot`'s `attentionKeys`: that projection
+  // drops `since` on purpose (lib/flight-companion-gate.js:219), because it
+  // moves on every heartbeat and would defeat the gate's own identity
+  // comparison. The gate needs the identity tuple; the model needs the age.
+  // The sweep already applies ATTENTION_CAP before storing, so the stored array
+  // is bounded and `truncated` says whether it was cut.
+  // Every remaining field is defended too: this document is persisted store
+  // state read back at turn time, so a row written by an older sweep revision
+  // can be partial, and rendering the literal string "undefined" inside a block
+  // the prompt calls ground truth is worse than saying "unknown".
+  const attentionLines = attention.map(
+    (row) => `  - ${row.issue || '(no task)'} · ${row.lane || 'unknown lane'} · stage ${row.stage || 'unknown'}` +
+      ` · since ${row.since || 'unknown'} · loop ${row.loopId}`
+  );
+
+  const lines = [
     'CURRENT CENSUS (authoritative — these numbers are ground truth; narrate them, never recompute or restate them differently):',
     laneLines,
     `  attention items: ${snapshot.attentionCount}${snapshot.truncated ? ' (list truncated)' : ''}`,
+  ];
+  if (attentionLines.length) {
+    lines.push('ATTENTION ROWS (each is a real run — name the task, never just the count):', ...attentionLines);
+  }
+
+  // LIN-2619 writes this field; until it lands the key is absent and nothing is
+  // rendered, so that ticket never has to touch this function.
+  const staleAttentionCount = currentCensusDoc.state?.staleAttentionCount;
+  if (Number.isFinite(staleAttentionCount)) {
+    lines.push(`  stale attention rows (fossil, likely not really waiting): ${staleAttentionCount}`);
+  }
+
+  lines.push(
     `  census revision: ${snapshot.censusRev}`,
-  ].join('\n');
+    // The vocabulary line (plan-review 2617-F1). The model wrote "2,197 tasks
+    // terminal" on 2026-09-05 because nothing here told it what a lane counts:
+    // `buildSweepPayload` tallies one lane per LOOP (lib/observer-sweep.js:132-157)
+    // and `classifyLoop` classifies one Loop (:70), while a session spans several
+    // loops and a task can span several sessions.
+    'VOCABULARY: these lanes count dispatch loops (runs) — not sessions (one session spans several loops) and not tasks. ' +
+      '"silent" and "terminal" include historical bookkeeping. "blocked" means parked waiting on a human: alive, not dead.',
+  );
+  return lines.join('\n');
 }
 
 /**
@@ -151,8 +206,12 @@ function buildFlightCompanionMessages({ history, message, censusDoc }) {
       "You are the Flight Companion for this workspace — a friendly, up-to-speed colleague who " +
         "watches work in flight and talks it through with the human.",
       buildCensusSeedText(censusDoc),
-      "Use your tools (list_task_sessions, get_session, get_stack, and the rest of the read catalog) " +
-        "when you want more depth than the census above gives you. You may call send_follow_up to " +
+      "Use your tools when you want more depth than the census above gives you. For \"what is in " +
+        "flight?\" or \"what is stalled?\" call list_active_sessions, which returns one row per " +
+        "session with real session ids and task identifiers — not counts; for \"what needs me?\" " +
+        "call it with lane 'waiting', or call list_pending_decisions for the questions themselves. " +
+        "Then drill in with get_session, and reach for get_stack, list_task_sessions and the rest " +
+        "of the read catalog as needed. You may call send_follow_up to " +
         "reason about or request a follow-up on a session, but its write may not always execute " +
         "immediately — respect whatever the tool itself reports back.",
     ].join('\n\n'),
@@ -191,6 +250,11 @@ function buildFlightCompanionMessages({ history, message, censusDoc }) {
  *   `send_follow_up` write (LIN-1073). Wired in server.js §A.12.
  * @param {Object} [deps.agentStatusStore] - the other session read-model dep.
  *   Wired in server.js §A.12.
+ * @param {Object} [deps.taskDecisionsStore] - LIN-2617: scan-produced decisions,
+ *   one of `list_pending_decisions`' three inputs. Wired in server.js §A.12.
+ * @param {Object} [deps.shelvedRulingsStore] - LIN-2617: shelved rulings
+ *   (LIN-1727), the input whose absence would resurface a decision a human
+ *   deliberately shelved. Wired in server.js §A.12.
  * @param {Object} [deps.proxyTokenStore] - LIN-1431 bootstrap-token provisioning
  *   for an `execute`-mode follow-up resuming a claude-code session. Optional,
  *   same as Task Chat's own wiring — absence degrades cleanly
@@ -237,6 +301,11 @@ export function createFlightCompanionRoutes({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore,
   freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
   dispatchQueueStore, agentStatusStore, proxyTokenStore,
+  // LIN-2617: the two extra inputs `list_pending_decisions` needs to return the
+  // same rows the rulings feed returns. Optional, like every other store here —
+  // absent, that ONE tool reports "not configured" and the rest of the catalog
+  // is untouched.
+  taskDecisionsStore, shelvedRulingsStore,
   chatClient = { streamChat: defaultStreamChat, streamChatWithTools: defaultStreamChatWithTools },
   createToolCatalog = defaultCreateChatToolCatalog,
 }) {
@@ -512,6 +581,13 @@ export function createFlightCompanionRoutes({
           dispatchedBy: req.session?.accountId || null,
           workspacePreferencesStore,
           proxyTokenStore,
+          // LIN-2617: `list_pending_decisions`' other two inputs, plus the loop
+          // shaper both rulings feeds already apply. `enrichLoop` is imported
+          // here (a route may reach into routes/) and injected, so lib/chat-tools.js
+          // itself never imports from routes/.
+          taskDecisionsStore,
+          shelvedRulingsStore,
+          enrichLoop,
           baseUrl: `${req.protocol}://${req.get('host')}`,
         });
         const executeTool = async (call) => {
