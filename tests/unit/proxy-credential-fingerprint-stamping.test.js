@@ -37,11 +37,17 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROXY_SRC = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
+// LIN-679 Stage 4 (LIN-2538): group F's 7 direct sites (stack, prompt,
+// recommend, recap x2, brief x2) moved to their own sub-router. The
+// remaining 2 (autopilot/kickoff, recommend-and-dispatch) stay in
+// routes/proxy.js until Stages 5/6 land — three-way split, part 1 of 3.
+const PROXY_COMPUTE_SRC = readFileSync(join(__dirname, '../../routes/proxy-compute.js'), 'utf8');
 
-// The 9 direct call sites, named by the endpoint tag their own
-// workspaceUnavailable(...) call passes — a stable, human-readable anchor
-// that survives line-number drift. Order matches the plan's own enumeration.
-const DIRECT_SITE_ENDPOINTS = [
+// The 7 direct call sites that moved to routes/proxy-compute.js, named by
+// the endpoint tag their own workspaceUnavailable(...) call passes — a
+// stable, human-readable anchor that survives line-number drift. Order
+// matches the plan's own enumeration.
+const COMPUTE_SITE_ENDPOINTS = [
   '/api/proxy/stack',
   '/api/proxy/prompt',
   '/api/proxy/recommend',
@@ -49,6 +55,11 @@ const DIRECT_SITE_ENDPOINTS = [
   '/api/proxy/recap', // POST (recap appears twice — see the dedicated test below)
   '/api/proxy/brief', // GET
   '/api/proxy/brief', // POST (brief appears twice — see the dedicated test below)
+];
+
+// The 2 direct call sites remaining in routes/proxy.js (group H kickoff,
+// group I recommend-and-dispatch) — not yet extracted (Stages 5/6).
+const PROXY_SITE_ENDPOINTS = [
   '/api/proxy/autopilot/kickoff',
   '/api/proxy/recommend-and-dispatch',
 ];
@@ -94,55 +105,78 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     // LIN-2044 routed all 9 of these sites onto resolveProviderAccess (passing `req`
     // as the third arg so ITS internal stamp, already pinned above, lands on this
     // request) and deleted the now-redundant manual stamp line at each site.
+    //
+    // LIN-679 Stage 4 (LIN-2538) — three-way split, part 1 of 3: 7 of the 9
+    // sites moved to routes/proxy-compute.js; the other 2 (group H kickoff,
+    // group I recommend-and-dispatch) stay in routes/proxy.js until Stages
+    // 5/6 land. Do NOT add an `expect 0 in routes/proxy.js` complement — the
+    // 2 remaining sites are expected here, not a regression.
     const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
-    const matches = PROXY_SRC.match(pattern) || [];
+    const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
+    const proxyMatches = PROXY_SRC.match(pattern) || [];
     assert.equal(
-      matches.length,
-      9,
-      `expected 9 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in this exact shape, found ${matches.length}. ` +
-      'A count below 9 means a site reverted to the pre-LIN-2044 raw resolveWorkspaceAccess(...) + manual-stamp shape ' +
-      '(losing both provider resolution and, if `req` is not threaded through, the request-scoped stamp); ' +
-      'a count above 9 means a NEW 10th direct site was added — update this pin\'s expected count only after also ' +
+      computeMatches.length,
+      7,
+      `expected 7 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in routes/proxy-compute.js, found ${computeMatches.length}.`
+    );
+    assert.equal(
+      proxyMatches.length,
+      2,
+      `expected 2 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites remaining in routes/proxy.js, found ${proxyMatches.length}. ` +
+      'A count below 2 means a site reverted to the pre-LIN-2044 raw resolveWorkspaceAccess(...) + manual-stamp shape, or moved out early; ' +
+      'a count above 2 means a NEW direct site was added — update this pin\'s expected counts only after also ' +
       'updating the "expected exactly 1" resolveWorkspaceAccess( count pinned in workspace-accesstoken-linear-egress-census.test.js.'
     );
   });
 
-  test('each of the 9 direct sites checks !accessToken immediately after the resolveProviderAccess(...) call, with nothing but the LIN-1980 comment between them — no logic can act on a request whose provider resolution failed before the guard has a chance to reject it', () => {
-    // Belt-and-braces on the ordering claim itself (not just presence): since
-    // resolveProviderAccess's own internal stamp (pinned above) completes before
-    // the `await` on its call site returns, the meaningful residual risk is a
-    // stray statement sneaking in BETWEEN the resolve call and its !accessToken
-    // guard that reads/uses accessToken (or anything else) before the guard can
-    // reject an unresolved credential — so assert nothing but the LIN-1980
-    // comment sits in that gap, for each of the 9 direct sites.
+  // Belt-and-braces on the ordering claim itself (not just presence): since
+  // resolveProviderAccess's own internal stamp (pinned above) completes before
+  // the `await` on its call site returns, the meaningful residual risk is a
+  // stray statement sneaking in BETWEEN the resolve call and its !accessToken
+  // guard that reads/uses accessToken (or anything else) before the guard can
+  // reject an unresolved credential — so assert nothing but the LIN-1980
+  // comment sits in that gap, for each of the 9 direct sites.
+  //
+  // LIN-679 Stage 4 (LIN-2538) — three-way split, part 1 of 3: run this check
+  // separately over routes/proxy-compute.js (7 sites) and routes/proxy.js (2
+  // sites remaining, group H kickoff + group I recommend-and-dispatch).
+  function assertOrderingGuard(source, expectedCount, label) {
     const resolveIdx = [];
     let cursor = 0;
     const needle = 'const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);';
     while (true) {
-      const idx = PROXY_SRC.indexOf(needle, cursor);
+      const idx = source.indexOf(needle, cursor);
       if (idx === -1) break;
       resolveIdx.push(idx);
       cursor = idx + needle.length;
     }
-    assert.equal(resolveIdx.length, 9);
+    assert.equal(resolveIdx.length, expectedCount, `expected ${expectedCount} direct sites in ${label}, found ${resolveIdx.length}`);
 
     for (const idx of resolveIdx) {
       // Bounded by the NEXT resolve site (or EOF) rather than a fixed char
       // count, so a comment of any length between the resolve call and its
       // guard can't produce a false "guard not found".
-      const nextResolveIdx = resolveIdx.find(other => other > idx) ?? PROXY_SRC.length;
-      const window = PROXY_SRC.slice(idx, Math.min(idx + 400, nextResolveIdx));
+      const nextResolveIdx = resolveIdx.find(other => other > idx) ?? source.length;
+      const window = source.slice(idx, Math.min(idx + 400, nextResolveIdx));
       const guardIdx = window.indexOf('if (!accessToken)');
-      assert.ok(guardIdx >= 0, `no !accessToken guard found shortly after the resolve site (offset ${idx})`);
+      assert.ok(guardIdx >= 0, `no !accessToken guard found shortly after the resolve site in ${label} (offset ${idx})`);
       const between = window.slice(needle.length, guardIdx);
       const strippedOfComments = between.replace(/\/\/[^\n]*/g, '').trim();
       assert.equal(strippedOfComments, '',
-        `unexpected non-comment code between the resolve call and its !accessToken guard (offset ${idx}): ${JSON.stringify(between)}`);
+        `unexpected non-comment code between the resolve call and its !accessToken guard in ${label} (offset ${idx}): ${JSON.stringify(between)}`);
     }
+  }
+
+  test('each of the 9 direct sites checks !accessToken immediately after the resolveProviderAccess(...) call, with nothing but the LIN-1980 comment between them — no logic can act on a request whose provider resolution failed before the guard has a chance to reject it', () => {
+    assertOrderingGuard(PROXY_COMPUTE_SRC, 7, 'routes/proxy-compute.js');
+    assertOrderingGuard(PROXY_SRC, 2, 'routes/proxy.js');
   });
 
-  test('endpoint coverage sanity: every endpoint tag this ticket\'s plan named for the 9 direct sites is actually present in routes/proxy.js', () => {
-    for (const endpoint of new Set(DIRECT_SITE_ENDPOINTS)) {
+  test('endpoint coverage sanity: every endpoint tag this ticket\'s plan named for the 9 direct sites is actually present in its own file', () => {
+    for (const endpoint of new Set(COMPUTE_SITE_ENDPOINTS)) {
+      assert.ok(PROXY_COMPUTE_SRC.includes(`'${endpoint}'`), `expected to find the endpoint tag '${endpoint}' in routes/proxy-compute.js`);
+    }
+    for (const endpoint of new Set(PROXY_SITE_ENDPOINTS)) {
       assert.ok(PROXY_SRC.includes(`'${endpoint}'`), `expected to find the endpoint tag '${endpoint}' in routes/proxy.js`);
     }
   });
