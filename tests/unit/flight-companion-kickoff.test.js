@@ -188,6 +188,29 @@ describe('LIN-2618: one shared brief, rendered into both surfaces', () => {
     assert.match(turn.content, /No new message from the human this tick/);
   });
 
+  test('a boot turn (LIN-2622) is told it is one, and told to ALWAYS speak — never the auto-wake silence rule', () => {
+    const out = buildFlightCompanionMessages({
+      history: [], message: 'Start', censusSeedText: 'CENSUS', turnKind: 'boot',
+      now: Date.parse('2026-09-05T12:00:00.000Z'),
+    });
+    const system = out[0];
+    assert.match(system.content, /just hit start/i);
+    assert.match(system.content, /always speak/i);
+    // The failure this guards against: falling through to the auto-wake
+    // wording would tell a human-started turn to stay silent.
+    assert.doesNotMatch(system.content, /a check-in tick — nobody typed/i);
+    // The readout shape (headline block + the seven ordered headings) is the
+    // shared section, unchanged for a boot — no new slot needed there.
+    assert.match(system.content, /mandatory headline block/i);
+    let cursor = -1;
+    for (const heading of COMPANION_READOUT_HEADINGS) {
+      const at = system.content.indexOf(heading);
+      assert.ok(at > -1, `readout heading missing on a boot turn: ${heading}`);
+      assert.ok(at > cursor, `readout heading out of order on a boot turn: ${heading}`);
+      cursor = at;
+    }
+  });
+
   test('the playbook slot is omitted when empty and rendered when filled (LIN-2625)', () => {
     const without = buildFlightCompanionMessages({ history: [], censusSeedText: 'CENSUS' })[0].content;
     assert.doesNotMatch(without, /## Playbook/);

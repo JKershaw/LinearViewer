@@ -15,7 +15,7 @@ import { test, describe, mock } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { runFlightCompanionTurn, sumUsage } from '../../lib/flight-companion-turn.js';
-import { buildTurnRecords, COMPANION_SEED_STATE } from '../../lib/flight-companion-gate.js';
+import { buildTurnRecords, buildCompanionSnapshot, deriveReservationLeaseMs, COMPANION_SEED_STATE } from '../../lib/flight-companion-gate.js';
 import { streamChat, streamChatWithTools, setLlmCallRecorder } from '../../lib/openrouter.js';
 import { CHAT_TOOL_RESULT_BUDGETS } from '../../lib/chat-tools.js';
 
@@ -824,5 +824,113 @@ describe('LIN-2625: playbook memory', () => {
     assert.ok(capturedMessages[0].content.includes('browser playbook'));
     // And no write of any kind was attempted against either instance key.
     assert.strictEqual(store.advances.length, 0);
+  });
+});
+
+// LIN-2622 beat 2: the boot turn's seam. A boot skips shouldSpendTurn's
+// refusal chain (no-census/hash-identical/floor/no-delta) — a human asked for
+// this turn — but not the reservation protocol: it calls buildTurnRecords
+// DIRECTLY, exactly the shared record producer LIN-2631 extracted for this.
+// The adversarial set (boot-vs-auto-wake race, commit-only-after-done,
+// no-commit-on-error/disconnect, the propose->execute mutation witness) is
+// beat 3 and deliberately not pulled forward here.
+describe('LIN-2622: the boot turn reserves via buildTurnRecords directly', () => {
+  test('a boot turn reserves BEFORE the model call, with a lease derived from its OWN budget', async () => {
+    const store = fakeStore({ census: censusDoc() });
+    const order = [];
+    const originalAdvance = store.advance.bind(store);
+    store.advance = async (...args) => { order.push('advance'); return originalAdvance(...args); };
+
+    const out = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'boot', message: 'Start', apiKey: 'sk-test',
+      followUpMode: 'propose', budget: { maxIterations: 5, maxTokens: 2500 },
+      onEvent: () => {},
+      deps: baseDeps(store, {
+        async streamChat(_m, o, onEvent) { order.push('model'); onEvent('done', {}); },
+        async streamChatWithTools(_m, o, onEvent) { order.push('model'); onEvent('done', {}); },
+      }),
+    });
+
+    assert.strictEqual(out.spent, true);
+    // The commit write (a THIRD 'advance', after 'done') trails these two —
+    // sliced off here since this test is about ordering the RESERVATION
+    // ahead of the model call, not about how many advances a full turn makes.
+    assert.deepStrictEqual(order.slice(0, 2), ['advance', 'model'], 'the reservation must be written before the model call runs');
+
+    const reserveAdvance = store.state.advances.find((a) => a.meta?.reason === 'flight-companion-turn');
+    assert.ok(reserveAdvance, 'expected exactly one reservation write, keyed the same as the auto-wake path');
+    // deriveReservationLeaseMs(5) off the boot's own budget, never the
+    // default (auto-wake calls this with NO explicit maxIterations, which
+    // would derive a different lease for a smaller budget).
+    const expectedUntil = new Date(baseDeps(store).now() + deriveReservationLeaseMs(5)).toISOString();
+    assert.strictEqual(reserveAdvance.record.turnReservedUntil, expectedUntil);
+  });
+
+  test('a boot turn still spends against a hash-identical census — auto-wake would refuse it, boot must not', async () => {
+    const census = censusDoc('same-hash');
+    const companionState = {
+      v: 1,
+      lastCensusStateHash: 'same-hash',
+      lastCensusSnapshot: buildCompanionSnapshot(census),
+      lastTurnAt: new Date(1_699_000_000_000).toISOString(),
+      turnReservedUntil: null,
+      reservationId: null,
+      notes: '',
+    };
+    const store = fakeStore({ census, companionState });
+
+    // Sanity check: the SAME store/census would refuse an auto-wake turn.
+    const autoWakeOut = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'auto-wake', apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: baseDeps(store, scriptedClient([['done', {}]])),
+    });
+    assert.strictEqual(autoWakeOut.spent, false);
+    assert.strictEqual(autoWakeOut.reason, 'hash-identical');
+
+    // A fresh store (the auto-wake call above may have touched nothing, but
+    // isolate anyway) for the actual boot assertion.
+    const bootStore = fakeStore({ census, companionState });
+    const out = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'boot', message: 'Start', apiKey: 'sk-test',
+      followUpMode: 'propose', budget: { maxIterations: 5, maxTokens: 2500 },
+      onEvent: () => {},
+      deps: baseDeps(bootStore, scriptedClient([['done', {}]])),
+    });
+    assert.strictEqual(out.spent, true, 'a boot must not be refused by hash-identical, unlike auto-wake');
+    const reservationAdvances = bootStore.state.advances.filter((a) => a.meta?.reason === 'flight-companion-turn');
+    assert.strictEqual(reservationAdvances.length, 1, 'the reservation must still be written, not skipped');
+  });
+
+  test('a boot turn with no sweep yet skips reservation entirely rather than calling buildTurnRecords blind', async () => {
+    const store = fakeStore({ census: null });
+    const out = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'boot', message: 'Start', apiKey: 'sk-test',
+      followUpMode: 'propose', budget: { maxIterations: 5, maxTokens: 2500 },
+      onEvent: () => {},
+      deps: baseDeps(store, scriptedClient([['done', {}]])),
+    });
+    assert.strictEqual(out.spent, true, 'a boot with no sweep yet must still orient (the model call still runs)');
+    assert.strictEqual(store.state.advances.length, 0, 'nothing to reserve against — no advance call at all');
+  });
+
+  test('the boot turn\'s own budget (maxTokens 2500) reaches the model call', async () => {
+    const store = fakeStore({ census: censusDoc() });
+    let capturedOptions = null;
+    const out = await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'boot', message: 'Start', apiKey: 'sk-test',
+      followUpMode: 'propose', budget: { maxIterations: 5, maxTokens: 2500 },
+      onEvent: () => {},
+      deps: baseDeps(store, {
+        async streamChat(_m, o, onEvent) { capturedOptions = o; onEvent('done', {}); },
+        async streamChatWithTools(_m, o, onEvent) { capturedOptions = o; onEvent('done', {}); },
+      }),
+    });
+    assert.strictEqual(out.spent, true);
+    assert.ok(capturedOptions);
+    assert.strictEqual(capturedOptions.maxTokens, 2500);
+    if ('maxIterations' in capturedOptions) {
+      assert.strictEqual(capturedOptions.maxIterations, 5);
+    }
   });
 });
