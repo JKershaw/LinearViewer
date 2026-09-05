@@ -2499,7 +2499,13 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 // LIN-2432 §A.12: mirrors createTaskChatRoutes' set above, minus savedChatStore
 // (§A.11/LIN-2437's own concern — see routes/flight-companion.js's JSDoc for why
 // it is deliberately not threaded here yet).
-app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore }))
+// LIN-2617 adds taskDecisionsStore + shelvedRulingsStore, the two inputs the
+// `list_pending_decisions` chat tool needs to return the same rows the rulings
+// feed returns. NOT threaded into createTaskChatRoutes above: that route file is
+// outside this change's file carve (passage LIN-2636 leg 01), so Task Chat keeps
+// the clean "not configured" degradation for that one tool until a follow-up
+// wires it. Every other tool in the shared catalog is unaffected there.
+app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))

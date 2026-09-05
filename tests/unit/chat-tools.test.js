@@ -10,11 +10,15 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, deriveFollowUpDispatch } from '../../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, deriveFollowUpDispatch, projectActiveSession } from '../../lib/chat-tools.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
 import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
-import { getSessionsForWorkspace } from '../../lib/pipeline-loops.js';
+import { getSessionsForWorkspace, getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
+import { classifyLoop } from '../../lib/observer-sweep.js';
+import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
+import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
+import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
 
 // A recording fake of the pass-1 provider read surface. Every method records
 // the scope it was called with so tests can assert workspace-scoping, and
@@ -89,7 +93,8 @@ describe('CHAT_TOOL_SCHEMAS', () => {
     const names = CHAT_TOOL_SCHEMAS.map(t => t.function.name).sort();
     assert.deepStrictEqual(names, [
       'get_brief', 'get_children_status', 'get_comments', 'get_history', 'get_recap',
-      'get_relations', 'get_session', 'get_stack', 'list_task_sessions', 'lookup_task',
+      'get_relations', 'get_session', 'get_stack', 'list_active_sessions',
+      'list_pending_decisions', 'list_task_sessions', 'lookup_task',
       'search_tasks',
     ]);
   });
@@ -124,14 +129,21 @@ describe('CHAT_TOOL_SCHEMAS', () => {
   });
 });
 
-describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073)', () => {
-  test('grants only get_comments and get_session a larger-than-default budget', () => {
-    // Additive map: get_comments and get_session (full transcript, LIN-1073) are
-    // the ONLY overrides, each strictly larger than the global default.
-    assert.deepStrictEqual(Object.keys(CHAT_TOOL_RESULT_BUDGETS).sort(), ['get_comments', 'get_session']);
+describe('CHAT_TOOL_RESULT_BUDGETS (LIN-1065, LIN-1073, LIN-2617)', () => {
+  test('grants only the row-list and transcript tools a larger-than-default budget', () => {
+    // Additive map: get_comments, get_session (full transcript, LIN-1073) and the
+    // two LIN-2617 fleet-wide row lists are the ONLY overrides, each strictly
+    // larger than the global default.
+    assert.deepStrictEqual(Object.keys(CHAT_TOOL_RESULT_BUDGETS).sort(), [
+      'get_comments', 'get_session', 'list_active_sessions', 'list_pending_decisions',
+    ]);
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments > TOOL_RESULT_MAX_CHARS);
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_comments >= 10000, 'within the recommended ~10-12k range');
     assert.ok(CHAT_TOOL_RESULT_BUDGETS.get_session > TOOL_RESULT_MAX_CHARS);
+    // LIN-2617: sized so twenty rows fit without truncation — a clipped row list
+    // is a silently wrong answer to "what is in flight?", not a shorter one.
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_active_sessions >= 12000);
+    assert.ok(CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions >= 12000);
   });
 
   test('does NOT override any other tool, so they keep the 4000 default', () => {
@@ -1480,5 +1492,360 @@ describe('read-only invariant', () => {
   test('send_follow_up (LIN-1073) is the sole, deliberate exception — kept out of CHAT_TOOL_SCHEMAS', () => {
     assert.strictEqual(FOLLOW_UP_TOOL_SCHEMA.function.name, 'send_follow_up');
     assert.ok(!CHAT_TOOL_SCHEMAS.includes(FOLLOW_UP_TOOL_SCHEMA));
+  });
+});
+
+// ─── Pass-4 (LIN-2617): the fleet-wide reads ─────────────────────────────────
+
+const T_FLEET_OLD = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
+const T_FLEET_MID = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+const T_FLEET_FRESH = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+// A fleet with one of each thing the tool has to get right: a session still
+// moving, a session parked on a human, a finished session, and a bare `wake`
+// loop that — with no sessionId and no followUpTo — would otherwise surface as
+// its own session row via `_buildSessions`' standalone pass.
+function fleetHistory() {
+  return [
+    sessionHistoryItem({
+      id: 'sess-working', kind: 'autopilot', issueIdentifier: 'LIN-700', target: 'cli',
+      dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+      feedback: [{ message: '[working] 3 tools/12s · alive', timestamp: T_FLEET_FRESH }],
+    }),
+    sessionHistoryItem({
+      id: 'sess-blocked', kind: 'autopilot', issueIdentifier: 'LIN-701', target: 'cli',
+      dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+      feedback: [{ message: '[blocked] Needs a ruling on the merge order', timestamp: T_FLEET_MID }],
+    }),
+    sessionHistoryItem({
+      id: 'sess-finished', kind: 'autopilot', issueIdentifier: 'LIN-702', target: 'cli',
+      dispatchedAt: T_FLEET_OLD, resolvedAt: T_FLEET_MID, status: 'taken',
+      feedback: [{ message: '[done] Task completed in 9s', timestamp: T_FLEET_MID }],
+    }),
+    sessionHistoryItem({
+      id: 'wake-loose', kind: 'wake', issueIdentifier: 'LIN-703', target: 'cli',
+      dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+      feedback: [{ message: '[working] re-waking held session', timestamp: T_FLEET_MID }],
+    }),
+  ];
+}
+
+function makeFleetCatalog(history) {
+  const stores = makeMockSessionStores({ history });
+  const { executeTool } = createChatToolCatalog({
+    provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+    dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+    sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
+  });
+  return { executeTool, stores };
+}
+
+describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
+  test('folds a bare wake loop into noise instead of emitting it as a session row', async () => {
+    const { executeTool } = makeFleetCatalog(fleetHistory());
+    const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+
+    // The wake loop DID reconstruct into its own standalone session (that is
+    // `_buildSessions`' pass-3 behaviour, not something this tool controls) —
+    // the tool is what must decline to report it as work.
+    assert.strictEqual(
+      result.sessions.some(r => r.sessionId === 'wake-loose'), false,
+      'a wake loop must never be its own row'
+    );
+    assert.strictEqual(result.noise.wakeLoopsFolded, 1);
+    // ...and the fold is not achieved by dropping the fleet: the three real
+    // sessions all survive it.
+    assert.deepStrictEqual(
+      result.sessions.map(r => r.sessionId).sort(),
+      ['sess-blocked', 'sess-finished', 'sess-working']
+    );
+  });
+
+  test('session lanes agree with classifyLoop on the same fixture, folded to the lineage tail', async () => {
+    const history = fleetHistory();
+    const { executeTool, stores } = makeFleetCatalog(history);
+    const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+
+    // Re-derive the expectation through the IMPORTED classifier with the same
+    // two inputs the sweep passes it. A hand-rolled lane rule in the tool
+    // diverges from this and fails.
+    const sessions = await getSessionsForWorkspace(URL_KEY, {
+      dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+    });
+    const superseded = computeSupersededLoopIds(sessions.flatMap(s => s.loops || []));
+    const now = Date.now();
+
+    assert.ok(result.sessions.length > 0);
+    for (const row of result.sessions) {
+      const session = sessions.find(s => s.sessionId === row.sessionId);
+      const workLoops = (session.loops || []).filter(l => l.kind !== 'wake');
+      // Single-loop sessions here, so the lineage tail is the loop itself.
+      assert.strictEqual(workLoops.length, 1, `${row.sessionId} fixture is single-loop`);
+      assert.strictEqual(
+        row.lifecycle,
+        classifyLoop(workLoops[0], { superseded, now, staleMs: DEFAULT_LANE_STALE_MS }),
+        `${row.sessionId} lane must be classifyLoop's, not a second opinion`
+      );
+    }
+
+    // And the fixture really does exercise more than one lane, so the agreement
+    // above is not vacuously true.
+    const lanes = new Set(result.sessions.map(r => r.lifecycle));
+    assert.ok(lanes.size >= 2, `expected several lanes, got ${[...lanes].join(',')}`);
+  });
+
+  test('the default read omits finished sessions and counts them as noise; lane:all keeps them', async () => {
+    const { executeTool } = makeFleetCatalog(fleetHistory());
+
+    const dflt = await executeTool({ name: 'list_active_sessions', arguments: {} });
+    assert.strictEqual(dflt.sessions.some(r => r.sessionId === 'sess-finished'), false);
+    assert.strictEqual(dflt.noise.terminalOmitted, 1);
+
+    const all = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+    assert.strictEqual(all.sessions.some(r => r.sessionId === 'sess-finished'), true);
+  });
+
+  test('rows carry real ids and a waiting-on-human flag, sorted by last activity descending', async () => {
+    const { executeTool } = makeFleetCatalog(fleetHistory());
+    const result = await executeTool({ name: 'list_active_sessions', arguments: {} });
+
+    const blocked = result.sessions.find(r => r.sessionId === 'sess-blocked');
+    assert.strictEqual(blocked.lifecycle, 'blocked');
+    assert.strictEqual(blocked.waitingOnHuman, true);
+    assert.strictEqual(blocked.seedIssue, 'LIN-701');
+    assert.deepStrictEqual(blocked.tasksTouched, ['LIN-701']);
+    assert.strictEqual(blocked.kind, 'autopilot');
+    assert.strictEqual(blocked.latestMarker, 'blocked');
+    assert.match(blocked.latestFeedback, /Needs a ruling on the merge order/);
+    assert.strictEqual(blocked.runCount, 1);
+
+    const working = result.sessions.find(r => r.sessionId === 'sess-working');
+    assert.strictEqual(working.waitingOnHuman, false);
+
+    const stamps = result.sessions.map(r => r.lastActivityAt);
+    assert.deepStrictEqual(stamps, [...stamps].sort().reverse(), 'sorted by lastActivityAt desc');
+  });
+
+  test('the lane filter is validated, and the read needs its stores', async () => {
+    const { executeTool } = makeFleetCatalog(fleetHistory());
+    await assert.rejects(
+      () => executeTool({ name: 'list_active_sessions', arguments: { lane: 'terminal' } }),
+      /lane/
+    );
+
+    const { executeTool: unconfigured } = createChatToolCatalog({
+      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+    });
+    await assert.rejects(
+      () => unconfigured({ name: 'list_active_sessions', arguments: {} }),
+      /not configured/
+    );
+  });
+
+  test('projectActiveSession is exported and pure, so LIN-1951 reuses this shape', () => {
+    const row = projectActiveSession(
+      {
+        sessionId: 's1', seedIssue: 'LIN-9', tasksTouched: ['LIN-9'], dispatchedAt: T_FLEET_MID,
+        loops: [{
+          loopId: 's1', kind: 'autopilot', dispatchedAt: T_FLEET_MID, agentState: 'running',
+          terminalStatus: null, wakeMarker: null, feedback: [{ message: 'hello', timestamp: T_FLEET_MID }],
+        }],
+      },
+      { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS }
+    );
+    assert.deepStrictEqual(Object.keys(row).sort(), [
+      'dispatchedAt', 'kind', 'lastActivityAt', 'latestFeedback', 'latestMarker', 'lifecycle',
+      'parentSessionId', 'runCount', 'seedIssue', 'sessionId', 'tasksTouched', 'waitingOnHuman',
+    ]);
+    assert.strictEqual(row.latestFeedback, 'hello');
+  });
+});
+
+function decisionEntry(id, question, timestamp) {
+  return {
+    kind: 'decision',
+    timestamp,
+    message: `[decision] ${JSON.stringify({
+      decision_id: id,
+      question,
+      options: [{ id: 'a', label: 'Merge now' }, { id: 'b', label: 'Hold for the witness' }],
+      recommended: 'b',
+    })}`,
+  };
+}
+
+// One of each of the predicate's three inputs, exactly as the acceptance names
+// them: a dispatch-loop decision, a task-bound decision, and a decision that is
+// actively shelved (which must NOT come back).
+function decisionsFixture() {
+  const history = [
+    sessionHistoryItem({
+      id: 'sess-dec', kind: 'autopilot', issueIdentifier: 'LIN-800', target: 'cli',
+      dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+      feedback: [
+        { message: '[blocked] waiting on a ruling', timestamp: T_FLEET_OLD },
+        decisionEntry('dec-loop', 'Merge PR #219 before or after the witness?', T_FLEET_OLD),
+      ],
+    }),
+    sessionHistoryItem({
+      id: 'sess-shelved', kind: 'autopilot', issueIdentifier: 'LIN-801', target: 'cli',
+      dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken',
+      feedback: [
+        { message: '[blocked] parked', timestamp: T_FLEET_MID },
+        decisionEntry('dec-shelved', 'Should we rename the flag?', T_FLEET_MID),
+      ],
+    }),
+  ];
+  const taskDecisions = [{
+    id: 'td-1', urlKey: URL_KEY, issueId: 'uuid-802', issueIdentifier: 'LIN-802',
+    scannedAt: T_FLEET_FRESH, outcome: null,
+    decision: {
+      decision_id: 'dec-task',
+      question: 'This ticket has two conflicting acceptance criteria — which holds?',
+      options: [{ id: 'a', label: 'The description' }, { id: 'b', label: 'The review comment' }],
+      recommended: 'b',
+    },
+  }];
+  const shelvedRulings = [{
+    urlKey: URL_KEY, decisionId: 'dec-shelved',
+    resurfaceAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    lapseCount: 1,
+  }];
+  return { history, taskDecisions, shelvedRulings };
+}
+
+function makeDecisionsCatalog({ history, taskDecisions, shelvedRulings }) {
+  const stores = makeMockSessionStores({ history });
+  const { executeTool } = createChatToolCatalog({
+    provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+    dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+    sessionIsTerminal: () => false,
+    taskDecisionsStore: { async listUnansweredForWorkspaces() { return taskDecisions; } },
+    shelvedRulingsStore: { async listForWorkspaces() { return shelvedRulings; } },
+  });
+  return { executeTool, stores };
+}
+
+describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
+  test('returns exactly the rows the rulings feed returns for the same three inputs', async () => {
+    const fixture = decisionsFixture();
+    const { executeTool, stores } = makeDecisionsCatalog(fixture);
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+
+    // The feed's own call, on the same inputs — not a hand-written expectation.
+    // If this tool ever grows a second classifier, the two diverge here.
+    const rawLoops = await getLoopsForWorkspace(URL_KEY, {
+      dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore, lean: true,
+    });
+    const loops = rawLoops.map(l => ({ ...l, workspaceUrlKey: URL_KEY }));
+    const feedRows = collectUnansweredDecisions(
+      { loops, taskDecisions: fixture.taskDecisions, shelvedRulings: fixture.shelvedRulings },
+      { now: new Date() }
+    );
+
+    assert.deepStrictEqual(
+      result.decisions.map(d => d.decisionId).sort(),
+      feedRows.map(r => r.decision.decision_id).sort()
+    );
+    assert.strictEqual(result.count, feedRows.length);
+  });
+
+  test('an actively shelved ruling stays out, and a shelve is what keeps it out', async () => {
+    const fixture = decisionsFixture();
+
+    const withShelf = await (await makeDecisionsCatalog(fixture)).executeTool(
+      { name: 'list_pending_decisions', arguments: {} }
+    );
+    assert.strictEqual(withShelf.decisions.some(d => d.decisionId === 'dec-shelved'), false);
+
+    // Drop the shelf row and the same decision reappears — so the exclusion is
+    // the shelvedRulings input doing its job, not the fixture being empty.
+    const noShelf = await (await makeDecisionsCatalog({ ...fixture, shelvedRulings: [] })).executeTool(
+      { name: 'list_pending_decisions', arguments: {} }
+    );
+    assert.strictEqual(noShelf.decisions.some(d => d.decisionId === 'dec-shelved'), true);
+  });
+
+  test('rows carry the question, options and recommendation, oldest first', async () => {
+    const { executeTool } = makeDecisionsCatalog(decisionsFixture());
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+
+    const loopRow = result.decisions.find(d => d.decisionId === 'dec-loop');
+    assert.strictEqual(loopRow.issueIdentifier, 'LIN-800');
+    assert.strictEqual(loopRow.sessionId, 'sess-dec');
+    assert.match(loopRow.question, /Merge PR #219/);
+    assert.deepStrictEqual(loopRow.options.map(o => o.id), ['a', 'b']);
+    assert.strictEqual(loopRow.recommended, 'b');
+    assert.strictEqual(loopRow.canReply, true);
+    assert.ok(loopRow.since, 'a parked-since lower bound is reported');
+
+    const taskRow = result.decisions.find(d => d.decisionId === 'dec-task');
+    assert.strictEqual(taskRow.disposition, 'task-bound');
+    assert.strictEqual(taskRow.sessionId, null, 'a task decision has no run behind it');
+
+    // Oldest first: the loop decision (5h) precedes the task scan (10m).
+    const order = result.decisions.map(d => d.decisionId);
+    assert.ok(order.indexOf('dec-loop') < order.indexOf('dec-task'), `got ${order.join(',')}`);
+  });
+
+  test('fails cleanly as not-configured when the shelved-rulings store is absent', async () => {
+    const stores = makeMockSessionStores({ history: decisionsFixture().history });
+    const { executeTool } = createChatToolCatalog({
+      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+      taskDecisionsStore: { async listUnansweredForWorkspaces() { return []; } },
+    });
+    // Without it, a decision a human deliberately shelved would resurface — so
+    // this degrades to "not configured" rather than to a wrong answer.
+    await assert.rejects(
+      () => executeTool({ name: 'list_pending_decisions', arguments: {} }),
+      /not configured/
+    );
+  });
+
+  test('is read-only: it never answers or dismisses, and calls no store method that could', async () => {
+    const fixture = decisionsFixture();
+    const calls = [];
+    const stores = makeMockSessionStores({ history: fixture.history });
+    const { executeTool } = createChatToolCatalog({
+      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+      taskDecisionsStore: new Proxy({
+        async listUnansweredForWorkspaces() { return fixture.taskDecisions; },
+      }, { get(t, k) { calls.push(String(k)); return t[k]; } }),
+      shelvedRulingsStore: new Proxy({
+        async listForWorkspaces() { return fixture.shelvedRulings; },
+      }, { get(t, k) { calls.push(String(k)); return t[k]; } }),
+    });
+    await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    assert.deepStrictEqual(
+      [...new Set(calls)].sort(), ['listForWorkspaces', 'listUnansweredForWorkspaces'],
+      'only the two list reads — never markDecisionAnswered/dismiss/shelve'
+    );
+  });
+});
+
+describe('pass-4 fleet reads — partial lists say so (LIN-2617)', () => {
+  test('a capped list reports the full matching count AND flags itself truncated', async () => {
+    const { executeTool } = makeFleetCatalog(fleetHistory());
+    const capped = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all', limit: 1 } });
+    // Quoting `count` must stay safe: it is the fleet total, not the row count.
+    assert.strictEqual(capped.count, 3);
+    assert.strictEqual(capped.sessions.length, 1);
+    assert.strictEqual(capped.truncated, true);
+
+    const whole = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+    assert.strictEqual(whole.truncated, false);
+  });
+
+  test('the decisions list flags truncation the same way', async () => {
+    const { executeTool } = makeDecisionsCatalog(decisionsFixture());
+    const capped = await executeTool({ name: 'list_pending_decisions', arguments: { limit: 1 } });
+    assert.strictEqual(capped.count, 2);
+    assert.strictEqual(capped.decisions.length, 1);
+    assert.strictEqual(capped.truncated, true);
+    // Oldest-first survives the cap: the longest-parked decision is the one
+    // that must not be truncated away.
+    assert.strictEqual(capped.decisions[0].decisionId, 'dec-loop');
   });
 });
