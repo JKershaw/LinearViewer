@@ -867,6 +867,29 @@ describe('lean projection (LIN-622)', () => {
     }
   });
 
+  // T16 (LIN-2653): the fossil-bookkeeping stamp rides the always-present
+  // scalar set beside historyStatus (lib/pipeline-loops.js:763), same as
+  // agentTokenId/agentTokenLabel just above — it must survive the lean drop
+  // the 60s observer sweep uses, not just the full read-summary path.
+  test('_buildLoops carries `bookkeeping` on every loop (lean and default, LIN-2653)', () => {
+    const stamp = { at: '2026-04-10T09:00:00.000Z', by: 'operator-1', reason: 'fossil pass' };
+    const hist = historyItem({ id: 'h-stamped', bookkeeping: stamp });
+    const full = _buildLoops({ historyItems: [hist], now: NOW });
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    for (const [label, loop] of [['default', full[0]], ['lean', lean[0]]]) {
+      assert.deepStrictEqual(loop.bookkeeping, stamp, `${label}: bookkeeping`);
+    }
+  });
+
+  test('_buildLoops carries `bookkeeping: null` for an unstamped row (lean and default)', () => {
+    const hist = historyItem({ id: 'h-unstamped' });
+    const full = _buildLoops({ historyItems: [hist], now: NOW });
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    for (const [label, loop] of [['default', full[0]], ['lean', lean[0]]]) {
+      assert.strictEqual(loop.bookkeeping, null, `${label}: bookkeeping`);
+    }
+  });
+
   test('_buildLoops pre-derives wakeMarker + waitingMessage for a [blocked] run (LIN-1005, lean and default)', () => {
     const blockedFeedback = [
       { message: '[working] 3 tools/12s · alive', timestamp: '2026-04-10T10:20:00.000Z' },
