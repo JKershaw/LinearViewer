@@ -1723,9 +1723,45 @@ a.wordmark:hover {
     gap: var(--space-2) 1ch;
   }
 
+  /* LIN-2551 — the mobile density budget for the filter strip.
+     LIN-2527's 4th item (assignee) took `.nav-filters` from one row to three
+     at every swept width (360/390/412/430). The 3-item strip fitted on one
+     row with only a few px to spare, so the 4th item tipped an already-thin
+     budget rather than introducing the fragility — which is why the fix is a
+     budget, not a rewrite. The four knobs below buy the room back WITHOUT
+     removing information: every label and value still renders, and nothing
+     above 640px changes. Pinned by the LIN-2551 block in
+     tests/e2e/header-nav.spec.js, which measures the strip's rendered height
+     with a real assignee SELECTED — the default `all`/`all` state is ~40px
+     cheaper and a budget tuned against it passes while the real one wraps.
+
+     `flex-wrap` is deliberately KEPT as the safety valve below this range.
+     Making the row structurally unwrappable (`nowrap`) was tried and
+     rejected twice over: on its own it pushes the last selector past the
+     viewport edge, where the root's `overflow-x: clip` leaves it unreachable
+     with no scrollbar to reveal it; and constraining the row enough to stop
+     that shrinks the values away to nothing, so the row "fits" only by hiding
+     what it is showing. Both failure modes are worse than the wrap, and both
+     are now pinned by their own tests. Getting to one row at ANY width would
+     mean dropping the labels or the brand on mobile — a design call, not a
+     budget one. */
   .nav-filters {
     flex-direction: row;
-    gap: 1.5ch;
+    gap: 1ch;
+  }
+
+  /* Labels are the strip's largest fixed cost (~147px of its ~395px at 360px)
+     and the part that cannot truncate, so a step down here buys the most room
+     for the least loss. */
+  .nav-label {
+    font-size: 0.8em;
+  }
+
+  /* The flex `gap` above already separates the brand from the first selector;
+     the base rule's extra margin is a second separator paid for twice. */
+  .wordmark-nav {
+    margin-right: 0;
+    font-size: 0.85em;
   }
 
   .nav-actions {
@@ -1736,6 +1772,8 @@ a.wordmark:hover {
     min-height: 44px;
     display: flex;
     align-items: center;
+    /* Label-to-value spacing, tightened from the base 0.5ch (LIN-2551). */
+    gap: 0.25ch;
   }
 
   /* Landing/preview auth links (Sign in / GitHub / Jira, .nav-action.login):
@@ -1749,7 +1787,9 @@ a.wordmark:hover {
   }
 
   .nav-value {
-    max-width: 12ch;
+    /* Tightened from 12ch (LIN-2551). Only the workspace name is long enough
+       to reach this cap in practice; team/assignee values sit under it. */
+    max-width: 8ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1941,11 +1981,11 @@ a.wordmark:hover {
 
   /* Tighter nav spacing on very small phones */
   .nav-filters {
-    gap: 1ch;
+    gap: 0.75ch;
   }
 
   .nav-value {
-    max-width: 10ch;
+    max-width: 7ch;
   }
 }
 

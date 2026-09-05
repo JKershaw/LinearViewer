@@ -635,24 +635,12 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
   });
 
   for (const width of MOBILE_SWEEP_WIDTHS) {
-    // KNOWN GAP, not silently dropped (LIN-2527 AC5 asked for a "no
-    // .nav-primary-row wrap" assertion here too — deliberately NOT included).
-    // Measured directly: at 390px with the default 'Test Workspace' session
-    // name, `.nav-filters` alone (wordmark + workspace + team + assignee)
-    // already needs ~393px against a ~366px available row width, so
-    // `.nav-actions` (the search toggle) wraps to its own line. The pre-
-    // existing 3-item case (team only, no assignee) was ALREADY at ~4px of
-    // margin at the same width — this ticket's 4th item tips a genuinely
-    // fragile pre-existing layout over, it doesn't introduce the fragility.
-    // Fixing it is a public/style.css layout change (`.nav-value` mobile
-    // truncation / `.nav-primary-row` wrap behavior) outside this lane's
-    // declared file carve (lib/tree.js, server.js, lib/components/navbar.js,
-    // public/common.js, lib/render.js, tests/fixtures/local-harness.js) and
-    // with real blast radius on OTHER pinned mobile-density specs in this
-    // same file (LIN-1058/1286/2179) — not something to touch speculatively.
-    // Asserting item COUNT below is still real, valuable coverage; the wrap
-    // question is left an open, honestly-flagged finding rather than a faked
-    // pass or a silently dropped check.
+    // The wrap question this sweep deliberately left open (LIN-2527 AC5's "no
+    // .nav-primary-row wrap" assertion) is now CLOSED by the LIN-2551 block
+    // at the bottom of this file, which measures the strip rather than
+    // counting it. This sweep keeps asserting item COUNT — a distinct
+    // property (the assignee item is PRESENT on the dashboard and absent
+    // elsewhere), which a wrap measurement does not cover.
     test(`dashboard at ${width}px: .nav-filters carries the assignee item (4 children)`, async ({ page, workerUrlKey }) => {
       await page.setViewportSize({ width, height: 800 });
       await page.goto(`/workspace/${workerUrlKey}/`);
@@ -685,5 +673,108 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
     const childCount = await page.locator('.nav-filters').evaluate(el => el.children.length);
     expect(childCount).toBe(4);
     await expect(page.locator('#assignee-toggle')).toHaveText('Alice');
+  });
+});
+
+// LIN-2551 — the mobile density budget, measured rather than counted.
+//
+// This discharges LIN-2516 ledger item L4. The LIN-2529 sweep above asserts
+// `.nav-filters` CHILD COUNTS at these same widths and never wrap-freedom,
+// which is exactly why CI stayed green while the strip rendered three rows
+// deep on every phone-sized viewport: a count of 4 is satisfied whether those
+// four items sit on one row or four.
+//
+// What is asserted here is the property the count cannot see — the strip
+// occupies a SINGLE row. `.nav-filters` is a wrapping flex container, so its
+// rendered height is the direct witness: one row of 44px-min-height items, vs
+// the ~96px (three rows) it measured at before the budget fix.
+//
+// Measured with a real assignee SELECTED, not the default `all`. That is
+// load-bearing and was found the hard way: a budget tuned against `all`/`all`
+// fits, then overflows again the moment a real value replaces either — so a
+// spec that swept only the default state would have passed over the same bug.
+const DENSITY_SWEEP_WIDTHS = [360, 390, 412, 430];
+
+// One row of `.nav-item`s, whose mobile `min-height` is 44px (the tap-target
+// rule above). Anything at or under this is one row; a second row lands near
+// 88px and the pre-fix three-row state measured 94-101px. The allowance over
+// 44 absorbs line-height/baseline-alignment jitter without being loose enough
+// to admit a second row.
+const SINGLE_ROW_MAX_HEIGHT = 60;
+
+test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
+  test.beforeEach(async ({ page, workerUrlKey }) => {
+    await page.goto(`/test/set-session?urlKey=${workerUrlKey}`);
+    await page.goto(`/workspace/${workerUrlKey}/?team=all`);
+  });
+
+  for (const width of DENSITY_SWEEP_WIDTHS) {
+    test(`dashboard at ${width}px: the 4-item filter strip does not wrap`, async ({ page, workerUrlKey }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${workerUrlKey}/?assignee=Charlie`);
+      await page.waitForLoadState('networkidle');
+
+      const filters = page.locator('.nav-filters');
+      await expect(filters).toBeVisible();
+      expect(await filters.evaluate(el => el.children.length)).toBe(4);
+
+      const height = await filters.evaluate(el => Math.round(el.getBoundingClientRect().height));
+      expect(height, `.nav-filters must render as ONE row at ${width}px — measured ${height}px against a ${SINGLE_ROW_MAX_HEIGHT}px single-row bound`).toBeLessThanOrEqual(SINGLE_ROW_MAX_HEIGHT);
+    });
+
+    test(`dashboard at ${width}px: no filter control is pushed off-viewport`, async ({ page, workerUrlKey }) => {
+      // The other half of "it fits": a strip forced onto one row by shrinking
+      // can push its last item past the viewport edge, where the root's
+      // `overflow-x: clip` makes it unreachable with NO horizontal scrollbar
+      // to reveal it. That failure mode is invisible to a height assertion,
+      // and it is a worse outcome than the wrap it would have replaced — so
+      // both are pinned, not just the one this ticket set out to fix.
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/workspace/${workerUrlKey}/?assignee=Charlie`);
+      await page.waitForLoadState('networkidle');
+
+      const overflow = await page.evaluate(() => {
+        const viewport = document.documentElement.clientWidth;
+        const controls = [...document.querySelectorAll('.nav-filters .nav-value')];
+        return {
+          viewport,
+          offscreen: controls
+            .filter(c => c.getBoundingClientRect().right > viewport + 1)
+            .map(c => `${c.id || c.className}@${Math.round(c.getBoundingClientRect().right)}`),
+          docScrollWidth: document.documentElement.scrollWidth
+        };
+      });
+
+      expect(overflow.offscreen, `every filter control must sit inside the ${width}px viewport`).toEqual([]);
+      expect(overflow.docScrollWidth, 'the page must not scroll horizontally').toBeLessThanOrEqual(overflow.viewport);
+    });
+  }
+
+  test('the strip still shows what it is showing — values are not crushed away to fit', async ({ page, workerUrlKey }) => {
+    // The guard against "passing" the assertions above by shrinking every
+    // value to nothing. A `nowrap` variant of this fix did exactly that
+    // (team and assignee values rendered 0px and 4px wide at 360px) and would
+    // have satisfied both a height and an off-viewport check.
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(`/workspace/${workerUrlKey}/?assignee=Charlie`);
+    await page.waitForLoadState('networkidle');
+
+    const values = await page.evaluate(() =>
+      [...document.querySelectorAll('.nav-filters .nav-value')].map(v => ({
+        text: v.textContent.trim(),
+        width: Math.round(v.getBoundingClientRect().width),
+        truncated: v.scrollWidth > v.clientWidth + 1
+      }))
+    );
+
+    expect(values.length).toBe(3);
+    for (const v of values) {
+      expect(v.width, `"${v.text}" must still render legibly, not be shrunk to nothing`).toBeGreaterThanOrEqual(10);
+    }
+    // The short values fit outright; only a long workspace name reaches the
+    // truncation cap, which is the cap doing its job rather than a squeeze.
+    const [, team, assignee] = values;
+    expect(team.truncated, 'a short team value must not be truncated').toBe(false);
+    expect(assignee.truncated, 'a real assignee name must not be truncated').toBe(false);
   });
 });
