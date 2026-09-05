@@ -25,6 +25,11 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLIENT_SRC = readFileSync(join(__dirname, '../../public/flight-companion.js'), 'utf8');
+// LIN-2632: the shared window.ChatUI.toolBreadcrumbLabel implementation the
+// Flight Companion breadcrumb rendering will call — loaded from its real
+// home (public/chat.js, lifted off task-chat.js per LIN-1578) rather than
+// re-declared here, so a drift between the two can't hide from this suite.
+const CHAT_JS_SRC = readFileSync(join(__dirname, '../../public/chat.js'), 'utf8');
 // Comments legitimately name the very things a constraint check forbids
 // (explaining why NOT to use them) — strip block/line comments before
 // grepping for CODE, so a doc comment's own prose can't trip a "must not
@@ -1280,5 +1285,159 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     await flush();
     assert.strictEqual(user.questionInput.value, 'status please');
     looseDeepEqual(user.exports.getChatHistory(), []);
+  });
+});
+
+// ─── Shared tool-label helper (LIN-2632) ────────────────────────────────────
+//
+// toolBreadcrumbLabel used to be a task-chat.js-local function; it is lifted
+// into window.ChatUI (public/chat.js) here so Flight Companion's breadcrumb
+// rendering (a later beat) and Task Chat share one implementation, per
+// LIN-1578's direction that this shared layer must not be forked. chat.js
+// has no document/window dependency at load time (only inside appendMessage/
+// appendNote, neither of which these tests call), so a bare `{ window: {} }`
+// sandbox is enough to load it and read off the attached ChatUI.
+function loadChatUI() {
+  const sandbox = { window: {}, console };
+  vm.createContext(sandbox);
+  vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
+  return sandbox.window.ChatUI;
+}
+
+describe('window.ChatUI.toolBreadcrumbLabel (LIN-2632) — lifted from task-chat.js, extended for Flight Companion', () => {
+  test('is exposed on the shared ChatUI surface', () => {
+    const ChatUI = loadChatUI();
+    assert.strictEqual(typeof ChatUI.toolBreadcrumbLabel, 'function');
+  });
+
+  // Pre-fix (acceptance-witness): before this beat's chat.js edit, ChatUI has
+  // no toolBreadcrumbLabel at all, so `ChatUI.toolBreadcrumbLabel(...)` throws
+  // a TypeError — every assertion below was observed to fail that way against
+  // unfixed public/chat.js (a pre-fix "red" is impossible in the normal
+  // fail-differently sense since the function is simply absent; this is the
+  // mutation-equivalent: delete the export and the whole suite throws instead
+  // of asserting).
+
+  test('get_stack: names the count when a limit was requested', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_stack', arguments: { limit: 5 } }),
+      'checked the top 5 tasks on the stack'
+    );
+  });
+
+  test('get_stack: falls back to a plain description with no limit argument', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_stack', arguments: {} }),
+      'checked the task stack'
+    );
+  });
+
+  test('list_task_sessions: names the task when an issueId was requested', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_task_sessions', arguments: { issueId: 'LIN-123' } }),
+      'checked sessions for LIN-123'
+    );
+  });
+
+  test('list_task_sessions: falls back to a plain description with no issueId', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_task_sessions', arguments: {} }),
+      'checked task sessions'
+    );
+  });
+
+  test('get_session: names the session when a sessionId was requested', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_session', arguments: { sessionId: 'abc-123' } }),
+      'checked session abc-123'
+    );
+  });
+
+  test('get_session: falls back to a plain description with no sessionId', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_session', arguments: {} }),
+      'checked a session'
+    );
+  });
+
+  test('list_active_sessions never prints the bare tool name', () => {
+    const ChatUI = loadChatUI();
+    const label = ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_active_sessions', arguments: {} });
+    assert.equal(label, 'checked active sessions');
+    assert.notEqual(label, 'list_active_sessions');
+  });
+
+  test('list_pending_decisions never prints the bare tool name', () => {
+    const ChatUI = loadChatUI();
+    const label = ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'list_pending_decisions', arguments: {} });
+    assert.equal(label, 'checked pending decisions');
+    assert.notEqual(label, 'list_pending_decisions');
+  });
+
+  test('every companion catalog tool name resolves to a non-empty, non-bare label on call', () => {
+    const ChatUI = loadChatUI();
+    const COMPANION_TOOLS = ['get_stack', 'list_task_sessions', 'get_session', 'list_active_sessions', 'list_pending_decisions'];
+    for (const name of COMPANION_TOOLS) {
+      const label = ChatUI.toolBreadcrumbLabel({ phase: 'call', name, arguments: {} });
+      assert.ok(label, `${name} must produce a non-empty label`);
+      assert.notEqual(label, name, `${name} must not fall through to the bare-name fallback`);
+    }
+  });
+
+  test('error phase still names the tool for a companion tool, matching the pre-existing Task Chat shape', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'error', name: 'get_stack', error: 'timeout' }),
+      'get_stack failed: timeout'
+    );
+  });
+
+  // The existing Task Chat labels (LIN-990/LIN-1073) must still resolve
+  // byte-for-byte after the lift.
+  test('lookup_task/get_relations: unchanged from task-chat.js', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'lookup_task', arguments: { issueId: 'LIN-9' } }),
+      'looked up LIN-9'
+    );
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'get_relations', arguments: {} }),
+      'get_relations'
+    );
+  });
+
+  test('search_tasks: unchanged from task-chat.js', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'search_tasks', arguments: { query: 'billing' } }),
+      'searched "billing"'
+    );
+  });
+
+  test('send_follow_up: unchanged from task-chat.js, including the write-tool snippet', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({
+        phase: 'call', name: 'send_follow_up', arguments: { sessionId: 'sess-1', prompt: 'keep going' }
+      }),
+      'sent a follow-up to session sess-1: "keep going"'
+    );
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'send_follow_up', arguments: {} }),
+      'send_follow_up'
+    );
+  });
+
+  test('cap and unrecognized phases: unchanged from task-chat.js', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'cap', name: 'get_stack' }), 'reached the tool-lookup limit');
+    assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'result', name: 'get_stack' }), '');
+    assert.equal(ChatUI.toolBreadcrumbLabel(null), '');
   });
 });

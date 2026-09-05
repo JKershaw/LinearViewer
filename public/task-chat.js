@@ -130,40 +130,10 @@
     if (char) char.textContent = PILL_GLYPHS[state] || '';
   }
 
-  // Human-readable label for a `tool` SSE breadcrumb (LIN-990). Derived from the
-  // streamChatWithTools event shape ({ phase, name, arguments, error }). Returns
-  // '' for phases we don't surface (e.g. 'result') so the caller can skip them.
-  function toolBreadcrumbLabel(data) {
-    if (!data || typeof data !== 'object') return '';
-    var name = data.name || 'tool';
-    var args = data.arguments || {};
-    if (data.phase === 'call') {
-      if (name === 'lookup_task' || name === 'get_relations') {
-        return args.issueId ? 'looked up ' + args.issueId : name;
-      }
-      if (name === 'search_tasks') {
-        return args.query ? 'searched "' + args.query + '"' : name;
-      }
-      if (name === 'send_follow_up') {
-        // LIN-1073 review: this is the catalog's one WRITE tool — the generic
-        // fallback below would hide a real side effect (a queued dispatch
-        // follow-up) behind an anonymous tool name, so it must always name the
-        // session it targeted and a snippet of what was sent.
-        if (!args.sessionId) return name;
-        var prompt = typeof args.prompt === 'string' ? args.prompt.trim() : '';
-        var snippet = prompt ? ': "' + (prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt) + '"' : '';
-        return 'sent a follow-up to session ' + args.sessionId + snippet;
-      }
-      return name;
-    }
-    if (data.phase === 'error') {
-      return name + ' failed: ' + (data.error || 'unknown error');
-    }
-    if (data.phase === 'cap') {
-      return 'reached the tool-lookup limit';
-    }
-    return '';
-  }
+  // Human-readable label for a `tool` SSE breadcrumb (LIN-990) — lifted into
+  // the shared window.ChatUI.toolBreadcrumbLabel (public/chat.js) by LIN-2632
+  // per LIN-1578's direction that this shared layer must not be forked; this
+  // page calls the shared implementation rather than keeping its own.
 
   // Render a tool breadcrumb into the transcript. Breadcrumbs are surfaced to the
   // reader but are NOT chat history — they never enter `chatHistory` and are not
@@ -385,7 +355,7 @@
         if (type === 'tool') {
           // Tool breadcrumb: surface it in the log, but it is NOT assistant
           // content — do not touch answerText or chatHistory.
-          appendToolBreadcrumb(toolBreadcrumbLabel(eventData), answerLi);
+          appendToolBreadcrumb(window.ChatUI.toolBreadcrumbLabel(eventData), answerLi);
         } else if (type === 'token' || type === 'message') {
           var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
           answerText += text;
