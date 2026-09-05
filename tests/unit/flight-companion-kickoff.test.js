@@ -11,11 +11,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { buildFlightCompanionKickoff } from '../../lib/prompts/flight-companion-kickoff.js';
 import { buildCensusSeedText } from '../../routes/flight-companion.js';
 import {
   buildFlightCompanionMessages, COMPANION_PERSONA, COMPANION_BRIEF_SECTIONS,
-  COMPANION_FOSSIL_READOUT, COMPANION_READOUT_HEADINGS,
+  COMPANION_FOSSIL_READOUT, COMPANION_READOUT_HEADINGS, formatCompanionClock, formatFossilThreshold,
 } from '../../lib/prompts/flight-companion-brief.js';
 
 const BASE_URL = 'https://example.com';
@@ -179,8 +180,11 @@ describe('LIN-2618: one shared brief, rendered into both surfaces', () => {
     const turn = out[out.length - 1];
     assert.match(system.content, /a check-in tick — nobody typed/i);
     assert.match(system.content, /say nothing at all/i);
-    // LIN-2443 AC1: the status line carries a silent tick, never a bubble.
-    assert.match(system.content, /status line already carries it/i);
+    // LIN-2443 AC1: the status line carries a silent tick, never a bubble. That
+    // concretisation is CHAT-ONLY — a pasted Claude Code session has no status
+    // line, so asserting one to it would be a false fact about its own
+    // environment offered as the reason to stay silent.
+    assert.match(system.content, /status line already says/i);
     assert.match(turn.content, /No new message from the human this tick/);
   });
 
@@ -263,5 +267,161 @@ describe('LIN-2618: the extraction must not cost the kickoff any instruction it 
     ]) {
       assert.match(text, claim, `the kickoff lost: ${claim}`);
     }
+  });
+});
+
+describe('LIN-2618: the shared/transport split is real, not just a word blacklist', () => {
+  const kickoff = () => buildFlightCompanionKickoff({ baseUrl: BASE_URL });
+  const chat = () => buildFlightCompanionMessages({
+    history: [], message: 'hi', censusSeedText: 'CENSUS', turnKind: 'user-initiated',
+  })[0].content;
+
+  test('no shared section asserts a thing only ONE surface has', () => {
+    // The earlier leak test blacklists six tokens, which cannot see semantic
+    // transport-specificity. These are the three concrete facts that a pasted
+    // Claude Code session cannot reach — it has no census (routes/proxy.js
+    // serves none), no lanes, and no page — so a shared section stating any of
+    // them as fact would be telling that session something false about its own
+    // environment.
+    const shared = [COMPANION_PERSONA, ...COMPANION_BRIEF_SECTIONS].join('\n');
+    for (const [claim, why] of [
+      [/status line/i, 'only the in-page chat has a status line'],
+      [/\bcensus\b/i, 'only the in-page chat is handed a census'],
+      [/census lanes|the lanes count/i, 'lanes are a census concept the kickoff never sees'],
+      [/composer/i, 'the composer is a page element'],
+      [/chat page/i, 'the kickoff is not a page'],
+    ]) {
+      assert.ok(!claim.test(shared), `shared brief must not assert: ${why}`);
+    }
+  });
+
+  test('...and each surface still carries its own concretisation of those rules', () => {
+    const c = chat();
+    // The chat says the transport-specific parts the shared sections dropped.
+    assert.match(c, /status line already says/i);
+    assert.match(c, /\bcensus\b/i);
+    assert.match(c, /composer below is the invitation/i);
+    // The kickoff says its own, and NOT the chat's.
+    const k = kickoff();
+    assert.doesNotMatch(k, /status line/i);
+    assert.doesNotMatch(k, /composer/i);
+    assert.match(k, /every `GET`/i);
+  });
+
+  test('the fossil instruction is conditional, so a surface with no census does not go hunting', () => {
+    // It must not order a session to obtain a count it cannot obtain — the
+    // kickoff's own hard rule says the observation endpoints will 401, so a
+    // session told to fetch one would either fabricate it or bounce off a 401.
+    assert.match(COMPANION_FOSSIL_READOUT, /if — and only if — you are given/i);
+    assert.match(COMPANION_FOSSIL_READOUT, /do not go looking for one and never estimate/i);
+  });
+
+  test('a waiting item is reported with what it is holding up (LIN-2027 fold-in)', () => {
+    // Ticket item 6: waiting-on-a-human items carry critical-path context from
+    // get_stack's blocking signals, so the human can order by consequence
+    // rather than by age.
+    for (const text of [kickoff(), chat()]) {
+      assert.match(text, /Say what each one is holding up/i);
+      assert.match(text, /blocking \/ critical-path signals/i);
+      assert.match(text, /unblocks three others/i);
+    }
+  });
+});
+
+describe('LIN-2618: the "separate, older mechanism" claim is retired everywhere it was made', () => {
+  const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+
+  test('no surviving source or doc still calls the kickoff a separate, older mechanism', () => {
+    // Ticket item 7 / plan-review 2618-F3. The first pass fixed the two CLAUDE.md
+    // entries and llms.txt's prose block and missed three more — including one
+    // in the route file this change edits, ~100 lines above a new comment
+    // asserting the opposite.
+    for (const path of [
+      '../../routes/flight-companion.js',
+      '../../public/llms.txt',
+      '../../CLAUDE.md',
+      '../../lib/render-flight-companion.js',
+    ]) {
+      const src = read(path);
+      assert.doesNotMatch(src, /SEPARATE, older/i, `${path} still calls the kickoff a separate, older mechanism`);
+      assert.doesNotMatch(src, /separate, older kickoff/i, `${path} still calls the kickoff separate and older`);
+    }
+  });
+});
+
+describe('LIN-2618: the shared sections are shared by identity, not by resemblance', () => {
+  test('neither renderer may extend the persona in place', () => {
+    // `includes` alone would pass if one surface appended a sentence inside the
+    // persona block, which is precisely the divergence this module exists to
+    // prevent. Pin the block's boundaries: what follows the persona must be the
+    // section delimiter, not more persona.
+    const k = buildFlightCompanionKickoff({ baseUrl: BASE_URL });
+    const c = buildFlightCompanionMessages({ history: [], censusSeedText: 'CENSUS' })[0].content;
+    for (const [text, label] of [[k, 'kickoff'], [c, 'chat']]) {
+      const at = text.indexOf(COMPANION_PERSONA);
+      assert.ok(at > -1, `${label} must carry the persona`);
+      const after = text.slice(at + COMPANION_PERSONA.length);
+      assert.match(
+        after.slice(0, 32), /^\n\n(---|Your job this session)/,
+        `${label} appended to the persona instead of rendering it as-is`
+      );
+    }
+  });
+
+  test('every shared section is rendered whole, in both surfaces, in one piece', () => {
+    const k = buildFlightCompanionKickoff({ baseUrl: BASE_URL });
+    const c = buildFlightCompanionMessages({ history: [], censusSeedText: 'CENSUS' })[0].content;
+    for (const section of COMPANION_BRIEF_SECTIONS) {
+      for (const [text, label] of [[k, 'kickoff'], [c, 'chat']]) {
+        // Exactly once — a section rendered twice is as wrong as one dropped.
+        assert.strictEqual(
+          text.split(section).length - 1, 1,
+          `${label} must render "${section.split('\n')[0]}" exactly once`
+        );
+      }
+    }
+  });
+});
+
+describe('LIN-2618: the builder is defensive where a future caller will actually hit it', () => {
+  test('a null clock reads as unknown, never as a confident 1970', () => {
+    // `new Date(null)` is the EPOCH, not an Invalid Date, and the `= Date.now()`
+    // default only covers `undefined`. LIN-2622's boot endpoint is the next
+    // caller; a nullable clock there would have the model age every `since` it
+    // is shown by ~56 years and report the whole fleet as fossilised.
+    for (const bad of [null, undefined, NaN, 'nonsense', {}, [], true]) {
+      const out = formatCompanionClock(bad);
+      assert.doesNotMatch(out, /1970/, `a ${JSON.stringify(bad)} clock must not render 1970`);
+      assert.doesNotMatch(out, /Invalid Date/);
+    }
+    assert.match(formatCompanionClock(null), /CURRENT TIME: unknown/);
+    // A real clock still works, both shapes.
+    const iso = '2026-09-05T12:00:00.000Z';
+    assert.match(formatCompanionClock(Date.parse(iso)), /2026-09-05T12:00:00\.000Z/);
+    assert.match(formatCompanionClock(new Date(iso)), /2026-09-05T12:00:00\.000Z/);
+  });
+
+  test('a sub-hour staleness threshold reads in minutes, never as "0h"', () => {
+    // "rows older than 0h" is a vacuous claim inside a block the prompt calls
+    // ground truth, and rounding 30m up to "1h" over-claims in the other
+    // direction.
+    assert.strictEqual(formatFossilThreshold(30 * 60000), '30m');
+    assert.strictEqual(formatFossilThreshold(60000), '1m');
+    assert.strictEqual(formatFossilThreshold(1), '1m');
+    assert.strictEqual(formatFossilThreshold(90 * 60000), '2h');
+    // The production value and the ordinary shapes are unchanged.
+    assert.strictEqual(formatFossilThreshold(7 * 24 * 3600000), '7d');
+    assert.strictEqual(formatFossilThreshold(6 * 3600000), '6h');
+    assert.strictEqual(formatFossilThreshold(0), 'the staleness threshold');
+  });
+
+  test('an omitted history is an empty one, matching the signature\'s own promise', () => {
+    // The `= {}` parameter default signals a tolerance the body did not have:
+    // `buildFlightCompanionMessages()` threw on the history spread.
+    assert.doesNotThrow(() => buildFlightCompanionMessages());
+    const out = buildFlightCompanionMessages();
+    assert.strictEqual(out.length, 2, 'system turn plus the stand-in user turn');
+    assert.strictEqual(out[0].role, 'system');
+    assert.strictEqual(out[1].role, 'user');
   });
 });

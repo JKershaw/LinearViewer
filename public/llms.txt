@@ -371,7 +371,7 @@ main.flight-companion-page[data-url-key]  - page container
       .fc-proposal-approve                    - approve — POSTs to approve-follow-up
       .fc-proposal-dismiss                    - dismiss — client-only, no request
   section (How to use)                    - short intro + the three steps
-  section (Kickoff prompt)                - the separate, older paste-to-Claude-Code path
+  section (Kickoff prompt)                - the paste-to-Claude-Code transport (same shared brief as the chat since LIN-2618)
     #flight-companion-copy                  - copy-to-clipboard button (outside the collapse)
     .prompt-proxy-toggle                    - +proxy toggle (only when the proxy flag is on)
     #flight-companion-copy-feedback         - copy status text

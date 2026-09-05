@@ -19,8 +19,11 @@
  *     enqueue of a follow-up the model proposed (LIN-2434 §A.6); see that route's
  *     own header comment below for the full contract.
  *
- * The kickoff prompt above is a SEPARATE, older mechanism (a session standing in
- * for the model, its curls as tools) — pasted by hand, no dispatch of its own.
+ * The kickoff prompt above is a DIFFERENT TRANSPORT, not a different companion
+ * (a session standing in for the model, its curls as tools) — pasted by hand,
+ * no dispatch of its own. Since LIN-2618 it renders the SAME shared brief this
+ * route's system turn does (lib/prompts/flight-companion-brief.js); what
+ * differs between them is the transport, not who the companion is.
  * The turn + approve-follow-up endpoints are the newer, in-page chat mechanism
  * (LIN-751 Phase A): the model proposes a follow-up on an auto-wake turn, but can
  * never dispatch it itself — only approve-follow-up, reached by an attended
