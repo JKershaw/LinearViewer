@@ -48,6 +48,7 @@ const MAX_REASON_LENGTH = 500;
  * @param {Object} [deps.taskDecisionsStore] - Scan-produced decisions (null → that input is skipped)
  * @param {Object} [deps.shelvedRulingsStore] - Shelved rulings (null → that input is skipped)
  * @param {Object} [deps.dismissalSuggestionsStore] - Proposed dismissals (null → the propose route 503s)
+ * @param {Object} [deps.sessionsFeedCache] - Shared SWR cache for the loop read (null → uncached)
  */
 export function createRulingsRoutes({
   proxyLimiter,
@@ -58,9 +59,48 @@ export function createRulingsRoutes({
   agentStatusStore,
   taskDecisionsStore = null,
   shelvedRulingsStore = null,
-  dismissalSuggestionsStore = null
+  dismissalSuggestionsStore = null,
+  sessionsFeedCache = null
 }) {
   const router = Router();
+
+  /**
+   * The workspace's unanswered decisions, through the SAME short-TTL SWR cache
+   * the session-authed rulings feed uses (`routes/dashboard.js`).
+   *
+   * Caching is not an optimisation here, it is a bound. `getLoopsForWorkspace`
+   * reconstructs from a 30-day dispatch-history window with NO row cap — the
+   * read `lib/pipeline-loops.js` itself flags as the LIN-615 truncation-footgun
+   * guard, and the one this repo blames for the LIN-608 OOM. The only other
+   * limit on this route is `proxyLimiter`, which is per-IP and shared across
+   * every proxy endpoint, so N agents on N addresses would each get their own
+   * full reconstruction. A distinct `view` namespace keeps this payload from
+   * colliding with the dashboard's on the same workspace key.
+   */
+  async function readRulings(urlKey) {
+    const load = async () => {
+      const rawLoops = await getLoopsForWorkspace(urlKey, {
+        dispatchStore: dispatchQueueStore,
+        agentStatusStore,
+        lean: true
+      });
+      // Shaped as the session-authed feed shapes its own loops, minus
+      // `workspaceName` and the activity sort (neither of which any answer-state
+      // decision reads): `enrichLoop` supplies the `agentState` that
+      // `resolveDisposition` reads, and the workspace tag is what puts a usable
+      // `anchor.workspaceUrlKey` on every row. Without the enrichment a live,
+      // mid-turn ruling reports as repliable; without the tag a caller cannot
+      // route a reply back to the right workspace.
+      const loops = rawLoops.map(loop => ({ ...enrichLoop(loop), workspaceUrlKey: urlKey }));
+      const [taskDecisions, shelvedRulings] = await Promise.all([
+        taskDecisionsStore ? taskDecisionsStore.listUnansweredForWorkspaces([urlKey]) : Promise.resolve([]),
+        shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
+      ]);
+      return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings }, { now: new Date() });
+    };
+    if (!sessionsFeedCache) return load();
+    return sessionsFeedCache.get(sessionsFeedCache.keyFor([{ urlKey }], 'proxy-rulings'), load);
+  }
 
   /**
    * Every unanswered decision for the TOKEN's workspace.
@@ -77,31 +117,10 @@ export function createRulingsRoutes({
   router.get('/api/proxy/rulings', proxyLimiter, authenticateProxyToken, async (req, res) => {
     const urlKey = req.proxyUrlKey;
     try {
-      // `lean` drops the heavy per-loop promptText the feed never reads
-      // (LIN-622/LIN-623) — the same read the rulings feed itself uses.
-      // Shaped exactly as the session-authed rulings feed shapes its own loops
-      // (routes/dashboard.js's mergeLoops): `enrichLoop` supplies the
-      // `agentState` that `resolveDisposition` reads, and the workspace tag is
-      // what puts a usable `anchor.workspaceUrlKey` on every row. Both are
-      // load-bearing rather than cosmetic — without the tag a caller cannot
-      // route a reply back to the right workspace, and without the enrichment
-      // a live, mid-turn ruling would report as repliable.
-      const rawLoops = await getLoopsForWorkspace(urlKey, {
-        dispatchStore: dispatchQueueStore,
-        agentStatusStore,
-        lean: true
-      });
-      const loops = rawLoops.map(loop => ({ ...enrichLoop(loop), workspaceUrlKey: urlKey }));
-      const [taskDecisions, shelvedRulings, suggestions] = await Promise.all([
-        taskDecisionsStore ? taskDecisionsStore.listUnansweredForWorkspaces([urlKey]) : Promise.resolve([]),
-        shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([]),
+      const [rulings, suggestions] = await Promise.all([
+        readRulings(urlKey),
         dismissalSuggestionsStore ? dismissalSuggestionsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
       ]);
-
-      const rulings = collectUnansweredDecisions(
-        { loops, taskDecisions, shelvedRulings },
-        { now: new Date() }
-      );
 
       // Attach any STANDING proposal to its ruling. A withdrawn row is not
       // standing — the human already said Keep — so it is excluded here rather
@@ -161,7 +180,7 @@ export function createRulingsRoutes({
         logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
         return badRequest.json(res, 'A reason is required — a dismissal nobody justified is one the operator cannot agree to');
       }
-      if (reason.length > MAX_REASON_LENGTH) {
+      if (reason.trim().length > MAX_REASON_LENGTH) {
         logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
         return badRequest.json(res, `reason must be ${MAX_REASON_LENGTH} characters or fewer`);
       }
@@ -171,6 +190,20 @@ export function createRulingsRoutes({
       }
 
       try {
+        // The id must name a ruling that is actually unanswered in THIS
+        // workspace. Without this a caller gets `201 {success: true}` for a
+        // typo or an already-answered decision, and writes a durable, no-TTL
+        // row nobody will ever see — a success signal that means nothing, and
+        // unbounded orphan rows from any readWrite token. The read is the same
+        // cached one the GET just served, so the check is effectively free.
+        const rulings = await readRulings(req.proxyUrlKey);
+        if (!rulings.some(row => row.decision?.decision_id === decisionId)) {
+          logEvent(req, '/api/proxy/rulings/suggest-dismissal', 404);
+          return jsonError(res, 404, 'No unanswered ruling with that decisionId in this workspace', {
+            code: 'RULING_NOT_FOUND'
+          });
+        }
+
         // Attribution comes from the TOKEN, never from the request body — a
         // caller must not be able to propose in someone else's name. A token
         // is minted by a signed-in human, so `createdBy` is a real identity;

@@ -68,16 +68,20 @@ function decisionItem(id, identifier, decisionId) {
   };
 }
 
-let server, baseUrl, collection, suggestionsStore, tokenScope, historyItems;
+let server, baseUrl, collection, suggestionsStore, tokenScope, historyItems, foreignHistoryItems;
 
 before(async () => {
   process.env.NODE_ENV = 'test';
   const app = express();
   app.use(express.json());
 
+  // Workspace-AWARE on purpose. The previous mock ignored its urlKey argument,
+  // which meant the review could repoint the route at a hardcoded other
+  // workspace and the whole suite stayed green — the isolation property these
+  // routes exist to hold had zero coverage.
   const dispatchQueueStore = {
-    async listItems() { return []; },
-    async listHistory() { return { items: historyItems }; }
+    async listItems(urlKey) { return urlKey === URL_KEY ? [] : []; },
+    async listHistory(urlKey) { return { items: urlKey === URL_KEY ? historyItems : foreignHistoryItems }; }
   };
   const agentStatusStore = { async listStatus() { return { items: [] }; } };
 
@@ -104,7 +108,8 @@ before(async () => {
     agentStatusStore,
     taskDecisionsStore: null,
     shelvedRulingsStore: null,
-    dismissalSuggestionsStore: suggestionsStore
+    dismissalSuggestionsStore: suggestionsStore,
+    sessionsFeedCache: null
   }));
 
   server = http.createServer(app);
@@ -118,6 +123,7 @@ beforeEach(() => {
   collection._docs.length = 0;
   tokenScope = 'readWrite';
   historyItems = [decisionItem('loop-1', 'LIN-1', DECISION_ID)];
+  foreignHistoryItems = [decisionItem('loop-9', 'OTHER-9', 'foreign-decision')];
 });
 
 async function req(method, path, body) {
@@ -294,5 +300,71 @@ describe('degrade paths', () => {
     });
     assert.equal(res.status, 503);
     s.close();
+  });
+});
+
+
+describe('workspace isolation and loop shaping', () => {
+  test("only the TOKEN's workspace is read — a foreign workspace's rulings never appear", async () => {
+    // Pinned because the previous mock ignored its urlKey, so repointing the
+    // route at another workspace left the suite green. A proxy token is scoped
+    // to exactly one workspace; that is the property the whole token model
+    // rests on.
+    const { body } = await req('GET', '/api/proxy/rulings');
+    assert.equal(body.count, 1);
+    assert.equal(body.rulings[0].decision.decision_id, DECISION_ID);
+    assert.ok(
+      !body.rulings.some(r => r.decision.decision_id === 'foreign-decision'),
+      "another workspace's ruling must never surface"
+    );
+  });
+
+  test('a suggestion recorded in ANOTHER workspace never attaches here', async () => {
+    await suggestionsStore.suggest({
+      urlKey: 'some-other-workspace', decisionId: DECISION_ID, reason: 'r', suggestedBy: 'x'
+    });
+    const { body } = await req('GET', '/api/proxy/rulings');
+    assert.equal(body.rulings[0].suggestedDismissal, null);
+  });
+
+  test('rows are ENRICHED — disposition and canReply are resolved, not left undefined', async () => {
+    // The enrichLoop export from routes/dashboard.js is justified as
+    // load-bearing; without it `agentState` is missing and resolveDisposition
+    // silently downgrades, so a live mid-turn ruling would report as repliable.
+    // Dropping the enrichment previously left the whole suite green.
+    const { body } = await req('GET', '/api/proxy/rulings');
+    const row = body.rulings[0];
+    assert.ok(typeof row.disposition === 'string' && row.disposition.length > 0, 'disposition is resolved');
+    assert.equal(typeof row.canReply, 'boolean');
+    assert.equal(row.disposition, 'resumable', 'a blocked, non-terminal loop is resumable');
+    assert.equal(row.canReply, true);
+  });
+});
+
+describe('a proposal must name a real unanswered ruling', () => {
+  test('an unknown decisionId is 404, and writes nothing', async () => {
+    // Otherwise a typo returns 201 {success:true} and leaves a durable, no-TTL
+    // orphan row nobody will ever see — a success signal that means nothing.
+    const { status, body } = await req('POST', '/api/proxy/rulings/no-such-decision/suggest-dismissal', { reason: 'r' });
+    assert.equal(status, 404);
+    assert.equal(body.code, 'RULING_NOT_FOUND');
+    assert.equal(collection._docs.length, 0);
+  });
+
+  test("a decisionId that exists in ANOTHER workspace is still 404 here", async () => {
+    const { status } = await req('POST', '/api/proxy/rulings/foreign-decision/suggest-dismissal', { reason: 'r' });
+    assert.equal(status, 404);
+    assert.equal(collection._docs.length, 0);
+  });
+
+  test('a real decisionId still succeeds', async () => {
+    const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, { reason: 'r' });
+    assert.equal(status, 201);
+  });
+
+  test('an over-long reason is measured on the TRIMMED value the store persists', async () => {
+    const padded = `  ${'x'.repeat(500)}  `;
+    const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, { reason: padded });
+    assert.equal(status, 201, 'whitespace must not push a legal reason over the cap');
   });
 });
