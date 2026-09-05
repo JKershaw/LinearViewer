@@ -46,6 +46,7 @@ import { parseFeedbackImage } from '../lib/attachment-upload.js';
  * @param {Function} deps.refResolutionFailed - Maps a RefResolutionError to its own 422 (closure-local)
  * @param {Function} deps.partialWriteFailed - Maps a PartialWriteError (write landed, confirmation re-read failed) to its own envelope (closure-local)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
+ * @param {Object} [deps.harbourCommentsStore] - Durable (urlKey, commentId) ledger (LIN-2648); best-effort record at each createComment seam, never gates the response
  */
 export function createProxyWriteRoutes({
   proxyLimiter,
@@ -66,6 +67,7 @@ export function createProxyWriteRoutes({
   refResolutionFailed,
   partialWriteFailed,
   logEvent,
+  harbourCommentsStore = null,
 }) {
   const router = Router();
 
@@ -545,6 +547,23 @@ export function createProxyWriteRoutes({
       if (writeRejected(req, res, '/api/proxy/issues/comments', commentCreate, 'Comment was not created')) return;
 
       commentDedupe.set(key, commentCreate);
+
+      // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
+      // mirrors the stampDecisionAnswers discipline (routes/workspace-api.js) —
+      // a single attempt, caught and logged, never propagated, never retried.
+      // The comment already succeeded and is the durable half of this write; a
+      // ledger-write failure must never fail it.
+      if (harbourCommentsStore) {
+        try {
+          const newCommentId = commentCreate.comment?.id;
+          if (newCommentId) {
+            await harbourCommentsStore.record({ urlKey: req.proxyUrlKey, commentId: newCommentId });
+          }
+        } catch (ledgerErr) {
+          console.error('Harbour-comments ledger record failed:', ledgerErr.message);
+        }
+      }
+
       logEvent(req, '/api/proxy/issues/comments', 201);
       res.status(201).json(commentCreate);
     } catch (err) {
@@ -770,6 +789,21 @@ export function createProxyWriteRoutes({
       }
       const commentCreate = normalizeWritePayload(await provider.createComment(token, issueId, embedded), 'comment');
       if (writeRejected(req, res, endpoint, commentCreate, 'Comment was not created')) return;
+
+      // Best-effort Harbour-comments ledger record (LIN-2648) — same discipline
+      // as the plain-comment seam above: a single attempt, caught and logged,
+      // never propagated, never retried.
+      if (harbourCommentsStore) {
+        try {
+          const newCommentId = commentCreate.comment?.id;
+          if (newCommentId) {
+            await harbourCommentsStore.record({ urlKey: req.proxyUrlKey, commentId: newCommentId });
+          }
+        } catch (ledgerErr) {
+          console.error('Harbour-comments ledger record failed:', ledgerErr.message);
+        }
+      }
+
       logEvent(req, endpoint, 201);
       res.status(201).json(commentCreate);
     } catch (err) {

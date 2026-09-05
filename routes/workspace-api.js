@@ -284,7 +284,7 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
  * @param {Object} [options.taskDecisionsStore] - Task-keyed scan-decision store (LIN-2197)
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -1569,6 +1569,22 @@ ${goal}`
       }
 
       commentDedupe.set(key, commentCreate)
+
+      // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
+      // mirrors the stampDecisionAnswers discipline immediately below — a single
+      // attempt, caught and logged, never propagated, never retried. The comment
+      // already succeeded and is the durable half of this write; a ledger-write
+      // failure must never fail it.
+      if (harbourCommentsStore) {
+        try {
+          const newCommentId = commentCreate.comment?.id
+          if (newCommentId) {
+            await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId: newCommentId })
+          }
+        } catch (ledgerErr) {
+          console.error('Harbour-comments ledger record failed:', ledgerErr.message)
+        }
+      }
 
       // Best-effort answer stamp(s) (LIN-1728 decision 1 / LIN-2197 Phase 5;
       // factored into stampDecisionAnswers, shared with the dedupe-hit retry

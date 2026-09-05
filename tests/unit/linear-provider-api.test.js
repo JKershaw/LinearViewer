@@ -28,6 +28,7 @@ import {
   cycles,
   cycleDetail,
   fetchAttachment,
+  fetchIssueContext,
   relations,
   createIssue,
   updateIssue,
@@ -121,6 +122,64 @@ describe('Linear source provenance (LIN-561)', () => {
     assert.ok(!('source' in list.nodes[0]), 'list read must not carry source');
     assert.ok(!('source' in detail), 'detail read must not carry source');
     assert.ok(!('source' in found[0]), 'search read must not carry source');
+  });
+});
+
+// =============================================================================
+// Comment projection — commentId (LIN-2648 F1)
+// =============================================================================
+
+describe('fetchIssueContext comment projection carries commentId, never id (LIN-2648)', () => {
+  test('projects commentId: c.id onto each comment, reusing the id ISSUE_DETAIL_QUERY already selects', async () => {
+    stub(async () => ({
+      issue: {
+        id: 'issue-uuid-1',
+        identifier: 'LIN-1',
+        title: 'T',
+        description: 'D',
+        url: 'https://linear.app/acme/issue/LIN-1',
+        state: { name: 'Todo', type: 'unstarted' },
+        labels: { nodes: [] },
+        parent: null,
+        children: { nodes: [] },
+        comments: {
+          nodes: [
+            { id: 'uuid-123', body: 'hello', createdAt: '2026-09-01T09:00:00.000Z', user: { name: 'John' } }
+          ]
+        }
+      }
+    }));
+
+    const context = await fetchIssueContext(API_KEY, 'LIN-1');
+    assert.strictEqual(context.comments.length, 1);
+    assert.strictEqual(context.comments[0].commentId, 'uuid-123');
+    assert.strictEqual(context.comments[0].body, 'hello');
+  });
+
+  test('[F1 regression pin] the projected comment never carries a key literally named `id`', async () => {
+    stub(async () => ({
+      issue: {
+        id: 'issue-uuid-1',
+        identifier: 'LIN-1',
+        title: 'T',
+        description: 'D',
+        url: 'https://linear.app/acme/issue/LIN-1',
+        state: { name: 'Todo', type: 'unstarted' },
+        labels: { nodes: [] },
+        parent: null,
+        children: { nodes: [] },
+        comments: {
+          nodes: [
+            { id: 'uuid-123', body: 'hello', createdAt: '2026-09-01T09:00:00.000Z', user: { name: 'John' } }
+          ]
+        }
+      }
+    }));
+
+    const context = await fetchIssueContext(API_KEY, 'LIN-1');
+    const keys = Object.keys(context.comments[0]);
+    assert.ok(!keys.includes('id'), `projected comment must never carry a literal "id" key, got: ${keys.join(', ')}`);
+    assert.deepStrictEqual(keys.sort(), ['body', 'commentId', 'createdAt', 'user'].sort());
   });
 });
 

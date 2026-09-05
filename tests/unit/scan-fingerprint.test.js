@@ -25,6 +25,7 @@ import {
   BASIS_VERSION
 } from '../../lib/scan-fingerprint.js';
 import { hashContext } from '../../lib/recap-cache.js';
+import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
 
 /** A representative recommendation context. */
 function makeContext(overrides = {}) {
@@ -310,5 +311,77 @@ describe('basisChanged — the tri-state', () => {
 
   test('called with nothing at all → unknown, never a throw', () => {
     assert.strictEqual(basisChanged(), null);
+  });
+
+  test('a hash raised under the OLD BASIS_VERSION (1), pre-dating the commentId fallback, is UNKNOWN across the 1→2 boundary — never a fleet-wide true', () => {
+    // LIN-2648: BASIS_VERSION bumped 1 -> 2 in the same change that widened the
+    // comment-id extraction to `id || commentId`. Every row raised before this
+    // change carries `raisedBasisVersion: 1`; this pins that they compare as
+    // unknown against the new projection rather than a mass false-positive.
+    assert.strictEqual(
+      basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: 1, currentBasisHash: 'bbb' }),
+      null
+    );
+    assert.strictEqual(
+      basisChanged({ raisedBasisHash: 'aaa', raisedBasisVersion: 1, currentBasisHash: 'aaa' }),
+      null
+    );
+  });
+});
+
+/**
+ * LIN-2648 F1 — the `commentId` key is load-bearing: it must reach the scan
+ * basis fallback (`scanBasisFromContext`'s `id || commentId`) WITHOUT reaching
+ * `hashContext` (`lib/recap-cache.js`'s `extractHashableContext`, feeds
+ * `inputHash`) or `snapshotFromContext` (`lib/task-snapshot-store.js`), both of
+ * which read `c?.id` specifically and only that key. A leak here would shift
+ * `inputHash` fleet-wide for every Linear task with a comment — see the LIN-2648
+ * description's "Why the commentId key is load-bearing" section for the three
+ * concrete consequences (resurrected rulings, false-stale, cache invalidation).
+ */
+describe('F1 — commentId is invisible to hashContext/snapshotFromContext, visible only to the basis', () => {
+  // The Linear shape post-projection widening: comments carry `commentId`
+  // (never `id`) alongside body/createdAt/user, per lib/providers/linear/index.js.
+  function linearShapedContext(comments) {
+    return makeContext({
+      comments: comments || [
+        { commentId: 'lin-c-1', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z', user: 'John' },
+        { commentId: 'lin-c-2', body: 'Second comment', createdAt: '2026-09-02T09:00:00.000Z', user: 'Jane' }
+      ]
+    });
+  }
+
+  test('[F1 golden/leak] commentId does not move hashContext or snapshotFromContext, in either direction', () => {
+    const withCommentId = linearShapedContext();
+    const withoutCommentId = {
+      ...withCommentId,
+      comments: withCommentId.comments.map(({ commentId, ...rest }) => rest)
+    };
+
+    assert.strictEqual(
+      hashContext(withCommentId), hashContext(withoutCommentId),
+      'hashContext must ignore commentId (with -> without)'
+    );
+    assert.strictEqual(
+      hashContext(withoutCommentId), hashContext(withCommentId),
+      'hashContext must ignore commentId (without -> with)'
+    );
+    assert.deepStrictEqual(
+      snapshotFromContext(withCommentId), snapshotFromContext(withoutCommentId),
+      'snapshotFromContext must ignore commentId (with -> without)'
+    );
+    assert.deepStrictEqual(
+      snapshotFromContext(withoutCommentId), snapshotFromContext(withCommentId),
+      'snapshotFromContext must ignore commentId (without -> with)'
+    );
+  });
+
+  test('[F1 companion] scanBasisHashFromContext DOES move when commentId differs — without this the leak test above is vacuous', () => {
+    const a = linearShapedContext();
+    const b = linearShapedContext([
+      { commentId: 'lin-c-1-DIFFERENT', body: 'First comment', createdAt: '2026-09-01T09:00:00.000Z', user: 'John' },
+      { commentId: 'lin-c-2', body: 'Second comment', createdAt: '2026-09-02T09:00:00.000Z', user: 'Jane' }
+    ]);
+    assert.notStrictEqual(scanBasisHashFromContext(a), scanBasisHashFromContext(b));
   });
 });
