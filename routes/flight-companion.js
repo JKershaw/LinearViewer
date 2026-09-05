@@ -139,20 +139,23 @@ export function buildCensusSeedText(currentCensusDoc) {
   if (!currentCensusDoc) {
     return 'CURRENT CENSUS: not available yet for this workspace (no sweep has run).';
   }
-  // Sanitised BEFORE `buildCompanionSnapshot`, not after. That function maps
-  // `attention` straight to `[row.loopId, …]` (lib/flight-companion-gate.js:219)
-  // and throws on a null row — so defending only the rendering below would be
-  // dead code, because the snapshot call happens first. Dropping the unusable
-  // rows here fixes it entirely inside this route, without editing the gate
-  // file (which this change's carve does not permit), and keeps the count and
-  // the rendered rows counting the same set. A row with no `loopId` cannot be
-  // drilled into and is not an attention row anyone can act on.
+  // This filter is for RENDERING HONESTY, not crash avoidance (LIN-2661 made
+  // `buildCompanionSnapshot` itself safe against a null/undefined row — see
+  // `isWellFormedAttentionRow`, `lib/flight-companion-gate.js:280` — so
+  // feeding it the raw `currentCensusDoc` directly, below, is no longer a
+  // hazard). It stays because it serves an independent purpose: this route
+  // reads `since`/`issue` straight off these rows for `attentionLines` below,
+  // fields the snapshot's identity-tuple projection deliberately drops
+  // (`lib/flight-companion-gate.js:360`), and a row with no `loopId` cannot be
+  // drilled into or shown honestly to a human — it is dropped outright rather
+  // than rendered as a half-row. The bar here is deliberately LOOSER than the
+  // gate's own well-formed-ROW criterion (`loopId`+`lane`+`stage`,
+  // `isWellFormedAttentionRow`, `lib/flight-companion-gate.js:280`): a row with
+  // an id but no `lane`/`stage` still renders here, honestly labelled, even
+  // though the gate excludes it from its own identity-tuple accounting.
   const attention = (Array.isArray(currentCensusDoc.state?.attention) ? currentCensusDoc.state.attention : [])
     .filter((row) => row && typeof row === 'object' && row.loopId);
-  const usableDoc = attention.length === (currentCensusDoc.state?.attention?.length ?? 0)
-    ? currentCensusDoc
-    : { ...currentCensusDoc, state: { ...currentCensusDoc.state, attention } };
-  const snapshot = buildCompanionSnapshot(usableDoc);
+  const snapshot = buildCompanionSnapshot(currentCensusDoc);
   const laneLines = CENSUS_LANE_KEYS.map((key) => `  ${key}: ${snapshot.lanes[key]}`).join('\n');
 
   // LIN-2617: the ROWS, not just the count. Read straight off the census doc's
@@ -161,7 +164,7 @@ export function buildCensusSeedText(currentCensusDoc) {
   // already carry — never re-sorted, re-dated or re-derived here.
   //
   // Deliberately NOT `buildCompanionSnapshot`'s `attentionKeys`: that projection
-  // drops `since` on purpose (lib/flight-companion-gate.js:219), because it
+  // drops `since` on purpose (lib/flight-companion-gate.js:360), because it
   // moves on every heartbeat and would defeat the gate's own identity
   // comparison. The gate needs the identity tuple; the model needs the age.
   // The sweep already applies ATTENTION_CAP before storing, so the stored array
@@ -175,10 +178,29 @@ export function buildCensusSeedText(currentCensusDoc) {
       ` · since ${row.since || 'unknown'} · loop ${row.loopId}`
   );
 
+  // The header count is computed from THIS route's own filtered `attention`
+  // array (loopId-present criterion), not `snapshot.attentionCount`
+  // (loopId+lane+stage, LIN-2661) — a deliberate, permanent divergence, not a
+  // bug to reconcile later. `snapshot.attentionCount` only counts rows the
+  // gate trusts as identity-tuples for its own no-delta diff; this header
+  // must count the SAME set as `attentionLines` above so the header and the
+  // rendered rows never disagree (the invariant at
+  // `tests/unit/flight-companion-turn-route.test.js:982-984`). The two predicates
+  // can differ in both directions: a row with an id but no `lane`/`stage`
+  // renders here (counted in the header) but is excluded from the gate's own
+  // `attentionCount`; conversely a falsy-but-present `loopId` (e.g. `''`) is
+  // dropped by this route's truthiness filter but kept by the gate's `!= null`
+  // check, so the gate's count can exceed the header's. No producer emits
+  // that second case today, and it is harmless either way since this header
+  // is compared only against this route's own rows, never against the gate's
+  // count. Do NOT "fix" the two numbers back into agreement: doing so either
+  // re-admits an unsanitized tuple into the gate's identity diff, or deletes
+  // the tested honest-partial-row rendering at
+  // `tests/unit/flight-companion-turn-route.test.js:979`.
   const lines = [
     'CURRENT CENSUS (authoritative — these numbers are ground truth; narrate them, never recompute or restate them differently):',
     laneLines,
-    `  attention items: ${snapshot.attentionCount}${snapshot.truncated ? ' (list truncated)' : ''}`,
+    `  attention items: ${attention.length}${snapshot.truncated ? ' (list truncated)' : ''}`,
   ];
   if (attentionLines.length) {
     lines.push('ATTENTION ROWS (each is a real run — name the task, never just the count):', ...attentionLines);
