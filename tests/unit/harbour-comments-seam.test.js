@@ -64,6 +64,23 @@ function makeFakeLedger({ throwOnRecord = false } = {}) {
   };
 }
 
+// LIN-2664 F2: the ORIGINAL create's ledger write fails once, then heals on
+// any later attempt — models a transient ledger outage that has cleared by
+// the time a dedupe-hit resubmission re-attempts the record.
+function makeFlakyLedger() {
+  const calls = [];
+  let attempt = 0;
+  return {
+    calls,
+    async record({ urlKey, commentId }) {
+      attempt += 1;
+      calls.push({ urlKey, commentId, attempt });
+      if (attempt === 1) throw new Error('ledger down (first attempt)');
+      return { urlKey, commentId, recordedAt: new Date().toISOString() };
+    },
+  };
+}
+
 // Modelled on tests/unit/harbour-comments-store.test.js's mock collection.
 function createMockCollection() {
   const docs = [];
@@ -209,6 +226,31 @@ describe('seam 1 — POST /api/proxy/issues/:issueId/comments (routes/proxy-writ
 
     const { status } = await postProxyComment(app, ISSUE_ID, { body: 'seam1-nostore body' });
     assert.strictEqual(status, 201);
+  });
+
+  // LIN-2664 F2: the failure this fixes — a dedupe-hit resubmission returned
+  // the prior comment WITHOUT ever re-attempting the ledger record, so a
+  // comment whose original ledger write failed stayed permanently unrecorded.
+  test('LIN-2664 F2: a dedupe-hit repairs the ledger after the original create\'s record() failed', async () => {
+    const provider = new FakeWriteProvider({ name: 'seam1-repair' });
+    const ledger = makeFlakyLedger();
+    const app = buildProxyApp({ provider, harbourCommentsStore: ledger });
+    const body = 'seam1-repair body';
+
+    const first = await postProxyComment(app, ISSUE_ID, { body });
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(ledger.calls.length, 1, 'the original create attempted (and failed) its ledger record');
+
+    const second = await postProxyComment(app, ISSUE_ID, { body });
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true, 'still served from the dedupe cache — no second comment minted');
+    assert.strictEqual(provider.calls.createComment.length, 1, 'no second provider write on the dedupe hit');
+    assert.strictEqual(ledger.calls.length, 2, 'the dedupe hit re-attempted the ledger record');
+    assert.strictEqual(
+      ledger.calls[1].commentId,
+      first.body.comment.id,
+      'the repair attempt targets the SAME comment id the original create minted'
+    );
   });
 });
 

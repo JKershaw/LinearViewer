@@ -805,6 +805,55 @@ describe(
       }
     });
 
+    // --- LIN-2664 (F1): harbour-comments' _id-based lookup uses the
+    // AUTOMATIC _id_ index, never a shipped INDEX_SPECS entry ---
+    //
+    // Unlike the lineage query above (which builds its index from a shipped
+    // db-indexes.js spec, so it can't drift from production), harbour-comments
+    // has NO spec to look up — lib/db-indexes.js's "Deliberately NOT indexed"
+    // list documents it as relying on the automatic _id_ index every MongoDB
+    // collection gets for free. This test asserts that reliance directly:
+    // no createIndex call here at all.
+    test('harbour-comments _id $in lookup (wereRecordedByHarbour) is served by the automatic _id_ index, not a collection scan (LIN-2664 F1)', async () => {
+      const collection = freshCollection('harbour-comments');
+
+      const urlKey = 'acme';
+      const docs = [];
+      const idKeys = [];
+      for (let i = 0; i < 25; i++) {
+        const commentId = randomUUID();
+        const _id = `${urlKey}::${commentId}`;
+        docs.push({ _id, urlKey, commentId, recordedAt: new Date() });
+        idKeys.push(_id);
+      }
+      // Noise: a large unrelated population in the SAME collection, so an
+      // accidental COLLSCAN would show up as touching far more docs than the
+      // matched set.
+      for (let n = 0; n < 3000; n++) {
+        const commentId = randomUUID();
+        docs.push({ _id: `other-workspace::${commentId}`, urlKey: 'other-workspace', commentId, recordedAt: new Date() });
+      }
+      await collection.insertMany(docs);
+
+      // The exact query shape wereRecordedByHarbour issues (lib/harbour-comments-store.js).
+      const explained = await collection.find({ _id: { $in: idKeys } }).explain('executionStats');
+      const stats = explained.executionStats;
+
+      const ixscan = findStage(stats.executionStages, 'IXSCAN');
+      assert.ok(ixscan, 'the harbour-comments _id lookup must be served by an index scan, not a COLLSCAN');
+      assert.strictEqual(
+        ixscan.indexName,
+        '_id_',
+        'the lookup must use the automatic _id_ index — there is no shipped INDEX_SPECS entry to build one from'
+      );
+      assert.strictEqual(
+        findStage(stats.executionStages, 'COLLSCAN'),
+        null,
+        'no collection scan may appear in the winning plan'
+      );
+      assert.strictEqual(stats.nReturned, 25, 'exactly the seeded ledger rows come back');
+    });
+
     test('addFeedback: TWO DISTINCT beat items sharing one edge each win their own terminalWakeItems CAS slot on real MongoDB (LIN-1357)', async () => {
       // The regression this ticket fixes, proven against real MongoDB: a
       // multi-beat stepper's beat 1 and beat 2 are distinct dispatch ids that

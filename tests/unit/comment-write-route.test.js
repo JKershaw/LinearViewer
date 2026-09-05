@@ -74,7 +74,24 @@ function makeFakeTaskDecisionsStore(overrides = {}) {
   return { store, calls };
 }
 
-function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore } = {}) {
+// LIN-2664 F2: the ORIGINAL create's ledger write fails once, then heals on
+// any later attempt — models a transient harbour-comments ledger outage that
+// has cleared by the time a dedupe-hit resubmission re-attempts the record.
+function makeFlakyHarbourCommentsStore() {
+  const calls = [];
+  let attempt = 0;
+  return {
+    calls,
+    async record({ urlKey, commentId }) {
+      attempt += 1;
+      calls.push({ urlKey, commentId, attempt });
+      if (attempt === 1) throw new Error('ledger down (first attempt)');
+      return { urlKey, commentId, recordedAt: new Date().toISOString() };
+    },
+  };
+}
+
+function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore } = {}) {
   registerProvider(provider);
   const app = express();
   app.use(express.json());
@@ -90,6 +107,7 @@ function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore } 
     customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
     reportHistoryStore: {}, dispatchQueueStore: dispatchQueueStore || {}, agentStatusStore: {}, promptTraceStore: {},
     taskDecisionsStore,
+    harbourCommentsStore,
   });
   app.use(workspaceRouter);
 
@@ -521,5 +539,33 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — task-decision answer
     const third = await postComment(app, ISSUE_ID, payload);
     assert.strictEqual(third.status, 200);
     assert.strictEqual(calls.markOutcome.length, 2, 'no further stamp once one has already succeeded');
+  });
+});
+
+// =============================================================================
+// LIN-2664 F2: dedupe-hit harbour-comments ledger repair on this seam
+// (routes/workspace-api.js POST /workspace/:urlKey/api/comments/:issueId).
+// =============================================================================
+describe('POST /workspace/:urlKey/api/comments/:issueId — harbour-comments ledger repair (LIN-2664 F2)', () => {
+  test('a dedupe-hit repairs the ledger after the original create\'s record() failed', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const harbourCommentsStore = makeFlakyHarbourCommentsStore();
+    const app = buildApp({ provider, harbourCommentsStore });
+
+    const payload = { body: 'the same text — ledger repair' };
+    const first = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(harbourCommentsStore.calls.length, 1, 'the original create attempted (and failed) its ledger record');
+
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true, 'still served from the dedupe cache — no second comment minted');
+    assert.strictEqual(calls.createComment.length, 1, 'no second provider write on the dedupe hit');
+    assert.strictEqual(harbourCommentsStore.calls.length, 2, 'the dedupe hit re-attempted the ledger record');
+    assert.strictEqual(
+      harbourCommentsStore.calls[1].commentId,
+      first.body.comment.id,
+      'the repair attempt targets the SAME comment id the original create minted'
+    );
   });
 });

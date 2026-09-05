@@ -537,6 +537,23 @@ export function createProxyWriteRoutes({
         // never from `provider.createComment` below, so it is not evidence
         // the provider accepted anything on THIS request.
         logEvent(req, '/api/proxy/issues/comments', 200, null, { skipWitness: true });
+
+        // Dedupe-hit ledger repair (LIN-2649 S1, F2): a dedupe hit means the
+        // ORIGINAL create's own ledger-record attempt (below) may have failed
+        // silently, leaving a Harbour-written comment unrecorded. Re-attempt
+        // it here before returning — idempotent upsert, same best-effort
+        // discipline as the non-dedupe path, never gates the response.
+        if (harbourCommentsStore) {
+          try {
+            const priorCommentId = prior.comment?.id;
+            if (priorCommentId) {
+              await harbourCommentsStore.record({ urlKey: req.proxyUrlKey, commentId: priorCommentId });
+            }
+          } catch (ledgerErr) {
+            console.error('Harbour-comments ledger repair failed:', ledgerErr.message);
+          }
+        }
+
         return res.status(200).json({ ...prior, deduped: true });
       }
 
