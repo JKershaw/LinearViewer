@@ -205,6 +205,14 @@
     return 'sweep last seen ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' \u00b7 the periodic scan may be down';
   }
 
+  // Third sibling to formatCheckIn/formatSweepNotSeen (LIN-2487). Takes no
+  // date on purpose: `no-census` means there has never BEEN a scan, so there
+  // is no timestamp to name — unlike sweep-not-seen, which names when the
+  // sweep was last seen. Pure, like both siblings.
+  function formatNoCensus() {
+    return 'no fleet scan yet';
+  }
+
   // ─── DOM-touching glue ───────────────────────────────────────────────────
 
   function setEmptyVisible(visible) {
@@ -254,6 +262,21 @@
     checkInEl.textContent = formatSweepNotSeen(sweepLastSeenAt ? new Date(sweepLastSeenAt) : null);
     checkInEl.hidden = false;
     checkInEl.classList.add('fc-checkin--warning');
+  }
+
+  // Sibling to the two above (LIN-2487) — the SAME single, replaceable element.
+  // Deliberately does NOT set `fc-checkin--warning`, and removes it: a
+  // workspace with no census yet is usually a brand-new one inside the sweep's
+  // own 60s interval, which is not a fault. The distinct TEXT is the signal —
+  // an operator watching "no fleet scan yet" persist knows something is wrong,
+  // where "nothing new" told them the opposite. Telling a first-run workspace
+  // apart from a sweep whose register() rejected at boot needs a persistence
+  // signal the client does not have; see the ticket for that observation.
+  function updateCheckInStatusNoCensus() {
+    if (!checkInEl) return;
+    checkInEl.textContent = formatNoCensus();
+    checkInEl.hidden = false;
+    checkInEl.classList.remove('fc-checkin--warning');
   }
 
   function appendAssistantBubble() {
@@ -478,8 +501,19 @@
         // effect stays 'double' either way: nothing was surfaced by a model
         // (never 'reset'), and a dead sweep can recover (never 'stop' —
         // advanceCadence has no un-stop).
+        //
+        // LIN-2487: `no-census` is the OTHER reason that does not mean
+        // "checked, nothing new" — there is no census document at all, so
+        // nothing was checked. LIN-2438 deliberately left this reason
+        // un-relabelled inside the gate (it is an honest reason, and the gate
+        // tests pin that it is never rewritten), which meant it arrived here
+        // and fell through to the ordinary check-in line — reporting a
+        // successful quiet scan for a fleet that has never been scanned.
+        // Handled here, on the client, exactly as that ticket intended.
         if (classification.reason === 'sweep-not-seen') {
           updateCheckInStatusSweepNotSeen(classification.sweepLastSeenAt);
+        } else if (classification.reason === 'no-census') {
+          updateCheckInStatusNoCensus();
         } else {
           updateCheckInStatus();
         }
@@ -726,6 +760,7 @@
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
+      formatNoCensus,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },

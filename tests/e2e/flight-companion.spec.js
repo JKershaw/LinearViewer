@@ -266,5 +266,41 @@ test.describe('Flight Companion Page (experimental)', () => {
       await expect(page.locator('.fc-msg-who')).toHaveCount(0);
       await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
     });
+
+    // LIN-2487 — the same shape for the OTHER gate-silent reason that does not
+    // mean "checked, nothing new". LIN-2438 left `no-census` un-relabelled in
+    // the gate (correctly — it is an honest reason), and the client had no
+    // branch for it, so a fleet that has never been scanned reported a
+    // successful quiet scan. Real DOM, real client, no model call.
+    test('a gate-silent no-census response says no scan has happened, rather than reporting a quiet one', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+      await page.clock.install();
+      await page.route('**/api/flight-companion/turn', (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+        });
+      });
+
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      await page.clock.fastForward(30000);
+
+      const checkin = page.locator('#flight-companion-checkin');
+      await expect(checkin).toBeVisible();
+      await expect(checkin).toContainText('no fleet scan yet');
+      // The defect, asserted directly: this line used to claim a scan happened.
+      await expect(checkin).not.toContainText('nothing new');
+      // Not styled as a warning — the common case is a brand-new workspace
+      // inside the sweep's own interval, which is not a fault.
+      await expect(checkin).not.toHaveClass(/fc-checkin--warning/);
+
+      await expect(page.locator('.fc-msg-who')).toHaveCount(0);
+      await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
+    });
   });
 });
