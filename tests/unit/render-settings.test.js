@@ -62,6 +62,46 @@ describe('renderSettingsPage — AI usage section', () => {
   test('does not throw when llmStats is omitted', () => {
     assert.doesNotThrow(() => renderSettingsPage('Acme', BASE));
   });
+
+  test('renders latency rows and the SSE/keepalive caveat when latencyByFeatureModel is populated', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      llmStats: {
+        totalCalls: 3,
+        totalCost: 0.035,
+        totalTokens: 12345,
+        byFeature: [{ feature: 'recommend', calls: 3, cost: 0.035 }],
+        latencyByFeatureModel: [
+          { feature: 'recommend', model: 'openai/gpt-5.4-mini', count: 2, p50Ms: 1200, p90Ms: 1800, maxMs: 2000 },
+          { feature: 'brief', model: 'anthropic/claude-opus-5', count: 1, p50Ms: 500, p90Ms: 500, maxMs: 500 }
+        ]
+      }
+    });
+    assert.match(html, /latency \(feature × model\):/);
+    assert.match(html, /recommend · openai\/gpt-5\.4-mini:/);
+    assert.match(html, /2 calls · p50 1200ms · p90 1800ms · max 2000ms/);
+    assert.match(html, /brief · anthropic\/claude-opus-5:/);
+    assert.match(html, /1 call · p50 500ms · p90 500ms · max 500ms/); // singular "call"
+    assert.match(html, /end-to-end response time/);
+    assert.match(html, /not time-to-first-token/);
+    assert.match(html, /SSE lanes/);
+  });
+
+  test('renders no latency node or caveat when latencyByFeatureModel is absent or empty', () => {
+    const base = {
+      totalCalls: 1,
+      totalCost: 0.01,
+      totalTokens: 100,
+      byFeature: [{ feature: 'recommend', calls: 1, cost: 0.01 }]
+    };
+    const htmlAbsent = renderSettingsPage('Acme', { ...BASE, llmStats: base });
+    assert.doesNotMatch(htmlAbsent, /latency \(feature × model\):/);
+    assert.doesNotMatch(htmlAbsent, /end-to-end response time/);
+
+    const htmlEmpty = renderSettingsPage('Acme', { ...BASE, llmStats: { ...base, latencyByFeatureModel: [] } });
+    assert.doesNotMatch(htmlEmpty, /latency \(feature × model\):/);
+    assert.doesNotMatch(htmlEmpty, /end-to-end response time/);
+  });
 });
 
 describe('renderSettingsPage — provider context disclosure (LIN-2357)', () => {
