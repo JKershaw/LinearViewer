@@ -1828,6 +1828,31 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     ]);
     assert.strictEqual(row.latestFeedback, 'hello');
   });
+
+  test('LIN-2653 F1: a bookkeeping stamp flips both lifecycle and waitingOnHuman for projectActiveSession', () => {
+    const baseLoop = {
+      loopId: 's-fossil', kind: 'autopilot', dispatchedAt: T_FLEET_OLD, agentState: 'waiting',
+      terminalStatus: null, wakeMarker: 'blocked', feedback: [{ message: '[blocked] waiting', timestamp: T_FLEET_OLD }],
+    };
+    const opts = { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS };
+
+    const unstamped = projectActiveSession(
+      { sessionId: 's1', seedIssue: 'LIN-9', tasksTouched: [], dispatchedAt: T_FLEET_OLD, loops: [baseLoop] },
+      opts
+    );
+    assert.strictEqual(unstamped.lifecycle, 'blocked');
+    assert.strictEqual(unstamped.waitingOnHuman, true);
+
+    const stamped = projectActiveSession(
+      {
+        sessionId: 's1', seedIssue: 'LIN-9', tasksTouched: [], dispatchedAt: T_FLEET_OLD,
+        loops: [{ ...baseLoop, bookkeeping: { at: T_FLEET_OLD, by: 'operator', reason: 'fossil' } }],
+      },
+      opts
+    );
+    assert.strictEqual(stamped.lifecycle, 'resolved');
+    assert.strictEqual(stamped.waitingOnHuman, false);
+  });
 });
 
 function decisionEntry(id, question, timestamp, optionCount = 0) {

@@ -317,6 +317,40 @@ describe('fossil pass T20 — --execute writes, against a real MangoDB tmpdir', 
       assert.equal(row.bookkeeping, null, `${id} must be untouched by a dry run`);
     }
   });
+
+  test('F2 (LIN-2653 close-out): the row must go through runFossilPass\'s own read, not a fixture bypass — a genuinely recent row is excluded, which only holds if that read is lean:false', async () => {
+    // `dispatchedAt`/`resolvedAt` are 20 days old (well past FOSSIL_AGE_MS on
+    // gate 2's own-signals fallback), but the row's OWN raw feedback carries
+    // a `[blocked]` entry just 2 days old — real data a non-lean read
+    // preserves. `runFossilPass` hardcodes `lean: false` at its one
+    // `getLoopsForWorkspace` call site specifically so gate 3
+    // (`ownRawLastActivityMs`) sees that entry; a `lean: true` read collapses
+    // `feedback` to `[]` in `_buildLoops` (lib/pipeline-loops.js:730),
+    // which falls back to the old `dispatchedAt` and would wrongly pass gate
+    // 3 on "was this row dispatched long ago" alone — the exact silent
+    // failure mode M17 proved by flipping that one literal and watching the
+    // whole suite stay green.
+    const { store } = await seed([
+      fossilRow('e-recent-feedback', {
+        dispatchedAt: daysAgo(20),
+        resolvedAt: daysAgo(20),
+        feedback: [{ message: '[blocked] need a decision', timestamp: daysAgo(2) }]
+      })
+    ]);
+
+    const { perWorkspace } = await runFossilPass({
+      dispatchStore: store,
+      agentStatusStore: emptyAgentStatusStore,
+      urlKeys: [URL_KEY],
+      now: NOW_MS
+    });
+
+    const eligibleIds = perWorkspace[0].selection.eligible.map((r) => r.loopId);
+    assert.ok(!eligibleIds.includes('e-recent-feedback'),
+      'a row whose own raw feedback is 2 days old must not be selected on a 20-day-old dispatchedAt alone');
+    const skipped = perWorkspace[0].selection.skipped.find((s) => s.loopId === 'e-recent-feedback');
+    assert.equal(skipped?.reason, 'own-row-recent-activity');
+  });
 });
 
 describe('fossil pass — a failed workspace read stamps nothing for that workspace', () => {
@@ -354,6 +388,51 @@ describe('fossil pass — a failed workspace read stamps nothing for that worksp
 
     assert.ok(result.stamped.some((s) => s.urlKey === 'healthy'), 'the healthy workspace still proceeded');
     assert.match(result.report, /1 FAILED: broken — stamped nothing/, 'the report names the failure honestly');
+  });
+});
+
+describe('fossil pass F4 (LIN-2653 close-out) — a write error is reported as a write error, not a benign refusal', () => {
+  // `stampBookkeeping`'s catch collapses BOTH "already stamped / no longer
+  // taken" and "the write itself threw" into the identical
+  // `{ok:false, reason:'not-found'}` shape (lib/dispatch-store.js — correct
+  // for its own never-throws contract). `runFossilPass` must tell them apart
+  // by reading the row back: still `taken` + `bookkeeping: null` means the
+  // write never landed even though its own precondition still holds.
+  function storeWithStampFailure({ postFailureStatus, postFailureBookkeeping }) {
+    return {
+      listObservedWorkspaceKeys: async () => [URL_KEY],
+      listItems: async () => [],
+      listHistory: async () => ({ items: [fossilItem('e1')], total: 1 }),
+      stampBookkeeping: async () => ({ ok: false, reason: 'not-found' }),
+      getItemStatus: async (_urlKey, itemId) => (itemId === 'e1'
+        ? { id: itemId, status: postFailureStatus, bookkeeping: postFailureBookkeeping }
+        : null)
+    };
+  }
+
+  test('a row still eligible after the failed write is disposition "write-error"', async () => {
+    const store = storeWithStampFailure({ postFailureStatus: 'taken', postFailureBookkeeping: null });
+    const result = await runFossilPass({
+      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, now: NOW_MS, execute: true
+    });
+    assert.equal(result.stamped.length, 1);
+    assert.equal(result.stamped[0].disposition, 'write-error');
+    assert.match(result.report, /WRITE ERROR — still eligible after the attempt, so the write itself failed \(not a benign refusal\): 1/);
+    assert.match(result.report, /e1 — not-found/);
+  });
+
+  test('a row already stamped or no longer taken by the time of the re-read is disposition "refused"', async () => {
+    const store = storeWithStampFailure({
+      postFailureStatus: 'taken',
+      postFailureBookkeeping: { at: NOW.toISOString(), by: 'someone-else', reason: 'raced' }
+    });
+    const result = await runFossilPass({
+      dispatchStore: store, agentStatusStore: emptyAgentStatusStore, now: NOW_MS, execute: true
+    });
+    assert.equal(result.stamped.length, 1);
+    assert.equal(result.stamped[0].disposition, 'refused');
+    assert.match(result.report, /Refused by the store's own filter \(already stamped, or no longer `taken`\): 1/);
+    assert.ok(!result.report.includes('WRITE ERROR'), 'no write-error section when nothing qualifies');
   });
 });
 

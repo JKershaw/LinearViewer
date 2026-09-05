@@ -41,9 +41,13 @@
  *      filter re-enforces this at the write).
  *   3. `classifyLoop` puts it in the `silent` or `blocked` lane. Reusing
  *      `classifyLoop` wholesale — rather than reimplementing its checks — is
- *      what makes terminal rows, superseded rows and live rows fall out for
- *      free: a terminal row classifies `terminal` before the lane branches are
- *      reached, and a `followUpTo`-superseded row falls through to `unknown`.
+ *      what makes terminal rows and live rows fall out for free: a terminal
+ *      row classifies `terminal` before the lane branches are reached. A
+ *      `followUpTo`-superseded row does NOT fall through to `unknown` —
+ *      `classifyLoop` still classifies it `silent`/`blocked` on its own stale
+ *      activity signal, so it needs the separate explicit
+ *      `superseded.has(loopId)` gate below (see that gate's comment,
+ *      `:378`).
  *   4. GATE 2 (F1, the one clock): `now - loopLastActivityMs(loop) >
  *      FOSSIL_AGE_MS`. This is the IDENTICAL function over the IDENTICAL Loop
  *      record with the IDENTICAL strict `>` comparison that the census itself
@@ -497,11 +501,17 @@ export function buildFossilReport({ perWorkspace, now, headSha = null, execute =
   if (execute) {
     lines.push('');
     lines.push(`## Stamped: ${stamped.filter(s => s.ok).length} of ${stamped.length} attempted`);
-    const refused = stamped.filter(s => !s.ok);
+    const refused = stamped.filter(s => !s.ok && s.disposition !== 'write-error');
+    const writeErrors = stamped.filter(s => !s.ok && s.disposition === 'write-error');
     if (refused.length) {
       lines.push(`Refused by the store's own filter (already stamped, or no longer \`taken\`): ${refused.length}`);
       for (const row of refused.slice(0, 20)) lines.push(`  ${row.loopId} — ${row.reason}`);
       if (refused.length > 20) lines.push(`  … and ${refused.length - 20} more`);
+    }
+    if (writeErrors.length) {
+      lines.push(`WRITE ERROR — still eligible after the attempt, so the write itself failed (not a benign refusal): ${writeErrors.length}`);
+      for (const row of writeErrors.slice(0, 20)) lines.push(`  ${row.loopId} — ${row.reason}`);
+      if (writeErrors.length > 20) lines.push(`  … and ${writeErrors.length - 20} more`);
     }
   } else {
     lines.push('');
@@ -565,7 +575,27 @@ export async function runFossilPass({
 
     for (const row of selection.eligible) {
       const result = await dispatchStore.stampBookkeeping(urlKey, row.loopId, { by, reason: STAMP_REASON });
-      stamped.push({ urlKey, loopId: row.loopId, ok: result.ok === true, reason: result.reason || null });
+      const ok = result.ok === true;
+      // F4 (LIN-2653 close-out): `stampBookkeeping`'s catch collapses a genuine
+      // write error into the SAME `{ok:false, reason:'not-found'}` shape as an
+      // ordinary "already stamped, or no longer taken" filter miss — correct
+      // for the store's own never-throws contract (lib/dispatch-store.js:
+      // ~1353-1370), but a report that renders every `!ok` row as "benign
+      // refusal" would misreport a transient write failure as expected during
+      // `--execute`. Distinguish downstream, without touching the store: a
+      // row selected as eligible was `taken` with `bookkeeping: null` at
+      // selection time, so if a fresh read finds it STILL matches that same
+      // shape, the write never landed even though its own precondition still
+      // holds — a write error, not a refusal. Any other current state (now
+      // stamped, no longer `taken`) is the ordinary benign case.
+      let disposition = null;
+      if (!ok) {
+        const current = await dispatchStore.getItemStatus(urlKey, row.loopId).catch(() => null);
+        disposition = (current && current.status === 'taken' && !current.bookkeeping)
+          ? 'write-error'
+          : 'refused';
+      }
+      stamped.push({ urlKey, loopId: row.loopId, ok, reason: result.reason || null, disposition });
     }
   }
 

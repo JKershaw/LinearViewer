@@ -153,6 +153,15 @@ entry is not independently guarded beyond gates 7 and 8.
   `_formatHistoryItem` — `listHistory`, `getItemStatus`.
 * `GET /workspace/:urlKey/api/dispatch/history` (session auth) returns `listHistory`
   wholesale, so it carries the field.
+* `lib/chat-tools.js` — a second `classifyLoop` consumer. `projectActiveSession`
+  (`:833` calls `classifyLoop` per loop) folds the per-loop lanes into two
+  human-facing signals: `lifecycle` and `waitingOnHuman` (`:876`,
+  `[...laneByLoopId.values()].includes('blocked')`). A stamped row now
+  classifies `resolved` instead of `blocked`, so both flip — `blocked`/`true`
+  becomes `resolved`/`false` — for that loop. `waitingOnHuman` feeds a
+  human-facing Flight Companion signal, so this is the surface an operator
+  most needs to know about before authorising the stamp: retiring a fossil
+  correctly stops it from reporting as waiting-on-a-human.
 
 It is **not** exposed on the consumer proxy surfaces: `GET /api/proxy/dispatch` and
 `GET /api/proxy/dispatch/{id}` each build their response from an explicit field
