@@ -142,10 +142,23 @@ export function buildCensusSeedText(currentCensusDoc) {
   // comparison. The gate needs the identity tuple; the model needs the age.
   // The sweep already applies ATTENTION_CAP before storing, so the stored array
   // is bounded and `truncated` says whether it was cut.
+  //
+  // Every field is defended, not just two. This document is persisted store
+  // state read back at turn time, so a row written by an older sweep revision
+  // can be partial — and this function is called from
+  // `buildFlightCompanionMessages` with no try/catch around it, so one
+  // malformed row would take out the whole companion turn. Rendering the
+  // literal string "undefined" inside a block the prompt calls ground truth is
+  // the worse failure of the two, so an unusable row is skipped outright.
   const attention = Array.isArray(currentCensusDoc.state?.attention) ? currentCensusDoc.state.attention : [];
-  const attentionLines = attention.map(
-    (row) => `  - ${row.issue || '(no task)'} · ${row.lane} · stage ${row.stage ?? 'unknown'} · since ${row.since} · loop ${row.loopId}`
-  );
+  const attentionLines = [];
+  for (const row of attention) {
+    if (!row || typeof row !== 'object' || !row.loopId) continue;
+    attentionLines.push(
+      `  - ${row.issue || '(no task)'} · ${row.lane || 'unknown lane'} · stage ${row.stage || 'unknown'}` +
+      ` · since ${row.since || 'unknown'} · loop ${row.loopId}`
+    );
+  }
 
   const lines = [
     'CURRENT CENSUS (authoritative — these numbers are ground truth; narrate them, never recompute or restate them differently):',
@@ -189,8 +202,12 @@ function buildFlightCompanionMessages({ history, message, censusDoc }) {
       "You are the Flight Companion for this workspace — a friendly, up-to-speed colleague who " +
         "watches work in flight and talks it through with the human.",
       buildCensusSeedText(censusDoc),
-      "Use your tools (list_task_sessions, get_session, get_stack, and the rest of the read catalog) " +
-        "when you want more depth than the census above gives you. You may call send_follow_up to " +
+      "Use your tools when you want more depth than the census above gives you. For \"what is in " +
+        "flight?\" or \"what is stalled?\" call list_active_sessions, which returns one row per " +
+        "session with real session ids and task identifiers — not counts; for \"what needs me?\" " +
+        "call it with lane 'waiting', or call list_pending_decisions for the questions themselves. " +
+        "Then drill in with get_session, and reach for get_stack, list_task_sessions and the rest " +
+        "of the read catalog as needed. You may call send_follow_up to " +
         "reason about or request a follow-up on a session, but its write may not always execute " +
         "immediately — respect whatever the tool itself reports back.",
     ].join('\n\n'),

@@ -899,16 +899,57 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
       },
     };
     const text = buildCensusSeedText(censusDoc);
+    const lines = text.split('\n');
 
-    // Byte-for-byte: every field of every row reaches the model, so it can say
-    // "LIN-2515 has been parked since 01:35" instead of "25 attention items".
-    for (const row of attention) {
-      for (const value of [row.loopId, row.issue, row.lane, row.stage, row.since]) {
-        assert.ok(text.includes(value), `attention row value ${value} must appear verbatim in the seed`);
-      }
+    // Byte-for-byte on the RENDERED LINE, not per-field containment. Asserting
+    // only that each value appears *somewhere* passes even when the lane and
+    // stage are swapped — which, inside a block the prompt calls ground truth,
+    // is exactly the failure this ticket exists to prevent.
+    const expected = [
+      '  - LIN-2515 · blocked · stage close-out · since 2026-09-05T01:35:00.000Z · loop loop-a',
+      '  - LIN-2604 · silent · stage plan · since 2026-09-05T03:10:00.000Z · loop loop-b',
+    ];
+    for (const line of expected) {
+      assert.ok(lines.includes(line), `expected exactly this line:\n${line}\ngot:\n${text}`);
     }
+    // Each row exactly once — a duplicated row would double-count the fleet.
+    for (const line of expected) {
+      assert.strictEqual(lines.filter(l => l === line).length, 1, 'each attention row renders once');
+    }
+    // Rows appear in the census doc's own order, never re-sorted here: the sweep
+    // already sorted them and this function's contract is no-recompute.
+    assert.ok(lines.indexOf(expected[0]) < lines.indexOf(expected[1]));
     // The count survives alongside the rows — this is additive, not a swap.
     assert.match(text, /attention items: 2\b/);
+  });
+
+  test('LIN-2617: a partial or malformed attention row degrades instead of rendering "undefined" or throwing', () => {
+    const base = { working: 0, silent: 0, blocked: 2, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
+    // The census doc is persisted store state read back at turn time, and this
+    // function is called with no try/catch around it — one bad row from an
+    // older sweep revision must not take out the whole companion turn.
+    //
+    // A literal `null` row is NOT covered here, and deliberately so: it throws
+    // upstream of this function, in `buildCompanionSnapshot`
+    // (lib/flight-companion-gate.js:219, `attention.map(row => [row.loopId, …])`),
+    // which this change's file carve does not permit editing. That is a
+    // pre-existing defect on the gate's own read path, not one this rendering
+    // introduces, and it is reported rather than worked around here.
+    const text = buildCensusSeedText({
+      rev: 3, stateHash: 'h',
+      state: {
+        lanes: base, truncated: false,
+        attention: ['nonsense', { lane: 'blocked' }, { loopId: 'l9' }, { loopId: 'l8', issue: 'LIN-1', lane: 'blocked', stage: 'plan', since: '2026-09-05T00:00:00.000Z' }],
+      },
+    });
+    assert.doesNotMatch(text, /undefined/, 'never the literal string "undefined" inside a ground-truth block');
+    // A row with no loopId cannot be drilled into, so it is dropped outright
+    // rather than rendered as a half-row.
+    assert.doesNotMatch(text, /\(no task\) · blocked/);
+    // A row with an id but missing fields still renders, honestly labelled.
+    assert.ok(text.includes('  - (no task) · unknown lane · stage unknown · since unknown · loop l9'));
+    // ...and the well-formed row is unaffected.
+    assert.ok(text.includes('  - LIN-1 · blocked · stage plan · since 2026-09-05T00:00:00.000Z · loop l8'));
   });
 
   test('LIN-2617: the seed states what a lane actually counts, so a loop total is never narrated as tasks', () => {
