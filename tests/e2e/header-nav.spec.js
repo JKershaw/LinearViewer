@@ -793,15 +793,25 @@ test.describe('.nav-filters mobile density budget (LIN-2551)', () => {
     );
 
     expect(values.length).toBe(3);
+
+    // The distinction this test exists to draw: a value TRUNCATED by the `ch`
+    // cap still renders a readable span with an ellipsis, and its full text is
+    // a tap away in the dropdown. A value CRUSHED by flex shrink renders a few
+    // pixels of nothing. The `nowrap` revision produced 0px and 4px here; the
+    // shipped budget produces ~39-59px. The bound sits between the two, so it
+    // fails on a squeeze and passes on an honest cap.
+    const LEGIBLE_MIN_PX = 30;
     for (const v of values) {
-      expect(v.width, `"${v.text}" must still render legibly, not be shrunk to nothing`).toBeGreaterThanOrEqual(10);
+      expect(v.width, `"${v.text}" must still render legibly, not be shrunk to nothing`).toBeGreaterThanOrEqual(LEGIBLE_MIN_PX);
     }
-    // Real selected values render IN FULL — only a long workspace name reaches
-    // the truncation cap, which is the cap doing its job rather than a squeeze.
+
+    // And it must be the real selected values under test, not the defaults —
+    // `?team=` resolves by id, and a value that silently degraded to `all`
+    // would render ~12px and quietly measure the wrong thing.
     const [, team, assignee] = values;
     expect(team.text, 'the selected team must be the value under test, not the `all` default').toBe('Engineering');
-    expect(team.truncated, 'a real selected team name must not be truncated').toBe(false);
-    expect(assignee.truncated, 'a real selected assignee name must not be truncated').toBe(false);
+    expect(assignee.text, 'the selected assignee must be the value under test').toBe('Charlie');
+    expect(assignee.truncated, 'a short real assignee name should sit under the cap, not at it').toBe(false);
   });
 
   test('320px — below the swept range, the strip degrades by wrapping rather than by clipping', async ({ page, workerUrlKey }) => {

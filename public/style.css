@@ -2013,10 +2013,13 @@ a.wordmark:hover {
     gap: 0.75ch;
   }
 
-  /* The brand's ~80px buys the values a LONGER cap than the ≤640px rule, not
-     a shorter one — the strip reads better after this fix than before it. */
+  /* The brand's ~80px is spent on fitting FOUR selectors, not on lengthening
+     three — 8ch is what leaves 360px (the tightest width carrying both a team
+     and an assignee) a margin that survives another machine's font metrics.
+     A 10ch cap fitted locally and still wrapped on CI at exactly that width
+     and that filter state. */
   .nav-value {
-    max-width: 10ch;
+    max-width: 8ch;
   }
 }
 
