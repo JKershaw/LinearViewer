@@ -625,7 +625,18 @@
    off the bold amber `.obs-summary-waiting` label they inherit from by
    default — the excerpt is supporting detail, not the headline. */
 .obs-summary-decision-excerpt { font-weight: 400; color: var(--muted); }
-.obs-summary-decision-options { font-weight: 400; color: var(--muted); }
+.obs-summary-decision-options {
+  font-weight: 400;
+  color: var(--muted);
+  /* LIN-2195: a label with no break opportunity — a URL, a path, an ID — has
+     no space to wrap at, so it paints straight past the card and is silently
+     cut off by `.obs-session { overflow: hidden }`: exactly the clipping
+     LIN-2184 removed `white-space: nowrap` to fix, reintroduced through the
+     back door. Measured at 185px lost on an 80-char unbreakable label. The
+     length bound alone cannot prevent this; the text has to be allowed to
+     break anywhere. */
+  overflow-wrap: anywhere;
+}
 /* Most-recent run kind beside "working…" (LIN-631). */
 .obs-summary-kind {
   font-size: 0.72rem;

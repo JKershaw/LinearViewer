@@ -53,6 +53,19 @@ const ARCHIVE_PAGE_SIZE = 30;               // archive "load more" page size
 // mobile width, the feed's primary form factor. A single named constant,
 // referenced once below, so retuning it further is a one-line change.
 const DECISION_EXCERPT_CHARS = 65;
+// LIN-2195: the option run's own budget, the sibling `DECISION_EXCERPT_CHARS`
+// never had. LIN-2184 removed `white-space: nowrap` from
+// `.obs-summary-decision-options` to stop the run being silently clipped
+// against `.obs-session { overflow: hidden }` — correct, since visible beats
+// silently truncated — but that traded clipping for unbounded card GROWTH,
+// because nothing bounded the options. The reviewer measured a 5-option
+// decision at 7 lines on a 360px card, against 1 line before.
+//
+// 80 rather than 65: the run is a bracketed list of labels where the case
+// excerpt is prose, so the same budget would typically admit only two short
+// options. This keeps the glance surface glanceable at 360px while still
+// usually showing more than one choice.
+const DECISION_OPTIONS_CHARS = 80;
 
 // Filter state.
 const hiddenWorkspaces = new Set();        // urlKeys toggled off
@@ -329,6 +342,92 @@ function excerptDecisionCase(decisionCase, maxChars) {
 }
 
 /**
+ * LIN-2195: bound the rendered option run on a feed card.
+ *
+ * Takes whole labels in order until the next one would exceed the budget, then
+ * reports the remainder as `+N more`. Whole-label rather than a flat character
+ * truncation of the joined run: an option label cut mid-word ("Rebuild the ind…")
+ * reads as a rendering bug, and the run's job on the glance surface is to say
+ * what KIND of choice is waiting, which a half-word cannot do.
+ *
+ * The one exception is a first label that alone exceeds the budget — there is
+ * nothing to fall back to, so it is truncated with the same trailing ellipsis
+ * `excerptDecisionCase` uses. Truncating one label beats rendering a card whose
+ * height is set by a single long option.
+ *
+ * Returns `{labels, overflow}`, not a string, so the caller keeps ownership of
+ * escaping — the labels are agent-authored text and must not be pre-joined into
+ * markup here.
+ *
+ * @param {Array<{label: string}>} options
+ * @param {number} maxChars - budget across the joined labels
+ * @returns {{labels: Array<string>, overflow: number}}
+ */
+function boundDecisionOptions(options, maxChars) {
+  const all = (Array.isArray(options) ? options : [])
+    .map(o => (o && typeof o.label === 'string' ? o.label : ''))
+    .filter(label => label.length > 0);
+  if (all.length === 0) return { labels: [], overflow: 0 };
+
+  // Greedy fill against a budget: whole labels in order, ' / ' between them.
+  function fill(budget) {
+    const labels = [];
+    let used = 0;
+    for (const label of all) {
+      const cost = label.length + (labels.length ? 3 : 0);
+      if (labels.length && used + cost > budget) break;
+      if (!labels.length && cost > budget) {
+        // Nothing to fall back to, so truncate — walking CODE POINTS but
+        // counting UTF-16 UNITS. Both halves matter and an earlier version had
+        // only one: iterating code points stops a truncation splitting a
+        // surrogate pair (a lone half paints as U+FFFD, and emoji in an option
+        // label are not exotic), but every budget comparison in this function
+        // is in UTF-16 units, so slicing by code-point COUNT let an astral
+        // label render at roughly twice the budget — measured at 143 chars for
+        // an 80-char budget, which reproduced the very card growth this
+        // function exists to prevent. One unit is reserved for the ellipsis so
+        // the result stays INSIDE the budget rather than at budget + 1.
+        let kept = '';
+        for (const ch of label) {
+          if (kept.length + ch.length > budget - 1) break;
+          kept += ch;
+        }
+        labels.push(`${kept.trimEnd()}…`);
+        used = budget;
+        break;
+      }
+      labels.push(label);
+      used += cost;
+    }
+    return { labels, overflow: all.length - labels.length };
+  }
+
+  // The `+N more` suffix is part of what RENDERS, so it has to come out of the
+  // same budget — otherwise the constant bounds this function's return value
+  // rather than the card, and the run overruns by the suffix's own width
+  // (measured at +12 chars, 15%, before this).
+  //
+  // But a run that FITS has no suffix, so reserving up front would shorten
+  // every run to pay for a suffix most never render. Instead: fill, and only
+  // if something overflowed, re-fill with the suffix reserved. Dropping labels
+  // can only raise the overflow count, which can only widen the suffix, so
+  // this is iterated to a fixed point — it converges in one or two passes
+  // because the width grows logarithmically in the count.
+  const renderedLength = ({ labels, overflow }) =>
+    labels.join(' / ').length + (overflow > 0 ? ` +${overflow} more`.length : 0);
+
+  let result = fill(maxChars);
+  // Converge on the RENDERED length, not on the label count: a re-fill can keep
+  // the same number of labels while truncating one of them, which is a real
+  // change the count cannot see.
+  for (let pass = 0; pass < 5; pass++) {
+    if (renderedLength(result) <= maxChars) break;
+    result = fill(Math.max(1, maxChars - ` +${result.overflow} more`.length));
+  }
+  return result;
+}
+
+/**
  * The feed card's decision summary — a bounded excerpt of the case plus the
  * option labels, appended to the "waiting on you" line. NOT full prose (that
  * is the waiting banner's job, beat 3) — this is the glance. Consumes the
@@ -345,8 +444,9 @@ function renderWaitingDecisionSummary(decision, decisionCase) {
     ? ` <span class="obs-summary-decision-excerpt">${escapeHtml(excerpt)}</span>`
     : '';
   const options = Array.isArray(decision && decision.options) ? decision.options : [];
-  const optionsHtml = options.length
-    ? ` <span class="obs-summary-decision-options">[${options.map(o => escapeHtml(String(o.label))).join(' / ')}]</span>`
+  const { labels, overflow } = boundDecisionOptions(options, DECISION_OPTIONS_CHARS);
+  const optionsHtml = labels.length
+    ? ` <span class="obs-summary-decision-options">[${labels.map(l => escapeHtml(l)).join(' / ')}${overflow > 0 ? ` +${overflow} more` : ''}]</span>`
     : '';
   return `${excerptHtml}${optionsHtml}`;
 }
@@ -2189,6 +2289,8 @@ if (typeof module !== 'undefined' && module.exports) {
     // (and its budget constant) so the truncation acceptance test asserts
     // against the constant, not a hard-coded copy of its value.
     renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS,
+    // LIN-2195: the option run's budget seam.
+    boundDecisionOptions, DECISION_OPTIONS_CHARS,
     // LIN-1728 review (`2d47a7c8`, F2): expose the rulings press handler so
     // the `gone`-disposition partial-failure path (comment durably recorded,
     // the fresh run fails to start) is unit-testable against a hand-rolled

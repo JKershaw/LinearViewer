@@ -288,6 +288,50 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     await expect(optionsRun).not.toHaveText('');
     await optionsRun.scrollIntoViewIfNeeded();
 
+    // LIN-2195: the ticket's ACTUAL acceptance criterion — "the glance surface
+    // should stay glanceable at 360px" — measured rather than asserted in
+    // prose. The clip check below proves the run is CONTAINED; containment was
+    // already true before this ticket and stayed true while the card grew to 7
+    // line boxes, so it cannot witness the growth. This does.
+    //
+    // Measured RELATIVE to the same run rendered unbounded, in the same element
+    // and the same computed style, rather than against a fixed line count. An
+    // absolute count is a font-metrics assertion in disguise: it held at <= 2
+    // locally and produced 3 in the Linux CI container, where the self-hosted
+    // face resolves differently. The relative form asks the question the ticket
+    // actually asks — did bounding the run make the glance surface smaller —
+    // and is invariant to whatever font the runner ends up with.
+    const { boundedLines, unboundedLines } = await optionsRun.evaluate((el, labels) => {
+      // BOTH strings are measured in the SAME probe, from the SAME origin.
+      // Measuring the live element against a clone appended at the end of the
+      // inline flow compares a run starting at x=37 with one starting at
+      // x=237 — a ~1.5 line-box head start that is an artifact of position,
+      // not of the bound, and it let both assertions pass with the bound
+      // disabled. The probe stays INLINE inside a block wrapper: getClientRects
+      // on a block returns one border-box rect, not per-line fragments.
+      const wrap = document.createElement('div');
+      const probe = el.cloneNode(false);
+      wrap.appendChild(probe);
+      el.parentNode.parentNode.appendChild(wrap);
+      probe.textContent = el.textContent;
+      const bounded = probe.getClientRects().length;
+      probe.textContent = `[${labels.join(' / ')}]`;
+      const unbounded = probe.getClientRects().length;
+      wrap.remove();
+      return { boundedLines: bounded, unboundedLines: unbounded };
+    }, DECISION_PAYLOAD.options.map(o => o.label));
+
+    expect(unboundedLines).toBeGreaterThan(1); // the fixture must actually overflow, or this proves nothing
+    expect(boundedLines).toBeLessThan(unboundedLines);
+    // A generous absolute ceiling on top, so an unbounded run that happened to
+    // fit in 2 lines on some future runner still could not pass silently.
+    expect(boundedLines).toBeLessThanOrEqual(3);
+
+    // ...and the run must actually be doing its job — bounded, but not empty,
+    // and reporting the remainder rather than silently dropping it. The
+    // fixture's 5 options exceed the budget, so a "+N more" marker is expected.
+    await expect(optionsRun).toContainText('more');
+
     const cardBox = await card.boundingBox();
     const result = await optionsRun.evaluate(el => {
       const rects = el.getClientRects();
