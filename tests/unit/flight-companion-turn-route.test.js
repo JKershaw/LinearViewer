@@ -877,7 +877,7 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.12) — server.js store w
 });
 
 describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic census seed, copied verbatim', () => {
-  test('renders every lane count, attentionCount, and censusRev straight from buildCompanionSnapshot with no transformation', () => {
+  test('renders every lane count and censusRev straight from buildCompanionSnapshot with no transformation; the attention-items header is computed from the route\'s own filtered set, which agrees with the snapshot\'s attentionCount on well-formed input', () => {
     const censusDoc = {
       rev: 12,
       stateHash: 'hash-xyz',
@@ -896,6 +896,12 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     for (const [lane, count] of Object.entries(expectedSnapshot.lanes)) {
       assert.match(text, new RegExp(`${lane}: ${count}\\b`), `lane ${lane} must appear with its exact count`);
     }
+    // The header is route-computed (its own loopId-filtered `attention.length`,
+    // LIN-2661), not read from `snapshot.attentionCount` — but both rows here
+    // are fully well-formed, so the gate's stricter criterion and the route's
+    // looser one agree, and this fixture cannot distinguish the two sources.
+    // The malformed-row fixture below (`:944`) is what actually pins the
+    // route's own computation once the two diverge.
     assert.match(text, new RegExp(`attention items: ${expectedSnapshot.attentionCount}\\b`));
     assert.match(text, new RegExp(`census revision: ${expectedSnapshot.censusRev}\\b`));
     // Ground-truth framing must be present — the model is told not to
@@ -947,12 +953,16 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // function is called with no try/catch around it — one bad row from an
     // older sweep revision must not take out the whole companion turn.
     //
-    // A literal `null` row IS covered: `buildCompanionSnapshot` throws on one
-    // (lib/flight-companion-gate.js:219, `attention.map(row => [row.loopId, …])`),
-    // and it runs before any rendering here, so defending only the rendering
-    // would have been dead code. The array is sanitised before that call
-    // instead — which fixes it entirely inside this route, without editing the
-    // gate file, whose own latent fault on that input is reported separately.
+    // Post-LIN-2661, `buildCompanionSnapshot` itself no longer throws on a
+    // `null`/`undefined` row (lib/flight-companion-gate.js:304) — this route's
+    // own `row.loopId`-present filter is no longer crash defense, since the
+    // raw `currentCensusDoc` (including this fixture's `null` row) is now fed
+    // to it directly. This test is therefore now the route-side regression
+    // guard for the gate's non-throwing (it would fail loudly, not just
+    // degrade, if that guarantee were ever weakened), and its remaining job is
+    // rendering honesty: a row with an id but missing fields still renders
+    // here, honestly labelled, even though the gate's own stricter criterion
+    // (loopId+lane+stage) would exclude it from its identity-tuple accounting.
     const text = buildCensusSeedText({
       rev: 3, stateHash: 'h',
       state: {
