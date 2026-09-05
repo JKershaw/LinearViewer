@@ -325,9 +325,12 @@ The mechanism is the same push substrate as a subscribed orchestrator above, poi
   **per child**: each outstanding child carries its own ~30-minute liveness clock, so a child silent that
   long with no wake gets a one-line `followUpTo` liveness nudge and a fresh re-dispatch if it can't
   resume — nudged or failed on its **own** timer, so a single wedged child never freezes the siblings or
-  the batch. One exception: a child already woken to you as `blocked` is expected to stay silent
-  afterward — that silence is a human parked on it, not a wedge; don't nudge or re-dispatch it on this
-  rule, surface it to the human so they can unblock it. Never promote that per-child probe into a
+  the batch. One exception: a child already woken to you as `blocked` has a human parked on it, so
+  that silence is not a wedge — don't nudge or re-dispatch it on this rule, surface it to the human
+  so they can unblock it. That exemption lasts only while it stays blocked: where a push reaches you
+  at all, a later outcome on it does now arrive, and once you are woken on it again you judge that
+  outcome like any other and the ~30-min clock restarts from it. Never sit waiting on a wake that
+  may never come. Never promote that per-child probe into a
   standing poll.
 - **Judge its report on evidence and advance.** When the wake lands, cross-check the task's real
   artifact the way you'd check any completion — the child's "done" is still a pointer to *go and look*,
