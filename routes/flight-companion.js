@@ -74,6 +74,7 @@ import { COMPANION_INSTANCE_PREFIX, COMPANION_SEED_STATE, shouldSpendTurn, build
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
+import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
@@ -117,13 +118,16 @@ const CENSUS_LANE_KEYS = ['working', 'silent', 'blocked', 'terminal', 'queued', 
  *   result, or `null` when no sweep has ever run for this workspace.
  * @returns {string}
  */
-// Exported ONLY for direct unit testing of the verbatim guarantee (LIN-2432
-// §A.7) — `buildFlightCompanionMessages` itself stays local/unexported (per
-// beat-2 feedback: no premature lib/prompts/ extraction), the same
-// local-helper-plus-source-grep testing shape routes/task-chat.js already
-// uses for its own unexported sanitizeHistory. This is the one pure,
-// deterministic piece worth a real import-and-call test rather than a
-// source-text assertion.
+// Exported for direct unit testing of the verbatim guarantee (LIN-2432 §A.7),
+// and now also because `buildFlightCompanionMessages` reads it from another
+// module. LIN-2618 RETIRES this note's former second half ("no premature
+// lib/prompts/ extraction", beat-2 feedback): the builder has moved to
+// `lib/prompts/flight-companion-brief.js`. That note's own condition has been
+// met rather than overruled — a SECOND surface (the pasted kickoff) now needs
+// the same persona, disposition, readout shape and gate, and the in-page chat
+// having drifted away from it is the defect LIN-2618 exists to fix. The seed
+// itself deliberately stays here: it is coupled to this route's census read and
+// to `buildCompanionSnapshot`, neither of which belongs in a prompt module.
 export function buildCensusSeedText(currentCensusDoc) {
   if (!currentCensusDoc) {
     return 'CURRENT CENSUS: not available yet for this workspace (no sweep has run).';
@@ -173,12 +177,17 @@ export function buildCensusSeedText(currentCensusDoc) {
     lines.push('ATTENTION ROWS (each is a real run — name the task, never just the count):', ...attentionLines);
   }
 
-  // LIN-2619 writes this field; until it lands the key is absent and nothing is
-  // rendered, so that ticket never has to touch this function.
-  const staleAttentionCount = currentCensusDoc.state?.staleAttentionCount;
-  if (Number.isFinite(staleAttentionCount)) {
-    lines.push(`  stale attention rows (fossil, likely not really waiting): ${staleAttentionCount}`);
-  }
+  // LIN-2619's fossil fold, rendered through the SHARED helper so this line and
+  // the instruction the brief teaches (COMPANION_FOSSIL_READOUT, carried
+  // byte-identically into the pasted kickoff) cannot drift apart. #1399 landed
+  // the count alone, without its threshold; LIN-2619's review ledger item 5 asks
+  // for both, because "313 fossil rows" and "313 rows older than 7d" are
+  // different claims and only the second is actionable.
+  const staleLine = renderStaleAttentionLine(
+    currentCensusDoc.state?.staleAttentionCount,
+    currentCensusDoc.state?.staleAttentionThresholdMs
+  );
+  if (staleLine) lines.push(staleLine);
 
   lines.push(
     `  census revision: ${snapshot.censusRev}`,
@@ -191,36 +200,6 @@ export function buildCensusSeedText(currentCensusDoc) {
       '"silent" and "terminal" include historical bookkeeping. "blocked" means parked waiting on a human: alive, not dead.',
   );
   return lines.join('\n');
-}
-
-/**
- * Turn messages: system framing (persona + the §A.7 census seed) + replayed
- * history + the new turn. An auto-wake turn (no new user text) still needs a
- * turn-shaped final message so the model has something to react to — a fixed,
- * neutral prompt stands in for a real user turn.
- */
-function buildFlightCompanionMessages({ history, message, censusDoc }) {
-  const system = {
-    role: 'system',
-    content: [
-      "You are the Flight Companion for this workspace — a friendly, up-to-speed colleague who " +
-        "watches work in flight and talks it through with the human.",
-      buildCensusSeedText(censusDoc),
-      "Use your tools when you want more depth than the census above gives you. For \"what is in " +
-        "flight?\" or \"what is stalled?\" call list_active_sessions, which returns one row per " +
-        "session with real session ids and task identifiers — not counts; for \"what needs me?\" " +
-        "call it with lane 'waiting', or call list_pending_decisions for the questions themselves. " +
-        "Then drill in with get_session, and reach for get_stack, list_task_sessions and the rest " +
-        "of the read catalog as needed. You may call send_follow_up to " +
-        "reason about or request a follow-up on a session, but its write may not always execute " +
-        "immediately — respect whatever the tool itself reports back.",
-    ].join('\n\n'),
-  };
-  const turnMessage = {
-    role: 'user',
-    content: message || '(No new message from the human this tick — check on anything that changed and only speak up if there is something worth surfacing.)',
-  };
-  return [system, ...history, turnMessage];
 }
 
 /**
@@ -558,7 +537,16 @@ export function createFlightCompanionRoutes({
       }
 
       const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-      const messages = buildFlightCompanionMessages({ history: safeHistory, message: hasUserMessage ? rawMessage.trim() : null, censusDoc: currentCensusDoc });
+      // LIN-2618: the seed is rendered HERE and handed over as text, so the
+      // brief module never imports from routes/ and the "embedded unmodified"
+      // guarantee is structural rather than a convention.
+      const messages = buildFlightCompanionMessages({
+        history: safeHistory,
+        message: hasUserMessage ? rawMessage.trim() : null,
+        censusSeedText: buildCensusSeedText(currentCensusDoc),
+        now: Date.now(),
+        turnKind,
+      });
       const callMeta = { urlKey: workspace.urlKey, feature: 'flight-companion' };
 
       if (isToolCapableModel(selectedModel)) {

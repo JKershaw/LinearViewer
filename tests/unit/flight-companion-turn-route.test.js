@@ -74,6 +74,9 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MangoClient } from '@jkershaw/mangodb';
 import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
+import {
+  buildFlightCompanionMessages, renderStaleAttentionLine, formatFossilThreshold,
+} from '../../lib/prompts/flight-companion-brief.js';
 import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 
@@ -975,14 +978,46 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     const withoutRows = buildCensusSeedText({ rev: 1, stateHash: 'h', state: { lanes: base, attention: [], truncated: false } });
     assert.doesNotMatch(withoutRows, /ATTENTION ROWS/);
 
-    // LIN-2619 has not landed, so the field is absent and nothing is rendered —
-    // that ticket never has to touch this function.
-    assert.doesNotMatch(withoutRows, /stale attention rows/i);
-    const withStale = buildCensusSeedText({
+    // A census with no fossil fold renders no fossil line at all — a zero
+    // rendered as "+0 rows older than 7d" is noise that trains the model to
+    // ignore the line.
+    assert.doesNotMatch(withoutRows, /not listed/i);
+    const withZero = buildCensusSeedText({
       rev: 1, stateHash: 'h',
-      state: { lanes: base, attention: [], truncated: false, staleAttentionCount: 9 },
+      state: { lanes: base, attention: [], truncated: false, staleAttentionCount: 0, staleAttentionThresholdMs: 604800000 },
     });
-    assert.match(withStale, /stale attention rows[^\n]*: 9\b/i);
+    assert.doesNotMatch(withZero, /not listed/i);
+  });
+
+  test('LIN-2618: the fossil count renders WITH its threshold — a count alone is not an actionable claim', () => {
+    const base = { working: 0, silent: 313, blocked: 52, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
+    const text = buildCensusSeedText({
+      rev: 4, stateHash: 'h',
+      state: {
+        lanes: base, attention: [], truncated: false,
+        staleAttentionCount: 313, staleAttentionThresholdMs: 7 * 24 * 60 * 60 * 1000,
+      },
+    });
+    // LIN-2619 ledger item 5: a fossil-dominated fleet must not read as
+    // near-clean just because the visible attention list is short.
+    assert.ok(text.includes('+313 silent / blocked rows older than 7d, not listed'), text);
+    // The line is rendered through the SHARED helper, so it matches the shape
+    // the brief teaches both surfaces.
+    assert.ok(text.includes(renderStaleAttentionLine(313, 7 * 24 * 60 * 60 * 1000)));
+  });
+
+  test('LIN-2618: a malformed staleness threshold degrades rather than rendering "older than undefined"', () => {
+    const base = { working: 0, silent: 1, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
+    const text = buildCensusSeedText({
+      rev: 5, stateHash: 'h',
+      state: { lanes: base, attention: [], truncated: false, staleAttentionCount: 4 },
+    });
+    assert.doesNotMatch(text, /undefined/);
+    assert.ok(text.includes('+4 silent / blocked rows older than the staleness threshold, not listed'), text);
+    // Sub-day and non-integer thresholds still read sensibly.
+    assert.strictEqual(formatFossilThreshold(6 * 3600000), '6h');
+    assert.strictEqual(formatFossilThreshold(14 * 24 * 3600000), '14d');
+    assert.strictEqual(formatFossilThreshold(0), 'the staleness threshold');
   });
 
   test('a truncated attention list is noted, not silently dropped', () => {
@@ -1000,23 +1035,42 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     assert.doesNotMatch(text, /working: 0/);
   });
 
-  test('the route\'s system message actually embeds buildCensusSeedText\'s own output unmodified, not a re-derived summary', () => {
-    // Source-text proof that buildFlightCompanionMessages composes the system
-    // content FROM buildCensusSeedText(censusDoc) directly — combined with the
-    // direct unit tests above (which prove that function's own output is
-    // verbatim), this closes the loop without needing a live model call.
-    const start = ROUTE_SRC.indexOf('function buildFlightCompanionMessages(');
-    assert.ok(start > 0, 'expected buildFlightCompanionMessages to exist');
-    const end = ROUTE_SRC.indexOf('\n}', start);
-    const fnSrc = ROUTE_SRC.slice(start, end);
-    assert.match(fnSrc, /buildCensusSeedText\(\s*censusDoc\s*\)/);
+  test('the system message embeds buildCensusSeedText\'s own output unmodified, not a re-derived summary', () => {
+    // LIN-2618 moved this pin with the builder. It was a source-text grep while
+    // `buildFlightCompanionMessages` was unexported; now that it is exported
+    // from lib/prompts/flight-companion-brief.js this is a real import-and-call
+    // assertion — a strictly stronger claim than the grep it replaces, since it
+    // checks the actual rendered output rather than one line of source.
+    const censusDoc = {
+      rev: 7, stateHash: 'h',
+      state: {
+        lanes: { working: 3, silent: 1, blocked: 2, terminal: 5, queued: 0, resolved: 7, unknown: 0 },
+        attention: [{ loopId: 'l1', issue: 'LIN-2515', lane: 'blocked', stage: 'close-out', since: '2026-09-05T01:35:00.000Z' }],
+        truncated: false,
+      },
+    };
+    const seed = buildCensusSeedText(censusDoc);
+    const [system] = buildFlightCompanionMessages({
+      history: [], message: 'where are we?', censusSeedText: seed,
+      now: Date.parse('2026-09-05T12:00:00.000Z'), turnKind: 'user-initiated',
+    });
+    // The WHOLE seed, byte for byte — not a subset, not a reformat.
+    assert.ok(system.content.includes(seed), 'the seed must be embedded verbatim');
+    // And that really does carry the rows and the vocabulary line into the turn.
+    assert.ok(system.content.includes('LIN-2515'));
+    assert.match(system.content, /dispatch loops \(runs\)/i);
   });
 
-  test('the turn handler passes a real censusDoc through to message-building on BOTH turn shapes (auto-wake\'s already-read doc, and a fresh read for user-initiated)', () => {
-    assert.match(ROUTE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusDoc:\s*currentCensusDoc/s);
-    // The user-initiated branch must read it fresh (auto-wake already
+  test('the turn handler renders the seed from a real censusDoc and hands it to the builder', () => {
+    // The route now renders the seed and passes it as text (LIN-2618), which is
+    // what keeps lib/prompts/ free of any routes/ import. Both halves are pinned:
+    // the call site passes the rendered seed...
+    assert.match(ROUTE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*buildCensusSeedText\(currentCensusDoc\)/s);
+    // ...and the user-initiated branch reads the doc fresh (auto-wake already
     // populated currentCensusDoc via the gate, above).
     assert.match(ROUTE_SRC, /turnKind === 'user-initiated' && observerStateStore/);
+    // The builder is no longer defined in this file at all.
+    assert.doesNotMatch(ROUTE_SRC, /function buildFlightCompanionMessages\(/);
   });
 });
 
