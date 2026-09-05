@@ -78,6 +78,10 @@ test.describe('Dispatch presets settings UI', () => {
 
     const createForm = page.locator('[data-testid="dispatch-preset-create-form"]');
     await expect(createForm.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('');
+    // LIN-2616: effort is a plain opaque text input (like model), never a
+    // pre-selectable enum — but it must still be genuinely blank on an
+    // untouched new-preset row, the same invariant harness proves above.
+    await expect(createForm.locator('.dispatch-preset-toplevel-config input.dispatch-effort-input')).toHaveValue('');
     await createForm.locator('.dispatch-preset-name-input').fill('Blank config preset');
     await page.locator('.dispatch-preset-create-btn').click();
     await page.waitForLoadState('networkidle');
@@ -85,6 +89,7 @@ test.describe('Dispatch presets settings UI', () => {
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Blank config preset"]') });
     await expect(item.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('');
     await expect(item.locator('.dispatch-preset-toplevel-config input.dispatch-model-input')).toHaveValue('');
+    await expect(item.locator('.dispatch-preset-toplevel-config input.dispatch-effort-input')).toHaveValue('');
   });
 
   test('editing a preset persists the change', async ({ page, localWorkerUrlKey, request }) => {

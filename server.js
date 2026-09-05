@@ -3223,7 +3223,7 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
   // Workspace-wide dispatch defaults (LIN-1094), used only for the model/harness
   // placeholder nicety (LIN-1096) — non-load-bearing, so a failed read just
   // leaves the controls with generic placeholders.
-  let dispatchDefaults = { model: null, harness: null };
+  let dispatchDefaults = { model: null, harness: null, effort: null };
   try {
     dispatchDefaults = await resolveDispatchDefaults({ urlKey: workspace.urlKey, store: workspacePreferencesStore });
   } catch (e) {
@@ -3328,11 +3328,12 @@ app.post('/workspace/:urlKey/settings/model', workspaceFromUrl, async (req, res)
 });
 
 /**
- * Save workspace-wide + per-prompt-type dispatch model/harness defaults (LIN-1095).
- * Distinct from /settings/model above: that selects the model used to WRITE
- * prompts; this selects the model/harness dispatched agents EXECUTE with,
- * consumed at dispatch time via resolveDispatchDefaults() (LIN-1094). Both
- * fields stay opaque strings (no registry), validated with the same shared
+ * Save workspace-wide + per-prompt-type dispatch model/harness/effort defaults
+ * (LIN-1095, `effort` added LIN-2616/G2). Distinct from /settings/model above:
+ * that selects the model used to WRITE prompts; this selects the
+ * model/harness/effort dispatched agents EXECUTE with, consumed at dispatch
+ * time via resolveDispatchDefaults() (LIN-1094). All three fields stay opaque
+ * strings (no registry), validated with the same shared
  * validateOpaqueDispatchField() the dispatch/proxy routes use (LIN-1084).
  * Persists via the same read-merge-write discipline as /settings/model so
  * dispatchDefaults never clobbers modelId/features.
@@ -3355,8 +3356,10 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
 
   const model = readField('defaultModel');
   const harness = readHarness('defaultHarnessSelect');
+  const effort = readField('defaultEffort');
   validate(model, 'model');
   validate(harness, 'harness');
+  validate(effort, 'effort');
 
   // byKind is scoped to DISPATCH_DEFAULT_KINDS (the PROMPT_TEMPLATES step-kinds
   // plus `autopilot`, LIN-1278), both by only ever reading these specific field
@@ -3366,12 +3369,15 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
   for (const kind of DISPATCH_DEFAULT_KINDS) {
     const kindModel = readField(`kind__${kind}__Model`);
     const kindHarness = readHarness(`kind__${kind}__HarnessSelect`);
+    const kindEffort = readField(`kind__${kind}__Effort`);
     validate(kindModel, 'model');
     validate(kindHarness, 'harness');
-    if (kindModel || kindHarness) {
+    validate(kindEffort, 'effort');
+    if (kindModel || kindHarness || kindEffort) {
       byKind[kind] = {};
       if (kindModel) byKind[kind].model = kindModel;
       if (kindHarness) byKind[kind].harness = kindHarness;
+      if (kindEffort) byKind[kind].effort = kindEffort;
     }
   }
 
@@ -3382,6 +3388,7 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
   const dispatchDefaults = {};
   if (model) dispatchDefaults.model = model;
   if (harness) dispatchDefaults.harness = harness;
+  if (effort) dispatchDefaults.effort = effort;
   if (Object.keys(byKind).length) dispatchDefaults.byKind = byKind;
 
   try {
