@@ -235,6 +235,13 @@ export function createProxyFlightCompanionRoutes({
           followUpMode: 'propose',
           instanceKeySuffix: PROXY_INSTANCE_SUFFIX,
           via: 'proxy',
+          // LIN-2625: read-only for the playbook, never write. Every
+          // dispatched worker holds a readWrite proxy token, and a
+          // proxy-writable playbook would let any of them put text into the
+          // system turn of every user of the workspace (plan-review 2625-F3).
+          // The turn core reads the playbook regardless of this flag — only
+          // the `remember` tool and its persistence are gated by it.
+          allowPlaybookWrite: false,
           onStreamStart: startStream,
           onEvent: (type, data) => {
             events.push({ type, data });
