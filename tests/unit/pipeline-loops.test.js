@@ -890,6 +890,47 @@ describe('lean projection (LIN-622)', () => {
     }
   });
 
+  // ── T17 (LIN-2653): the pinned reader `_deriveAgentState` ────────────────
+  //
+  // The fossil pass never touches `status`, so a stamped row must read
+  // IDENTICALLY to the same row unstamped. Pinned at two levels: the
+  // derivation itself, which structurally cannot see the stamp, and the whole
+  // built Loop record, which must differ in the `bookkeeping` field and in
+  // nothing else whatsoever.
+  test('T17: _deriveAgentState is byte-identical for a stamped vs unstamped row', () => {
+    const stamp = { at: '2026-04-04T09:00:00.000Z', by: 'operator-1', reason: 'fossil-pass-lin2633' };
+    const unstamped = historyItem({ id: 'h-t17', issueIdentifier: 'LIN-1700' });
+    const stamped = historyItem({ id: 'h-t17', issueIdentifier: 'LIN-1700', bookkeeping: stamp });
+
+    const before = _buildLoops({ historyItems: [unstamped], now: NOW })[0];
+    const after = _buildLoops({ historyItems: [stamped], now: NOW })[0];
+
+    assert.strictEqual(after.bookkeeping, stamp, 'sanity: the row really is stamped');
+    assert.strictEqual(before.bookkeeping, null, 'sanity: and its twin really is not');
+    assert.strictEqual(after.agentState, before.agentState, 'agentState must not move');
+    assert.strictEqual(after.historyStatus, 'taken', 'and status is untouched — still taken');
+    assert.strictEqual(before.historyStatus, after.historyStatus);
+
+    // The whole record, not just the one field: delete the stamp from both and
+    // they must be deep-equal. This catches any downstream derivation that
+    // starts keying on the stamp, not merely `_deriveAgentState`.
+    const { bookkeeping: _a, ...afterRest } = after;
+    const { bookkeeping: _b, ...beforeRest } = before;
+    assert.deepStrictEqual(afterRest, beforeRest,
+      'the stamp must change the loop record in exactly one field and no other');
+  });
+
+  test('T17: the same holds for every agent-status decoration branch', () => {
+    const stamp = { at: '2026-04-04T09:00:00.000Z', by: null, reason: 'fossil-pass-lin2633' };
+    for (const agentStatus of ['completed', 'failed', 'blocked', 'in-progress']) {
+      const fmn = agentStatusEntry({ dispatchId: 'h-t17b', taskIdentifier: 'LIN-1701', status: agentStatus });
+      const base = { id: 'h-t17b', issueIdentifier: 'LIN-1701' };
+      const before = _buildLoops({ historyItems: [historyItem(base)], agentStatusEntries: [fmn], now: NOW })[0];
+      const after = _buildLoops({ historyItems: [historyItem({ ...base, bookkeeping: stamp })], agentStatusEntries: [fmn], now: NOW })[0];
+      assert.strictEqual(after.agentState, before.agentState, `agentState must not move for agentStatus=${agentStatus}`);
+    }
+  });
+
   test('_buildLoops pre-derives wakeMarker + waitingMessage for a [blocked] run (LIN-1005, lean and default)', () => {
     const blockedFeedback = [
       { message: '[working] 3 tools/12s · alive', timestamp: '2026-04-10T10:20:00.000Z' },

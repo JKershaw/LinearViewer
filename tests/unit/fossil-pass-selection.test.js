@@ -24,7 +24,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { __internal } from '../../lib/pipeline-loops.js';
-import { FOSSIL_AGE_MS, classifyLoop } from '../../lib/observer-sweep.js';
+import { FOSSIL_AGE_MS, classifyLoop, buildSweepPayload } from '../../lib/observer-sweep.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
 import { loopLastActivityMs, DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import {
@@ -167,6 +167,67 @@ describe('fossil pass T1 — the age gate', () => {
     const loops = build({ historyItems: [justPast, justInside] });
 
     assert.deepEqual(eligibleIds(loops), ['h-just-past']);
+  });
+});
+
+// ─── T2: census-agreement — the eligible set is a SUBSET, never a superset ──
+
+describe('fossil pass T2 — census agreement is an identity, not a coincidence', () => {
+  test('the eligible set is a subset of the census\'s own fossil rows for the same now/loops', () => {
+    // N5's derivation, applied: `buildSweepPayload` returns
+    // `staleAttentionCount` as a bare NUMBER and does not export
+    // `rankableSinceMs`, so "the rows the census counted as stale" is not
+    // directly readable. It IS recoverable as `attentionKeysFull` (every
+    // attention-eligible row, unfiltered by the fossil cut) minus the loopIds
+    // still enumerated in `attention` (the fresh ones) — valid while the
+    // fixture's fresh population stays under ATTENTION_CAP (25), which this
+    // fixture's 3 fresh rows satisfy comfortably.
+    const rows = [
+      // Fossils the pass should select.
+      historyItem({ id: 'c-fossil-1', issueIdentifier: 'LIN-1210', dispatchedAt: daysAgo(9), resolvedAt: daysAgo(9) }),
+      historyItem({ id: 'c-fossil-2', issueIdentifier: 'LIN-1211', dispatchedAt: daysAgo(15), resolvedAt: daysAgo(15) }),
+      historyItem({
+        id: 'c-fossil-blocked', issueIdentifier: 'LIN-1212', dispatchedAt: daysAgo(20), resolvedAt: daysAgo(20),
+        feedback: [{ message: '[blocked] need a decision', timestamp: daysAgo(20) }]
+      }),
+      // Fresh rows the census enumerates and the pass must never select.
+      historyItem({ id: 'c-fresh-1', issueIdentifier: 'LIN-1213', dispatchedAt: daysAgo(2), resolvedAt: daysAgo(2) }),
+      historyItem({
+        id: 'c-fresh-blocked', issueIdentifier: 'LIN-1214', dispatchedAt: daysAgo(3), resolvedAt: daysAgo(3),
+        feedback: [{ message: '[blocked] need a decision', timestamp: daysAgo(3) }]
+      }),
+      // A row gate 3 refuses but the census still counts as stale — the case
+      // that makes this a SUBSET rather than an equality.
+      historyItem({
+        id: 'c-f3-refused', issueIdentifier: 'LIN-1215', dispatchedAt: daysAgo(12), resolvedAt: daysAgo(12),
+        feedback: [{ message: '[blocked] recent', timestamp: msAgo(2 * 60 * 60 * 1000) }]
+      })
+    ];
+    const loops = build({ historyItems: rows });
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS });
+
+    // N5's recovery: every attention-eligible loopId, minus those still
+    // enumerated in `attention` (the fresh ones) = the fossil-cut rows.
+    const enumerated = new Set(payload.attention.map((a) => a.loopId));
+    const censusFossilIds = payload.attentionKeysFull
+      .map(([loopId]) => loopId)
+      .filter((loopId) => !enumerated.has(loopId));
+
+    assert.ok(payload.attention.length < 25, 'sanity: the fresh population is under ATTENTION_CAP, so the derivation is valid');
+    assert.equal(censusFossilIds.length, payload.staleAttentionCount,
+      'sanity: the recovered set size matches the census\'s own staleAttentionCount');
+    assert.ok(censusFossilIds.length > 0, 'sanity: the census really did cut some rows as fossils');
+
+    const selected = eligibleIds(loops);
+    for (const id of selected) {
+      assert.ok(censusFossilIds.includes(id),
+        `${id} was selected but the census does not count it as a fossil — the pass must never be a SUPERSET of the census`);
+    }
+
+    // And it is a STRICT subset here: the F3-refused row is a census fossil
+    // the pass declines to stamp, which is the conservative direction.
+    assert.ok(censusFossilIds.includes('c-f3-refused'), 'sanity: the census counts the F3 row as stale');
+    assert.ok(!selected.includes('c-f3-refused'), 'but the pass refuses it — strictly fewer, never more');
   });
 });
 
