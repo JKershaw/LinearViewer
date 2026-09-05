@@ -16,7 +16,8 @@
  *   ... --token <tok>        proxy token (default $PROXY_TOKEN)
  *   ... --cache <dir>        detail cache (default $TMPDIR/harbour-plan-review-round-trips-cache)
  *   ... --no-cache           ignore the on-disk cache and re-read everything (Session 2's posture)
- *   ... --ruler-change-at <ISO>  optional LIN-1859 ruler-change instant (b6c5e046) — when
+ *   ... --ruler-change-at <ISO>  optional LIN-1859 ruler-change instant (b6c5e046).
+ *       An unparseable value exits 2 rather than reporting a fabricated 0 (LIN-2358) — when
  *                                 supplied, the result's diagnostics.rulerContamination
  *                                 flags R0 rows whose window straddles it
  *   ... --limit <n>          issues per list page (default 250, the proxy's max)
@@ -46,7 +47,8 @@ import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { computePlanReviewRoundTrips } from '../lib/plan-review-round-trips.js';
+import { computePlanReviewRoundTrips, __internal } from '../lib/plan-review-round-trips.js';
+const { requireInstant } = __internal;
 import { classifyUpstreamError } from '../lib/errors.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -78,15 +80,6 @@ function parseArgs(argv) {
     else if (v === '--cache') a.cache = argv[++i];
     else if (v === '--limit') a.limit = parseInt(argv[++i], 10) || 250;
     else if (v === '--ruler-change-at') a.rulerChangeAt = argv[++i];
-  }
-  // LIN-2358: validate at the argv boundary too. The library throws on an
-  // unparseable value and that is the real guard — but a typo'd flag deserves a
-  // usage error, not a stack trace from three frames down, and the check is
-  // free here. Deliberately the same predicate the library uses, so the two
-  // cannot disagree about what parses.
-  if (a.rulerChangeAt && !Number.isFinite(new Date(a.rulerChangeAt).getTime())) {
-    console.error(`--ruler-change-at must be a parseable ISO instant (got ${JSON.stringify(a.rulerChangeAt)})`);
-    process.exit(2);
   }
   return a;
 }
@@ -362,6 +355,26 @@ function render(result, meta) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) { console.log(USAGE); return; }
+
+  // LIN-2358: validate at the argv boundary too. The library throws on an
+  // unparseable value and that is the real guard — but a typo'd flag deserves a
+  // usage error rather than a stack trace three frames down. Uses the library's
+  // OWN predicate via __internal, not a hand-copy: a copy is exactly what
+  // drifts. Lives here rather than in parseArgs so `--help` still prints usage,
+  // and so parseArgs stays pure and testable.
+  //
+  // `!== undefined`, not truthy: `--ruler-change-at ""` (or the flag with its
+  // value fat-fingered off the end) previously ran the whole read and reported
+  // no contamination at all, without a word about the flag the operator typed.
+  if (args.rulerChangeAt !== undefined && args.rulerChangeAt !== null) {
+    try {
+      requireInstant(args.rulerChangeAt, 'cli', '--ruler-change-at');
+    } catch (err) {
+      console.error(`error: ${err.message}`);
+      console.error(USAGE);
+      process.exit(2);
+    }
+  }
 
   if (!args.token) {
     console.error('error: set PROXY_TOKEN env var or pass --token <proxy token>');
