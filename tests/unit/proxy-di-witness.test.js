@@ -160,20 +160,24 @@ describe('Half A: mount-completeness census against the real repo', () => {
     }
   });
 
-  // A separate, coarser sanity pin: the corpus is exactly 8 files / 111
+  // A separate, coarser sanity pin: the corpus is exactly 9 files / 117
   // declared deps today (LIN-2540: group I's routes/proxy-dispatch.js adds
   // 24, all un-defaulted so classifyParams counts every one as required —
-  // 87 + 24 = 111). Unlike the test above, THIS one is not blind to a
+  // 87 + 24 = 111; LIN-2444's routes/proxy-rulings.js then adds 6 more —
+  // proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent,
+  // dispatchQueueStore, agentStatusStore — its other three
+  // (taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore) are
+  // defaulted to null and so are not counted as required: 111 + 6 = 117). Unlike the test above, THIS one is not blind to a
   // signature+mount drop (removing a dep from a factory's signature shrinks
   // `required`, which this total catches) — that's a different, unrelated
   // invariant catching it, not evidence Half A's own missing/extra detectors
   // saw the gap; keeping the two in separate tests keeps that distinction
   // legible in the mutation-validation record.
-  test('the corpus is exactly 8 proxy sub-router files totalling 111 declared deps', () => {
+  test('the corpus is exactly 9 proxy sub-router files totalling 117 declared deps', () => {
     const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
-    assert.equal(rows.length, 8, `expected 8 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
+    assert.equal(rows.length, 9, `expected 9 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
     const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
-    assert.equal(totalDeps, 111, `expected 111 total required deps across the 8 factories, found ${totalDeps}`);
+    assert.equal(totalDeps, 117, `expected 117 total required deps across the 9 factories, found ${totalDeps}`);
   });
 });
 

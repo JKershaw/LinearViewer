@@ -69,6 +69,7 @@ import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
+import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
@@ -480,8 +481,16 @@ const taskDecisionsStore = new TaskDecisionsStore({
 // task-decisions above: a TTL could silently erase the lapse-count history
 // (docs/escalation-philosophy.md §4/§6).
 const shelvedRulingsCollection = db.collection('shelved-rulings')
+const dismissalSuggestionsCollection = db.collection('dismissal-suggestions')
 const shelvedRulingsStore = new ShelvedRulingsStore({
   collection: shelvedRulingsCollection
+})
+// LIN-2444: proposed dismissals — a view annotation on a ruling, never an
+// answer to it. Separate collection from shelved-rulings because the two are
+// different acts with different lifecycles (a shelve defers a decision the
+// operator still owns; a suggestion offers them a one-click way to close it).
+const dismissalSuggestionsStore = new DismissalSuggestionsStore({
+  collection: dismissalSuggestionsCollection
 })
 
 // Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
@@ -2455,7 +2464,7 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
   return resolveNorthStarDocVersion(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore }))

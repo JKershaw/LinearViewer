@@ -376,7 +376,13 @@ function loopActivityMs(loop) {
  * @param {Object} loop
  * @returns {Object}
  */
-function enrichLoop(loop) {
+// Exported for routes/proxy-rulings.js (LIN-2444): the consumer-API rulings
+// read needs loops shaped exactly as the rulings feed shapes them, because
+// `resolveDisposition` (lib/unanswered-decisions.js) reads `agentState`. Shared
+// by export rather than copied — a second local enrichment would drift from
+// this one silently, and the two would then disagree about whether a ruling can
+// be replied to.
+export function enrichLoop(loop) {
   // Prefer the build-time terminal completion (present on every reconstructed
   // loop); fall back to scanning raw feedback for loops built elsewhere. The
   // lean feed drops raw feedback[], so this must not depend on it (LIN-622).
