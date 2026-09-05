@@ -87,6 +87,13 @@ import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { dispatchQueueLimiter } from './dispatch.js';
 import { badRequest, unauthorized, notFound, jsonError, serverError } from '../lib/errors.js';
+// LIN-2631 item 2: one shared writer, so LIN-2620's proxy turn does not become
+// a fourth copy of the frame format.
+import { sendSSE } from '../lib/sse.js';
+// LIN-2631: the turn itself lives in lib/ now, so the proxy endpoint, the boot
+// turn, the playbook memory and the scheduler tick can each run one without
+// pretending to be an Express handler. This route is the browser's adapter.
+import { runFlightCompanionTurn } from '../lib/flight-companion-turn.js';
 
 // Duplicated, not imported — same house convention `lib/flight-companion-gate.js`'s
 // own header documents (each observer-pipeline-stage file restates its own
@@ -94,10 +101,6 @@ import { badRequest, unauthorized, notFound, jsonError, serverError } from '../l
 const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
 
 const MAX_MESSAGE_LENGTH = 2000;
-
-function sendSSE(res, type, data) {
-  res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
-}
 
 // Restated, not imported, from lib/flight-companion-gate.js's own private
 // LANE_KEYS (which itself restates lib/observer-sweep.js's LANE_KEYS) — same
@@ -425,349 +428,117 @@ export function createFlightCompanionRoutes({
       return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
-    if (isFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
-        if (turnKind === 'user-initiated') {
-          return res.status(429).json({
-            error: check.reason,
-            freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt },
-          });
-        }
-        // Auto-wake: fail SILENTLY — no toast, no surfaced error. There may
-        // be no one watching an auto-wake tick.
-        return res.json({ turnKind, spent: false, reason: 'free-tier' });
-      }
-    }
-
-    if (companionAdvance) {
-      // LIN-2435 Commit 1: consume advance()'s tri-state (mirroring
-      // lib/observer-sweep.js:281-284 / lib/observer-pass.js:371-374) — a
-      // lost CAS (`false`, another overlapping auto-wake turn won the race)
-      // or a backend error (`null`) must abort BEFORE the SSE headers below
-      // and before the model call, never silently proceed to a second
-      // billable spend against the same gate window. `null` denies the
-      // spend, the safe reading of observer-state-store's own "do not treat
-      // as safe to converge" contract.
-      // LIN-2442: writes the RESERVATION record, not the new baseline — the
-      // baseline only commits after a terminal `done` frame (see the
-      // `sawDone` block below). This is still the same CAS, at the same call
-      // site, still bumping `rev` on every spend decision — the double-spend
-      // guard below is unaffected by the split.
-      const advanceResult = await observerStateStore.advance(
-        companionAdvance.instanceKey, companionAdvance.expectedRev, companionAdvance.reserveRecord,
-        { reason: 'flight-companion-turn' }
-      );
-      if (advanceResult !== true) {
-        if (advanceResult === null) {
-          console.error('Flight Companion turn: advance() backend error', { instanceKey: companionAdvance.instanceKey });
-        }
-        return res.json({ turnKind, spent: false, reason: advanceResult === null ? 'advance-error' : 'lost-race' });
-      }
-    }
-
-    // Start SSE.
-    res.set({
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    });
-    res.flushHeaders?.();
-
-    // LIN-2449: the client can vanish mid-turn, and nothing here noticed.
-    // `sawDone` is driven by the MODEL stream's terminal frame, not by the
-    // client receiving it — the route wires no close handler and no abort
-    // signal — so a disconnect left the turn running to completion, `res.end()`
-    // wrote into a dead socket, `sawDone` was true, and the commit block below
-    // consumed the census delta for a report nobody ever saw. Same permanent
-    // delta loss LIN-2442 fixed, reached by disconnect instead of by error.
-    //
-    // `writableFinished` is the discriminator: it is true only once the
-    // response has been fully flushed, so a 'close' before that is a genuine
-    // disconnect rather than our own `res.end()` completing normally.
+    // LIN-2449: the client can vanish mid-turn. `writableFinished` is the
+    // discriminator — true only once the response has been fully flushed, so a
+    // 'close' before that is a genuine disconnect rather than our own
+    // `res.end()` completing. The reservation is deliberately NOT released
+    // here; it self-expires via the lease, which is LIN-2442's recorded
+    // no-write-on-failure design and the property LIN-2447 depends on.
     const clientAbort = new AbortController();
     let clientGone = false;
     res.on('close', () => {
       if (res.writableFinished) return;
       clientGone = true;
-      // Ends the model call rather than letting it run to completion for
-      // output that is discarded. The reservation is deliberately NOT released
-      // here — it self-expires via the lease, which is LIN-2442's recorded
-      // no-write-on-failure design and the property LIN-2447 depends on.
       clientAbort.abort();
     });
 
-    // §A.4: the 'proposed' phase is self-describing from the propose-mode
-    // executor's own return shape (`{ proposed: true, ... }`), not a second
-    // turnKind branch threaded through SSE forwarding — it can never fire for
-    // an execute-mode call, which never returns that shape.
-    const proposedCallIds = new Set();
-    // LIN-2442: the ONLY signal that gates the post-stream baseline commit
-    // below — a throw, a dead-socket write, or a hard process crash all
-    // leave this `false`, and nothing releases the reservation explicitly on
-    // any of those paths (mirrors lib/scheduler.js:32-37's recorded rule
-    // against failure-path writes). The reservation self-expires instead.
-    let sawDone = false;
-    const onEvent = (type, data) => {
-      if (type === 'tool' && data.phase === 'result' && proposedCallIds.has(data.id)) {
-        data = { ...data, phase: 'proposed' };
-        proposedCallIds.delete(data.id);
-      }
-      // LIN-2435 Commit 1: surface the gate's already-computed `surface` on
-      // an auto-wake turn's terminal frame ONLY — the client's wake-cadence
-      // reset criterion (ruling 62bb3b4e). A user-initiated `done` is
-      // unchanged and carries no `surface` field at all.
-      if (type === 'done' && turnKind === 'auto-wake') {
-        data = { ...data, surface: turnSurface };
-      }
-      if (type === 'done') {
-        sawDone = true;
-      }
-      sendSSE(res, type, data);
-      if (type === 'done' || type === 'error') {
-        res.end();
-      }
+    // The SSE headers go up at the core's point of no return — after every
+    // refusal path, before the model call — which is exactly where this handler
+    // wrote them before the extraction. Lazily writing them on the first EVENT
+    // instead is subtly wrong and was caught by the (a1) witness: a model call
+    // that throws before emitting anything would then answer 500 JSON where the
+    // browser has always received a 200 with an SSE `error` frame.
+    let streaming = false;
+    const startStream = () => {
+      if (streaming) return;
+      streaming = true;
+      res.set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      });
+      res.flushHeaders?.();
     };
 
     try {
-      // §A.7: user-initiated turns haven't read the census yet (only the
-      // auto-wake gate does, above) — read it fresh here, purely for
-      // orientation. Optional-guarded, mirroring the GET page handler: an
-      // absent observerStateStore degrades to the honest "not available" seed
-      // text rather than throwing.
-      if (currentCensusDoc === null && turnKind === 'user-initiated' && observerStateStore) {
-        currentCensusDoc = await observerStateStore.readCurrent(`${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`);
-      }
-
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-      // LIN-2618: the seed is rendered HERE and handed over as text, so the
-      // brief module never imports from routes/ and the "embedded unmodified"
-      // guarantee is structural rather than a convention.
-      const messages = buildFlightCompanionMessages({
-        history: safeHistory,
-        message: hasUserMessage ? rawMessage.trim() : null,
-        censusSeedText: buildCensusSeedText(currentCensusDoc),
-        now: Date.now(),
+      const outcome = await runFlightCompanionTurn({
+        workspace,
         turnKind,
-      });
-      const callMeta = { urlKey: workspace.urlKey, feature: 'flight-companion' };
-
-      if (isToolCapableModel(selectedModel)) {
-        const provider = getProviderForWorkspace(workspace);
-        const scope = getWorkspaceCallScope(workspace);
-        const { tools, executeTool: catalogExecuteTool } = createToolCatalog({
-          provider,
-          scope,
-          recapCacheStore,
-          briefCacheStore,
-          urlKey: workspace.urlKey,
-          dispatchQueueStore,
-          agentStatusStore,
-          sessionIsTerminal,
-          followUpEnabled: true,
-          // §A.4: the ONE line that makes an auto-wake turn write-incapable —
-          // followUpMode: 'propose' short-circuits send_follow_up before it
-          // ever reaches createDispatchItem (lib/chat-tools.js, LIN-2432 beat 1).
-          followUpMode: turnKind === 'user-initiated' ? 'execute' : 'propose',
-          dispatchedBy: req.session?.accountId || null,
-          workspacePreferencesStore,
-          proxyTokenStore,
-          // LIN-2617: `list_pending_decisions`' other two inputs, plus the loop
-          // shaper both rulings feeds already apply. `enrichLoop` is imported
-          // here (a route may reach into routes/) and injected, so lib/chat-tools.js
-          // itself never imports from routes/.
-          taskDecisionsStore,
-          shelvedRulingsStore,
-          enrichLoop,
+        message: hasUserMessage ? rawMessage.trim() : null,
+        history: safeHistory,
+        apiKey: apiKeyToUse,
+        isFreeTier,
+        onStreamStart: startStream,
+        onEvent: (type, data) => {
+          sendSSE(res, type, data);
+          if (type === 'done' || type === 'error') res.end();
+        },
+        signal: clientAbort.signal,
+        isClientGone: () => clientGone,
+        // The free-tier quota sits HERE — after the gate, before the
+        // reservation write — which is the ordering LIN-2432 §A.2 makes an
+        // acceptance criterion. The core owns the ordering; this route owns
+        // what a quota is.
+        onBeforeSpend: async () => {
+          if (!isFreeTier) return null;
+          const check = await freeTierStore.tryUse(workspace.urlKey);
+          if (check.allowed) return null;
+          return { reason: 'free-tier', freeTierCheck: check };
+        },
+        deps: {
+          observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
+          dispatchQueueStore, agentStatusStore, taskDecisionsStore, shelvedRulingsStore,
+          proxyTokenStore, sessionIsTerminal, enrichLoop,
+          chatClient, createToolCatalog,
+          getProvider: getProviderForWorkspace,
+          getScope: getWorkspaceCallScope,
+          buildCensusSeedText,
           baseUrl: `${req.protocol}://${req.get('host')}`,
-        });
-        const executeTool = async (call) => {
-          const raw = await catalogExecuteTool(call);
-          if (call?.name === 'send_follow_up' && raw && raw.proposed === true) {
-            proposedCallIds.add(call.id);
-          }
-          return raw;
-        };
-        await chatClient.streamChatWithTools(
-          messages,
-          {
-            apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta,
-            toolResultMaxCharsByTool: CHAT_TOOL_RESULT_BUDGETS,
-            signal: clientAbort.signal,
-          },
-          onEvent
-        );
-      } else {
-        // Unknown-capability model: degrade to plain streaming with tools OFF,
-        // exactly mirroring Task Chat — never a silent swap to a different model.
-        await chatClient.streamChat(
-          messages,
-          { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, callMeta, signal: clientAbort.signal },
-          onEvent
-        );
-      }
+          dispatchedBy: req.session?.accountId || null,
+        },
+      });
 
-      // LIN-2442: commit the NEW census baseline only now that a terminal
-      // `done` frame was actually observed — the report has already reached
-      // the user (the frame is sent and `res.end()`'d inside `onEvent`
-      // before we get here). A throw from either streaming call above skips
-      // this block entirely (it lands in the `catch` below instead), leaving
-      // `sawDone` false and the baseline untouched, exactly as designed.
-      //
-      // Fresh `readCurrent` rather than `expectedRev + 1`: the store's own
-      // duplicate-identical-state branch (lib/observer-state-store.js
-      // :397-406) returns `true` for a no-op write WITHOUT bumping `rev`, so
-      // assuming a strict +1 here would CAS against a stale witness on the
-      // very next tick.
-      //
-      // Isolated in its own try/catch — never the outer one, which would
-      // otherwise try to `sendSSE`/`res.end()` a response already ended by
-      // the `done` frame above.
-      // LIN-2449: `!clientGone` alongside `sawDone`. The abort above usually
-      // makes this moot by throwing out of the streaming call, but not always:
-      // a disconnect arriving after the terminal frame is generated is too
-      // late to abort, and reaches here with `sawDone` already true. This gate
-      // is what catches that.
-      //
-      // KNOWN RESIDUAL, measured rather than assumed: the gate closes the case
-      // once the socket's 'close' has actually been PROCESSED. If teardown has
-      // not been observed by the time this line runs — a disconnect landing in
-      // the same event-loop iteration as the terminal frame — `clientGone` is
-      // still false and the delta is consumed. That window cannot be closed
-      // from here: inside it every synchronous signal reads healthy
-      // (`res.destroyed` false, `socket.destroyed` false, `writable` true), so
-      // the alternative discriminator (`res.writableEnded && !res.destroyed`)
-      // is fooled identically, and deferring this block by a tick was measured
-      // NOT to close it. The residual is ~one event-loop iteration around the
-      // terminal frame, against a pre-fix behaviour of consuming the delta on
-      // 100% of disconnects. Accepted deliberately, not overlooked.
-      //
-      // Also unclosable here, and equally inherent: a client that vanishes
-      // without sending FIN/RST (a dropped mobile radio) never fires 'close'
-      // at all. Both would need an app-level acknowledgement to close.
-      if (sawDone && !clientGone && companionAdvance) {
-        try {
-          const currentEnvelope = await observerStateStore.readCurrent(companionAdvance.instanceKey);
-          // LIN-2447 item 2: commit only onto OUR OWN reservation. The read
-          // above is deliberately fresh (the store's duplicate-identical-state
-          // branch does not bump `rev`, so `expectedRev + 1` would CAS against
-          // a stale witness) — but fresh also means it can return a SUCCESSOR's
-          // record, if this turn outlived its lease and the next one reserved.
-          // Committing onto that would do two wrong things at once: clear the
-          // successor's live lease (our commit record carries
-          // `turnReservedUntil: null`) and overwrite its baseline with our own
-          // stale one. Matching the reservation id is what makes the CAS
-          // scoped to the turn that opened it rather than to whatever is there
-          // now. Skipping is safe and is the same benign outcome as a lost CAS
-          // below: the successor is already reporting this change.
-          // Our own id must be truthy for the match to mean anything: a `null`
-          // on both sides would make `stillOurs` true against a successor that
-          // has just COMMITTED (its record carries `reservationId: null`),
-          // which is precisely the record we must not write over.
-          const ourReservationId = companionAdvance.reserveRecord.reservationId;
-          const stillOurs = !!ourReservationId
-            && currentEnvelope
-            && currentEnvelope.state
-            && currentEnvelope.state.reservationId === ourReservationId;
-          if (currentEnvelope && !currentEnvelope.state) {
-            console.error('Flight Companion turn: commit skipped, record has no state', {
-              instanceKey: companionAdvance.instanceKey,
-              urlKey: workspace.urlKey,
-            });
-          } else if (currentEnvelope && !stillOurs) {
-            console.error('Flight Companion turn: commit skipped, reservation no longer ours', {
-              instanceKey: companionAdvance.instanceKey,
-              urlKey: workspace.urlKey,
-            });
-          } else if (currentEnvelope) {
-            const commitResult = await observerStateStore.advance(
-              companionAdvance.instanceKey, currentEnvelope.rev, companionAdvance.commitRecord,
-              { reason: 'flight-companion-commit' }
-            );
-            if (commitResult !== true) {
-              // Benign by design: the report already reached the user, so a
-              // lost CAS or backend error here only means the census
-              // baseline lags — the next eligible turn re-surfaces the same
-              // change once (via hash-identical no longer matching), never
-              // loses it. Logged, never retried, never thrown.
-              console.error('Flight Companion turn: commit advance() did not land', {
-                instanceKey: companionAdvance.instanceKey,
-                result: commitResult,
-              });
-            }
-          } else {
-            console.error('Flight Companion turn: commit skipped, instance vanished', {
-              instanceKey: companionAdvance.instanceKey,
-            });
-          }
-        } catch (commitError) {
-          console.error('Flight Companion turn: commit write threw', {
-            instanceKey: companionAdvance.instanceKey,
-            error: commitError,
+      if (!outcome.spent && !streaming) {
+        // A free-tier refusal is the one that differs by turn kind: a user
+        // typed and deserves the 429 with its quota detail; an auto-wake tick
+        // fails SILENTLY — no toast, no surfaced error, since there may be no
+        // one watching it.
+        if (outcome.reason === 'free-tier' && turnKind === 'user-initiated') {
+          const check = outcome.freeTierCheck;
+          return res.status(429).json({
+            error: check.reason,
+            freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt },
           });
         }
+        return res.json({
+          turnKind: outcome.turnKind,
+          spent: false,
+          reason: outcome.reason,
+          sweepLastSeenAt: outcome.sweepLastSeenAt,
+        });
       }
     } catch (error) {
       // LIN-2449: a disconnect aborts the streaming call, which throws here.
-      // There is no socket left to tell, so skip the write rather than
-      // pushing an `error` frame into a dead one. Every other error path is
-      // unchanged, including its untouched no-commit behaviour.
+      // There is no socket left to tell, so skip the write rather than pushing
+      // an `error` frame into a dead one. Keep the error itself: a genuine bug
+      // coinciding with a disconnect would otherwise vanish without a trace.
       if (clientGone) {
-        // Keep the error itself: a genuine bug that happens to coincide with a
-        // disconnect would otherwise vanish without a trace, since this branch
-        // swallows the only report of it.
         console.error('Flight Companion turn: client disconnected mid-turn, census delta left unconsumed', {
           urlKey: workspace.urlKey,
-          instanceKey: companionAdvance ? companionAdvance.instanceKey : null,
-          error: error?.message,
+          error,
         });
         return;
       }
       console.error('Flight Companion turn error:', error);
-      sendSSE(res, 'error', { message: 'Failed to generate a response' });
-      res.end();
+      if (streaming) {
+        sendSSE(res, 'error', { error: error.message || 'Turn failed' });
+        res.end();
+      } else if (!res.headersSent) {
+        res.status(500).json({ error: 'Turn failed' });
+      }
     }
   });
 
-  // ─── Approve follow-up (LIN-2434 §A.6) ─────────────────────────────────────
-  //
-  // The server-side approval counterpart to §A.4's `propose` branch in
-  // `lib/chat-tools.js`'s `send_follow_up` executor: that branch deliberately
-  // stops at `{ proposed: true, sessionId, prompt }` without deriving or
-  // enqueueing anything, precisely so derivation happens FRESH, here, from
-  // the session's then-current state — never carried over stale from
-  // whenever the model proposed it.
-  //
-  // Only `sessionId`/`prompt` are read from the body; a client-supplied
-  // `target`/`force`/`followUpTo` is never read at all, so there is nothing
-  // to overwrite. `followUpTo`/`target`/`force` come from
-  // `deriveFollowUpDispatch` (`lib/chat-tools.js`, LIN-2433) — the same
-  // helper `send_follow_up`'s own execute path calls, never re-derived or
-  // hand-copied — and the enqueue goes through `createDispatchItem`
-  // (`lib/dispatch-factory.js`), the same seam every other dispatch path
-  // uses, never `dispatchQueueStore.addItem` directly. No LLM call is made
-  // or re-entered here: once `sessionId` + `prompt` are known the effect is
-  // deterministic.
-  //
-  // R1 (the ratified operator hazard): `dispatchQueueLimiter` is applied
-  // explicitly, because this route lives on a different router/factory than
-  // routes/dispatch.js and inherits nothing from it by registration.
-  //
-  // R2: going through `createDispatchItem` does NOT preserve the LIN-1656
-  // duplicate-dispatch guard or the LIN-1751 `maxTasks` budget bound —
-  // `deriveFollowUpDispatch` always returns a non-null `followUpTo`, and
-  // both guards are entry-gated on `followUpTo == null`
-  // (`lib/dispatch-factory.js`), so neither can ever engage on this route.
-  // That is deliberate factory design (a `followUpTo` row IS the intended
-  // second dispatch), not a defect, and it changes nothing about the
-  // correctness of calling `createDispatchItem` here. What it actually
-  // contributes on this path: LIN-1139 workspace dispatch defaults, kind
-  // resolution, and the LIN-1431 `finalizePrompt` → `provisionBootstrapToken`
-  // hop (without which a resumed claude-code session lands with
-  // `bootstrapToken: null` and can't write back). The real bounds on this
-  // route are stronger anyway: byte-for-byte parity with `send_follow_up`'s
-  // own execute path, plus the human click, plus this route's own explicit
-  // rate limit above.
   router.post('/workspace/:urlKey/api/flight-companion/approve-follow-up', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const featureFlags = getFeatureFlags(req.session);

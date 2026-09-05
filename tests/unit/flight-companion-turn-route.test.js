@@ -82,6 +82,10 @@ import { ObserverStateStore } from '../../lib/observer-state-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js'), 'utf8');
+// LIN-2631: the turn body moved to lib/. Structural pins that are about the
+// TURN read this; pins that are about the ROUTE (its handler shape, its
+// dashboard abstinence) keep reading ROUTE_SRC.
+const CORE_SRC = readFileSync(join(__dirname, '../../lib/flight-companion-turn.js'), 'utf8');
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 // Set/restore env vars around one async body — mirrors
@@ -753,12 +757,17 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.4) — the `phase: \'prop
 });
 
 describe('Flight Companion turn endpoint — source-text wiring (structural pins, see file header)', () => {
+  // LIN-2631 item 6: these pins MOVE with the code they pin. The turn body now
+  // lives in lib/flight-companion-turn.js, so they read CORE_SRC; the ones that
+  // are genuinely about the ROUTE (its own handler body, its dashboard
+  // abstinence) still read ROUTE_SRC. A pin left pointing at the file the code
+  // used to be in is not a weaker pin, it is a vacuous one.
   test('the propose-mode SSE phase rewrite keys off the executor\'s OWN return shape ({proposed:true}), not a second turnKind branch', () => {
-    assert.match(ROUTE_SRC, /raw\.proposed\s*===\s*true/);
-    assert.match(ROUTE_SRC, /phase:\s*'proposed'/);
-    // Never a hand-rolled second dispatch of turnKind through the SSE path —
+    assert.match(CORE_SRC, /raw\.proposed\s*===\s*true/);
+    assert.match(CORE_SRC, /phase:\s*'proposed'/);
+    // Never a hand-rolled second dispatch of turnKind through the event path —
     // the rewrite must be reachable from data alone.
-    assert.doesNotMatch(ROUTE_SRC, /turnKind\s*===\s*'auto-wake'[^}]*phase:\s*'proposed'/s);
+    assert.doesNotMatch(CORE_SRC, /turnKind\s*===\s*'auto-wake'[^}]*phase:\s*'proposed'/s);
   });
 
   test('createDispatchItem is never called from the TURN route\'s own handler — its only door there is deep inside lib/chat-tools.js\'s executor, already proven unreachable in propose mode by tests/unit/chat-tools.test.js', () => {
@@ -770,6 +779,12 @@ describe('Flight Companion turn endpoint — source-text wiring (structural pins
     // turn route's own handler body, not "this file never imports it".
     const turnRouteStart = ROUTE_SRC.indexOf("router.post('/workspace/:urlKey/api/flight-companion/turn'");
     assert.ok(turnRouteStart >= 0, 'expected to find the turn route registration in routes/flight-companion.js');
+    // LIN-2631: the invariant now has TWO homes, and both are pinned — the
+    // route's own handler (below) and the extracted core, which is where the
+    // turn body actually went. Pinning only the route after the extraction
+    // would pass trivially: the handler no longer contains a turn.
+    assert.doesNotMatch(CORE_SRC, /createDispatchItem/,
+      'the extracted turn core must not even import the write path, let alone call it');
     // The route registration's own closing `  });` (2-space indent, matching
     // the router.post( call's own indent level) — NOT the next route's
     // registration, whose preceding doc comment may legitimately mention
@@ -785,7 +800,7 @@ describe('Flight Companion turn endpoint — source-text wiring (structural pins
     // VACUOUSLY — proving nothing. Pin the slice as non-trivial and as
     // actually reaching the handler's own end, via a marker string that
     // exists ONLY in the turn route's own catch block.
-    assert.match(turnRouteBody, /Failed to generate a response/,
+    assert.match(turnRouteBody, /client disconnected mid-turn/,
       'the extracted slice must reach the turn handler\'s own closing catch block — a truncated/vacuous slice would silently pass the assertion below');
     // A CALL (no space before the paren, this codebase's call style), not a
     // prose mention — the turn route's own comment legitimately names
@@ -1061,16 +1076,24 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     assert.match(system.content, /dispatch loops \(runs\)/i);
   });
 
-  test('the turn handler renders the seed from a real censusDoc and hands it to the builder', () => {
+  test('the turn core renders the seed from a real censusDoc and hands it to the builder', () => {
     // The route now renders the seed and passes it as text (LIN-2618), which is
     // what keeps lib/prompts/ free of any routes/ import. Both halves are pinned:
     // the call site passes the rendered seed...
-    assert.match(ROUTE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*buildCensusSeedText\(currentCensusDoc\)/s);
+    // LIN-2631 moved this pin with the code: the seed render and the builder
+    // call both live in the core now. `buildCensusSeedText` itself deliberately
+    // stays in the route (it is coupled to the census read and to
+    // buildCompanionSnapshot) and is injected, which is what keeps lib/ free of
+    // a routes/ import.
+    assert.match(CORE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*deps\.buildCensusSeedText\(currentCensusDoc\)/s);
     // ...and the user-initiated branch reads the doc fresh (auto-wake already
     // populated currentCensusDoc via the gate, above).
-    assert.match(ROUTE_SRC, /turnKind === 'user-initiated' && observerStateStore/);
-    // The builder is no longer defined in this file at all.
+    assert.match(CORE_SRC, /turnKind === 'user-initiated' && observerStateStore/);
+    // The builder is defined in neither file — it belongs to the brief.
     assert.doesNotMatch(ROUTE_SRC, /function buildFlightCompanionMessages\(/);
+    assert.doesNotMatch(CORE_SRC, /function buildFlightCompanionMessages\(/);
+    // The route hands the renderer over rather than rendering into the core.
+    assert.match(ROUTE_SRC, /buildCensusSeedText,/);
   });
 });
 

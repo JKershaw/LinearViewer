@@ -33,7 +33,7 @@ import { DEFAULT_MAX_TOOL_ITERATIONS } from '../../lib/openrouter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-import { buildCompanionSnapshot, shouldSpendTurn, COMPANION_SEED_STATE, COMPANION_INSTANCE_PREFIX, DEFAULT_COMPANION_FLOOR_MS, RESERVATION_LEASE_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
+import { buildCompanionSnapshot, shouldSpendTurn, buildTurnRecords, deriveReservationLeaseMs, COMPANION_SEED_STATE, COMPANION_INSTANCE_PREFIX, DEFAULT_COMPANION_FLOOR_MS, RESERVATION_LEASE_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 
 const ZERO_LANES = { working: 0, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 };
 
@@ -926,5 +926,109 @@ describe('shouldSpendTurn: sweep liveness (LIN-2438)', () => {
     const tightHorizon = hashIdenticalArgs({ lastSeenAt: seenAt });
     tightHorizon.sweepHorizonMs = 100;
     assert.strictEqual(shouldSpendTurn(tightHorizon).reason, 'sweep-not-seen');
+  });
+});
+
+// ─── LIN-2631: the record producer and the budget-derived lease ──────────────
+
+describe('LIN-2631 item 3: buildTurnRecords — one producer for boot and auto-wake', () => {
+  const CENSUS = {
+    rev: 9, stateHash: 'hash-new',
+    state: { lanes: { working: 2, silent: 0, blocked: 1, terminal: 0, queued: 0, resolved: 0, unknown: 0 }, attention: [], truncated: false },
+  };
+  const COMPANION = {
+    v: 1, lastCensusStateHash: 'hash-old', lastCensusSnapshot: { lanes: {}, attentionKeys: [] },
+    lastTurnAt: null, turnReservedUntil: null, reservationId: null, notes: 'keep me',
+  };
+
+  test('produces the same pair shouldSpendTurn does, so boot and auto-wake cannot drift', () => {
+    // Before this extraction only `shouldSpendTurn` could mint records, and
+    // only on its spend branch — so a boot turn (LIN-2622) had no way to obtain
+    // a pair except by re-deriving one. Two derivations of one baseline is
+    // exactly how a reservation and its commit come to disagree.
+    const now = 1_700_000_000_000;
+    const direct = buildTurnRecords({
+      currentCensusDoc: CENSUS, companionDoc: COMPANION, now, reservationId: 'nonce-1',
+    });
+    const viaGate = shouldSpendTurn({
+      currentCensusDoc: CENSUS, companionDoc: COMPANION, now, reservationId: 'nonce-1',
+    });
+    assert.strictEqual(viaGate.spend, true, 'fixture must actually reach the spend branch');
+    assert.deepStrictEqual(direct.reserveRecord, viaGate.reserveRecord);
+    assert.deepStrictEqual(direct.commitRecord, viaGate.nextRecord);
+  });
+
+  test('the reserve record re-emits the PRIOR baseline; the commit record carries the NEW one', () => {
+    // LIN-2442's whole property: a turn that dies before committing must not
+    // consume the delta it reserved against.
+    const { reserveRecord, commitRecord } = buildTurnRecords({
+      currentCensusDoc: CENSUS, companionDoc: COMPANION, now: 1_700_000_000_000, reservationId: 'n',
+    });
+    assert.strictEqual(reserveRecord.lastCensusStateHash, 'hash-old', 'reservation must NOT move the baseline');
+    assert.strictEqual(commitRecord.lastCensusStateHash, 'hash-new', 'the commit is what moves it');
+    assert.ok(reserveRecord.turnReservedUntil, 'the reservation carries a lease');
+    assert.strictEqual(commitRecord.turnReservedUntil, null, 'the commit clears it');
+    assert.strictEqual(reserveRecord.reservationId, 'n');
+    assert.strictEqual(commitRecord.reservationId, null);
+    // Operator notes survive both.
+    assert.strictEqual(reserveRecord.notes, 'keep me');
+    assert.strictEqual(commitRecord.notes, 'keep me');
+  });
+
+  test('keeps `nextRecord` as an alias, so no existing caller or test has to change', () => {
+    const out = buildTurnRecords({
+      currentCensusDoc: CENSUS, companionDoc: COMPANION, now: 1_700_000_000_000,
+    });
+    assert.deepStrictEqual(out.nextRecord, out.commitRecord);
+  });
+
+  test('the lease honours the caller\'s own value, which is what a boot needs', () => {
+    const now = 1_700_000_000_000;
+    const { reserveRecord } = buildTurnRecords({
+      currentCensusDoc: CENSUS, companionDoc: COMPANION, now, leaseMs: 12_345,
+    });
+    assert.strictEqual(reserveRecord.turnReservedUntil, new Date(now + 12_345).toISOString());
+  });
+
+  test('an unusable clock throws rather than stamping an Invalid Date into durable state', () => {
+    assert.throws(
+      () => buildTurnRecords({ currentCensusDoc: CENSUS, companionDoc: COMPANION, now: 'nonsense' }),
+      /now \(epoch ms or Date\) is required/
+    );
+  });
+});
+
+describe('LIN-2631 item 5: the lease is derived from the turn\'s own budget', () => {
+  test('the default budget reproduces the landed LIN-2447 constant, not a new number', () => {
+    // LIN-2447 (`f6eba327`) raised the constant to 900_000 because the real
+    // worst case is (4 + 1) x 120_000 — `streamChatWithTools` always falls
+    // through to a final `streamChat`, a fifth timeout the original comment
+    // missed. Deriving must AGREE with that, or this ticket would be silently
+    // reverting a landed fix.
+    assert.strictEqual(deriveReservationLeaseMs(DEFAULT_MAX_TOOL_ITERATIONS), RESERVATION_LEASE_MS);
+    assert.strictEqual(deriveReservationLeaseMs(4), 900_000);
+  });
+
+  test('a boot budget of five iterations gets a longer lease than the default', () => {
+    // The acceptance criterion, and the reason a constant could not serve every
+    // caller: a bigger budget that kept the default lease would outlive it as a
+    // matter of course, which is the one thing the lease exists to make rare.
+    const boot = deriveReservationLeaseMs(5);
+    assert.strictEqual(boot, (5 + 1) * 120_000 * 1.5);
+    assert.ok(boot > RESERVATION_LEASE_MS, `boot lease ${boot} must exceed the default ${RESERVATION_LEASE_MS}`);
+  });
+
+  test('the +1 for the mandatory final streamChat is load-bearing, not decoration', () => {
+    // Dropping it is the original LIN-2447 defect. Pin the gap explicitly so a
+    // future "simplification" to maxIterations x timeout fails here.
+    assert.strictEqual(deriveReservationLeaseMs(4) - (4 * 120_000 * 1.5), 120_000 * 1.5);
+  });
+
+  test('an absent or nonsensical budget falls back to the constant rather than to zero', () => {
+    // A zero lease would mark every reservation instantly expired, which reads
+    // downstream as "no turn in flight" — strictly worse than the default.
+    for (const bad of [undefined, null, NaN, -1, 'four', {}]) {
+      assert.strictEqual(deriveReservationLeaseMs(bad), RESERVATION_LEASE_MS, `${JSON.stringify(bad)}`);
+    }
   });
 });
