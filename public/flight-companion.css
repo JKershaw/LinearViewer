@@ -138,6 +138,21 @@
   color: var(--red);
 }
 
+/* LIN-2622: the start button (empty state) and the re-orient affordance —
+   a complementary pair, `.hidden` toggled opposite each other, never both
+   visible at once (see public/flight-companion.js's setEmptyVisible). Not a
+   status STRIP — LIN-2621 (still Backlog) owns that; `.fc-reorient-btn` is a
+   deliberately minimal stand-in sitting beside the existing check-in line
+   rather than a strip this ticket has no business building. */
+.fc-start-btn {
+  margin: 0 0 var(--space-2);
+}
+
+.fc-reorient-btn {
+  margin: 0 0 var(--space-2);
+  font-size: 0.85em;
+}
+
 .fc-chat-composer {
   margin-top: var(--space-1);
 }
@@ -233,16 +248,19 @@
  *
  * Its direct children are already in exactly the right DOM order for this
  * (lib/render-flight-companion.js's `chatBody`: the section-header, the
- * thread, the empty-state placeholder, the check-in status line, then the
- * composer) — the thread/empty-state pair (only one is ever visible; both
- * carry `[hidden]` toggled by flight-companion.js) gets `flex: 1`, so
- * whichever is showing fills the remaining space, while chat.css's own
- * `overflow-y: auto` on `.chat-thread` does the actual scrolling;
- * everything else (section-header, check-in line, composer) keeps its
- * natural height. Nothing here is ever stacked/overlaid, so no new
- * background is needed — this block declares no color and no animation,
- * so it is dark-theme- and reduced-motion-safe by construction, not by a
- * separate override.
+ * thread, the empty-state placeholder, the start button (LIN-2622), the
+ * check-in status line, the re-orient button (LIN-2622), then the composer)
+ * — the thread/empty-state pair (only one is ever visible; both carry
+ * `[hidden]` toggled by flight-companion.js) gets `flex: 1`, so whichever is
+ * showing fills the remaining space, while chat.css's own `overflow-y: auto`
+ * on `.chat-thread` does the actual scrolling; everything else
+ * (section-header, start button, check-in line, re-orient button, composer)
+ * keeps its natural height — `#flight-companion-start`/`#flight-companion-
+ * reorient` are added to the SAME `flex: 0 0 auto` group as `#flight-
+ * companion-checkin`/`.fc-chat-composer` below for exactly this reason.
+ * Nothing here is ever stacked/overlaid, so no new background is needed —
+ * this block declares no color and no animation, so it is dark-theme- and
+ * reduced-motion-safe by construction, not by a separate override.
  *
  * `100dvh` (with a `100vh` fallback for engines that don't support dynamic
  * viewport units) rather than `100vh` alone: the dynamic unit shrinks with
@@ -283,6 +301,8 @@
     --chat-thread-max-height: none;
   }
   #flight-companion-checkin,
+  #flight-companion-start,
+  #flight-companion-reorient,
   .fc-chat-composer {
     flex: 0 0 auto;
   }

@@ -100,6 +100,14 @@
   var checkInEl = document.getElementById('flight-companion-checkin');
   var questionInput = document.getElementById('flight-companion-question');
   var sendBtn = document.getElementById('flight-companion-send');
+  // LIN-2622: the start button (empty state) and the re-orient affordance.
+  // Both are optional-guarded, like checkInEl — LIN-2621 (Backlog at the time
+  // of writing) owns the actual status strip; #flight-companion-reorient is a
+  // deliberately minimal stand-in living next to the existing check-in line
+  // rather than a strip this ticket has no business building. Both drive the
+  // SAME boot turn.
+  var startBtn = document.getElementById('flight-companion-start');
+  var reorientBtn = document.getElementById('flight-companion-reorient');
 
   if (!thread || !questionInput || !sendBtn) return;
 
@@ -133,9 +141,15 @@
   // anyway). An auto-wake `done` resets only when the route's gate marked
   // this spend `surface:true`; the narrow `surface:false` seed-turn edge
   // case still renders/records normally but doubles, same as "nothing to
-  // report".
+  // report". LIN-2622: a boot `done` resets exactly like a user-initiated
+  // one — a boot is exactly as human-initiated as typing, and the ticket's
+  // own acceptance is "reset the wake cadence on done ONLY", never on the
+  // error/disconnect paths below (see settleFailedThinkingRow's widened
+  // guard and every failure branch in handleNonStreamOutcome, none of which
+  // apply any cadence effect to a boot turn at all — left exactly where it
+  // was, which is what "not on error, not on disconnect" means here).
   function doneCadenceEffect(turnKind, surface) {
-    if (turnKind === 'user-initiated') return 'reset';
+    if (turnKind === 'user-initiated' || turnKind === 'boot') return 'reset';
     return surface === true ? 'reset' : 'double';
   }
 
@@ -246,13 +260,21 @@
 
   // ─── DOM-touching glue ───────────────────────────────────────────────────
 
+  // LIN-2622: the start button and the re-orient affordance are a
+  // complementary pair, never shown together — start makes sense only while
+  // there is nothing to re-orient FROM, and once the thread has content a
+  // second "start" reads as a lie (nothing about the fleet is starting).
   function setEmptyVisible(visible) {
     if (emptyState) emptyState.classList.toggle('hidden', !visible);
+    if (startBtn) startBtn.classList.toggle('hidden', !visible);
+    if (reorientBtn) reorientBtn.classList.toggle('hidden', visible);
   }
 
   function setComposerBusy(busy) {
     questionInput.disabled = busy;
     sendBtn.disabled = busy;
+    if (startBtn) startBtn.disabled = busy;
+    if (reorientBtn) reorientBtn.disabled = busy;
   }
 
   // AC4 (LIN-2443): ChatUI.appendMessage bakes the speaker pill into
@@ -599,8 +621,13 @@
   // `answerLi` is null on every auto-wake path (ensureAssistantBubble is
   // never called there), so this is a no-op for those regardless of
   // `turnKind` — the guard is belt-and-braces, not load-bearing on its own.
+  // LIN-2622: a boot turn gets the SAME eager bubble (it renders as a
+  // user-initiated turn — see sendTurn below), so it needs the same
+  // settling on every failure exit; the button must never strand the UI in
+  // a permanent in-progress state (LIN-2443's "pill stuck in-progress" is
+  // exactly the landed failure shape this guards against).
   function settleFailedThinkingRow(answerEl, answerLi, turnKind, message) {
-    if (turnKind !== 'user-initiated' || !answerLi) return;
+    if ((turnKind !== 'user-initiated' && turnKind !== 'boot') || !answerLi) return;
     answerEl.classList.remove('chat-cursor');
     answerEl.textContent = '[error: ' + (message || 'failed') + ']';
     setBubbleState(answerLi, 'failed');
@@ -632,6 +659,20 @@
         // and fell through to the ordinary check-in line — reporting a
         // successful quiet scan for a fleet that has never been scanned.
         // Handled here, on the client, exactly as that ticket intended.
+        //
+        // LIN-2622: a BOOT can also land here — its own reservation can lose
+        // a race (an overlapping auto-wake) or hit a backend fault, and the
+        // route answers that with the SAME plain `{spent:false}` JSON shape.
+        // That is not "the companion checked and found nothing" the way an
+        // auto-wake's silent tick is — a human just clicked Start and is
+        // owed an honest answer, not a silently-refreshed status line — so
+        // it is handled first and never falls through to the shared
+        // auto-wake branches below.
+        if (turnKind === 'boot') {
+          chatHistory.pop();
+          settleMessage = 'That did not go through — try again in a moment.';
+          break;
+        }
         if (classification.reason === 'sweep-not-seen') {
           updateCheckInStatusSweepNotSeen(classification.sweepLastSeenAt);
         } else if (classification.reason === 'no-census') {
@@ -644,22 +685,23 @@
       case 'session-expired':
         showInlineNote(classification.message);
         applyCadenceEffect('stop');
-        if (turnKind === 'user-initiated') {
+        if (turnKind === 'user-initiated' || turnKind === 'boot') {
           chatHistory.pop();
-          questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
         }
         break;
       case 'flag-off':
         showInlineNote(classification.message);
         applyCadenceEffect('stop');
-        if (turnKind === 'user-initiated') {
+        if (turnKind === 'user-initiated' || turnKind === 'boot') {
           chatHistory.pop();
-          questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
         }
         break;
       case 'message-too-long':
-        // user-initiated only (cannot occur on auto-wake). Composer text
-        // is preserved for editing; no auto-retry.
+        // user-initiated only — structurally unreachable for a boot (the
+        // boot route never reads a body message at all, so it validates
+        // nothing that could produce this classification).
         chatHistory.pop();
         showInlineNote(classification.message);
         questionInput.value = sentMessage;
@@ -670,12 +712,14 @@
           applyCadenceEffect('stop');
         } else {
           chatHistory.pop();
-          questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
         }
         break;
       case 'free-tier-limit':
-        // user-initiated only — the auto-wake equivalent is the silent
-        // gate-silent row above, a distinct code path.
+        // Reachable by both a user-initiated turn and a boot (LIN-2622: a
+        // boot charges the free tier and 429s exactly like a typed turn) —
+        // the auto-wake equivalent is the silent gate-silent row above, a
+        // distinct code path.
         settleMessage = freeTierMessage(classification);
         chatHistory.pop();
         showInlineNote(settleMessage);
@@ -687,7 +731,7 @@
           applyCadenceEffect('double');
         } else {
           chatHistory.pop();
-          questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
         }
         break;
     }
@@ -727,7 +771,12 @@
       return answerEl;
     }
 
-    if (turnKind === 'user-initiated') {
+    // LIN-2622: a boot renders exactly like a user-initiated turn — the
+    // human clicked Start (or re-orient), and deserves to see what they
+    // asked for rather than a turn appearing from nowhere — it just posts
+    // to a different endpoint below and carries a fixed message rather than
+    // whatever the composer held.
+    if (turnKind === 'user-initiated' || turnKind === 'boot') {
       appendUserBubble(message);
       chatHistory.push({ role: 'user', content: message });
       capHistory(chatHistory);
@@ -760,15 +809,23 @@
       updateCheckInStatusChecking();
     }
 
-    var priorHistory = turnKind === 'user-initiated' ? chatHistory.slice(0, -1) : chatHistory.slice();
+    var priorHistory = (turnKind === 'user-initiated' || turnKind === 'boot') ? chatHistory.slice(0, -1) : chatHistory.slice();
     var body = { history: priorHistory };
-    if (message) body.message = message;
+    // LIN-2622: a boot never sends `message` — the server hardcodes its own
+    // turn content and never reads a client-supplied one for this endpoint
+    // (LIN-2432's "never client-asserted" rule, extended here); sending it
+    // anyway would suggest the client's text is what the model actually saw.
+    if (message && turnKind !== 'boot') body.message = message;
+    // LIN-2622: a boot posts to its own endpoint, never `/turn` — the turn
+    // kind is endpoint-selected, not body-selected, so the client's choice
+    // of URL is the ONLY thing that distinguishes a boot from here on.
+    var endpoint = turnKind === 'boot' ? 'boot' : 'turn';
 
     // Raw fetch carve-out: this response may be a Server-Sent Events stream
     // consumed via the reader below; window.api() parses the body as JSON
     // and would break streaming — the non-stream branch reads the body
     // itself instead.
-    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/flight-companion/turn', {
+    fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/flight-companion/' + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
       body: JSON.stringify(body),
@@ -808,7 +865,7 @@
               chatHistory.push({ role: 'assistant', content: answerText });
               capHistory(chatHistory);
               setBubbleState(answerLi, 'done');
-            } else if (turnKind === 'user-initiated') {
+            } else if (turnKind === 'user-initiated' || turnKind === 'boot') {
               // AC2: the human asked and deserves a row. Display-only — this
               // sentence is NEVER pushed to chatHistory (that is exactly what
               // the guard above exists to prevent).
@@ -821,6 +878,11 @@
               // none is created now — only the one status line updates.
               updateCheckInStatus();
             }
+            // LIN-2622: the cadence resets on `done` ONLY — doneCadenceEffect
+            // treats a boot exactly like a user-initiated turn here, and every
+            // failure exit below (mid-stream error, non-stream outcome,
+            // network failure) leaves the cadence untouched for a boot rather
+            // than resetting or doubling it.
             applyCadenceEffect(doneCadenceEffect(turnKind, eventData && eventData.surface));
             finishTurn();
           } else if (type === 'error') {
@@ -830,7 +892,10 @@
             errEl.classList.remove('chat-cursor');
             errEl.textContent = answerText + '\n[error: ' + ((eventData && eventData.message) || 'failed') + ']';
             setBubbleState(answerLi, 'failed');
-            if (turnKind === 'user-initiated') chatHistory.pop();
+            // LIN-2622: a boot's cadence is left alone on an error, same as
+            // user-initiated — "reset on done only" means an error moves it
+            // neither way, never a 'double' the way an auto-wake's does.
+            if (turnKind === 'user-initiated' || turnKind === 'boot') chatHistory.pop();
             else applyCadenceEffect('double');
             finishTurn();
           }
@@ -847,10 +912,10 @@
     }).catch(function () {
       // Network failure (fetch itself rejected).
       var networkMessage = 'Network failure — try again.';
-      if (turnKind === 'user-initiated') {
+      if (turnKind === 'user-initiated' || turnKind === 'boot') {
         chatHistory.pop();
         showInlineNote(networkMessage);
-        questionInput.value = message;
+        if (turnKind === 'user-initiated') questionInput.value = message;
       } else {
         applyCadenceEffect('double');
       }
@@ -899,10 +964,22 @@
     sendTurn(text, 'user-initiated');
   }
 
+  // LIN-2622: the start button (empty state) and the re-orient affordance
+  // both drive the SAME boot turn — a server-composed orient turn, never a
+  // client-asserted message. 'Start' is the synthetic display text (see
+  // sendTurn's boot branch above); the ACTUAL turn content is hardcoded
+  // server-side and never read from the request body either way.
+  function startBoot() {
+    if (inFlight) return;
+    sendTurn('Start', 'boot');
+  }
+
   sendBtn.addEventListener('click', submitQuestion);
   questionInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuestion(); }
   });
+  if (startBtn) startBtn.addEventListener('click', startBoot);
+  if (reorientBtn) reorientBtn.addEventListener('click', startBoot);
 
   window.addEventListener('beforeunload', function () {
     if (timerId) { clearTimeout(timerId); timerId = null; }
@@ -924,7 +1001,7 @@
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
       formatNoCensus,
-      applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion,
+      applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },
       CADENCE_BASE_MS: CADENCE_BASE_MS, CADENCE_CAP_MS: CADENCE_CAP_MS, HISTORY_CAP: HISTORY_CAP,
