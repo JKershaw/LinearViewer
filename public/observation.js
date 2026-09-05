@@ -1544,6 +1544,20 @@ function renderRulingRow(row) {
 
   li.appendChild(composer);
 
+  // LIN-2241 tier 1: the ruling's basis has moved since it was raised — the
+  // task was edited, commented on, or changed state after the scan read it, so
+  // the question may no longer be the right question. Strictly `=== true`: the
+  // field is TRI-state and `null` means unknown (no recorded basis, or nothing
+  // newer than the scan observed), which must never render as either answer.
+  // This is a fact, not a judgement — no model call produced it — so it is
+  // phrased as an observation and changes nothing about the row's actions.
+  if (row.basisChanged === true) {
+    const staleNote = document.createElement('p');
+    staleNote.className = 'obs-ruling-stale-note';
+    staleNote.textContent = '↻ the task changed since this was raised — re-read before answering';
+    li.appendChild(staleNote);
+  }
+
   // LIN-1727: a decision that has lapsed out of a prior shelve (its timer
   // expired without ever being decided) carries that history forward as a
   // visible flag — repeated lapses should raise priority, not be silently

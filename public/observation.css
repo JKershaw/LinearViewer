@@ -405,6 +405,25 @@
   margin: 0.4rem 0 0;
 }
 
+/* LIN-2241 tier 1. Deliberately the MUTED foreground, not the amber the lapse
+   note above uses: a moved basis is an observation the operator may want, not a
+   warning that something is wrong, and spending the alert colour on it would
+   make the genuine escalation signals next to it read as less urgent. */
+.obs-ruling-stale-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0;
+}
+
+/* The backstop disclaimer at the head of the rulings tab (LIN-2241 acceptance
+   criterion 5: the surface states its own limits). */
+.obs-rulings-limits {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0 0 0.6rem;
+  max-width: 62ch;
+}
+
 .obs-session {
   border: 1px solid var(--line);
   /* Coloured left accent stripe per status (mockup, design §6.1: 3px); status hue

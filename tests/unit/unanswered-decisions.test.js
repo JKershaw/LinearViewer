@@ -148,7 +148,7 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
     assert.strictEqual(rows[0].decision.decision_id, 'd-2');
   });
 
-  test('row shape carries decision, decisionCase, an anchor, disposition, and canReply', () => {
+  test('row shape carries decision, decisionCase, an anchor, disposition, canReply and basisChanged', () => {
     const l = loop({
       loopId: 'loop-a',
       issueId: 'uuid-a',
@@ -175,7 +175,13 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
       },
       disposition: 'resumable',
       canReply: true,
-      shelvedLapseCount: 0
+      shelvedLapseCount: 0,
+      // LIN-2241 tier 1 — always present, always `null` on a loop-backed row
+      // (no task scan raised it, so there is no basis to compare). Pinned in
+      // this exhaustive shape assertion on purpose: the client reads the
+      // tri-state strictly (`=== true`), so a row shipping the field as
+      // `undefined` instead of `null` is a contract change worth failing on.
+      basisChanged: null
     });
   });
 
@@ -421,5 +427,91 @@ describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
     );
     assert.strictEqual(rows.length, 1);
     assert.strictEqual(rows[0].anchor.workspaceUrlKey, 'globex');
+  });
+});
+
+describe('collectUnansweredDecisions — basisChanged (LIN-2241 tier 1)', () => {
+  const RAISED_AT = new Date('2026-09-01T09:00:00.000Z');
+  const AFTER = new Date('2026-09-03T09:00:00.000Z');
+  const BEFORE = new Date('2026-08-30T09:00:00.000Z');
+
+  function raised(overrides = {}) {
+    return taskDecision({ basisHash: 'basis-at-raise', scannedAt: RAISED_AT.toISOString(), ...overrides });
+  }
+  function observed(overrides = {}) {
+    return {
+      urlKey: 'acme',
+      issueId: 'uuid-task-1',
+      basisHash: 'basis-now',
+      observedAt: AFTER.toISOString(),
+      ...overrides
+    };
+  }
+
+  test('a later observation with a different basis flags the row', () => {
+    const rows = collectUnansweredDecisions(
+      { taskDecisions: [raised()], taskBasis: [observed()] },
+      { now: NOW }
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].basisChanged, true);
+  });
+
+  test('a later observation with the SAME basis reports false, not null', () => {
+    const rows = collectUnansweredDecisions(
+      { taskDecisions: [raised()], taskBasis: [observed({ basisHash: 'basis-at-raise' })] },
+      { now: NOW }
+    );
+    assert.equal(rows[0].basisChanged, false);
+  });
+
+  test('a row raised before this feature (no basisHash) is unknown, never flagged', () => {
+    // Every ruling already sitting in the queue when this lands takes this path.
+    const rows = collectUnansweredDecisions(
+      { taskDecisions: [taskDecision({ scannedAt: RAISED_AT.toISOString() })], taskBasis: [observed()] },
+      { now: NOW }
+    );
+    assert.equal(rows[0].basisChanged, null);
+  });
+
+  test('no observation for the task is unknown', () => {
+    const rows = collectUnansweredDecisions({ taskDecisions: [raised()], taskBasis: [] }, { now: NOW });
+    assert.equal(rows[0].basisChanged, null);
+  });
+
+  test('an observation OLDER than the scan is unknown, not a change', () => {
+    const rows = collectUnansweredDecisions(
+      { taskDecisions: [raised()], taskBasis: [observed({ observedAt: BEFORE.toISOString() })] },
+      { now: NOW }
+    );
+    assert.equal(rows[0].basisChanged, null);
+  });
+
+  test('an observation for a DIFFERENT task never leaks onto this row', () => {
+    const rows = collectUnansweredDecisions(
+      { taskDecisions: [raised()], taskBasis: [observed({ issueId: 'uuid-task-2' })] },
+      { now: NOW }
+    );
+    assert.equal(rows[0].basisChanged, null);
+  });
+
+  test('an observation from a different WORKSPACE never leaks onto this row', () => {
+    const rows = collectUnansweredDecisions(
+      { taskDecisions: [raised()], taskBasis: [observed({ urlKey: 'other' })] },
+      { now: NOW }
+    );
+    assert.equal(rows[0].basisChanged, null);
+  });
+
+  test('a loop-backed row carries basisChanged: null, keeping the row shape uniform', () => {
+    const l = loop({ decision: decision('d-1') });
+    const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].basisChanged, null);
+  });
+
+  test('omitting taskBasis entirely is a no-op — every row reports unknown', () => {
+    const rows = collectUnansweredDecisions({ taskDecisions: [raised()] }, { now: NOW });
+    assert.equal(rows[0].basisChanged, null);
   });
 });
