@@ -1,0 +1,70 @@
+/* Effort self-assessment read-out (LIN-2641). Semantic-token-only
+   (dark-safe), reusing .kpi-grid/.kpi-card from escalation-kpis.css and
+   adding per-card stat-row + tier-split footnote rules. */
+
+.effort-population,
+.effort-completeness {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem;
+}
+.effort-completeness--incomplete {
+  color: var(--amber);
+}
+
+.effort-grid {
+  margin-top: 0.75rem;
+}
+
+.effort-card-row {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.3rem 0;
+  flex-wrap: wrap;
+}
+.effort-card-metric {
+  font-family: var(--font-structural);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.effort-card-value {
+  font-family: var(--font-structural);
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+
+.effort-card-sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.effort-card-footnote {
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  margin-top: 0.4rem;
+  border-top: 1px dashed var(--line);
+  padding-top: 0.3rem;
+}
+
+.effort-notes {
+  margin-top: 1.25rem;
+}
+.effort-caption {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+.effort-notes-details summary {
+  cursor: pointer;
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+.effort-notes-details ul {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}

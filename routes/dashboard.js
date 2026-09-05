@@ -16,6 +16,8 @@
  *   POST     /workspace/:urlKey/api/dashboard/rulings/shelve       — shelve any ruling with a reason + re-surface timer (LIN-1727; view-only, works uniformly for loop-backed and task-bound)
  *   GET      /workspace/:urlKey/escalation-kpis                    — operator-facing escalation KPI audit page (LIN-1736; rate, time-to-response, false-escalation, unanswered age); ?windowDays= (default 30), ?targetPerDay= (optional)
  *   GET      /workspace/:urlKey/api/escalation-kpis                — the same KPIs as JSON
+ *   GET      /workspace/:urlKey/effort-readout                     — operator-facing per-kind effort x cost x duration x survived-the-next-gate read-out (LIN-2641); URL-only, unflagged and unlinked
+ *   GET      /workspace/:urlKey/api/effort-readout                 — the same read-out as JSON
  *   GET|POST /workspace/:urlKey/api/dashboard/run-summary/:loopId  — cached, on-demand short run summary
  *   GET|POST /workspace/:urlKey/api/dashboard/session-summary/:sessionId — cached session rollup (terminal); cheap latest-child statusLine proxy when live (LIN-592)
  *   GET      /workspace/:urlKey/api/dashboard/session-context/:sessionId — deterministic tasks-touched + relationship graph (LIN-593)
@@ -40,6 +42,11 @@ import { renderSessionPage } from '../lib/render-session.js';
 import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph, resolvedDecisionEvents, firstRaisedAt } from '../lib/pipeline-loops.js';
 import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
+import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
+import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
+import { classifyUpstreamError, isAuthError } from '../lib/errors.js';
+import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
+import { resolveIssueBinding } from '../lib/workspace.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -111,6 +118,24 @@ const WORKSPACE_FANOUT_CONCURRENCY = 2;
 // backend cost this bound exists to hold. Reads short-circuit on the first Done
 // touched task, so the common case (the seed is the done task) still costs one read.
 const FEED_HYDRATION_CAP = 5;
+
+// Max per-issue provider round trips in flight for the effort read-out's
+// comment/description fan-out (LIN-2641). Deliberately its OWN constant rather
+// than a reuse of WORKSPACE_FANOUT_CONCURRENCY above: that one bounds a
+// cross-WORKSPACE Loop-graph fan-out whose per-slot cost is a full 30-day
+// history materialisation, while this bounds per-ISSUE HTTP reads against one
+// provider. They are different resources with different right answers, and
+// coupling them would make a change to either silently re-tune the other.
+const EFFORT_READOUT_ISSUE_CONCURRENCY = 4;
+
+// The history read's row bound (LIN-2641). `listHistory` sorts { resolvedAt: -1 }
+// and pushes this into the query, so it means "the 200 most recently RESOLVED
+// rows", not the 200 most recently dispatched. The paired live read
+// (`listItems`) takes NO limit — the method has no such option; it is bounded
+// only by its own TTL predicate (expiresAt > now). The two reads therefore
+// carry two different bounds, and the page states each honestly rather than
+// one shared number.
+const EFFORT_READOUT_HISTORY_LIMIT = 200;
 
 /**
  * Run `mapper` over `items` with at most `limit` in flight, returning
@@ -1722,6 +1747,145 @@ export function createDashboardRoutes({
       console.error('Escalation KPIs error:', error);
       keepalive.stop();
       keepalive.send(500, { error: 'Could not compute escalation KPIs' });
+    }
+  });
+
+  // ─── Effort self-assessment read-out (LIN-2641, Phase 2 of LIN-2566) ───────
+  //
+  // Per-kind effort x cost x duration x survived-the-next-gate over this
+  // workspace's recent dispatch rows. Modelled on the escalation-kpis pair
+  // above: a URL-only operator page (unflagged, unlinked) that computes on
+  // page load rather than being polled.
+  //
+  // NOT on the poll path, deliberately. `public/llms.txt` documents that the
+  // live feed reads Mongo only — no provider calls per poll — and this route
+  // DOES make per-issue provider reads, so it must stay a page-load-only
+  // surface. Never move this computation into /api/dashboard/sessions.
+  async function computeWorkspaceEffortReadout(workspace, { now }) {
+    const urlKey = workspace.urlKey;
+
+    // Two reads, two DIFFERENT bounds (see the constants above). `listItems`
+    // is given no `limit` because it accepts none; `listHistory` carries the
+    // real one. Projection excludes only `prompt` — `status`, `feedback` and
+    // `rootItemId` are all load-bearing for the adapter and both joins.
+    const [liveRows, history] = await Promise.all([
+      dispatchQueueStore.listItems(urlKey, { projection: { prompt: 0 } }),
+      dispatchQueueStore.listHistory(urlKey, { limit: EFFORT_READOUT_HISTORY_LIMIT, projection: { prompt: 0 } }),
+    ]);
+    const historyRows = history.items || [];
+
+    // The issues the survival walk will actually score — derived through the
+    // SAME population rule the compute layer uses, so the set fetched and the
+    // set scored cannot drift.
+    const identifiers = eligibleIssueIdentifiers({ liveRows, historyRows });
+
+    // One binding for the whole read, resolved from the workspace itself — a
+    // dispatch row carries no per-issue provenance to thread as `source`. On a
+    // multi-binding workspace a foreign-source issue therefore reads against
+    // the wrong provider and fails; that failure is counted as a skip and
+    // DISCLOSED in `completeness` rather than silently dropped, so the page
+    // under-reports honestly instead of mis-attributing. Threading per-issue
+    // provenance would need a `source` on the dispatch row itself.
+    const { provider, callScope } = resolveIssueBinding(workspace, null);
+    const supports = (name) => typeof provider?.supports === 'function' && provider.supports(name);
+    const survivalAvailable = supports('fetchIssueComments');
+    // `description` is what `GATE_DUE_MARKER` matches for gateDue/gateHonoured.
+    // Without it those two fields would render a uniform zero that is not a
+    // measurement, so the compute layer omits them instead.
+    const gateFieldsAvailable = supports('fetchIssueFields');
+
+    const issueContext = new Map();
+    let skipped = 0;
+
+    if (survivalAvailable && identifiers.length) {
+      const settled = await settleWithConcurrency(identifiers, EFFORT_READOUT_ISSUE_CONCURRENCY, async (identifier) => {
+        // `fetchIssueComments` (not `fetchIssueContext`) because the verdict
+        // walk needs each comment's own `id` + `createdAt`, which only this
+        // reader emits. `fetchIssueFields` supplies the description the gate
+        // fields are derived from.
+        const [comments, fields] = await Promise.all([
+          provider.fetchIssueComments(callScope, identifier),
+          gateFieldsAvailable ? provider.fetchIssueFields(callScope, identifier) : Promise.resolve(null),
+        ]);
+        return {
+          identifier,
+          id: fields?.id || identifier,
+          description: typeof fields?.description === 'string' ? fields.description : '',
+          comments: Array.isArray(comments) ? comments : [],
+        };
+      });
+
+      for (const outcome of settled) {
+        if (outcome.status === 'fulfilled') {
+          const ctx = outcome.value;
+          issueContext.set(ctx.identifier, ctx);
+          continue;
+        }
+        // An auth rejection is NOT a skip (LIN-1984's lesson: a run that
+        // silently skipped most of its reads still reported success). It is
+        // non-retryable and cannot be fixed by rendering partial numbers, so
+        // it propagates to the caller's upstream-aware error branch.
+        if (isAuthError(outcome.reason)) throw outcome.reason;
+        // Retryable (429/5xx/network) — count it, still render, and say so.
+        skipped += 1;
+      }
+    }
+
+    return computeEffortReadout({
+      liveRows,
+      historyRows,
+      historyTotal: history.total ?? historyRows.length,
+      issueContext,
+      asOf: now.toISOString(),
+      skipped,
+      survivalAvailable,
+      gateFieldsAvailable,
+    });
+  }
+
+  router.get('/workspace/:urlKey/effort-readout', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const now = new Date();
+    try {
+      const readout = await computeWorkspaceEffortReadout(workspace, { now });
+      res.send(renderEffortReadoutPage(workspace.name, {
+        urlKey: workspace.urlKey,
+        workspaces: req.session.workspaces || [],
+        featureFlags: getFeatureFlags(req.session),
+        readout,
+        generatedAt: now.toISOString(),
+      }));
+    } catch (error) {
+      if (isAuthError(error)) {
+        // No numbers at all on an auth failure — a "Try again" against the
+        // same rejected credential is a dead end, so this page routes to the
+        // re-auth recovery instead.
+        return res.status(401).send(renderUpstreamAwareErrorPage(error, {
+          actionUrl: `/workspace/${workspace.urlKey}/effort-readout`,
+          time: now.toISOString(),
+        }));
+      }
+      console.error('Effort read-out page error:', error);
+      res.status(500).send('Failed to compute the effort read-out');
+    }
+  });
+
+  router.get('/workspace/:urlKey/api/effort-readout', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const now = new Date();
+    const keepalive = armKeepalive(res);
+    try {
+      const readout = await computeWorkspaceEffortReadout(workspace, { now });
+      keepalive.stop();
+      keepalive.send(200, { generatedAt: now.toISOString(), ...readout });
+    } catch (error) {
+      keepalive.stop();
+      if (isAuthError(error)) {
+        const classified = classifyUpstreamError(error);
+        return keepalive.send(401, { error: classified.detail, code: classified.code, retryable: classified.retryable });
+      }
+      console.error('Effort read-out error:', error);
+      keepalive.send(500, { error: 'Could not compute the effort read-out' });
     }
   });
 
