@@ -88,6 +88,8 @@ describe('buildCompanionSnapshot', () => {
         ['loop-2', 'silent', 'waiting']
       ],
       attentionCount: 2,
+      // LIN-2661: 0 malformed rows dropped — a well-formed census.
+      malformedAttentionCount: 0,
       truncated: true,
       censusRev: 7
     });
