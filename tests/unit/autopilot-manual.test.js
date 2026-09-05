@@ -51,3 +51,67 @@ describe('extractPrincipleZeroSection', () => {
     assert.ok(manual.includes(section));
   });
 });
+
+/**
+ * LIN-2334 — the `blocked` carve-out on the coordinator's PER-CHILD liveness
+ * clock.
+ *
+ * This is not documentation: `lib/prompts/autopilot-manual.js` reads this file
+ * as its single source of truth and it is inlined verbatim into every autopilot
+ * kickoff, so prose here reaches the model on every run. Before this ticket the
+ * per-child clock stated the ~30-minute rule with no carve-out, which told the
+ * coordinator to nudge and re-dispatch a child that is silent *because a human
+ * is parked on it* — out from under that human.
+ *
+ * Pinned the way the four `lib/prompts/autopilot-kickoff.js` statements of the
+ * same rule are pinned (tests/unit/autopilot-kickoff.test.js), and asserted on
+ * the BUILT manual rather than on the file, because the built string is what
+ * actually reaches the model.
+ */
+describe('LIN-2334: the blocked carve-out on the per-child liveness clock', () => {
+  // The manual is hard-wrapped Markdown, so every assertion below runs against
+  // the whitespace-flattened text — the same idiom the sibling kickoff pins use
+  // (tests/unit/autopilot-kickoff.test.js), and the right one here because a
+  // re-wrap of the paragraph is not a prompt change and must not fail the suite.
+  const flat = () => buildAutopilotManual().replace(/\s+/g, ' ');
+
+  test('the manual carries the adjudicated carve-out sentence', () => {
+    assert.ok(
+      flat().includes("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it"),
+      'the carve-out must be present in the manual the kickoff inlines'
+    );
+  });
+
+  test('it names the blocked silence as a human parked on it, not a wedge', () => {
+    assert.ok(flat().includes('a child already woken to you as `blocked` is expected to stay silent'));
+    assert.ok(flat().includes('that silence is a human parked on it, not a wedge'));
+  });
+
+  test('it uses "surface it to the human", never LIN-2269\'s rejected "keep waiting for the unblock"', () => {
+    // LIN-2269 adjudicated this correction: a `blocked` step consumes the
+    // once-only terminal-wake slot, so "keep waiting" waits on a wake that
+    // (at the time) could never arrive. The rejected phrasing must not
+    // reappear here by way of a later well-meaning edit.
+    assert.ok(!flat().includes('keep waiting for the unblock'));
+  });
+
+  test('the carve-out sits INSIDE the per-child liveness clock, not merely somewhere in the file', () => {
+    // The defect was location-specific: the rule at the per-child clock had no
+    // carve-out even though the kickoff's statements of the same rule did. A
+    // carve-out elsewhere in the manual would not fix it, so assert adjacency
+    // rather than mere presence.
+    const text = flat();
+    const clockAt = text.indexOf('each outstanding child carries its own ~30-minute liveness clock');
+    const carveAt = text.indexOf("don't nudge or re-dispatch it on this rule, surface it to the human so they can unblock it");
+    const nextBulletAt = text.indexOf('**Judge its report on evidence and advance.**');
+    assert.ok(clockAt > -1, 'the per-child liveness clock is present');
+    assert.ok(carveAt > clockAt, 'the carve-out follows the clock it qualifies');
+    assert.ok(nextBulletAt > carveAt, 'the carve-out is still inside that bullet, before the next one');
+  });
+
+  test('the per-child probe is still forbidden from becoming a standing poll', () => {
+    // Regression guard: the carve-out was spliced mid-bullet, so the sentence
+    // it was inserted ahead of must survive.
+    assert.ok(flat().includes('Never promote that per-child probe into a standing poll'));
+  });
+});
