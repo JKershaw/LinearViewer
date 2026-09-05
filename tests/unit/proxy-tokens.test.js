@@ -481,6 +481,74 @@ describe('ProxyTokenStore', () => {
     });
   });
 
+  describe('describeRejectionCause (LIN-1938 S2 — read-only rejection-cause lookup)', () => {
+    test('unrecognized bearer returns null', async () => {
+      const descriptor = await store.describeRejectionCause('never-issued-token');
+      assert.strictEqual(descriptor, null);
+    });
+
+    test('empty/missing token returns null', async () => {
+      assert.strictEqual(await store.describeRejectionCause(''), null);
+      assert.strictEqual(await store.describeRejectionCause(null), null);
+    });
+
+    test('bootstrap-only token resolves to bootstrap_only', async () => {
+      const boot = await store.createToken('workspace-1', { kind: 'bootstrap' });
+      const descriptor = await store.describeRejectionCause(boot.token);
+      assert.strictEqual(descriptor.state, 'bootstrap_only');
+      assert.strictEqual(descriptor.urlKey, 'workspace-1');
+    });
+
+    test('expired standard token resolves to expired + expiresAt', async () => {
+      const result = await store.createToken('workspace-1', { ttl: 1 });
+      const docs = collection._docs();
+      const expiredAt = new Date(Date.now() - 60 * 60 * 1000);
+      docs[0].expiresAt = expiredAt;
+
+      const descriptor = await store.describeRejectionCause(result.token);
+      assert.strictEqual(descriptor.state, 'expired');
+      assert.strictEqual(descriptor.expiresAt, expiredAt.toISOString());
+      assert.strictEqual(descriptor.urlKey, 'workspace-1');
+    });
+
+    test('consumed single-use token resolves to consumed', async () => {
+      const result = await store.createToken('workspace-1', { singleUse: true });
+      await store.validateToken(result.token); // consumes it
+      const descriptor = await store.describeRejectionCause(result.token);
+      assert.strictEqual(descriptor.state, 'consumed');
+    });
+
+    test('a legacy doc with no `kind` field is treated as standard, not misclassified as bootstrap-only', async () => {
+      const result = await store.createToken('workspace-1', { ttl: 1 });
+      const docs = collection._docs();
+      delete docs[0].kind;
+      docs[0].expiresAt = new Date(Date.now() - 60 * 60 * 1000);
+
+      const descriptor = await store.describeRejectionCause(result.token);
+      assert.strictEqual(descriptor.state, 'expired');
+    });
+
+    test('a still-valid token (no rejection reason) resolves to null — nothing to describe', async () => {
+      const result = await store.createToken('workspace-1');
+      const descriptor = await store.describeRejectionCause(result.token);
+      assert.strictEqual(descriptor, null);
+    });
+
+    test('never mutates: lastUsedAt/consumed are unchanged after the call', async () => {
+      const result = await store.createToken('workspace-1', { singleUse: true, kind: 'bootstrap' });
+      const docs = collection._docs();
+      const before = { lastUsedAt: docs[0].lastUsedAt, consumed: docs[0].consumed };
+
+      await store.describeRejectionCause(result.token);
+
+      assert.deepStrictEqual(
+        { lastUsedAt: docs[0].lastUsedAt, consumed: docs[0].consumed },
+        before,
+        'describeRejectionCause must not write lastUsedAt/consumed (read-only lookup)'
+      );
+    });
+  });
+
   describe('scope', () => {
     test('read scope is stored correctly', async () => {
       const result = await store.createToken('workspace-1', { scope: 'read' });

@@ -61,6 +61,9 @@ export const BASE_DEPS = () => ({
   proxyTokenStore: {
     validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'readWrite', createdBy: 'u1' }),
     listTokens: async () => ([]),
+    // LIN-1938 S2: only reached when a caller overrides validateToken to
+    // reject — this default bearer is never a recognized token to describe.
+    describeRejectionCause: async () => null,
   },
   proxyEventStore: {
     recordEvent: async () => {},

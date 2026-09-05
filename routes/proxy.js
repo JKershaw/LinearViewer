@@ -524,7 +524,38 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         // workspace is resolved yet, so there is nothing to audit — hence the
         // direct call.
         logCredentialRejection(req, 'auth');
-        return jsonError(res, 401, 'Invalid, expired, or consumed token', PROXY_TOKEN_REJECTED_EXTRA);
+
+        // LIN-1938 S2/S3: a read-only lookup so the 401 can say WHY, and so
+        // the recognized-expired case leaves an audit row at all — until now
+        // this branch never reached `logEvent`/`recordEvent`, so an expired
+        // working token was invisible both to the agent (bare "invalid,
+        // expired, or consumed") and to an operator (no row anywhere). An
+        // unrecognized bearer (garbage/never-issued) has no `urlKey` to
+        // attribute a row to, so it gets neither field nor a row — only a
+        // recognized token document earns either.
+        const descriptor = await proxyTokenStore.describeRejectionCause(token);
+        const extra = descriptor
+          ? {
+              ...PROXY_TOKEN_REJECTED_EXTRA,
+              proxyTokenState: descriptor.state,
+              ...(descriptor.state === 'expired' ? { proxyTokenExpiredAt: descriptor.expiresAt } : {})
+            }
+          : PROXY_TOKEN_REJECTED_EXTRA;
+
+        if (descriptor) {
+          proxyEventStore.recordEvent({
+            urlKey: descriptor.urlKey,
+            tokenId: null,
+            tokenLabel: null,
+            method: req.method,
+            endpoint: req.originalUrl,
+            status: 401,
+            stage: STAGE_PROXY_TOKEN,
+            note: descriptor.state
+          }).catch(err => console.error('Failed to log proxy-token rejection event:', err));
+        }
+
+        return jsonError(res, 401, 'Invalid, expired, or consumed token', extra);
       }
 
       req.proxyTokenId = result.tokenId;
