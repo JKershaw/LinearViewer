@@ -376,22 +376,33 @@ describe('shouldSpendTurn: turn-in-flight precedence (LIN-2442)', () => {
       'the +1 in the derivation is this unconditional final streamChat — if it becomes conditional, the arithmetic below changes'
     );
 
-    const worstCaseMs = (DEFAULT_MAX_TOOL_ITERATIONS + 1) * requestTimeoutMs;
-    assert.strictEqual(worstCaseMs, 600_000, 'sanity: the worst case the old lease exactly equalled');
+    // The bound, stated for what it is: (MAX + 1) calls, each bounded in
+    // TIME-TO-RESPONSE-HEADERS. Not a total-duration worst case — streamChat
+    // clears its timeout once the fetch resolves and then reads the SSE body
+    // unguarded, and executeTool is unbounded. Asserted as a floor the lease
+    // must clear, never as an equality: pinning the literal 600_000 would both
+    // certify a figure that is not the worst case AND go red on a legitimate
+    // DEFAULT_MAX_TOOL_ITERATIONS bump that leaves the invariant intact.
+    const headersBoundMs = (DEFAULT_MAX_TOOL_ITERATIONS + 1) * requestTimeoutMs;
     assert.ok(
-      RESERVATION_LEASE_MS > worstCaseMs,
-      `lease (${RESERVATION_LEASE_MS}) must EXCEED the ${worstCaseMs}ms model-call worst case, not equal it`
+      RESERVATION_LEASE_MS > headersBoundMs,
+      `lease (${RESERVATION_LEASE_MS}) must EXCEED the ${headersBoundMs}ms (MAX+1)-call bound, not equal it — equalling it is the defect LIN-2447 fixed`
     );
     assert.ok(
-      RESERVATION_LEASE_MS >= worstCaseMs * 1.25,
+      RESERVATION_LEASE_MS >= headersBoundMs * 1.25,
       'and by a real margin, not a rounding error'
     );
   });
 
-  test('LIN-2447 item 3: two same-millisecond reservations are distinguishable, so they cannot both win the CAS', () => {
-    // Byte-identical inputs, byte-identical clock — the exact collision that
-    // let advance()'s duplicate-identical-state branch return true to BOTH
-    // callers, so both proceeded to a billable model call.
+  test('LIN-2447: two same-millisecond gate evaluations produce distinguishable reserve records', () => {
+    // Named for what it actually asserts. It does NOT touch advance(), so it
+    // proves nothing about who wins a CAS — and item 3's claimed collision does
+    // not reproduce anyway (see the reservationId comment in the gate: the
+    // duplicate-identical-state branch needs `current.rev === expectedRev`, so
+    // the loser of a real race sees rev+1 and gets false, with or without a
+    // nonce). What matters here is the property item 2 depends on: byte-
+    // identical inputs and an identical clock must still yield records that can
+    // be told apart, because turnReservedUntil alone cannot identify a turn.
     const build = () => {
       const priorSnapshot = { lanes: lanes({ terminal: 0 }), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
       return {
@@ -408,12 +419,12 @@ describe('shouldSpendTurn: turn-in-flight precedence (LIN-2442)', () => {
     assert.notStrictEqual(
       a.reserveRecord.reservationId,
       b.reserveRecord.reservationId,
-      'same-millisecond reservations must differ, or the store cannot tell them apart'
+      'same-millisecond reservations must differ, or the commit CAS has nothing to match on'
     );
     assert.notDeepStrictEqual(
       a.reserveRecord,
       b.reserveRecord,
-      'and the RECORDS must differ — the store hashes the whole state, so equal records hash equal and both callers win'
+      'and the whole RECORD must differ, not just a field the commit path happens to read'
     );
   });
 

@@ -593,10 +593,21 @@ export function createFlightCompanionRoutes({
           // scoped to the turn that opened it rather than to whatever is there
           // now. Skipping is safe and is the same benign outcome as a lost CAS
           // below: the successor is already reporting this change.
-          const stillOurs = currentEnvelope
+          // Our own id must be truthy for the match to mean anything: a `null`
+          // on both sides would make `stillOurs` true against a successor that
+          // has just COMMITTED (its record carries `reservationId: null`),
+          // which is precisely the record we must not write over.
+          const ourReservationId = companionAdvance.reserveRecord.reservationId;
+          const stillOurs = !!ourReservationId
+            && currentEnvelope
             && currentEnvelope.state
-            && currentEnvelope.state.reservationId === companionAdvance.reserveRecord.reservationId;
-          if (currentEnvelope && !stillOurs) {
+            && currentEnvelope.state.reservationId === ourReservationId;
+          if (currentEnvelope && !currentEnvelope.state) {
+            console.error('Flight Companion turn: commit skipped, record has no state', {
+              instanceKey: companionAdvance.instanceKey,
+              urlKey: workspace.urlKey,
+            });
+          } else if (currentEnvelope && !stillOurs) {
             console.error('Flight Companion turn: commit skipped, reservation no longer ours', {
               instanceKey: companionAdvance.instanceKey,
               urlKey: workspace.urlKey,

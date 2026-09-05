@@ -1031,7 +1031,7 @@ describe('Flight Companion turn endpoint (LIN-2442) — acceptance witnesses, mu
     assert.strictEqual(afterTurn1.state.lastCensusStateHash, null, 'the OLD (seed/null) baseline must be untouched by a failed turn');
     assert.ok(afterTurn1.state.turnReservedUntil, 'a reservation lease must be recorded');
 
-    // Fast-forward past BOTH the 180s floor and the 600s lease the same way
+    // Fast-forward past BOTH the 180s floor and the reservation lease the same way
     // real elapsed time would read: by writing already-past deadlines
     // through the store's OWN CAS (route has no injectable clock —
     // Date.now() is read directly — this is the same wall-clock-simulation
@@ -1138,7 +1138,7 @@ describe('Flight Companion turn endpoint (LIN-2442) — acceptance witnesses, mu
   });
 
   // ── (c) the lease outlasts a slow turn — first-ever run of this witness ──
-  test('(c) a turn still in flight past the 180s floor but inside the 600s lease is denied with reason: turn-in-flight', async () => {
+  test('(c) a turn still in flight past the 180s floor but inside the reservation lease is denied with reason: turn-in-flight', async () => {
     const store = freshRealStore();
     const census = censusWithAttention('hash-c', 4);
     withCensus(store, census);
@@ -1529,7 +1529,6 @@ describe('Flight Companion turn endpoint (LIN-2447 item 2) — late commit canno
   // record survived.
   function racingObserverStateStore({ censusDoc, successorState, calls }) {
     let doc = { rev: 1, state: COMPANION_SEED_STATE };
-    let readsAfterReserve = 0;
     let reserved = false;
     return {
       calls,
@@ -1541,7 +1540,6 @@ describe('Flight Companion turn endpoint (LIN-2447 item 2) — late commit canno
         calls.push({ method: 'readCurrent', instanceKey });
         if (instanceKey.startsWith('sweep:v1:')) return censusDoc;
         if (reserved) {
-          readsAfterReserve++;
           // The commit block's own fresh read: hand it the successor's record.
           return { _id: instanceKey, rev: 9, state: successorState };
         }
@@ -1553,7 +1551,6 @@ describe('Flight Companion turn endpoint (LIN-2447 item 2) — late commit canno
         doc = { rev: doc.rev + 1, state: nextState };
         return true;
       },
-      get readsAfterReserve() { return readsAfterReserve; },
     };
   }
 
