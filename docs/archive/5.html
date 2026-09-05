@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>The Cheap Ships · Harbour Archive #5</title>
+<meta name="description" content="An essay filed to the Harbour Archive on 5 September 2026: five levers that could make Harbour a hundred times cheaper per landed task, what each unlocks, and where it takes the project.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; }
+</style>
+</head>
+<body>
+<style>
+  @font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("/fonts/inter-400.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("/fonts/inter-500.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("/fonts/inter-600.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("/fonts/inter-700.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("/fonts/jetbrains-mono-400.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("/fonts/jetbrains-mono-500.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 600; font-display: swap; src: url("/fonts/jetbrains-mono-600.woff2") format("woff2"); }
+
+  :root {
+    --paper: #faf9f6;
+    --card: #fffefb;
+    --ink: #1c2430;
+    --muted: #5c6672;
+    --faint: #8b93a0;
+    --line: #e4e1d8;
+    --line-soft: #eeece5;
+    --blue: #0b6fb8;
+    --blue-soft: #e3eef8;
+    --amber: #bb5f10;
+    --amber-soft: #f8ede0;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+      --line: #2a323d; --line-soft: #232a34;
+      --blue: #3f96dd; --blue-soft: #1d2c3b; --amber: #cf7f2e; --amber-soft: #33281c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+    --line: #2a323d; --line-soft: #232a34;
+    --blue: #3f96dd; --blue-soft: #1d2c3b; --amber: #cf7f2e; --amber-soft: #33281c;
+  }
+
+  html { background: var(--paper); }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 740px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  .masthead { padding: 72px 0 28px; border-bottom: 3px double var(--line); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 22px;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(40px, 7vw, 68px); line-height: 1.02; margin: 0 0 16px;
+    font-weight: 700; letter-spacing: -0.02em; text-wrap: balance;
+  }
+  .mast-sub { font-size: clamp(18px, 2.4vw, 22px); color: var(--muted); margin: 0 0 22px; text-wrap: balance; }
+  .byline {
+    font-family: var(--mono); font-size: 13px; color: var(--muted); line-height: 1.7;
+    border-left: 2px solid var(--line); padding-left: 14px; margin: 0;
+  }
+  .byline b { color: var(--ink); font-weight: 600; }
+
+  h2 {
+    font-family: var(--sans); font-weight: 700; letter-spacing: -0.01em;
+    font-size: clamp(26px, 3.6vw, 34px); line-height: 1.15; margin: 64px 0 18px;
+  }
+  h2 .num { font-family: var(--mono); font-weight: 500; font-size: 0.55em; color: var(--faint); letter-spacing: .1em; display: block; margin-bottom: 8px; }
+  h3 {
+    font-family: var(--sans); font-weight: 600; font-size: 21px; line-height: 1.3; margin: 40px 0 10px;
+  }
+  h3 .lever { font-family: var(--mono); font-weight: 500; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--amber); display: block; margin-bottom: 6px; }
+  p { margin: 0 0 18px; }
+  p.lede { font-size: 20px; line-height: 1.55; }
+  em { font-style: italic; }
+  .pull {
+    margin: 34px 0; padding: 18px 22px; border-left: 3px solid var(--amber);
+    background: var(--amber-soft); border-radius: 0 6px 6px 0;
+    font-size: 20px; line-height: 1.5;
+  }
+  .pull small { display: block; margin-top: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .figures {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 26px 0 30px;
+  }
+  .fig {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+  }
+  .fig .v { font-family: var(--mono); font-weight: 600; font-size: 24px; line-height: 1.1; color: var(--ink); }
+  .fig .k { font-family: var(--sans); font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+
+  .tablewrap { overflow-x: auto; margin: 26px 0 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 15px; line-height: 1.45; }
+  caption { text-align: left; font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 12px 16px 4px; }
+  th, td { text-align: left; vertical-align: top; padding: 11px 16px; border-top: 1px solid var(--line-soft); }
+  thead th { font-weight: 600; color: var(--muted); font-size: 13px; border-top: 0; }
+  td.num, th.num { font-family: var(--mono); white-space: nowrap; }
+  td strong { font-family: var(--sans); }
+
+  .colophon {
+    margin: 64px 0 0; padding: 26px 0 0; border-top: 3px double var(--line);
+    font-family: var(--sans); font-size: 15px; color: var(--muted); line-height: 1.6;
+  }
+  .colophon h2 { font-size: 16px; margin: 0 0 12px; letter-spacing: .08em; text-transform: uppercase; font-family: var(--mono); font-weight: 500; color: var(--muted); }
+  .colophon ul { padding-left: 20px; margin: 0 0 18px; }
+  .colophon li { margin: 0 0 8px; }
+  .sources { columns: 2; column-gap: 28px; }
+  @media (max-width: 640px) { .sources { columns: 1; } body { font-size: 17px; } }
+  .foot { padding: 40px 0 72px; font-family: var(--mono); font-size: 12px; color: var(--faint); }
+</style>
+
+<main class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Harbour Archive · Document 5 · An essay</p>
+  <h1>The Cheap Ships</h1>
+  <p class="mast-sub">Five levers, what each one unlocks, and where they take Harbour. Told from the run as it stood on the evening of Friday 5 September 2026.</p>
+  <p class="byline"><b>Written</b> in conversation with John by the Flight Companion history session, 5 September 2026.<br><b>Grounded</b> in Harbour's own reviews at HEAD and the week's public model news. Every figure is cited at the foot.<br><b>Filed</b> as the first essay in the Archive. Documents 1, 2 and 4 are museum editions; document 3 is a project brief.</p>
+</header>
+
+<section>
+  <h2><span class="num">Part one</span>Where the meter is</h2>
+
+  <p class="lede">It is Friday evening, 5 September. The gauge on <code>/kpis</code> reads a little over seventy percent of the week's window spent. At the current burn the window runs dry on Sunday morning. It refills on Thursday. The fleet only moves while a tab is open, and each landed task costs about thirty dollars at API list rate.</p>
+
+  <div class="figures">
+    <div class="fig"><div class="v">70.7%</div><div class="k">of the weekly window consumed, Friday evening</div></div>
+    <div class="fig"><div class="v">$30.25</div><div class="k">API-equivalent per terminal-marked task, trailing 30 days</div></div>
+    <div class="fig"><div class="v">30–65×</div><div class="k">list-rate compute bought per prepaid pound, when the week has headroom</div></div>
+    <div class="fig"><div class="v">2 of 4</div><div class="k">measured weeks that hit or grazed the cap</div></div>
+  </div>
+
+  <p>That thirty dollars never reaches a bank account, because every session rides the subscription. The capacity review measured what that lane is worth: one prepaid pound buys thirty to sixty-five pounds of list-rate compute, when the week has headroom. Two of the four measured weeks did not. The cap binds, not the backlog.</p>
+
+  <p>John reframed the objective on 15 August, and it still holds. The goal is not to save money. It is verified outcomes per week under a fixed weekly budget. Tonight's addition is the second half of that sentence: run at full capacity, then step off the subscription altogether while keeping the books balanced.</p>
+
+  <p>The August reviews found the fact that makes the whole story possible. Ninety-five and a half percent of all spend is carried-context re-reads. An implementation leg carries about 190 times the context it was handed. The observer carried 1,420 times. The engines are not slow. The archive put it best: the engines run at the same speed they did in June, and what changed is wasted motion.</p>
+
+  <p>Then came the probes. Two real legs from the capacity day were re-run with the smallest context that still passed the same verifier. One cost twelve times less. The other cost forty-four times less. Removing a single ninety-three-token pointer to a file and a function more than doubled the cost of an otherwise identical handoff. On localized tasks Haiku matched Sonnet exactly from the same distillate, at a quarter of the price.</p>
+
+  <div class="pull">The frontier model was being paid to search, not to judge.<small>Context-efficiency ceiling review, 15 August 2026</small></div>
+
+  <p>Every optimisation lined up in the wing attacks that one fact from a different side. Here they are in the order they compound.</p>
+</section>
+
+<section>
+  <h2><span class="num">Part two</span>Five levers</h2>
+
+  <h3><span class="lever">Lever one · uptime</span>The observer that does not think</h3>
+  <p>The first lever is already half-landed, and it is the one this week was spent on. The observer sweep classifies the whole fleet into seven lanes with no model call at all. The judgement pass spends one small stateless call only when the census changed, and its quiet path is deterministic, which the code describes as honest regardless of model behaviour. The Flight Companion's gate is a pure function that decides whether an auto-wake may spend anything.</p>
+  <p>The levers map priced this lever at the top of the table: coordination carry on a full-width day falls from roughly $580 to $30 or $60, because the orchestrator tier alone was almost a quarter of the day. What it unlocks is the thing John asked for first. The run keeps moving with the tab closed. He becomes the navigator rather than the presence required for every tick. The trust ladder he set, read-only first, then supervised writes, then unsupervised, is the shape the docket and its nine follow-ups now take. And it hands the next lever a clean problem: once coordination is nearly free, what remains is the worker legs, and worker spend is research.</p>
+
+  <h3><span class="lever">Lever two · context</span>The wiki</h3>
+  <p>The design is a wiki base with deterministically generated stub files for everything that can be pulled out of code, plus meta-analysis indexes, so that a search surfaces almost everything a task needs and skips most of the research phase. The lineage is visible on John's GitHub: CodeWiki-Generator fingerprints a repository deterministically before any synthesis and already serves agents over MCP; Pith extracts deterministic facts into a node graph and exists to compress a codebase into prose an agent can use.</p>
+  <p>Harbour's own measurements say exactly why this works. The gap between finding an answer and emitting it was 2.2 times in cost and 2.8 times in turns. CLAUDE.md is 27.8 thousand tokens, is not in the cached preamble at all, enters mid-session in about a third of transcripts, and dropping it changed the verifier result not at all while cutting probe cost by a quarter. The outside evidence agrees. The AGENTS.md study found long context files add over twenty percent inference cost without raising success, while deterministic code maps such as CodeGraph self-report roughly half the tokens and tool calls.</p>
+  <p>A wiki regenerated from HEAD also makes the staleness check a diff rather than an expedition, and the cited-sweep rule becomes a query over an index. The long tail, nine sessions carrying thirty-one percent of a day, is the search tail. This shortens it. And it hands the next lever a task in the exact shape it eats: a pointer, a plan, a few files, a test command.</p>
+
+  <h3><span class="lever">Lever three · price</span>Dash</h3>
+  <p>This is the lever that moves implementation off the frontier meter. Dash's pipeline is Understand, then Plan, then Implement as search-and-replace diffs applied through git in a worktree, then Verify against the test suite with up to three corrections. It decomposes automatically. It rejects tasks that exceed its complexity thresholds and returns guidance, which is the decomposition hint. Query mode runs the research phase alone and writes an answer, which is the read-only pass. The integration guide says the quiet part plainly: you are the approval layer, and Dash produces first versions. It defaults to a Gemini Flash-class model in the sub-dollar tier and takes any OpenRouter model or a local LM Studio endpoint.</p>
+  <p>Three of John's notes matter most here. Dash can call Dash, so an implementer can hand sub-slices to its cheaper self. Dash is built with Harbour, so the tool that cuts Harbour's costs is itself dispatched through Harbour's loop. And the discipline came from data: dash-analysis read four hundred of his own sessions and found error-recovery loops in three quarters of them and whitespace-broken string replacements in nearly a third. Diffs through git with a test loop are the direct answer.</p>
+  <p>Wiring it in is small. Simple-dispatcher's harness registry already holds the opencode template, with no Stop hook and process-exit liveness, and a Dash entry is one more row. Harbour already forwards harness, model and effort per kind, so the workspace setting is one field. LIN-1181, tracking Dash invocations and cost, has sat on the cheap-models roadmap since July. The old <code>dash</code> target that LIN-900 removed returns on the right axis this time, as a harness rather than a target.</p>
+
+  <h3><span class="lever">Lever four · routing</span>Judgement stays expensive on purpose</h3>
+  <p>The mechanism is built: per-kind model, harness and now effort, resolved payload over workspace over default, with the effort flag landing on main today. The cheap-models roadmap says the remaining half is proof, with four acceptance tests: a cheap model finishes a real task unattended, you can see what it cost, the smart model catches the cheap one, and a run survives a hiccup.</p>
+  <p>The ceiling review supplies the routing rule. Work-shaped legs did not separate the tiers. Judgement-shaped legs did, and by depth of engagement rather than context need. So the frontier model buys plan-review, review, close-out and rulings. Cheap models buy implementation and lookups. Deterministic code buys the census, the grounding and the graph. The north star already forbids the alternative: pricing is policy, never judgement, and no agent reasons about price.</p>
+  <p>This week's news is on Harbour's side twice. Fable 5.1 cut cache reads to $0.25 per million, which is a direct discount on what Harbour spends the frontier on. And two papers plus Scale's standardized leaderboard show harness-induced variance exceeding model-induced variance, with the same Opus 4.5 scoring five points apart across three scaffolds and vendor tables running twenty points above harness-controlled runs. The harness is the product. That is Harbour's entire bet, now in print.</p>
+
+  <h3><span class="lever">Lever five · runtime</span>Harbour OS</h3>
+  <p>The last lever puts all of it on one floor. The landing page has the line: Harbour is the cockpit, Harbour OS is the workshop floor. Today Harbour spawns into it over an OSC escape as the <code>local</code> target. Browser-agent shows the philosophy the workstation grew from: inference in the browser over WebGPU, a deliberately tiny model, and the design rule that the model handles only small self-contained tasks while deterministic code manages the complexity. That is the same rule as the observer sweep, and the same rule as Dash.</p>
+  <p>When the wiki, Dash, the observer and the companion all run in Harbour OS, the macOS terminal-driver fragility that so much of simple-dispatcher exists to defend against simply stops being the runtime. Local inference finishes the picture. Apple Silicon on MLX now decodes a 35B mixture-of-experts coder at over a hundred tokens a second, and open-weight 30B models report 73 to 76 percent on SWE-bench Verified on a single 24GB card. John's earlier ruling that everything is paid by the user who starts it gains a new reading: the user's own GPU, at zero marginal cost.</p>
+</section>
+
+<section>
+  <h2><span class="num">Part three</span>What it adds up to</h2>
+
+  <p>Here is the 100× claim decomposed against numbers Harbour has already measured or the market has already published.</p>
+
+  <div class="tablewrap">
+  <table>
+    <caption>The factors behind one hundred times</caption>
+    <thead><tr><th>Factor</th><th>Grounding</th><th class="num">Multiplier on cost per landed task</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Coordination carry</strong> to the observer harness</td><td>Levers map: $580 of a $1,540 day falls to $30–60</td><td class="num">≈1.5× on the whole day</td></tr>
+      <tr><td><strong>Worker context</strong>, wiki plus pointer handoffs</td><td>Probes at 12× and 44.6×; search gap 2.2×; dropping CLAUDE.md 1.3×</td><td class="num">3–5× on worker legs</td></tr>
+      <tr><td><strong>Model price tier</strong>, frontier to Flash-class or local</td><td>$10/$50 against $0.75/$3.75; DeepSeek V4 Flash at $0.14/$0.28; local at zero marginal</td><td class="num">10–30× on implementation legs</td></tr>
+      <tr><td><strong>Rework and repetition</strong>, Dash's verify loop plus mutation checks</td><td>Buckets B3 and B4 were 15 percent of the day</td><td class="num">≈1.2×</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Multiplied, the implementation lane lands between roughly 50× and 250×. The judgement legs stay frontier-priced by design, so the blended figure on day one is more like 20× to 50×. It climbs toward 100× as decomposition pushes more of the work-product bucket, which was 56 percent of spend, into the cheap lane. So "comfortably 100×" is grounded for the lane that matters and a stretch-but-reachable number for the blend. Uptime is not in the table because it is a throughput multiplier rather than a cost one: a fleet that runs with the tab closed simply uses the whole week.</p>
+
+  <p>The exchange rate is where the story turns. The subscription is about £45 a week. Run to the cap, it buys on the order of $4,000 to $5,700 of list-rate compute across roughly 3.7 full-width days, and from 14 September the limits settle about seventeen percent below today's. At 10× the same week of work on the API costs a few hundred dollars, more than the plan but with no cap and no reset. At 100× it costs less than the plan fee.</p>
+
+  <div class="pull">One hundred times is the exchange rate at which the subscription becomes optional, and financial balance holds without it.</div>
+</section>
+
+<section>
+  <h2><span class="num">Part four</span>The tide, and how fast</h2>
+
+  <p>The tide is running the same way, and faster than the plan needs.</p>
+
+  <div class="tablewrap">
+  <table>
+    <caption>Signals from the week of 1 September 2026</caption>
+    <thead><tr><th>Signal</th><th>What it means for Harbour</th></tr></thead>
+    <tbody>
+      <tr><td>The token expenditure index fell below $1 per million on 1 September, under half its summer peak</td><td>Dash's default tier gets cheaper without anyone touching Harbour</td></tr>
+      <tr><td>Epoch AI's estimate: price for fixed capability falls 9× to 900× a year by benchmark, about 40× a year at GPT-4 level</td><td>Harbour's 100× is its own work multiplied by a tide that adds roughly 10× a year on its own</td></tr>
+      <tr><td>Sub-dollar models now report 70 to 79 percent on SWE-bench Verified, where the frontier stood a year ago; the open-weight gap is three to five months</td><td>The Haiku-matches-Sonnet finding generalizes; the cheap lane is where last year's frontier now lives</td></tr>
+      <tr><td>METR's time-horizon doubling is 88.6 days; Mythos Preview's 50 percent horizon passed sixteen hours, past the point METR calls reliable</td><td>Longer autonomous legs mean fewer wakes per task, which the north star already counts as a tax</td></tr>
+      <tr><td>Subscription OAuth is blocked in third-party harnesses; Codex and Copilot moved to credits</td><td>The industry is pricing agents per token; BYOK through Dash is the grain, not against it</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>How fast could it arrive? The observer docket and its follow-ups are in flight now. A Dash harness entry plus the workspace field is days of work once the hosted or BYOK path is stable, and LIN-1181 gives it a meter from the first run. A wiki regenerated from HEAD is a periodical, and CodeWiki-Generator already speaks MCP, so the lookup path exists. The routing evals are the cheap-models roadmap's four tests, run against the post-compaction base as the levers map always intended. Harbour OS as the runtime is the long pole, and it can absorb the others one at a time. Nothing in the chain waits on a model that does not exist yet.</p>
+</section>
+
+<section>
+  <h2><span class="num">Part five</span>Where it takes Harbour</h2>
+
+  <p>Back to its own north star: completes verified backlog work at a cost and cadence a solo operator can sustain, funds itself doing it, and proves every word. At 100× the free tier becomes a line item the operator can afford to publish. A stranger trusting it in one sitting becomes a product rather than a hope. And because Dash is built with Harbour, the loop closes on itself: Harbour dispatches the work that makes Harbour cheaper, so each landed ticket lowers the price of the next.</p>
+
+  <p>The constraint then moves to the place the north star already named as scarce: operator minutes. The nineteen questions that parked overnight and turned out to be nearly all false alarms are the shape of the next bottleneck, which is why decision context and dependency impact was the right thing to prioritise first. When every ship is cheap, the pilot's attention is the only expensive thing in the harbour, and the surface that spends it well is the one that wins.</p>
+
+  <p>The folded-loop document has the closing line. The harbour is not where ships stop being ships. It is where they remain answerable to the land. Cheap ships, an expensive pilot, and the land still deciding what is worth doing and what counts as done. That is the game after it shifts.</p>
+</section>
+
+<aside class="colophon">
+  <h2>Caveats the essay carries</h2>
+  <ul>
+    <li>The multipliers are ranges, not forecasts. They overlap, so the honest composite is the product of conservative ends, never the sum of the table.</li>
+    <li>Most public benchmark scores this month are vendor self-reported. Scale's SWE-bench Pro and Artificial Analysis's Terminal-Bench 2.1 are the harness-controlled comparisons; METR has published no time-horizon figure for any Claude 5 family, GPT-5.6 or GPT-6 model yet.</li>
+    <li>Epoch AI's price-decline rate is an early-2025 estimate. The September 2026 index confirms the direction, not the multiplier.</li>
+    <li>The weekly-window figures carry shared-meter noise, since personal use rides the same subscription. Treat window points as ranges.</li>
+  </ul>
+
+  <h2>Sources</h2>
+  <div class="sources">
+    <ul>
+      <li><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/reviews/capacity-levers-map-2026-08-15.md">Capacity levers map, 15 August 2026</a></li>
+      <li><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/reviews/capacity-test-run-review-2026-08-14.md">Capacity test run review, 14 August 2026</a></li>
+      <li><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/reviews/intra-session-efficiency-review-2026-08-14.md">Intra-session efficiency review</a></li>
+      <li><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/reviews/context-efficiency-ceiling-review-2026-08-15.md">Context-efficiency ceiling review</a></li>
+      <li><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/north-star.md">North star, v2</a></li>
+      <li><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/the-folded-loop.md">The folded loop</a></li>
+      <li><a href="/archive/4">Harbour Archive #4, the August Wing</a></li>
+      <li><a href="https://dash.jkershaw.com">Dash</a> and its <code>guide</code> output</li>
+      <li><a href="https://github.com/JKershaw/CodeWiki-Generator">CodeWiki-Generator</a>, <a href="https://github.com/JKershaw/pith">Pith</a>, <a href="https://github.com/JKershaw/Browser-agent">Browser-agent</a></li>
+      <li><a href="https://www.jkershaw.com/posts/2025-11-29-Claude-tips">Human-AI collaboration analysis</a>, November 2025</li>
+      <li><a href="https://www.anthropic.com/claude-fable-and-mythos-5-1">Anthropic: Claude Fable 5.1 and Mythos 5.1</a></li>
+      <li><a href="https://artificialanalysis.ai/evaluations/terminalbench-v2-1">Artificial Analysis: Terminal-Bench 2.1</a></li>
+      <li><a href="https://labs.scale.com/leaderboard/swe_bench_pro_public">Scale: SWE-bench Pro, standardized</a></li>
+      <li><a href="https://metr.org/time-horizons/">METR time horizons</a></li>
+      <li><a href="https://epoch.ai/data-insights/llm-inference-price-trends">Epoch AI: inference price trends</a></li>
+      <li><a href="https://www.cnbc.com/2026/09/01/ai-token-prices-lows.html">CNBC: token prices at record lows, 1 September 2026</a></li>
+      <li><a href="https://arxiv.org/abs/2605.23950">Stop comparing LLM agents without disclosing the harness</a></li>
+      <li><a href="https://arxiv.org/abs/2602.11988">Evaluating AGENTS.md</a></li>
+      <li><a href="https://github.com/colbymchenry/codegraph">CodeGraph</a></li>
+      <li><a href="https://explainx.ai/blog/claude-usage-limits-2026-timeline-explained">Claude usage limits, 2026 timeline</a></li>
+      <li><a href="https://ollama.com/blog/mlx">Ollama on MLX</a></li>
+      <li><a href="https://huggingface.co/meta-models/Muse-Glimmer-30B">Muse Glimmer 30B</a></li>
+    </ul>
+  </div>
+</aside>
+
+<p class="foot">Harbour Archive · document 5 · filed 2026-09-05 · served verbatim from docs/archive/5.html</p>
+
+</main>
+</body>
+</html>

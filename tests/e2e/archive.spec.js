@@ -31,6 +31,12 @@ test.describe('Archive Pages', () => {
     await expect(page).toHaveTitle(/Project Brief/);
   });
 
+  test('serves archive #5 (the essay) without authentication', async ({ page }) => {
+    const response = await page.goto('/archive/5');
+    expect(response.status()).toBe(200);
+    await expect(page).toHaveTitle(/The Cheap Ships/);
+  });
+
   test('archive #3 loads its self-hosted faces from public/fonts', async ({ page }) => {
     // It links /fonts/*.woff2 rather than inlining them as base64 (same origin,
     // unlike the published artifact). A moved or renamed face would silently
