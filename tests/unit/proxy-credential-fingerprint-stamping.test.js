@@ -42,6 +42,10 @@ const PROXY_SRC = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8')
 // remaining 2 (autopilot/kickoff, recommend-and-dispatch) stay in
 // routes/proxy.js until Stages 5/6 land — three-way split, part 1 of 3.
 const PROXY_COMPUTE_SRC = readFileSync(join(__dirname, '../../routes/proxy-compute.js'), 'utf8');
+// LIN-679 Stage 5 (LIN-2539): group H's 1 direct site (autopilot/kickoff)
+// moved to its own sub-router — three-way split, part 2 of 3. The remaining
+// 1 (recommend-and-dispatch, group I) stays in routes/proxy.js until Stage 6.
+const PROXY_KICKOFF_SRC = readFileSync(join(__dirname, '../../routes/proxy-kickoff.js'), 'utf8');
 
 // The 7 direct call sites that moved to routes/proxy-compute.js, named by
 // the endpoint tag their own workspaceUnavailable(...) call passes — a
@@ -57,10 +61,14 @@ const COMPUTE_SITE_ENDPOINTS = [
   '/api/proxy/brief', // POST (brief appears twice — see the dedicated test below)
 ];
 
-// The 2 direct call sites remaining in routes/proxy.js (group H kickoff,
-// group I recommend-and-dispatch) — not yet extracted (Stages 5/6).
-const PROXY_SITE_ENDPOINTS = [
+// The 1 direct call site that moved to routes/proxy-kickoff.js (group H).
+const KICKOFF_SITE_ENDPOINTS = [
   '/api/proxy/autopilot/kickoff',
+];
+
+// The 1 direct call site remaining in routes/proxy.js (group I
+// recommend-and-dispatch) — not yet extracted (Stage 6).
+const PROXY_SITE_ENDPOINTS = [
   '/api/proxy/recommend-and-dispatch',
 ];
 
@@ -107,12 +115,15 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     // request) and deleted the now-redundant manual stamp line at each site.
     //
     // LIN-679 Stage 4 (LIN-2538) — three-way split, part 1 of 3: 7 of the 9
-    // sites moved to routes/proxy-compute.js; the other 2 (group H kickoff,
-    // group I recommend-and-dispatch) stay in routes/proxy.js until Stages
-    // 5/6 land. Do NOT add an `expect 0 in routes/proxy.js` complement — the
-    // 2 remaining sites are expected here, not a regression.
+    // sites moved to routes/proxy-compute.js.
+    // LIN-679 Stage 5 (LIN-2539) — three-way split, part 2 of 3: 1 more
+    // (group H kickoff) moved to routes/proxy-kickoff.js. The remaining 1
+    // (group I recommend-and-dispatch) stays in routes/proxy.js until Stage
+    // 6 lands. No `expect 0 in routes/proxy.js` complement — the 1 remaining
+    // site is expected here, not a regression.
     const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
     const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
+    const kickoffMatches = PROXY_KICKOFF_SRC.match(pattern) || [];
     const proxyMatches = PROXY_SRC.match(pattern) || [];
     assert.equal(
       computeMatches.length,
@@ -120,11 +131,16 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
       `expected 7 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in routes/proxy-compute.js, found ${computeMatches.length}.`
     );
     assert.equal(
+      kickoffMatches.length,
+      1,
+      `expected 1 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site in routes/proxy-kickoff.js, found ${kickoffMatches.length}.`
+    );
+    assert.equal(
       proxyMatches.length,
-      2,
-      `expected 2 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites remaining in routes/proxy.js, found ${proxyMatches.length}. ` +
-      'A count below 2 means a site reverted to the pre-LIN-2044 raw resolveWorkspaceAccess(...) + manual-stamp shape, or moved out early; ' +
-      'a count above 2 means a NEW direct site was added — update this pin\'s expected counts only after also ' +
+      1,
+      `expected 1 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site remaining in routes/proxy.js, found ${proxyMatches.length}. ` +
+      'A count below 1 means a site reverted to the pre-LIN-2044 raw resolveWorkspaceAccess(...) + manual-stamp shape, or moved out early; ' +
+      'a count above 1 means a NEW direct site was added — update this pin\'s expected counts only after also ' +
       'updating the "expected exactly 1" resolveWorkspaceAccess( count pinned in workspace-accesstoken-linear-egress-census.test.js.'
     );
   });
@@ -138,8 +154,10 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
   // comment sits in that gap, for each of the 9 direct sites.
   //
   // LIN-679 Stage 4 (LIN-2538) — three-way split, part 1 of 3: run this check
-  // separately over routes/proxy-compute.js (7 sites) and routes/proxy.js (2
-  // sites remaining, group H kickoff + group I recommend-and-dispatch).
+  // separately over routes/proxy-compute.js (7 sites).
+  // LIN-679 Stage 5 (LIN-2539) — three-way split, part 2 of 3: also run it
+  // over routes/proxy-kickoff.js (1 site) and routes/proxy.js (1 site
+  // remaining, group I recommend-and-dispatch).
   function assertOrderingGuard(source, expectedCount, label) {
     const resolveIdx = [];
     let cursor = 0;
@@ -169,12 +187,16 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
 
   test('each of the 9 direct sites checks !accessToken immediately after the resolveProviderAccess(...) call, with nothing but the LIN-1980 comment between them — no logic can act on a request whose provider resolution failed before the guard has a chance to reject it', () => {
     assertOrderingGuard(PROXY_COMPUTE_SRC, 7, 'routes/proxy-compute.js');
-    assertOrderingGuard(PROXY_SRC, 2, 'routes/proxy.js');
+    assertOrderingGuard(PROXY_KICKOFF_SRC, 1, 'routes/proxy-kickoff.js');
+    assertOrderingGuard(PROXY_SRC, 1, 'routes/proxy.js');
   });
 
   test('endpoint coverage sanity: every endpoint tag this ticket\'s plan named for the 9 direct sites is actually present in its own file', () => {
     for (const endpoint of new Set(COMPUTE_SITE_ENDPOINTS)) {
       assert.ok(PROXY_COMPUTE_SRC.includes(`'${endpoint}'`), `expected to find the endpoint tag '${endpoint}' in routes/proxy-compute.js`);
+    }
+    for (const endpoint of new Set(KICKOFF_SITE_ENDPOINTS)) {
+      assert.ok(PROXY_KICKOFF_SRC.includes(`'${endpoint}'`), `expected to find the endpoint tag '${endpoint}' in routes/proxy-kickoff.js`);
     }
     for (const endpoint of new Set(PROXY_SITE_ENDPOINTS)) {
       assert.ok(PROXY_SRC.includes(`'${endpoint}'`), `expected to find the endpoint tag '${endpoint}' in routes/proxy.js`);
