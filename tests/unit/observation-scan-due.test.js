@@ -620,6 +620,18 @@ test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)'
     assert.equal(refusalEl.textContent, message);
   });
 
+  // ACCEPTANCE-WITNESS EXCEPTION (recorded per beat-4 follow-up, since no PR
+  // existed yet to carry it): this test could NOT be made to fail against
+  // beat 3's own diff in isolation. Stashing lib/render-observation.js +
+  // public/observation.js back to beat 2 (commit 373d9e91) and re-running
+  // this test still passed — the "selection stays completely intact, never
+  // truncated" invariant is established by beat 2's setAllDueSelected/
+  // dueSelectedIds (no cap logic exists anywhere in that path), not
+  // introduced by beat 3. Beat 3 only ADDS the refusal *display* on top of
+  // an already-non-truncating selection. Kept anyway as a real regression
+  // guard for the pairing (a future change that capped the selection to
+  // "fix" the refusal display would fail this), just not one this specific
+  // beat's diff could ever fail on its own.
   test('a refusal enqueues nothing and leaves the selection COMPLETELY intact — no truncation', () => {
     const sandbox = makeSandbox();
     const { paintDuePage, setAllDueSelected, dueSelectedIds, BULK_SCAN_MAX_PER_RUN } = sandbox.module.exports;

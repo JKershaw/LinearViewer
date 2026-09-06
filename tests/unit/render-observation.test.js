@@ -209,3 +209,91 @@ describe('render-observation: scan cost estimate wiring (LIN-2706 §B.1)', () =>
     assert.equal(embeddedData(html).scanCostEstimate, null);
   });
 });
+
+describe('render-observation: third due-tab disclaimer — bulk-scan (LIN-2706 §B.9)', () => {
+  const html = (openRouterSource) => renderObservationPage(
+    { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+    { urlKey: 'ws-a', openRouterSource }
+  );
+
+  test('the unconditional (dollar-estimate) branch always renders, regardless of tier', () => {
+    for (const source of [null, 'oauth', 'env', 'free']) {
+      const out = html(source);
+      assert.match(out, /id="obs-due-bulk-disclaimer"/, `unconditional disclaimer missing for openRouterSource=${source}`);
+      assert.match(out, /Abort stops the queue and releases the browser; scans already sent will finish, bill, and may still raise a ruling/, `verbatim abort text missing for openRouterSource=${source}`);
+      assert.match(out, /30-day historical mean/, `dollar-estimate framing missing for openRouterSource=${source}`);
+    }
+  });
+
+  test('the conditional (quota) branch renders ONLY when isFreeTier (openRouterSource === "free")', () => {
+    assert.doesNotMatch(html(null), /id="obs-due-bulk-quota-note"/, 'no session/env/free source: no quota note');
+    assert.doesNotMatch(html('oauth'), /id="obs-due-bulk-quota-note"/, 'a paid OAuth key: no quota note');
+    assert.doesNotMatch(html('env'), /id="obs-due-bulk-quota-note"/, 'a paid env key: no quota note');
+    assert.match(html('free'), /id="obs-due-bulk-quota-note"/, 'free tier: the quota note must render');
+    assert.match(html('free'), /daily\/hourly free quota/, 'the quota note must name the quota, not just repeat the dollar disclaimer');
+  });
+
+  test('the two budget gates are disclosed as separate sentences, never merged into one', () => {
+    const out = html('free');
+    const dollarAt = out.indexOf('id="obs-due-bulk-disclaimer"');
+    const dollarCloseAt = out.indexOf('</p>', dollarAt);
+    const quotaAt = out.indexOf('id="obs-due-bulk-quota-note"');
+    assert.ok(dollarAt > -1 && quotaAt > -1, 'both notes are present');
+    assert.ok(quotaAt > dollarCloseAt, 'the quota note is its OWN <p>, not appended inside the dollar-estimate paragraph');
+  });
+
+  test('mounted inside the due section, alongside the existing #obs-due-limits/#obs-due-cost-note block', () => {
+    const out = html('free');
+    const sectionAt = out.indexOf('id="obs-due-section"');
+    const costNoteAt = out.indexOf('id="obs-due-cost-note"');
+    const disclaimerAt = out.indexOf('id="obs-due-bulk-disclaimer"');
+    const dueListAt = out.indexOf('id="obs-due-list"');
+    assert.ok(sectionAt < costNoteAt, 'inside the due section');
+    assert.ok(costNoteAt < disclaimerAt && disclaimerAt < dueListAt, 'alongside the existing limits/cost-note block, above the feed it qualifies');
+  });
+});
+
+describe('render-observation: the three disclaimers stay textually distinct (LIN-2706 §B.9 no-shared-partial)', () => {
+  // A regression guard against a future "helpful" consolidation into one
+  // shared partial — the parent ticket's explicit constraint is that these
+  // three stay separate, own-wording partials. If someone later merges them,
+  // this test (comparing the rendered text of all three) must fail.
+  function extractParagraph(html, id) {
+    const at = html.indexOf(`id="${id}"`);
+    assert.ok(at > -1, `#${id} must be present`);
+    const openAt = html.lastIndexOf('<p', at);
+    const closeAt = html.indexOf('</p>', at);
+    return html.slice(openAt, closeAt + 4);
+  }
+
+  test('the rulings, due-tab, and bulk-scan disclaimers are three DIFFERENT strings', () => {
+    const out = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a', openRouterSource: 'free' }
+    );
+    const rulings = extractParagraph(out, 'obs-rulings-limits');
+    const dueTab = extractParagraph(out, 'obs-due-limits');
+    const bulkScan = extractParagraph(out, 'obs-due-bulk-disclaimer');
+
+    assert.notEqual(rulings, dueTab, 'rulings and due-tab disclaimers must differ');
+    assert.notEqual(rulings, bulkScan, 'rulings and bulk-scan disclaimers must differ');
+    assert.notEqual(dueTab, bulkScan, 'due-tab and bulk-scan disclaimers must differ');
+  });
+
+  test('none of the three disclaimers is a substring of another (guards a partial/prefix-shared merge too)', () => {
+    const out = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a', openRouterSource: 'free' }
+    );
+    const rulings = extractParagraph(out, 'obs-rulings-limits');
+    const dueTab = extractParagraph(out, 'obs-due-limits');
+    const bulkScan = extractParagraph(out, 'obs-due-bulk-disclaimer');
+    const texts = [rulings, dueTab, bulkScan];
+    for (let i = 0; i < texts.length; i++) {
+      for (let j = 0; j < texts.length; j++) {
+        if (i === j) continue;
+        assert.ok(!texts[i].includes(texts[j]), `disclaimer ${i} must not fully contain disclaimer ${j}`);
+      }
+    }
+  });
+});

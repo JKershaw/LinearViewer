@@ -1183,3 +1183,33 @@ a.obs-task-ident:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .obs-due-retry:hover { color: var(--text); border-color: var(--border-strong); }
+
+/* Bulk-scan bar (LIN-2706 §B.3/§B.10): select-all-loaded + exact count + cost
+   estimate. Same flex/gap idiom as .obs-due-row above -- the per-row
+   checkbox itself needs no rule of its own, since .obs-due-row already sets
+   display:flex/align-items:center/gap:0.5rem. Additive only -- no existing
+   due-tab rule above this line is touched. */
+.obs-bulk-scan-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.6rem;
+}
+/* Machine-fact typographic convention (mirrors .obs-due-progress above): a
+   computed dollar figure is a machine fact, not prose. */
+.obs-bulk-scan-estimate {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+/* The third due-tab disclaimer (LIN-2706 §B.9) -- same declarations as
+   .obs-rulings-limits / .obs-due-limits above. Its own class: the
+   no-shared-partial constraint governs markup/text reuse between the three
+   disclaimers, not that unrelated classes may declare identical CSS. */
+.obs-bulk-scan-limits {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0 0 0.6rem;
+  max-width: 62ch;
+}
