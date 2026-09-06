@@ -130,6 +130,27 @@ let dueLoading = false;
 let dueCheckedCount = 0;        // cumulative rows rendered across every loaded page
 let dueTotalCandidateCount = 0; // the route's own totalCandidateCount field
 
+// Scan-due SELECTION state (LIN-2706 §B.2). `dueSelectedIds` is the single
+// owner of the Scan-due bulk-scan selection — every consumer (the exact
+// count and cost estimate, §B.4/§B.5; the over-ceiling refusal, §B.8; a
+// row's own checked attribute on repaint, §B.3) derives from this Set rather
+// than caching its own copy or reading checkbox DOM state back as truth.
+// Written ONLY by the delegated row-checkbox handler, the select-all
+// handler, and this module's own two lifecycle hooks below. A bare
+// `issueId` key is sufficient (deliberately not the composite `rulingKey()`
+// idiom `02e56b89`/LIN-2293 uses) — the due tab is single-workspace by
+// construction (one `data-url-key` on the page), unlike the rulings feed
+// the composite key exists to disambiguate.
+const dueSelectedIds = new Set();
+// `dueLoadedItems` mirrors exactly what is currently painted in
+// `#obs-due-list` (loaded-rows-only, §B.2) — replaced wholesale on a full
+// repaint (loadInitialDueCheckPage's `paintDuePage(..., {append:false})`
+// call), concatenated on load-more. It exists so "select all loaded" and the
+// tri-state sync can iterate the loaded population without a DOM query
+// (rows are string-rendered, not held as real elements) and so pruning a
+// vanished row is a simple Set-membership check rather than a DOM diff.
+let dueLoadedItems = [];
+
 // Live data + view state preserved across polls.
 const sessionIndex = new Map();            // sessionId → session payload
 const activeCards = new Map();             // sessionId → <li>
@@ -2228,7 +2249,12 @@ function renderDueRowHtml(item) {
   const retryBtn = item && item.error
     ? `<button type="button" class="obs-due-retry" data-issue-id="${escapeHtml(String(item.issueId))}">Retry</button>`
     : '';
+  // LIN-2706 §B.3: reflects membership in dueSelectedIds (the Set is the
+  // single source of truth, never the checkbox DOM), so a repaint restores
+  // checked state rather than dropping it.
+  const checkedAttr = dueSelectedIds.has(String(item.issueId)) ? ' checked' : '';
   return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}">`
+    + `<input type="checkbox" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr}>`
     + `<span class="obs-due-issue">${escapeHtml(String(idLabel))}</span>`
     + `<span class="obs-due-badge">checked &middot; provider read</span>`
     + `<span class="obs-due-status">${escapeHtml(status.text)}</span>`
@@ -2268,11 +2294,80 @@ function paintDuePage(items, pageCandidateCount, { append } = {}) {
   const empty = document.getElementById('obs-due-empty');
   if (!list) return;
   const html = items.map(renderDueRowHtml).join('');
-  if (append) list.insertAdjacentHTML('beforeend', html);
-  else list.innerHTML = html;
+  if (append) {
+    list.insertAdjacentHTML('beforeend', html);
+    // Pagination is additive only — nothing already loaded ever vanishes on
+    // a load-more, so the selection needs no pruning here (LIN-2706 §B.2).
+    dueLoadedItems = dueLoadedItems.concat(items);
+  } else {
+    list.innerHTML = html;
+    dueLoadedItems = items.slice();
+    // Prune vanished rows (LIN-2706 §B.2): a full repaint replaces the
+    // loaded population wholesale, so any selected id no longer among it
+    // can never remain selected — the selection is loaded-rows-only, and
+    // its count can never exceed what is on screen.
+    const loadedIds = new Set(dueLoadedItems.map(i => String(i.issueId)));
+    for (const id of dueSelectedIds) {
+      if (!loadedIds.has(id)) dueSelectedIds.delete(id);
+    }
+  }
   dueCheckedCount += Number.isFinite(pageCandidateCount) ? pageCandidateCount : items.length;
   updateDueProgress();
   if (empty) empty.hidden = dueCheckedCount > 0;
+  syncDueBulkBar();
+}
+
+// Re-renders #obs-due-list from dueLoadedItems alone (no counts/progress
+// touched) — used when the SELECTION changes without the underlying rows
+// changing (the select-all-loaded toggle, LIN-2706 §B.3), so every row's
+// checkbox reflects the new membership without re-fetching or re-counting.
+function repaintDueRows() {
+  const list = document.getElementById('obs-due-list');
+  if (!list) return;
+  list.innerHTML = dueLoadedItems.map(renderDueRowHtml).join('');
+}
+
+// Re-syncs the select-all-loaded checkbox's tri-state (none/some/all of the
+// currently loaded rows selected) and the bulk bar's visibility (LIN-2706
+// §B.3). Called after every repaint and every selection change so the two
+// can never desync. `indeterminate` is a DOM property, not an HTML
+// attribute, so this must run as script after paint rather than being baked
+// into renderDueRowHtml's string output.
+function syncDueBulkBar() {
+  const bar = document.getElementById('obs-due-bulk-bar');
+  const selectAll = document.getElementById('obs-due-select-all');
+  const total = dueLoadedItems.length;
+  const selectedCount = dueLoadedItems.filter(i => dueSelectedIds.has(String(i.issueId))).length;
+  if (bar) bar.hidden = total === 0;
+  if (selectAll) {
+    selectAll.checked = total > 0 && selectedCount === total;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+  }
+}
+
+// LIN-2706 §B.3: the per-row toggle, extracted to a standalone entry point —
+// mirrors this file's existing extraction of startBulkScan/stopBulkScan as
+// testable entry points rather than inline listener bodies — so it is
+// unit-testable directly, without simulating a DOM click event the fake
+// test DOM cannot dispatch.
+function toggleDueSelection(id, checked) {
+  if (!id) return;
+  if (checked) dueSelectedIds.add(id);
+  else dueSelectedIds.delete(id);
+  syncDueBulkBar();
+}
+
+// LIN-2706 §B.3: select-all-loaded, same extraction rationale as
+// toggleDueSelection above. "Select all loaded" iterates ONLY the rows
+// currently painted — never an implicit all-pages semantic (§B.2);
+// dueLoadedItems is exactly that population.
+function setAllDueSelected(checked) {
+  dueLoadedItems.forEach((item) => {
+    if (checked) dueSelectedIds.add(String(item.issueId));
+    else dueSelectedIds.delete(String(item.issueId));
+  });
+  repaintDueRows();
+  syncDueBulkBar();
 }
 
 function updateDueMoreButton() {
@@ -2292,6 +2387,12 @@ async function loadInitialDueCheckPage() {
   dueCheckedCount = 0;
   dueTotalCandidateCount = 0;
   dueNextCursor = null;
+  // LIN-2706 §B.2: a fresh tab entry starts with an empty selection —
+  // unconditionally, not merely "cleared if the reloaded page happens to
+  // share no ids with the old one" (which is all paintDuePage's own
+  // prune-by-intersection would give it, since the same tasks are likely to
+  // reappear on a reload).
+  dueSelectedIds.clear();
   setPollStatus('loading…');
   try {
     const res = await fetch(dueUrl(urlKey));
@@ -2605,12 +2706,33 @@ function initControls() {
   // per-row re-check endpoint, so retry re-runs the one-shot initial load —
   // "leave it for the next load/reload", one of the two acceptable shapes
   // the design calls out, via event delegation since rows are string-rendered.
+  //
+  // LIN-2706 §B.3 extends this SAME delegated listener with a second
+  // branch for the per-row `.obs-due-select` checkbox, rather than adding a
+  // separate listener — the feed repaints wholesale (loadInitialDueCheckPage/
+  // loadMoreDueChecks), so a per-row listener would accumulate across
+  // repaints; delegation on the list container is the one-attempt-only
+  // discipline `6be2857f` installed. A checkbox's native toggle happens
+  // BEFORE its `click` event fires, so `e.target.checked` already reflects
+  // the new state by the time this handler runs.
   const dueList = document.getElementById('obs-due-list');
   if (dueList) {
     dueList.addEventListener('click', (e) => {
-      const btn = e.target.closest('.obs-due-retry');
-      if (!btn) return;
-      loadInitialDueCheckPage();
+      const retryBtn = e.target.closest('.obs-due-retry');
+      if (retryBtn) { loadInitialDueCheckPage(); return; }
+      const checkbox = e.target.closest('.obs-due-select');
+      if (!checkbox) return;
+      toggleDueSelection(checkbox.dataset.issueId, checkbox.checked);
+    });
+  }
+
+  // Select-all-loaded (LIN-2706 §B.3): a single static control, attached
+  // once — never repainted, so a plain listener (not delegation) is safe
+  // here, unlike the per-row checkboxes above.
+  const dueSelectAll = document.getElementById('obs-due-select-all');
+  if (dueSelectAll) {
+    dueSelectAll.addEventListener('click', (e) => {
+      setAllDueSelected(!!e.target.checked);
     });
   }
 
@@ -2718,6 +2840,15 @@ if (typeof module !== 'undefined' && module.exports) {
     // without a DOM via this export.
     dueStatusCopy, renderDueRowHtml, dueUrl, updateDueDayOneNotice, paintDuePage,
     pollCurrentView, switchView, loadInitialDueCheckPage, loadMoreDueChecks,
+    // LIN-2706 §B.2/§B.3: the selection lifecycle + selection-UI seam.
+    // `dueSelectedIds` is exported directly (a `const` Set, mutated in
+    // place — never reassigned, so this reference stays live) so a test can
+    // assert lifecycle behaviour (clear/survive/prune) against the SAME Set
+    // the render/toggle functions read and write, not a hand-rolled copy.
+    // `toggleDueSelection`/`setAllDueSelected` are extracted, like
+    // startBulkScan/stopBulkScan below, so the delegated-listener bodies are
+    // directly callable without simulating a DOM click event.
+    dueSelectedIds, toggleDueSelection, setAllDueSelected, syncDueBulkBar, repaintDueRows,
     // LIN-2700 / LIN-2651 Phase 2: the bulk-scan pool seam — the concurrency/
     // ceiling constants, the run entry point + stop, and the two pure helpers
     // (selection refusal, error classification) are the parts a regression

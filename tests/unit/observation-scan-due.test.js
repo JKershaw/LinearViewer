@@ -49,6 +49,8 @@ function makeSandbox({ fetchImpl } = {}) {
   register('obs-due-more');
   register('obs-due-progress');
   register('obs-due-dayone');
+  register('obs-due-bulk-bar');
+  register('obs-due-select-all');
   register('obs-due-section');
   register('obs-session-views');
   register('obs-rulings-section');
@@ -335,5 +337,167 @@ test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () =
     resolveFirst(jsonResponse({ items: [], nextCursor: null, pageCandidateCount: 0, totalCandidateCount: 0 }));
     await Promise.all([p1, p2]);
     assert.equal(calls, 1, 'a load already in flight must not be duplicated');
+  });
+});
+
+// ─── Selection lifecycle + selection UI (LIN-2706 §B.2/§B.3) ───────────────────
+//
+// This session adds NO spend path and NO scan-triggering control — these
+// tests exercise only the Set that owns the selection, the checkbox
+// rendering that reflects it, and the select-all/tri-state sync. There is
+// no "Scan selected" button anywhere in this file's exports; it does not
+// exist yet (Session 2, LIN-2707).
+
+test.describe('dueSelectedIds — lifecycle (LIN-2706 §B.2)', () => {
+  test('clears on loadInitialDueCheckPage, even when the reloaded page re-lists the SAME id', async () => {
+    // The stronger claim than "prune by intersection": a fresh tab entry
+    // clears unconditionally. Re-using issueId 'a' on both loads is what
+    // distinguishes this from paintDuePage's own prune-by-intersection,
+    // which would leave 'a' selected since it is still present.
+    const sandbox = makeSandbox({
+      fetchImpl: async () => jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 1 })
+    });
+    const { loadInitialDueCheckPage, dueSelectedIds, toggleDueSelection } = sandbox.module.exports;
+    await loadInitialDueCheckPage();
+    toggleDueSelection('a', true);
+    assert.ok(dueSelectedIds.has('a'), 'selection sanity check before reload');
+
+    await loadInitialDueCheckPage();
+    assert.equal(dueSelectedIds.size, 0, 'a fresh tab entry must clear the selection unconditionally');
+  });
+
+  test('survives loadMoreDueChecks — an in-progress selection is not dropped by pagination', async () => {
+    const sandbox = makeSandbox({
+      fetchImpl: async (url) => (url.includes('cursor')
+        ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
+        : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
+    });
+    const { loadInitialDueCheckPage, loadMoreDueChecks, dueSelectedIds, toggleDueSelection } = sandbox.module.exports;
+    await loadInitialDueCheckPage();
+    toggleDueSelection('a', true);
+
+    await loadMoreDueChecks();
+    assert.ok(dueSelectedIds.has('a'), 'appending a page must not silently drop an in-progress selection');
+  });
+
+  test('prunes a vanished row on a full repaint — the count can never exceed what is on screen', () => {
+    // Isolates paintDuePage's OWN prune-by-intersection mechanism from
+    // loadInitialDueCheckPage's unconditional clear (tested separately
+    // above) by driving paintDuePage directly.
+    const sandbox = makeSandbox();
+    const { paintDuePage, dueSelectedIds, toggleDueSelection } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
+    toggleDueSelection('a', true);
+    toggleDueSelection('b', true);
+    assert.equal(dueSelectedIds.size, 2, 'selection sanity check before the repaint');
+
+    // A full repaint (append:false) whose new rows no longer include 'a'.
+    paintDuePage([{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 1, { append: false });
+    assert.deepEqual([...dueSelectedIds], ['b'], "'a' must be pruned once it is no longer among the loaded rows");
+  });
+
+  test('loaded-rows-only: a load-more page never prunes rows from an EARLIER page', async () => {
+    const sandbox = makeSandbox({
+      fetchImpl: async (url) => (url.includes('cursor')
+        ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
+        : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
+    });
+    const { loadInitialDueCheckPage, loadMoreDueChecks, dueSelectedIds, toggleDueSelection } = sandbox.module.exports;
+    await loadInitialDueCheckPage();
+    toggleDueSelection('a', true);
+    await loadMoreDueChecks();
+    toggleDueSelection('b', true);
+    assert.deepEqual([...dueSelectedIds].sort(), ['a', 'b'], 'both pages worth of selection must coexist — pagination is additive, never a prune trigger');
+  });
+});
+
+test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-2706 §B.3)', () => {
+  test('renderDueRowHtml reflects Set membership: checked when selected, unchecked otherwise', () => {
+    const sandbox = makeSandbox();
+    const { renderDueRowHtml, dueSelectedIds } = sandbox.module.exports;
+    const item = { issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true };
+
+    assert.doesNotMatch(renderDueRowHtml(item), /obs-due-select[^>]*checked/, 'unselected row must not render checked');
+    dueSelectedIds.add('a');
+    assert.match(renderDueRowHtml(item), /class="obs-due-select" data-issue-id="a" checked/, 'selected row must render checked');
+  });
+
+  test('a repaint with the SAME items preserves checked state (idempotent repaint)', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
+    const items = [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }];
+    paintDuePage(items, 2, { append: false });
+    toggleDueSelection('a', true);
+
+    // Re-painting the SAME items (e.g. a retry re-running the same load)
+    // must reproduce the checked state from the Set, not drop it.
+    paintDuePage(items, 2, { append: false });
+    const html = sandbox.__nodes.get('obs-due-list').innerHTML;
+    assert.match(html, /data-issue-id="a" checked/, "row 'a' must stay checked across the repaint");
+    assert.doesNotMatch(html, /data-issue-id="b" checked/, "row 'b' must stay unchecked across the repaint");
+  });
+
+  test('select-all-loaded selects only the currently PAINTED rows, never an implicit all-pages sweep', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, setAllDueSelected, dueSelectedIds } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
+
+    setAllDueSelected(true);
+    assert.deepEqual([...dueSelectedIds].sort(), ['a', 'b']);
+
+    setAllDueSelected(false);
+    assert.equal(dueSelectedIds.size, 0, 'select-all off must clear exactly the loaded rows');
+  });
+
+  test('select-all-loaded repaints the list so every row reflects the new membership', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, setAllDueSelected } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
+
+    setAllDueSelected(true);
+    const html = sandbox.__nodes.get('obs-due-list').innerHTML;
+    assert.match(html, /data-issue-id="a" checked/);
+    assert.match(html, /data-issue-id="b" checked/);
+  });
+
+  test('select-all-loaded, driven across a load-more, covers BOTH pages — the loaded population grows additively', async () => {
+    const sandbox = makeSandbox({
+      fetchImpl: async (url) => (url.includes('cursor')
+        ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
+        : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
+    });
+    const { loadInitialDueCheckPage, loadMoreDueChecks, setAllDueSelected, dueSelectedIds } = sandbox.module.exports;
+    await loadInitialDueCheckPage();
+    await loadMoreDueChecks();
+    setAllDueSelected(true);
+    assert.deepEqual([...dueSelectedIds].sort(), ['a', 'b']);
+  });
+
+  test('tri-state: none/some/all loaded selected, and the bulk bar is hidden with nothing loaded', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
+    const selectAll = sandbox.__nodes.get('obs-due-select-all');
+    const bar = sandbox.__nodes.get('obs-due-bulk-bar');
+
+    paintDuePage([], 0, { append: false });
+    assert.equal(bar.hidden, true, 'an empty loaded page: the bulk bar stays hidden');
+
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }, { issueId: 'c', issueIdentifier: 'LIN-3', dueStatus: null }], 3, { append: false });
+    assert.equal(bar.hidden, false, 'rows are loaded: the bulk bar must be shown');
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, false, 'none selected: not indeterminate');
+
+    toggleDueSelection('a', true);
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, true, 'some (not all) selected: indeterminate');
+
+    toggleDueSelection('b', true);
+    toggleDueSelection('c', true);
+    assert.equal(selectAll.checked, true, 'all loaded selected: checked, not indeterminate');
+    assert.equal(selectAll.indeterminate, false);
+
+    toggleDueSelection('a', false);
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, true, 'dropping back to "some" must clear the all-checked state');
   });
 });
