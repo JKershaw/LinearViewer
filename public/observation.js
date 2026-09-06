@@ -2397,6 +2397,8 @@ function syncDueBulkBar() {
   const countEl = document.getElementById('obs-due-selected-count');
   const estimateEl = document.getElementById('obs-due-selected-cost');
   const refusalEl = document.getElementById('obs-due-bulk-refusal');
+  const scanBtn = document.getElementById('obs-due-scan-selected');
+  const stopBtn = document.getElementById('obs-due-stop');
   const total = dueLoadedItems.length;
   const selectedCount = dueSelectedIds.size;
   if (bar) bar.hidden = total === 0;
@@ -2411,6 +2413,46 @@ function syncDueBulkBar() {
     refusalEl.hidden = !message;
     refusalEl.textContent = message || '';
   }
+  // LIN-2701 §B.7: the run control's enabled/visible state is DERIVED here,
+  // alongside the rest of this bar's readouts, never stored in a parallel
+  // flag. "(selection non-empty) AND (no live run)" reads dueSelectedIds
+  // (Session 1's selection owner) and `bulkScanStop` (the pool's own
+  // module-scope live-run pointer, same file, same closure) directly — no
+  // second `isRunning` boolean is introduced, so this can never disagree
+  // with what stopBulkScan() itself dispatches on.
+  const running = bulkScanStop !== null;
+  if (scanBtn) {
+    scanBtn.disabled = running || selectedCount === 0;
+    scanBtn.textContent = `Scan selected (${selectedCount})`;
+  }
+  if (stopBtn) stopBtn.hidden = !running;
+}
+
+/**
+ * The "Scan selected (N)" button's click handler, extracted as a standalone
+ * entry point (same rationale as toggleDueSelection/setAllDueSelected
+ * above) so it is directly callable in tests without simulating a DOM
+ * click. Drives the EXISTING pool over the CURRENT dueSelectedIds — no
+ * second concurrency primitive, no re-tuned ceiling, no new scan invoker.
+ * `onResult` paints each row as it settles (LIN-2701 §B.6); `onTeardown`
+ * re-syncs the bar (re-enabling the button, hiding Stop) while leaving the
+ * selection itself untouched — teardown deliberately does not clear it, so
+ * the operator can see what ran and adjust before a re-run.
+ *
+ * The button's own disabled state is the ordinary presentation guard; the
+ * authoritative refusal is `startBulkScan`'s own function-level check
+ * (beat 1). A `run-in-progress` or over-ceiling refusal reaching here at all
+ * means the button's disabled state raced a click — resyncing rather than
+ * throwing is the correct response, not a bug to fix here.
+ */
+function startDueBulkScan() {
+  const urlKey = observationData?.urlKey;
+  const items = [...dueSelectedIds].map((issueId) => ({ urlKey, identifier: issueId }));
+  startBulkScan(items, {
+    onResult: paintBulkScanRowResult,
+    onTeardown: () => { syncDueBulkBar(); }
+  });
+  syncDueBulkBar();
 }
 
 // LIN-2706 §B.3: the per-row toggle, extracted to a standalone entry point —
@@ -2609,12 +2651,32 @@ function classifyBulkScanError(err) {
  * their eventual settlement still lands in `results`, but teardown does not
  * wait for it.
  *
+ * `onResult(entry)` fires once per settled item, in runOne's own `finally` —
+ * a per-row hook alongside the batch-level `onTeardown`, so Phase 3 (LIN-2701
+ * §B.6/§B.7) can render a row's outcome as it settles instead of polling
+ * `results`. Optional; omitting it changes nothing (Phase 2's tests keep
+ * passing byte-identically). On abort, an already-issued item's `onResult`
+ * fires AFTER `onTeardown` has already run for that run (teardown() is
+ * synchronous inside stop(), the straggler's rejection is a later microtask)
+ * — callers must accept a late `onResult` without reviving a torn-down run.
+ *
+ * Refuses synchronously, before touching the selection ceiling, when a run
+ * is already live (`bulkScanStop` non-null) — `reason: 'run-in-progress'`.
+ * This is the authoritative guard: `bulkScanStop = stop` below is
+ * unconditional, so an unguarded second call would silently overwrite the
+ * pointer, orphaning run 1 (unreachable from stopBulkScan() thereafter) while
+ * doubling global in-flight past BULK_SCAN_CONCURRENCY. See LIN-2700's
+ * hand-off (ledger item 4) and LIN-2701 §B.7.
+ *
  * @param {Array<{urlKey:string, identifier:string, source?:string}>} items
- * @param {{onTeardown?: (results: Array) => void}} [opts]
- * @returns {{refused:true, limit:number, requested:number, message:string}
+ * @param {{onTeardown?: (results: Array) => void, onResult?: (entry: object) => void}} [opts]
+ * @returns {{refused:true, reason:'run-in-progress'}
+ *          |{refused:true, limit:number, requested:number, message:string}
  *          |{refused:false, results: Array}}
  */
-function startBulkScan(items, { onTeardown } = {}) {
+function startBulkScan(items, { onTeardown, onResult } = {}) {
+  if (bulkScanStop) return { refused: true, reason: 'run-in-progress' };
+
   const check = checkBulkScanSelection(items);
   if (check.refused) return check;
 
@@ -2657,14 +2719,17 @@ function startBulkScan(items, { onTeardown } = {}) {
   }
 
   async function runOne(item) {
+    let entry;
     try {
       const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, { signal: controller.signal });
-      results.push({ item, outcome: 'fulfilled', value });
+      entry = { item, outcome: 'fulfilled', value };
     } catch (err) {
-      results.push({ item, outcome: classifyBulkScanError(err), error: err });
+      entry = { item, outcome: classifyBulkScanError(err), error: err };
     } finally {
+      results.push(entry);
       inFlight--;
       settledCount++;
+      if (onResult) onResult(entry);
       if (settledCount === total) teardown();
       pump();
     }
@@ -2697,6 +2762,114 @@ function startBulkScan(items, { onTeardown } = {}) {
  */
 function stopBulkScan() {
   if (bulkScanStop) bulkScanStop();
+}
+
+// ─── Bulk scan result classification + row paint (LIN-2701 §B.6) ───────────
+//
+// Presentation only: reads an already-settled pool entry ({item, outcome,
+// value|error}) and paints one row. Never mutates dueSelectedIds, never
+// re-enqueues, never feeds anything back into the pool above. Session 2
+// (§B.7) wires this in as the pool's onResult callback once the run
+// controls exist; nothing calls it yet.
+
+/**
+ * Classify one settled bulk-scan pool entry into exactly one of seven
+ * mutually exclusive buckets. The predicates are implemented as written in
+ * the plan-review-corrected table (LIN-2701 §B.6) and must NOT be
+ * simplified back — that table is itself the fix for a blocking
+ * plan-review finding.
+ *
+ * 'scan failed' is checked FIRST, by the PRESENCE of a `statusCode` field on
+ * the resolved body — never by enumerating values — so it can never fall
+ * through to 'zero-finding'. `armKeepalive` (lib/http-keepalive.js:43)
+ * commits HTTP 200 once its 25s flush fires and then delivers errors as
+ * `{...body, statusCode}` *inside* that 200; `window.api` (public/common.js)
+ * throws only on `!response.ok`, so a resolved body's `statusCode` is
+ * otherwise invisible to the caller. The scan route's own healthy 200 body
+ * (routes/workspace-api.js) is exactly `{status, id, issueId, decision,
+ * scannedAt, outcome, outcomeAt, model}` — no `statusCode` key — so presence
+ * has no false positive.
+ *
+ * 'scan failed' also absorbs `outcome === 'other'` that is NOT the
+ * AI_NOT_CONFIGURED shape: a fast (pre-flush) 404/422/500/502, or a 503
+ * that isn't AI_NOT_CONFIGURED (e.g. PRINCIPLE_ZERO_UNAVAILABLE), would
+ * otherwise match no bucket — and every settled row must land in exactly
+ * one.
+ *
+ * @param {{item: object, outcome: 'fulfilled'|'aborted'|'rate-limited'|'other', value?: object, error?: Error}} entry
+ * @returns {'scan-failed'|'terminal-row-no-op'|'new-decision'|'zero-finding'|'skipped-quota'|'unavailable'|'cancelled'}
+ */
+function classifyBulkScanResult(entry) {
+  const { outcome, value, error } = entry || {};
+
+  if (outcome === 'fulfilled') {
+    if (value && Object.prototype.hasOwnProperty.call(value, 'statusCode')) return 'scan-failed';
+    if (value && value.outcome != null) return 'terminal-row-no-op';
+    if (value && value.decision != null) return 'new-decision';
+    return 'zero-finding';
+  }
+  if (outcome === 'rate-limited') return 'skipped-quota';
+  if (outcome === 'aborted') return 'cancelled';
+  // outcome === 'other': the ONLY other named shape is AI_NOT_CONFIGURED
+  // (unavailable); every remaining fast throw must still land somewhere, and
+  // 'scan failed' is that catch-all — see the doc comment above.
+  if (error && error.status === 503 && error.body && error.body.code === 'AI_NOT_CONFIGURED') return 'unavailable';
+  return 'scan-failed';
+}
+
+// Copy per bucket. Terminal-row no-op is deliberately NOT worded like a
+// success (it burned a billed LLM call and raised nothing — conflating it
+// with new-decision/zero-finding would overstate the batch's productivity),
+// and quota/unavailable are deliberately distinct from each other (different
+// cause, same "didn't scan" effect — conflating them mislabels a config
+// problem as budget exhaustion).
+const BULK_SCAN_RESULT_COPY = {
+  'scan-failed': { cls: 'obs-bulk-result-failed', text: 'scan failed' },
+  'terminal-row-no-op': { cls: 'obs-bulk-result-noop', text: 'scanned — already ruled on, nothing changed' },
+  'new-decision': { cls: 'obs-bulk-result-decision', text: 'scanned — new decision raised' },
+  'zero-finding': { cls: 'obs-bulk-result-zero', text: 'scanned — nothing found' },
+  'skipped-quota': { cls: 'obs-bulk-result-quota', text: 'skipped — quota' },
+  'unavailable': { cls: 'obs-bulk-result-unavailable', text: 'unavailable — AI not configured' },
+  'cancelled': { cls: 'obs-bulk-result-cancelled', text: 'cancelled' }
+};
+
+/**
+ * Paint one settled bulk-scan result into its due row, keyed by `issueId`
+ * (`entry.item.identifier` — the same id `renderDueRowHtml` stamps onto the
+ * row's own `data-issue-id`). Idempotent: painting the SAME issueId again
+ * (including a late `onResult` arriving after `stopBulkScan()`'s teardown,
+ * per §B.7's ordering note — teardown runs synchronously, ahead of any
+ * already-issued job's rejection) replaces this row's ONE result badge
+ * in place rather than appending a duplicate. A row that has left the DOM
+ * (repainted away, scrolled out of a wholesale re-render) is simply not
+ * painted — presentation-only, so the run itself is unaffected either way.
+ * Never touches dueSelectedIds or any run-control state — see stopBulkScan's
+ * own note that a late arrival must not revive a torn-down run; this
+ * function has no access to that state at all, by construction.
+ *
+ * @param {{item: {identifier: string}}} entry
+ */
+function paintBulkScanRowResult(entry) {
+  const issueId = entry && entry.item && entry.item.identifier != null ? String(entry.item.identifier) : null;
+  if (!issueId) return;
+  const list = document.getElementById('obs-due-list');
+  if (!list) return;
+  let row = null;
+  for (const child of list.children) {
+    if (child.dataset && child.dataset.issueId === issueId) { row = child; break; }
+  }
+  if (!row) return;
+
+  const bucket = classifyBulkScanResult(entry);
+  const copy = BULK_SCAN_RESULT_COPY[bucket];
+
+  let badge = row.querySelector('.obs-bulk-scan-result');
+  if (!badge) {
+    badge = document.createElement('span');
+    row.appendChild(badge);
+  }
+  badge.className = `obs-bulk-scan-result ${copy.cls}`;
+  badge.textContent = copy.text;
 }
 
 // ─── Controls ──────────────────────────────────────────────────────────────────
@@ -2803,6 +2976,14 @@ function initControls() {
       setAllDueSelected(!!e.target.checked);
     });
   }
+
+  // LIN-2701 §B.7: rendered already wired (plan-review N3) — both static
+  // controls, attached once, same rationale as select-all-loaded above.
+  const dueScanSelected = document.getElementById('obs-due-scan-selected');
+  if (dueScanSelected) dueScanSelected.addEventListener('click', startDueBulkScan);
+
+  const dueStop = document.getElementById('obs-due-stop');
+  if (dueStop) dueStop.addEventListener('click', stopBulkScan);
 
   const chips = document.getElementById('obs-chips');
   if (chips) {
@@ -2917,6 +3098,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // startBulkScan/stopBulkScan below, so the delegated-listener bodies are
     // directly callable without simulating a DOM click event.
     dueSelectedIds, toggleDueSelection, setAllDueSelected, syncDueBulkBar, repaintDueRows,
+    // LIN-2701 §B.7: the run control's own entry point, extracted like
+    // toggleDueSelection/setAllDueSelected above, so a test can drive a run
+    // directly without simulating a DOM click.
+    startDueBulkScan,
     // LIN-2706 §B.4/§B.5/§B.8: exact count, honest cost estimate, and the
     // over-ceiling refusal — each a standalone pure(ish) function so its
     // states (unknown vs $0.00, refused vs within-ceiling) are directly
@@ -2931,5 +3116,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // module-level to fix a cross-run corruption bug found in beat 4.
     startBulkScan, stopBulkScan, checkBulkScanSelection, classifyBulkScanError,
     BULK_SCAN_CONCURRENCY, BULK_SCAN_MAX_PER_RUN,
+    // LIN-2701 §B.6: the seven-way result classifier + its per-row paint —
+    // exposed so the predicate chain is directly unit-testable without a
+    // DOM, and so §B.7's run-control wiring (Session 2, later beats) can
+    // pass paintBulkScanRowResult straight into startBulkScan's onResult.
+    classifyBulkScanResult, paintBulkScanRowResult, BULK_SCAN_RESULT_COPY,
   };
 }

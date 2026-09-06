@@ -1,5 +1,10 @@
 /**
  * LIN-2700 (LIN-2651 Phase 2) — the client-side bulk-scan pool.
+ * LIN-2701 §B.6 (Phase 3, beat 2) — the seven-way result classifier built on
+ * top of that pool (classifyBulkScanResult), added below the Phase 2
+ * witnesses in the same file: the classifier is exported from the SAME
+ * vm-sandboxed module and needs the same harness, and its witnesses drive
+ * real pool entries through it exactly the way §B.7's onResult wiring will.
  *
  * Three required witnesses, all net-new (zero prior coverage — no existing
  * test can be extended, per the ticket): the strict concurrency-peak bound,
@@ -27,6 +32,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
@@ -305,5 +311,276 @@ test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-
     // and the no-op-run-2 mutation, while still failing on any overshoot.
     assert.equal(run2Peak, BULK_SCAN_CONCURRENCY, `run2's peak in-flight must reach exactly ${BULK_SCAN_CONCURRENCY} — never more (run1's stragglers must not free slots) and never less (run 2 must actually issue) — observed ${run2Peak}`);
     assert.equal(run2Calls, BULK_SCAN_CONCURRENCY, `run2 must have issued exactly ${BULK_SCAN_CONCURRENCY} calls: no settle ever frees a real slot here, so more means over-issuance and fewer means run 2 never ran, observed ${run2Calls}`);
+  });
+});
+
+test.describe('startBulkScan — two live runs are unreachable (Witness 6, LIN-2700 hand-off)', () => {
+  test('a second startBulkScan with no intervening stop is refused with reason: run-in-progress; global peak in-flight never exceeds BULK_SCAN_CONCURRENCY; stopBulkScan() still reaches the one live run', async () => {
+    // The LIN-2700 hand-off reproduction: an unguarded startBulkScan lets a
+    // second call overwrite the module-level bulkScanStop pointer, orphaning
+    // run 1 (permanently unreachable from stopBulkScan()) while doubling
+    // global in-flight past BULK_SCAN_CONCURRENCY (measured there as
+    // `after run2: calls=4 peak=4`). The guard must be in startBulkScan
+    // itself, not only a disabled button, so this calls it programmatically
+    // exactly the way that reproduction did.
+    let calls = 0;
+    let inFlight = 0;
+    let peak = 0;
+    let capturedSignal = null;
+    const postScan = async (urlKey, id, source, { signal }) => {
+      calls++;
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      capturedSignal = signal;
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          inFlight--;
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        });
+      });
+    };
+    const sandbox = makeSandbox(postScan);
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+
+    const res1 = startBulkScan(items(6, 'run1-'));
+    await flush();
+    assert.equal(res1.refused, false, 'the first call must be admitted');
+    assert.equal(calls, BULK_SCAN_CONCURRENCY, `run 1 must have issued exactly ${BULK_SCAN_CONCURRENCY} calls before a second start is attempted`);
+
+    // No intervening stop — the exact "start, start again" shape the
+    // hand-off found no guard for.
+    const res2 = startBulkScan(items(6, 'run2-'));
+    assert.equal(res2.refused, true, 'a second startBulkScan while a run is live must be refused');
+    assert.equal(res2.reason, 'run-in-progress', 'the refusal must carry the distinct run-in-progress reason so the UI can branch on it');
+
+    await flush(10);
+    // Strict equality, not `<=` — tests/unit/settle-with-concurrency.test.js:80's
+    // own stated rationale: `<=` passes trivially (even vacuously at 0), and
+    // would not distinguish "the guard held" from "the pool stopped issuing
+    // work altogether".
+    assert.strictEqual(peak, BULK_SCAN_CONCURRENCY, `global peak in-flight must never exceed BULK_SCAN_CONCURRENCY (${BULK_SCAN_CONCURRENCY}) even though a second start was attempted — observed ${peak}`);
+    assert.equal(calls, BULK_SCAN_CONCURRENCY, 'the refused second call must never issue a single postScan call of its own');
+
+    // stopBulkScan() must still reach run 1 — the exact capability the
+    // hand-off found broken ("run1 signal aborted = false" after a second,
+    // unguarded start).
+    assert.ok(capturedSignal, 'run 1 must have called postScan with a signal');
+    assert.equal(capturedSignal.aborted, false, 'run 1\'s signal must not be aborted yet');
+    stopBulkScan();
+    assert.equal(capturedSignal.aborted, true, 'stopBulkScan() must still reach the one live run (run 1) and abort its signal');
+    assert.equal(inFlight, 0, 'the abort must have settled every one of run 1\'s in-flight jobs');
+  });
+});
+
+// ─── LIN-2701 §B.6 — classifyBulkScanResult (Session 2, beat 2) ────────────
+//
+// classifyBulkScanResult is presentation-only: it reads an already-settled
+// pool entry ({item, outcome, value|error}) and never mutates the selection,
+// re-enqueues, or feeds back into the pool. These witnesses drive real
+// entries through the real pool (Witnesses 1/2) or the store's real
+// recordScan (Witness 3), never a hand-built guess at either shape.
+
+test.describe('classifyBulkScanResult — skipped quota, fast 429 + its global-hourly variant (Witness 1)', () => {
+  test('a fast 429 throw classifies as skipped-quota; every row after the first also 429s and the batch still settles every remaining row rather than aborting', async () => {
+    const N = 4; // > BULK_SCAN_CONCURRENCY, so this proves the pool keeps pumping past the first 429, not just tolerating one
+    let calls = 0;
+    const postScan = async () => {
+      calls++;
+      const err = new Error('Free tier daily limit reached');
+      err.status = 429;
+      err.body = { freeTier: { used: true, remaining: 0, limit: 20, resetsAt: '2026-09-07T00:00:00.000Z' } };
+      throw err;
+    };
+    const sandbox = makeSandbox(postScan);
+    const { startBulkScan, classifyBulkScanResult, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    assert.ok(N > BULK_SCAN_CONCURRENCY, 'test needs a queue tail beyond the concurrency bound to be meaningful');
+
+    let teardownResults = null;
+    const res = startBulkScan(items(N), { onTeardown: (results) => { teardownResults = results; } });
+    assert.equal(res.refused, false);
+    await flush(10);
+
+    assert.ok(teardownResults, 'a 429 must never set the pool-wide stop flag — the batch must reach ordinary teardown, not abort early');
+    assert.equal(teardownResults.length, N, `every row must settle — the global-hourly variant where every row after the first also 429s must still settle all ${N}, got ${teardownResults.length}`);
+    assert.equal(calls, N, 'every row must actually have been attempted, not short-circuited after the first 429');
+    for (const entry of teardownResults) {
+      assert.equal(entry.outcome, 'rate-limited');
+      assert.equal(classifyBulkScanResult(entry), 'skipped-quota');
+    }
+  });
+});
+
+test.describe('classifyBulkScanResult — flushed scan failure (Witness 2)', () => {
+  test('a resolved 200 body carrying a statusCode field classifies as scan-failed, never zero-finding — the shape an "obvious" rejecting-stub test would miss entirely', async () => {
+    // Representative of the reachable flushed statuses (404/422/500/502/503/401,
+    // per routes/workspace-api.js) — armKeepalive grafts `statusCode` onto the
+    // route's OWN successful-shaped body when the flush already committed 200.
+    const flushedBody = {
+      status: 'fresh',
+      id: 'scan_11111111_aaaaaaaaaaaa',
+      issueId: '11111111-2222-3333-4444-555555555555',
+      decision: null,
+      scannedAt: '2026-09-06T00:00:00.000Z',
+      outcome: null,
+      outcomeAt: null,
+      model: 'openai/gpt-5.4-mini',
+      statusCode: 503
+    };
+    const postScan = async () => flushedBody;
+    const sandbox = makeSandbox(postScan);
+    const { startBulkScan, classifyBulkScanResult } = sandbox.module.exports;
+
+    let teardownResults = null;
+    startBulkScan(items(1), { onTeardown: (results) => { teardownResults = results; } });
+    await flush();
+
+    assert.ok(teardownResults);
+    assert.equal(teardownResults.length, 1);
+    const entry = teardownResults[0];
+    assert.equal(entry.outcome, 'fulfilled', 'a flushed body still resolves the fetch — window.api only throws on !response.ok');
+    assert.equal(classifyBulkScanResult(entry), 'scan-failed', 'a flushed statusCode-bearing 200 body must classify as scan failed');
+    assert.notEqual(classifyBulkScanResult(entry), 'zero-finding', 'it must never fall through to zero-finding');
+  });
+});
+
+// Mirrors tests/unit/task-decisions-store.test.js's own mock collection and
+// fixtures (createMockCollection/sampleDecision/ISSUE_ID/HASH_A there are
+// file-local, not exported, so this reconstructs the SAME shape and values
+// rather than inventing a divergent one) — driving classifyBulkScanResult
+// against the store's REAL recordScan output, not a hand-rolled guess at it.
+function createMockDecisionsCollection() {
+  const docs = [];
+  function matches(doc, query) {
+    if (query._id !== undefined && doc._id !== query._id) return false;
+    if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
+    return true;
+  }
+  return {
+    _docs: docs,
+    async insertOne(doc) { docs.push(doc); return { insertedId: doc._id }; },
+    async findOne(query) { return docs.find(d => matches(d, query)) || null; },
+    find(query = {}) {
+      const results = docs.filter(d => matches(d, query));
+      return { async toArray() { return results.slice(); } };
+    },
+    async deleteOne(query) {
+      const idx = docs.findIndex(d => matches(d, query));
+      if (idx >= 0) { docs.splice(idx, 1); return { deletedCount: 1 }; }
+      return { deletedCount: 0 };
+    },
+    async deleteMany(query) {
+      let count = 0;
+      for (let i = docs.length - 1; i >= 0; i--) {
+        if (matches(docs[i], query)) { docs.splice(i, 1); count++; }
+      }
+      return { deletedCount: count };
+    },
+    async updateOne(query, update, opts = {}) {
+      const idx = docs.findIndex(d => matches(d, query));
+      if (idx >= 0) {
+        Object.assign(docs[idx], update.$set || {});
+        return { matchedCount: 1, modifiedCount: 1, upsertedId: null };
+      }
+      if (opts.upsert) {
+        const doc = { ...(update.$set || {}) };
+        docs.push(doc);
+        return { matchedCount: 0, modifiedCount: 0, upsertedId: doc._id };
+      }
+      return { matchedCount: 0, modifiedCount: 0, upsertedId: null };
+    }
+  };
+}
+
+const DECISIONS_URL_KEY = 'ws1';
+const DECISIONS_ISSUE_ID = '11111111-2222-3333-4444-555555555555';
+const DECISIONS_HASH_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+function sampleDecision(overrides = {}) {
+  return {
+    decision_id: 'scan_11111111_aaaaaaaaaaaa',
+    question: 'Which auth strategy should this use?',
+    options: [{ id: 'a', label: 'OAuth' }, { id: 'b', label: 'API key' }],
+    free_text: false,
+    ...overrides
+  };
+}
+
+test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row, driven through the store\'s real recordScan (Witness 3)', () => {
+  test('a new decision classifies as new-decision', async () => {
+    const collection = createMockDecisionsCollection();
+    const store = new TaskDecisionsStore({ collection });
+    const record = await store.recordScan({
+      urlKey: DECISIONS_URL_KEY, issueId: DECISIONS_ISSUE_ID, inputHash: DECISIONS_HASH_A,
+      decision: sampleDecision()
+    });
+
+    const sandbox = makeSandbox(async () => ({}));
+    const { classifyBulkScanResult } = sandbox.module.exports;
+    const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
+    assert.equal(classifyBulkScanResult(entry), 'new-decision');
+  });
+
+  test('a zero-finding scan (decision: null, no statusCode) classifies as zero-finding', async () => {
+    const collection = createMockDecisionsCollection();
+    const store = new TaskDecisionsStore({ collection });
+    const record = await store.recordScan({
+      urlKey: DECISIONS_URL_KEY, issueId: DECISIONS_ISSUE_ID, inputHash: DECISIONS_HASH_A,
+      decision: null
+    });
+    assert.equal(record.decision, null);
+
+    const sandbox = makeSandbox(async () => ({}));
+    const { classifyBulkScanResult } = sandbox.module.exports;
+    const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
+    assert.equal(classifyBulkScanResult(entry), 'zero-finding');
+  });
+
+  test('a statusCode-bearing body is never routed to zero-finding even when decision is absent', async () => {
+    const collection = createMockDecisionsCollection();
+    const store = new TaskDecisionsStore({ collection });
+    const record = await store.recordScan({
+      urlKey: DECISIONS_URL_KEY, issueId: DECISIONS_ISSUE_ID, inputHash: DECISIONS_HASH_A,
+      decision: null
+    });
+    // Simulate armKeepalive's flushed-error graft (lib/http-keepalive.js:43)
+    // landing on an otherwise zero-finding-shaped body — the exact case the
+    // ticket calls out as the one an "obvious" classifier would miss.
+    const flushedValue = { ...record, statusCode: 503 };
+
+    const sandbox = makeSandbox(async () => ({}));
+    const { classifyBulkScanResult } = sandbox.module.exports;
+    const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: flushedValue };
+    assert.equal(classifyBulkScanResult(entry), 'scan-failed');
+    assert.notEqual(classifyBulkScanResult(entry), 'zero-finding');
+  });
+
+  test('recordScan at an existing outcome-stamped id (the terminal-row fixture, tests/unit/task-decisions-store.test.js:182) classifies as terminal-row-no-op', async () => {
+    const collection = createMockDecisionsCollection();
+    const store = new TaskDecisionsStore({ collection });
+    await store.recordScan({
+      urlKey: DECISIONS_URL_KEY, issueId: DECISIONS_ISSUE_ID, inputHash: DECISIONS_HASH_A,
+      decision: sampleDecision({ question: 'original' })
+    });
+    // Seed a terminal outcome directly onto that row (mirrors the cited
+    // fixture exactly — markOutcome itself is a later phase's job).
+    const _id = TaskDecisionsStore.buildId(DECISIONS_ISSUE_ID, DECISIONS_HASH_A);
+    const stamped = collection._docs.find(d => d._id === _id);
+    stamped.outcome = 'dismissed';
+    stamped.outcomeAt = new Date('2026-08-20T00:00:00.000Z');
+
+    const record = await store.recordScan({
+      urlKey: DECISIONS_URL_KEY, issueId: DECISIONS_ISSUE_ID, inputHash: DECISIONS_HASH_A,
+      decision: sampleDecision({ question: 'a fresh LLM result for the SAME unchanged content' })
+    });
+    // Do NOT assert byte-identical rows — the terminal branch may patch
+    // dueBasisHash/dueBasisVersion (lib/task-decisions-store.js:186-199);
+    // `value.outcome != null` is the exact signal, not row equality.
+    assert.equal(record.outcome, 'dismissed');
+    assert.equal(record.decision.question, 'original'); // the new result was discarded
+
+    const sandbox = makeSandbox(async () => ({}));
+    const { classifyBulkScanResult } = sandbox.module.exports;
+    const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
+    assert.equal(classifyBulkScanResult(entry), 'terminal-row-no-op');
   });
 });
