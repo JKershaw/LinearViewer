@@ -652,11 +652,29 @@
     // are structurally identical, so they cannot disagree for a row this
     // tool actually produced. `resolved`/`replying` guard against a double
     // tap firing two posts for the same row.
+    // LIN-2621 beat 6 (independent review finding F1, John's ruling
+    // `lin2621-ledger-gate` gate 1): a task-bound decision ALWAYS carries
+    // `loopId: null` (lib/unanswered-decisions.js's `taskDecisionAnchor`),
+    // and the tool's own projection (lib/chat-tools.js's
+    // `projectPendingDecision`) exposes no raw issue UUID for
+    // `taskDecisionsStore.markOutcome` to match against. Rendering it
+    // interactive meant a tap posted a reply but never stamped an outcome,
+    // so `lib/unanswered-decisions.js`'s `if (entry.outcome) continue` never
+    // fired and the row never left the pending set — every later listing
+    // re-rendered it as fresh, and each tap posted another duplicate
+    // comment on a real issue. Until the projection carries the raw ids
+    // (routed follow-up, out of this leg's carve), a loopId-less decision
+    // renders read-only instead: passing a disposition outside
+    // appendOptions' own resumable/gone/task-bound allow-list reuses its
+    // EXISTING read-only path verbatim (no buttons, caption-only — the same
+    // mechanism beat 4's `mid-turn`/`canReply:false` case already exercises),
+    // then the caption text is swapped for one naming where to reply instead.
+    var unlinked = !decision.loopId;
     var resolved = false;
-    window.ChatUI.appendOptions(wrap, {
+    var optionsWrap = window.ChatUI.appendOptions(wrap, {
       options: decision.options,
       recommended: decision.recommended,
-      disposition: decision.disposition,
+      disposition: unlinked ? 'task-bound-unlinked' : decision.disposition,
       onSelect: function (optionId, optionLabel) {
         // Second, structural guard (mirrors public/observation.js's rulings
         // row handler) — belt-and-braces alongside appendOptions' own
@@ -719,6 +737,14 @@
           });
       },
     });
+    if (unlinked) {
+      // appendOptions' own read-only branch renders a generic caption for
+      // any disposition it doesn't recognize ("no action available yet") —
+      // swap it for one that names where to actually reply, since this is a
+      // real, answerable decision, just not answerable from here yet.
+      var caption = optionsWrap.querySelector('.chat-options-caption');
+      if (caption) caption.textContent = 'Reply from the Rulings tab (Observation → Rulings) — not here yet.';
+    }
     wrap.appendChild(feedback);
 
     var li = document.createElement('li');

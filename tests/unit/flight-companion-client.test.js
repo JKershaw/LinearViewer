@@ -1732,7 +1732,18 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     assert.strictEqual(apiCalls.length, 0, 'never window.api — postComment is a raw fetch of its own');
   });
 
-  test('a tap on a task-bound decision (no loopId) posts with no stamp pair — a plain, unstamped reply', async () => {
+  // LIN-2621 beat 6 (independent review finding F1): a task-bound decision
+  // ALWAYS carries `loopId: null` (lib/unanswered-decisions.js's
+  // `taskDecisionAnchor`), and the tool's own projection
+  // (lib/chat-tools.js's `projectPendingDecision`) exposes no raw issue UUID
+  // for `taskDecisionsStore.markOutcome` to match against. Rendering it
+  // interactive (as beat 4 did) meant a tap posted a reply comment but never
+  // stamped an outcome, so `lib/unanswered-decisions.js`'s
+  // `if (entry.outcome) continue` never fired, the row never left the
+  // pending set, and every later listing re-rendered it as fresh — each tap
+  // posting another duplicate comment on a real issue. It must now render
+  // read-only, pointing at the Rulings tab, so no tap is possible.
+  test('a loopId-less decision renders read-only — the caption points at the Rulings tab, no interactive buttons, so no tap can post', async () => {
     const d = decision({ disposition: 'task-bound', loopId: null, decisionId: 'scan_abc123', issueIdentifier: 'LIN-9' });
     const { exports: m, thread, replyDeliveryCalls } = loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
@@ -1740,11 +1751,26 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     m.autoWakeTick();
     await flush();
     const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    assert.ok(wrap.querySelector('.chat-options--readonly'), 'read-only wrapper class present');
+    assert.strictEqual(wrap.querySelector('.chat-options-row'), null, 'no button row at all — no tap is possible');
+    assert.match(wrap.querySelector('.chat-options-caption').textContent, /Rulings/,
+      'caption directs the human to the Rulings tab instead of tapping here');
+    assert.strictEqual(replyDeliveryCalls.length, 0, 'read-only: nothing was ever posted');
+  });
+
+  test('a loop-anchored decision (loopId present) is unaffected by the read-only mitigation — still renders interactive and posts', async () => {
+    const d = decision({ disposition: 'resumable', loopId: 'loop-9', decisionId: 'dec-9', issueIdentifier: 'LIN-9' });
+    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
+    assert.strictEqual(wrap.querySelector('.chat-options--readonly'), null);
     wrap.querySelector('.chat-options-row').children[1].dispatch('click'); // "Hold"
     await flush();
     assert.strictEqual(replyDeliveryCalls.length, 1);
-    assert.strictEqual(replyDeliveryCalls[0].decision, undefined,
-      'the tool exposes no raw issue UUID for a task-bound row, so the best-effort stamp pair is omitted rather than sent wrong');
+    looseDeepEqual(replyDeliveryCalls[0].decision, { decisionLoopId: 'loop-9', decisionId: 'dec-9' });
     assert.strictEqual(replyDeliveryCalls[0].prompt, 'Hold');
   });
 
