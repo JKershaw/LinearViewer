@@ -115,3 +115,45 @@ describe('render-observation: scan-due tab (LIN-2649 S4 / LIN-2667)', () => {
     assert.match(out, /id="obs-due-progress"/);
   });
 });
+
+describe('render-observation: bulk-scan script wiring (LIN-2700 / LIN-2651 Phase 2)', () => {
+  const html = () => renderObservationPage(
+    { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+    { urlKey: 'ws-a' }
+  );
+
+  // This guards LIN-2700's single documented deviation from its "public/
+  // observation.js and nothing else" scope: the bulk-scan pool calls
+  // window.ScanSection.postScan, which public/scan.js defines and which was
+  // NOT loaded on this page before LIN-2700 added it to the script list.
+  //
+  // Nothing else covers that one line. The bulk-scan witnesses
+  // (tests/unit/observation-bulk-scan.test.js) stub window.ScanSection inside
+  // their vm sandbox, so they can never observe the real page wiring, and no
+  // E2E navigates to /observation and touches ScanSection. Removing /scan.js
+  // from the list left 82/82 of the related unit tests green (review mutation
+  // M8) while the pool would TypeError at runtime in a browser — and that
+  // error would be swallowed into classifyBulkScanError's 'other' bucket, so
+  // it would not even be loud. Hence this assertion.
+  test('the Observation page loads /scan.js, so window.ScanSection exists for the bulk-scan pool', () => {
+    assert.match(
+      html(),
+      /<script src="\/scan\.js"><\/script>/,
+      'the bulk-scan pool calls window.ScanSection.postScan, which only exists if /scan.js is in the page script list'
+    );
+  });
+
+  test('/scan.js loads after /common.js and before /observation.js', () => {
+    // Order is load-bearing in both directions, per the justification comment
+    // in lib/render-observation.js: scan.js reads window.escapeHtml and
+    // window.relativeTime at top level (common.js defines them), and
+    // observation.js is the consumer of window.ScanSection.
+    const out = html();
+    const commonAt = out.indexOf('<script src="/common.js"></script>');
+    const scanAt = out.indexOf('<script src="/scan.js"></script>');
+    const observationAt = out.indexOf('<script src="/observation.js"></script>');
+    assert.ok(commonAt > -1 && scanAt > -1 && observationAt > -1, 'all three scripts are present');
+    assert.ok(scanAt > commonAt, '/scan.js must load after /common.js (it reads escapeHtml/relativeTime at top level)');
+    assert.ok(scanAt < observationAt, '/scan.js must load before /observation.js (its consumer)');
+  });
+});

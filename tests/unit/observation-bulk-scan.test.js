@@ -292,7 +292,18 @@ test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-
 
     await flush(15);
 
-    assert.ok(run2Peak <= BULK_SCAN_CONCURRENCY, `run2's peak in-flight must never exceed ${BULK_SCAN_CONCURRENCY} regardless of run1's stragglers, observed ${run2Peak}`);
-    assert.ok(run2Calls <= BULK_SCAN_CONCURRENCY, `run2 must never have issued more than ${BULK_SCAN_CONCURRENCY} calls without a settle freeing a real slot, observed ${run2Calls}`);
+    // Strict equality, not `<=` — the same discipline Witness 1 states and
+    // this witness originally failed to apply. A one-sided `<=` bound passes
+    // vacuously at 0: a mutation making startBulkScan a no-op for every run
+    // after the first (review mutation M7) issues nothing at all for run 2,
+    // and `0 <= 2` held, so the whole suite stayed green while the witness
+    // proved nothing about run 2. Equality is the honest assertion here and
+    // is fully deterministic: run2PostScan returns a promise that never
+    // settles, so run 2's in-flight count only ever climbs — it must reach
+    // exactly the bound and stop there. This form kills BOTH the cross-run
+    // corruption bug it was written for (peak 4 against the pre-beat-4 code)
+    // and the no-op-run-2 mutation, while still failing on any overshoot.
+    assert.equal(run2Peak, BULK_SCAN_CONCURRENCY, `run2's peak in-flight must reach exactly ${BULK_SCAN_CONCURRENCY} — never more (run1's stragglers must not free slots) and never less (run 2 must actually issue) — observed ${run2Peak}`);
+    assert.equal(run2Calls, BULK_SCAN_CONCURRENCY, `run2 must have issued exactly ${BULK_SCAN_CONCURRENCY} calls: no settle ever frees a real slot here, so more means over-issuance and fewer means run 2 never ran, observed ${run2Calls}`);
   });
 });
