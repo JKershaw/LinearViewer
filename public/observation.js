@@ -2337,6 +2337,183 @@ async function loadMoreDueChecks() {
   }
 }
 
+// ─── Bulk scan pool (LIN-2700 / LIN-2651 Phase 2) ───────────────────────────
+//
+// Client-orchestrated pool that fires POST /workspace/:urlKey/api/scan/:issueId
+// (via public/scan.js's postScan, reached as window.ScanSection.postScan) over
+// an operator-selected set of Scan-due rows. Mechanism only — no selection UI,
+// no controls, no result display; that is Phase 3 (LIN-2701). This pool owns
+// only: the queue/concurrency, the total-per-run refusal, the stop flag, the
+// shared AbortController, and enough error discrimination for Phase 3 to build
+// its later 7-way classification on top of.
+
+const bulkScanQueue = [];
+let bulkScansInFlight = 0;
+let bulkScanStopped = false;
+let bulkScanController = null;   // one shared AbortController per run
+let bulkScanTeardown = null;     // current run's teardown, so stopBulkScan can reach it
+
+// Own constant — deliberately NEVER BASIS_CHECK_CONCURRENCY (:1598). That one
+// bounds advisory provider reads a page load fires on its own initiative; a
+// bulk scan issues real, billable LLM calls against the same OpenRouter
+// budget every other feature draws from, so it gets its own — tighter —
+// number rather than inheriting one tuned for a cheaper resource.
+const BULK_SCAN_CONCURRENCY = 2;
+
+// A ceiling on TOTAL scans per run, in addition to the concurrency bound
+// above — the same "how fast" vs "how much total" split BASIS_CHECK_CONCURRENCY
+// / BASIS_CHECK_MAX_PER_PAGE already draw (:1598-1606). loadMoreDueChecks lets
+// an operator accumulate a selection across repeated "load more" pages before
+// running a scan over all of it; past this many in one run the selection is
+// REFUSED outright, never silently truncated — dropping rows from an
+// operator's explicit selection would be a worse failure than telling them to
+// split the run. Anchored to (never imported from — client code stays
+// independent of the server-side constant) DUE_CHECK_PAGE_SIZE
+// (routes/workspace-api.js:44): one page is the natural selection unit the UI
+// already establishes, so an ordinary single-page selection is never refused.
+// Deliberately NOT BASIS_CHECK_MAX_PER_PAGE — the two ceilings bound different
+// resources, and coupling them would let a change to one silently re-tune the
+// other.
+const BULK_SCAN_MAX_PER_RUN = 40;
+
+/**
+ * Refuse an over-ceiling selection before anything is enqueued. Never
+ * truncates — an explicit "scan N at a time; run again for the rest" refusal
+ * is the whole point (Phase 3 owns where this is displayed; the pool owns the
+ * refusal itself).
+ */
+function checkBulkScanSelection(items) {
+  if (items.length > BULK_SCAN_MAX_PER_RUN) {
+    return {
+      refused: true,
+      limit: BULK_SCAN_MAX_PER_RUN,
+      requested: items.length,
+      message: `scan ${BULK_SCAN_MAX_PER_RUN} at a time; run again for the rest`
+    };
+  }
+  return { refused: false };
+}
+
+/**
+ * Classify a postScan failure at the pool boundary — abort vs 429, never
+ * conflated. A client abort surfaces as the native DOMException `fetch`
+ * itself rejects with (window.api's own `.status`/`.body` wrapping happens
+ * only after a response is received, so an aborted call never reaches it):
+ * `err.name === 'AbortError'`, no `.status`. A 429 is window.api's own thrown
+ * Error carrying `.status === 429` and — per its docstring — `.body.freeTier`
+ * (public/common.js:497). Anything else is left as 'other': full per-row
+ * classification is Phase 3's job: this just surfaces enough for it.
+ */
+function classifyBulkScanError(err) {
+  if (err && err.name === 'AbortError') return 'aborted';
+  if (err && err.status === 429) return 'rate-limited';
+  return 'other';
+}
+
+/**
+ * Drain the bulk-scan queue up to BULK_SCAN_CONCURRENCY at a time. Mirrors
+ * pumpBasisChecks's (:1609) at-most-once/drain-on-settle `finally` shape —
+ * its OWN in-flight counter and queue, never the basis-check ones — but adds
+ * a stop check INSIDE the loop body, immediately before a dequeued job is
+ * issued. That is the whole point: it closes the dequeue-but-not-yet-issued
+ * window pumpBasisChecks has no equivalent of (lib/openrouter.js:1786 guards
+ * the same class of gap server-side). Because dequeue and issue happen
+ * synchronously in the same turn with no await between them, checking right
+ * here means a job can never be shifted off the queue without the check
+ * having just passed — the window is closed by construction, not by timing.
+ */
+function pumpBulkScans() {
+  while (bulkScansInFlight < BULK_SCAN_CONCURRENCY && bulkScanQueue.length) {
+    if (bulkScanStopped) return;
+    const job = bulkScanQueue.shift();
+    bulkScansInFlight++;
+    job().catch(() => {}).finally(() => {
+      bulkScansInFlight--;
+      pumpBulkScans();
+    });
+  }
+}
+
+/**
+ * Start a bulk-scan run over `items` ({urlKey, identifier, source} rows,
+ * e.g. from the Scan-due tab's selection). Refuses synchronously — before
+ * enqueueing anything — if the selection exceeds BULK_SCAN_MAX_PER_RUN.
+ *
+ * `onTeardown(results)` fires once, on full settlement OR on stopBulkScan(),
+ * whichever comes first — clearing in-flight counters and handing back
+ * whatever re-enables the (not-yet-built) run control is Phase 3's job, this
+ * pool just calls the callback. Already-issued in-flight requests are LEFT TO
+ * COMPLETE after a stop (the accepted abort gap — see LIN-2700/LIN-2651):
+ * their eventual settlement still lands in `results`, but teardown does not
+ * wait for it.
+ *
+ * @param {Array<{urlKey:string, identifier:string, source?:string}>} items
+ * @param {{onTeardown?: (results: Array) => void}} [opts]
+ * @returns {{refused:true, limit:number, requested:number, message:string}
+ *          |{refused:false, results: Array}}
+ */
+function startBulkScan(items, { onTeardown } = {}) {
+  const check = checkBulkScanSelection(items);
+  if (check.refused) return check;
+
+  bulkScanStopped = false;
+  bulkScansInFlight = 0;
+  bulkScanQueue.length = 0;
+  const controller = new AbortController();
+  bulkScanController = controller;
+
+  const results = [];
+  const total = items.length;
+  let settledCount = 0;
+  let tornDown = false;
+
+  function teardown() {
+    if (tornDown) return;
+    tornDown = true;
+    bulkScansInFlight = 0;
+    bulkScanController = null;
+    bulkScanTeardown = null;
+    if (onTeardown) onTeardown(results);
+  }
+  bulkScanTeardown = teardown;
+
+  if (total === 0) {
+    teardown();
+    return { refused: false, results };
+  }
+
+  for (const item of items) {
+    bulkScanQueue.push(async () => {
+      try {
+        const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, { signal: controller.signal });
+        results.push({ item, outcome: 'fulfilled', value });
+      } catch (err) {
+        results.push({ item, outcome: classifyBulkScanError(err), error: err });
+      } finally {
+        settledCount++;
+        if (settledCount === total) teardown();
+      }
+    });
+  }
+
+  pumpBulkScans();
+  return { refused: false, results };
+}
+
+/**
+ * Stop the current bulk-scan run: sets the stop flag (closing the
+ * dequeue-but-not-yet-issued window in pumpBulkScans above) and aborts the
+ * shared AbortController (canceling in-flight HTTP calls client-side — see
+ * the abort-gap note above for what "canceling" does and does not mean
+ * server-side), then tears down immediately rather than waiting for
+ * already-issued requests to settle.
+ */
+function stopBulkScan() {
+  bulkScanStopped = true;
+  if (bulkScanController) bulkScanController.abort();
+  if (bulkScanTeardown) bulkScanTeardown();
+}
+
 // ─── Controls ──────────────────────────────────────────────────────────────────
 
 // Switch the active Observation tab (LIN-1194, extended LIN-1728/LIN-2667).
@@ -2525,5 +2702,11 @@ if (typeof module !== 'undefined' && module.exports) {
     // without a DOM via this export.
     dueStatusCopy, renderDueRowHtml, dueUrl, updateDueDayOneNotice, paintDuePage,
     pollCurrentView, switchView, loadInitialDueCheckPage, loadMoreDueChecks,
+    // LIN-2700 / LIN-2651 Phase 2: the bulk-scan pool seam — the concurrency/
+    // ceiling constants, the run entry point + stop, and the two pure helpers
+    // (selection refusal, error classification) are the parts a regression
+    // would be invisible without a direct test for.
+    startBulkScan, stopBulkScan, checkBulkScanSelection, classifyBulkScanError,
+    pumpBulkScans, BULK_SCAN_CONCURRENCY, BULK_SCAN_MAX_PER_RUN,
   };
 }
