@@ -156,3 +156,53 @@ test.describe('Swim Vertical Screenshots', () => {
     });
   });
 });
+
+// ==========================================================================
+// VR baseline matrix (LIN-1229): vertical swim at 1280 + 390, light + dark.
+//
+// Pins the LIN-1226 outcome — the vertical `.swim-container` max-height now
+// re-derived from the S2 sticky nav (`calc(100vh - var(--nav-sticky-h) …)`), so
+// its scroll area tracks the two-row nav (incl. the <=640px bump) with no
+// clipping and no excessive gap. That is a VIEWPORT-height concern, so these
+// shots are viewport-clamped (NOT fullPage) — a fullPage capture expands to the
+// full lane content and would not show the sticky-nav-derived clamp.
+//
+// Reuses the LIN-1221 ship "S3 matrix" template verbatim: the `theme=dark`
+// cookie set pre-paint via context.addCookies (the authed shell reads the
+// cookie, not prefers-color-scheme; emulateMedia would not flip it). This block
+// runs in its OWN describe with inline setup so the theme cookie is applied
+// BEFORE the first paint at each theme — the outer suite's beforeEach navigates
+// once at load and cannot set a per-theme pre-paint cookie.
+//
+// Output: tests/screenshots/swim-vertical/s3-{desktop-1280,mobile-390}-{light,dark}.png
+// ==========================================================================
+test.describe('S3 matrix (LIN-1229): vertical 1280 + 390, light + dark', () => {
+  const sizes = [
+    { name: 'desktop-1280', width: 1280, height: 720 },
+    { name: 'mobile-390', width: 390, height: 844 }
+  ];
+  const themes = ['light', 'dark'];
+
+  for (const size of sizes) {
+    for (const theme of themes) {
+      test(`s3 ${size.name} ${theme}`, async ({ page, context, baseURL }) => {
+        await context.addCookies([{ name: 'theme', value: theme, url: baseURL }]);
+        await page.setViewportSize({ width: size.width, height: size.height });
+        // Realistic swim sample fixture; clear any persisted orientation.
+        await page.goto('/test/set-session?swimSample=true');
+        await page.evaluate(() => localStorage.removeItem('swim-settings'));
+        await page.goto(SWIM_URL);
+        await page.waitForLoadState('networkidle');
+        // Flip to vertical orientation, then close the settings panel for a clean shot.
+        await page.locator('.swim-settings-toggle').click();
+        await page.locator('#swim-orientation').selectOption('vertical');
+        await page.waitForTimeout(150);
+        await page.locator('.swim-settings-toggle').click();
+        await page.waitForTimeout(150); // settle lane layout
+        await page.screenshot({
+          path: `${SCREENSHOT_DIR}/s3-${size.name}-${theme}.png`
+        });
+      });
+    }
+  }
+});
