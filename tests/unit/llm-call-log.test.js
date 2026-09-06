@@ -24,6 +24,7 @@ function createMockCollection() {
       const results = docs.filter(doc => {
         if (query.urlKey && doc.urlKey !== query.urlKey) return false;
         if (query.issueIdentifier && doc.issueIdentifier !== query.issueIdentifier) return false;
+        if (query.feature && doc.feature !== query.feature) return false;
         if (query.expiresAt?.$gt && !(doc.expiresAt > query.expiresAt.$gt)) return false;
         return true;
       });
@@ -290,5 +291,140 @@ describe('LlmCallLogStore.summarizeByIssue', () => {
     assert.deepStrictEqual(await store.summarizeByIssue('acme'), empty);
     assert.deepStrictEqual(await store.summarizeByIssue(undefined, 'LIN-1'), empty);
     assert.deepStrictEqual(await new LlmCallLogStore({}).summarizeByIssue('acme', 'LIN-1'), empty);
+  });
+});
+
+describe('LlmCallLogStore.summarizeByFeature (LIN-2702)', () => {
+  let store;
+  let collection;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new LlmCallLogStore({ collection });
+  });
+
+  test('zero rows in window -> unknown:true, meanUsd:null, calls:0', async () => {
+    const s = await store.summarizeByFeature('acme', 'scan');
+    assert.deepStrictEqual(s, { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true });
+  });
+
+  test('rows present but all unpriced -> unknown:true, meanUsd:null, but calls still reports the row count', async () => {
+    await store.record({ urlKey: 'acme', feature: 'scan' }); // no cost reported
+    await store.record({ urlKey: 'acme', feature: 'scan' }); // no cost reported
+
+    const s = await store.summarizeByFeature('acme', 'scan');
+    assert.strictEqual(s.calls, 2); // "2 unpriced calls" stays distinguishable from "no calls"
+    assert.strictEqual(s.pricedCalls, 0);
+    assert.strictEqual(s.meanUsd, null);
+    assert.strictEqual(s.unknown, true);
+  });
+
+  // The single most important test in the ticket: cost:0 rows are genuinely
+  // priced (Number.isFinite(0) is true), so a window that is all real zeros
+  // must report a known $0.00, never the unknown carrier.
+  test('priced rows averaging exactly zero -> meanUsd:0, unknown:false (never unknown)', async () => {
+    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0 });
+    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0 });
+
+    const s = await store.summarizeByFeature('acme', 'scan');
+    assert.strictEqual(s.calls, 2);
+    assert.strictEqual(s.pricedCalls, 2);
+    assert.strictEqual(s.meanUsd, 0);
+    assert.strictEqual(s.unknown, false);
+  });
+
+  test('mixed priced/unpriced -> mean computed over priced rows only, not calls', async () => {
+    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.02 });
+    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.04 });
+    await store.record({ urlKey: 'acme', feature: 'scan' }); // unpriced
+
+    const s = await store.summarizeByFeature('acme', 'scan');
+    assert.strictEqual(s.calls, 3);
+    assert.strictEqual(s.pricedCalls, 2);
+    // Dividing by calls (3) would give 0.02; dividing by pricedCalls (2) gives 0.03.
+    assert.ok(Math.abs(s.meanUsd - 0.03) < 1e-9);
+    assert.strictEqual(s.unknown, false);
+  });
+
+  test('rows whose expiresAt has passed are excluded from the window (aged-out-only -> unknown)', async () => {
+    const now = Date.now();
+    collection._docs.push({
+      _id: 'expired', urlKey: 'acme', feature: 'scan', cost: 0.05,
+      timestamp: new Date(now - 1000 * 60 * 60), expiresAt: new Date(now - 1000)
+    });
+
+    const s = await store.summarizeByFeature('acme', 'scan');
+    assert.deepStrictEqual(s, { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true });
+  });
+
+  test('feature scoping: a different feature or a different urlKey is excluded', async () => {
+    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.01 });
+    await store.record({ urlKey: 'acme', feature: 'recommend', cost: 99 }); // other feature
+    await store.record({ urlKey: 'other', feature: 'scan', cost: 99 }); // other workspace
+
+    const s = await store.summarizeByFeature('acme', 'scan');
+    assert.strictEqual(s.calls, 1);
+    assert.ok(Math.abs(s.meanUsd - 0.01) < 1e-9);
+  });
+
+  test('guard: missing urlKey, missing feature, or no collection all return the unknown shape', async () => {
+    const empty = { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true };
+    await store.record({ urlKey: 'acme', feature: 'scan', cost: 0.01 });
+    assert.deepStrictEqual(await store.summarizeByFeature(undefined, 'scan'), empty);
+    assert.deepStrictEqual(await store.summarizeByFeature('acme', undefined), empty);
+    assert.deepStrictEqual(await new LlmCallLogStore({}).summarizeByFeature('acme', 'scan'), empty);
+  });
+
+  test('catch path: a collection error returns the unknown shape, never meanUsd:0', async () => {
+    const flaky = new LlmCallLogStore({
+      collection: { find() { throw new Error('mongo down'); } }
+    });
+    const s = await flaky.summarizeByFeature('acme', 'scan');
+    assert.deepStrictEqual(s, { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true });
+  });
+});
+
+// Unintended-side-effect coverage (LIN-2702): summarize() and
+// summarizeByIssue() must not have moved when the same rows are also read by
+// summarizeByFeature() — the new honest-unknown convention must not leak into
+// the two methods that deliberately do not use it.
+describe('summarize()/summarizeByIssue() are unaffected by summarizeByFeature (LIN-2702)', () => {
+  let store;
+  let collection;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new LlmCallLogStore({ collection });
+  });
+
+  test('summarize() empty case still carries totalCost:0 with no `unknown` key', async () => {
+    const s = await store.summarize('acme');
+    assert.deepStrictEqual(s, { totalCalls: 0, totalCost: 0, totalTokens: 0, byFeature: [], lastCallAt: null, latencyByFeatureModel: [] });
+    assert.strictEqual('unknown' in s, false);
+  });
+
+  test('summarizeByIssue() empty case is still the literal zero shape, not the unknown carrier', async () => {
+    const s = await store.summarizeByIssue('acme', 'LIN-1');
+    assert.deepStrictEqual(s, { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] });
+    assert.strictEqual('unknown' in s, false);
+  });
+
+  test('summarize() and summarizeByIssue() are unchanged over rows summarizeByFeature also reads', async () => {
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'scan', cost: 0.02 });
+    await store.record({ urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'scan' }); // unpriced
+
+    const byFeature = await store.summarizeByFeature('acme', 'scan');
+    assert.strictEqual(byFeature.pricedCalls, 1);
+
+    const summary = await store.summarize('acme');
+    assert.strictEqual(summary.totalCalls, 2);
+    assert.ok(Math.abs(summary.totalCost - 0.02) < 1e-9); // unpriced row folds to 0 here, unlike summarizeByFeature
+    assert.strictEqual(summary.byFeature[0].feature, 'scan');
+    assert.strictEqual(summary.byFeature[0].calls, 2);
+
+    const byIssue = await store.summarizeByIssue('acme', 'LIN-1');
+    assert.strictEqual(byIssue.calls, 2);
+    assert.strictEqual(byIssue.unpricedCalls, 1);
+    assert.ok(Math.abs(byIssue.costUsd - 0.02) < 1e-9);
   });
 });
