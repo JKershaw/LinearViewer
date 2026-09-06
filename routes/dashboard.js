@@ -37,7 +37,7 @@
 
 import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
-import { renderObservationPage } from '../lib/render-observation.js';
+import { renderObservationPage as renderObservationPageImpl } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
 import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph, resolvedDecisionEvents, firstRaisedAt } from '../lib/pipeline-loops.js';
 import { computeEscalationKpis } from '../lib/escalation-kpis.js';
@@ -538,7 +538,20 @@ export function createDashboardRoutes({
   // suggestion join is skipped and every row reports
   // `suggestedDismissal: null`, same degrade-gracefully convention as the
   // three stores above.
-  dismissalSuggestionsStore = null
+  dismissalSuggestionsStore = null,
+  // Per-LLM-call cost log (LIN-418), read ONLY by the Observation page load
+  // (LIN-2706) to derive the Scan-due tab's pre-run cost estimate. Default
+  // null -> the estimate degrades to `unknown` via the `.catch(() => null)`
+  // below, same degrade-gracefully convention as the stores above.
+  llmCallLogStore = null,
+  // DI seam (LIN-2706), defaulting to the real renderer: this module has no
+  // module-mock story (mock.module needs --experimental-test-module-mocks,
+  // not opted into anywhere in this repo — same constraint documented in
+  // tests/unit/flight-companion-turn-route.test.js), so a test that needs the
+  // observation page handler's try/catch to see a throwing render call
+  // injects a stub here instead, same narrow-DI pattern as that file's
+  // `chatClient`/`createToolCatalog`.
+  renderObservationPage = renderObservationPageImpl
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -1044,21 +1057,38 @@ export function createDashboardRoutes({
   // ─── HTML page ──────────────────────────────────────────────────────────────
 
   // First-class observation page (LIN-595): no feature flag (mirrors swim).
-  router.get('/workspace/:urlKey/observation', workspaceFromUrl, (req, res) => {
+  //
+  // Async since LIN-2706, to await the scan cost estimate read below.
+  // Express ^4.18.2 never awaits a route handler's returned promise, so the
+  // entire body -- the store read, renderObservationPage, and res.send --
+  // stays inside one try/catch: an uncaught rejection anywhere here would
+  // otherwise become an unhandled rejection that server.js's process-level
+  // net logs but never answers, hanging the request instead of 500ing it
+  // (mirrors /escalation-kpis and /effort-readout below).
+  router.get('/workspace/:urlKey/observation', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    const html = renderObservationPage(
-      {
-        workspaces: (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }))
-      },
-      {
-        deployInfo: getDeployInfo(),
-        urlKey: workspace.urlKey,
-        openRouterSource: getOpenRouterSource(req),
-        workspaces: req.session.workspaces,
-        featureFlags: getFeatureFlags(req.session)
-      }
-    );
-    res.send(html);
+    try {
+      const scanCostEstimate = llmCallLogStore
+        ? await llmCallLogStore.summarizeByFeature(workspace.urlKey, 'scan').catch(() => null)
+        : null;
+      const html = renderObservationPage(
+        {
+          workspaces: (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }))
+        },
+        {
+          deployInfo: getDeployInfo(),
+          urlKey: workspace.urlKey,
+          openRouterSource: getOpenRouterSource(req),
+          workspaces: req.session.workspaces,
+          featureFlags: getFeatureFlags(req.session),
+          scanCostEstimate
+        }
+      );
+      res.send(html);
+    } catch (error) {
+      console.error('Observation page error:', error);
+      res.status(500).send('Failed to render the Observation page');
+    }
   });
 
   // Dedicated per-session page (LIN-1003, Phase 1 of LIN-950). The Observation

@@ -3681,3 +3681,93 @@ describe('GET /api/dashboard/rulings — suggestedDismissal join (LIN-2444)', ()
     assert.ok(!keys.some(k => k.startsWith('proxy-rulings::')), 'the human feed must not read the proxy entry');
   });
 });
+
+describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + async try/catch (LIN-2706 §B.1)', () => {
+  function makeObservationRouter({ llmCallLogStore, renderObservationPage } = {}) {
+    const { dispatchQueueStore, agentStatusStore } = makeStores({});
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      llmCallLogStore: llmCallLogStore || null,
+      ...(renderObservationPage ? { renderObservationPage } : {})
+    });
+  }
+
+  test('llmCallLogStore absent (default null): the page still renders, degrading the estimate rather than throwing', async () => {
+    const router = makeObservationRouter();
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
+    const { req, res } = makeReqRes({
+      session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a', name: 'Alpha' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.match(res.sentBody, /window\.__OBSERVATION_DATA__/);
+    const data = JSON.parse(res.sentBody.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/)[1]);
+    assert.ok('scanCostEstimate' in data, 'scanCostEstimate key is present in the embedded data');
+    assert.strictEqual(data.scanCostEstimate, null, 'an unwired store degrades to null (renders as "unknown"), never a fabricated number');
+  });
+
+  test('llmCallLogStore.summarizeByFeature rejects: the page still renders with unknown:true, never $0.00', async () => {
+    const llmCallLogStore = { async summarizeByFeature() { throw new Error('boom'); } };
+    const router = makeObservationRouter({ llmCallLogStore });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
+    const { req, res } = makeReqRes({
+      session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a', name: 'Alpha' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const data = JSON.parse(res.sentBody.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/)[1]);
+    assert.ok('scanCostEstimate' in data, 'scanCostEstimate key is present in the embedded data');
+    assert.strictEqual(data.scanCostEstimate, null, 'the retained .catch(() => null) degrades a rejected read to null, rendered client-side as "unknown"');
+  });
+
+  test('llmCallLogStore.summarizeByFeature resolves: the estimate is threaded through unmodified', async () => {
+    const estimate = { calls: 4, pricedCalls: 4, meanUsd: 0.05, unknown: false };
+    const llmCallLogStore = { async summarizeByFeature() { return estimate; } };
+    const router = makeObservationRouter({ llmCallLogStore });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
+    const { req, res } = makeReqRes({
+      session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a', name: 'Alpha' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const data = JSON.parse(res.sentBody.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/)[1]);
+    assert.deepEqual(data.scanCostEstimate, estimate);
+  });
+
+  test('a throwing renderObservationPage (stubbed) yields a 500 rather than a hung request (F1)', async () => {
+    // Express ^4.18.2 never awaits a route handler's promise, so without a
+    // handler-level try/catch this would surface only as an unhandled
+    // rejection — the process survives but no response is ever sent. The
+    // request would hang forever rather than 500ing, which this test cannot
+    // observe directly (there is no timeout to assert against); asserting the
+    // 500 IS the proof the try/catch actually wraps the render call.
+    const router = makeObservationRouter({
+      renderObservationPage: () => { throw new Error('render exploded'); }
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation');
+    const { req, res } = makeReqRes({
+      session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a', name: 'Alpha' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 500);
+    assert.match(res.sentBody, /Failed to render the Observation page/);
+  });
+});
