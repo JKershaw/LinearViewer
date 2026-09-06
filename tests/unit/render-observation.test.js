@@ -71,3 +71,47 @@ describe('render-observation: rulings-tab limits disclaimer (LIN-2241 criterion 
     assert.match(html(), /Principle&nbsp;0 gate/);
   });
 });
+
+describe('render-observation: scan-due tab (LIN-2649 S4 / LIN-2667)', () => {
+  const html = () => renderObservationPage(
+    { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+    { urlKey: 'ws-a' }
+  );
+
+  test('a fourth tab, Scan-due, renders alongside Autopilot/Sessions/Rulings', () => {
+    const out = html();
+    assert.match(out, /data-view="due"[^>]*>Scan-due</);
+    const tabCount = (out.match(/class="obs-tab( is-active)?"/g) || []).length;
+    assert.strictEqual(tabCount, 4);
+  });
+
+  test('the due section states its own backstop-not-guarantee disclaimer, distinct from the rulings one', () => {
+    const out = html();
+    const sectionAt = out.indexOf('id="obs-due-section"');
+    const limitsAt = out.indexOf('id="obs-due-limits"');
+    assert.ok(sectionAt > -1 && limitsAt > sectionAt, 'the disclaimer is inside the due section');
+    assert.match(out, /provider-content fingerprint comparison/);
+    assert.match(out, /not an LLM judgement/);
+    assert.match(out, /backstop, not a guarantee/);
+  });
+
+  test('the due section never shares markup with #obs-session-views', () => {
+    const out = html();
+    const sessionViewsAt = out.indexOf('id="obs-session-views"');
+    const sessionViewsCloseAt = out.indexOf('</div>', sessionViewsAt);
+    const dueSectionAt = out.indexOf('id="obs-due-section"');
+    assert.ok(dueSectionAt > sessionViewsCloseAt, 'the due section sits outside #obs-session-views entirely');
+  });
+
+  test('states the provider-read-vs-LLM-scan cost distinction', () => {
+    assert.match(html(), /reads live task content but never calls a model/i);
+  });
+
+  test('carries the pagination/readout hooks: feed list, empty state, load-more, progress readout', () => {
+    const out = html();
+    assert.match(out, /id="obs-due-list"/);
+    assert.match(out, /id="obs-due-empty"/);
+    assert.match(out, /id="obs-due-more"[^>]*hidden/);
+    assert.match(out, /id="obs-due-progress"/);
+  });
+});

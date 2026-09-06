@@ -1126,3 +1126,60 @@ a.obs-task-ident:hover { text-decoration: underline; }
   0% { background: var(--inset); }
   100% { background: var(--raised); }
 }
+
+/* Scan-due tab (LIN-2649 S4 / LIN-2667). The backstop disclaimer + day-one
+   copy mirror .obs-rulings-limits' idiom (own wording, own mechanism). */
+.obs-due-limits, .obs-due-dayone {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0 0 0.6rem;
+  max-width: 62ch;
+}
+.obs-due-dayone[hidden] { display: none; }
+.obs-due-cost-note {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin: 0 0 0.8rem;
+}
+.obs-due-progress {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+.obs-due-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 0.85rem;
+}
+.obs-due-issue { font-family: var(--font-structural); color: var(--text); }
+/* The provider-read badge is deliberately distinct from a scan button's own
+   affordance — the two costs (a due-check's provider read vs. a scan's LLM
+   call) must stay visually and mechanically separate. */
+.obs-due-badge {
+  font-family: var(--font-structural);
+  font-size: 0.7rem;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.05rem 0.4rem;
+}
+.obs-due-status { color: var(--muted); }
+.obs-due-row.obs-due-yes .obs-due-status { color: var(--amber); }
+.obs-due-row.obs-due-error .obs-due-status { color: var(--danger, #c0392b); }
+.obs-due-retry {
+  margin-left: auto;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.obs-due-retry:hover { color: var(--text); border-color: var(--border-strong); }

@@ -106,12 +106,12 @@ async function clearRunsFor(page, urlKey) {
 }
 
 test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
-  test('a third tab renders alongside Autopilot/Sessions', async ({ page }) => {
+  test('a third tab renders alongside Autopilot/Sessions/Scan-due', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
     const tabs = page.locator('#obs-tabs .obs-tab');
-    await expect(tabs).toHaveCount(3);
+    await expect(tabs).toHaveCount(4);
     await expect(page.locator('.obs-tab[data-view="rulings"]')).toBeVisible();
     await expect(page.locator('.obs-tab[data-view="rulings"]')).not.toHaveClass(/is-active/);
   });

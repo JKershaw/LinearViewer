@@ -120,6 +120,16 @@ let archiveOffset = ARCHIVE_PAGE_SIZE;      // next offset to request via load-m
 let archiveLoading = false;
 const loadedArchiveIds = new Set();         // sessionIds pulled in via load-more
 
+// Scan-due tab state (LIN-2649 S4 / LIN-2667). On-demand only — the fetch
+// that fills these is NEVER driven by pollCurrentView's timer/visibility
+// dispatch (see the [F-1] early return in pollCurrentView below); it is
+// driven directly by switchView's `due` branch and the "load more" click
+// handler, both calling the same loadInitialDueCheckPage/loadMoreDueChecks.
+let dueNextCursor = null;       // opaque cursor string the route emits verbatim; null = no more pages
+let dueLoading = false;
+let dueCheckedCount = 0;        // cumulative rows rendered across every loaded page
+let dueTotalCandidateCount = 0; // the route's own totalCandidateCount field
+
 // Live data + view state preserved across polls.
 const sessionIndex = new Map();            // sessionId → session payload
 const activeCards = new Map();             // sessionId → <li>
@@ -1449,7 +1459,19 @@ function startPolling() {
 // Dispatch to the right poll for the active tab (LIN-1728: the rulings tab reads
 // a different endpoint entirely, not /sessions with a `?view=` discriminator —
 // a ruling row is not a session).
+//
+// [F-1] LIN-2649 S4/LIN-2667: the due tab is an EARLY RETURN here, not a branch
+// that dispatches to a due-fetching function. pollCurrentView has THREE call
+// sites — the self-scheduling tick loop's setTimeout, the visibilitychange
+// handler, and switchView's trailing call — all of which are timers/recurring
+// triggers except the last. Naming a due-fetch function "one-shot" would not
+// make it one-shot if pollCurrentView called it: it would still run on every
+// tick and every tab-focus change, silently turning on-demand due-checking
+// into ambient polling load. The one-shot load is instead driven directly
+// from switchView's own `due` branch (below) and the load-more handler —
+// never from here.
 function pollCurrentView() {
+  if (currentView === 'due') return;
   return currentView === 'rulings' ? pollRulings() : pollSessions();
 }
 
@@ -2162,16 +2184,165 @@ function deliverRulingReply(row, prompt, li) {
   }
 }
 
+// ─── Scan-due (LIN-2649 S4 / LIN-2667) ──────────────────────────────────────
+//
+// A due-check row is a provider-content fingerprint comparison, never an LLM
+// judgement — the tab reads GET /workspace/:urlKey/api/scan-due (LIN-2666),
+// paginated via an opaque `nextCursor` string the route emits and accepts
+// VERBATIM (LIN-2667's N-A discharge: emitted and accepted are the identical
+// value, so this client never inspects or re-encodes it).
+
+function dueUrl(urlKey, cursor) {
+  const qs = cursor ? `?cursor=${cursor}` : '';
+  return `/workspace/${encodeURIComponent(urlKey)}/api/scan-due${qs}`;
+}
+
+// Tri-state copy (design §3/§6/§8). Branches on `typeof dueStatus === 'boolean'`
+// BEFORE treating a value as due/not-due — the same guard requestBasisCheck's
+// `basisChanged` handling above already uses — so a plain `null` can only ever
+// reach the single "unknown" branch, never "not due". `error` is an orthogonal
+// flag: a `null` raised by a provider-read failure gets the retry copy, NEVER
+// the scan-baseline copy — scanning spends an LLM call and cannot fix a
+// transient read failure, so conflating the two would tell the operator
+// something false.
+function dueStatusCopy(item) {
+  if (item && item.error) {
+    return { cls: 'obs-due-error', text: "couldn't check this task right now — the provider read failed." };
+  }
+  if (typeof item?.dueStatus === 'boolean') {
+    return item.dueStatus
+      ? { cls: 'obs-due-yes', text: 'due — scanned content has changed' }
+      : { cls: 'obs-due-no', text: 'not due — no change since last scan' };
+  }
+  return { cls: 'obs-due-unknown', text: 'basis not comparable yet — scan to establish a current baseline' };
+}
+
+// Pure string renderer (like renderActivityLog/renderArtifacts above) so the
+// tri-state branches are unit-testable without a DOM. The "checked · provider
+// read" badge is deliberately distinct from a scan button's own affordance —
+// the two costs (a due-check's provider read vs. a scan's LLM call) must stay
+// visually and mechanically separate.
+function renderDueRowHtml(item) {
+  const idLabel = item.issueIdentifier || item.issueId;
+  const status = dueStatusCopy(item);
+  const retryBtn = item && item.error
+    ? `<button type="button" class="obs-due-retry" data-issue-id="${escapeHtml(String(item.issueId))}">Retry</button>`
+    : '';
+  return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}">`
+    + `<span class="obs-due-issue">${escapeHtml(String(idLabel))}</span>`
+    + `<span class="obs-due-badge">checked &middot; provider read</span>`
+    + `<span class="obs-due-status">${escapeHtml(status.text)}</span>`
+    + retryBtn
+    + `</li>`;
+}
+
+function updateDueProgress() {
+  const el = document.getElementById('obs-due-progress');
+  if (!el) return;
+  el.textContent = dueTotalCandidateCount > 0 ? `checked ${dueCheckedCount} of ${dueTotalCandidateCount}` : '';
+}
+
+// Day-one copy (design, non-negotiable wording — see lib/render-observation.js).
+// NOT a transient banner that clears itself: it is the actual, correct state
+// of the whole pre-WS2 population, so it renders whenever the just-loaded
+// first page's candidates are ALL `dueStatus: null` (never re-evaluated
+// against a later "load more" page — the first page is the honest population
+// sample).
+function updateDueDayOneNotice(items) {
+  const el = document.getElementById('obs-due-dayone');
+  if (!el) return;
+  el.hidden = !(items.length > 0 && items.every(i => i.dueStatus === null));
+}
+
+// `pageCandidateCount` is read directly off the route's own field (LIN-2666's
+// `pageCandidateCount: page.items.length`), rather than re-derived from
+// `items.length` here, so the readout is traceably "fed directly from the
+// route's response fields" per design §6/§8 — not a client recomputation
+// that happens to agree with it today.
+function paintDuePage(items, pageCandidateCount, { append } = {}) {
+  const list = document.getElementById('obs-due-list');
+  const empty = document.getElementById('obs-due-empty');
+  if (!list) return;
+  const html = items.map(renderDueRowHtml).join('');
+  if (append) list.insertAdjacentHTML('beforeend', html);
+  else list.innerHTML = html;
+  dueCheckedCount += Number.isFinite(pageCandidateCount) ? pageCandidateCount : items.length;
+  updateDueProgress();
+  if (empty) empty.hidden = dueCheckedCount > 0;
+}
+
+function updateDueMoreButton() {
+  const more = document.getElementById('obs-due-more');
+  if (!more) return;
+  more.hidden = !dueNextCursor;
+}
+
+// The ONE-SHOT initial load, called ONLY from switchView's `due` branch below
+// — never from setTimeout/setInterval/pollCurrentView (see [F-1] there). Also
+// what the client-side chip-driven "reload" affordance (a per-row retry
+// falls back to this — see renderDueRowHtml's retry button) re-runs.
+async function loadInitialDueCheckPage() {
+  const urlKey = observationData?.urlKey;
+  if (!urlKey || dueLoading) return;
+  dueLoading = true;
+  dueCheckedCount = 0;
+  dueTotalCandidateCount = 0;
+  dueNextCursor = null;
+  setPollStatus('loading…');
+  try {
+    const res = await fetch(dueUrl(urlKey));
+    if (res.status === 401) { window.location.href = '/logout'; return; }
+    if (!res.ok) { setPollStatus('● disconnected'); return; }
+    const data = await res.json();
+    const items = Array.isArray(data.items) ? data.items : [];
+    dueTotalCandidateCount = Number.isFinite(data.totalCandidateCount) ? data.totalCandidateCount : 0;
+    dueNextCursor = data.nextCursor || null;
+    paintDuePage(items, data.pageCandidateCount, { append: false });
+    updateDueDayOneNotice(items);
+    updateDueMoreButton();
+    setPollStatus('● live');
+  } catch (e) {
+    setPollStatus('● disconnected');
+    console.warn('Scan-due load failed:', e);
+  } finally {
+    dueLoading = false;
+  }
+}
+
+// Subsequent pages, driven by the "load more" click handler only. Replays
+// `dueNextCursor` VERBATIM as `?cursor=` (LIN-2667 N-A) — no encode/decode
+// step on this side of the wire at all.
+async function loadMoreDueChecks() {
+  const urlKey = observationData?.urlKey;
+  if (!urlKey || dueLoading || !dueNextCursor) return;
+  dueLoading = true;
+  updateDueMoreButton();
+  try {
+    const res = await fetch(dueUrl(urlKey, dueNextCursor));
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = Array.isArray(data.items) ? data.items : [];
+    dueNextCursor = data.nextCursor || null;
+    paintDuePage(items, data.pageCandidateCount, { append: true });
+    updateDueMoreButton();
+  } catch (e) {
+    console.warn('Scan-due load-more failed:', e);
+  } finally {
+    dueLoading = false;
+    updateDueMoreButton();
+  }
+}
+
 // ─── Controls ──────────────────────────────────────────────────────────────────
 
-// Switch the active Observation tab (LIN-1194, extended LIN-1728). The three
-// views carry different data sets entirely (Autopilot excludes standalone;
-// Sessions includes standalone but is running-only; Rulings is unanswered
-// decisions, not sessions at all), so the feed state is reset before
-// re-polling to keep them from bleeding together, and the collapsed cards are
-// torn down so a fresh poll rebuilds them for the new view.
+// Switch the active Observation tab (LIN-1194, extended LIN-1728/LIN-2667).
+// The four views carry different data sets entirely (Autopilot excludes
+// standalone; Sessions includes standalone but is running-only; Rulings is
+// unanswered decisions; Scan-due is due-check rows), so the feed state is
+// reset before re-polling to keep them from bleeding together, and the
+// collapsed cards are torn down so a fresh poll rebuilds them for the new view.
 function switchView(view) {
-  if (view !== 'sessions' && view !== 'autopilot' && view !== 'rulings') return;
+  if (view !== 'sessions' && view !== 'autopilot' && view !== 'rulings' && view !== 'due') return;
   if (view === currentView) return;
   currentView = view;
 
@@ -2185,13 +2356,15 @@ function switchView(view) {
     }
   }
 
-  // The rulings tab hosts an entirely different container (#obs-rulings-section)
+  // The rulings/due tabs each host their own container, entirely separate
   // from the session views' shared Filter/Active/Archive shell
   // (#obs-session-views) — toggle which one is visible.
   const sessionViews = document.getElementById('obs-session-views');
   const rulingsSection = document.getElementById('obs-rulings-section');
-  if (sessionViews) sessionViews.hidden = view === 'rulings';
+  const dueSection = document.getElementById('obs-due-section');
+  if (sessionViews) sessionViews.hidden = view === 'rulings' || view === 'due';
   if (rulingsSection) rulingsSection.hidden = view !== 'rulings';
+  if (dueSection) dueSection.hidden = view !== 'due';
 
   // Tear down the feed state — the other view's sessions must not linger.
   for (const el of activeCards.values()) el.remove();
@@ -2207,6 +2380,14 @@ function switchView(view) {
   renderFeeds();
 
   setPollStatus('loading…');
+  // [C-2] pollCurrentView() no-ops for `due` (the [F-1] early return above),
+  // so the pill set to 'loading…' on the line above would otherwise strand
+  // there for as long as the tab is open. loadInitialDueCheckPage drives
+  // setPollStatus itself (● live / ● disconnected) on completion, exactly
+  // like the two pollers, so calling it here — alongside the now-harmless-
+  // for-`due` pollCurrentView() call — closes that gap rather than leaving it
+  // to a later discovery.
+  if (view === 'due') loadInitialDueCheckPage();
   pollCurrentView();
 }
 
@@ -2217,6 +2398,22 @@ function initControls() {
       const tab = e.target.closest('.obs-tab');
       if (!tab || !tab.dataset.view) return;
       switchView(tab.dataset.view);
+    });
+  }
+
+  const dueMore = document.getElementById('obs-due-more');
+  if (dueMore) dueMore.addEventListener('click', loadMoreDueChecks);
+
+  // Retry affordance for an `error: true` row (LIN-2667): there is no
+  // per-row re-check endpoint, so retry re-runs the one-shot initial load —
+  // "leave it for the next load/reload", one of the two acceptable shapes
+  // the design calls out, via event delegation since rows are string-rendered.
+  const dueList = document.getElementById('obs-due-list');
+  if (dueList) {
+    dueList.addEventListener('click', (e) => {
+      const btn = e.target.closest('.obs-due-retry');
+      if (!btn) return;
+      loadInitialDueCheckPage();
     });
   }
 
@@ -2318,5 +2515,11 @@ if (typeof module !== 'undefined' && module.exports) {
     // (one attempt per row, the concurrency gate, the per-page ceiling) and the
     // strict `=== true` render are the parts most likely to regress silently.
     requestBasisCheck, applyBasisResult, basisCheckCache, basisCheckStarted, BASIS_CHECK_MAX_PER_PAGE,
+    // LIN-2649 S4 / LIN-2667: the scan-due tab seam — tri-state copy/rendering,
+    // the never-ambient dispatch (pollCurrentView, switchView), and pagination
+    // (loadInitialDueCheckPage/loadMoreDueChecks, dueUrl) are all unit-testable
+    // without a DOM via this export.
+    dueStatusCopy, renderDueRowHtml, dueUrl, updateDueDayOneNotice, paintDuePage,
+    pollCurrentView, switchView, loadInitialDueCheckPage, loadMoreDueChecks,
   };
 }

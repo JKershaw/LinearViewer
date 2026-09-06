@@ -168,9 +168,10 @@ describe('GET /workspace/:urlKey/api/scan-due — pagination (LIN-2666)', () => 
     assert.strictEqual(page1.status, 200);
     assert.strictEqual(page1.body.items.length, 40, 'page 1 returns exactly DUE_CHECK_PAGE_SIZE items');
     assert.ok(page1.body.nextCursor, 'page 1 must carry a non-null nextCursor — 41 candidates exist');
+    assert.strictEqual(typeof page1.body.nextCursor, 'string', 'nextCursor is emitted as the same opaque string the cursor param accepts (LIN-2667 N-A)');
     assert.strictEqual(page1.body.totalCandidateCount, 41);
 
-    const page2 = await getScanDue(app, `?cursor=${encodeCursor(page1.body.nextCursor)}`);
+    const page2 = await getScanDue(app, `?cursor=${page1.body.nextCursor}`);
     assert.strictEqual(page2.status, 200);
     assert.strictEqual(page2.body.items.length, 1, 'page 2 returns the 41st candidate');
     assert.strictEqual(page2.body.nextCursor, null, 'the last page carries a null nextCursor');
@@ -182,14 +183,14 @@ describe('GET /workspace/:urlKey/api/scan-due — pagination (LIN-2666)', () => 
     assert.deepStrictEqual([...seenIds].sort(), [...expectedIds].sort(), 'the union is exactly the seeded candidate set');
   });
 
-  test('the emitted nextCursor, fed back, genuinely resumes rather than restarting', async () => {
+  test('the emitted nextCursor, fed back verbatim, genuinely resumes rather than restarting', async () => {
     const rows = seedRows(41);
     const { provider } = makeFakeProvider();
     const { store } = makeStore(rows);
     const app = buildApp({ provider, taskDecisionsStore: store });
 
     const page1 = await getScanDue(app);
-    const page2 = await getScanDue(app, `?cursor=${encodeCursor(page1.body.nextCursor)}`);
+    const page2 = await getScanDue(app, `?cursor=${page1.body.nextCursor}`);
 
     const page1Ids = new Set(page1.body.items.map(i => i.issueId));
     const page2Ids = page2.body.items.map(i => i.issueId);
