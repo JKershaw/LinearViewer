@@ -64,8 +64,8 @@
     return window.api(scanUrl(urlKey, identifier, source), { on401: false });
   }
 
-  async function postScan(urlKey, identifier, source) {
-    return window.api(scanUrl(urlKey, identifier, source), { method: 'POST', on401: false });
+  async function postScan(urlKey, identifier, source, { signal } = {}) {
+    return window.api(scanUrl(urlKey, identifier, source), { method: 'POST', on401: false, signal });
   }
 
   async function postDismiss(urlKey, identifier, source, id) {
@@ -367,5 +367,5 @@
     wireActions(container, ctx);
   }
 
-  window.ScanSection = { init };
+  window.ScanSection = { init, postScan };
 })();
