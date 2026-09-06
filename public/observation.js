@@ -2327,21 +2327,71 @@ function repaintDueRows() {
   list.innerHTML = dueLoadedItems.map(renderDueRowHtml).join('');
 }
 
+// LIN-2706 §B.4: the exact selected count — its own figure, labelled exact,
+// never merged with the cost estimate or phrased so the two read as one
+// number.
+function dueSelectedCountText() {
+  return `${dueSelectedIds.size} selected (exact)`;
+}
+
+// LIN-2706 §B.5: a SMALL LOCAL formatter — deliberately NOT `formatCost`
+// (lib/render-settings.js:667 / public/flight-companion.js:163). Both of
+// those fold a non-number to `$0.00`, which would destroy exactly the
+// `unknown` distinction this exists to preserve: an empty 30-day window is
+// genuine absence of history, not zero spend, and must never render the
+// same as a priced row that happens to average to zero. Mirrors their own
+// precision idiom (small per-call amounts keep 4 decimals; a larger total
+// rounds to 2) without importing it — this file has no module graph to
+// lib/, the same reason every other restatement in this codebase exists.
+//
+// Renders `meanUsd × selectedCount` as the estimate. `estimate` is
+// `observationData.scanCostEstimate`, threaded verbatim from the server
+// (LIN-2706 §B.1): `{calls, pricedCalls, meanUsd, unknown}`.
+function formatDueScanCostEstimate(estimate, selectedCount) {
+  if (!estimate || estimate.unknown || typeof estimate.meanUsd !== 'number' || !Number.isFinite(estimate.meanUsd)) {
+    return 'unknown';
+  }
+  const total = estimate.meanUsd * selectedCount;
+  return `$${total.toFixed(total > 0 && total < 1 ? 4 : 2)}`;
+}
+
+// LIN-2706 §B.8: over-ceiling refusal. CONSUMES checkBulkScanSelection /
+// BULK_SCAN_MAX_PER_RUN (Phase 2, above) rather than mirroring the ceiling
+// or reimplementing the check — the message itself already interpolates
+// the constant. Returns `null` when the selection is within the ceiling
+// (the message clears on the next selection change simply because this is
+// recomputed fresh, from the CURRENT dueSelectedIds, on every call).
+function dueBulkScanRefusalMessage() {
+  const check = checkBulkScanSelection([...dueSelectedIds]);
+  return check.refused ? check.message : null;
+}
+
 // Re-syncs the select-all-loaded checkbox's tri-state (none/some/all of the
-// currently loaded rows selected) and the bulk bar's visibility (LIN-2706
-// §B.3). Called after every repaint and every selection change so the two
-// can never desync. `indeterminate` is a DOM property, not an HTML
-// attribute, so this must run as script after paint rather than being baked
-// into renderDueRowHtml's string output.
+// currently loaded rows selected), the exact count, the cost estimate, the
+// over-ceiling refusal, and the bulk bar's visibility (LIN-2706 §B.3-§B.5,
+// §B.8). Called after every repaint and every selection change so none of
+// these can desync from dueSelectedIds. `indeterminate` is a DOM property,
+// not an HTML attribute, so this must run as script after paint rather than
+// being baked into renderDueRowHtml's string output.
 function syncDueBulkBar() {
   const bar = document.getElementById('obs-due-bulk-bar');
   const selectAll = document.getElementById('obs-due-select-all');
+  const countEl = document.getElementById('obs-due-selected-count');
+  const estimateEl = document.getElementById('obs-due-selected-cost');
+  const refusalEl = document.getElementById('obs-due-bulk-refusal');
   const total = dueLoadedItems.length;
-  const selectedCount = dueLoadedItems.filter(i => dueSelectedIds.has(String(i.issueId))).length;
+  const selectedCount = dueSelectedIds.size;
   if (bar) bar.hidden = total === 0;
   if (selectAll) {
     selectAll.checked = total > 0 && selectedCount === total;
     selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+  }
+  if (countEl) countEl.textContent = dueSelectedCountText();
+  if (estimateEl) estimateEl.textContent = formatDueScanCostEstimate(observationData?.scanCostEstimate, selectedCount);
+  if (refusalEl) {
+    const message = dueBulkScanRefusalMessage();
+    refusalEl.hidden = !message;
+    refusalEl.textContent = message || '';
   }
 }
 
@@ -2849,6 +2899,11 @@ if (typeof module !== 'undefined' && module.exports) {
     // startBulkScan/stopBulkScan below, so the delegated-listener bodies are
     // directly callable without simulating a DOM click event.
     dueSelectedIds, toggleDueSelection, setAllDueSelected, syncDueBulkBar, repaintDueRows,
+    // LIN-2706 §B.4/§B.5/§B.8: exact count, honest cost estimate, and the
+    // over-ceiling refusal — each a standalone pure(ish) function so its
+    // states (unknown vs $0.00, refused vs within-ceiling) are directly
+    // unit-testable without a DOM.
+    dueSelectedCountText, formatDueScanCostEstimate, dueBulkScanRefusalMessage,
     // LIN-2700 / LIN-2651 Phase 2: the bulk-scan pool seam — the concurrency/
     // ceiling constants, the run entry point + stop, and the two pure helpers
     // (selection refusal, error classification) are the parts a regression

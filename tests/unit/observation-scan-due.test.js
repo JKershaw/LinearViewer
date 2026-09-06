@@ -41,7 +41,7 @@ class FakeElement {
   remove() {}
 }
 
-function makeSandbox({ fetchImpl } = {}) {
+function makeSandbox({ fetchImpl, scanCostEstimate } = {}) {
   const nodes = new Map();
   const register = (id) => { const el = new FakeElement(id); nodes.set(id, el); return el; };
   register('obs-due-list');
@@ -51,6 +51,9 @@ function makeSandbox({ fetchImpl } = {}) {
   register('obs-due-dayone');
   register('obs-due-bulk-bar');
   register('obs-due-select-all');
+  register('obs-due-selected-count');
+  register('obs-due-selected-cost');
+  register('obs-due-bulk-refusal');
   register('obs-due-section');
   register('obs-session-views');
   register('obs-rulings-section');
@@ -80,7 +83,7 @@ function makeSandbox({ fetchImpl } = {}) {
   vm.createContext(sandbox);
   vm.runInContext(SRC, sandbox, { filename: 'observation.js' });
   sandbox.__nodes = nodes;
-  vm.runInContext('observationData = { urlKey: "acme" };', sandbox);
+  vm.runInContext(`observationData = { urlKey: "acme", scanCostEstimate: ${JSON.stringify(scanCostEstimate ?? null)} };`, sandbox);
   return sandbox;
 }
 
@@ -499,5 +502,156 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     toggleDueSelection('a', false);
     assert.equal(selectAll.checked, false);
     assert.equal(selectAll.indeterminate, true, 'dropping back to "some" must clear the all-checked state');
+  });
+});
+
+// ─── Exact count, honest cost estimate, over-ceiling refusal (LIN-2706 §B.4/§B.5/§B.8) ───
+//
+// Still no spend path and no scan-triggering control anywhere in this file's
+// exports — no "Scan selected" button, no Stop button, nothing that calls
+// startBulkScan. These are pre-run-only surfaces.
+
+test.describe('dueSelectedCountText — exact count (LIN-2706 §B.4)', () => {
+  test('renders the exact selected count, never merged with the cost figure', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, toggleDueSelection, dueSelectedCountText } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
+    assert.match(dueSelectedCountText(), /^0 selected/);
+    assert.doesNotMatch(dueSelectedCountText(), /\$/, 'the count text must never carry a dollar figure');
+
+    toggleDueSelection('a', true);
+    assert.match(dueSelectedCountText(), /^1 selected/);
+    toggleDueSelection('b', true);
+    assert.match(dueSelectedCountText(), /^2 selected/);
+  });
+
+  test('the rendered #obs-due-selected-count hook tracks selection via syncDueBulkBar', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], 1, { append: false });
+    const countEl = sandbox.__nodes.get('obs-due-selected-count');
+    assert.match(countEl.textContent, /^0 selected/);
+    toggleDueSelection('a', true);
+    assert.match(countEl.textContent, /^1 selected/);
+  });
+});
+
+test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it (LIN-2706 §B.5)', () => {
+  test('unknown:true renders the literal word "unknown"', () => {
+    const sandbox = makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.module.exports;
+    assert.equal(formatDueScanCostEstimate({ calls: 0, pricedCalls: 0, meanUsd: null, unknown: true }, 5), 'unknown');
+  });
+
+  test('a null/absent estimate renders "unknown"', () => {
+    const sandbox = makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.module.exports;
+    assert.equal(formatDueScanCostEstimate(null, 5), 'unknown');
+    assert.equal(formatDueScanCostEstimate(undefined, 5), 'unknown');
+  });
+
+  test('a priced row averaging exactly zero renders $0.00, unknown:false — distinct from the unknown state', () => {
+    const sandbox = makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.module.exports;
+    assert.equal(formatDueScanCostEstimate({ calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }, 5), '$0.00');
+  });
+
+  test('a normal priced mean renders meanUsd × selectedCount', () => {
+    const sandbox = makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.module.exports;
+    // Sub-$1 totals keep 4 decimals, mirroring formatCost's own precision idiom
+    // (0.02 * 5 = 0.10, still < 1).
+    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.02, unknown: false }, 5), '$0.1000');
+    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.001, unknown: false }, 1), '$0.0010');
+    // A total >= 1 rounds to 2 decimals instead.
+    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.5, unknown: false }, 5), '$2.50');
+  });
+
+  test('regression: no input path yields $0.00 for an unknown estimate', () => {
+    const sandbox = makeSandbox();
+    const { formatDueScanCostEstimate } = sandbox.module.exports;
+    const unknownInputs = [
+      { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true },
+      null,
+      undefined,
+      { unknown: true, meanUsd: 0 } // unknown must win even when meanUsd is present/zero
+    ];
+    for (const estimate of unknownInputs) {
+      for (const count of [0, 1, 5, 40]) {
+        assert.notEqual(formatDueScanCostEstimate(estimate, count), '$0.00', `estimate=${JSON.stringify(estimate)} count=${count} must never render $0.00`);
+      }
+    }
+  });
+
+  test('the rendered #obs-due-selected-cost hook reflects the wired scanCostEstimate via syncDueBulkBar', () => {
+    const sandbox = makeSandbox({ scanCostEstimate: { calls: 4, pricedCalls: 4, meanUsd: 0.02, unknown: false } });
+    const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
+    const estimateEl = sandbox.__nodes.get('obs-due-selected-cost');
+    assert.equal(estimateEl.textContent, '$0.00', 'zero selected: meanUsd × 0');
+    toggleDueSelection('a', true);
+    toggleDueSelection('b', true);
+    assert.equal(estimateEl.textContent, '$0.0400');
+  });
+
+  test('the rendered hook renders "unknown" (never $0.00) when the wired estimate is unknown', () => {
+    const sandbox = makeSandbox({ scanCostEstimate: { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true } });
+    const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], 1, { append: false });
+    toggleDueSelection('a', true);
+    assert.equal(sandbox.__nodes.get('obs-due-selected-cost').textContent, 'unknown');
+  });
+});
+
+test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)', () => {
+  test('selecting past BULK_SCAN_MAX_PER_RUN shows the refusal, interpolating the REAL constant', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, setAllDueSelected, BULK_SCAN_MAX_PER_RUN, dueBulkScanRefusalMessage } = sandbox.module.exports;
+    const items = Array.from({ length: BULK_SCAN_MAX_PER_RUN + 5 }, (_, i) => ({ issueId: `i${i}`, issueIdentifier: `LIN-${i}`, dueStatus: null }));
+    paintDuePage(items, items.length, { append: false });
+    setAllDueSelected(true);
+
+    const message = dueBulkScanRefusalMessage();
+    assert.ok(message, 'an over-ceiling selection must produce a refusal message');
+    assert.match(message, new RegExp(String(BULK_SCAN_MAX_PER_RUN)), 'the message must interpolate the REAL constant, never a hard-coded 40');
+
+    const refusalEl = sandbox.__nodes.get('obs-due-bulk-refusal');
+    assert.equal(refusalEl.hidden, false);
+    assert.equal(refusalEl.textContent, message);
+  });
+
+  test('a refusal enqueues nothing and leaves the selection COMPLETELY intact — no truncation', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, setAllDueSelected, dueSelectedIds, BULK_SCAN_MAX_PER_RUN } = sandbox.module.exports;
+    const items = Array.from({ length: BULK_SCAN_MAX_PER_RUN + 5 }, (_, i) => ({ issueId: `i${i}`, issueIdentifier: `LIN-${i}`, dueStatus: null }));
+    paintDuePage(items, items.length, { append: false });
+    setAllDueSelected(true);
+
+    assert.equal(dueSelectedIds.size, BULK_SCAN_MAX_PER_RUN + 5, 'the selection must be left completely intact, never capped/trimmed down to the ceiling');
+    // Nothing is enqueued: startBulkScan is never called from this pre-run
+    // surface at all (Session 2, LIN-2707, owns the run control) — there is
+    // no call path here to assert a count against. That absence is a
+    // structural property of this beat's diff (grep for startBulkScan finds
+    // no new call site), not a runtime behaviour this test can probe.
+  });
+
+  test('the refusal clears on the next selection change once back within the ceiling', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, setAllDueSelected, toggleDueSelection, dueBulkScanRefusalMessage, BULK_SCAN_MAX_PER_RUN } = sandbox.module.exports;
+    const items = Array.from({ length: BULK_SCAN_MAX_PER_RUN + 1 }, (_, i) => ({ issueId: `i${i}`, issueIdentifier: `LIN-${i}`, dueStatus: null }));
+    paintDuePage(items, items.length, { append: false });
+    setAllDueSelected(true);
+    assert.ok(dueBulkScanRefusalMessage(), 'sanity: over the ceiling by 1');
+
+    toggleDueSelection('i0', false);
+    assert.equal(dueBulkScanRefusalMessage(), null, 'dropping back to exactly the ceiling must clear the refusal');
+  });
+
+  test('a within-ceiling selection never shows a refusal', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, setAllDueSelected, dueBulkScanRefusalMessage } = sandbox.module.exports;
+    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
+    setAllDueSelected(true);
+    assert.equal(dueBulkScanRefusalMessage(), null);
   });
 });
