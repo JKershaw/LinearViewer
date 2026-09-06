@@ -315,6 +315,14 @@ test.describe('loadInitialDueCheckPage / loadMoreDueChecks — pagination', () =
     assert.equal(mixed.__nodes.get('obs-due-dayone').hidden, true);
   });
 
+  test('day-one notice stays hidden when the first page is entirely provider-read errors', async () => {
+    const allError = makeSandbox({
+      fetchImpl: async () => jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: null, error: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: null, error: true }], nextCursor: null, pageCandidateCount: 2, totalCandidateCount: 2 })
+    });
+    await allError.module.exports.loadInitialDueCheckPage();
+    assert.equal(allError.__nodes.get('obs-due-dayone').hidden, true, 'an all-error page must not get scan-baseline day-one copy');
+  });
+
   test('loadInitialDueCheckPage guards re-entrancy: a second call while one is in flight is a no-op', async () => {
     let calls = 0;
     let resolveFirst;

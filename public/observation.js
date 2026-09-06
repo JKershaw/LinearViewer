@@ -2247,11 +2247,15 @@ function updateDueProgress() {
 // of the whole pre-WS2 population, so it renders whenever the just-loaded
 // first page's candidates are ALL `dueStatus: null` (never re-evaluated
 // against a later "load more" page — the first page is the honest population
-// sample).
+// sample). An `error: true` row also carries `dueStatus: null`, but that is a
+// provider-read failure, not an unestablished baseline — scanning spends an
+// LLM call and cannot fix a transient read failure, so an errored row must
+// never count toward "day one" (same rationale as dueStatusCopy's own
+// error-first branch above).
 function updateDueDayOneNotice(items) {
   const el = document.getElementById('obs-due-dayone');
   if (!el) return;
-  el.hidden = !(items.length > 0 && items.every(i => i.dueStatus === null));
+  el.hidden = !(items.length > 0 && items.every(i => i.dueStatus === null && !i.error));
 }
 
 // `pageCandidateCount` is read directly off the route's own field (LIN-2666's
