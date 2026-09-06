@@ -132,7 +132,7 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     await expect(page.locator('#obs-due-selected-count')).toHaveText('0 selected (exact)');
   });
 
-  test('an over-ceiling selection refuses and leaves every row checked, with no scan-triggering control anywhere', async ({ page }) => {
+  test('an over-ceiling selection refuses and leaves every row checked, and clicking Scan anyway never issues a single scan call', async ({ page }) => {
     const items = Array.from({ length: 45 }, (_, i) => ({
       issueId: `issue-${i}`,
       issueIdentifier: `LIN-${i}`,
@@ -162,9 +162,27 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     const checkedCount = await page.locator('#obs-due-list .obs-due-select:checked').count();
     expect(checkedCount, 'a refusal must never truncate the selection').toBe(45);
 
-    // No path to a billed call anywhere on this tab, in any state.
-    await expect(page.locator('#obs-due-section button:has-text("Scan")')).toHaveCount(0);
-    await expect(page.locator('#obs-due-section button:has-text("Stop")')).toHaveCount(0);
+    // LIN-2701 §B.7 adds the "Scan selected (N)"/Stop controls this session
+    // — the safety property is no longer "no control exists" (this test's
+    // original assertion, from before those controls existed) but "clicking
+    // it while over-ceiling never issues a single billed call": the pool's
+    // own function-level refusal (startBulkScan, checkBulkScanSelection) is
+    // what's authoritative here, never button absence. The button itself is
+    // NOT ceiling-gated (enablement is only selection-non-empty AND no-live-
+    // run — the ceiling is surfaced via the refusal message above, never
+    // mirrored into UI enablement), so it is clickable, and a click must
+    // still refuse before touching the network.
+    let scanCalls = 0;
+    await page.route(`**/workspace/${URL_KEY}/api/scan/*`, (route) => {
+      scanCalls++;
+      route.fulfill({ json: {} });
+    });
+    const scanBtn = page.locator('#obs-due-scan-selected');
+    await expect(scanBtn).toBeEnabled();
+    await scanBtn.click();
+    await expect(refusal).toContainText('scan 40 at a time');
+    expect(scanCalls, 'an over-ceiling click must never issue a single scan call').toBe(0);
+    await expect(page.locator('#obs-due-stop')).toBeHidden();
   });
 
   // The fourth element the finding-3 styling fix covers, and the one the
@@ -203,8 +221,9 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
       await page.locator('#obs-due-bulk-disclaimer').innerText()
     );
 
-    // Still no spend path on the free-tier branch either.
-    await expect(page.locator('#obs-due-section button:has-text("Scan")')).toHaveCount(0);
+    // LIN-2701 §B.7: the control now exists on both tiers — it is not
+    // itself free-tier-gated; only the quota disclosure above is.
+    await expect(page.locator('#obs-due-scan-selected')).toBeVisible();
   });
 
   // Review N3 (LIN-2706 PR #1424): the per-row checkbox's accessible name,

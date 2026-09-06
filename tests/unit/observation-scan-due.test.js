@@ -41,10 +41,62 @@ class FakeElement {
   remove() {}
 }
 
-function makeSandbox({ fetchImpl, scanCostEstimate } = {}) {
+// LIN-2701 §B.7 (beat 3): a row-level fake, real enough for
+// paintBulkScanRowResult's own DOM contract (dataset.issueId, querySelector
+// for its one result badge, appendChild to create it) — NOT a general DOM,
+// just the exact surface that function touches.
+class FakeDueRow {
+  constructor(issueId, className) {
+    this.dataset = { issueId };
+    this.className = className;
+    this._badge = null;
+  }
+  querySelector(sel) {
+    return sel === '.obs-bulk-scan-result' ? this._badge : null;
+  }
+  appendChild(el) {
+    this._badge = el;
+    return el;
+  }
+}
+
+// Parses the exact `<li class="..." data-issue-id="...">` shape
+// renderDueRowHtml emits (LIN-2706 §B.3's own comment pins this attribute
+// order/contiguity) into FakeDueRow instances — real rows, not a hand-typed
+// guess, since they come from parsing THIS module's own real render output.
+function parseDueRows(html) {
+  const rows = [];
+  const re = /<li class="([^"]*)" data-issue-id="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(html))) rows.push(new FakeDueRow(m[2], m[1]));
+  return rows;
+}
+
+// The due-list container itself: a real .children array reflecting whatever
+// was last assigned/appended, kept in sync with the plain innerHTML string
+// existing tests already assert against (backward-compatible — `_html`
+// stays the source of truth for those, `.children` is additive).
+class FakeDueListElement extends FakeElement {
+  constructor(id) {
+    super(id);
+    this._children = [];
+  }
+  set innerHTML(v) { this._html = v; this._children = parseDueRows(v); }
+  get innerHTML() { return this._html; }
+  insertAdjacentHTML(_pos, html) { this._html += html; this._children = this._children.concat(parseDueRows(html)); }
+  get children() { return this._children; }
+}
+
+// A created result-badge span: only the two fields paintBulkScanRowResult
+// ever touches (className, textContent).
+class FakeBadgeElement {
+  constructor() { this.className = ''; this.textContent = ''; }
+}
+
+function makeSandbox({ fetchImpl, scanCostEstimate, postScanImpl } = {}) {
   const nodes = new Map();
-  const register = (id) => { const el = new FakeElement(id); nodes.set(id, el); return el; };
-  register('obs-due-list');
+  const register = (id, El = FakeElement) => { const el = new El(id); nodes.set(id, el); return el; };
+  register('obs-due-list', FakeDueListElement);
   register('obs-due-empty');
   register('obs-due-more');
   register('obs-due-progress');
@@ -54,6 +106,8 @@ function makeSandbox({ fetchImpl, scanCostEstimate } = {}) {
   register('obs-due-selected-count');
   register('obs-due-selected-cost');
   register('obs-due-bulk-refusal');
+  register('obs-due-scan-selected');
+  register('obs-due-stop');
   register('obs-due-section');
   register('obs-session-views');
   register('obs-rulings-section');
@@ -66,11 +120,18 @@ function makeSandbox({ fetchImpl, scanCostEstimate } = {}) {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
       location: { href: '' },
+      // LIN-2701 §B.7: the pool reaches postScan via window.ScanSection ONLY
+      // (never window.api directly — that would be re-deriving the scan
+      // endpoint, the same "no fourth scan-URL builder" non-goal
+      // observation-bulk-scan.test.js's sandbox also guards). Existing tests
+      // in this file never start a run, so this default is never invoked.
+      ScanSection: { postScan: postScanImpl || (async () => { throw new Error('no postScan stub configured'); }) },
     },
     document: {
       addEventListener() {},
       getElementById: (id) => nodes.get(id) || null,
       querySelector: () => null,
+      createElement: () => new FakeBadgeElement(),
     },
     escapeHtml: (s) => (s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')),
     relativeTime: () => '',
@@ -78,6 +139,10 @@ function makeSandbox({ fetchImpl, scanCostEstimate } = {}) {
     fetch: fetchImpl || (async () => { throw new Error('no fetch stub configured'); }),
     setTimeout,
     clearTimeout,
+    // Required for startBulkScan's `new AbortController()` — absent from a
+    // bare vm.createContext({}) by default, same note
+    // observation-bulk-scan.test.js's own sandbox carries.
+    AbortController,
   };
   sandbox.window.window = sandbox.window;
   vm.createContext(sandbox);
@@ -704,5 +769,150 @@ test.describe('over-ceiling refusal — refuse, never truncate (LIN-2706 §B.8)'
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
     setAllDueSelected(true);
     assert.equal(dueBulkScanRefusalMessage(), null);
+  });
+});
+
+// ─── LIN-2701 §B.7 — the run controls, wired (Session 2, beat 3) ───────────
+//
+// These two witnesses need BOTH the real due-tab render (real row paint, real
+// run controls) AND a controllable/deferred postScan stub — exactly what
+// tests/unit/observation-bulk-scan.test.js's sandbox structurally cannot
+// offer (it stubs window.ScanSection and never renders real due rows), and
+// what this file already has everything else for. Building it here, not a
+// third file, keeps the DOM/fetch-free harness in one place per surface.
+
+test.describe('"Scan selected (N)" / Stop — button enablement (Witness 6, moved from §B.3 per N3)', () => {
+  test('enabled state tracks (selection non-empty) AND (no live run), across all four combinations', async () => {
+    const gates = [];
+    const postScan = async () => new Promise((_resolve, reject) => { gates.push(reject); });
+    const sandbox = makeSandbox({ postScanImpl: postScan });
+    const { paintDuePage, setAllDueSelected, toggleDueSelection, startDueBulkScan, stopBulkScan } = sandbox.module.exports;
+    const scanBtn = sandbox.__nodes.get('obs-due-scan-selected');
+    const stopBtn = sandbox.__nodes.get('obs-due-stop');
+
+    paintDuePage([
+      { issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true },
+      { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: true }
+    ], 2, { append: false });
+
+    // Cell 1: nothing selected, no run — disabled, Stop hidden.
+    assert.equal(scanBtn.disabled, true, 'empty selection + no run must disable the button');
+    assert.equal(scanBtn.textContent, 'Scan selected (0)');
+    assert.equal(stopBtn.hidden, true);
+
+    // Cell 2: selection non-empty, no run — enabled.
+    setAllDueSelected(true);
+    assert.equal(scanBtn.disabled, false, 'non-empty selection + no run must enable the button');
+    assert.equal(scanBtn.textContent, 'Scan selected (2)');
+    assert.equal(stopBtn.hidden, true);
+
+    // Cell 4: selection non-empty, run live — disabled again, Stop visible.
+    startDueBulkScan();
+    await flush();
+    assert.equal(gates.length, 2, 'both rows must actually be in flight');
+    assert.equal(scanBtn.disabled, true, 'a live run must disable the button even though the selection is still non-empty');
+    assert.equal(stopBtn.hidden, false, 'Stop must be visible while a run is live');
+
+    // Cell 3: selection cleared WHILE the run is still live — still disabled
+    // (a live run alone is sufficient; the formula is OR, not merely AND).
+    toggleDueSelection('a', false);
+    toggleDueSelection('b', false);
+    assert.equal(scanBtn.disabled, true, 'a live run must keep the button disabled even with an empty selection');
+    assert.equal(stopBtn.hidden, false);
+
+    // Tear down, then restore the selection — back to cell 2 (enabled).
+    for (const reject of gates) reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    stopBulkScan();
+    await flush();
+    assert.equal(stopBtn.hidden, true, 'Stop must hide again once the run tears down');
+    assert.equal(scanBtn.disabled, true, 'the selection is still empty (cell 1) immediately after teardown — teardown does not restore it');
+    setAllDueSelected(true);
+    assert.equal(scanBtn.disabled, false, 'reselecting after teardown must re-enable the button (cell 2)');
+  });
+});
+
+test.describe('startBulkScan — cancellation / late settlement (Witness 10, LIN-2701 §B.12 item 10 — mandatory)', () => {
+  test('a stop with rows in flight, driven through the REAL startDueBulkScan (no hand-passed callbacks): settled entries classify cancelled, repaint the row exactly once, and never flip the run control back to running — with the selection left intact', async () => {
+    const gates = [];
+    const postScan = async () => new Promise((_resolve, reject) => { gates.push(reject); });
+    let createElementCalls = 0;
+    const sandbox = makeSandbox({ postScanImpl: postScan });
+    const realCreateElement = sandbox.document.createElement;
+    sandbox.document.createElement = (...args) => { createElementCalls++; return realCreateElement(...args); };
+
+    const {
+      paintDuePage, setAllDueSelected, startDueBulkScan, stopBulkScan, paintBulkScanRowResult
+    } = sandbox.module.exports;
+
+    paintDuePage([
+      { issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true },
+      { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: true }
+    ], 2, { append: false });
+
+    const scanBtn = sandbox.__nodes.get('obs-due-scan-selected');
+    const stopBtn = sandbox.__nodes.get('obs-due-stop');
+
+    // Select both rows, then drive the run through the REAL entry point —
+    // no hand-passed onResult/onTeardown, no mirrored syncDueBulkBar call.
+    // This is the exact gap the previous version of this witness left open
+    // (flagged in review): it must exercise startDueBulkScan's OWN wiring,
+    // so a future drift in its callbacks can fail THIS test, not just a
+    // hand-rolled mirror of it.
+    setAllDueSelected(true);
+    startDueBulkScan();
+    await flush();
+    assert.equal(gates.length, 2, 'both rows must be in flight before stop');
+    assert.equal(stopBtn.hidden, false, 'Stop must be visible while the run is live');
+    assert.equal(scanBtn.disabled, true, 'a live run must disable the button even with a non-empty selection');
+
+    stopBulkScan();
+
+    // Teardown is synchronous inside stopBulkScan() — the control must
+    // already read "torn down" before any straggler has settled, exactly as
+    // startBulkScan's own doc comment describes the ordering. Non-vacuous:
+    // the selection is genuinely non-empty here (2 rows), so a real
+    // re-enable is being asserted, not a button that was disabled anyway.
+    assert.equal(stopBtn.hidden, true, 'teardown must hide Stop immediately — it does not wait for stragglers');
+    assert.equal(scanBtn.disabled, false, 'teardown must re-enable the button — the 2-row selection is still intact, never auto-cleared by teardown');
+    assert.equal(scanBtn.textContent, 'Scan selected (2)', 'teardown must leave the selection itself untouched');
+
+    // Now let the already-issued (now-aborted) calls actually settle — the
+    // late arrival: onResult fires AFTER onTeardown, by construction (stop()
+    // tears down synchronously; the already-issued runOne()s only reject a
+    // microtask later).
+    for (const reject of gates) reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+    await flush();
+
+    // (i) each aborted row classifies as cancelled — observed via the REAL
+    // classify->paint pipeline startDueBulkScan wires up internally (never a
+    // hand-passed onResult): 'cancelled' is BULK_SCAN_RESULT_COPY's text for
+    // that ONE bucket, so seeing it painted is direct evidence of the real
+    // classification, not an assumption about it.
+    const list = sandbox.__nodes.get('obs-due-list');
+    const rowA = list.children.find((r) => r.dataset.issueId === 'a');
+    const rowB = list.children.find((r) => r.dataset.issueId === 'b');
+    assert.ok(rowA && rowB, 'both rows must still be in the DOM');
+    const badgeA = rowA.querySelector('.obs-bulk-scan-result');
+    const badgeB = rowB.querySelector('.obs-bulk-scan-result');
+    assert.ok(badgeA && badgeB, 'the late onResult must still paint both rows — presentation-only, the run itself is unaffected');
+    assert.equal(badgeA.textContent, 'cancelled');
+    assert.equal(badgeB.textContent, 'cancelled');
+    assert.equal(createElementCalls, 2, 'exactly one badge element created per row (2 rows total), never per-arrival');
+
+    // (ii) re-delivering the SAME kind of settled entry to the real,
+    // directly-exported paintBulkScanRowResult paints the row exactly once,
+    // not twice — idempotent, keyed by issueId. Constructed to match exactly
+    // what the real pool hands onResult for an aborted row (LIN-2700's
+    // classifyBulkScanError: AbortError, no .status).
+    paintBulkScanRowResult({ item: { identifier: 'a' }, outcome: 'aborted', error: Object.assign(new Error('aborted'), { name: 'AbortError' }) });
+    assert.equal(createElementCalls, 2, 'repainting the SAME issueId must reuse the existing badge, never create a second one');
+    assert.equal(rowA.querySelector('.obs-bulk-scan-result'), badgeA, 'it must be the exact same badge object, not a new one appended alongside it');
+
+    // (iii) — the real teeth: these late onResults must NEVER have flipped
+    // the run control back to "running", and the selection must still read
+    // intact — non-vacuous because the selection is genuinely non-empty.
+    assert.equal(stopBtn.hidden, true, 'a late onResult must never revive the Stop control');
+    assert.equal(scanBtn.disabled, false, 'a late onResult must never re-disable the Scan-selected control');
+    assert.equal(scanBtn.textContent, 'Scan selected (2)', 'a late onResult must never touch the selection either');
   });
 });
