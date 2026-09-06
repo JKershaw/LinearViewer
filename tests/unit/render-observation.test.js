@@ -251,6 +251,37 @@ describe('render-observation: third due-tab disclaimer — bulk-scan (LIN-2706 �
     assert.ok(sectionAt < costNoteAt, 'inside the due section');
     assert.ok(costNoteAt < disclaimerAt && disclaimerAt < dueListAt, 'alongside the existing limits/cost-note block, above the feed it qualifies');
   });
+
+  test('the disclaimer points at the estimate correctly: "below", never "above" (review finding 2, PR #1424)', () => {
+    // This partial mounts BEFORE #obs-due-bulk-bar (the element that actually
+    // carries the estimate), so a live render puts the bar visually below
+    // this text -- "above" was measured backwards. A mutation flipping the
+    // wording back to "above" must turn this red.
+    const out = html('free');
+    assert.doesNotMatch(out, /estimate above/i, 'must not claim the estimate is above this text');
+    assert.match(out, /estimate below/i, 'must claim the estimate is below this text, matching the real mount order');
+  });
+
+  test('bounded copy: the disclaimer paragraph does not balloon (review finding 5, §B.5)', () => {
+    // §B.5's own rule ("copy length is bounded ... its witness must measure
+    // rendered output, not font metrics") was never landed for this partial;
+    // the review measured it as the longest paragraph on the tab (361 chars
+    // vs #obs-due-limits' 217). Pin a generous but real ceiling on the
+    // RENDERED text, both branches.
+    for (const source of [null, 'free']) {
+      const out = html(source);
+      const disclaimerAt = out.indexOf('id="obs-due-bulk-disclaimer"');
+      const disclaimerClose = out.indexOf('</p>', disclaimerAt);
+      const disclaimerText = out.slice(disclaimerAt, disclaimerClose);
+      assert.ok(disclaimerText.length < 500, `dollar-estimate disclaimer too long: ${disclaimerText.length} chars`);
+      if (source === 'free') {
+        const quotaAt = out.indexOf('id="obs-due-bulk-quota-note"');
+        const quotaClose = out.indexOf('</p>', quotaAt);
+        const quotaText = out.slice(quotaAt, quotaClose);
+        assert.ok(quotaText.length < 400, `quota note too long: ${quotaText.length} chars`);
+      }
+    }
+  });
 });
 
 describe('render-observation: the three disclaimers stay textually distinct (LIN-2706 §B.9 no-shared-partial)', () => {

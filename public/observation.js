@@ -2348,11 +2348,15 @@ function dueSelectedCountText() {
 // `observationData.scanCostEstimate`, threaded verbatim from the server
 // (LIN-2706 §B.1): `{calls, pricedCalls, meanUsd, unknown}`.
 function formatDueScanCostEstimate(estimate, selectedCount) {
+  // `est. ` prefix (review finding 4, LIN-2706 PR #1424): the exact count is
+  // explicitly labelled "(exact)"; without a label of its own a bare
+  // `$0.0600`/`unknown` sitting next to it read as one ambiguous figure
+  // rather than the textually-distinct estimate §B.5 requires.
   if (!estimate || estimate.unknown || typeof estimate.meanUsd !== 'number' || !Number.isFinite(estimate.meanUsd)) {
-    return 'unknown';
+    return 'est. unknown';
   }
   const total = estimate.meanUsd * selectedCount;
-  return `$${total.toFixed(total > 0 && total < 1 ? 4 : 2)}`;
+  return `est. $${total.toFixed(total > 0 && total < 1 ? 4 : 2)}`;
 }
 
 // LIN-2706 §B.8: over-ceiling refusal. CONSUMES checkBulkScanSelection /

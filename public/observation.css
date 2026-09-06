@@ -1196,6 +1196,14 @@ a.obs-task-ident:hover { text-decoration: underline; }
   flex-wrap: wrap;
   margin: 0 0 0.6rem;
 }
+/* [hidden] beats an author-origin `display` rule only when it is declared for
+   the exact selector carrying the attribute (the UA sheet's `[hidden] {
+   display: none }` loses to the flex rule above without this). Same idiom
+   this file already uses for .obs-archive-body/.obs-archive-more/
+   .obs-due-dayone above -- review finding 1 (LIN-2706 PR #1424): without
+   this line the bar rendered on an empty Scan-due tab despite carrying
+   `hidden`. */
+.obs-bulk-scan-bar[hidden] { display: none; }
 /* Machine-fact typographic convention (mirrors .obs-due-progress above): a
    computed dollar figure is a machine fact, not prose. */
 .obs-bulk-scan-estimate {
@@ -1203,11 +1211,36 @@ a.obs-task-ident:hover { text-decoration: underline; }
   font-size: 0.78rem;
   color: var(--muted);
 }
+/* The exact-count and refusal readouts share the same muted, small-print
+   treatment as the estimate above -- review finding 3 (LIN-2706 PR #1424):
+   left unstyled, the quota note (16px near-black) and these outshouted the
+   disclaimer they belong beside. */
+.obs-bulk-scan-count {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.obs-bulk-scan-refusal {
+  color: var(--muted);
+  font-size: 0.78rem;
+  max-width: 62ch;
+}
 /* The third due-tab disclaimer (LIN-2706 §B.9) -- same declarations as
    .obs-rulings-limits / .obs-due-limits above. Its own class: the
    no-shared-partial constraint governs markup/text reuse between the three
    disclaimers, not that unrelated classes may declare identical CSS. */
 .obs-bulk-scan-limits {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0 0 0.6rem;
+  max-width: 62ch;
+}
+/* The free-tier quota note (§B.9's conditional branch) -- same declarations
+   as .obs-bulk-scan-limits above. Its own class for the same no-shared-
+   *partial* reason .obs-bulk-scan-limits's own comment gives; review finding
+   3 flagged it as unstyled (16px/near-black/max-width:none), the single most
+   prominent block of copy on the tab. */
+.obs-bulk-scan-quota-note {
   color: var(--muted);
   font-size: 0.78rem;
   margin: 0 0 0.6rem;

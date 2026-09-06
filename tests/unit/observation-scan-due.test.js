@@ -537,23 +537,23 @@ test.describe('dueSelectedCountText — exact count (LIN-2706 §B.4)', () => {
 });
 
 test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it (LIN-2706 §B.5)', () => {
-  test('unknown:true renders the literal word "unknown"', () => {
+  test('unknown:true renders "est. unknown"', () => {
     const sandbox = makeSandbox();
     const { formatDueScanCostEstimate } = sandbox.module.exports;
-    assert.equal(formatDueScanCostEstimate({ calls: 0, pricedCalls: 0, meanUsd: null, unknown: true }, 5), 'unknown');
+    assert.equal(formatDueScanCostEstimate({ calls: 0, pricedCalls: 0, meanUsd: null, unknown: true }, 5), 'est. unknown');
   });
 
-  test('a null/absent estimate renders "unknown"', () => {
+  test('a null/absent estimate renders "est. unknown"', () => {
     const sandbox = makeSandbox();
     const { formatDueScanCostEstimate } = sandbox.module.exports;
-    assert.equal(formatDueScanCostEstimate(null, 5), 'unknown');
-    assert.equal(formatDueScanCostEstimate(undefined, 5), 'unknown');
+    assert.equal(formatDueScanCostEstimate(null, 5), 'est. unknown');
+    assert.equal(formatDueScanCostEstimate(undefined, 5), 'est. unknown');
   });
 
-  test('a priced row averaging exactly zero renders $0.00, unknown:false — distinct from the unknown state', () => {
+  test('a priced row averaging exactly zero renders est. $0.00, unknown:false — distinct from the unknown state', () => {
     const sandbox = makeSandbox();
     const { formatDueScanCostEstimate } = sandbox.module.exports;
-    assert.equal(formatDueScanCostEstimate({ calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }, 5), '$0.00');
+    assert.equal(formatDueScanCostEstimate({ calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }, 5), 'est. $0.00');
   });
 
   test('a normal priced mean renders meanUsd × selectedCount', () => {
@@ -561,10 +561,10 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     const { formatDueScanCostEstimate } = sandbox.module.exports;
     // Sub-$1 totals keep 4 decimals, mirroring formatCost's own precision idiom
     // (0.02 * 5 = 0.10, still < 1).
-    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.02, unknown: false }, 5), '$0.1000');
-    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.001, unknown: false }, 1), '$0.0010');
+    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.02, unknown: false }, 5), 'est. $0.1000');
+    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.001, unknown: false }, 1), 'est. $0.0010');
     // A total >= 1 rounds to 2 decimals instead.
-    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.5, unknown: false }, 5), '$2.50');
+    assert.equal(formatDueScanCostEstimate({ calls: 10, pricedCalls: 10, meanUsd: 0.5, unknown: false }, 5), 'est. $2.50');
   });
 
   test('regression: no input path yields $0.00 for an unknown estimate', () => {
@@ -579,6 +579,7 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     for (const estimate of unknownInputs) {
       for (const count of [0, 1, 5, 40]) {
         assert.notEqual(formatDueScanCostEstimate(estimate, count), '$0.00', `estimate=${JSON.stringify(estimate)} count=${count} must never render $0.00`);
+        assert.notEqual(formatDueScanCostEstimate(estimate, count), 'est. $0.00', `estimate=${JSON.stringify(estimate)} count=${count} must never render est. $0.00`);
       }
     }
   });
@@ -588,18 +589,34 @@ test.describe('formatDueScanCostEstimate — honest unknown, never $0.00 for it 
     const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
     const estimateEl = sandbox.__nodes.get('obs-due-selected-cost');
-    assert.equal(estimateEl.textContent, '$0.00', 'zero selected: meanUsd × 0');
+    assert.equal(estimateEl.textContent, 'est. $0.00', 'zero selected: meanUsd × 0');
     toggleDueSelection('a', true);
     toggleDueSelection('b', true);
-    assert.equal(estimateEl.textContent, '$0.0400');
+    assert.equal(estimateEl.textContent, 'est. $0.0400');
   });
 
-  test('the rendered hook renders "unknown" (never $0.00) when the wired estimate is unknown', () => {
+  test('the rendered hook renders "est. unknown" (never $0.00) when the wired estimate is unknown', () => {
     const sandbox = makeSandbox({ scanCostEstimate: { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true } });
     const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], 1, { append: false });
     toggleDueSelection('a', true);
-    assert.equal(sandbox.__nodes.get('obs-due-selected-cost').textContent, 'unknown');
+    assert.equal(sandbox.__nodes.get('obs-due-selected-cost').textContent, 'est. unknown');
+  });
+
+  // Review finding 5 (LIN-2706 PR #1424): §B.5's "copy length is bounded"
+  // witness never landed — nothing measured RENDERED output. The disclaimer
+  // (lib/render-observation.js's renderBulkScanDisclaimer) is now the
+  // longest paragraph on the tab; this pins the estimate/count readouts
+  // specifically, since those are the two that grow with the data
+  // (selectedCount, meanUsd) rather than being fixed prose.
+  test('bounded copy: the estimate and count readouts stay short regardless of selection size or price', () => {
+    const sandbox = makeSandbox();
+    const { formatDueScanCostEstimate, dueSelectedCountText } = sandbox.module.exports;
+    const worstCaseEstimate = formatDueScanCostEstimate({ calls: 40, pricedCalls: 40, meanUsd: 999999.9999, unknown: false }, 40);
+    assert.ok(worstCaseEstimate.length <= 40, `estimate readout too long: "${worstCaseEstimate}" (${worstCaseEstimate.length} chars)`);
+    for (let i = 0; i < 45; i++) sandbox.module.exports.toggleDueSelection(`row-${i}`, true);
+    const countText = dueSelectedCountText();
+    assert.ok(countText.length <= 40, `count readout too long: "${countText}" (${countText.length} chars)`);
   });
 });
 
