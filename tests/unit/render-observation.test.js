@@ -157,3 +157,55 @@ describe('render-observation: bulk-scan script wiring (LIN-2700 / LIN-2651 Phase
     assert.ok(scanAt < observationAt, '/scan.js must load before /observation.js (its consumer)');
   });
 });
+
+describe('render-observation: scan cost estimate wiring (LIN-2706 §B.1)', () => {
+  // window.__OBSERVATION_DATA__ is embedded via embedJson (lib/components/page.js),
+  // plain JSON.stringify plus a few XSS-hardening char escapes that don't touch
+  // any of these fixtures, so a straight JSON.parse round-trips it.
+  function embeddedData(html) {
+    const match = html.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/);
+    assert.ok(match, 'window.__OBSERVATION_DATA__ is embedded in the page');
+    return JSON.parse(match[1]);
+  }
+
+  test('an unknown estimate reaches the embedded JSON with unknown:true, never collapsed to $0.00 or a number', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a', scanCostEstimate: { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true } }
+    );
+    assert.deepEqual(
+      embeddedData(html).scanCostEstimate,
+      { calls: 0, pricedCalls: 0, meanUsd: null, unknown: true }
+    );
+  });
+
+  test('a priced estimate reaches the embedded JSON verbatim, unknown:false', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a', scanCostEstimate: { calls: 5, pricedCalls: 5, meanUsd: 0.0123, unknown: false } }
+    );
+    assert.deepEqual(
+      embeddedData(html).scanCostEstimate,
+      { calls: 5, pricedCalls: 5, meanUsd: 0.0123, unknown: false }
+    );
+  });
+
+  test('a priced estimate averaging exactly zero stays unknown:false, distinct from the unknown state', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a', scanCostEstimate: { calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false } }
+    );
+    assert.deepEqual(
+      embeddedData(html).scanCostEstimate,
+      { calls: 3, pricedCalls: 3, meanUsd: 0, unknown: false }
+    );
+  });
+
+  test('an absent estimate embeds as null (the route\'s own store-absent/rejected degrade path), not a fabricated number', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a' }
+    );
+    assert.equal(embeddedData(html).scanCostEstimate, null);
+  });
+});
