@@ -2347,11 +2347,21 @@ async function loadMoreDueChecks() {
 // shared AbortController, and enough error discrimination for Phase 3 to build
 // its later 7-way classification on top of.
 
-const bulkScanQueue = [];
-let bulkScansInFlight = 0;
-let bulkScanStopped = false;
-let bulkScanController = null;   // one shared AbortController per run
-let bulkScanTeardown = null;     // current run's teardown, so stopBulkScan can reach it
+// Only the CURRENT run's stop is ever reachable from module scope — the
+// queue, in-flight counter, and AbortController below are per-run closure
+// state (see startBulkScan), never shared across runs. An earlier revision
+// kept those three at module scope, which reopened exactly the bug the stop
+// flag exists to prevent: stopping run 1 immediately zeroed the shared
+// in-flight counter, and run 1's own already-issued jobs still decremented
+// it (and re-pumped) as they settled — if run 2 had since started, THOSE
+// stale decrements freed "slots" run 2 never actually had, letting a second
+// run exceed BULK_SCAN_CONCURRENCY. Reproduced directly: stop run 1 with 2
+// jobs in flight, start run 2 in the same synchronous turn (no await between
+// them — the realistic "click Stop, click Start again" shape), and run 2's
+// observed peak in-flight was double BULK_SCAN_CONCURRENCY. Scoping the
+// counters per-run makes a stale run's stragglers structurally unable to
+// touch a newer run's bookkeeping.
+let bulkScanStop = null; // stop() for the currently active run, or null between runs
 
 // Own constant — deliberately NEVER BASIS_CHECK_CONCURRENCY (:1598). That one
 // bounds advisory provider reads a page load fires on its own initiative; a
@@ -2411,33 +2421,16 @@ function classifyBulkScanError(err) {
 }
 
 /**
- * Drain the bulk-scan queue up to BULK_SCAN_CONCURRENCY at a time. Mirrors
- * pumpBasisChecks's (:1609) at-most-once/drain-on-settle `finally` shape —
- * its OWN in-flight counter and queue, never the basis-check ones — but adds
- * a stop check INSIDE the loop body, immediately before a dequeued job is
- * issued. That is the whole point: it closes the dequeue-but-not-yet-issued
- * window pumpBasisChecks has no equivalent of (lib/openrouter.js:1786 guards
- * the same class of gap server-side). Because dequeue and issue happen
- * synchronously in the same turn with no await between them, checking right
- * here means a job can never be shifted off the queue without the check
- * having just passed — the window is closed by construction, not by timing.
- */
-function pumpBulkScans() {
-  while (bulkScansInFlight < BULK_SCAN_CONCURRENCY && bulkScanQueue.length) {
-    if (bulkScanStopped) return;
-    const job = bulkScanQueue.shift();
-    bulkScansInFlight++;
-    job().catch(() => {}).finally(() => {
-      bulkScansInFlight--;
-      pumpBulkScans();
-    });
-  }
-}
-
-/**
  * Start a bulk-scan run over `items` ({urlKey, identifier, source} rows,
  * e.g. from the Scan-due tab's selection). Refuses synchronously — before
  * enqueueing anything — if the selection exceeds BULK_SCAN_MAX_PER_RUN.
+ *
+ * The queue, in-flight counter, stop flag, and AbortController are all
+ * LOCAL to this call — a fresh, independent set every run (see the module
+ * comment above on why: a shared, module-level counter let a stopped run's
+ * still-settling stragglers corrupt a subsequent run's bookkeeping). Only
+ * `stop` itself is published to module scope (`bulkScanStop`), so
+ * stopBulkScan() can always reach whichever run is currently active.
  *
  * `onTeardown(results)` fires once, on full settlement OR on stopBulkScan(),
  * whichever comes first — clearing in-flight counters and handing back
@@ -2456,11 +2449,10 @@ function startBulkScan(items, { onTeardown } = {}) {
   const check = checkBulkScanSelection(items);
   if (check.refused) return check;
 
-  bulkScanStopped = false;
-  bulkScansInFlight = 0;
-  bulkScanQueue.length = 0;
+  const queue = items.slice();
+  let inFlight = 0;
+  let stopped = false;
   const controller = new AbortController();
-  bulkScanController = controller;
 
   const results = [];
   const total = items.length;
@@ -2470,48 +2462,72 @@ function startBulkScan(items, { onTeardown } = {}) {
   function teardown() {
     if (tornDown) return;
     tornDown = true;
-    bulkScansInFlight = 0;
-    bulkScanController = null;
-    bulkScanTeardown = null;
+    if (bulkScanStop === stop) bulkScanStop = null;
     if (onTeardown) onTeardown(results);
   }
-  bulkScanTeardown = teardown;
+
+  /**
+   * Drain this run's own queue up to BULK_SCAN_CONCURRENCY at a time.
+   * Mirrors pumpBasisChecks's (:1609) at-most-once/drain-on-settle `finally`
+   * shape, but adds a stop check INSIDE the loop body, immediately before a
+   * dequeued item is issued. That is the whole point: it closes the
+   * dequeue-but-not-yet-issued window pumpBasisChecks has no equivalent of
+   * (lib/openrouter.js:1786 guards the same class of gap server-side).
+   * Because dequeue and issue happen synchronously in the same turn with no
+   * await between them, checking right here means an item can never be
+   * shifted off the queue without the check having just passed — the window
+   * is closed by construction, not by timing.
+   */
+  function pump() {
+    while (inFlight < BULK_SCAN_CONCURRENCY && queue.length) {
+      if (stopped) return;
+      const item = queue.shift();
+      inFlight++;
+      runOne(item);
+    }
+  }
+
+  async function runOne(item) {
+    try {
+      const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, { signal: controller.signal });
+      results.push({ item, outcome: 'fulfilled', value });
+    } catch (err) {
+      results.push({ item, outcome: classifyBulkScanError(err), error: err });
+    } finally {
+      inFlight--;
+      settledCount++;
+      if (settledCount === total) teardown();
+      pump();
+    }
+  }
+
+  function stop() {
+    stopped = true;
+    controller.abort();
+    teardown();
+  }
+  bulkScanStop = stop;
 
   if (total === 0) {
     teardown();
     return { refused: false, results };
   }
 
-  for (const item of items) {
-    bulkScanQueue.push(async () => {
-      try {
-        const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, { signal: controller.signal });
-        results.push({ item, outcome: 'fulfilled', value });
-      } catch (err) {
-        results.push({ item, outcome: classifyBulkScanError(err), error: err });
-      } finally {
-        settledCount++;
-        if (settledCount === total) teardown();
-      }
-    });
-  }
-
-  pumpBulkScans();
+  pump();
   return { refused: false, results };
 }
 
 /**
- * Stop the current bulk-scan run: sets the stop flag (closing the
- * dequeue-but-not-yet-issued window in pumpBulkScans above) and aborts the
- * shared AbortController (canceling in-flight HTTP calls client-side — see
- * the abort-gap note above for what "canceling" does and does not mean
+ * Stop the current bulk-scan run: sets that run's own stop flag (closing the
+ * dequeue-but-not-yet-issued window in its pump() above) and aborts its own
+ * AbortController (canceling in-flight HTTP calls client-side — see the
+ * abort-gap note above for what "canceling" does and does not mean
  * server-side), then tears down immediately rather than waiting for
- * already-issued requests to settle.
+ * already-issued requests to settle. A no-op between runs (bulkScanStop is
+ * null once the active run has torn down).
  */
 function stopBulkScan() {
-  bulkScanStopped = true;
-  if (bulkScanController) bulkScanController.abort();
-  if (bulkScanTeardown) bulkScanTeardown();
+  if (bulkScanStop) bulkScanStop();
 }
 
 // ─── Controls ──────────────────────────────────────────────────────────────────
@@ -2705,8 +2721,11 @@ if (typeof module !== 'undefined' && module.exports) {
     // LIN-2700 / LIN-2651 Phase 2: the bulk-scan pool seam — the concurrency/
     // ceiling constants, the run entry point + stop, and the two pure helpers
     // (selection refusal, error classification) are the parts a regression
-    // would be invisible without a direct test for.
+    // would be invisible without a direct test for. pump() itself is now
+    // per-run closure state (not exported) — see startBulkScan's own comment
+    // on why the queue/in-flight counter/AbortController had to stop being
+    // module-level to fix a cross-run corruption bug found in beat 4.
     startBulkScan, stopBulkScan, checkBulkScanSelection, classifyBulkScanError,
-    pumpBulkScans, BULK_SCAN_CONCURRENCY, BULK_SCAN_MAX_PER_RUN,
+    BULK_SCAN_CONCURRENCY, BULK_SCAN_MAX_PER_RUN,
   };
 }

@@ -244,3 +244,55 @@ test.describe('startBulkScan — client-side abort-signal propagation (Witness 3
     assert.equal(capturedSignal.aborted, true, 'the SAME signal object postScan received must flip to aborted');
   });
 });
+
+test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-run corruption)', () => {
+  test('a stopped run\'s stragglers settling AFTER a second run has started must not corrupt the second run\'s concurrency bound', async () => {
+    // Found empirically in beat 4: run 1's queue/in-flight-counter/
+    // AbortController used to be module-level (shared), so stopping run 1
+    // and starting run 2 in the SAME synchronous turn (no await between them
+    // — the realistic "click Stop, click Start again" shape) let run 1's
+    // already-issued jobs' straggler settle-callbacks decrement run 2's
+    // shared in-flight counter as microtasks, artificially freeing "slots"
+    // run 2 never actually had and letting pumpBulkScans over-issue past
+    // BULK_SCAN_CONCURRENCY. Reproduced directly against the pre-fix code:
+    // run 2's observed peak in-flight was double the bound. Per-run closure
+    // state (this beat's fix) makes that structurally impossible — a stale
+    // run's own runOne()/pump() closures can only ever touch THEIR OWN
+    // inFlight/queue, never a newer run's.
+    let run1Calls = 0;
+    const run1PostScan = async (urlKey, id, source, { signal }) => {
+      run1Calls++;
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+      });
+    };
+    const sandbox = makeSandbox(run1PostScan);
+    const { startBulkScan, stopBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+
+    startBulkScan(items(3, 'run1-'));
+    await flush();
+    assert.equal(run1Calls, BULK_SCAN_CONCURRENCY, `run1 must have issued exactly ${BULK_SCAN_CONCURRENCY} calls before stop`);
+
+    // Swap in run 2's mock, then stop run1 and start run2 BACK TO BACK,
+    // synchronously — no await between them — so run1's abort-triggered
+    // rejection microtasks are still pending when run2 begins pumping.
+    let run2Calls = 0;
+    let run2InFlight = 0;
+    let run2Peak = 0;
+    const run2PostScan = async () => {
+      run2Calls++;
+      run2InFlight++;
+      run2Peak = Math.max(run2Peak, run2InFlight);
+      return new Promise(() => {}); // never resolves — only peak/call count matter
+    };
+    sandbox.window.ScanSection.postScan = run2PostScan;
+
+    stopBulkScan();
+    startBulkScan(items(6, 'run2-'));
+
+    await flush(15);
+
+    assert.ok(run2Peak <= BULK_SCAN_CONCURRENCY, `run2's peak in-flight must never exceed ${BULK_SCAN_CONCURRENCY} regardless of run1's stragglers, observed ${run2Peak}`);
+    assert.ok(run2Calls <= BULK_SCAN_CONCURRENCY, `run2 must never have issued more than ${BULK_SCAN_CONCURRENCY} calls without a settle freeing a real slot, observed ${run2Calls}`);
+  });
+});
