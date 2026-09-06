@@ -41,13 +41,23 @@ test.beforeEach(({ workerUrlKey }) => {
  * byte-identical to /turn's precisely so ONE mock harness covers both; a
  * second, forked mocking helper would be exactly the duplication that frame
  * parity claim exists to avoid.
+ *
+ * LIN-2621 beat 3: `usage`, when given, rides on the `done` frame exactly
+ * like the real turn core's summed hop usage does (LIN-2631) — omitted by
+ * default so every pre-existing caller stays byte-identical (a `done` with
+ * no `usage` key at all, not `usage: undefined`).
  */
-async function mockTurn(page, { token, endpoint = 'turn' } = {}) {
+async function mockTurn(page, { token, endpoint = 'turn', usage, toolFrames } = {}) {
   await page.route(`**/api/flight-companion/${endpoint}`, (route) => {
     if (route.request().method() !== 'POST') return route.continue();
+    const doneData = usage ? { usage } : {};
+    // LIN-2621 beat 4: `toolFrames`, when given, are spliced in before the
+    // narrated/silent tail — e.g. a `list_pending_decisions` tool result —
+    // additive to the existing token/no-token shapes below.
+    const pre = Array.isArray(toolFrames) ? toolFrames : [];
     const frames = token
-      ? renderSSEFrames([['token', { token }], ['done', {}]])
-      : renderSSEFrames([['done', {}]]);
+      ? renderSSEFrames([...pre, ['token', { token }], ['done', doneData]])
+      : renderSSEFrames([...pre, ['done', doneData]]);
     return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
   });
 }
@@ -179,6 +189,39 @@ test.describe('Flight Companion Page (experimental)', () => {
       // False-positive guard: not still showing the class the bubble is
       // created with.
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
+    });
+
+    // LIN-2621 beat 3: the ticket's own item 1 — a visible turn's bubble
+    // renders its OWN meta line (tokens + cost), read from the final `done`
+    // frame's usage. Renders exactly what the frame carries — no caveat
+    // string, per beat 3's explicit instruction not to hedge the known
+    // lib/openrouter.js tool-hop gap.
+    test('a visible turn\'s bubble renders its own meta line with tokens and cost', async ({ page }) => {
+      await mockTurn(page, {
+        token: 'ack',
+        usage: { prompt_tokens: 100, completion_tokens: 47, total_tokens: 147, cost: 0.00042 },
+      });
+
+      await page.locator('#flight-companion-question').fill('are you there?');
+      await page.locator('#flight-companion-send').click();
+
+      const meta = page.locator('.fc-msg-meta');
+      await expect(meta).toHaveCount(1);
+      await expect(meta).toHaveText('147 tokens · $0.0004');
+    });
+
+    // LIN-2621 beat 3: a turn with no usage at all (the model call resolved,
+    // but no cost information reached this client — a defensive shape, not
+    // one the real turn core produces) renders no meta line, never a
+    // fabricated "0 tokens · $0.00".
+    test('a visible turn with no usage on its done frame renders no meta line', async ({ page }) => {
+      await mockTurn(page, { token: 'ack' });
+
+      await page.locator('#flight-companion-question').fill('are you there?');
+      await page.locator('#flight-companion-send').click();
+
+      await expect(page.locator('.fc-msg-who')).toHaveCount(1);
+      await expect(page.locator('.fc-msg-meta')).toHaveCount(0);
     });
 
     // LIN-2622: the start button, driving a mocked boot SSE turn through to a
@@ -443,6 +486,31 @@ test.describe('Flight Companion Page (experimental)', () => {
       await expect(page.locator('.fc-msg-who')).toHaveCount(0);
       await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
     });
+
+    // LIN-2621 beat 3: "otherwise the page's biggest spender is its only
+    // invisible one" — a silent tick still carries real usage (a tool-using
+    // auto-wake turn that narrated nothing), and the strip's running total +
+    // check-in count are the ONLY other visible effect, alongside the
+    // unchanged check-in line above. No bubble paints either way (LIN-2443
+    // AC1 unchanged).
+    test('a silent tick with usage updates the strip\'s running total and check-in count, still with no bubble', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+      await page.clock.install();
+      await mockTurn(page, { usage: { prompt_tokens: 200, completion_tokens: 10, total_tokens: 210, cost: 0.0009 } });
+
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      const tabTotal = page.locator('#flight-companion-strip-tab-total');
+      await expect(tabTotal).toHaveText('0 check-ins · $0.00 this tab');
+
+      await page.clock.fastForward(30000);
+
+      await expect(tabTotal).toHaveText('1 check-in · $0.0009 this tab');
+      await expect(page.locator('.fc-msg-who')).toHaveCount(0);
+      await expect(page.locator('.fc-msg-meta')).toHaveCount(0);
+    });
   });
 
   test.describe('Sweep-liveness gate-silent tick (LIN-2438, page.clock)', () => {
@@ -525,5 +593,85 @@ test.describe('Flight Companion — no-census check-in (LIN-2487, page.clock)', 
 
     await expect(page.locator('.fc-msg-who')).toHaveCount(0);
     await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
+  });
+});
+
+// LIN-2621 beat 4: waiting-on-you decisions as option buttons, reused
+// verbatim from the rulings tab's own primitive (public/chat.css's
+// `.chat-options*` rules, public/chat.js's window.ChatUI.appendOptions) — a
+// tap answers through window.ReplyDelivery.postComment, the existing
+// session-auth comment path, never a new write surface. Real DOM, real
+// client; the comment POST is intercepted here (never reaches Express) —
+// same "no model calls, no live writes" discipline as the rest of this file.
+test.describe('Decisions as option buttons (LIN-2621 beat 4)', () => {
+  const decisionsToolFrame = (decisions) => (
+    ['tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: JSON.stringify({ count: decisions.length, truncated: false, decisions }) }]
+  );
+
+  test('an interactive decision renders its options with the recommended star; a tap posts a comment and the row settles', async ({ page }) => {
+    const decision = {
+      decisionId: 'dec-42', issueIdentifier: 'LIN-42', loopId: 'loop-42', sessionId: 'sess-42',
+      question: 'Ship the fix now?', options: [{ id: 'yes', label: 'Ship it' }, { id: 'no', label: 'Hold' }],
+      optionsTotal: 2, recommended: 'yes', since: null, disposition: 'resumable', canReply: true, shelvedLapseCount: 0,
+    };
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+    await page.clock.install();
+    await mockTurn(page, { toolFrames: [decisionsToolFrame([decision])] });
+
+    let commentRequest = null;
+    await page.route('**/api/comments/**', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      commentRequest = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'c1' }) });
+    });
+
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.clock.fastForward(30000);
+
+    const card = page.locator('.fc-decision');
+    await expect(card).toHaveCount(1);
+    await expect(card.locator('.fc-decision-question')).toHaveText('Ship the fix now?');
+    const buttons = card.locator('.chat-options-row .chat-option-btn');
+    await expect(buttons).toHaveCount(2);
+    await expect(buttons.nth(0)).toHaveClass(/chat-option--recommended/);
+    await expect(buttons.nth(1)).not.toHaveClass(/chat-option--recommended/);
+
+    await buttons.nth(0).click();
+    await expect.poll(() => commentRequest).not.toBeNull();
+    expect(commentRequest.body).toBe('Ship it');
+    expect(commentRequest.decisionLoopId).toBe('loop-42');
+    expect(commentRequest.decisionId).toBe('dec-42');
+
+    await expect(card).toHaveClass(/fc-decision--resolved/);
+    await expect(buttons.nth(0)).toBeDisabled();
+    await expect(buttons.nth(1)).toBeDisabled();
+    await expect(card.locator('.fc-decision-feedback')).toContainText('Replied');
+  });
+
+  test('canReply: false / a read-only disposition renders the caption only — no tappable buttons', async ({ page }) => {
+    const decision = {
+      decisionId: 'dec-43', issueIdentifier: 'LIN-43', loopId: 'loop-43', sessionId: 'sess-43',
+      question: 'Still running', options: [{ id: 'yes', label: 'Ship it' }],
+      optionsTotal: 1, recommended: null, since: null, disposition: 'mid-turn', canReply: false, shelvedLapseCount: 0,
+    };
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+    await page.clock.install();
+    await mockTurn(page, { toolFrames: [decisionsToolFrame([decision])] });
+    await page.route('**/api/comments/**', (route) => {
+      if (route.request().method() === 'POST') throw new Error('a read-only decision must never post a comment');
+      return route.continue();
+    });
+
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.clock.fastForward(30000);
+
+    const card = page.locator('.fc-decision');
+    await expect(card).toHaveCount(1);
+    await expect(card.locator('.chat-options--readonly')).toHaveCount(1);
+    await expect(card.locator('.chat-options-row')).toHaveCount(0);
   });
 });

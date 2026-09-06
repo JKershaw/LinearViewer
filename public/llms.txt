@@ -351,9 +351,11 @@ main.task-chat-page[data-url-key]      - page container
 
 The Flight Companion page (`/workspace/{urlKey}/flight-companion`) is a live, in-page chat for LIN-751 ("realtime chat with work in flight"): a companion that watches the workspace's dispatch feed and checks in with you on its own client-driven cadence (visible-tab only, 30s base, doubling to a 180s cap on nothing-to-report ticks; the server's own pre-call gate is always the real spend authority), or answers directly when you send it a message. It renders through the shared chat UI (`chat.css`/`window.ChatUI`) and streams turns over SSE, including tool-use breadcrumbs (LIN-2632) via the SAME shared `window.ChatUI.toolBreadcrumbLabel` Task Chat uses — never a page-local label fork. On an auto-wake turn, a proposed follow-up renders an inline Approve/Dismiss control and only an Approve click can enqueue it — the model can never dispatch one unapproved there. On a turn you start yourself, though, the model's `send_follow_up` executes directly (no proposal card, no approval needed) — the approval gate is auto-wake-only, not a blanket guarantee. Requires the per-user `flightCompanion` feature flag; reached only via a link in Settings.
 
-Chat is the FIRST section on the page (LIN-2443) — `How to use` and the kickoff prompt follow it, and the read-only observer report stays last. A silent auto-wake tick (one that completes with no text, the designed common outcome) paints NO chat bubble at all: instead the single, non-stacking status line (`#flight-companion-checkin`, `aria-live="polite"`, hidden until first use) reads `checking in…` for the duration of the tick, then settles to e.g. `checked in 22:03 · nothing new` on `done` — consecutive silent ticks overwrite that one node rather than appending rows, and a non-spend `gate-silent` tick refreshes the same line the same way (LIN-2632 beat 3). A turn YOU start instead gets the thinking state: an assistant row appears IMMEDIATELY, before any token or tool event, in the in-progress pill state with a quiet `thinking…` placeholder — the placeholder is display-only and never enters the client-held history, so an empty turn still ends with an honest `no reply — nothing to add` on that SAME row rather than a second one. Either way the speaker pill leaves the in-progress state on `done`/`error`.
+Chat is the FIRST section on the page (LIN-2443) — `How to use` and the kickoff prompt follow it, and the read-only observer report stays last. Above the thread sits a status strip (LIN-2621): model id, tools on/off (both resolved server-side ONCE per page load via `resolveWorkspaceModel`/`isToolCapableModel` — the SAME resolver the turn core uses), last check-in, next check-in due, sweep liveness/no-census, the running "this tab so far" cost total, and a mode line (`mode: read-only · proposes, never acts · rung 1 of 3`, byte-pinned; LIN-2626 turns it into a real control later). A silent auto-wake tick (one that completes with no text, the designed common outcome) paints NO chat bubble at all: instead the single, non-stacking status line (`#flight-companion-checkin`, `aria-live="polite"`, hidden until first use) reads `checking in…` for the duration of the tick, then settles to e.g. `checked in 22:03 · nothing new` on `done` — consecutive silent ticks overwrite that one node rather than appending rows, and a non-spend `gate-silent` tick refreshes the same line the same way (LIN-2632 beat 3). A turn YOU start instead gets the thinking state: an assistant row appears IMMEDIATELY, before any token or tool event, in the in-progress pill state with a quiet `thinking…` placeholder — the placeholder is display-only and never enters the client-held history, so an empty turn still ends with an honest `no reply — nothing to add` on that SAME row rather than a second one. Either way the speaker pill leaves the in-progress state on `done`/`error`.
 
-Tool use is visible (LIN-2632 beat 2, "it doesn't appear to use tools?"): a `tool` event's `call` phase renders a quiet breadcrumb row (`↳ <label> …`, `.fc-inline-note`), correlated by the event's own `id` to the matching `result` (which settles it — drops the ellipsis, keeps the call-time label) or `error` (which marks it, recomputed as `<name> failed: <reason>`) that closes it out; a `proposed` event still renders the Approve/Dismiss card instead, and `cap` still shows the tool-call-limit note. Breadcrumbs are notes, not bubbles — they never enter chat history and never trigger bubble creation on their own; on a user-initiated turn a breadcrumb arriving mid-hop inserts BEFORE the (already-present) thinking/answer row, reading `you → ↳ tool → the answer`.
+Every `done` frame carries the turn's own summed usage (LIN-2631 sums hop usage server-side onto the FINAL `done` only). A visible turn's own bubble grows a trailing meta line (`.fc-msg-meta`, "N tokens · $x") reading exactly what that frame carried, no caveat text; the strip's running total and check-in count (LIN-2621 beat 3) accumulate on EVERY `done` this tab observes — visible or silent, any turn kind — since a silent tick's cost otherwise has nowhere to appear. `lib/openrouter.js` does not yet attach per-hop usage to a tool-using turn's intermediate frames, so a multi-hop turn's displayed cost under-reports today until that lands as its own follow-up — a known, out-of-scope gap, not a defect of this page.
+
+Tool use is visible (LIN-2632 beat 2, "it doesn't appear to use tools?"): a `tool` event's `call` phase renders a quiet breadcrumb row (`↳ <label> …`, `.fc-inline-note`), correlated by the event's own `id` to the matching `result` (which settles it — drops the ellipsis, keeps the call-time label) or `error` (which marks it, recomputed as `<name> failed: <reason>`) that closes it out; a `proposed` event still renders the Approve/Dismiss card instead, and `cap` still shows the tool-call-limit note. A `list_pending_decisions` result ALSO renders each returned decision as an option-button card (`.fc-decision`, LIN-2621 beat 4) in the thread, reusing the rulings tab's own primitive (`window.ChatUI.appendOptions`, `chat.css`'s `.chat-options*`) verbatim — no fork. Breadcrumbs are notes, not bubbles — they never enter chat history and never trigger bubble creation on their own; on a user-initiated turn a breadcrumb arriving mid-hop inserts BEFORE the (already-present) thinking/answer row, reading `you → ↳ tool → the answer`.
 
 **Narrow viewports (≤600px) take the phone shape** (Shape B, LIN-1412 D2 / LIN-2632 beat 4): `.flight-companion-chat-section` becomes an ordinary (non-positioned) `height: 100dvh` column — the thread grows to fill the available height (chat.css's `--chat-thread-max-height` overridden to `none` here, rather than the shared 40vh default) instead of sitting in a short box, and the composer ends up flush with the viewport's own bottom edge as the column's last child once scrolled to, staying anchored even as a software keyboard shrinks the visual viewport (the `dvh` unit, not `vh`). No `position` of its own is needed: the page's own shared header (`.nav-bar`) is already `position: sticky`, which closes the header-height gap for free. `How to use` / `Kickoff prompt` / `Latest observer report` fold below — genuinely reachable (clickable, not merely geometrically in the viewport) by scrolling past the chat section. An earlier revision made the section itself `position: sticky`, which review (LIN-2632 finding F2) found pinned it over those sections for nearly the whole page scroll instead — fixed by dropping `position` entirely. This is a per-surface override of chat.css's own documented `--chat-thread-max-height` contract, not a fork of it — chat.css itself is untouched, so every other `.chat-thread`/`.chat-composer` consumer (Task Chat, Collective, the session reply surface) is unaffected. Above 600px the page is unstyled by this rule (Shape A: the thread stays inside the ordinary scrolling page).
 
@@ -371,6 +373,35 @@ main.flight-companion-page[data-url-key]  - page container
                                               companion.css; LIN-2632 review F2 dropped
                                               an earlier position:sticky, which pinned
                                               it over the sections below instead)
+    #flight-companion-strip                 - the status strip (LIN-2621), the FIRST
+                                              child of the section — server-rendered,
+                                              above the thread. Prepending it does not
+                                              reorder any sibling below, so the phone-
+                                              shape selectors keyed on that order are
+                                              unaffected; the strip itself joins the
+                                              fixed-height (flex: 0 0 auto) group
+      .fc-strip-model                         - "model: <code>…</code>" — resolved once
+                                              per page load, same resolver the turn uses
+      .fc-strip-tools                         - "tools: on|off" — isToolCapableModel on
+                                              that SAME resolved model id
+      .fc-strip-checkin                       - "last check-in: <time>|never" — the
+                                              companion doc's own lastTurnAt
+      #flight-companion-strip-next            - "next check-in: —" server-rendered
+                                              placeholder; filled/updated client-side
+                                              from the wake cadence's own countdown —
+                                              no server-side schedule exists to render
+      .fc-strip-sweep                         - "sweep alive|stale · last seen …" or
+                                              LIN-2487's own "no fleet scan yet" wording
+                                              (reused verbatim, not re-implemented)
+      #flight-companion-strip-tab-total        - "N check-ins · $x this tab" — server-
+                                              rendered with its TRUE initial value ("0
+                                              check-ins · $0.00 this tab"); updated in
+                                              place client-side on EVERY `done` frame
+                                              this tab observes, visible or silent, any
+                                              turn kind (LIN-2621 beat 3)
+      .fc-strip-mode                          - "mode: read-only · proposes, never acts
+                                              · rung 1 of 3" — byte-pinned text; LIN-2626
+                                              turns this into a real control later
     #flight-companion-thread                - live chat thread (ul.chat-thread). Below
                                               600px this fills the section instead of
                                               chat.css's 40vh default (--chat-thread-
@@ -381,11 +412,32 @@ main.flight-companion-page[data-url-key]  - page container
                                               "thinking…" — replaced outright by the
                                               first token, or by "no reply — nothing to
                                               add" on an empty done (LIN-2632 beat 3)
+        .fc-msg-meta                           - a visible turn's own cost meta line
+                                              ("N tokens · $x"), appended once `done`
+                                              carries usage — reads exactly what the
+                                              frame carried, never a fabricated "0
+                                              tokens · $0.00" when usage is absent
+                                              (LIN-2621 beat 3)
       .fc-inline-note (chat-note)              - a tool breadcrumb ("↳ <label> …" on
                                               call, settled/marked in place on the
                                               matching result/error by the tool event's
                                               own id — never a new row) or a cap-limit /
                                               proposal-fallback note (LIN-2632 beat 2)
+      .fc-decision                             - a waiting-on-you decision, rendered from
+                                              a `list_pending_decisions` tool result
+                                              (LIN-2621 beat 4) — the question plus the
+                                              SAME option-button row the rulings tab uses
+                                              (`.chat-options-row`/`.chat-option-btn`,
+                                              `window.ChatUI.appendOptions`; a star marks
+                                              the recommended option). A read-only
+                                              disposition renders `.chat-options--
+                                              readonly` (a caption only, no buttons). A
+                                              tap POSTs through `window.ReplyDelivery.
+                                              postComment` ONLY (never a dispatch/resume
+                                              call) and settles the card in place
+                                              (`.fc-decision--resolved`, `.fc-decision-
+                                              feedback`); buttons disable immediately so
+                                              a second tap cannot double-post
     #flight-companion-chat-empty            - empty state, hidden once a row exists
     #flight-companion-start                 - "start" button (LIN-2622), visible only in the
                                               empty state; POSTs the boot turn (see Endpoints
@@ -401,9 +453,13 @@ main.flight-companion-page[data-url-key]  - page container
     #flight-companion-reorient              - "reorient" button (LIN-2622), the complementary
                                               half of #flight-companion-start — hidden until
                                               the empty state is gone, then visible; drives
-                                              the SAME boot turn. Deliberately NOT a status
-                                              strip (LIN-2621, still unbuilt, owns that) — a
-                                              minimal stand-in beside the check-in line
+                                              the SAME boot turn. Carries the existing
+                                              `.action-btn.connect` colour variant (LIN-2622
+                                              close-out finding F1, fixed by LIN-2621 beat 2)
+                                              rather than the bare, effectively-invisible
+                                              `.action-btn` it used to — kept in this same
+                                              sibling position rather than folded into the
+                                              status strip above
     #flight-companion-question              - chat composer input
     #flight-companion-send                  - send button
     .fc-proposal                            - an inline model-proposed follow-up
@@ -428,6 +484,8 @@ main.flight-companion-page[data-url-key]  - page container
 - `POST /workspace/{urlKey}/api/flight-companion/turn` — SSE chat turn; body `{ message?, history[] }` (an absent/empty `message` is an auto-wake tick, never a client-asserted flag). Events: `token`, `tool` (`phase`: `call`/`result`/`error`/`cap`/`proposed`), `done` (an auto-wake `done` carries `surface`), `error`. A non-spend auto-wake tick returns plain JSON `{ turnKind, spent:false, reason }` instead of streaming.
 - `POST /workspace/{urlKey}/api/flight-companion/boot` — SSE boot (orient) turn (LIN-2622), driven by `#flight-companion-start`/`#flight-companion-reorient`; body `{ history[] }` only — `message`/turn kind/`followUpMode`/budget are all endpoint-hardcoded server-side, never read from the body (the same "never client-asserted" rule as `/turn`). Propose-only (never executes a follow-up), its own budget (5 tool iterations / 2500 tokens) and lease, and it charges the free tier with the SAME 429 shape a typed turn gets — never auto-wake's silent refusal. Same SSE frame set as `/turn` (`token`/`tool`/`done`/`error`), consumed by the identical client stream reader — no boot-specific parsing exists.
 - `POST /workspace/{urlKey}/api/flight-companion/approve-follow-up` — body `{ sessionId, prompt }`; enqueues the follow-up the model proposed on a prior auto-wake turn.
+
+A decision-card tap (`.fc-decision`, LIN-2621 beat 4) is NOT a Flight-Companion-specific endpoint: it reuses the general `POST /workspace/{urlKey}/api/comments/{issueId}` write via `window.ReplyDelivery.postComment` — the same session-auth reply path the rulings tab and `public/scan.js`'s answer form already use. A loop-anchored decision (resumable/gone) also best-effort-stamps `markDecisionAnswered` (`decisionLoopId`/`decisionId` in the body); a task-bound decision posts a plain, unstamped comment, since the tool result carries no raw issue UUID for `taskDecisionsStore.markOutcome` to match against — a named limitation, not a defect.
 
 ## Passage Planner (experimental)
 

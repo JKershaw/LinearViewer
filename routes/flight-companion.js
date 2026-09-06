@@ -79,7 +79,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kickoff.js';
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
-import { buildCompanionSnapshot } from '../lib/flight-companion-gate.js';
+import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
@@ -117,6 +117,12 @@ const CENSUS_LANE_KEYS = ['working', 'silent', 'blocked', 'terminal', 'queued', 
 // reads/writes regardless of which (possibly suffixed) reservation instance a
 // given turn is using.
 const COMPANION_INSTANCE_PREFIX = 'companion:v1:';
+
+// LIN-2621: restated, not imported, from lib/flight-companion-turn.js's own
+// private SWEEP_INSTANCE_PREFIX — same house convention as COMPANION_INSTANCE_PREFIX
+// just above. The GET page handler needs its own read of the census doc for the
+// status strip's sweep-liveness/no-census line, independent of the turn endpoint's.
+const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
 
 /**
  * §A.7: the deterministic census seed, built from the SAME raw sweep census
@@ -241,6 +247,79 @@ export function buildCensusSeedText(currentCensusDoc) {
 }
 
 /**
+ * LIN-2621: the status strip's data, derived from this page load's already-
+ * resolved model and the two observer-state documents the GET handler reads
+ * (never a write, matching this route's existing read-only contract). Pure —
+ * no I/O of its own — and exported for direct unit testing, the same pattern
+ * `buildCensusSeedText` above follows.
+ *
+ * `lastCheckInAt` reads `companionDoc.state.lastTurnAt` (`companion:v1:<urlKey>`,
+ * `lib/flight-companion-gate.js`'s `COMPANION_SEED_STATE`/`buildTurnRecords`
+ * shape) — the last time ANY reserved turn (auto-wake or boot) actually
+ * committed. This is genuinely available at page-load time; it is NOT the
+ * client's own live wake-cadence countdown (`nextCheckInAt` below), which has
+ * no server-side representation at all — see that field's own doc comment.
+ *
+ * Sweep liveness reuses `lib/flight-companion-gate.js`'s own
+ * `DEFAULT_SWEEP_LIVENESS_HORIZON_MS` (the same 30-minute threshold the
+ * auto-wake gate's `checkSweepLiveness` already applies) rather than
+ * inventing a second one. `censusDoc == null` means "no fleet scan yet" —
+ * LIN-2487's own wording, reused verbatim rather than reimplemented: that
+ * ticket's actual formatter (`formatNoCensus`, `public/flight-companion.js`)
+ * is a browser-only, live-tick-time function (`Date#toLocaleTimeString`) with
+ * no ES module export reachable from this server-rendered page load, so this
+ * checks the SAME null-ness the gate itself keys off and prints the SAME
+ * established phrase, rather than re-deriving the no-census classification.
+ *
+ * @param {Object} p
+ * @param {string} p.model - the model id this page load resolved (`resolveWorkspaceModel`)
+ * @param {Object|null} p.companionDoc - `observerStateStore.readCurrent('companion:v1:<urlKey>')` result, or null
+ * @param {Object|null} p.censusDoc - `observerStateStore.readCurrent('sweep:v1:<urlKey>')` result, or null
+ * @param {number} [p.now] - injected clock (epoch ms), for deterministic tests
+ * @returns {{model: string, toolsOn: boolean, lastCheckInAt: string|null, nextCheckInAt: null, sweepStatus: 'no-census'|'alive'|'stale', sweepLastSeenAt: string|null, mode: string}}
+ */
+export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, now = Date.now() } = {}) {
+  const toolsOn = isToolCapableModel(model);
+  const lastTurnAt = companionDoc?.state?.lastTurnAt || null;
+  const lastCheckInAt = lastTurnAt ? new Date(lastTurnAt).toISOString() : null;
+
+  let sweepStatus;
+  let sweepLastSeenAt = null;
+  if (!censusDoc) {
+    sweepStatus = 'no-census';
+  } else {
+    const seenMs = censusDoc.lastSeenAt ? new Date(censusDoc.lastSeenAt).getTime() : NaN;
+    sweepLastSeenAt = Number.isFinite(seenMs) ? new Date(seenMs).toISOString() : null;
+    sweepStatus = Number.isFinite(seenMs) && (now - seenMs) <= DEFAULT_SWEEP_LIVENESS_HORIZON_MS
+      ? 'alive'
+      : 'stale';
+  }
+
+  return {
+    model,
+    toolsOn,
+    lastCheckInAt,
+    // LIN-2621 beat 2: deliberately null, not computed. "Next check-in due" is
+    // the CLIENT's own wake-cadence countdown (chained setTimeout, 30s base
+    // doubling to a 180s cap, paused on a hidden tab, reset on completion) —
+    // an in-memory, per-tab value with no server-side persisted schedule to
+    // read at page-load time (there is no "next scheduled wake" document
+    // anywhere in observer-state-store). Filling this in is public/flight-
+    // companion.js's job (`#flight-companion-strip-next`, populated from the
+    // SAME `cadence`/`scheduleAutoWake` state the client already tracks),
+    // mirroring the existing `#flight-companion-checkin` house pattern: born
+    // empty/server-rendered, filled client-side. Reported plainly rather than
+    // guessed at server-render time.
+    nextCheckInAt: null,
+    sweepStatus,
+    sweepLastSeenAt,
+    // LIN-2626 turns this into the control; rung 1 is correct while no toggle
+    // exists.
+    mode: 'read-only · proposes, never acts · rung 1 of 3',
+  };
+}
+
+/**
  * @param {Object} deps
  * @param {Function} deps.workspaceFromUrl    - middleware: session + req.workspace
  * @param {Function} deps.getOpenRouterSource - (req) → 'oauth'|'env'|'free'|null
@@ -346,8 +425,34 @@ export function createFlightCompanionRoutes({
       const observerReportDoc = observerStateStore
         ? await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
         : null;
+
+      // LIN-2621: resolve the model ONCE per page load, via the SAME
+      // `resolveWorkspaceModel` function (and the SAME free-tier `forceDefault`
+      // derivation, mirrored from the turn endpoint below) the turn core
+      // resolves with today — deliberately NOT `resolveAiOperationModel`,
+      // since LIN-2623 has not landed and the eventual one-site switch needs
+      // to move both call sites together. Tools-on/off derives from
+      // `isToolCapableModel` on this SAME resolved id (via
+      // `buildFlightCompanionStripData`), never a second, independent guess.
+      const sessionApiKey = req.session.openRouterApiKey;
+      const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+      const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+      const model = await resolveWorkspaceModel({
+        urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier,
+      });
+      // Read-only, same discipline as observerReportDoc above: readCurrent
+      // ONLY, feeding the strip's last-check-in / sweep-liveness / no-census
+      // lines (see buildFlightCompanionStripData's own doc comment).
+      const companionDoc = observerStateStore
+        ? await observerStateStore.readCurrent(`${COMPANION_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
+        : null;
+      const censusDoc = observerStateStore
+        ? await observerStateStore.readCurrent(`${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
+        : null;
+      const strip = buildFlightCompanionStripData({ model, companionDoc, censusDoc });
+
       const html = renderFlightCompanionPage(
-        { prompt, observerReportDoc },
+        { prompt, observerReportDoc, strip },
         {
           deployInfo: getDeployInfo(),
           urlKey: workspace.urlKey,

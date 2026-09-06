@@ -297,6 +297,45 @@ describe('LIN-2631: hop usage is summed onto the final done', () => {
     assert.strictEqual(doneFrame.usage, undefined);
   });
 
+  // LIN-2621 beat 1 re-grounding: today's PRODUCTION shape (no tool hop ever
+  // puts usage on the wire yet — see sumUsage's own doc comment above), pinned
+  // as a characterization test so a future lib/openrouter.js change that DOES
+  // start emitting hop usage cannot silently alter a plain single-hop turn's
+  // reported total.
+  test('a single-hop turn (today\'s only real shape) reports exactly that one call\'s usage, unchanged', async () => {
+    const store = fakeStore({ census: censusDoc() });
+    let doneFrame = null;
+    const usage = { prompt_tokens: 50, completion_tokens: 20, total_tokens: 70, cost: 0.0012 };
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'go', apiKey: 'sk-test',
+      onEvent: (t, d) => { if (t === 'done') doneFrame = d; },
+      deps: baseDeps(store, scriptedClient([['token', { token: 'hi' }], ['done', { finishReason: 'stop', usage }]])),
+    });
+    assert.deepStrictEqual(doneFrame.usage, usage);
+  });
+
+  // LIN-2621 beat 1: "intermediate hops must not each claim the total" —
+  // a mid-turn tool frame keeps reporting only ITS OWN usage; the running sum
+  // is attached to the terminal `done` frame alone, never rewritten backward
+  // onto an already-emitted event.
+  test('an intermediate tool frame keeps its own usage; only the final done carries the running total', async () => {
+    const store = fakeStore({ census: censusDoc() });
+    const seen = [];
+    await runFlightCompanionTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'go', apiKey: 'sk-test',
+      onEvent: (t, d) => seen.push([t, d]),
+      deps: baseDeps(store, scriptedClient([
+        ['tool', { phase: 'call', id: 'c1', name: 'get_stack' }],
+        ['tool', { phase: 'result', id: 'c1', name: 'get_stack', usage: { prompt_tokens: 100, completion_tokens: 20 } }],
+        ['done', { finishReason: 'stop', usage: { prompt_tokens: 7, completion_tokens: 3 } }],
+      ])),
+    });
+    const toolResult = seen.find(([t, d]) => t === 'tool' && d.phase === 'result');
+    const done = seen.find(([t]) => t === 'done');
+    assert.deepStrictEqual(toolResult[1].usage, { prompt_tokens: 100, completion_tokens: 20 });
+    assert.deepStrictEqual(done[1].usage, { prompt_tokens: 107, completion_tokens: 23 });
+  });
+
   test('an auto-wake done carries the gate\'s surface; a user-initiated one never does', async () => {
     const store = fakeStore({ census: censusDoc() });
     let autoDone = null;

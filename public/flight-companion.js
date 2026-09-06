@@ -108,6 +108,20 @@
   // SAME boot turn.
   var startBtn = document.getElementById('flight-companion-start');
   var reorientBtn = document.getElementById('flight-companion-reorient');
+  // LIN-2621: the status strip's "next check-in due" mount — server-rendered
+  // as an em-dash placeholder (lib/render-flight-companion.js's
+  // renderStatusStrip), since the wake cadence below is this client's own
+  // in-memory countdown with no server-side schedule to render at page-load
+  // time. Optional-guarded like every other mount here.
+  var nextCheckInEl = document.getElementById('flight-companion-strip-next');
+  // LIN-2621 beat 3: the strip's running "this tab so far" total — server-
+  // rendered with its true initial value (a fresh tab has spent nothing),
+  // unlike the next-check-in placeholder above, whose initial value is
+  // genuinely unknown at render time. Updated in place on EVERY `done`
+  // frame this tab observes, visible or silent (see sendTurn's 'done'
+  // handling below) — the whole point being that a silent tick's cost is
+  // otherwise invisible nowhere else on the page.
+  var tabTotalEl = document.getElementById('flight-companion-strip-tab-total');
 
   if (!thread || !questionInput || !sendBtn) return;
 
@@ -115,6 +129,10 @@
   var inFlight = false;
   var cadence = { delayMs: CADENCE_BASE_MS, stopped: false };
   var timerId = null;
+  // LIN-2621 beat 3: per-tab, in-memory only — deliberately not persisted
+  // across a reload (the ticket's own "does not need to persist" note).
+  var tabCheckInCount = 0;
+  var tabTotalCost = 0;
   // LIN-2632: an auto-wake tick's "checking in…" placeholder (set at
   // sendTurn's start) snapshots whatever the status line showed before it,
   // so finishTurn can restore that exact prior state if the turn ends
@@ -134,6 +152,53 @@
 
   function nextCadenceDelay(currentDelayMs) {
     return Math.min(currentDelayMs * 2, CADENCE_CAP_MS);
+  }
+
+  // LIN-2621 beat 3: format a USD amount for display. Mirrors lib/render-
+  // settings.js's own formatCost (the settings page's AI usage KPI tree) —
+  // same house rule (small per-call amounts keep 4 decimals; a larger total
+  // rounds to 2) — restated here rather than imported, since this file is a
+  // browser IIFE with no module graph to lib/, the same reason every other
+  // vocabulary/prefix restatement in this codebase exists.
+  function formatCost(cost) {
+    var n = (typeof cost === 'number' && isFinite(cost)) ? cost : 0;
+    return '$' + n.toFixed(n > 0 && n < 1 ? 4 : 2);
+  }
+
+  // A single turn's meta line: tokens and cost, read straight off the final
+  // `done` frame's `usage` (lib/openrouter.js's extractUsage shape —
+  // `{prompt_tokens, completion_tokens, total_tokens, cost}`). Renders
+  // exactly what the frame carries — no hedging, no caveat about a
+  // tool-using turn's usage being under-reported today (that gap is
+  // lib/openrouter.js's, out of this ticket's scope per beat 1's finding;
+  // this plumbing is correct for whatever usage arrives and becomes
+  // accurate for free once that lands). Returns '' when there is nothing
+  // usable to show, so a turn with no usage at all renders no meta line —
+  // never a fabricated "0 tokens · $0.00".
+  function formatTurnMeta(usage) {
+    if (!usage || typeof usage !== 'object') return '';
+    var tokens = null;
+    if (typeof usage.total_tokens === 'number' && isFinite(usage.total_tokens)) {
+      tokens = usage.total_tokens;
+    } else {
+      var p = typeof usage.prompt_tokens === 'number' && isFinite(usage.prompt_tokens) ? usage.prompt_tokens : 0;
+      var c = typeof usage.completion_tokens === 'number' && isFinite(usage.completion_tokens) ? usage.completion_tokens : 0;
+      if (p || c) tokens = p + c;
+    }
+    var hasCost = typeof usage.cost === 'number' && isFinite(usage.cost);
+    if (tokens === null && !hasCost) return '';
+    var parts = [];
+    if (tokens !== null) parts.push(tokens.toLocaleString() + ' tokens');
+    if (hasCost) parts.push(formatCost(usage.cost));
+    return parts.join(' · ');
+  }
+
+  // LIN-2621 beat 4: the strip's running "this tab so far" total. The
+  // ticket's own template ("N check-ins · $x this tab") is a format sketch,
+  // not a byte-pinned string (unlike the mode line) — pluralised properly
+  // (1 check-in, 2 check-ins), everything else unchanged.
+  function formatTabTotal(count, cost) {
+    return count + (count === 1 ? ' check-in' : ' check-ins') + ' · ' + formatCost(cost) + ' this tab';
   }
 
   // The reset criterion (ruling 62bb3b4e): a user-initiated `done` always
@@ -175,6 +240,16 @@
     return state;
   }
 
+  // LIN-2621: the strip's "next check-in due" text for a countdown of
+  // `delayMs` starting now. Injected `nowMs` for deterministic tests — the
+  // wall-clock time is a genuine prediction (the client's own cadence timer),
+  // never a duration, since that is what the strip's other fields ("last
+  // check-in") are already stamped as.
+  function formatNextCheckIn(delayMs, nowMs) {
+    var due = new Date((typeof nowMs === 'number' ? nowMs : Date.now()) + delayMs);
+    return 'next check-in: ' + due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
   // A `phase: 'proposed'` tool result is a stringified, possibly-truncated
   // JSON payload (lib/openrouter.js's truncateToolResult) — parsed
   // defensively. A truncation marker (`\n… [truncated N chars]`) fails
@@ -186,6 +261,28 @@
         return { ok: true, proposal: parsed };
       }
       return { ok: false };
+    } catch (e) {
+      return { ok: false };
+    }
+  }
+
+  // LIN-2621 beat 4: `list_pending_decisions`' tool result (lib/chat-tools.js's
+  // `projectPendingDecision` shape: `{count, truncated, decisions: [{decisionId,
+  // question, options: [{id,label}], recommended, disposition, canReply,
+  // loopId, issueIdentifier, ...}]}`), parsed with the SAME defensive posture
+  // as parseProposalResult above — a truncated/malformed payload fails
+  // JSON.parse or the shape check honestly, never throws uncaught. A row
+  // missing `decisionId` or a non-array `options` is dropped rather than
+  // rendered half-built; `appendOptions` (public/chat.js) already drops any
+  // individual malformed OPTION the same way, one level down.
+  function parseDecisionsResult(resultString) {
+    try {
+      var parsed = JSON.parse(resultString);
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.decisions)) return { ok: false };
+      var decisions = parsed.decisions.filter(function (d) {
+        return d && typeof d.decisionId === 'string' && d.decisionId && Array.isArray(d.options);
+      });
+      return { ok: true, decisions: decisions };
     } catch (e) {
       return { ok: false };
     }
@@ -363,6 +460,31 @@
     return li.querySelector('.fc-msg-body');
   }
 
+  // LIN-2621 beat 3: the visible turn's own meta line — tokens and cost, read
+  // from the final `done` frame's `usage`. Appended as a page-local `.fc-msg-
+  // meta` span inside the bubble's own surface (a sibling after the text
+  // node), the same namespaced-addition convention `.fc-proposal*`/`.fc-obs-
+  // *` already use elsewhere in this file rather than reusing chat.css's
+  // `.chat-msg__time` — that class is documented there as specifically for
+  // row/log-style layouts (Collective), not the stacked-bubble column this
+  // page uses, so repurposing it would be forcing an unrelated house style
+  // rather than following one. No new chat.css rule; flight-companion.css
+  // owns `.fc-msg-meta` alongside its other `.fc-*` bubble sub-components.
+  function appendTurnMeta(answerEl, usage) {
+    if (!answerEl || !answerEl.parentNode) return;
+    var text = formatTurnMeta(usage);
+    if (!text) return;
+    var meta = document.createElement('span');
+    meta.className = 'fc-msg-meta';
+    meta.textContent = text;
+    answerEl.parentNode.appendChild(meta);
+  }
+
+  function updateTabTotalDisplay() {
+    if (!tabTotalEl) return;
+    tabTotalEl.textContent = formatTabTotal(tabCheckInCount, tabTotalCost);
+  }
+
   function appendUserBubble(text) {
     window.ChatUI.appendMessage(thread, {
       who: 'you', self: true, text: text, textClass: 'fc-msg-body', bodyClass: 'fc-msg-surface', liClass: 'fc-msg',
@@ -482,6 +604,159 @@
     });
   }
 
+  // LIN-2621 beat 4: a waiting-on-you decision, rendered as the SAME option-
+  // button row the rulings tab uses (public/chat.js's window.ChatUI.
+  // appendOptions — composed here, never forked: no new CSS rule, no copied
+  // button markup). `renderDecisions` handles the tool result's `decisions`
+  // array; `renderOneDecision` builds one row.
+  //
+  // A tap answers through `window.ReplyDelivery.postComment` ONLY — never
+  // `deliverReply` (which also resumes/dispatches a run for a `resumable`/
+  // `gone` disposition on the rulings tab). That is a deliberately NARROWER
+  // write surface than rulings has: a human click posting a comment through
+  // the existing session-auth reply path is exactly the write posture
+  // Flight Companion already has (LIN-2434's approve card), so no new one is
+  // introduced; starting/resuming a run from here would be, so it never
+  // happens from this control regardless of disposition.
+  function renderDecisions(resultString, beforeLi) {
+    var parsed = parseDecisionsResult(resultString);
+    if (!parsed.ok) {
+      showInlineNote('The companion checked pending decisions, but the details were too long to show in full.', beforeLi);
+      return;
+    }
+    // Nothing pending: the model's own prose says so — no dead UI to add.
+    parsed.decisions.forEach(function (decision) {
+      renderOneDecision(decision, beforeLi);
+    });
+  }
+
+  function renderOneDecision(decision, beforeLi) {
+    var wrap = document.createElement('div');
+    wrap.className = 'fc-decision';
+
+    if (decision.question) {
+      var q = document.createElement('p');
+      q.className = 'fc-decision-question';
+      // Model/task-authored text — textContent only.
+      q.textContent = decision.question;
+      wrap.appendChild(q);
+    }
+
+    var feedback = document.createElement('span');
+    feedback.className = 'fc-decision-feedback';
+
+    // Reused verbatim: the rulings tab's own option-button row primitive.
+    // `disposition` alone decides interactive vs. read-only inside
+    // appendOptions via the SAME allow-list `canReplyFor` (lib/unanswered-
+    // decisions.js) computes `decision.canReply` from — the two predicates
+    // are structurally identical, so they cannot disagree for a row this
+    // tool actually produced. `resolved`/`replying` guard against a double
+    // tap firing two posts for the same row.
+    // LIN-2621 beat 6 (independent review finding F1, John's ruling
+    // `lin2621-ledger-gate` gate 1): a task-bound decision ALWAYS carries
+    // `loopId: null` (lib/unanswered-decisions.js's `taskDecisionAnchor`),
+    // and the tool's own projection (lib/chat-tools.js's
+    // `projectPendingDecision`) exposes no raw issue UUID for
+    // `taskDecisionsStore.markOutcome` to match against. Rendering it
+    // interactive meant a tap posted a reply but never stamped an outcome,
+    // so `lib/unanswered-decisions.js`'s `if (entry.outcome) continue` never
+    // fired and the row never left the pending set — every later listing
+    // re-rendered it as fresh, and each tap posted another duplicate
+    // comment on a real issue. Until the projection carries the raw ids
+    // (routed follow-up, out of this leg's carve), a loopId-less decision
+    // renders read-only instead: passing a disposition outside
+    // appendOptions' own resumable/gone/task-bound allow-list reuses its
+    // EXISTING read-only path verbatim (no buttons, caption-only — the same
+    // mechanism beat 4's `mid-turn`/`canReply:false` case already exercises),
+    // then the caption text is swapped for one naming where to reply instead.
+    var unlinked = !decision.loopId;
+    var resolved = false;
+    var optionsWrap = window.ChatUI.appendOptions(wrap, {
+      options: decision.options,
+      recommended: decision.recommended,
+      disposition: unlinked ? 'task-bound-unlinked' : decision.disposition,
+      onSelect: function (optionId, optionLabel) {
+        // Second, structural guard (mirrors public/observation.js's rulings
+        // row handler) — belt-and-braces alongside appendOptions' own
+        // disposition-driven readOnly branch, which already omits buttons
+        // entirely for a non-interactive disposition.
+        if (!decision.canReply || resolved) return;
+        resolved = true;
+        // `.children` of the shared row rather than querySelectorAll (not
+        // part of this codebase's minimal DOM-shim surface, see
+        // tests/unit/flight-companion-client.test.js's own header) — every
+        // child of `.chat-options-row` is one option button, by
+        // appendOptions' own construction (public/chat.js).
+        var optionsRow = wrap.querySelector('.chat-options-row');
+        var buttons = optionsRow ? Array.prototype.slice.call(optionsRow.children) : [];
+        buttons.forEach(function (b) { b.disabled = true; });
+        feedback.textContent = 'Replying…';
+
+        // Loop-anchored (resumable/gone): both fields the comment route
+        // needs for a best-effort `markDecisionAnswered` stamp are present
+        // in this tool's own projection. Task-bound: the tool exposes
+        // `decisionId` (== the scan store's own row id, `lib/scan.js`'s
+        // "a scan's decision_id and its store row id always agree") but NOT
+        // the raw issue UUID `taskDecisionsStore.markOutcome` matches
+        // against — only `issueIdentifier`, a human string. Rather than
+        // send a value known to be the wrong shape, this omits the stamp
+        // pair for that case: the reply comment still posts (the durable,
+        // human-visible half), only the best-effort "answered" stamp on the
+        // scan row does not fire — the SAME graceful degradation
+        // window.ReplyDelivery.postComment already gives any caller that
+        // omits the decision argument.
+        var extra = decision.loopId
+          ? { decisionLoopId: decision.loopId, decisionId: decision.decisionId }
+          : undefined;
+
+        window.ReplyDelivery.postComment(urlKey, decision.issueIdentifier, optionLabel, extra)
+          .then(function (commentResult) {
+            if (!commentResult.ok) {
+              var status = commentResult.status;
+              var message = (commentResult.data && commentResult.data.error) || ('HTTP ' + status);
+              if (status >= 400 && status < 500) {
+                // Terminal client error — leave the row disabled; retrying
+                // the same request would only fail the same way.
+                feedback.textContent = message;
+              } else {
+                // 5xx — retryable.
+                resolved = false;
+                buttons.forEach(function (b) { b.disabled = false; });
+                feedback.textContent = message + ' — try again.';
+              }
+              return;
+            }
+            feedback.textContent = 'Replied ✓';
+            wrap.classList.add('fc-decision--resolved');
+          })
+          .catch(function () {
+            // Network failure — retryable.
+            resolved = false;
+            buttons.forEach(function (b) { b.disabled = false; });
+            feedback.textContent = 'Network failure — try again.';
+          });
+      },
+    });
+    if (unlinked) {
+      // appendOptions' own read-only branch renders a generic caption for
+      // any disposition it doesn't recognize ("no action available yet") —
+      // swap it for one that names where to actually reply, since this is a
+      // real, answerable decision, just not answerable from here yet.
+      var caption = optionsWrap.querySelector('.chat-options-caption');
+      if (caption) caption.textContent = 'Reply from the Rulings tab (Observation → Rulings) — not here yet.';
+    }
+    wrap.appendChild(feedback);
+
+    var li = document.createElement('li');
+    li.className = 'chat-msg fc-decision-msg';
+    li.appendChild(wrap);
+    if (beforeLi && beforeLi.parentNode === thread) thread.insertBefore(li, beforeLi);
+    else thread.appendChild(li);
+    thread.hidden = false;
+    thread.scrollTop = thread.scrollHeight;
+    setEmptyVisible(false);
+  }
+
   // ─── Tool-wire phase handling (F5: all five phases explicit) ───────────
 
   // Settle a 'call' breadcrumb on its matching 'result' — correlated via the
@@ -523,6 +798,12 @@
       if (toolLis && data.id) toolLis[data.id] = { li: li, label: label };
     } else if (data.phase === 'result') {
       settleToolCall(data, toolLis);
+      // LIN-2621 beat 4: additive to the ordinary breadcrumb settle above —
+      // `list_pending_decisions` is a plain read-only tool with no server-
+      // side phase relabel (unlike send_follow_up's 'proposed'), so this
+      // branches on the tool's own name within 'result' rather than a
+      // second phase value.
+      if (data.name === 'list_pending_decisions') renderDecisions(data.result, beforeLi);
     } else if (data.phase === 'error') {
       failToolCall(data, toolLis);
     } else if (data.phase === 'proposed') {
@@ -537,6 +818,12 @@
   function scheduleAutoWake(delayMs) {
     if (timerId) clearTimeout(timerId);
     timerId = setTimeout(autoWakeTick, delayMs);
+    // LIN-2621: every place that arms the shared timer is a new "next
+    // check-in" prediction — updating it here, in the one place the timer is
+    // actually armed, covers every caller (initial load, a cadence effect,
+    // the in-flight retry branch, and visibility resume) without repeating
+    // the call at each site.
+    if (nextCheckInEl) nextCheckInEl.textContent = formatNextCheckIn(delayMs);
   }
 
   // Apply a cadence effect AND (unless stopped/hidden) reschedule the
@@ -547,12 +834,14 @@
     cadence = advanceCadence(cadence, effect);
     if (cadence.stopped) {
       if (timerId) { clearTimeout(timerId); timerId = null; }
+      if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
       return;
     }
     if (document.hidden) {
       // Paused — no eager scheduling while hidden; resumed by
       // visibilitychange below, at the (possibly just-updated) delay.
       if (timerId) { clearTimeout(timerId); timerId = null; }
+      if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
       return;
     }
     scheduleAutoWake(cadence.delayMs);
@@ -878,6 +1167,20 @@
               // none is created now — only the one status line updates.
               updateCheckInStatus();
             }
+            // LIN-2621 beat 3: every `done` frame — visible or silent, any
+            // turn kind — updates the running "this tab so far" total and
+            // check-in count. This is the ONLY other visible effect a silent
+            // tick has (AC1/AC2 above are otherwise unchanged): the strip
+            // updates, no bubble paints. `answerLi` is non-null exactly when
+            // a bubble exists this turn (the two branches above, never AC1's
+            // silent one) — that is what gates the per-bubble meta line,
+            // independent of the always-on tab-total accumulation.
+            tabCheckInCount += 1;
+            if (eventData && eventData.usage && typeof eventData.usage.cost === 'number' && isFinite(eventData.usage.cost)) {
+              tabTotalCost += eventData.usage.cost;
+            }
+            updateTabTotalDisplay();
+            if (answerLi) appendTurnMeta(answerEl, eventData && eventData.usage);
             // LIN-2622: the cadence resets on `done` ONLY — doneCadenceEffect
             // treats a boot exactly like a user-initiated turn here, and every
             // failure exit below (mid-stream error, non-stream outcome,
@@ -1000,10 +1303,13 @@
     module.exports = {
       capHistory, nextCadenceDelay, doneCadenceEffect, autoWakeErrorCadenceEffect,
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
-      formatNoCensus,
+      formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal, parseDecisionsResult,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },
+      getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
+      getTabTotalText: function () { return tabTotalEl ? tabTotalEl.textContent : null; },
+      getTabTotals: function () { return { count: tabCheckInCount, cost: tabTotalCost }; },
       CADENCE_BASE_MS: CADENCE_BASE_MS, CADENCE_CAP_MS: CADENCE_CAP_MS, HISTORY_CAP: HISTORY_CAP,
     };
   }
