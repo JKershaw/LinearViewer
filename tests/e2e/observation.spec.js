@@ -591,18 +591,21 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     return item;
   }
 
-  test('all three tabs render, Autopilot active by default', async ({ page }) => {
+  test('all four tabs render, Autopilot active by default', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
-    // A third tab, Rulings, was added by LIN-1728 Phase 4 — its own coverage
-    // lives in tests/e2e/observation-rulings.spec.js; asserted here only for
-    // count/inactive-by-default so this file's own tab invariant stays true.
+    // A third tab, Rulings, was added by LIN-1728 Phase 4 (own coverage in
+    // tests/e2e/observation-rulings.spec.js), and a fourth, Scan-due, by
+    // LIN-2667 (LIN-2649 S4, unit-tested in render-observation.test.js);
+    // asserted here only for count/inactive-by-default so this file's own
+    // tab invariant stays true.
     const tabs = page.locator('#obs-tabs .obs-tab');
-    await expect(tabs).toHaveCount(3);
+    await expect(tabs).toHaveCount(4);
     await expect(page.locator('.obs-tab[data-view="autopilot"]')).toHaveClass(/is-active/);
     await expect(page.locator('.obs-tab[data-view="sessions"]')).not.toHaveClass(/is-active/);
     await expect(page.locator('.obs-tab[data-view="rulings"]')).not.toHaveClass(/is-active/);
+    await expect(page.locator('.obs-tab[data-view="due"]')).not.toHaveClass(/is-active/);
   });
 
   test('a standalone running session shows under Sessions but NOT under Autopilot', async ({ page }) => {

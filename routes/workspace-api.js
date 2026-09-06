@@ -2763,6 +2763,10 @@ ${goal}`
    *   `items[]`: { issueId, issueIdentifier, dueStatus: true|false|null, error?: true }.
    *   `dueStatus` is exactly `true`/`false`/`null`; `error` is an orthogonal flag set only
    *   on a per-candidate provider-read failure, never folded into `dueStatus`.
+   *   `nextCursor` is the SAME opaque base64url-JSON string the `cursor` query param
+   *   above accepts — emitted and accepted are identical, replay it verbatim as
+   *   `?cursor=<nextCursor>`; `null` on the last page. (Its inverse decode is above,
+   *   at the top of the handler.)
    */
   router.get('/workspace/:urlKey/api/scan-due', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -2840,7 +2844,11 @@ ${goal}`
 
       keepalive.send(200, {
         items,
-        nextCursor: page.nextCursor,
+        // Symmetric with the cursor decode above (N-A discharge, LIN-2667):
+        // emit the SAME base64url-JSON string the `cursor` param accepts, so a
+        // client replays it verbatim. Conditional — an unconditional encode
+        // would turn a last-page `null` into the string "bnVsbA".
+        nextCursor: page.nextCursor ? Buffer.from(JSON.stringify(page.nextCursor)).toString('base64url') : null,
         pageCandidateCount: page.items.length,
         totalCandidateCount: page.totalCandidateCount
       });
