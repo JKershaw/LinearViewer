@@ -43,7 +43,7 @@ Issues are wrapped in nested `.node` containers:
       .detail-toggle[data-toggle="attachments"] - "Attachments (N) ▶" toggle (auth only, nested; image gallery via /api/image relay, attachment-capable providers only)
       .detail-toggle[data-toggle="brief"]    - "Brief ▶" toggle (auth only, nested; lazy AI brief)
       .detail-toggle[data-toggle="recap"]    - "Recap ▶" toggle (auth only, nested; lazy AI recap)
-      .detail-toggle[data-toggle="scan"]     - "Scan ▶" toggle (auth only, nested; human-triggered scan for an operator-worthy blocker — one click still starts every run, but a run may now be this single scan or, from the Observation Scan-due tab, a bounded/refusable/abortable batch of N; no auto-run either way)
+      .detail-toggle[data-toggle="scan"]     - "Scan ▶" toggle (auth only, nested; human-triggered scan for an operator-worthy blocker — one click still starts every run, and a run may be this single scan or, once the Observation Scan-due tab's own run controls land (LIN-2707), a bounded/refusable/abortable batch of N; no auto-run either way. That tab today offers selection and pricing only — no batch is startable from anywhere yet)
       .detail-toggle[data-toggle="context"] - "Context ▶" toggle (auth only, nested; lazy relationship diagram)
       .detail-toggle[data-toggle="sessions"] - "Dispatched Sessions ▶" toggle (nested; dispatch flag only)
     .detail-toggle[data-toggle="prompts"]  - "Prompts ▶" toggle (auth only)
@@ -139,7 +139,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.detail-toggle[data-toggle="comments"]` - Comments toggle (nested in Details, lazy-loaded on first expand)
 - `.detail-toggle[data-toggle="brief"]` - Brief toggle (nested in Details, lazy AI current-state brief)
 - `.detail-toggle[data-toggle="recap"]` - Recap toggle (nested in Details, lazy AI progress recap)
-- `.detail-toggle[data-toggle="scan"]` - Scan toggle (nested in Details, human-triggered scan for an operator-worthy blocker — one click still starts every run; never auto-runs on expand, only a cheap status check does. A run may be this single scan or, from the Observation Scan-due tab (LIN-2706, see Autopilot Observation Endpoints below), a bounded/refusable/abortable batch of N. A found blocker renders a question + options + an answer box (durable comment write) and a dismiss action.)
+- `.detail-toggle[data-toggle="scan"]` - Scan toggle (nested in Details, human-triggered scan for an operator-worthy blocker — one click still starts every run; never auto-runs on expand, only a cheap status check does. A run may be this single scan or, once the Observation Scan-due tab's own run controls land (LIN-2707, see Autopilot Observation Endpoints below), a bounded/refusable/abortable batch of N — that tab ships selection and pricing only today (LIN-2706), so the single scan is currently the only run any of this starts. A found blocker renders a question + options + an answer box (durable comment write) and a dismiss action.)
 - `.detail-toggle[data-toggle="context"]` - Context toggle (nested in Details, lazy relationship diagram: blockers/blocked/parent/children/related). Each task node is `.context-node` with `data-context-nav="LIN-123"`.
 - `.detail-toggle[data-toggle="sessions"]` - Dispatched Sessions toggle (nested in Details, dispatch flag only)
 - `.detail-content[data-content="prompts"]` - Prompts section content (hidden by default)

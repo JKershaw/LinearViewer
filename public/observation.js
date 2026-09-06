@@ -2252,9 +2252,23 @@ function renderDueRowHtml(item) {
   // LIN-2706 §B.3: reflects membership in dueSelectedIds (the Set is the
   // single source of truth, never the checkbox DOM), so a repaint restores
   // checked state rather than dropping it.
+  //
+  // The checkbox carries its own accessible name (review N3, LIN-2706 PR
+  // #1424): the row's identifier lives in a SIBLING span, so without
+  // `aria-label` a screen reader announces an unnamed checkbox and the
+  // operator cannot tell which task they are selecting. Every other checkbox
+  // in this codebase is named — swim's four and collective's rows sit inside
+  // a `<label>` with visible text, and this feature's own select-all is
+  // label-wrapped — so this is the existing convention, not a new one. It is
+  // `aria-label` rather than a wrapping `<label>` because the row is a flex
+  // container whose children are laid out by `.obs-due-row`; wrapping would
+  // change the layout the styling witness now pins. The attribute is placed
+  // BEFORE `class`/`data-issue-id` deliberately, so the `class="obs-due-select"
+  // data-issue-id="..." checked` sequence the selection tests match stays
+  // contiguous.
   const checkedAttr = dueSelectedIds.has(String(item.issueId)) ? ' checked' : '';
   return `<li class="obs-due-row ${status.cls}" data-issue-id="${escapeHtml(String(item.issueId))}">`
-    + `<input type="checkbox" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr}>`
+    + `<input type="checkbox" aria-label="select ${escapeHtml(String(idLabel))}" class="obs-due-select" data-issue-id="${escapeHtml(String(item.issueId))}"${checkedAttr}>`
     + `<span class="obs-due-issue">${escapeHtml(String(idLabel))}</span>`
     + `<span class="obs-due-badge">checked &middot; provider read</span>`
     + `<span class="obs-due-status">${escapeHtml(status.text)}</span>`

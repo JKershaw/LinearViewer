@@ -79,12 +79,37 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     await expect(page.locator('#obs-due-list .obs-due-select').first()).toBeVisible();
 
     const bar = page.locator('#obs-due-bulk-bar');
-    // At least one row must be selected before the bar shows anything —
-    // the initial paint alone must not have flashed it.
+    // The bar appears as soon as ROWS load, independent of selection
+    // (`syncDueBulkBar` keys its `hidden` off `dueLoadedItems.length`, not the
+    // selection) — a freshly painted list already reads `0 selected (exact) ·
+    // est. unknown`, which the closing lines of this test assert directly.
+    // Selecting here is what gives the count something non-zero to show and
+    // what puts the estimate beside it; it is not a precondition for the bar
+    // being painted at all. (Review N4, LIN-2706 PR #1424: the previous
+    // comment here claimed the opposite and was the same species of defect as
+    // finding 2 — prose that misdescribes what renders.)
+    await expect(bar).toBeVisible();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('0 selected (exact)');
     await page.locator('#obs-due-select-all').check();
     await expect(bar).toBeVisible();
     await expect(bar).toHaveCSS('display', 'flex');
     await expect(page.locator('#obs-due-selected-count')).toHaveText('3 selected (exact)');
+
+    // Review finding 3 / N2 (LIN-2706 PR #1424) — the STYLING witness. The
+    // fix for finding 3 (the count/estimate/refusal/quota-note rendering as
+    // 16px near-black body copy, outshouting the disclaimer they sit beside)
+    // had no assertion at any level: deleting `.obs-bulk-scan-count` &
+    // friends from public/observation.css left the whole unit suite and this
+    // spec green. Only a real stylesheet in a real browser can see it, so it
+    // is pinned here, on the page this spec already has open.
+    //
+    // 12.48px is `font-size: 0.78rem` against the 16px root — the shared
+    // small-print size .obs-due-limits/.obs-due-progress already use. Pinned
+    // rather than a colour because it is theme-independent: an unstyled span
+    // inherits the body's own 16px, so the assertion fails the moment the
+    // rule is gone, in either colour scheme.
+    await expect(page.locator('#obs-due-selected-count')).toHaveCSS('font-size', '12.48px');
+    await expect(page.locator('#obs-due-selected-cost')).toHaveCSS('font-size', '12.48px');
 
     // Finding 2: the disclaimer must name the estimate's real position.
     const disclaimer = page.locator('#obs-due-bulk-disclaimer');
@@ -123,6 +148,16 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     const refusal = page.locator('#obs-due-bulk-refusal');
     await expect(refusal).toBeVisible();
     await expect(refusal).toContainText('scan 40 at a time');
+    // The refusal's own share of the finding-3 styling fix (see the note in
+    // the previous test): muted small print with a measured line length, not
+    // 16px full-width body copy shouting over the disclaimer above it.
+    await expect(refusal).toHaveCSS('font-size', '12.48px');
+    // `max-width: 62ch` resolves against the rendered font's own advance
+    // width, so it is asserted as "measured, not unbounded" rather than as an
+    // exact pixel value — pinning 464.256px would make this spec fail on a
+    // font-metric change or a slow webfont load without the styling having
+    // regressed at all.
+    await expect(refusal).not.toHaveCSS('max-width', 'none');
 
     const checkedCount = await page.locator('#obs-due-list .obs-due-select:checked').count();
     expect(checkedCount, 'a refusal must never truncate the selection').toBe(45);
@@ -130,5 +165,72 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // No path to a billed call anywhere on this tab, in any state.
     await expect(page.locator('#obs-due-section button:has-text("Scan")')).toHaveCount(0);
     await expect(page.locator('#obs-due-section button:has-text("Stop")')).toHaveCount(0);
+  });
+
+  // The fourth element the finding-3 styling fix covers, and the one the
+  // review named explicitly: `.obs-bulk-scan-quota-note` renders only on the
+  // free-tier branch of renderBulkScanDisclaimer, so it needs its own session.
+  // `/test/set-session?freeTierEnabled=true` sets `session.freeTierEnabled`,
+  // and the Playwright web server starts with `OPENROUTER_API_KEY=` and
+  // `OPENROUTER_FREE_TIER_KEY=` explicitly empty (playwright.config.js), so
+  // `getOpenRouterSource` deterministically returns 'free' here — no
+  // dependence on the developer's own .env.
+  test('the free-tier quota note renders as its own muted small-print paragraph, not 16px body copy', async ({ page }) => {
+    await page.route(SCAN_DUE_ROUTE, (route) => route.fulfill({
+      json: {
+        items: [{ issueId: 'issue-1', issueIdentifier: 'LIN-1', dueStatus: true }],
+        nextCursor: null,
+        pageCandidateCount: 1,
+        totalCandidateCount: 1,
+      },
+    }));
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}&freeTierEnabled=true`);
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.click('#obs-tabs [data-view="due"]');
+
+    const quotaNote = page.locator('#obs-due-bulk-quota-note');
+    await expect(quotaNote).toBeVisible();
+    await expect(quotaNote).toContainText('free tier');
+    await expect(quotaNote).toHaveCSS('font-size', '12.48px');
+    await expect(quotaNote).not.toHaveCSS('max-width', 'none');
+
+    // Two budget gates, disclosed as two separate paragraphs (§B.9) — the
+    // quota note must not have been folded into the dollar-estimate
+    // disclaimer, and both must stay small print beside each other.
+    await expect(page.locator('#obs-due-bulk-disclaimer')).toHaveCSS('font-size', '12.48px');
+    await expect(page.locator('#obs-due-bulk-quota-note')).not.toHaveText(
+      await page.locator('#obs-due-bulk-disclaimer').innerText()
+    );
+
+    // Still no spend path on the free-tier branch either.
+    await expect(page.locator('#obs-due-section button:has-text("Scan")')).toHaveCount(0);
+  });
+
+  // Review N3 (LIN-2706 PR #1424): the per-row checkbox's accessible name,
+  // asserted against the real accessibility tree rather than the HTML string
+  // the unit test can see.
+  test('every per-row checkbox has an accessible name naming the task it selects', async ({ page }) => {
+    await page.route(SCAN_DUE_ROUTE, (route) => route.fulfill({
+      json: {
+        items: [
+          { issueId: 'issue-1', issueIdentifier: 'LIN-1', dueStatus: true },
+          { issueId: 'issue-2', issueIdentifier: 'LIN-2', dueStatus: false },
+        ],
+        nextCursor: null,
+        pageCandidateCount: 2,
+        totalCandidateCount: 2,
+      },
+    }));
+    await openDueTab(page);
+    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(2);
+
+    await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-2' })).toBeVisible();
+
+    // The name survives a repaint (select-all re-renders every row from
+    // dueLoadedItems), so it is a property of the renderer, not of first paint.
+    await page.locator('#obs-due-select-all').check();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).toBeChecked();
   });
 });

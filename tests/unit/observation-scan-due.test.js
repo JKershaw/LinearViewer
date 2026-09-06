@@ -425,6 +425,28 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     assert.match(renderDueRowHtml(item), /class="obs-due-select" data-issue-id="a" checked/, 'selected row must render checked');
   });
 
+  // Review N3 (LIN-2706 PR #1424): the row's identifier lives in a SIBLING
+  // span, so the checkbox has no accessible name unless it carries one of its
+  // own — a screen reader would otherwise announce an unnamed checkbox with no
+  // way to tell which task it selects.
+  test('renderDueRowHtml gives every per-row checkbox an accessible name carrying the row identifier', () => {
+    const { renderDueRowHtml } = makeSandbox().module.exports;
+
+    const row = renderDueRowHtml({ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true });
+    assert.match(row, /<input type="checkbox" aria-label="select LIN-1"/, 'the checkbox must name the row it selects');
+
+    // The identifier is the label when present; the raw id is the fallback,
+    // matching the visible `.obs-due-issue` span's own idLabel derivation, so
+    // the announced name can never disagree with the name on screen.
+    const noIdentifier = renderDueRowHtml({ issueId: 'raw-id-9', dueStatus: null });
+    assert.match(noIdentifier, /aria-label="select raw-id-9"/, 'falls back to the issueId, exactly as the visible label does');
+
+    // Escaped, like every other interpolation in this renderer.
+    const nasty = renderDueRowHtml({ issueId: 'x', issueIdentifier: '<img src=x>', dueStatus: true });
+    assert.match(nasty, /aria-label="select &lt;img src=x&gt;"/, 'the accessible name is escaped, not raw');
+    assert.doesNotMatch(nasty, /aria-label="select <img/);
+  });
+
   test('a repaint with the SAME items preserves checked state (idempotent repaint)', () => {
     const sandbox = makeSandbox();
     const { paintDuePage, toggleDueSelection } = sandbox.module.exports;
