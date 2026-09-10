@@ -19,6 +19,8 @@ import { classifyLoop } from '../../lib/observer-sweep.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
 import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
+import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
+import { createMockCollection } from '../fixtures/mock-collection.js';
 
 // A recording fake of the pass-1 provider read surface. Every method records
 // the scope it was called with so tests can assert workspace-scoping, and
@@ -1903,6 +1905,15 @@ const T_FLEET_OLD = new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString();
 const T_FLEET_MID = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
 const T_FLEET_FRESH = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
+// LIN-2704: genuinely UUID-shaped, so a `markOutcome` stamp against the
+// projected `issueId` is not a silent no-op (`lib/task-decisions-store.js`'s
+// canonical-UUID guard, `UUID_REGEX.test(issueId)`). The prior fixture value
+// ('uuid-802') was NOT UUID-shaped — `grep -n "uuid-802" tests/unit/chat-
+// tools.test.js` (verified at this ticket's HEAD, 4f59a79a) returned only the
+// fixture assignment itself; every other reference keys on `decision_id:
+// 'dec-task'` instead, so replacing it in place changes no other assertion.
+const TASK_DECISION_UUID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+
 // A fleet with one of each thing the tool has to get right: a session still
 // moving, a session parked on a human, a finished session, and a bare `wake`
 // loop that — with no sessionId and no followUpTo — would otherwise surface as
@@ -2258,7 +2269,7 @@ function decisionsFixture() {
     }),
   ];
   const taskDecisions = [{
-    id: 'td-1', urlKey: URL_KEY, issueId: 'uuid-802', issueIdentifier: 'LIN-802',
+    id: 'td-1', urlKey: URL_KEY, issueId: TASK_DECISION_UUID, issueIdentifier: 'LIN-802',
     scannedAt: T_FLEET_FRESH, outcome: null,
     decision: {
       decision_id: 'dec-task',
@@ -2382,6 +2393,103 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
     assert.deepStrictEqual(
       [...new Set(calls)].sort(), ['listForWorkspaces', 'listUnansweredForWorkspaces'],
       'only the two list reads — never markDecisionAnswered/dismiss/shelve'
+    );
+  });
+});
+
+// LIN-2704: the pending-set exit is the acceptance criterion, not "a tap
+// posts" (§4 of the plan). Unlike the rest of this describe block, these
+// tests wire a REAL TaskDecisionsStore (tests/fixtures/mock-collection.js)
+// rather than the listUnansweredForWorkspaces-only stub above, because the
+// thing being proven is the real `markOutcome` path the projected ids feed —
+// a stub that only ever returns the seeded array can't demonstrate a row
+// actually leaving the pending set.
+describe('pass-4 fleet read — list_pending_decisions pending-set exit (LIN-2704)', () => {
+  function makeRealTaskDecisionsStore(fixtureTaskDecisions) {
+    const collection = createMockCollection();
+    for (const entry of fixtureTaskDecisions) {
+      collection._docs.push({
+        _id: entry.id, urlKey: entry.urlKey, issueId: entry.issueId,
+        issueIdentifier: entry.issueIdentifier, decision: entry.decision,
+        scannedAt: new Date(entry.scannedAt), outcome: entry.outcome ?? null, outcomeAt: null,
+      });
+    }
+    return new TaskDecisionsStore({ collection });
+  }
+
+  test('the projection carries the anchor\'s raw issueId and taskDecisionId, additive to issueIdentifier', async () => {
+    const fixture = decisionsFixture();
+    const { executeTool } = makeDecisionsCatalog(fixture);
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    const taskRow = result.decisions.find(d => d.decisionId === 'dec-task');
+    assert.strictEqual(taskRow.issueId, TASK_DECISION_UUID);
+    assert.strictEqual(taskRow.taskDecisionId, 'td-1');
+    assert.strictEqual(taskRow.issueIdentifier, 'LIN-802', 'additive, never a replacement');
+  });
+
+  test('stamping a task-bound decision with the projected ids removes it from the next listing — the real markOutcome path', async () => {
+    const fixture = decisionsFixture();
+    const taskDecisionsStore = makeRealTaskDecisionsStore(fixture.taskDecisions);
+    const stores = makeMockSessionStores({ history: fixture.history });
+    const { executeTool } = createChatToolCatalog({
+      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+      taskDecisionsStore,
+      shelvedRulingsStore: { async listForWorkspaces() { return fixture.shelvedRulings; } },
+    });
+
+    const before = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    const taskRow = before.decisions.find(d => d.decisionId === 'dec-task');
+    assert.ok(taskRow, 'the task-bound row is present before stamping');
+
+    // The real path a client tap drives (routes/workspace-api.js's
+    // stampDecisionAnswers -> taskDecisionsStore.markOutcome), fed EXACTLY the
+    // ids this tool's own projection produced — never re-derived.
+    const stamped = await taskDecisionsStore.markOutcome({
+      urlKey: URL_KEY, issueId: taskRow.issueId, id: taskRow.taskDecisionId, outcome: 'answered',
+    });
+    assert.ok(stamped, 'markOutcome must return the stamped record, not null — the mutation witness that the stamp actually happened');
+    assert.strictEqual(stamped.outcome, 'answered');
+
+    const after = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    assert.strictEqual(
+      after.decisions.some(d => d.decisionId === 'dec-task'), false,
+      'the row must be ABSENT from the next listing — a tap posting is not the criterion, leaving the pending set is'
+    );
+    // Only the stamped row exits; the loop-anchored row is untouched by this.
+    assert.strictEqual(after.decisions.some(d => d.decisionId === 'dec-loop'), true);
+  });
+
+  test('a non-UUID issueId cannot stamp — markOutcome no-ops and the row stays in the pending set', async () => {
+    // Same row shape the happy-path test above uses, but keyed under the
+    // historically non-UUID-shaped issueId this fixture used to carry before
+    // LIN-2704 (`uuid-802`) — pins that the canonical-UUID guard itself is
+    // still enforced, not merely unexercised now that the happy path uses a
+    // real UUID.
+    const fixture = decisionsFixture();
+    const nonUuidTaskDecisions = [{ ...fixture.taskDecisions[0], id: 'td-2', issueId: 'uuid-802' }];
+    const taskDecisionsStore = makeRealTaskDecisionsStore(nonUuidTaskDecisions);
+    const stores = makeMockSessionStores({ history: fixture.history });
+    const { executeTool } = createChatToolCatalog({
+      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+      taskDecisionsStore,
+      shelvedRulingsStore: { async listForWorkspaces() { return []; } },
+    });
+
+    const before = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    const taskRow = before.decisions.find(d => d.decisionId === 'dec-task');
+    assert.strictEqual(taskRow.issueId, 'uuid-802');
+
+    const stamped = await taskDecisionsStore.markOutcome({
+      urlKey: URL_KEY, issueId: taskRow.issueId, id: taskRow.taskDecisionId, outcome: 'answered',
+    });
+    assert.strictEqual(stamped, null, 'the canonical-UUID guard refuses the write outright, never a silent partial stamp');
+
+    const after = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    assert.strictEqual(
+      after.decisions.some(d => d.decisionId === 'dec-task'), true,
+      'a no-op stamp must leave the row in the pending set, not silently drop it'
     );
   });
 });
@@ -2510,6 +2618,72 @@ describe('pass-4 fleet reads — review-ledger witnesses (LIN-2617)', () => {
       JSON.stringify(decisions).length <= CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions,
       `20 decision rows serialize to ${JSON.stringify(decisions).length}, over the declared budget`
     );
+  });
+
+  // LIN-2704 review ledger L1 (finding F1). The full-cap fixture ABOVE is 20
+  // LOOP-anchored rows, where both fields LIN-2704 added are at their cheapest:
+  // `anchor.issueId` is null for essentially every autopilot-dispatched loop
+  // (recommend-and-dispatch never resolves a provider id — see the note at
+  // public/flight-companion.js's `gone` branch) and `taskDecisionId` has no
+  // loop-anchor counterpart at all, so both serialize as bare nulls there.
+  //
+  // That is the WRONG class to size the budget on: the row class LIN-2704
+  // exists to enable is the TASK-BOUND one, which carries a real 36-char UUID
+  // in `issueId` AND a real 26-char store id in `taskDecisionId` — the only
+  // rows where the raise is actually spent. Sizing the cap on the loop shape
+  // and asserting the margin in a prose comment is what F1 objected to, so the
+  // task-bound figure is measured HERE, by the suite, instead.
+  test('a full-cap TASK-BOUND payload — the row class LIN-2704 enables — still fits the raised budget', async () => {
+    // Faithful id shapes, not stubs: TaskDecisionsStore's `_id` and the
+    // decision's own `decision_id` are the SAME 26-char value
+    // (`scan_<issueId8>_<inputHash12>` — lib/task-decisions-store.js:26, reused
+    // as decision_id at lib/scan.js:148), and `issueId` is a canonical UUID
+    // because `markOutcome` rejects anything else. Content is the worst case
+    // the field caps admit, matching the loop fixture above.
+    const long = 'x'.repeat(4000);
+    const taskDecisions = Array.from({ length: 25 }, (_, i) => {
+      // Distinct issueIds: collectUnansweredDecisions keeps only the latest row
+      // per (urlKey, issueId), so a shared id would collapse 25 rows into 1.
+      const issueId = `3fa85f64-5717-4562-b3fc-2c963f66af${String(i).padStart(2, '0')}`;
+      const rowId = `scan_${issueId.slice(0, 8)}_${String(i).padStart(2, '0')}c1170e5832`;
+      return {
+        id: rowId, urlKey: URL_KEY, issueId, issueIdentifier: `LIN-27${i}`,
+        scannedAt: T_FLEET_MID, outcome: null,
+        decision: {
+          decision_id: rowId, question: long, recommended: 'o1',
+          options: Array.from({ length: 8 }, (_, j) => ({ id: `o${j}`, label: 'y'.repeat(400) })),
+        },
+      };
+    });
+    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
+
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    const size = JSON.stringify(result).length;
+    const budget = CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions;
+
+    // Structural, as everywhere else in this file: whatever the rows contain,
+    // what reaches the model is valid JSON inside the budget.
+    assert.ok(size <= budget, `task-bound rows serialize to ${size}, over the ${budget} budget`);
+    assert.doesNotThrow(() => JSON.parse(JSON.stringify(result)));
+
+    // THE ledger assertion. Measured at this commit: 19993 bytes against the
+    // 20000 cap — 7 bytes of headroom, i.e. the raise is spent almost exactly
+    // by the task-bound class and NOT the ~6.5% margin a loop-shaped
+    // measurement suggests. If any future field widens a decision row, this
+    // fails rather than silently withholding a pending decision from the one
+    // page whose whole job is "what needs me?" — fitToBudget pops from the
+    // TAIL and the sort is oldest-first, so the row lost is the newest-parked.
+    // A failure here is not "bump the number": it is a prompt to re-derive the
+    // cap from this class and re-record it, the way LIN-2704 had to.
+    assert.strictEqual(
+      result.decisions.length, 20,
+      `all 20 task-bound rows must survive the byte trim; serialized to ${size} against ${budget} `
+      + `(headroom ${budget - size}B). A dropped row means the raised cap no longer covers the row class LIN-2704 enabled.`
+    );
+    // `truncated` is honest here about the ROW CAP (25 pending, 20 returned),
+    // which is the pre-existing limit — not about a byte trim.
+    assert.strictEqual(result.truncated, true);
+    assert.strictEqual(result.count, 25);
   });
 
   test('noise.terminalOmitted counts what THIS read withheld, never the fleet', async () => {

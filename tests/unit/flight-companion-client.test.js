@@ -1616,11 +1616,20 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
 // dispatches/resumes a run for a resumable/gone row on the rulings tab —
 // deliberately narrower here, see renderOneDecision's own comment).
 describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons', () => {
-  // Matches lib/chat-tools.js's projectPendingDecision shape exactly.
+  // Matches lib/chat-tools.js's projectPendingDecision shape exactly —
+  // including `issueId`/`taskDecisionId` (LIN-2704), additive to
+  // `issueIdentifier`. `taskDecisionId: null` is the loop-anchored default
+  // (a loop anchor carries no `taskDecisionId` field at all,
+  // lib/unanswered-decisions.js's loop branch, so the real projection's
+  // `truncateText(undefined, ...)` resolves to `null`); a task-bound
+  // override sets both `issueId` (the raw UUID) and `taskDecisionId` (the
+  // scan store's own row id).
   function decision(overrides) {
     return Object.assign({
       decisionId: 'dec-1',
       issueIdentifier: 'LIN-100',
+      issueId: 'uuid-100',
+      taskDecisionId: null,
       loopId: 'loop-1',
       sessionId: 'sess-1',
       question: 'Should we ship it?',
@@ -1709,8 +1718,8 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     assert.ok(chatUICalls.appendNote.some(c => /too long to show/.test(c.text)));
   });
 
-  test('a tap on a loop-anchored (resumable) decision posts through window.ReplyDelivery.postComment ONLY, with decisionLoopId + decisionId', async () => {
-    const d = decision({ disposition: 'resumable', loopId: 'loop-7', decisionId: 'dec-7', issueIdentifier: 'LIN-77' });
+  test('a tap on a loop-anchored (resumable) decision posts through window.ReplyDelivery.postComment ONLY, with decisionLoopId + decisionId, to the raw issueId target', async () => {
+    const d = decision({ disposition: 'resumable', loopId: 'loop-7', decisionId: 'dec-7', issueId: 'uuid-77', issueIdentifier: 'LIN-77' });
     const { exports: m, thread, replyDeliveryCalls, apiCalls } = loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
     });
@@ -1725,53 +1734,79 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     // sandbox, so it carries a different (but structurally identical)
     // Object.prototype than this file's own literal — same cross-realm
     // reason beat 3's getTabTotals() assertions use looseDeepEqual.
+    // LIN-2704: the comment target now prefers the raw `issueId` (with an
+    // `issueIdentifier` fallback), mirroring public/observation.js's
+    // rulings-tab precedence, now that the projection carries it for every
+    // row — never just the task-bound ones.
     looseDeepEqual(replyDeliveryCalls[0], {
-      urlKey: 'acme', issueId: 'LIN-77', prompt: 'Ship it',
+      urlKey: 'acme', issueId: 'uuid-77', prompt: 'Ship it',
       decision: { decisionLoopId: 'loop-7', decisionId: 'dec-7' },
     });
     assert.strictEqual(apiCalls.length, 0, 'never window.api — postComment is a raw fetch of its own');
   });
 
-  // LIN-2621 beat 6 (independent review finding F1): a task-bound decision
-  // ALWAYS carries `loopId: null` (lib/unanswered-decisions.js's
-  // `taskDecisionAnchor`), and the tool's own projection
-  // (lib/chat-tools.js's `projectPendingDecision`) exposes no raw issue UUID
-  // for `taskDecisionsStore.markOutcome` to match against. Rendering it
-  // interactive (as beat 4 did) meant a tap posted a reply comment but never
-  // stamped an outcome, so `lib/unanswered-decisions.js`'s
-  // `if (entry.outcome) continue` never fired, the row never left the
-  // pending set, and every later listing re-rendered it as fresh — each tap
-  // posting another duplicate comment on a real issue. It must now render
-  // read-only, pointing at the Rulings tab, so no tap is possible.
-  test('a loopId-less decision renders read-only — the caption points at the Rulings tab, no interactive buttons, so no tap can post', async () => {
-    const d = decision({ disposition: 'task-bound', loopId: null, decisionId: 'scan_abc123', issueIdentifier: 'LIN-9' });
-    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+  // LIN-2704: the LIN-2621 beat-6 read-only mitigation (a fabricated
+  // 'task-bound-unlinked' disposition that deliberately fell outside
+  // appendOptions' resumable/gone/task-bound allow-list, forcing a
+  // loopId-less row read-only) is reverted. `lib/chat-tools.js`'s
+  // `projectPendingDecision` now projects the raw issue UUID and the scan
+  // store's own record id from the anchor, so a task-bound tap can carry the
+  // SAME best-effort stamp pair a loop-anchored tap always could — the real
+  // `'task-bound'` disposition reaches appendOptions' own (unchanged) allow-
+  // list, which is what makes the row interactive again.
+  test('a task-bound decision renders interactive — appendOptions\' real allow-list, not a fabricated disposition — and a tap posts the stamp pair to the raw issueId target', async () => {
+    const d = decision({
+      disposition: 'task-bound', loopId: null, decisionId: 'scan_abc123',
+      issueId: 'uuid-9', issueIdentifier: 'LIN-9', taskDecisionId: 'scan_abc123',
+    });
+    const { exports: m, thread, replyDeliveryCalls, apiCalls } = loadClient({
       fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
     });
     m.autoWakeTick();
     await flush();
     const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    assert.ok(wrap.querySelector('.chat-options--readonly'), 'read-only wrapper class present');
-    assert.strictEqual(wrap.querySelector('.chat-options-row'), null, 'no button row at all — no tap is possible');
-    assert.match(wrap.querySelector('.chat-options-caption').textContent, /Rulings/,
-      'caption directs the human to the Rulings tab instead of tapping here');
-    assert.strictEqual(replyDeliveryCalls.length, 0, 'read-only: nothing was ever posted');
-  });
-
-  test('a loop-anchored decision (loopId present) is unaffected by the read-only mitigation — still renders interactive and posts', async () => {
-    const d = decision({ disposition: 'resumable', loopId: 'loop-9', decisionId: 'dec-9', issueIdentifier: 'LIN-9' });
-    const { exports: m, thread, replyDeliveryCalls } = loadClient({
-      fetchImpl: () => sseResponse([decisionToolFrame([d]), sseFrame('done', { surface: true })]),
-    });
-    m.autoWakeTick();
-    await flush();
-    const wrap = thread.children.find(li => li.querySelector('.fc-decision')).querySelector('.fc-decision');
-    assert.strictEqual(wrap.querySelector('.chat-options--readonly'), null);
-    wrap.querySelector('.chat-options-row').children[1].dispatch('click'); // "Hold"
+    assert.strictEqual(wrap.querySelector('.chat-options--readonly'), null, 'interactive, not read-only');
+    const row = wrap.querySelector('.chat-options-row');
+    assert.ok(row, 'a button row is rendered — appendOptions\' own allow-list includes task-bound');
+    row.children[0].dispatch('click'); // "Ship it"
     await flush();
     assert.strictEqual(replyDeliveryCalls.length, 1);
-    looseDeepEqual(replyDeliveryCalls[0].decision, { decisionLoopId: 'loop-9', decisionId: 'dec-9' });
-    assert.strictEqual(replyDeliveryCalls[0].prompt, 'Hold');
+    // looseDeepEqual: cross-realm object, see the loop-anchored test above.
+    looseDeepEqual(replyDeliveryCalls[0], {
+      urlKey: 'acme', issueId: 'uuid-9', prompt: 'Ship it',
+      decision: { taskDecisionId: 'scan_abc123', taskDecisionIssueId: 'uuid-9' },
+    });
+    assert.strictEqual(apiCalls.length, 0, 'never window.api — postComment is a raw fetch of its own');
+  });
+
+  test('the loop-bound and task-bound reply lanes do not cross-contaminate — each tap carries only its own stamp pair', async () => {
+    const loopBound = decision({
+      disposition: 'resumable', loopId: 'loop-9', decisionId: 'dec-9',
+      issueId: 'uuid-9-loop', issueIdentifier: 'LIN-9',
+    });
+    const taskBound = decision({
+      disposition: 'task-bound', loopId: null, decisionId: 'scan-9',
+      issueId: 'uuid-9-task', issueIdentifier: 'LIN-19', taskDecisionId: 'scan-9',
+    });
+    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+      fetchImpl: () => sseResponse([decisionToolFrame([loopBound, taskBound]), sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const cards = thread.children.filter(li => li.querySelector('.fc-decision')).map(li => li.querySelector('.fc-decision'));
+    assert.strictEqual(cards.length, 2);
+
+    cards[0].querySelector('.chat-options-row').children[1].dispatch('click'); // loop-bound "Hold"
+    cards[1].querySelector('.chat-options-row').children[0].dispatch('click'); // task-bound "Ship it"
+    await flush();
+
+    assert.strictEqual(replyDeliveryCalls.length, 2);
+    const loopCall = replyDeliveryCalls.find(c => c.issueId === 'uuid-9-loop');
+    const taskCall = replyDeliveryCalls.find(c => c.issueId === 'uuid-9-task');
+    looseDeepEqual(loopCall.decision, { decisionLoopId: 'loop-9', decisionId: 'dec-9' });
+    assert.strictEqual('taskDecisionId' in loopCall.decision, false, 'the loop-bound tap never carries the task pair');
+    looseDeepEqual(taskCall.decision, { taskDecisionId: 'scan-9', taskDecisionIssueId: 'uuid-9-task' });
+    assert.strictEqual('decisionLoopId' in taskCall.decision, false, 'the task-bound tap never carries the loop pair');
   });
 
   test('the row settles visibly on a successful reply: buttons disabled, feedback shown, card marked resolved', async () => {
