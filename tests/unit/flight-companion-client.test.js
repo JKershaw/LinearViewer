@@ -2188,15 +2188,19 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
 function loadChatUI(doc) {
   const sandbox = { window: {}, console };
   if (doc) sandbox.document = doc;
-  // LIN-2670: a stub renderMarkdown + DOMPurify so a REAL chat.js
+  // LIN-2670: a stub renderMarkdown + DOMPurify + marked so a REAL chat.js
   // renderMarkdownText, sourced below by makeChatUI for the Flight
   // Companion client tests, actually runs rather than silently no-op'ing on
-  // its own DOMPurify-missing guard — that guard has its own dedicated
-  // coverage in tests/unit/chat-render-markdown-text.test.js.
+  // one of its own missing-global guards — each of which has its own
+  // dedicated coverage in tests/unit/chat-render-markdown-text.test.js.
   sandbox.window.renderMarkdown = function (text, opts, keepWholeFence) {
     return '<p data-rendered="' + String(!!keepWholeFence) + '">' + text + '</p>';
   };
   sandbox.DOMPurify = { sanitize: (html) => html };
+  // The marked guard (close-out ledger L2) reads the GLOBAL, not anything
+  // reachable through the stubbed renderMarkdown above, so the sandbox has
+  // to carry one. Never called — renderMarkdown is stubbed.
+  sandbox.marked = { parse: () => { throw new Error('marked.parse must not be reached — renderMarkdown is stubbed'); } };
   vm.createContext(sandbox);
   vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
   return sandbox.window.ChatUI;

@@ -162,8 +162,13 @@ test.describe('Task Chat Page (experimental)', () => {
       await page.locator('#task-chat-id').fill('TEST-9999');
       await page.locator('#task-chat-question').fill('hi');
       await page.locator('#task-chat-send').click();
-      await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body'))
-        .toContainText('error', { timeout: 5000 });
+      const body = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(body).toContainText('error', { timeout: 5000 });
+      // LIN-2670 close-out, ledger L1: the non-ok JSON arm (task-chat.js:351)
+      // is one of Task Chat's five plain-text paths. See the L1 note on the
+      // no-reply test below for why these assertions live on the existing
+      // per-path tests rather than in a new block of their own.
+      await expect(body).not.toHaveClass(/chat-md/);
     });
 
     // === LIN-2445 (LIN-2443's sibling class) ===
@@ -233,6 +238,19 @@ test.describe('Task Chat Page (experimental)', () => {
       await expect(answer).toHaveCount(1, { timeout: 5000 });
       await expect(answer).toContainText('no reply', { timeout: 5000 });
       await expect(answer).not.toContainText('[no response]');
+
+      // LIN-2670 close-out, ledger L1: the no-reply path (task-chat.js:392).
+      // The plan's cross-cutting claim "None of the plain-text paths acquires
+      // chat-md" was guarded only by the Flight Companion unit test T3
+      // (tests/unit/flight-companion-client.test.js) — Task Chat's own five
+      // plain-text paths had no equivalent assertion at any level. Task Chat
+      // has no vm-sandboxed client harness to mirror T3 into, so the witness
+      // goes where each path is ALREADY driven: one assertion per existing
+      // per-path test, no new page loads. The exact-text assertion is what
+      // makes it a real mirror of T3 rather than a class check — a swap here
+      // would rewrite the body, not just add a class.
+      await expect(answer).toHaveText('no reply — nothing to add');
+      await expect(answer).not.toHaveClass(/chat-md/);
 
       // An empty answer is still an answer — the turn ended cleanly.
       const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
@@ -334,6 +352,12 @@ test.describe('Task Chat Page (experimental)', () => {
 
       const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
       await expect(answer).toContainText('upstream exploded', { timeout: 5000 });
+      // LIN-2670 close-out, ledger L1: the mid-stream SSE error path
+      // (task-chat.js:401) — T3's own first case, mirrored. Exact text, so a
+      // done-frame swap leaking onto this path would be caught by content and
+      // not only by class.
+      await expect(answer).toHaveText('[error: upstream exploded]');
+      await expect(answer).not.toHaveClass(/chat-md/);
       const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
       await expect(pill).toHaveClass(/status-pill--failed/);
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
@@ -354,6 +378,9 @@ test.describe('Task Chat Page (experimental)', () => {
 
       const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
       await expect(answer).toContainText('request failed (500)', { timeout: 5000 });
+      // LIN-2670 close-out, ledger L1: the non-ok parse-failure arm
+      // (task-chat.js:357).
+      await expect(answer).not.toHaveClass(/chat-md/);
       const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
       await expect(pill).toHaveClass(/status-pill--failed/);
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
@@ -368,6 +395,11 @@ test.describe('Task Chat Page (experimental)', () => {
 
       const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
       await expect(answer).toContainText('network failure', { timeout: 5000 });
+      // LIN-2670 close-out, ledger L1: the network-failure path
+      // (task-chat.js:409) — the fifth and last of Task Chat's plain-text
+      // paths, completing the set the review recorded as untested.
+      await expect(answer).toHaveText('[error: network failure]');
+      await expect(answer).not.toHaveClass(/chat-md/);
       const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
       await expect(pill).toHaveClass(/status-pill--failed/);
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);

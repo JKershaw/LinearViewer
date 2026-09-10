@@ -61,7 +61,7 @@ class FakeElement {
   set innerHTML(v) { this._innerHTML = v; }
 }
 
-function makeSandbox({ withRenderMarkdown = true, withDOMPurify = true } = {}) {
+function makeSandbox({ withRenderMarkdown = true, withDOMPurify = true, withMarked = true } = {}) {
   const calls = [];
   const sandbox = {
     window: {},
@@ -69,6 +69,13 @@ function makeSandbox({ withRenderMarkdown = true, withDOMPurify = true } = {}) {
     console,
   };
   if (withDOMPurify) sandbox.DOMPurify = { sanitize: (html) => html };
+  // The helper guards on the `marked` GLOBAL (LIN-2670 close-out, ledger L2),
+  // not on anything reachable through the stubbed `window.renderMarkdown`, so
+  // the sandbox has to carry one for the rendering path to be exercised at
+  // all. Never actually called here — `window.renderMarkdown` is stubbed
+  // below, and marked's real parse behaviour is covered by
+  // tests/unit/common-render-markdown.test.js and the e2e suite.
+  if (withMarked) sandbox.marked = { parse: () => { throw new Error('marked.parse must not be reached — renderMarkdown is stubbed'); } };
   vm.createContext(sandbox);
   vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
   if (withRenderMarkdown) {
@@ -116,6 +123,32 @@ describe('window.ChatUI.renderMarkdownText (LIN-2670)', () => {
     assert.equal(el.innerHTML, null);
     assert.equal(el.classList.contains('chat-md'), false);
     assert.equal(el.textContent, 'raw markdown **here**');
+  });
+
+  // LIN-2670 close-out, ledger L2. NOT a security item: with marked absent
+  // `window.renderMarkdown` falls back to `escapeHtml`, whose output still
+  // passes through `DOMPurify.sanitize`, and the genuinely dangerous case
+  // (DOMPurify missing) is the test above. This pins a *behaviour delta*:
+  // without the guard the helper still fired and still added `chat-md`,
+  // whose `white-space: normal` collapses the newlines that the plain-text
+  // bubble's `pre-wrap` preserves today — leaving a degraded page slightly
+  // WORSE than no Markdown support at all. The guard makes that page fall
+  // back to exactly today's behaviour instead.
+  test('no-op when marked is absent, even with renderMarkdown and DOMPurify present (the degraded-load delta)', () => {
+    const { sandbox, calls } = makeSandbox({ withMarked: false });
+    const el = new FakeElement('span');
+    el.textContent = 'line one\nline two';
+
+    sandbox.window.ChatUI.renderMarkdownText(el, 'line one\nline two');
+
+    assert.equal(calls.length, 0, 'renderMarkdown must not even be called');
+    assert.equal(el.innerHTML, null);
+    assert.equal(
+      el.classList.contains('chat-md'),
+      false,
+      'chat-md must not be added — its white-space: normal would collapse newlines that pre-wrap keeps today',
+    );
+    assert.equal(el.textContent, 'line one\nline two', 'the streamed text is left exactly as-is');
   });
 
   test('calls window.renderMarkdown with (rawText, { breaks: true }, true) — the finding-1 opt-out', () => {

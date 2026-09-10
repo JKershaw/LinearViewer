@@ -210,11 +210,20 @@
    *
    * No-ops — leaving today's plain-text rendering untouched — unless `el`
    * and `rawText` are both present AND `window.renderMarkdown` is a function
-   * AND `DOMPurify` is available. The DOMPurify guard is stronger than the
-   * `render-session.js` precedent this mirrors: `window.renderMarkdown`
-   * returns marked's UNSANITIZED output when DOMPurify alone is missing
-   * (common.js), so this is the one `html:` sink for model-authored chat
-   * text and it must never fire on that fallback.
+   * AND `DOMPurify` is available AND `marked` is available. The DOMPurify
+   * guard is stronger than the `render-session.js` precedent this mirrors:
+   * `window.renderMarkdown` returns marked's UNSANITIZED output when
+   * DOMPurify alone is missing (common.js), so this is the one `html:` sink
+   * for model-authored chat text and it must never fire on that fallback.
+   *
+   * The `marked` guard (LIN-2670 close-out, ledger L2) is a behaviour
+   * guard, not a security one — with marked absent `window.renderMarkdown`
+   * falls back to `escapeHtml`, which DOMPurify still sanitizes. Without it
+   * a degraded load (DOMPurify present, marked missing) still acquired
+   * `chat-md`, whose `white-space: normal` collapses the newlines the
+   * plain-text bubble's `pre-wrap` preserves — leaving such a page slightly
+   * WORSE off than no Markdown support at all. Guarded, it falls back to
+   * exactly today's behaviour instead.
    *
    * Passes `keepWholeFence = true` to `window.renderMarkdown`: a chat
    * bubble's whole answer being a single fenced snippet is deliberate (the
@@ -230,6 +239,7 @@
     if (!el || !rawText) return;
     if (typeof window.renderMarkdown !== 'function') return;
     if (typeof DOMPurify === 'undefined') return;
+    if (typeof marked === 'undefined') return;
     el.classList.add('chat-md');
     el.innerHTML = window.renderMarkdown(rawText, { breaks: true }, true);
   }
