@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 
 // Experimental "talk to a task" page. Seeds via /test/set-session (the test-token
 // workspace, so the AI mock fires and the chat streams a deterministic answer
@@ -239,6 +240,81 @@ test.describe('Task Chat Page (experimental)', () => {
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
     });
 
+    // LIN-2670: the ticket's own headline acceptance criterion. The AI mock's
+    // real answers are plain prose with no Markdown syntax (buildMockAnswer,
+    // routes/task-chat.js), so — like the empty-answer test above — this
+    // intercepts the SSE turn to drive a deterministic Markdown-bearing body.
+    test('LIN-2670: a completed answer containing **bold** and a "- " list renders <strong> and <li>, not raw markdown syntax', async ({ page }) => {
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([['token', { token: 'Summary:\n\n**bold point**\n\n- one\n- two' }], ['done', {}]]),
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('what changed?');
+      await page.locator('#task-chat-send').click();
+
+      const body = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(body).toHaveClass(/chat-md/, { timeout: 5000 });
+      await expect(body.locator('strong')).toHaveCount(1);
+      await expect(body.locator('li')).toHaveCount(2);
+      await expect(body).not.toContainText('**bold point**');
+    });
+
+    // LIN-2670: the sanitisation spec. Assert the REAL security property
+    // (handler stripped, script dropped, nothing executes) — not the
+    // ticket's original "no img element" wording, which is wrong: it has
+    // now been demonstrated twice in real Chromium against the vendored
+    // DOMPurify 3.2.4 that a handler-less <img> is kept by default.
+    test('LIN-2670: a completed answer carrying a handler-less <img> and a <script> renders neither the handler nor the script, and executes nothing', async ({ page }) => {
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([
+          ['token', { token: '<img src=x onerror="window.__pwned = true"><script>window.__pwned2 = true;</script><p>after</p>' }],
+          ['done', {}],
+        ]),
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('render this');
+      await page.locator('#task-chat-send').click();
+
+      const body = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(body).toContainText('after', { timeout: 5000 });
+      await expect(body.locator('script')).toHaveCount(0);
+      const img = body.locator('img');
+      await expect(img).toHaveCount(1);
+      expect(await img.getAttribute('onerror')).toBeNull();
+      expect(await page.evaluate(() => window.__pwned)).toBeUndefined();
+      expect(await page.evaluate(() => window.__pwned2)).toBeUndefined();
+    });
+
+    // LIN-2670 finding 1: the whole-answer-fence ruling. Without this test
+    // the regression the keepWholeFence opt-out exists to prevent can
+    // silently return.
+    test('LIN-2670 finding 1: an answer that is entirely one fenced code block renders as <pre><code>, its contents NOT Markdown-interpreted', async ({ page }) => {
+      await page.route(`**${CHAT_API}/**`, (route) => route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([
+          ['token', { token: '```js\nconst a = 1; // # not a heading\n**not bold**\n```' }],
+          ['done', {}],
+        ]),
+      }));
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('show me the fix');
+      await page.locator('#task-chat-send').click();
+
+      const body = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(body.locator('pre code')).toHaveCount(1, { timeout: 5000 });
+      await expect(body.locator('strong')).toHaveCount(0);
+      await expect(body.locator('h1')).toHaveCount(0);
+      await expect(body.locator('pre code')).toContainText('**not bold**');
+    });
+
     // The remaining three terminal paths. The unknown-task test above covers the
     // non-ok response's JSON arm through the real endpoint; these three are not
     // reachable that way, so each is driven by intercepting the SSE turn. Added
@@ -338,6 +414,9 @@ test.describe('Task Chat Page (experimental)', () => {
       await item.locator('[data-testid="task-chat-saved-open"]').click();
       await expect(page.locator('.task-chat-msg-user')).toContainText('Where do you stand?', { timeout: 5000 });
       await expect(page.locator('#task-chat-active-label')).toContainText('TEST-1');
+      // LIN-2670: the replayed assistant bubble goes through the SAME
+      // rendering helper the live path uses.
+      await expect(page.locator('.task-chat-msg-assistant .task-chat-msg-body')).toHaveClass(/chat-md/);
 
       // RESUME: continue the rehydrated conversation via the unchanged turn path.
       await page.locator('#task-chat-question').fill('And what is next?');
@@ -358,6 +437,62 @@ test.describe('Task Chat Page (experimental)', () => {
     // fresh amber in-progress pill that nothing would ever settle. Unlike the
     // live case there is no completion moment to hook, so the replay opens the
     // bubble settled instead of swapping it afterwards.
+    // LIN-2670 finding 4: the saved-chat replay path. buildMockAnswer
+    // (routes/task-chat.js) returns plain prose with no Markdown syntax, so
+    // an assertion bolted onto the plain round-trip test above could only
+    // prove the helper ran, never that Markdown actually rendered — this
+    // reuses the page.route interception so the SAVED turn genuinely carries
+    // Markdown, then saves → resets → opens and asserts on the REHYDRATED
+    // bubble. Also confirms the stored transcript itself still holds raw
+    // Markdown, not rendered HTML — rendering happens at display time only.
+    test('LIN-2670: a reopened saved chat replays its assistant turn as rendered Markdown; the stored transcript stays raw', async ({ page }) => {
+      // Scoped to the turn endpoint only — `**${CHAT_API}/**` would also
+      // match the saved-chat CRUD endpoints (`${CHAT_API}/saved`, same path
+      // prefix) and swallow the real save/read calls this test makes below.
+      await page.route(`**${CHAT_API}/**`, (route) => {
+        if (route.request().url().includes('/saved')) return route.continue();
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: renderSSEFrames([['token', { token: '**bold point**\n\n- one\n- two' }], ['done', {}]]),
+        });
+      });
+
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('Where do you stand?');
+      await page.locator('#task-chat-send').click();
+      const liveBody = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(liveBody).toHaveClass(/chat-md/, { timeout: 5000 });
+
+      await page.locator('[data-testid="task-chat-save"]').click();
+      const item = page.locator('.task-chat-saved-item');
+      await expect(item).toHaveCount(1, { timeout: 5000 });
+      const savedId = await item.getAttribute('data-saved-id');
+
+      // The stored transcript is raw Markdown, not HTML — rendering is
+      // display-only and never touches what gets persisted.
+      const stored = await page.request.get(`${CHAT_API}/saved/${savedId}`);
+      const storedBody = await stored.json();
+      const storedAssistantTurn = storedBody.chat.transcript.find((t) => t.role === 'assistant');
+      expect(storedAssistantTurn.content).toBe('**bold point**\n\n- one\n- two');
+      expect(storedAssistantTurn.content).not.toContain('<strong>');
+
+      await page.locator('#task-chat-reset').click();
+      await expect(page.locator('.task-chat-msg')).toHaveCount(0);
+      await item.locator('[data-testid="task-chat-saved-open"]').click();
+
+      const replayedBody = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      await expect(replayedBody).toHaveClass(/chat-md/, { timeout: 5000 });
+      await expect(replayedBody.locator('strong')).toHaveCount(1);
+      await expect(replayedBody.locator('li')).toHaveCount(2);
+      await expect(replayedBody).not.toContainText('**bold point**');
+
+      // The replayed USER turn stays plain — same split as the live path.
+      const replayedUser = page.locator('.task-chat-msg-user .task-chat-msg-body');
+      await expect(replayedUser).not.toHaveClass(/chat-md/);
+      await expect(replayedUser).toContainText('Where do you stand?');
+    });
+
     test('a resumed transcript replays its answers already settled, never in-progress (LIN-2445)', async ({ page }) => {
       await haveOneTurn(page);
       await page.locator('[data-testid="task-chat-save"]').click();

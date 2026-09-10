@@ -339,6 +339,11 @@ main.task-chat-page[data-url-key]      - page container
   #task-chat-transcript                 - conversation log (ul)
     li.task-chat-msg.task-chat-msg-user      - your turn
     li.task-chat-msg.task-chat-msg-assistant - the task's turn
+      .task-chat-msg-body (chat-md)            - the assistant turn's text span carries
+                                              `chat-md` with rendered Markdown once the
+                                              turn completes (LIN-2670; same for Flight
+                                              Companion's `.fc-msg-body`) — the user's
+                                              own turn stays plain text
   #task-chat-question                   - question input
   #task-chat-send                       - ask button
   #task-chat-reset                      - clear the conversation
