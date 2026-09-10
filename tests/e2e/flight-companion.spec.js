@@ -951,6 +951,60 @@ test.describe('Flight Companion — 375×812 (LIN-2717 / LIN-2715 shared mobile 
     await page.keyboard.type(Array.from({ length: 40 }, (_, i) => `word${i}`).join(' '));
     await assertNoOverlapOrOverflow(page);
   });
+
+  // LIN-2717 review F5/ledger L8: finishTurn's caret-restore `.focus()`
+  // (public/flight-companion.js:902) fires the SAME `focus` listener a human
+  // tap does, so below the 600px gate a completed user-initiated turn yanks
+  // the page back to the composer even when the user scrolled away to read
+  // while it was in flight. Send-then-scroll-away, at the review's own
+  // measurement viewport: `main` 3da6d190 (the old `<input>`) moves ~126px
+  // here (ordinary UA behaviour, not this listener's doing); the unfixed
+  // gated listener moved ~826px; with the listener removed entirely, ~9px.
+  // The fix must land close to that ~9px floor, and in no case move the page
+  // further than `main`'s own 126px delta.
+  test('a completed turn does not yank the page back to the composer if the user scrolled away while it was in flight (LIN-2717 F5)', async ({ page }) => {
+    let resolveTurn;
+    const turnGate = new Promise((resolve) => { resolveTurn = resolve; });
+    await page.route('**/api/flight-companion/turn', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      await turnGate;
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: renderSSEFrames([['token', { token: 'ack' }], ['done', {}]]),
+      });
+    });
+
+    const input = page.locator('#flight-companion-question');
+    await input.click();
+    // Enter-to-send (not a click on #flight-companion-send) so the input —
+    // not the send button — genuinely holds focus at turn start, matching
+    // the scenario finishTurn's `questionHadFocusAtTurnStart` gate exists for.
+    await page.keyboard.type('are you there?');
+    await page.keyboard.press('Enter');
+
+    // The turn is now in flight (held open by turnGate) — scroll down to
+    // read "How to use" while waiting, the way the review's own scenario
+    // does. Deliberately a moderate scroll, not a jump to the very bottom of
+    // the page: scrolling arbitrarily far away would trigger the browser's
+    // OWN native "bring a newly-focused off-screen element into view"
+    // behaviour regardless of this listener, which is not what this test is
+    // isolating.
+    const howTo = page.locator('.flight-companion-page .section-header', { hasText: 'How to use' });
+    await howTo.scrollIntoViewIfNeeded();
+    const before = await page.evaluate(() => window.scrollY);
+    expect(before).toBeGreaterThan(0);
+
+    // Let the answer land.
+    resolveTurn();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+
+    const after = await page.evaluate(() => window.scrollY);
+    const moved = before - after;
+    // eslint-disable-next-line no-console
+    console.log(`LIN-2717 F5 witness: scrollY ${before} -> ${after} (moved ${moved}px)`);
+    expect(moved).toBeLessThanOrEqual(126);
+  });
 });
 
 // LIN-2487 — `no-census` is the gate-silent reason that is NOT about sweep

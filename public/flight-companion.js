@@ -149,6 +149,13 @@
   // regardless. Module-level like checkingInSnapshot above, for the same
   // reason: the inFlight guard makes at most one turn's slot live at a time.
   var questionHadFocusAtTurnStart = false;
+  // LIN-2717 F5: set immediately around finishTurn's caret-restore
+  // `questionInput.focus()` call so the mobile reveal listener below can
+  // tell that restore apart from a human tap — both fire the same `focus`
+  // event. Cleared right after the call (not in a `finally`, since `.focus()`
+  // is synchronous and never throws), so a genuine tap microseconds later
+  // is unaffected.
+  var restoringFocusProgrammatically = false;
 
   // ─── Pure helpers (exposed via the test seam at the bottom — no DOM) ────
 
@@ -899,7 +906,9 @@
       setComposerBusy(false);
     }
     if (turnKind === 'user-initiated' && questionHadFocusAtTurnStart) {
+      restoringFocusProgrammatically = true;
       questionInput.focus();
+      restoringFocusProgrammatically = false;
     }
     questionHadFocusAtTurnStart = false;
     // LIN-2632: clear the "checking in…" placeholder on every path out of an
@@ -1354,7 +1363,13 @@
   // even when the composer is already fully visible), so the unconditional
   // listener yanked the whole page to the top on every desktop focus. Gate
   // it to the shape it exists for, on the SAME breakpoint that block uses.
+  // LIN-2717 F5: finishTurn's caret-restore `.focus()` fires this same
+  // listener, but that focus is programmatic, not a human tap — skip the
+  // reveal there so it does not yank the page away from wherever the user
+  // scrolled while the turn was in flight. `restoringFocusProgrammatically`
+  // is only ever true for the duration of that synchronous `.focus()` call.
   questionInput.addEventListener('focus', function () {
+    if (restoringFocusProgrammatically) return;
     if (!window.matchMedia('(max-width: 600px)').matches) return;
     questionInput.scrollIntoView({ block: 'end', inline: 'nearest' });
   });
