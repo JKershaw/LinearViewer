@@ -155,6 +155,12 @@
   // event. Cleared right after the call (not in a `finally`, since `.focus()`
   // is synchronous and never throws), so a genuine tap microseconds later
   // is unaffected.
+  //
+  // CAUTION (LIN-2717 ledger L10): the name reads general, but this is set at
+  // exactly ONE call site — finishTurn's restore. Any NEW programmatic
+  // `.focus()` on this composer (LIN-1578's shared composer is the obvious
+  // candidate) must set it too, or F5 silently returns with nothing going red:
+  // the e2e witness only drives the finishTurn path.
   var restoringFocusProgrammatically = false;
 
   // ─── Pure helpers (exposed via the test seam at the bottom — no DOM) ────

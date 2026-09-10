@@ -953,15 +953,25 @@ test.describe('Flight Companion — 375×812 (LIN-2717 / LIN-2715 shared mobile 
   });
 
   // LIN-2717 review F5/ledger L8: finishTurn's caret-restore `.focus()`
-  // (public/flight-companion.js:902) fires the SAME `focus` listener a human
-  // tap does, so below the 600px gate a completed user-initiated turn yanks
-  // the page back to the composer even when the user scrolled away to read
-  // while it was in flight. Send-then-scroll-away, at the review's own
-  // measurement viewport: `main` 3da6d190 (the old `<input>`) moves ~126px
-  // here (ordinary UA behaviour, not this listener's doing); the unfixed
-  // gated listener moved ~826px; with the listener removed entirely, ~9px.
-  // The fix must land close to that ~9px floor, and in no case move the page
-  // further than `main`'s own 126px delta.
+  // fires the SAME `focus` listener a human tap does, so below the 600px gate
+  // a completed user-initiated turn yanked the page back to the composer even
+  // when the user scrolled away to read while it was in flight.
+  //
+  // Every figure below is measured by THIS test, in THIS scenario (moderate
+  // scroll to "How to use" at 375x812) — the earlier ~126px / ~826px / ~9px
+  // numbers came from a DEEPER-scroll variant and do not describe what runs
+  // here, which is why the bound they justified was far looser than the
+  // behaviour warrants (ledger L9):
+  //
+  //   as shipped, with the flag guard   Chromium 0px  WebKit 0px  Firefox 0px
+  //   with `if (restoringFocusProgrammatically) return;` deleted
+  //                                     Chromium 481px WebKit 480px Firefox 480px
+  //
+  // So the guarded path does not move the page at all, and the regression it
+  // guards against moves it ~480px. The 10px bound below is therefore ~48x
+  // below the regression while still refusing a PARTIAL one: an assertion
+  // loose enough to tolerate 126px of yank would pass on a half-broken fix
+  // against a true value of zero.
   test('a completed turn does not yank the page back to the composer if the user scrolled away while it was in flight (LIN-2717 F5)', async ({ page }) => {
     let resolveTurn;
     const turnGate = new Promise((resolve) => { resolveTurn = resolve; });
@@ -1003,7 +1013,10 @@ test.describe('Flight Companion — 375×812 (LIN-2717 / LIN-2715 shared mobile 
     const moved = before - after;
     // eslint-disable-next-line no-console
     console.log(`LIN-2717 F5 witness: scrollY ${before} -> ${after} (moved ${moved}px)`);
-    expect(moved).toBeLessThanOrEqual(126);
+    // 10px, not 126: the measured behaviour is exactly 0px on all three
+    // engines, so this is headroom for sub-pixel/UA rounding, not for a
+    // regression. Verified red at ~480px with the flag guard removed.
+    expect(moved).toBeLessThanOrEqual(10);
   });
 });
 
