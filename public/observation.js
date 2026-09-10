@@ -1599,7 +1599,19 @@ function renderRulings(rulings) {
     const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
     nodes.push(li);
-    if (key) { seen.add(key); renderedRulingRows.set(key, li); rulingsRowByKey.set(key, row); }
+    if (key) {
+      seen.add(key);
+      renderedRulingRows.set(key, li);
+      rulingsRowByKey.set(key, row);
+      // A withdrawn suggestion (row.suggestedDismissal gone null — e.g. a
+      // human pressed Keep in another tab) must drop out of selection HERE,
+      // in this same sweep, not only when the key later leaves `seen`
+      // entirely (review F1): the ruling itself is still unanswered, so it
+      // never leaves the payload, and a selected-but-withdrawn key would
+      // otherwise survive to the next "Agree selected" press and dismiss a
+      // ruling the human just said to keep.
+      if (!row?.suggestedDismissal) rulingsSelected.delete(key);
+    }
   }
 
   // Release a settled key (review F2 / LIN-2444 Phase 5) the moment its row
@@ -2380,7 +2392,12 @@ function refreshRulingsBadge(pageUrlKey) {
 function bulkAgreeRow(key, row, li) {
   const { decision, anchor } = row || {};
   const decisionId = decision?.decision_id;
-  if (!key || !anchor?.workspaceUrlKey || !decisionId || rulingsPending.has(key) || rulingsSettled.has(key)) {
+  // Belt and braces alongside the `renderRulings` prune above (review F1):
+  // the row looked up here is whatever the most recent poll last wrote into
+  // `rulingsRowByKey`, which can have changed between the batch's `confirm()`
+  // and this key's own turn in the sequential loop — re-check the suggestion
+  // is still live rather than trusting the snapshot taken at confirm time.
+  if (!key || !anchor?.workspaceUrlKey || !decisionId || !row?.suggestedDismissal || rulingsPending.has(key) || rulingsSettled.has(key)) {
     return Promise.resolve();
   }
 

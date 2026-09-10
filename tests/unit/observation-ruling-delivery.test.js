@@ -1403,4 +1403,79 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     renderRulings([makeRow({ suggestedDismissal: null })]);
     assert.equal(bar.hidden, true);
   });
+
+  // Review F1 — a WITHDRAWN suggestion (someone pressed Keep in another tab,
+  // or the proposer withdrew it) must drop out of selection the moment a
+  // poll repaints it as `suggestedDismissal: null`, not only once the key
+  // later vanishes from the payload entirely (it never does — the ruling
+  // stays unanswered). Checked directly against `renderRulings`, before
+  // bulk-agree ever runs, so this pins the PRUNE itself rather than only its
+  // downstream effect.
+  test('renderRulings drops a selected key from rulingsSelected once its suggestion is withdrawn (review F1)', () => {
+    const { module, bar, countEl, selectAll } = makeBulkSandbox();
+    const { renderRulings, toggleRulingSelection, rulingsSelected, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', 'd-w');
+
+    renderRulings([suggestedRow({ decision: { decision_id: 'd-w' } })]);
+    toggleRulingSelection(key, true);
+    assert.ok(rulingsSelected.has(key));
+
+    // Keep pressed elsewhere: next poll repaints the SAME still-unanswered
+    // decision with suggestedDismissal gone null.
+    renderRulings([makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-w' } })]);
+
+    assert.equal(rulingsSelected.has(key), false, 'a withdrawn row must be pruned from selection on this same repaint');
+    assert.equal(countEl.textContent, '0 selected', 'the bulk bar count must not over-report a withdrawn row as still selected');
+    assert.equal(bar.hidden, true, 'the bar must hide — nothing selectable remains');
+    assert.equal(selectAll.indeterminate, false, 'select-all must not be left indeterminate once the only selection was pruned');
+  });
+
+  // Review F1, end to end — reproduces the reviewer's own DOM-probe scenario:
+  // select a suggested row, the suggestion is withdrawn by a poll landing
+  // before the batch runs, then "Agree selected" must not dismiss it.
+  test('bulk-agree never dismisses a row whose suggestion was withdrawn before the batch ran (review F1)', async () => {
+    const calls = [];
+    const { module } = makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const withdrawn = suggestedRow({ decision: { decision_id: 'd-w' } });
+    const live = suggestedRow({ decision: { decision_id: 'd-live' } });
+    renderRulings([withdrawn, live]);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-w'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-live'), true);
+
+    // Suggestion withdrawn elsewhere; the poll repaints before Agree-selected fires.
+    renderRulings([makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-w' } }), live]);
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(calls, ['d-live'], 'the withdrawn row must never be POSTed — only the still-live suggestion is agreed');
+  });
+
+  // Review F1's "belt and braces" half — `bulkAgreeRow` itself must re-check
+  // `row.suggestedDismissal` at the moment it runs, because the row can
+  // change BETWEEN confirm() and this key's own turn in the sequential
+  // loop (the batch is awaited row by row, so a poll can land mid-batch).
+  // This test defeats the `renderRulings` prune deliberately — it re-adds
+  // the key to `rulingsSelected` after the withdrawing poll runs, so only
+  // `bulkAgreeRow`'s own guard can still save it.
+  test('bulkAgreeRow refuses a withdrawn row even if it is (re-)selected — the guard inside the loop, not just the prune (review F1)', async () => {
+    const calls = [];
+    const { module } = makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', 'd-w');
+
+    renderRulings([suggestedRow({ decision: { decision_id: 'd-w' } })]);
+    toggleRulingSelection(key, true);
+
+    // Withdraw it (repaint prunes it), then force it back into the
+    // selection Set directly — simulating the prune losing a race it
+    // isn't actually exposed to, so only bulkAgreeRow's own re-check defends.
+    renderRulings([makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-w' } })]);
+    rulingsSelected.add(key);
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(calls, [], 'bulkAgreeRow must independently refuse a row with no live suggestedDismissal');
+  });
 });
