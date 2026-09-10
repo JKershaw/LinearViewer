@@ -466,7 +466,10 @@ main.flight-companion-page[data-url-key]  - page container
                                               `.action-btn` it used to — kept in this same
                                               sibling position rather than folded into the
                                               status strip above
-    #flight-companion-question              - chat composer input
+    #flight-companion-question              - chat composer (textarea, auto-grows to an
+                                              8.5rem cap then scrolls; Enter sends,
+                                              Shift+Enter inserts a newline; whitespace-only
+                                              never sends)
     #flight-companion-send                  - send button
     .fc-proposal                            - an inline model-proposed follow-up
       .fc-proposal-approve                    - approve — POSTs to approve-follow-up

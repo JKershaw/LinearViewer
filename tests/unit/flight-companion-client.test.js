@@ -142,7 +142,40 @@ class FakeElement {
   // runs against this shim (`wrap.setAttribute('data-disposition', ...)`).
   setAttribute(name, value) { (this._attrs = this._attrs || {})[name] = String(value); }
   getAttribute(name) { return (this._attrs && this._attrs[name]) ?? null; }
-  dispatch(type) { (this._listeners[type] || []).forEach(fn => fn()); }
+  // LIN-2717 S4-a: `evt` is optional and backward-compatible — every
+  // pre-existing `.dispatch(type)` caller in this file passes the type only,
+  // and their handlers already receive `undefined` today. Without this,
+  // `:1305`'s `e.key` throws and the key contract is untestable at all.
+  dispatch(type, evt) { (this._listeners[type] || []).forEach(fn => fn(evt)); }
+  // LIN-2717 S4-c: opt-in fake layout for the composer only. resizeComposer's
+  // whole job is WRITE-then-READ-BACK, which a static fake cannot represent
+  // — a frozen clientHeight would make the overflow branch compare a stale
+  // value and bake a wrong expectation into the test. This models exactly
+  // one browser behavior: writing style.height reflows client/offsetHeight,
+  // clamped by the CSS min-height/max-height. NaN is propagated, never
+  // repaired — a 'NaNpx' write must stay visible to the assertions. `min`
+  // defaults to 35.2 (2.2rem at a 16px root — the stylesheet's real resting
+  // floor, not the plan's earlier "36" rounding) and `max` to 136 (8.5rem).
+  _useLayout({ content = 0, min = 35.2, max = 136, border = 2 } = {}) {
+    const self = this;
+    let box = Math.min(Math.max(content, min), max); // content-box px
+    this._heightWrites = [];
+    this.setContent = px => { content = px; }; // "the user typed N px of text"
+    Object.defineProperties(this, {
+      clientHeight: { get: () => box, configurable: true },
+      offsetHeight: { get: () => box + border, configurable: true },
+      scrollHeight: { get: () => Math.max(content, box), configurable: true },
+    });
+    this.style = {
+      overflowY: '',
+      get height() { return self._heightWrites[self._heightWrites.length - 1] ?? ''; },
+      set height(v) {
+        self._heightWrites.push(v);
+        const px = v === 'auto' ? content : parseFloat(v) - border; // box-sizing: border-box
+        box = Math.min(Math.max(px, min), max); // NaN stays NaN
+      },
+    };
+  }
 }
 
 function makeDocument({ hiddenInitial = false } = {}) {
@@ -332,7 +365,14 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   const emptyState = new FakeElement('p');
   const checkIn = new FakeElement('p');
   checkIn.hidden = true;
-  const questionInput = new FakeElement('input');
+  // LIN-2717 S4-b: 'textarea', keeping the file's lower-case tag convention
+  // ('button', 'li', 'span', 'ul', 'p', 'main' — closest() at :131 lower-
+  // cases before comparing, confirming the convention is intentional).
+  // Pairs with resizeComposer's case-insensitive guard: 'textarea' !==
+  // 'TEXTAREA', so changing the fake alone would not make the guard
+  // reachable — production stays honest in a browser, the seam stays
+  // idiomatic, and the guard is genuinely traversed.
+  const questionInput = new FakeElement('textarea');
   const sendBtn = new FakeElement('button');
   // LIN-2622: the start button and the re-orient affordance — mirrors the
   // real render (lib/render-flight-companion.js): reorient starts with the
@@ -363,6 +403,11 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   // module — wiring the owner document lets FakeElement#focus() and the
   // `disabled` setter's blur-on-disable simulate real activeElement changes.
   questionInput._ownerDocument = doc;
+  // LIN-2717 S4-c: every test runs against a live, correctly-resting
+  // composer — a crash or NaN regression in resizeComposer then fails the
+  // whole suite, not just the new tests below. Resize-specific tests call
+  // questionInput.setContent(px) to stage a scenario.
+  questionInput._useLayout({ content: 0 });
 
   const chatUI = makeChatUI(doc);
   const fetchSpy = makeFetchSpy(fetchImpl || (() => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' })));
@@ -2689,5 +2734,105 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
     const bubbles = thread.children.filter((li) => li.className.includes('fc-msg'));
     assert.strictEqual(bubbles.length, 2);
     assert.strictEqual(bubbles[1].querySelector('.fc-msg-body').textContent, 'orienting');
+  });
+});
+
+// ─── LIN-2717: composer auto-grow (S4 unit witnesses) ──────────────────────
+//
+// U7/U8/U9 below are exact-value assertions, not "a write happened" checks —
+// a 'NaNpx' write (the value the seam would produce with no offsetHeight/
+// clientHeight at all) fails every one of them. The fake's `_useLayout`
+// model uses `min: 35.2` (2.2rem at a 16px root — the stylesheet's real
+// resting floor; the plan's earlier "36" was a rounding error the approving
+// review flagged) and `max: 136` (8.5rem). Only the content=0 row is
+// sensitive to that correction — 48 and 200 both clamp past either min, so
+// their numbers are unaffected.
+
+describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesses)', () => {
+  test('U7 — resize after submitQuestion() clears the composer', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    // loadClient's own init-time resizeComposer() call (production :1348 —
+    // sizing a browser-restored value on first paint) already wrote once,
+    // against content=0; clear it so this test's own writes are what's
+    // being asserted.
+    questionInput._heightWrites = [];
+    // Pre-state: a grown, two-row box (via the real input-event path, not a
+    // direct resizeComposer() call — this also proves the listener is wired).
+    questionInput.setContent(48);
+    questionInput.value = 'hello';
+    questionInput.dispatch('input');
+    assert.deepStrictEqual(questionInput._heightWrites, ['auto', '50px'], 'pre-state: grown to two rows');
+
+    // setContent mutates the fake's layout model, not `.value` — there is no
+    // point to interject between the clear and the resize submitQuestion()
+    // performs synchronously (:1321's setComposerValue('')), so the box being
+    // cleared is staged before the call, not after.
+    questionInput.setContent(0);
+    m.submitQuestion();
+    await flush();
+
+    assert.deepStrictEqual(
+      questionInput._heightWrites.slice(-2),
+      ['auto', '37.2px'],
+      'the cleared-box row: content=0 clamps to the 35.2px resting floor, +2px border chrome',
+    );
+    assert.strictEqual(questionInput.style.overflowY, 'hidden');
+  });
+
+  test('U8 — resize after a server-error draft restore, while the composer is still disabled', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => jsonResponse(500, { error: 'boom' }),
+    });
+    questionInput.setContent(48);
+
+    // Record `disabled` at the instant of every height write — the only way
+    // to pin "the restore happens before finishTurn releases the lock"
+    // (:1050) as a fact about ORDER, not merely about the end state (which
+    // is `disabled === false` either way, once the turn settles).
+    const disabledAtWrite = [];
+    const push = questionInput._heightWrites.push.bind(questionInput._heightWrites);
+    questionInput._heightWrites.push = (v) => { disabledAtWrite.push(questionInput.disabled); return push(v); };
+
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    await flush();
+
+    assert.strictEqual(questionInput._heightWrites.at(-1), '50px', 'the restored two-row draft');
+    assert.strictEqual(questionInput.style.overflowY, 'hidden');
+    assert.strictEqual(disabledAtWrite.at(-1), true, 'the restore write lands while the composer is still locked');
+    assert.strictEqual(questionInput.disabled, false, 'and finishTurn releases it immediately after');
+  });
+
+  test('U9 — an auto-wake turn writes no height, provably (positive control closes the vacuum)', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    // loadClient's own init-time resizeComposer() call already wrote once,
+    // against content=0; clear it so the positive control below is checked
+    // against a clean slate.
+    questionInput._heightWrites = [];
+    questionInput.setContent(48);
+
+    // Positive control, same fixture, same element, BEFORE the recorders are
+    // reset: proves the tag guard is traversed, the `input` listener is
+    // bound, the layout model is live, and the arithmetic is right — so a
+    // silent `_heightWrites` below can only mean the turn-kind structure,
+    // not a broken seam passing vacuously (rev 1's own failure mode, per the
+    // approving plan-review). If S2's guard ever regresses to the case-
+    // sensitive `!== 'TEXTAREA'`, THIS line fails first.
+    questionInput.dispatch('input');
+    assert.deepStrictEqual(questionInput._heightWrites, ['auto', '50px']);
+
+    questionInput._heightWrites = [];
+    questionInput.style.overflowY = '';
+
+    m.autoWakeTick();
+    await flush();
+
+    assert.strictEqual(questionInput._heightWrites.length, 0, 'no auto-wake path assigns .value or fires input');
+    assert.strictEqual(questionInput.style.overflowY, '');
+    assert.strictEqual(questionInput._disabledWriteCount, 0);
   });
 });

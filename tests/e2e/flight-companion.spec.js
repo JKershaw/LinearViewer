@@ -424,6 +424,35 @@ test.describe('Flight Companion Page (experimental)', () => {
         await expect(page.locator('#flight-companion-send')).toBeInViewport();
         await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
       });
+
+      // LIN-2717 (beat 1 finding, not in the original plan): focusing a
+      // <textarea> reveals it via CENTER alignment in Chromium, unlike
+      // <input>'s edge alignment — which this page's 100dvh phone-shape
+      // column (flight-companion.css) depends on landing the composer flush
+      // with the viewport's bottom edge. public/flight-companion.js's own
+      // `focus` listener re-aligns to compensate. Isolated from the sibling
+      // test above (which exercises it only as a side effect of `.fill()`
+      // implicitly focusing before a full send/scroll/shrink sequence): here
+      // a bare `.click()` focus, with NO prior scroll and NO explicit
+      // scrollIntoView call, is the whole action under test.
+      test('focusing the composer directly reveals it flush with the viewport bottom (Chromium\'s textarea center-align quirk, compensated)', async ({ page }) => {
+        const send = page.locator('#flight-companion-send');
+        // Positive control: the composer starts off-screen at load, so
+        // anything that follows is caused by the focus, not by the initial
+        // page load already having it in view.
+        await expect(send).not.toBeInViewport();
+
+        await page.locator('#flight-companion-question').click();
+        await expect(send).toBeInViewport();
+
+        // Not merely intersecting somewhere — genuinely flush with the
+        // viewport's bottom edge, the way the phone-shape column design
+        // requires. A naive center-aligned reveal would land it mid-screen,
+        // which would still satisfy toBeInViewport() but fail this.
+        const sendBox = await send.boundingBox();
+        const viewportHeight = page.viewportSize().height;
+        expect(sendBox.y + sendBox.height).toBeGreaterThan(viewportHeight - 40);
+      });
     });
 
     test.describe('Below the fold on a phone viewport (LIN-2632 beat 4)', () => {
@@ -707,6 +736,195 @@ test.describe('Flight Companion Page (experimental)', () => {
       await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
     });
 
+  });
+});
+
+// LIN-2717: the composer keyboard contract. `fill()` sets `.value` directly
+// and fires only `input`, never `keydown` — none of this file's 13 existing
+// composer sites (all `fill()` + button `click()`) exercises the key handler
+// at `public/flight-companion.js:1305` (`Enter && !shiftKey`). Every test
+// below uses `keyboard.type`/`press` instead, never `fill()`, for exactly
+// that reason.
+test.describe('Flight Companion — LIN-2717 composer keyboard contract (Enter sends, Shift+Enter newlines)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('Shift+Enter inserts a newline and does not send', async ({ page }) => {
+    let posted = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
+    });
+
+    const input = page.locator('#flight-companion-question');
+    await input.click();
+    await page.keyboard.type('line one');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('line two');
+
+    await expect(input).toHaveValue('line one\nline two');
+    // The negative assertion is the point: without it, this test would pass
+    // even if Shift+Enter also sent.
+    await page.waitForTimeout(200);
+    expect(posted).toBeNull();
+  });
+
+  test('Enter sends; the posted message carries the interior newline', async ({ page }) => {
+    let posted = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
+    });
+
+    const input = page.locator('#flight-companion-question');
+    await input.click();
+    await page.keyboard.type('line one');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('line two');
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => posted).not.toBeNull();
+    // Interior, never trailing — routes/flight-companion.js:575 trims, so a
+    // trailing newline would fail here for a reason unrelated to the AC.
+    expect(posted.message).toBe('line one\nline two');
+    await expect(input).toHaveValue('');
+  });
+
+  test('whitespace-only never sends, from either entry point (client-side-only guarantee)', async ({ page }) => {
+    let posted = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
+    });
+
+    const input = page.locator('#flight-companion-question');
+    await input.click();
+    await page.keyboard.type('   ');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(200);
+    expect(posted).toBeNull();
+
+    // Same guard, the other entry point: the send button shares :1288.
+    await page.locator('#flight-companion-send').click();
+    await page.waitForTimeout(200);
+    expect(posted).toBeNull();
+  });
+});
+
+// LIN-2717: auto-grow + the CSS-owned cap. The unit seam's FakeElement layout
+// model proves the arithmetic; this is where the real layout engine is the
+// authority.
+test.describe('Flight Companion — LIN-2717 composer auto-grow (browser truth)', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockTurn(page, { token: 'ack' });
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('grows with content and stops at the stylesheet-owned max-height, then scrolls', async ({ page }) => {
+    const input = page.locator('#flight-companion-question');
+    const restingHeight = await input.evaluate((el) => el.getBoundingClientRect().height);
+
+    await input.click();
+    // Explicit Shift+Enter newlines, not wrapped-word growth — deterministic
+    // regardless of the composer's rendered width (a wrap-only approach
+    // would need enough words to fill several visual lines, which varies by
+    // viewport). Twelve lines guarantees past the ~6-line cap.
+    for (let i = 0; i < 12; i += 1) {
+      if (i > 0) await page.keyboard.press('Shift+Enter');
+      await page.keyboard.type(`line ${i}`);
+    }
+
+    const maxHeight = await input.evaluate((el) => parseFloat(getComputedStyle(el).maxHeight));
+    const { height, scrollHeight, clientHeight, overflowY } = await input.evaluate((el) => ({
+      height: el.getBoundingClientRect().height,
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+
+    expect(height).toBeGreaterThan(restingHeight);
+    // Read the computed cap, don't hard-code 136px — the CSS owns it.
+    expect(height).toBeLessThanOrEqual(maxHeight + 1);
+    expect(scrollHeight).toBeGreaterThan(clientHeight);
+    expect(overflowY).toBe('auto');
+  });
+
+  test('height resets to one row after Enter sends — the witness for the seven-sites .value chokepoint', async ({ page }) => {
+    const input = page.locator('#flight-companion-question');
+    const restingHeight = await input.evaluate((el) => el.getBoundingClientRect().height);
+
+    await input.click();
+    for (let i = 0; i < 4; i += 1) {
+      if (i > 0) await page.keyboard.press('Shift+Enter');
+      await page.keyboard.type(`line ${i}`);
+    }
+    const grownHeight = await input.evaluate((el) => el.getBoundingClientRect().height);
+    expect(grownHeight).toBeGreaterThan(restingHeight);
+
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+
+    const clearedHeight = await input.evaluate((el) => el.getBoundingClientRect().height);
+    expect(clearedHeight).toBeCloseTo(restingHeight, 0);
+  });
+});
+
+// LIN-2717: the shared 375×812 coordination point with LIN-2715. LIN-2715
+// owns pre-start inter-sibling VERTICAL collisions; LIN-2717 owns this
+// row's intra-row HORIZONTAL criterion, because the <input>-to-<textarea>
+// swap carries the min-content floor across (`size` -> `cols`, both default
+// 20). Whichever of the two tickets lands first creates this describe; the
+// second joins it rather than forking a second mobile block. The file's
+// existing mobile blocks are 390×844 (:371, :430, :499 above) — this is a
+// distinct viewport, per the AC's own literal wording.
+test.describe('Flight Companion — 375×812 (LIN-2717 / LIN-2715 shared mobile coordination point)', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test.beforeEach(async ({ page }) => {
+    await mockTurn(page, { token: 'ack' });
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  async function assertNoOverlapOrOverflow(page) {
+    const input = page.locator('#flight-companion-question');
+    const send = page.locator('#flight-companion-send');
+    // The phone-shape column puts the composer below the fold at first
+    // paint (LIN-2632) — scroll it into view the way a reaching user would,
+    // same idiom as the 390×844 reachability tests above.
+    await send.scrollIntoViewIfNeeded();
+    const [inputBox, sendBox] = await Promise.all([input.boundingBox(), send.boundingBox()]);
+    // The AC's literal wording: the composer must not overlap the send button.
+    expect(inputBox.x + inputBox.width).toBeLessThanOrEqual(sendBox.x + 1);
+    // The actual failure mechanism (a flex min-width:auto blowout) is
+    // overflow, not overlap in the CSS sense — assert that directly too.
+    const row = page.locator('.fc-chat-composer');
+    const { scrollWidth, clientWidth } = await row.evaluate((el) => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    // Geometric intersection alone is also true of a button under an opaque
+    // overlay — a real (trial) click is the decisive check.
+    await expect(send).toBeInViewport();
+    await send.click({ trial: true, timeout: 2000 });
+  }
+
+  test('the composer and send button do not overlap, at rest', async ({ page }) => {
+    await assertNoOverlapOrOverflow(page);
+  });
+
+  test('the composer and send button do not overlap once the composer has grown to the cap', async ({ page }) => {
+    const input = page.locator('#flight-companion-question');
+    await input.click();
+    await page.keyboard.type(Array.from({ length: 40 }, (_, i) => `word${i}`).join(' '));
+    await assertNoOverlapOrOverflow(page);
   });
 });
 

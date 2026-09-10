@@ -201,8 +201,34 @@
   margin-top: var(--space-1);
 }
 
+/* LIN-2717: FC's first visual styling for this control — .fc-composer-input
+   was previously `flex: 1 1 auto` and nothing else (UA-default rendering).
+   A UA <textarea> defaults to a monospace font and ignores .theme-dark, so
+   the border/background/padding/font/focus-ring tokens below are a
+   deliberate appearance change, not a like-for-like port. Check both
+   themes. */
 .fc-composer-input {
   flex: 1 1 auto;
+  min-width: 0;          /* AC: releases the textarea's cols-driven min-content floor */
+  box-sizing: border-box;
+  min-height: 2.2rem;    /* the resting one-row height — the shrink floor */
+  max-height: 8.5rem;    /* the cap; JS never needs to know it */
+  resize: none;          /* auto-grow owns the height */
+  overflow-y: hidden;    /* JS flips to auto once capped */
+  padding: 0.4rem 0.5rem;
+  font-family: var(--font-structural);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.fc-composer-input:focus { outline: none; border-color: var(--brand); }
+
+.fc-chat-composer .action-btn {
+  flex: 0 0 auto;        /* AC: the send button never shrinks or is pushed off */
+  align-self: flex-end;  /* stays on the composer's bottom edge as the textarea grows */
 }
 
 .fc-proposal {

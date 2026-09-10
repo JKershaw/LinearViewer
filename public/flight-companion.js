@@ -387,6 +387,38 @@
     if (reorientBtn) reorientBtn.disabled = busy;
   }
 
+  // LIN-2717: auto-grow the composer to its CSS-owned cap (flight-companion.css
+  // .fc-composer-input max-height). REV 2 / plan-review finding 1: the guard is
+  // case-INSENSITIVE by design. The prototype's verbatim `tagName !== 'TEXTAREA'`
+  // is correct in a browser (HTML tagName is always upper-case) but unreachable
+  // in the unit seam, whose FakeElement uses the file's lower-case tag
+  // convention — so the guard would early-return on every unit call and U9
+  // would pass for the wrong reason. Upper-casing costs nothing in production
+  // and keeps the seam idiomatic. See tests/unit/flight-companion-client.test.js.
+  function resizeComposer() {
+    if (!questionInput || String(questionInput.tagName).toUpperCase() !== 'TEXTAREA') return;
+    questionInput.style.height = 'auto';
+    // `chrome` = border width. With box-sizing: border-box, height:H means
+    // border+padding+content = H, but scrollHeight includes padding and
+    // EXCLUDES border — writing scrollHeight alone would under-size by the
+    // border width and leave a permanent 2px scrollbar. Deriving it from the
+    // two live metrics keeps this correct if the border is ever retuned.
+    // One imprecision, accepted: while still overflow-y: auto from a prior
+    // capped state, `chrome` also absorbs the scrollbar width and over-sizes
+    // by ~15px for a single frame; the CSS max-height bounds it either way.
+    var chrome = questionInput.offsetHeight - questionInput.clientHeight;
+    questionInput.style.height = (questionInput.scrollHeight + chrome) + 'px';
+    questionInput.style.overflowY =
+      questionInput.scrollHeight > questionInput.clientHeight ? 'auto' : 'hidden';
+  }
+
+  // LIN-2717: the single chokepoint for every programmatic `.value` write.
+  // Assigning `.value` directly fires no `input` event, so an auto-grow bound
+  // only to `input` would leave the box stuck tall after a send-clear and
+  // mis-sized after a draft restore. All seven programmatic write sites route
+  // through here instead of assigning `.value` directly.
+  function setComposerValue(v) { questionInput.value = v; resizeComposer(); }
+
   // AC4 (LIN-2443): ChatUI.appendMessage bakes the speaker pill into
   // innerHTML and returns only the <li>, so there is no mutation API — but
   // every state this needs already exists in the shared vocabulary
@@ -971,7 +1003,7 @@
         applyCadenceEffect('stop');
         if (turnKind === 'user-initiated' || turnKind === 'boot') {
           chatHistory.pop();
-          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') setComposerValue(sentMessage);
         }
         break;
       case 'flag-off':
@@ -979,7 +1011,7 @@
         applyCadenceEffect('stop');
         if (turnKind === 'user-initiated' || turnKind === 'boot') {
           chatHistory.pop();
-          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') setComposerValue(sentMessage);
         }
         break;
       case 'message-too-long':
@@ -988,7 +1020,7 @@
         // nothing that could produce this classification).
         chatHistory.pop();
         showInlineNote(classification.message);
-        questionInput.value = sentMessage;
+        setComposerValue(sentMessage);
         break;
       case 'ai-not-configured':
         showInlineNote(classification.message);
@@ -996,7 +1028,7 @@
           applyCadenceEffect('stop');
         } else {
           chatHistory.pop();
-          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') setComposerValue(sentMessage);
         }
         break;
       case 'free-tier-limit':
@@ -1015,7 +1047,7 @@
           applyCadenceEffect('double');
         } else {
           chatHistory.pop();
-          if (turnKind === 'user-initiated') questionInput.value = sentMessage;
+          if (turnKind === 'user-initiated') setComposerValue(sentMessage);
         }
         break;
     }
@@ -1241,7 +1273,7 @@
       if (turnKind === 'user-initiated' || turnKind === 'boot') {
         chatHistory.pop();
         showInlineNote(networkMessage);
-        if (turnKind === 'user-initiated') questionInput.value = message;
+        if (turnKind === 'user-initiated') setComposerValue(message);
       } else {
         applyCadenceEffect('double');
       }
@@ -1286,7 +1318,7 @@
   function submitQuestion() {
     var text = (questionInput.value || '').trim();
     if (!text || inFlight) return;
-    questionInput.value = '';
+    setComposerValue('');
     sendTurn(text, 'user-initiated');
   }
 
@@ -1304,8 +1336,24 @@
   questionInput.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuestion(); }
   });
+  // LIN-2717: human typing/paste is the one write `setComposerValue` cannot
+  // chokepoint (there is no `.value =` call to intercept) — `input` never
+  // fires on an auto-wake path, which is what keeps LIN-2718's turn-kind
+  // gate intact.
+  questionInput.addEventListener('input', resizeComposer);
+  // LIN-2717 finding, not in the plan: focusing a <textarea> reveals it via
+  // CENTER alignment in Chromium, unlike <input>'s edge alignment — which
+  // this page's phone-shape column (flight-companion.css's 100dvh block)
+  // depends on landing the composer flush with the viewport's bottom edge.
+  // Re-align on focus so the mobile reachability contract (LIN-2632) holds
+  // for a textarea the same way it happened to for the old <input>.
+  questionInput.addEventListener('focus', function () {
+    questionInput.scrollIntoView({ block: 'end', inline: 'nearest' });
+  });
   if (startBtn) startBtn.addEventListener('click', startBoot);
   if (reorientBtn) reorientBtn.addEventListener('click', startBoot);
+  // Size a browser-restored form value (e.g. bfcache) on first paint.
+  resizeComposer();
 
   window.addEventListener('beforeunload', function () {
     if (timerId) { clearTimeout(timerId); timerId = null; }
@@ -1328,6 +1376,7 @@
       advanceCadence, classifyTurnResponse, parseProposalResult, formatCheckIn, formatSweepNotSeen,
       formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal, parseDecisionsResult,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
+      resizeComposer,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },
       getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
