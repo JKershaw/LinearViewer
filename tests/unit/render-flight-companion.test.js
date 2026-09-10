@@ -260,3 +260,46 @@ describe('renderFlightCompanionPage — LIN-2621: the status strip', () => {
     assert.match(html, /<span class="fc-strip-tab-total" id="flight-companion-strip-tab-total">0 check-ins · \$0\.00 this tab<\/span>/);
   });
 });
+
+// LIN-2717 S3 (U1–U4). Added at close-out to discharge review ledger item L7:
+// the composer's markup contract had no unit witness, only an incidental E2E
+// value assertion. These pin the shape at the render layer, where the RCDATA
+// hazard actually lives.
+//
+// Every assertion below resolves the composer by id WITHOUT presuming its tag,
+// then asserts the tag — so reverting to `<input type="text">` fails loudly
+// here instead of passing vacuously against a `<textarea>`-shaped regex that
+// simply finds nothing.
+describe('renderFlightCompanionPage — LIN-2717: the composer is a textarea, and its markup contract', () => {
+  const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
+
+  // The composer element as rendered, whatever tag it currently uses.
+  const composer = html.match(/<(?:input|textarea)\b[^>]*id="flight-companion-question"[^>]*>/)?.[0];
+
+  test('the composer element is present and resolvable by id', () => {
+    assert.ok(composer, 'expected an <input> or <textarea> carrying id="flight-companion-question"');
+  });
+
+  // U1 — load-bearing. <textarea> content is RCDATA: any character between the
+  // tags (a newline from breaking the template, an indented closing tag) loads
+  // as .value on first paint and silently defeats the whitespace-only guard,
+  // since only ONE leading newline is stripped by the parser.
+  test('U1: renders as <textarea> with ZERO characters between the tags (the RCDATA trap)', () => {
+    assert.match(html, /<textarea[^>]*id="flight-companion-question"[^>]*><\/textarea>/);
+  });
+
+  test('U2: carries maxlength="2000"', () => {
+    assert.match(composer, /\bmaxlength="2000"/);
+  });
+
+  test('U3: carries an aria-label (the control has no other accessible name)', () => {
+    assert.match(composer, /\baria-label="Ask the flight companion"/);
+  });
+
+  // U4 — `type` is invalid on a textarea; this pins the swap away from
+  // <input type="text"> rather than merely observing the new tag.
+  test('U4: does not carry type="text"', () => {
+    assert.ok(composer.startsWith('<textarea'), 'composer must be a <textarea>, not an <input>');
+    assert.doesNotMatch(composer, /\btype="text"/);
+  });
+});
