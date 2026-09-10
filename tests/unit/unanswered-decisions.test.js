@@ -268,6 +268,16 @@ describe('collectUnansweredDecisions — taskDecisions branch (LIN-2197 Phase 3)
     assert.deepStrictEqual(rows, []);
   });
 
+  // LIN-2650 WS4 §7: a third outcome value, same presence-based predicate
+  // (`if (entry.outcome) continue`, lib/unanswered-decisions.js) — closes the
+  // "no change needed" claim with an actual assertion rather than prose.
+  test('a self-resolved task decision is excluded, same as answered/dismissed', () => {
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [taskDecision({ outcome: 'self-resolved', outcomeAt: NOW.toISOString() })]
+    }, { now: NOW });
+    assert.deepStrictEqual(rows, []);
+  });
+
   test('anchor shape: loopId null, target/followUpTo null, taskDecisionId carries the record id', () => {
     const entry = taskDecision({
       id: 'scan_abc12345_deadbeefcafe',

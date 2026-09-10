@@ -13,19 +13,28 @@
  * carries a decision (or not) and an outcome (or not):
  *   - decision: null                    → zero-finding, the common case
  *   - decision present, outcome: null   → an unanswered ruling: question,
- *                                          options, an answer box, dismiss
- *   - decision present, outcome set     → 'dismissed' or 'answered', shown
- *                                          as a collapsed note (LIN-2197
+ *                                          options, an answer box, dismiss,
+ *                                          retire
+ *   - decision present, outcome:
+ *     'dismissed'/'answered'            → shown as a collapsed note (LIN-2197
  *                                          Phase 4 close-out ledger item L2:
  *                                          an outcome-stamped row is durable,
- *                                          never silently re-escalated)
+ *                                          never silently re-escalated) —
+ *                                          write-once, no reversal
+ *   - decision present, outcome:
+ *     'self-resolved' (LIN-2650)        → shown as a collapsed "retired"
+ *                                          note with the machine-written
+ *                                          reason and an un-retire
+ *                                          affordance — the ONE outcome
+ *                                          value that is reversible
  *
- * `stale` carries the SAME three branches (LIN-2211): a decision found before
- * unrelated task activity (e.g. an unconnected comment) moved the content
- * hash is still a live ruling, not a shape the operator lost the ability to
- * act on — `renderStale` reuses `renderDecisionBody` verbatim so an orphaned
- * unanswered ruling keeps its answer/dismiss controls alongside the rescan
- * affordance, rather than degrading to a bare "rescan" placeholder.
+ * `stale` carries the SAME four branches (LIN-2211/LIN-2650): a decision
+ * found before unrelated task activity (e.g. an unconnected comment) moved
+ * the content hash is still a live ruling, not a shape the operator lost the
+ * ability to act on — `renderStale` reuses `renderDecisionBody` verbatim so
+ * an orphaned unanswered ruling keeps its answer/dismiss/retire controls
+ * alongside the rescan affordance, rather than degrading to a bare "rescan"
+ * placeholder.
  *
  * Answering posts a durable comment via the shared `window.ReplyDelivery`
  * chain (LIN-2200) — NOT `window.api` directly, per this ticket's own
@@ -33,7 +42,10 @@
  * server can best-effort stamp the row 'answered' alongside the comment
  * write (Phase 4 close-out ledger item L4). Dismissing calls the scan
  * store's own dismiss route instead (a purely local state change with no
- * comment attached).
+ * comment attached). Retire/un-retire (LIN-2650 WS4) are likewise local
+ * state changes with no comment attached — retire runs a server-side
+ * re-check first and only stamps the row when that check finds nothing
+ * pending; un-retire is a pure reversal, no re-check.
  *
  * Exposed as a global `ScanSection` since the swipe page is a plain script
  * (no module loader / build step) — same convention as BriefSection/
@@ -77,6 +89,43 @@
     });
   }
 
+  // LIN-2650 WS4. Retire re-scans server-side and only stamps the row
+  // self-resolved when that fresh check finds nothing pending; un-retire is
+  // a pure store reversal. Both take only `{ id }` — never a client-supplied
+  // verdict, matching the server's own contract.
+  async function postRetire(urlKey, identifier, source, id) {
+    return window.api(scanUrl(urlKey, identifier, source, '/retire'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      on401: false,
+      body: JSON.stringify({ id })
+    });
+  }
+
+  async function postUnretire(urlKey, identifier, source, id) {
+    return window.api(scanUrl(urlKey, identifier, source, '/unretire'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      on401: false,
+      body: JSON.stringify({ id })
+    });
+  }
+
+  // LIN-2650 WS4. Native confirm() is the ratified destructive-action
+  // primitive (LIN-511; see docs/ui-divergences.md, public/dispatch.js:856,
+  // public/proxy.js:234) — named constants beside the click handlers that
+  // use them, not inline literals, so a later copy edit has one place to
+  // change and a grep target a test can assert against. Both carry the
+  // ticket's backstop-not-guarantee disclaimer, required on both actions.
+  const RETIRE_CONFIRM_TEXT = 'Retire this ruling? Harbour will re-check the task right now and only retire it if that check finds nothing pending — this is a backstop, not a guarantee. An uncertain or failed check leaves the ruling exactly as it is.';
+  // LIN-2650 review F1 (required change, not a unilateral rewrite): un-retire
+  // performs no LLM judgement of its own, but the ruling it restores to the
+  // queue DOES — LIN-2241 criterion 5's backstop-not-guarantee disclaimer
+  // attaches to that scan judgement, not to the un-retire write itself, so
+  // the middle clause below names the judgement explicitly rather than
+  // disclaiming the deterministic action performing it.
+  const UNRETIRE_CONFIRM_TEXT = 'Un-retire this ruling? It returns to your queue as unanswered. Harbour is not re-checking anything now, and scan rulings come from an LLM judgement that is a backstop, not a guarantee. This does not undo whatever caused it to self-resolve — check the task yourself before acting on it again.';
+
   function actionButton(action, label) {
     return `<button type="button" class="scan-action" data-scan-action="${esc(action)}">${label}</button>`;
   }
@@ -111,6 +160,7 @@
         <div class="scan-answer-actions">
           <button type="button" class="scan-answer-submit" data-scan-action="answer">Send answer</button>
           <button type="button" class="scan-dismiss" data-scan-action="dismiss">Dismiss</button>
+          <button type="button" class="scan-retire" data-scan-action="retire">Retire</button>
         </div>
       </div>` : '';
     return `<div class="scan-decision" data-testid="scan-decision">${question}${optionsHtml}${answerHtml}</div>`;
@@ -124,6 +174,21 @@
     if (!data.decision) {
       return `${header('scan · no blockers', meta, rescanBtn)}
         <div class="scan-empty" data-testid="scan-empty">No blockers found. This task looks clear.</div>`;
+    }
+
+    // LIN-2650 WS0/WS4: self-resolved is tested FIRST — it is also a truthy
+    // `outcome` value that the dismissed/answered `||` chain below would not
+    // match, so without this it would silently fall through to the
+    // interactive answer UI on an already-retired row.
+    if (data.outcome === 'self-resolved') {
+      const reason = esc(data.outcomeReason || '');
+      const outcomeTs = data.outcomeAt ? relativeTime(data.outcomeAt) : '';
+      return `${header('scan · retired', meta, rescanBtn)}
+        <div class="scan-outcome-note" data-testid="scan-outcome-self-resolved">
+          Retired${outcomeTs ? ' ' + esc(outcomeTs) : ''} — ${reason}
+          <details class="scan-outcome-detail"><summary>show ruling</summary>${renderDecisionBody(data.decision, { interactive: false })}</details>
+          <button type="button" class="scan-unretire" data-scan-action="unretire">Un-retire</button>
+        </div>`;
     }
 
     if (data.outcome === 'dismissed' || data.outcome === 'answered') {
@@ -173,6 +238,19 @@
           : 'Rescan to check for blockers.')}`;
     }
 
+    // Same third branch as renderFresh — a self-resolved row can also be
+    // superseded by newer content exactly like a dismissed one can.
+    if (data.outcome === 'self-resolved') {
+      const reason = esc(data.outcomeReason || '');
+      const outcomeTs = data.outcomeAt ? relativeTime(data.outcomeAt) : '';
+      return `${header('scan · out of date · retired', meta, rescanBtn)}
+        <div class="scan-outcome-note" data-testid="scan-outcome-self-resolved">
+          Retired${outcomeTs ? ' ' + esc(outcomeTs) : ''} — ${reason}
+          <details class="scan-outcome-detail"><summary>show ruling</summary>${renderDecisionBody(data.decision, { interactive: false })}</details>
+          <button type="button" class="scan-unretire" data-scan-action="unretire">Un-retire</button>
+        </div>`;
+    }
+
     if (data.outcome === 'dismissed' || data.outcome === 'answered') {
       const outcomeLabel = data.outcome === 'dismissed' ? 'dismissed' : 'answered';
       const outcomeTs = data.outcomeAt ? relativeTime(data.outcomeAt) : '';
@@ -210,7 +288,9 @@
     load: { status: 'loading', body: 'Checking scan status.' },
     scan: { status: 'scanning', body: 'Reading the task for a blocker.' },
     dismiss: { status: 'dismissing', body: 'Dismissing the ruling.' },
-    answer: { status: 'sending', body: 'Recording your answer.' }
+    answer: { status: 'sending', body: 'Recording your answer.' },
+    retire: { status: 'checking', body: 'Re-checking the task before retiring.' },
+    unretire: { status: 'un-retiring', body: 'Un-retiring the ruling.' }
   };
 
   function renderGenerating(kind) {
@@ -250,6 +330,12 @@
     const answerBtn = container.querySelector('[data-scan-action="answer"]');
     if (answerBtn) answerBtn.addEventListener('click', () => runAnswer(container, ctx));
 
+    const retireBtn = container.querySelector('[data-scan-action="retire"]');
+    if (retireBtn) retireBtn.addEventListener('click', () => runRetire(container, ctx));
+
+    const unretireBtn = container.querySelector('[data-scan-action="unretire"]');
+    if (unretireBtn) unretireBtn.addEventListener('click', () => runUnretire(container, ctx));
+
     container.querySelectorAll('[data-option-label]').forEach(btn => {
       btn.addEventListener('click', () => {
         const input = container.querySelector('[data-scan-answer-input]');
@@ -284,6 +370,71 @@
       // already-UUID-shaped id (LIN-2197 Phase 4 close-out ledger item L3).
       const dismissIdentifier = ctx.lastData.issueId || ctx.identifier;
       const data = await postDismiss(ctx.urlKey, dismissIdentifier, ctx.source, id);
+      ctx.lastData = data;
+      applyState(container, renderFresh(data), 'fresh');
+    } catch (err) {
+      applyState(container, renderError(err && err.message), 'error');
+    }
+    wireActions(container, ctx);
+  }
+
+  // LIN-2650 WS4. Retire re-scans server-side; the route ignores anything
+  // this client sends beyond `id` (never a client-supplied verdict). Two
+  // outcomes: `retired: true` carries the full self-resolved record (same
+  // field family GET/POST scan already use, so it renders via the normal
+  // renderFresh path); `retired: false` means the row was never touched —
+  // nothing changed, so the current view is simply restored unchanged
+  // rather than treated as an error.
+  async function runRetire(container, ctx) {
+    if (!confirm(RETIRE_CONFIRM_TEXT)) return;
+    const data = ctx.lastData;
+    if (!data || !data.id) return;
+    const priorState = container.getAttribute('data-state') === 'stale' ? 'stale' : 'fresh';
+
+    applyState(container, renderGenerating('retire'), 'generating');
+    try {
+      const identifier = data.issueId || ctx.identifier;
+      const result = await postRetire(ctx.urlKey, identifier, ctx.source, data.id);
+      // LIN-2650 review F3: a keepalive-flushed error (lib/http-keepalive.js)
+      // commits HTTP 200 before the real status is known, then carries the
+      // failure as a `statusCode` field inside that 200 body — `window.api`
+      // throws only on `!response.ok`, so this is otherwise silently treated
+      // as a healthy response. Same presence-check convention as
+      // public/observation.js's `classifyBulkScanResult` (:2806). A healthy
+      // retire body is never `retired: true` AND `statusCode`-bearing, so
+      // this must be checked before the `retired` branch below.
+      if (result && Object.prototype.hasOwnProperty.call(result, 'statusCode')) {
+        throw new Error(result.error || `Retire failed (${result.statusCode})`);
+      }
+      if (result && result.retired) {
+        ctx.lastData = result;
+        applyState(container, renderFresh(result), 'fresh');
+      } else {
+        // Nothing changed server-side (markOutcome was never called) —
+        // restore the view the operator was already looking at.
+        applyState(container, priorState === 'stale' ? renderStale(data) : renderFresh(data), priorState);
+      }
+    } catch (err) {
+      applyState(container, renderError(err && err.message), 'error');
+    }
+    wireActions(container, ctx);
+  }
+
+  async function runUnretire(container, ctx) {
+    if (!confirm(UNRETIRE_CONFIRM_TEXT)) return;
+    const id = ctx.lastData && ctx.lastData.id;
+    if (!id) return;
+
+    applyState(container, renderGenerating('unretire'), 'generating');
+    try {
+      const identifier = (ctx.lastData && ctx.lastData.issueId) || ctx.identifier;
+      const data = await postUnretire(ctx.urlKey, identifier, ctx.source, id);
+      // LIN-2650 review F3, for symmetry with runRetire above: un-retire has
+      // no branch on the result shape at all today, so a flushed error body
+      // would otherwise render straight through as if it were a real record.
+      if (data && Object.prototype.hasOwnProperty.call(data, 'statusCode')) {
+        throw new Error(data.error || `Un-retire failed (${data.statusCode})`);
+      }
       ctx.lastData = data;
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {

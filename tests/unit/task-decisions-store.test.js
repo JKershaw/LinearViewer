@@ -448,6 +448,59 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
     assert.ok(!ids.includes(idOldTerminal), 'the older terminal row is evicted first');
     assert.ok(ids.includes(idNewTerminal), 'the newer terminal row survives');
   });
+
+  // LIN-2650 WS0 §3: a 'self-resolved' row joins the SAME unconditionally-exempt
+  // bucket as a decision-bearing unanswered row, not bucket 2 (terminal,
+  // evictable) — otherwise reversibility silently expires at the cap.
+  //
+  // LIN-2650 review F2: an earlier version of this test used maxPerTask: 2
+  // plus three following zero-finding pushes (mirroring the L2 test above).
+  // That push count is fully absorbed by the zero-finding bucket alone
+  // (toEvict === 2, exactly the two non-newest zero-finding rows available),
+  // so the eviction loop's `toEvict <= 0` break always fires before it ever
+  // reaches the self-resolved row's bucket — mutating away the exemption
+  // branch at `_pruneToCapacity` left this test green (0 fails), because the
+  // fixture never drove a prune that actually needed to consult it. Fixed
+  // per the approved plan's own guidance: drive `toEvict` past what the
+  // zero-finding bucket alone can satisfy — maxPerTask: 1 with a single
+  // following scan. The newest-row exemption absorbs that one push on its
+  // own (so the shipped exemption is never exercised by eviction pressure,
+  // and the row survives either way), but with the self-resolved exemption
+  // branch deleted, the self-resolved row itself becomes the only remaining
+  // eviction candidate and toEvict has a target to consume — see the
+  // reproduction recorded in the beat-1 report.
+  test('a self-resolved row survives a capacity prune even when pushed past maxPerTask (LIN-2650)', async () => {
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: 1 });
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const idSelfResolved = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await capped.markOutcome({
+      urlKey: URL_KEY, issueId: ISSUE_ID, id: idSelfResolved, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+
+    // One further zero-finding scan at maxPerTask: 1 — toEvict === 1 with no
+    // zero-finding candidate available (the only zero-finding row is docs[0],
+    // exempt as the newest row), so the self-resolved row is the sole
+    // candidate the eviction loop can reach.
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: 'h1'.padEnd(64, '0'), decision: null });
+
+    const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
+    const ids = rows.map(r => r._id);
+    assert.ok(ids.includes(idSelfResolved), 'the self-resolved row must survive the prune');
+    assert.equal(rows.length, 2, 'exempt self-resolved row + the newest zero-finding row (newest-row exemption)');
+
+    const afterRevert = await capped.getStatus(URL_KEY, ISSUE_ID, HASH_A);
+    assert.equal(afterRevert.id, idSelfResolved);
+    assert.equal(afterRevert.outcome, 'self-resolved');
+  });
+
+  // Regression pin (LIN-2650 plan-review CHECK 5, L4): the exemption above
+  // must NOT widen to every terminal outcome. This is deliberately NOT a new
+  // test — the plan calls for the EXISTING "terminal rows evict oldest-first
+  // once zero-finding rows are exhausted" test three above (unchanged since
+  // before this ticket) to keep passing byte-for-byte as the proof that
+  // 'answered'/'dismissed' rows stay evictable; re-run below as part of this
+  // suite, not modified.
 });
 
 describe('TaskDecisionsStore canonical-UUID guard', () => {
@@ -565,6 +618,190 @@ describe('TaskDecisionsStore.markOutcome', () => {
     assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'archived' }), null);
     assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' }) && true, true); // sanity: valid call still works
     assert.equal(await store.markOutcome({ issueId: ISSUE_ID, id, outcome: 'dismissed' }), null); // no urlKey
+  });
+});
+
+// LIN-2650 WS0 §1: markOutcome's allowlist widens to the closed three-value
+// set {'answered', 'dismissed', 'self-resolved'} — 'archived' (the test
+// above) must keep failing, proving the set stays closed rather than open.
+describe('TaskDecisionsStore.markOutcome — self-resolved (LIN-2650)', () => {
+  let collection, store;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  async function decisionBearingRow() {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    return TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+  }
+
+  test('self-resolved with reason+hash succeeds and both fields round-trip', async () => {
+    const id = await decisionBearingRow();
+    const record = await store.markOutcome({
+      urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved',
+      outcomeReason: 'Retired automatically: a rescan found no pending decision.', outcomeBasisHash: 'basis-xyz'
+    });
+    assert.equal(record.outcome, 'self-resolved');
+    assert.equal(record.outcomeReason, 'Retired automatically: a rescan found no pending decision.');
+    assert.equal(record.outcomeBasisHash, 'basis-xyz');
+    assert.ok(record.outcomeAt);
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, 'self-resolved');
+    assert.equal(status.outcomeReason, 'Retired automatically: a rescan found no pending decision.');
+    assert.equal(status.outcomeBasisHash, 'basis-xyz');
+  });
+
+  test('empty or missing outcomeReason is refused — returns null, row untouched', async () => {
+    const id = await decisionBearingRow();
+    assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: '   ', outcomeBasisHash: 'basis-xyz' }), null);
+    assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeBasisHash: 'basis-xyz' }), null);
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, null, 'a refused call must not stamp the row');
+  });
+
+  test('missing outcomeBasisHash is refused — returns null, row untouched', async () => {
+    const id = await decisionBearingRow();
+    assert.equal(await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: 'found nothing pending' }), null);
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, null);
+  });
+
+  test('answered/dismissed behaviour is byte-identical to today (regression pin, existing bodies unmodified)', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+
+    const record = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' });
+    assert.equal(record.outcome, 'dismissed');
+    assert.ok(record.outcomeAt);
+    // The widened allowlist must not start persisting outcomeReason/outcomeBasisHash
+    // for a call that never supplied them.
+    assert.equal(record.outcomeReason, null);
+    assert.equal(record.outcomeBasisHash, null);
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, 'dismissed');
+  });
+
+  test('a second markOutcome on an already-self-resolved row returns the original unchanged (first-stamp-wins extended)', async () => {
+    const id = await decisionBearingRow();
+    const first = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: 'first reason', outcomeBasisHash: 'hash-1' });
+    const second = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: 'second reason', outcomeBasisHash: 'hash-2' });
+    assert.equal(second.outcome, 'self-resolved');
+    assert.equal(second.outcomeReason, 'first reason', 'first stamp wins — re-marking is not the correction path, reverseOutcome is');
+    assert.equal(second.outcomeBasisHash, 'hash-1');
+    assert.equal(second.outcomeAt, first.outcomeAt);
+  });
+
+  // LIN-2650 plan-review C3: closes the pruning-exemption bound named in the
+  // round-2 review (a zero-finding row self-resolving would become
+  // permanently unprunable, in exactly the churn population bucket 1 exists
+  // to evict). Folded in here rather than deferred to WS4's retire route.
+  test('a zero-finding row (no decision) cannot be self-resolved — refused, stays evictable', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: null });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+
+    const result = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz' });
+    assert.equal(result, null);
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, null);
+  });
+});
+
+// LIN-2650 WS0 §2: reverseOutcome is the ONLY path off a self-resolved row —
+// it succeeds only when the row is currently self-resolved, and fails LOUD
+// (a thrown Error, not the class's usual returned null) otherwise.
+describe('TaskDecisionsStore.reverseOutcome (LIN-2650)', () => {
+  let collection, store;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  async function selfResolvedRow() {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz' });
+    return id;
+  }
+
+  test('reverses a self-resolved row, clearing all four outcome-family fields including outcomeAt', async () => {
+    const id = await selfResolvedRow();
+    const reversed = await store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+    assert.equal(reversed.outcome, null);
+    assert.equal(reversed.outcomeReason, null);
+    assert.equal(reversed.outcomeBasisHash, null);
+    assert.equal(reversed.outcomeAt, null, 'no stale resolved-at timestamp survives a reversal');
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, null);
+    assert.equal(status.outcomeAt, null);
+  });
+
+  test('rejects — by throwing, asserted via the exact message — on an answered/dismissed row (write-once integrity pin)', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' });
+
+    await assert.rejects(
+      () => store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id }),
+      { message: 'reverseOutcome: row is not self-resolved' }
+    );
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, 'dismissed', 'the rejected call must not touch the row');
+  });
+
+  test('rejects — by throwing the OTHER exact message — on a since-deleted/never-existent row id', async () => {
+    await assert.rejects(
+      () => store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: 'scan_nope_nope' }),
+      { message: 'reverseOutcome: row not found (pruned or replaced)' }
+    );
+
+    // The genuinely-pruned case: self-resolve, then delete the row directly
+    // (simulating _pruneToCapacity or a superseding rescan), then reverse.
+    const id = await selfResolvedRow();
+    await collection.deleteOne({ _id: id, urlKey: URL_KEY });
+    await assert.rejects(
+      () => store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id }),
+      { message: 'reverseOutcome: row not found (pruned or replaced)' }
+    );
+  });
+
+  test('a reversed row\'s id/inputHash/decision/scannedAt are untouched — only the four outcome-family fields move', async () => {
+    const id = await selfResolvedRow();
+    const before = await store.getStatus(URL_KEY, ISSUE_ID);
+    const reversed = await store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+
+    assert.equal(reversed.id, before.id);
+    assert.equal(reversed.inputHash, before.inputHash);
+    assert.deepEqual(reversed.decision, before.decision);
+    assert.equal(reversed.scannedAt, before.scannedAt);
+  });
+
+  // LIN-2650 review F5: the ticket's own required round-trip assertion
+  // ("Un-retire restores the row to unanswered and it re-appears in
+  // listUnansweredForWorkspaces") was missing — the reversal tests above
+  // only asserted the cleared fields and a getStatus read-back, never the
+  // bulk rulings-feed read un-retire is supposed to restore the row into.
+  test('a self-resolved row is excluded from listUnansweredForWorkspaces, and reverseOutcome puts it back (LIN-2650)', async () => {
+    const id = await selfResolvedRow();
+
+    const whileRetired = await store.listUnansweredForWorkspaces([URL_KEY]);
+    assert.deepEqual(whileRetired, [], 'a self-resolved row must not appear as an unanswered ruling');
+
+    await store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+
+    const afterReverse = await store.listUnansweredForWorkspaces([URL_KEY]);
+    assert.equal(afterReverse.length, 1, 'the un-retired row must re-enter the unanswered set');
+    assert.equal(afterReverse[0].id, id);
+    assert.equal(afterReverse[0].outcome, null);
   });
 });
 
@@ -956,6 +1193,92 @@ describe('TaskDecisionsStore recordScan — [F-2] terminal-row due-basis patch (
 
     const result = await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
     assert.equal(result.dueBasisHash, 'due-existing');
+  });
+});
+
+// LIN-2650 WS0 §4: recordScan itself is UNCHANGED — the terminal-row guard
+// (`existing && existing.outcome`) is presence-based and already treats
+// 'self-resolved' as never-silently-overwritten, same as 'dismissed'
+// (:182 above) and 'answered'. This is a PIN, not a new behavior test — it
+// closes the one gap tests/unit/observation-bulk-scan.test.js:557-583's
+// terminal-row-no-op coverage left, which today only exercises 'dismissed'.
+// Per plan-review C4: asserts the ENUMERATED fields the plan names
+// (decision/outcome/outcomeReason/outcomeBasisHash), not deep/byte equality
+// — the guard's terminal branch legitimately patches dueBasisHash/
+// dueBasisVersion in place (LIN-2649 WS2's [F-2] fix, tested above), so a
+// deep-equality assertion here would be a false failure in exactly the
+// branch this pin exists to characterize, not a real regression.
+describe('TaskDecisionsStore recordScan — self-resolved terminal-row pin (LIN-2650)', () => {
+  let collection, store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('recordScan against a self-resolved row\'s exact (issueId, inputHash) returns the existing row unchanged', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision({ question: 'original' }) });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const stamped = await store.markOutcome({
+      urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+
+    const rescanned = await store.recordScan({
+      urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A,
+      decision: sampleDecision({ question: 'a fresh LLM result for the SAME unchanged content' })
+    });
+
+    // Enumerated fields only (plan-review C4) — dueBasisHash/dueBasisVersion
+    // are not asserted equal here on purpose.
+    assert.deepEqual(rescanned.decision, stamped.decision);
+    assert.equal(rescanned.decision.question, 'original', 'the new result was discarded');
+    assert.equal(rescanned.outcome, 'self-resolved');
+    assert.equal(rescanned.outcomeReason, 'nothing pending');
+    assert.equal(rescanned.outcomeBasisHash, 'basis-xyz');
+  });
+});
+
+// LIN-2650 WS0 §5: toRecord's strict projection widens by exactly two named
+// fields, `?? null` idiom, same discipline `dueBasisHash`/`dueBasisVersion`
+// already established (basisHash describe block above).
+describe('TaskDecisionsStore outcomeReason/outcomeBasisHash (LIN-2650 WS0 §5)', () => {
+  let collection, store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('a fixture round-tripped through toRecord with outcomeReason/outcomeBasisHash set carries both fields', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({
+      urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcomeReason, 'nothing pending');
+    assert.equal(status.outcomeBasisHash, 'basis-xyz');
+  });
+
+  test('a fixture with outcomeReason/outcomeBasisHash absent (answered/dismissed/never-scanned) returns null for both, not undefined', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const dismissed = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' });
+    assert.strictEqual(dismissed.outcomeReason, null);
+    assert.strictEqual(dismissed.outcomeBasisHash, null);
+
+    // A legacy row with no outcomeReason/outcomeBasisHash field at all (pre-LIN-2650) —
+    // same migration convention as basisHash/dueBasisHash above.
+    collection._docs.push({
+      _id: TaskDecisionsStore.buildId('66666666-7777-8888-9999-000000000000', HASH_A),
+      urlKey: URL_KEY, issueId: '66666666-7777-8888-9999-000000000000', issueIdentifier: 'LIN-2',
+      inputHash: HASH_A, decision: null, scannedAt: new Date(), seq: 0,
+      outcome: null, outcomeAt: null
+    });
+    const neverScanned = await store.getStatus(URL_KEY, '66666666-7777-8888-9999-000000000000', HASH_A);
+    assert.equal(neverScanned.outcomeReason, null);
+    assert.equal(neverScanned.outcomeBasisHash, null);
   });
 });
 

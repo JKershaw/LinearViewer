@@ -199,6 +199,59 @@ describe('computeEscalationKpis — unanswered age', () => {
   });
 });
 
+// LIN-2650 WS0 §6: 'self-resolved' gets its own bucket, and the fix's own
+// atomicity depends on getting ALL of this right in one commit — one
+// fixture mixing dismissed/answered/self-resolved, one assertion block over
+// every sub-object the return value carries, so a fix landing on only one
+// metric cannot pass.
+describe('computeEscalationKpis — self-resolved outcome (LIN-2650)', () => {
+  test('a self-resolved row is excluded from falseEscalation and timeToResponse, still counted as raised, and reported in its own selfResolved.count', () => {
+    const result = computeEscalationKpis({
+      resolvedEvents: [
+        { decisionId: 'd-answered', raisedAt: iso(-2 * DAY_MS), resolvedAt: iso(-DAY_MS), outcome: 'answered' },
+        { decisionId: 'd-dismissed', raisedAt: iso(-2 * DAY_MS), resolvedAt: iso(-DAY_MS), outcome: 'dismissed' },
+        { decisionId: 'd-self-resolved', raisedAt: iso(-3 * DAY_MS), resolvedAt: iso(-DAY_MS), outcome: 'self-resolved' },
+      ],
+      windowMs: 30 * DAY_MS,
+      now: NOW,
+    });
+
+    // escalationRate.raisedInWindow: the self-resolved row was genuinely
+    // RAISED in-window and must still count as having been raised — the
+    // early `continue` lives in the SEPARATE resolved-in-window loop
+    // (:115-122), not this raised-in-window one (:104-107), so all three
+    // rows count here regardless of outcome.
+    assert.strictEqual(result.escalationRate.raisedInWindow, 3);
+
+    // falseEscalation.total/.dismissed/.answered/.rate: computed as if the
+    // self-resolved row did not exist — the exact pre-existing 2/3 shape
+    // from the false-escalation describe block above, unaffected by adding
+    // a third outcome value to the fixture.
+    assert.strictEqual(result.falseEscalation.answered, 1);
+    assert.strictEqual(result.falseEscalation.dismissed, 1);
+    assert.strictEqual(result.falseEscalation.total, 2, 'the self-resolved row must not book into either counter');
+    assert.strictEqual(result.falseEscalation.rate, 0.5);
+
+    // timeToResponse.count/.medianMs/.maxMs: computed as if the self-resolved
+    // row did not exist — it never reaches the guarded durations.push.
+    assert.strictEqual(result.timeToResponse.count, 2, 'the self-resolved row must not reach durations.push');
+    assert.strictEqual(result.timeToResponse.medianMs, DAY_MS);
+    assert.strictEqual(result.timeToResponse.maxMs, DAY_MS);
+
+    // selfResolved.count: the one row, correctly bucketed.
+    assert.deepStrictEqual(result.selfResolved, { count: 1 });
+  });
+
+  test('a self-resolved row resolved OUTSIDE the window contributes to nothing, same as any other outcome', () => {
+    const result = computeEscalationKpis({
+      resolvedEvents: [{ decisionId: 'd-1', raisedAt: iso(-DAY_MS), resolvedAt: iso(-40 * DAY_MS), outcome: 'self-resolved' }],
+      windowMs: 30 * DAY_MS,
+      now: NOW,
+    });
+    assert.deepStrictEqual(result.selfResolved, { count: 0 });
+  });
+});
+
 describe('computeEscalationKpis — windowMs is echoed back', () => {
   test('the effective window is reported on the result', () => {
     const result = computeEscalationKpis({ windowMs: 7 * DAY_MS, now: NOW });

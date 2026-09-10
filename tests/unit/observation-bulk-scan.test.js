@@ -583,4 +583,28 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
     const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
     assert.equal(classifyBulkScanResult(entry), 'terminal-row-no-op');
   });
+
+  // LIN-2650 plan-review round 2, C1: the widened outcome model adds a THIRD
+  // terminal value the presence check (`value.outcome != null`) must keep
+  // covering — the two cases above only ever exercised 'dismissed'. Uses the
+  // real markOutcome path (not a direct doc mutation) since self-resolved
+  // requires outcomeReason/outcomeBasisHash.
+  test('a self-resolved row (LIN-2650) classifies as terminal-row-no-op too — the presence check, not a two-value literal list', async () => {
+    const collection = createMockDecisionsCollection();
+    const store = new TaskDecisionsStore({ collection });
+    const first = await store.recordScan({
+      urlKey: DECISIONS_URL_KEY, issueId: DECISIONS_ISSUE_ID, inputHash: DECISIONS_HASH_A,
+      decision: sampleDecision({ question: 'original' })
+    });
+    const record = await store.markOutcome({
+      urlKey: DECISIONS_URL_KEY, issueId: DECISIONS_ISSUE_ID, id: first.id, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+    assert.equal(record.outcome, 'self-resolved');
+
+    const sandbox = makeSandbox(async () => ({}));
+    const { classifyBulkScanResult } = sandbox.module.exports;
+    const entry = { item: { identifier: DECISIONS_ISSUE_ID }, outcome: 'fulfilled', value: record };
+    assert.equal(classifyBulkScanResult(entry), 'terminal-row-no-op');
+  });
 });

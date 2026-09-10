@@ -20,6 +20,7 @@ import http from 'http';
 import express from 'express';
 import { createRulingsRoutes } from '../../routes/proxy-rulings.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
+import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 
 const URL_KEY = 'test-workspace';
 const DECISION_ID = 'd-1';
@@ -368,5 +369,114 @@ describe('a proposal must name a real unanswered ruling', () => {
     const padded = `  ${'x'.repeat(500)}  `;
     const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, { reason: padded });
     assert.equal(status, 201, 'whitespace must not push a legal reason over the cap');
+  });
+});
+
+// LIN-2650 WS0 §7: a direct spot-check of THIS consumer with a real
+// TaskDecisionsStore, named explicitly by the plan-review as worth doing
+// on its own — it is the one of the four inherited consumers with its own
+// dedicated route tests (this file), which could independently regress
+// without anyone noticing via the other three (rulings inbox, KPI
+// unanswered-age input, Flight Companion's chat tool). The main suite above
+// mounts this router with `taskDecisionsStore: null`, so task-bound rows
+// never reach it there — this is a SEPARATE, minimal app instance with a
+// real store wired in.
+describe('GET /api/proxy/rulings — task-bound rows via a real TaskDecisionsStore (LIN-2650 WS0 §7)', () => {
+  const TASK_URL_KEY = 'task-ws';
+  const ISSUE_UNANSWERED = '11111111-2222-3333-4444-555555555555';
+  const ISSUE_SELF_RESOLVED = '66666666-7777-8888-9999-000000000000';
+  const HASH = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+  function createTaskDecisionsMockCollection() {
+    const docs = [];
+    function matchesField(docValue, queryValue) {
+      if (queryValue && typeof queryValue === 'object' && Array.isArray(queryValue.$in)) {
+        return queryValue.$in.includes(docValue);
+      }
+      if (queryValue && typeof queryValue === 'object' && '$ne' in queryValue) {
+        return docValue !== queryValue.$ne;
+      }
+      return docValue === queryValue;
+    }
+    function matches(doc, query) {
+      if (query._id !== undefined && doc._id !== query._id) return false;
+      if (query.urlKey !== undefined && !matchesField(doc.urlKey, query.urlKey)) return false;
+      if (query.issueId !== undefined && doc.issueId !== query.issueId) return false;
+      if (query.outcome !== undefined && !matchesField(doc.outcome ?? null, query.outcome)) return false;
+      if (query.decision !== undefined && !matchesField(doc.decision ?? null, query.decision)) return false;
+      return true;
+    }
+    return {
+      _docs: docs,
+      async findOne(query) { return docs.find(d => matches(d, query)) || null; },
+      find(query = {}) {
+        const results = docs.filter(d => matches(d, query));
+        return { async toArray() { return results.slice(); } };
+      },
+      async updateOne(query, update, opts = {}) {
+        const idx = docs.findIndex(d => matches(d, query));
+        if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
+        if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0 }; }
+        return { matchedCount: 0 };
+      }
+    };
+  }
+
+  let taskServer, taskBaseUrl, taskDecisionsStore;
+
+  before(async () => {
+    const collection = createTaskDecisionsMockCollection();
+    taskDecisionsStore = new TaskDecisionsStore({ collection });
+
+    // One live unanswered decision-bearing row, and one self-resolved row —
+    // seeded directly via the real store (the retire route that would
+    // normally produce the latter lands in a later beat).
+    await taskDecisionsStore.recordScan({
+      urlKey: TASK_URL_KEY, issueId: ISSUE_UNANSWERED, issueIdentifier: 'LIN-100', inputHash: HASH,
+      decision: { decision_id: 'scan_11111111_aaaaaaaaaaaa', question: 'Which approach?', options: [{ id: 'a', label: 'A' }], free_text: false }
+    });
+    const selfResolvedRaised = await taskDecisionsStore.recordScan({
+      urlKey: TASK_URL_KEY, issueId: ISSUE_SELF_RESOLVED, issueIdentifier: 'LIN-200', inputHash: HASH,
+      decision: { decision_id: 'scan_66666666_aaaaaaaaaaaa', question: 'Still blocked?', options: [{ id: 'a', label: 'A' }], free_text: false }
+    });
+    await taskDecisionsStore.markOutcome({
+      urlKey: TASK_URL_KEY, issueId: ISSUE_SELF_RESOLVED, id: selfResolvedRaised.id, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use(createRulingsRoutes({
+      proxyLimiter: (req, res, next) => next(),
+      authenticateProxyToken: (req, res, next) => {
+        req.proxyUrlKey = TASK_URL_KEY;
+        req.proxyTokenScope = 'read';
+        req.proxyCreatedBy = 'account-123';
+        req.proxyTokenLabel = 'a-label';
+        next();
+      },
+      requireWriteScope: (req, res, next) => next(),
+      logEvent: () => {},
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      taskDecisionsStore,
+      shelvedRulingsStore: null,
+      dismissalSuggestionsStore: null,
+      sessionsFeedCache: null
+    }));
+
+    taskServer = http.createServer(app);
+    await new Promise(resolve => taskServer.listen(0, '127.0.0.1', resolve));
+    taskBaseUrl = `http://127.0.0.1:${taskServer.address().port}`;
+  });
+
+  after(() => taskServer?.close());
+
+  test('a self-resolved task-bound row is excluded — the unanswered one still appears', async () => {
+    const res = await fetch(`${taskBaseUrl}/api/proxy/rulings`);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.rulings.length, 1, 'only the unanswered row, not the self-resolved one');
+    assert.equal(body.rulings[0].decision.decision_id, 'scan_11111111_aaaaaaaaaaaa');
   });
 });
