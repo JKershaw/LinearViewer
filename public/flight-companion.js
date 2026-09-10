@@ -141,6 +141,14 @@
   // module-level slot is safe — never overwritten mid-turn.
   var checkingInSnapshot = null;
   var CHECKING_IN_TEXT = 'checking in…';
+  // LIN-2718: whether the composer's input held focus at the moment a
+  // user-initiated turn began — captured before setComposerBusy(true) runs
+  // (disabling the input blurs it, so this must be read first). Read once,
+  // in finishTurn, to decide whether that turn's completion may restore
+  // focus. Never set for 'boot'/'auto-wake' turns, which never restore focus
+  // regardless. Module-level like checkingInSnapshot above, for the same
+  // reason: the inFlight guard makes at most one turn's slot live at a time.
+  var questionHadFocusAtTurnStart = false;
 
   // ─── Pure helpers (exposed via the test seam at the bottom — no DOM) ────
 
@@ -367,6 +375,11 @@
     if (reorientBtn) reorientBtn.classList.toggle('hidden', visible);
   }
 
+  // LIN-2718: a dumb toggle only — turn-kind gating lives at each call site
+  // (sendTurn locks, finishTurn releases), never here. Only a user-initiated
+  // or boot turn may call this with `true`; an auto-wake tick must never
+  // reach it at all, in either direction — disabling the focused input is
+  // what blurs it and, on mobile, dismisses the keyboard mid-sentence.
   function setComposerBusy(busy) {
     questionInput.disabled = busy;
     sendBtn.disabled = busy;
@@ -840,9 +853,23 @@
 
   // ─── Turn send/receive ───────────────────────────────────────────────────
 
-  function finishTurn() {
+  function finishTurn(turnKind) {
     inFlight = false;
-    setComposerBusy(false);
+    // LIN-2718: release the lock only for the turn kinds that took it —
+    // an auto-wake tick never called setComposerBusy(true), so it must never
+    // call it with `false` either (that would still be touching the
+    // composer's disabled state on a background tick, the thing this ticket
+    // removes). Restore focus ONLY after a user-initiated turn, and only if
+    // the input held it when that turn began — never on boot (a click, not
+    // a caret, started it) and never on a wake (this branch is unreachable
+    // there in the first place).
+    if (turnKind === 'user-initiated' || turnKind === 'boot') {
+      setComposerBusy(false);
+    }
+    if (turnKind === 'user-initiated' && questionHadFocusAtTurnStart) {
+      questionInput.focus();
+    }
+    questionHadFocusAtTurnStart = false;
     // LIN-2632: clear the "checking in…" placeholder on every path out of an
     // auto-wake turn, not just the silent one. Every branch with something
     // more specific to say (a plain/sweep-not-seen/no-census check-in) has
@@ -993,12 +1020,26 @@
         break;
     }
     settleFailedThinkingRow(answerEl, answerLi, turnKind, settleMessage);
-    finishTurn();
+    finishTurn(turnKind);
   }
 
   function sendTurn(message, turnKind) {
     inFlight = true;
-    setComposerBusy(true);
+    // LIN-2718: only a user-initiated or boot turn locks the composer — an
+    // auto-wake tick must never disable the input or move focus (that is
+    // the root cause this ticket fixes: disabling a focused element blurs
+    // it, and on mobile that collapses the keyboard mid-sentence). The
+    // `inFlight` guard above stays the sole mutual-exclusion mechanism
+    // regardless of turn kind — it is never expressed via `disabled`.
+    // Read focus state BEFORE locking (disabling blurs it, so this must
+    // run first) — only meaningful for 'user-initiated'; a boot's turn
+    // never restores focus on completion either way.
+    if (turnKind === 'user-initiated') {
+      questionHadFocusAtTurnStart = document.activeElement === questionInput;
+    }
+    if (turnKind === 'user-initiated' || turnKind === 'boot') {
+      setComposerBusy(true);
+    }
 
     var answerEl = null;
     var answerLi = null;
@@ -1013,12 +1054,13 @@
     // AC3 (LIN-2443): the bubble is created on demand rather than at stream
     // open, so a silent or tool-only auto-wake tick never paints an empty
     // row. `chat-cursor` therefore appears with the first token rather than
-    // at stream open; the composer is already disabled via setComposerBusy,
-    // so a user turn still has feedback during the pre-first-token wait.
-    // For a user-initiated turn specifically, this is called EAGERLY below
-    // (before the fetch even goes out) rather than waited on — so by the
-    // time the first token/tool event actually arrives, this is already a
-    // no-op that returns the existing bubble.
+    // at stream open. LIN-2718: the composer is disabled via setComposerBusy
+    // ONLY for a user-initiated/boot turn (never for auto-wake, which never
+    // touches it), so a user turn still has that feedback during the
+    // pre-first-token wait. For a user-initiated turn specifically, this is
+    // called EAGERLY below (before the fetch even goes out) rather than
+    // waited on — so by the time the first token/tool event actually
+    // arrives, this is already a no-op that returns the existing bubble.
     function ensureAssistantBubble() {
       if (!answerEl) {
         answerEl = appendAssistantBubble();
@@ -1168,7 +1210,7 @@
             // network failure) leaves the cadence untouched for a boot rather
             // than resetting or doubling it.
             applyCadenceEffect(doneCadenceEffect(turnKind, eventData && eventData.surface));
-            finishTurn();
+            finishTurn(turnKind);
           } else if (type === 'error') {
             // A mid-stream error is not the designed silence AC1 covers, so
             // the bubble is created if absent — a failure is never silent.
@@ -1181,7 +1223,7 @@
             // neither way, never a 'double' the way an auto-wake's does.
             if (turnKind === 'user-initiated' || turnKind === 'boot') chatHistory.pop();
             else applyCadenceEffect('double');
-            finishTurn();
+            finishTurn(turnKind);
           }
         });
       }
@@ -1204,7 +1246,7 @@
         applyCadenceEffect('double');
       }
       settleFailedThinkingRow(answerEl, answerLi, turnKind, networkMessage);
-      finishTurn();
+      finishTurn(turnKind);
     });
   }
 
