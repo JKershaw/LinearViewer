@@ -860,7 +860,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.ok(!capturedUrl.includes('/api/proxy'), `expected no proxy-prefixed request, got ${capturedUrl}`);
   });
 
-  test('a successful Agree writes "agreed" feedback and re-enables its row (no dangling pending state)', async () => {
+  test('a successful Agree writes "agreed" feedback and clears its pending state (no dangling pending state)', async () => {
     const { module } = makeSandbox({ api: async () => ({ success: true }) });
     const { agreeRulingRow, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
@@ -886,6 +886,76 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.match(feedback.textContent, /agree failed/);
     assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
     assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', 'd-gone-1')), false, 'must not be stranded pending after a failure');
+  });
+
+  // Review F2 — Phase 5's plan wording says verbatim "on success the Agree
+  // path marks the key in a small rulingsSettled Set". Only bulkAgreeRow did;
+  // agreeRulingRow (the ticket's headline, one-click verb) did not. Pinned
+  // directly against the seam the fix reads/writes, not just its downstream
+  // effect on a repaint.
+  test('a successful single-click Agree marks the key rulingsSettled (review F2)', async () => {
+    const { module } = makeSandbox({ api: async () => ({ success: true }) });
+    const { agreeRulingRow, rulingsSettled, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow();
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+
+    await agreeRulingRow(row, li);
+
+    assert.ok(rulingsSettled.has(key), 'a succeeded single-click Agree must mark its key settled, exactly as bulkAgreeRow does');
+  });
+
+  // Review F2, end to end — reproduces the reviewer's own DOM-probe scenario:
+  // Agree succeeds, a poll lands (the stale loop-backed cache still serves
+  // the same suggested row), and the repainted row must come back REUSED
+  // with its controls still disabled rather than rebuilt fully re-armed —
+  // closing the exact double-POST hole the plan review already closed for
+  // bulk, now on the single-click path an operator actually uses.
+  test('a repaint after a successful Agree reuses the row with controls disabled, not rebuilt re-armed (review F2)', async () => {
+    const { module, list } = (() => {
+      const l = new FakeElement('ul');
+      const e = new FakeElement('p'); e.hidden = false;
+      const { module: m } = makeSandbox({
+        api: async () => ({ success: true }),
+        elements: { 'obs-rulings': l, 'obs-rulings-empty': e }
+      });
+      return { module: m, list: l };
+    })();
+    const { renderRulings, agreeRulingRow, rulingKey } = module.exports;
+    const suggestedRow = makeRow({ suggestedDismissal: SUGGESTION });
+
+    renderRulings([suggestedRow]);
+    const li = list.children[0];
+    await agreeRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
+
+    // The stale loop-backed cache still serves the same suggested row.
+    renderRulings([suggestedRow]);
+    const repaintedLi = list.children[0];
+
+    assert.equal(repaintedLi, li, 'a settled row must be REUSED, not rebuilt, across the repaint');
+    const agreeBtn = repaintedLi.querySelector('.obs-ruling-agree');
+    const keepBtn = repaintedLi.querySelector('.obs-ruling-keep');
+    assert.ok(agreeBtn && keepBtn, 'expected the row to still carry its Agree/Keep controls');
+    assert.equal(agreeBtn.disabled, true, 'Agree must still be disabled on the reused row');
+    assert.equal(keepBtn.disabled, true, 'Keep must still be disabled on the reused row');
+  });
+
+  // A second press on the (still-disabled, but still clickable in a hostile
+  // test) row must not re-POST — this is the guard itself, independent of
+  // whatever the DOM's `disabled` attribute would have prevented in a real
+  // browser.
+  test('a second Agree press on an already-settled key sends no request (review F2)', async () => {
+    let apiCalls = 0;
+    const { module } = makeSandbox({ api: async () => { apiCalls++; return { success: true }; } });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = makeRow();
+
+    await agreeRulingRow(row, li);
+    assert.equal(apiCalls, 1);
+
+    await agreeRulingRow(row, li);
+    assert.equal(apiCalls, 1, 'a second Agree on an already-settled key must not re-POST a second decision-answer');
   });
 
   test('Keep posts to the keep route with {decisionId}, never a dismiss endpoint', async () => {
@@ -989,8 +1059,11 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
-    assert.equal(agreeBtn.disabled, false, 're-enabled once the request settles');
-    assert.equal(keepBtn.disabled, false);
+    // Review F2: a SUCCESSFUL Agree marks the row rulingsSettled and stays
+    // disabled (reused, not rebuilt re-armed, by the next repaint) — it no
+    // longer re-enables on success the way a failure still does.
+    assert.equal(agreeBtn.disabled, true, 'a succeeded Agree must stay disabled, not re-arm (review F2)');
+    assert.equal(keepBtn.disabled, true);
   });
 
   test('pressing Keep disables every control on the row, including Agree and Keep themselves', async () => {

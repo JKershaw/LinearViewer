@@ -102,6 +102,24 @@ function rulingKey(urlKey, decisionId) {
   return `${urlKey}::${decisionId}`;
 }
 const rulingsPending = new Set();          // rulingKey → currently mid-reply (disables its buttons)
+// A key moves here the instant its Agree succeeds (review F2 — the plan's own
+// Phase 5 wording: "on success the Agree path marks the key in a small
+// `rulingsSettled` Set"). Needed even for the single-row press, not only a
+// future bulk batch: a succeeded loop-backed row is served from the stale
+// feed cache for TTL + two reads, so it keeps appearing in the payload with
+// `suggestedDismissal` still set. Without this, the next 5s poll rebuilds the
+// row FULLY RE-ARMED (renderRulingRow renders fresh, enabled controls), and a
+// second press re-POSTs — `markDecisionAnswered`'s unconditional `$push` has
+// no idempotence guard on that branch, so this stamps TWO `decision-answer`
+// entries on one decision. `rulingsSettled` is OR-ed into `renderRulings`'
+// `mustReuse` below so such a row is REUSED with its controls still disabled
+// rather than rebuilt re-armed, and it is released once the key is absent
+// from a poll's actual payload (the row has finally left the feed for real).
+// Deliberately its OWN Set — not `preservedRulingRows` (purpose-built for
+// partial-failure retry state) and not a second dismiss/answer-state
+// mutation (Agree still runs the one existing dismiss path; nothing about
+// answer state changes here).
+const rulingsSettled = new Set();
 const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across a poll's repaint (partial-failure retry state)
 // rulingKey → the <li> currently attached to #obs-rulings for it (LIN-1728
 // review F3). Populated on every renderRulings pass and consulted whenever a
@@ -1559,12 +1577,24 @@ function renderRulings(rulings) {
     const decisionId = row?.decision?.decision_id;
     const urlKey = row?.anchor?.workspaceUrlKey;
     const key = (decisionId && urlKey) ? rulingKey(urlKey, decisionId) : null;
-    const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key));
+    const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key));
     const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
     nodes.push(li);
     if (key) { seen.add(key); renderedRulingRows.set(key, li); }
   }
+
+  // Release a settled key (review F2) the moment its row is absent from THIS
+  // poll's actual payload — checked against `seen` here, BEFORE the
+  // preserved/pending re-add loops below re-inject stale nodes for their own,
+  // unrelated reasons, so a settled row that has genuinely left the feed
+  // (task-bound: next poll; loop-backed: once the stale cache catches up)
+  // stops being force-reused. A later re-suggestion on the same key then
+  // starts fully re-armed rather than permanently disabled.
+  for (const key of Array.from(rulingsSettled)) {
+    if (!seen.has(key)) rulingsSettled.delete(key);
+  }
+
   // A preserved or still-pending row whose decision already dropped out of
   // this poll's payload (the stamp landed server-side, or the payload just
   // hasn't caught up yet) still shows once more — dropping it here would be
@@ -2057,23 +2087,26 @@ function dismissRulingRow(row, li) {
 // so a later sequential batch (Group B) can call this per selected row
 // without further surgery — it returns the settling promise so a caller can
 // await it, though this beat wires no such caller yet.
+//
+// Review F2: on SUCCESS this does NOT call a `restore()` that re-enables
+// every control — it marks the key `rulingsSettled` instead, exactly as the
+// plan's own Phase 5 wording requires of "the Agree path", so the row is
+// REUSED with its controls still disabled (via `mustReuse` above) rather
+// than rebuilt re-armed by the next poll. A FAILED attempt still restores
+// (re-enables) so the operator can retry.
 function agreeRulingRow(row, li) {
   const { decision, anchor } = row || {};
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
   const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
-  if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return Promise.resolve();
+  if (!targetUrlKey || !decisionId || rulingsPending.has(key) || rulingsSettled.has(key)) return Promise.resolve();
 
   rulingsPending.add(key);
   const controls = rulingRowControls(li);
   controls.forEach(el => { el.disabled = true; });
 
   const feedback = li.querySelector('.obs-ruling-feedback');
-  const restore = () => {
-    rulingsPending.delete(key);
-    controls.forEach(el => { el.disabled = false; });
-  };
   const setFeedback = (text, isError) => {
     if (!feedback) return;
     feedback.textContent = text;
@@ -2082,13 +2115,15 @@ function agreeRulingRow(row, li) {
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
   return issueDismissRequest(anchor, decisionId).then(() => {
-    restore();
+    rulingsPending.delete(key);
     setFeedback('agreed', false);
+    rulingsSettled.add(key);
     pollRulings();
     refreshBadge();
   }).catch((err) => {
     console.error('Ruling agree failed:', err);
-    restore();
+    rulingsPending.delete(key);
+    controls.forEach(el => { el.disabled = false; });
     setFeedback('agree failed: ' + err.message, true);
   });
 }
@@ -3238,6 +3273,9 @@ if (typeof module !== 'undefined' && module.exports) {
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.
     issueDismissRequest, agreeRulingRow, keepRulingRow, rulingRowControls,
+    // Review F2: expose rulingsSettled so the settled-state regression pins
+    // the same seam the fix actually reads/writes.
+    rulingsSettled,
     // LIN-2293 review (F1): the collision has TWO halves — "disables both"
     // (deliverRulingReply/rulingsPending, covered above) and "re-renders
     // both", which lives entirely in renderRulings' reuse lookup against
