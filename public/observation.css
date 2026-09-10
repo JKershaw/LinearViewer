@@ -312,6 +312,44 @@
 .obs-ruling-feedback:empty { display: none; }
 .obs-ruling-feedback--error { color: var(--red); }
 
+/* Proposed-dismissal banner (LIN-2444 Phase 2) — a suggestion someone else
+   made, distinct from the ruling's own content, so it gets its own callout
+   rather than reusing .obs-ruling-cost's plain italic line. Base rules here
+   ARE the phone-width form (mobile-first, per this file's own convention —
+   the one width query below is a desktop enhancement, not a rewrite); the
+   reason wraps rather than clips, since it is the full argument being agreed
+   to, never a truncated excerpt like .obs-ruling-case above. Own names per
+   the plan (LIN-2711's ruleless bulk-scan classes are not reused here). */
+.obs-ruling-suggestion {
+  margin: 0.4rem 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brand) 6%, var(--card));
+}
+.obs-ruling-suggestion-label {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  margin: 0 0 0.2rem;
+}
+.obs-ruling-suggestion-reason {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--text);
+  margin: 0 0 0.25rem;
+  overflow-wrap: break-word;
+}
+.obs-ruling-suggestion-meta {
+  font-family: var(--font-structural);
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin: 0;
+}
+
 /* Free-text answer + dismiss (LIN-2225). Mirrors .sess-inline-reply-input /
    .sess-inline-reply-actions (session.css) — same textarea + action-row shape,
    scoped to a ruling row instead of a run card. */

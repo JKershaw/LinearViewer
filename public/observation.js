@@ -1726,6 +1726,37 @@ function renderRulingRow(row) {
     li.appendChild(cost);
   }
 
+  // Proposed-dismissal banner (LIN-2444 Phase 2). `null` covers both "never
+  // suggested" and "withdrawn" — the server's `!withdrawn` filter already
+  // collapses those (routes/dashboard.js), so no distinction is drawn here.
+  // Renders above the canReply branch entirely, so it appears on a mid-turn
+  // (non-canReply) row too — a suggestion can be made on a row nobody can
+  // yet answer. textContent throughout, matching the .obs-ruling-cost/
+  // .obs-ruling-question convention just above rather than a hand-rolled
+  // escape.
+  if (row.suggestedDismissal) {
+    const suggestion = row.suggestedDismissal;
+    const banner = document.createElement('div');
+    banner.className = 'obs-ruling-suggestion';
+
+    const label = document.createElement('p');
+    label.className = 'obs-ruling-suggestion-label';
+    label.textContent = 'proposed dismissal';
+    banner.appendChild(label);
+
+    const reason = document.createElement('p');
+    reason.className = 'obs-ruling-suggestion-reason';
+    reason.textContent = suggestion.reason;
+    banner.appendChild(reason);
+
+    const meta = document.createElement('p');
+    meta.className = 'obs-ruling-suggestion-meta';
+    meta.textContent = `— ${suggestion.suggestedBy}, ${relativeTime(suggestion.suggestedAt)}`;
+    banner.appendChild(meta);
+
+    li.appendChild(banner);
+  }
+
   window.ChatUI.appendOptions(li, {
     options: decision?.options,
     recommended: decision?.recommended,

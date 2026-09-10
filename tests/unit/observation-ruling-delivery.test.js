@@ -86,6 +86,7 @@ class FakeElement {
     this.disabled = false;
     this.type = undefined;
     this.classList = new FakeClassList(this);
+    this.attrs = {};
   }
   get className() { return this._className; }
   set className(v) {
@@ -94,6 +95,8 @@ class FakeElement {
   }
   get textContent() { return this._textContent; }
   set textContent(v) { this._textContent = v; this.children = []; }
+  setAttribute(name, value) { this.attrs[name] = String(value); }
+  getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attrs, name) ? this.attrs[name] : null; }
   appendChild(child) { this.children.push(child); return child; }
   addEventListener(type, handler) {
     (this.listeners[type] = this.listeners[type] || []).push(handler);
@@ -660,5 +663,105 @@ describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F
     assert.notEqual(list.children[0], list.children[1]);
 
     rulingsPending.delete(keyA);
+  });
+});
+
+// ─── Suggestion banner (LIN-2444 Phase 2) ────────────────────────────────────
+//
+// Render-only: a proposed-dismissal suggestion attaches as a sibling of
+// .obs-ruling-cost, above the canReply branch entirely, so it must appear on
+// BOTH a repliable and a mid-turn (non-canReply) row. `suggestedDismissal:
+// null` (the server's shape for both "never suggested" and "withdrawn") must
+// render exactly as today — no banner, no empty container.
+describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  const SUGGESTION = {
+    reason: 'the task shipped in LIN-9999',
+    suggestedBy: 'lane-e',
+    suggestedAt: '2026-09-05T00:00:00.000Z'
+  };
+
+  test('a standing suggestion renders the banner with reason + suggestedBy + a formatted suggestedAt', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ suggestedDismissal: SUGGESTION })]);
+
+    const li = list.children[0];
+    const banner = li.querySelector('.obs-ruling-suggestion');
+    assert.ok(banner, 'expected a .obs-ruling-suggestion banner');
+    const reasonEl = banner.querySelector('.obs-ruling-suggestion-reason');
+    const metaEl = banner.querySelector('.obs-ruling-suggestion-meta');
+    assert.equal(reasonEl.textContent, SUGGESTION.reason);
+    assert.match(metaEl.textContent, /lane-e/);
+    assert.match(metaEl.textContent, /stub-relative-time\(2026-09-05T00:00:00\.000Z\)/, 'suggestedAt is run through relativeTime, not printed raw');
+  });
+
+  test('the banner renders on a non-canReply (mid-turn) row too', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ suggestedDismissal: SUGGESTION, canReply: false })]);
+
+    const li = list.children[0];
+    assert.ok(li.querySelector('.obs-ruling-suggestion'), 'the banner must not be gated on canReply');
+  });
+
+  test('the banner renders on a canReply row too', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ suggestedDismissal: SUGGESTION, canReply: true })]);
+
+    const li = list.children[0];
+    assert.ok(li.querySelector('.obs-ruling-suggestion'));
+  });
+
+  test('suggestedDismissal: null renders no banner at all — no empty container either', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ suggestedDismissal: null })]);
+
+    const li = list.children[0];
+    assert.equal(li.querySelector('.obs-ruling-suggestion'), null);
+  });
+
+  test('a row with no suggestedDismissal field at all (undefined) also renders no banner', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow()]);
+
+    const li = list.children[0];
+    assert.equal(li.querySelector('.obs-ruling-suggestion'), null);
+  });
+
+  test('the reason text is rendered via textContent, never raw HTML interpolation', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    const hostileReason = '<img src=x onerror="alert(1)"> & "quoted" <b>bold</b>';
+    renderRulings([makeRow({ suggestedDismissal: { ...SUGGESTION, reason: hostileReason } })]);
+
+    const li = list.children[0];
+    const reasonEl = li.querySelector('.obs-ruling-suggestion-reason');
+    // textContent stores the literal string verbatim and never parses it into
+    // child nodes — the FakeElement shim's textContent setter clears
+    // `children`, so any markup-interpolation bug (e.g. innerHTML +=) would
+    // instead leave child nodes behind.
+    assert.equal(reasonEl.textContent, hostileReason);
+    assert.equal(reasonEl.children.length, 0);
   });
 });
