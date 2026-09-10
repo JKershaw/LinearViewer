@@ -43,7 +43,20 @@ import {
 } from '../../scripts/fossil-pass-lin2633.js';
 
 const URL_KEY = 'acme';
-const NOW = new Date('2026-09-05T12:00:00.000Z');
+// Clock-relative fixture, deliberately (LIN-1535 precedent, see
+// tests/unit/pipeline-sessions.test.js). This file drives the PUBLIC
+// `runFossilPass` entrypoint, whose 30-day lookback derives from the real
+// clock in TWO places — `_buildLoops`'s JS-side cutoff and, with no seam at
+// all, the store-side `since` predicate `_fetchWorkspaceData` pushes down —
+// so a fixed NOW ages out by calendar the moment real time crosses that
+// lookback, even though every offset below (1/8/12/16/20/25 days) is
+// unchanged and still encodes the same expectations. `NOW_MS` and every
+// `now: NOW_MS` argument in this file must keep deriving from this one
+// anchor, so the consumer clock and the reconstruction clock cannot diverge
+// again. Every offset here derives BACKWARD from the anchor, so the anchor is
+// simply "now" — it needs no back-off (the precedent's does, because its
+// fixtures derive forward from theirs).
+const NOW = new Date();
 const NOW_MS = NOW.getTime();
 const daysAgo = (d) => new Date(NOW_MS - d * 24 * 60 * 60 * 1000);
 
@@ -92,6 +105,16 @@ function fossilItem(id, overrides = {}) {
   };
 }
 
+// The 30-day window is pushed DOWN into the store's own query
+// (`dispatchedAt: {$gte: since}`, lib/dispatch-store.js), and
+// `_fetchWorkspaceData` derives that `since` from the real clock with no seam
+// to inject. A stub that ignores its options argument therefore returns rows a
+// real Mongo would have discarded, which is how an aged-out fixture hides
+// behind a green check (LIN-1535). Same field, same inclusive `$gte` boundary.
+function withinSince(items, since) {
+  return since ? items.filter((i) => new Date(i.dispatchedAt) >= since) : items;
+}
+
 // A store stub whose write method fails the test if it is ever reached.
 function noWriteStore({ loopsByWorkspace, urlKeys }) {
   return {
@@ -101,7 +124,10 @@ function noWriteStore({ loopsByWorkspace, urlKeys }) {
     },
     // getLoopsForWorkspace's two injected reads.
     listItems: async (urlKey) => (loopsByWorkspace[urlKey]?.live || []),
-    listHistory: async (urlKey) => ({ items: loopsByWorkspace[urlKey]?.history || [], total: 0 })
+    listHistory: async (urlKey, { since } = {}) => ({
+      items: withinSince(loopsByWorkspace[urlKey]?.history || [], since),
+      total: 0
+    })
   };
 }
 
@@ -345,6 +371,16 @@ describe('fossil pass T20 — --execute writes, against a real MangoDB tmpdir', 
       now: NOW_MS
     });
 
+    // NON-VACUITY (LIN-2731). `!eligible.includes(...)` is also satisfied by a
+    // row that never reached selection at all — once this row's 20-day
+    // `dispatchedAt` ages past the read's own 30-day window it vanishes before
+    // classification, and the real assertion below silently becomes a witness
+    // for nothing. Pin that the row WAS read first, so that day fails loudly.
+    const { selection } = perWorkspace[0];
+    const consideredIds = [...selection.eligible, ...selection.skipped].map((r) => r.loopId);
+    assert.ok(consideredIds.includes('e-recent-feedback'),
+      'the row must reach selection at all — if it aged out of the read window, the exclusion below proves nothing');
+
     const eligibleIds = perWorkspace[0].selection.eligible.map((r) => r.loopId);
     assert.ok(!eligibleIds.includes('e-recent-feedback'),
       'a row whose own raw feedback is 2 days old must not be selected on a 20-day-old dispatchedAt alone');
@@ -364,9 +400,9 @@ describe('fossil pass — a failed workspace read stamps nothing for that worksp
         if (urlKey === 'broken') throw new Error('simulated read failure');
         return [];
       },
-      listHistory: async (urlKey) => {
+      listHistory: async (urlKey, { since } = {}) => {
         if (urlKey === 'broken') throw new Error('simulated read failure');
-        return { items: [fossilItem('h1', { urlKey: 'healthy' })], total: 1 };
+        return { items: withinSince([fossilItem('h1', { urlKey: 'healthy' })], since), total: 1 };
       },
       stampBookkeeping: async (urlKey, id) => {
         assert.notEqual(urlKey, 'broken', 'the failed workspace must never be stamped');
@@ -402,7 +438,9 @@ describe('fossil pass F4 (LIN-2653 close-out) — a write error is reported as a
     return {
       listObservedWorkspaceKeys: async () => [URL_KEY],
       listItems: async () => [],
-      listHistory: async () => ({ items: [fossilItem('e1')], total: 1 }),
+      listHistory: async (_urlKey, { since } = {}) => ({
+        items: withinSince([fossilItem('e1')], since), total: 1
+      }),
       stampBookkeeping: async () => ({ ok: false, reason: 'not-found' }),
       getItemStatus: async (_urlKey, itemId) => (itemId === 'e1'
         ? { id: itemId, status: postFailureStatus, bookkeeping: postFailureBookkeeping }
