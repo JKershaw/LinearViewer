@@ -262,7 +262,16 @@
         // LIN-2445: every replayed turn is finished by definition — it was
         // persisted. Open it settled rather than appending an in-progress pill
         // that nothing will ever come along to clear.
-        chatHistory.forEach(function (turn) { appendBubble(turn.role, turn.content, 'done'); });
+        //
+        // LIN-2670: an assistant turn re-renders through the SAME helper the
+        // live path uses, so a reopened saved chat looks identical to the
+        // live turn it was saved from. The user turn's own raw text is left
+        // alone — same split as the live path (assistant renders, user
+        // stays plain).
+        chatHistory.forEach(function (turn) {
+          var bodyEl = appendBubble(turn.role, turn.content, 'done');
+          if (turn.role !== 'user') window.ChatUI.renderMarkdownText(bodyEl, turn.content);
+        });
         if (activeLabel) activeLabel.textContent = activeTask ? 'talking to ' + maskFlightCompanionSentinel(activeTask) : '';
         if (resetBtn) resetBtn.classList.remove('hidden');
         setEmptyVisible(chatHistory.length === 0);
@@ -364,8 +373,16 @@
         } else if (type === 'done') {
           answerEl.classList.remove('chat-cursor');
           if (answerText) {
+            // Raw Markdown goes into chatHistory FIRST — the render below is
+            // display-only and never touches what gets sent back to the
+            // model or saved to a transcript (LIN-2670).
             chatHistory.push({ role: 'assistant', content: answerText });
             if (chatHistory.length > 40) chatHistory.splice(0, chatHistory.length - 40);
+            // LIN-2670: swap the streamed raw text for rendered Markdown,
+            // once, here on the done frame — never per token. Updates
+            // answerEl IN PLACE (renderMarkdownText assigns innerHTML on the
+            // same element, never replacing it).
+            window.ChatUI.renderMarkdownText(answerEl, answerText);
           } else {
             // LIN-2445: the row STAYS — Task Chat is user-initiated, so a human
             // asked and deserves an answer even when it is empty (LIN-2443's
