@@ -20,7 +20,7 @@ import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, getPaidEnvKey, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
 import { getModelCatalog } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -48,7 +48,7 @@ import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
-import { generateScan, parseScanResponse } from '../lib/scan.js';
+import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
 import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { buildContextGraph } from '../lib/context-graph.js';
@@ -2719,6 +2719,291 @@ ${goal}`
         return notFound.json(res, error.message);
       }
       jsonError(res, 500, 'Failed to dismiss scan result', { message: error.message });
+    }
+  });
+
+  /**
+   * POST retire (LIN-2650 WS4): re-scan a task SERVER-SIDE and, only if that
+   * fresh check finds an EXPLICIT, well-formed "nothing pending" signal,
+   * stamp the row named in the request body 'self-resolved'. Never trusts a
+   * client-supplied verdict — the ONLY input to the retirement decision is
+   * the raw text THIS call's own re-scan produces.
+   *
+   * Deliberately does NOT call `generateScan`/`recordScan` (John's
+   * option-(a) ruling: no second row). It reuses POST scan's first three
+   * steps verbatim (provider/capability resolution, `fetchRecommendationContext`,
+   * `hashContext`) and then diverges: `buildScanMessages` (same fail-closed
+   * discipline as raising) → `streamChat` directly for the raw model text →
+   * `isExplicitRetirementSignal(raw)`, never `generateScan`'s own
+   * `has_decision !== true` collapse, which is right for raising and wrong
+   * for retiring (see `lib/scan.js`). Carries the SAME `mockAi` branch POST
+   * scan does, so mock-mode tests can reach both signal shapes deterministically.
+   *
+   * `markOutcome`'s three return shapes map to three distinct responses —
+   * fail loud, never a silent no-op, on a row that changed underneath this
+   * call:
+   *   - `null` (row pruned/replaced, `_pruneToCapacity` or a superseding
+   *     scan) → 404 `ROW_GONE`
+   *   - a record with `outcome !== 'self-resolved'` (first-stamp-wins caught
+   *     an already-terminal row — reachable without any client bug, since
+   *     this route's OWN re-scan runs before its `markOutcome` call, leaving
+   *     a window for a dismiss/answer/earlier-retire to land first) → 409
+   *     `ALREADY_TERMINAL`
+   *   - a record with `outcome === 'self-resolved'` (the write happened) →
+   *     200, success shape
+   *
+   * @route POST /workspace/:urlKey/api/scan/:issueId/retire
+   * @body {string} id - the existing row's `_id`, from a prior GET/POST scan result
+   * @returns {Object} 200 `{ retired: true, id, issueId, decision, outcome: 'self-resolved',
+   *   outcomeAt, outcomeReason, outcomeBasisHash, scannedAt }` on retirement;
+   *   200 `{ retired: false, reason }` when the rescan found nothing to retire;
+   *   404 `ROW_GONE` / 409 `ALREADY_TERMINAL` on a row that can't be (or
+   *   wasn't) stamped; 502 `SCAN_PARSE_FAILED` on a genuine parse/model
+   *   failure; 503 `PRINCIPLE_ZERO_UNAVAILABLE` fail-closed — same shapes
+   *   POST scan already uses for the latter two.
+   */
+  router.post('/workspace/:urlKey/api/scan/:issueId/retire', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+    const recordId = req.body?.id;
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format');
+    }
+    if (typeof recordId !== 'string' || !recordId) {
+      return badRequest.json(res, 'A scan record id is required');
+    }
+    if (!taskDecisionsStore) {
+      return jsonError(res, 503, 'Scan store not configured');
+    }
+    if (!issueProvider.supports('fetchRecommendationContext')) {
+      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
+        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+      });
+    }
+
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const mockAi = shouldMockAi(workspace);
+    const sessionApiKey = req.session.openRouterApiKey;
+    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+
+    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+      return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
+    }
+    if (!mockAi && isFreeTier) {
+      const check = await freeTierStore.tryUse(workspace.urlKey);
+      if (!check.allowed) {
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+      }
+    }
+
+    // Retire always re-scans, so — unlike dismiss's UUID fast path — it
+    // always needs fresh content, never just the stored row.
+    const keepalive = armKeepalive(res);
+    try {
+      let context;
+      if (isTestMode) {
+        context = await buildMockRecapContext(issueId);
+        if (!context) {
+          keepalive.stop();
+          return keepalive.send(404, { error: 'Issue not found' });
+        }
+      } else {
+        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      if (!UUID_REGEX.test(canonicalId)) {
+        keepalive.stop();
+        return keepalive.send(422, {
+          error: "This task's canonical id could not be resolved; scan requires a canonical identity",
+          code: 'CANONICAL_ID_REQUIRED'
+        });
+      }
+      const inputHash = hashContext(context);
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
+
+      let raw;
+      if (mockAi) {
+        raw = buildMockScanText(context);
+      } else {
+        const messages = buildScanMessages(context.issue, context);
+        if (!messages) {
+          // Same fail-closed discipline as raising: never send a scan prompt
+          // without the Principle 0 gate, and never touch the row when it
+          // was skipped.
+          keepalive.stop();
+          return keepalive.send(503, {
+            error: 'Scan rubric is temporarily unavailable; nothing was evaluated',
+            code: 'PRINCIPLE_ZERO_UNAVAILABLE'
+          });
+        }
+        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
+        let buffer = '';
+        await streamChat(
+          messages,
+          {
+            apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1000, temperature: 0,
+            callMeta: { feature: 'scan-retire', issueIdentifier: context.issue?.identifier || null, urlKey: workspace?.urlKey }
+          },
+          (type, data) => { if (type === 'token' && data?.token) buffer += data.token; }
+        );
+        raw = buffer;
+      }
+
+      // The client's request body carries only `id` (never a verdict) — but
+      // even if it did, `raw` here is what THIS call's own re-scan just
+      // produced, never anything the caller sent.
+      if (!isExplicitRetirementSignal(raw)) {
+        keepalive.stop();
+        const { payload } = extractScanPayload(raw);
+        if (payload === null) {
+          // A genuine parse/model failure — same shape POST scan already uses.
+          return keepalive.send(502, { error: 'Scan produced an unusable response; please retry', code: 'SCAN_PARSE_FAILED' });
+        }
+        // Covers a live decision, and absent/malformed input alike — all four
+        // of the ticket's named negative cases collapse to "leave it standing".
+        return keepalive.send(200, { retired: false, reason: 'The rescan did not find an explicit "nothing pending" signal — the ruling stands.' });
+      }
+
+      const outcomeReason = `Retired automatically: a rescan on ${new Date().toISOString()} found no pending decision.`;
+      const record = await taskDecisionsStore.markOutcome({
+        urlKey: workspace.urlKey, issueId: canonicalId, id: recordId,
+        outcome: 'self-resolved', outcomeReason,
+        // Same formula as `inputHash` above, applied to the SAME context —
+        // "what was checked when this was retired," reused rather than a
+        // fourth hash scheme.
+        outcomeBasisHash: inputHash
+      });
+
+      keepalive.stop();
+      if (!record) {
+        return keepalive.send(404, {
+          error: 'This ruling no longer exists — it may have been pruned or superseded by a newer scan',
+          code: 'ROW_GONE'
+        });
+      }
+      if (record.outcome !== 'self-resolved') {
+        return keepalive.send(409, {
+          error: 'This ruling changed while the check was running and was not retired',
+          code: 'ALREADY_TERMINAL'
+        });
+      }
+
+      return keepalive.send(200, {
+        retired: true,
+        id: record.id,
+        issueId: record.issueId,
+        decision: record.decision,
+        outcome: record.outcome,
+        outcomeAt: record.outcomeAt,
+        outcomeReason: record.outcomeReason,
+        outcomeBasisHash: record.outcomeBasisHash,
+        scannedAt: record.scannedAt
+      });
+    } catch (error) {
+      keepalive.stop();
+      console.error('Scan retire error:', error);
+      if (error.response?.status === 401) {
+        return keepalive.send(401, { error: 'Token expired or invalid' });
+      }
+      if (error.message?.includes('not found')) {
+        return keepalive.send(404, { error: error.message });
+      }
+      if (error.message?.includes('OpenRouter')) {
+        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
+      }
+      keepalive.send(500, { error: 'Failed to retire scan result', message: error.message });
+    }
+  });
+
+  /**
+   * POST unretire (LIN-2650 WS4): reverse a 'self-resolved' outcome, over
+   * `reverseOutcome`'s fail-loud thrown-error contract. No re-scan, no LLM
+   * call — this route's only job is the reverse write, so it mirrors
+   * dismiss's canonical-id resolution (UUID fast path; a context fetch only
+   * for a non-UUID `:issueId`), not retire's always-fresh-context shape.
+   *
+   * @route POST /workspace/:urlKey/api/scan/:issueId/unretire
+   * @body {string} id - the row's `_id`
+   * @returns {Object} 200 `{ status: 'fresh', id, issueId, decision, outcome: null,
+   *   outcomeAt: null, outcomeReason: null, outcomeBasisHash: null, scannedAt }`;
+   *   404 `ROW_GONE` when the row is pruned/replaced; 409 `NOT_SELF_RESOLVED`
+   *   when it isn't currently self-resolved.
+   */
+  router.post('/workspace/:urlKey/api/scan/:issueId/unretire', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { issueId } = req.params;
+    const recordId = req.body?.id;
+
+    if (!isValidIssueId(issueId)) {
+      return badRequest.json(res, 'Invalid issue ID format');
+    }
+    if (typeof recordId !== 'string' || !recordId) {
+      return badRequest.json(res, 'A scan record id is required');
+    }
+    if (!taskDecisionsStore) {
+      return jsonError(res, 503, 'Scan store not configured');
+    }
+
+    try {
+      let canonicalId;
+      if (UUID_REGEX.test(issueId)) {
+        canonicalId = issueId;
+      } else {
+        const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+        const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+        if (!issueProvider.supports('fetchRecommendationContext')) {
+          return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
+            code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
+          });
+        }
+
+        const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+        let context;
+        if (isTestMode) {
+          context = await buildMockRecapContext(issueId);
+          if (!context) return notFound.json(res, 'Issue not found');
+        } else {
+          context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
+        }
+
+        canonicalId = context.issue?.id || issueId;
+        if (!UUID_REGEX.test(canonicalId)) {
+          return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
+            code: 'CANONICAL_ID_REQUIRED'
+          });
+        }
+      }
+
+      const record = await taskDecisionsStore.reverseOutcome({ urlKey: workspace.urlKey, issueId: canonicalId, id: recordId });
+
+      return res.json({
+        status: 'fresh',
+        id: record.id,
+        issueId: record.issueId,
+        decision: record.decision,
+        outcome: record.outcome,
+        outcomeAt: record.outcomeAt,
+        outcomeReason: record.outcomeReason,
+        outcomeBasisHash: record.outcomeBasisHash,
+        scannedAt: record.scannedAt
+      });
+    } catch (error) {
+      if (error.message === 'reverseOutcome: row not found (pruned or replaced)') {
+        return jsonError(res, 404, 'This ruling no longer exists — it may have been pruned or superseded by a newer scan', { code: 'ROW_GONE' });
+      }
+      if (error.message === 'reverseOutcome: row is not self-resolved') {
+        return jsonError(res, 409, 'This ruling is not currently self-resolved and cannot be un-retired', { code: 'NOT_SELF_RESOLVED' });
+      }
+      console.error('Scan unretire error:', error);
+      if (error.response?.status === 401) {
+        return unauthorized.json(res, 'Token expired or invalid');
+      }
+      jsonError(res, 500, 'Failed to un-retire scan result', { message: error.message });
     }
   });
 

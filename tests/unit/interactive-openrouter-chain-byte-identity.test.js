@@ -33,6 +33,15 @@
  * the review's "extend the census" resolution rather than merely narrowing
  * the claim's wording.
  *
+ * LIN-2650 WS4 addendum: the new scan retire route (routes/workspace-api.js)
+ * is a genuine seventh interactive resolution site sharing the SAME
+ * `apiKeyToUse` shape as recommend/recommend-stream/recap/brief/scan (it
+ * runs its own live re-scan, so it needs the same free-tier clamp) — the
+ * census below is updated to six occurrences of that shape, not five. This
+ * file otherwise stays a byte-identity pin for LIN-2412's own five families;
+ * only the workspace-api.js count moves, and only because a real new site
+ * was added in the same shape, not because an existing one changed.
+ *
  * Run with: node --test tests/unit/interactive-openrouter-chain-byte-identity.test.js
  */
 import { test, describe } from 'node:test';
@@ -65,11 +74,11 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412)', () => 
     }
   });
 
-  test('routes/workspace-api.js: the remaining FIVE interactive sites carry the "apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)" shape (LIN-2412 F3 correction)', () => {
+  test('routes/workspace-api.js: the remaining SIX interactive sites carry the "apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)" shape (LIN-2412 F3 correction; LIN-2650 WS4 adds the retire route as a seventh total site)', () => {
     const src = read('routes/workspace-api.js');
     const SITE_SHAPE = 'apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)';
     const actualCount = src.split(SITE_SHAPE).length - 1;
-    assert.equal(actualCount, 5, `expected exactly 5 occurrence(s) of the apiKeyToUse shape (recommend/recommend-stream/recap/brief/scan), found ${actualCount} — routes/workspace-api.js therefore carries 6 total interactive resolution sites (1 pinned above + these 5), not the 1 this census originally over-claimed as the whole file`);
+    assert.equal(actualCount, 6, `expected exactly 6 occurrence(s) of the apiKeyToUse shape (recommend/recommend-stream/recap/brief/scan/scan-retire), found ${actualCount} — routes/workspace-api.js therefore carries 7 total interactive resolution sites (1 pinned above + these 6), not the 1 this census originally over-claimed as the whole file`);
   });
 
   test('routes/dashboard.js carries its own distinct shape at BOTH call sites (run-summary + session-summary), untouched', () => {

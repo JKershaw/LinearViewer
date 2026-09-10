@@ -12,7 +12,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildScanMessages, generateScan, isClaimedDecisionValid, parseScanResponse } from '../../lib/scan.js';
+import { buildScanMessages, generateScan, isClaimedDecisionValid, parseScanResponse, extractScanPayload, isExplicitRetirementSignal } from '../../lib/scan.js';
 import { extractPrincipleZeroSection } from '../../lib/prompts/autopilot-manual.js';
 
 const ISSUE_ID = '11111111-2222-3333-4444-555555555555';
@@ -179,5 +179,71 @@ describe('generateScan — fail-closed at the generateScan level (LIN-2197 Phase
       { principleZeroSection: undefined }
     );
     assert.ok(messages, 'an explicit undefined still falls through to the default extraction');
+  });
+});
+
+// LIN-2650 WS4 §1/§3: isExplicitRetirementSignal is a NARROWER predicate than
+// parseScanResponse's has_decision !== true check — only a well-formed,
+// literal `has_decision: false` retires. Every other shape (a live decision,
+// absent/malformed input, or a genuine parse/model error) must leave the
+// ruling standing, matching the ticket's fail-standing default. Tested here,
+// not through HTTP/the AI mock — the mock can only ever emit a clean
+// {has_decision:true}/{has_decision:false} shape (routes/workspace-api.js's
+// buildMockScanText), so the malformed/absent/error cases are untestable
+// through the mock or the route at all; this mirrors this codebase's own
+// established pattern for parseScanResponse's three-way split above.
+describe('isExplicitRetirementSignal — the RETIREMENT discriminator (LIN-2650 WS4)', () => {
+  test('an explicit, well-formed has_decision: false is retirement-eligible', () => {
+    assert.equal(isExplicitRetirementSignal('{"has_decision": false}'), true);
+  });
+
+  test('a live decision (has_decision: true) is NOT retirement-eligible — never retire on a "yes" answer', () => {
+    assert.equal(isExplicitRetirementSignal('{"has_decision": true, "question": "Which approach?"}'), false);
+  });
+
+  test('an absent has_decision is NOT retirement-eligible', () => {
+    assert.equal(isExplicitRetirementSignal('{}'), false);
+  });
+
+  test('a malformed has_decision (string, not boolean) is NOT retirement-eligible', () => {
+    assert.equal(isExplicitRetirementSignal('{"has_decision": "false"}'), false);
+  });
+
+  test('a genuine parse failure is NOT retirement-eligible', () => {
+    assert.equal(isExplicitRetirementSignal('not json at all'), false);
+  });
+
+  test('empty or non-string input is NOT retirement-eligible, mirroring parseScanResponse\'s own guard', () => {
+    assert.equal(isExplicitRetirementSignal(''), false);
+    assert.equal(isExplicitRetirementSignal(null), false);
+  });
+
+  test('other falsy has_decision values (0, empty string, null) are NOT retirement-eligible — only strict === false counts', () => {
+    assert.equal(isExplicitRetirementSignal('{"has_decision": 0}'), false);
+    assert.equal(isExplicitRetirementSignal('{"has_decision": ""}'), false);
+    assert.equal(isExplicitRetirementSignal('{"has_decision": null}'), false);
+  });
+});
+
+// LIN-2650 WS4 §1: extractScanPayload is the shared plumbing both
+// parseScanResponse and isExplicitRetirementSignal build on — a pure
+// refactor, so its own behaviour is exhaustively pinned by the EXISTING
+// parseScanResponse suite above (passing unmodified). This block only pins
+// its own directly-callable contract: null vs. an actual payload object.
+describe('extractScanPayload — shared extraction plumbing (LIN-2650 WS4)', () => {
+  test('returns the parsed payload object for well-formed JSON', () => {
+    assert.deepEqual(extractScanPayload('{"has_decision": false}'), { payload: { has_decision: false } });
+  });
+
+  test('returns { payload: null } for anything unparseable, never throws', () => {
+    assert.deepEqual(extractScanPayload('not json'), { payload: null });
+    assert.deepEqual(extractScanPayload(''), { payload: null });
+    assert.deepEqual(extractScanPayload(null), { payload: null });
+    assert.deepEqual(extractScanPayload('[]'), { payload: null }, 'an array is not a plain object');
+  });
+
+  test('extracts a fenced/prose-wrapped payload the same way parseScanResponse does', () => {
+    assert.deepEqual(extractScanPayload('```json\n{"has_decision": false}\n```'), { payload: { has_decision: false } });
+    assert.deepEqual(extractScanPayload('Sure, here you go: {"has_decision": false} — done.'), { payload: { has_decision: false } });
   });
 });

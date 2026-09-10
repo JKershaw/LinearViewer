@@ -565,3 +565,213 @@ describe('scan routes — outcomeReason/outcomeBasisHash projection (LIN-2650 WS
     assert.equal(got.body.outcomeBasisHash, null);
   });
 });
+
+// LIN-2650 WS4: the retire/un-retire routes. `buildMockScanText`
+// (routes/workspace-api.js) can only ever emit a clean {has_decision:true}
+// or {has_decision:false} — it decides which by regex-matching
+// DECISION_ISSUE/ZERO_FINDING_ISSUE's own fixture content, never anything
+// this test file controls directly. So: seed an existing row directly via
+// the real store (standing in for a prior GET/POST scan result — the
+// content of THAT original scan is irrelevant to retire, which only reads
+// the row's own `id` from the request body), then retire against whichever
+// fixture issue the mock resolves the needed shape for.
+const CANONICAL_DECISION_ISSUE_ID = '66666666-6666-6666-6666-666666666666'; // TEST-6, mock resolves has_decision:true
+const CANONICAL_ZERO_FINDING_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde'; // TEST-13, mock resolves has_decision:false
+
+function seededDecision(overrides = {}) {
+  return {
+    decision_id: 'scan_seeded_aaaaaaaaaaaa',
+    question: 'Which approach?',
+    options: [{ id: 'a', label: 'A' }],
+    free_text: false,
+    ...overrides
+  };
+}
+
+async function seedRow(canonicalIssueId, inputHash) {
+  return taskDecisionsStore.recordScan({
+    urlKey: 'test-workspace', issueId: canonicalIssueId, issueIdentifier: 'seeded', inputHash,
+    decision: seededDecision()
+  });
+}
+
+describe('POST /workspace/:urlKey/api/scan/:issueId/retire (LIN-2650 WS4)', () => {
+  test('an explicit has_decision:false rescan retires the row — the 2b success shape', async () => {
+    const seeded = await seedRow(CANONICAL_ZERO_FINDING_ISSUE_ID, 'seed-hash-1'.padEnd(64, '0'));
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/retire`, { id: seeded.id });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.retired, true);
+    assert.equal(result.body.id, seeded.id);
+    assert.equal(result.body.issueId, CANONICAL_ZERO_FINDING_ISSUE_ID);
+    assert.deepEqual(result.body.decision, seededDecision());
+    assert.equal(result.body.outcome, 'self-resolved');
+    assert.ok(result.body.outcomeAt);
+    assert.match(result.body.outcomeReason, /^Retired automatically: a rescan on .+ found no pending decision\.$/);
+    assert.ok(result.body.outcomeBasisHash, 'outcomeBasisHash is set — hashContext(context) of the rescan');
+
+    // Round-trips against a direct store read — no second read needed to
+    // populate the response, but the store itself must agree.
+    const status = await taskDecisionsStore.getStatus('test-workspace', CANONICAL_ZERO_FINDING_ISSUE_ID);
+    assert.equal(status.outcome, 'self-resolved');
+    assert.equal(status.outcomeReason, result.body.outcomeReason);
+    assert.equal(status.outcomeBasisHash, result.body.outcomeBasisHash);
+  });
+
+  test('a live decision (has_decision:true) leaves the ruling standing — 200 { retired: false }', async () => {
+    const seeded = await seedRow(CANONICAL_DECISION_ISSUE_ID, 'seed-hash-2'.padEnd(64, '0'));
+    const result = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/retire`, { id: seeded.id });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.retired, false);
+    assert.ok(typeof result.body.reason === 'string' && result.body.reason.length > 0);
+
+    const status = await taskDecisionsStore.getStatus('test-workspace', CANONICAL_DECISION_ISSUE_ID);
+    assert.equal(status.outcome, null, 'the row must be untouched — markOutcome is never called on this path');
+  });
+
+  // The ticket's own required test, made concrete: the client can send
+  // anything in the body — the ONLY input to the retirement decision is the
+  // raw text THIS call's OWN re-scan produces.
+  test('a client-supplied verdict is ignored — the server decides, not the client', async () => {
+    const seeded = await seedRow(CANONICAL_DECISION_ISSUE_ID, 'seed-hash-3'.padEnd(64, '0'));
+    // DECISION_ISSUE's mock resolves has_decision:true (a live decision) —
+    // spoofed fields the route doesn't even declare must not override that.
+    const result = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/retire`, {
+      id: seeded.id, has_decision: false, verdict: 'retire'
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.retired, false);
+    const status = await taskDecisionsStore.getStatus('test-workspace', CANONICAL_DECISION_ISSUE_ID);
+    assert.equal(status.outcome, null, 'markOutcome/reverseOutcome must never be called on this path');
+  });
+
+  // Plan-review round 1 F2: concretely reachable without any client bug —
+  // the retire route runs a live re-scan BEFORE its own markOutcome call, so
+  // a second operator/double-click/the bulk-scan pool can land a
+  // dismiss/answer/earlier-retire on the same row during that window.
+  test('the already-terminal race: a row dismissed before this call\'s markOutcome runs → 409 ALREADY_TERMINAL, prior outcome unchanged', async () => {
+    const seeded = await seedRow(CANONICAL_ZERO_FINDING_ISSUE_ID, 'seed-hash-4'.padEnd(64, '0'));
+    const dismissed = await taskDecisionsStore.markOutcome({
+      urlKey: 'test-workspace', issueId: CANONICAL_ZERO_FINDING_ISSUE_ID, id: seeded.id, outcome: 'dismissed'
+    });
+    assert.equal(dismissed.outcome, 'dismissed');
+
+    // ZERO_FINDING_ISSUE's mock still resolves has_decision:false — the
+    // re-scan itself would retire it, but the row already changed underneath.
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/retire`, { id: seeded.id });
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'ALREADY_TERMINAL');
+
+    const status = await taskDecisionsStore.getStatus('test-workspace', CANONICAL_ZERO_FINDING_ISSUE_ID);
+    assert.equal(status.outcome, 'dismissed', 'the prior outcome must be unchanged, not overwritten by the race');
+  });
+
+  test('a since-pruned/never-existent row id → 404 ROW_GONE', async () => {
+    // ZERO_FINDING_ISSUE's mock resolves has_decision:false, so the route
+    // reaches markOutcome, which finds nothing for this id.
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/retire`, { id: 'scan_nope_nope' });
+    assert.equal(result.status, 404);
+    assert.equal(result.body.code, 'ROW_GONE');
+  });
+
+  test('retiring without an id 400s', async () => {
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/retire`, {});
+    assert.equal(result.status, 400);
+  });
+
+  test('scan store not configured → 503', async () => {
+    const unconfiguredApp = express();
+    unconfiguredApp.use(express.json());
+    unconfiguredApp.use(createWorkspaceApiRoutes({
+      workspaceFromUrl: (req, _res, next) => {
+        req.workspace = { accessToken: 'test-token', urlKey: 'test-workspace' };
+        req.session = {};
+        next();
+      },
+      freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) }, customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
+      reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
+    }));
+    const result = await new Promise((resolve, reject) => {
+      const server = unconfiguredApp.listen(0, '127.0.0.1', () => {
+        const { port } = server.address();
+        const payload = JSON.stringify({ id: 'scan_x' });
+        const req = http.request(
+          { host: '127.0.0.1', port, path: `/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/retire`, method: 'POST',
+            headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) } },
+          (res) => {
+            let raw = '';
+            res.on('data', c => { raw += c; });
+            res.on('end', () => { server.close(); try { resolve({ status: res.statusCode, body: JSON.parse(raw) }); } catch (e) { reject(e); } });
+          }
+        );
+        req.on('error', reject);
+        req.end(payload);
+      });
+    });
+    assert.equal(result.status, 503);
+    assert.equal(result.body.error, 'Scan store not configured');
+  });
+});
+
+describe('POST /workspace/:urlKey/api/scan/:issueId/unretire (LIN-2650 WS4)', () => {
+  async function selfResolvedRow(canonicalIssueId, inputHash) {
+    const seeded = await seedRow(canonicalIssueId, inputHash);
+    const stamped = await taskDecisionsStore.markOutcome({
+      urlKey: 'test-workspace', issueId: canonicalIssueId, id: seeded.id, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+    return stamped;
+  }
+
+  test('reverses a self-resolved row — restores it to unanswered, all four outcome-family fields cleared', async () => {
+    const stamped = await selfResolvedRow(CANONICAL_ZERO_FINDING_ISSUE_ID, 'seed-hash-5'.padEnd(64, '0'));
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/unretire`, { id: stamped.id });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.status, 'fresh');
+    assert.equal(result.body.id, stamped.id);
+    assert.equal(result.body.outcome, null);
+    assert.equal(result.body.outcomeAt, null);
+    assert.equal(result.body.outcomeReason, null);
+    assert.equal(result.body.outcomeBasisHash, null);
+    assert.deepEqual(result.body.decision, seededDecision());
+
+    // Store-side confirmation too, not just the response body — this file's
+    // mock collection doesn't implement the `$in`/`$ne` operators
+    // `listUnansweredForWorkspaces` needs (that re-appearance is already
+    // directly covered by tests/unit/task-decisions-store.test.js's
+    // reverseOutcome suite against the real query shape).
+    const status = await taskDecisionsStore.getStatus('test-workspace', CANONICAL_ZERO_FINDING_ISSUE_ID);
+    assert.equal(status.outcome, null);
+    assert.equal(status.outcomeAt, null);
+  });
+
+  test('a since-cleared/never-existent row id → 404 ROW_GONE', async () => {
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/unretire`, { id: 'scan_nope_nope' });
+    assert.equal(result.status, 404);
+    assert.equal(result.body.code, 'ROW_GONE');
+  });
+
+  test('a row that is not currently self-resolved → 409 NOT_SELF_RESOLVED', async () => {
+    const seeded = await seedRow(CANONICAL_ZERO_FINDING_ISSUE_ID, 'seed-hash-6'.padEnd(64, '0'));
+    const dismissed = await taskDecisionsStore.markOutcome({
+      urlKey: 'test-workspace', issueId: CANONICAL_ZERO_FINDING_ISSUE_ID, id: seeded.id, outcome: 'dismissed'
+    });
+    assert.equal(dismissed.outcome, 'dismissed');
+
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/unretire`, { id: seeded.id });
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'NOT_SELF_RESOLVED');
+
+    const status = await taskDecisionsStore.getStatus('test-workspace', CANONICAL_ZERO_FINDING_ISSUE_ID);
+    assert.equal(status.outcome, 'dismissed', 'the rejected call must not touch the row');
+  });
+
+  test('un-retiring without an id 400s', async () => {
+    const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/unretire`, {});
+    assert.equal(result.status, 400);
+  });
+});
