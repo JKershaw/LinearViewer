@@ -567,6 +567,110 @@ test.describe('Flight Companion Page (experimental)', () => {
     });
   });
 
+  // LIN-2718: John's own complaint — "focus shifts from the input box when
+  // the feed checks/loads", which on a phone collapses the keyboard and
+  // loses the caret mid-sentence. Same installation-order discipline as the
+  // silent-tick block above (page.clock before the flag-on navigation, its
+  // own describe so it never shares the layout block's beforeEach — that
+  // beforeEach navigates before any clock could be installed).
+  test.describe('Auto-wake preserves composer focus, draft, and caret (LIN-2718)', () => {
+    test('focus, draft value, and caret position all survive a silent auto-wake tick', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+      await page.clock.install();
+      await mockTurn(page); // no token -> an empty `done`, the silent-tick shape a real check-in takes.
+
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      const input = page.locator('#flight-companion-question');
+      await input.fill('this is a partial dra');
+      // Caret placed mid-sentence, not at the end — fill() alone would leave
+      // it at the string's length, which can't distinguish "the caret was
+      // genuinely preserved" from "it always ends up at the end anyway" (a
+      // weaker, coincidentally-passing claim).
+      await input.evaluate((el) => el.setSelectionRange(4, 4));
+
+      const before = await input.evaluate((el) => ({
+        active: document.activeElement === el,
+        value: el.value,
+        selectionStart: el.selectionStart,
+        selectionEnd: el.selectionEnd,
+      }));
+      expect(before.active).toBe(true);
+      expect(before.selectionStart).toBe(4);
+      expect(before.selectionEnd).toBe(4);
+
+      // CADENCE_BASE_MS (public/flight-companion.js) is 30s — this fires the
+      // auto-wake tick.
+      await page.clock.fastForward(30000);
+
+      // Proof the tick genuinely ran (not that nothing happened at all) —
+      // the check-in line is the auto-wake's own visible progress surface.
+      await expect(page.locator('#flight-companion-checkin')).toContainText('nothing new');
+
+      const after = await input.evaluate((el) => ({
+        active: document.activeElement === el,
+        value: el.value,
+        selectionStart: el.selectionStart,
+        selectionEnd: el.selectionEnd,
+      }));
+      expect(after.active).toBe(true);
+      expect(after.value).toBe(before.value);
+      expect(after.selectionStart).toBe(before.selectionStart);
+      expect(after.selectionEnd).toBe(before.selectionEnd);
+    });
+
+    test('focus and caret also survive a mid-stream auto-wake error and a gate-silent (non-stream) outcome', async ({ page }) => {
+      let respondMode = 'error';
+      await page.route('**/api/flight-companion/turn', (route) => {
+        if (route.request().method() !== 'POST') return route.continue();
+        if (respondMode === 'error') {
+          return route.fulfill({
+            status: 200, contentType: 'text/event-stream',
+            body: `event: error\ndata: ${JSON.stringify({ message: 'boom' })}\n\n`,
+          });
+        }
+        return route.fulfill({
+          status: 200, contentType: 'application/json',
+          body: JSON.stringify({ turnKind: 'auto-wake', spent: false, reason: 'floor' }),
+        });
+      });
+      await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+
+      await page.clock.install();
+      await page.goto(PAGE_URL);
+      await page.waitForLoadState('networkidle');
+
+      const input = page.locator('#flight-companion-question');
+      await input.fill('draft across a failing tick');
+      await input.evaluate((el) => el.setSelectionRange(5, 5));
+
+      await page.clock.fastForward(30000); // mid-stream error tick
+
+      let state = await input.evaluate((el) => ({
+        active: document.activeElement === el, value: el.value,
+        selectionStart: el.selectionStart, selectionEnd: el.selectionEnd,
+      }));
+      expect(state.active).toBe(true);
+      expect(state.value).toBe('draft across a failing tick');
+      expect(state.selectionStart).toBe(5);
+      expect(state.selectionEnd).toBe(5);
+
+      respondMode = 'gate-silent';
+      await page.clock.fastForward(60000); // next tick, doubled interval after the error
+
+      state = await input.evaluate((el) => ({
+        active: document.activeElement === el, value: el.value,
+        selectionStart: el.selectionStart, selectionEnd: el.selectionEnd,
+      }));
+      expect(state.active).toBe(true);
+      expect(state.value).toBe('draft across a failing tick');
+      expect(state.selectionStart).toBe(5);
+      expect(state.selectionEnd).toBe(5);
+    });
+  });
+
   test.describe('Sweep-liveness gate-silent tick (LIN-2438, page.clock)', () => {
     // Same installation-order discipline as the plain silent-tick block
     // above: page.clock before the flag-on navigation, its own describe so
