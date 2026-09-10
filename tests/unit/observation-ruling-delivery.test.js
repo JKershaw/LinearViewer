@@ -103,7 +103,13 @@ class FakeElement {
   }
   click() { (this.listeners.click || []).forEach(fn => fn({ type: 'click' })); }
   _matches(el, selector) {
-    return selector.startsWith('.') && el.classList.contains(selector.slice(1));
+    // rulingRowControls(li) queries a COMMA-separated list of class
+    // selectors (real querySelectorAll supports that natively) — split and
+    // match any part, each still a bare `.class` selector.
+    return selector.split(',').some((part) => {
+      const trimmed = part.trim();
+      return trimmed.startsWith('.') && el.classList.contains(trimmed.slice(1));
+    });
   }
   querySelectorAll(selector) {
     const matches = [];
@@ -139,7 +145,15 @@ function makeLi({ withFeedback = true } = {}) {
 // exactly as before — the delivery tests below never touch the document). The
 // ChatUI stub is likewise inert for those: only renderRulingRow calls
 // appendOptions, and only the LIN-2293 render test reaches it.
-function makeSandbox({ postComment, dispatchPrompt, deliverReply, elements = {} }) {
+//
+// LIN-2444 Phase 3: `api` stubs `window.api`, the fetch wrapper
+// issueDismissRequest/keepRulingRow call directly (not via
+// window.ReplyDelivery). Defaults to a rejecting stub so a test that forgets
+// to pass one fails loudly instead of hitting a real TypeError deep in a
+// promise chain — `observationData` stays null in every sandbox (it is
+// never set here), so `pollRulings()`/`refreshBadge()` no-op safely off
+// `observationData?.urlKey` being undefined, needing no stub of their own.
+function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements = {} }) {
   const sandbox = {
     module: { exports: {} },
     window: {
@@ -151,7 +165,8 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply, elements = {} 
         deliverReply,
         errorFromResult: (r) => new Error((r.data && r.data.error) || `HTTP ${r.status}`)
       },
-      dispatchPrompt
+      dispatchPrompt,
+      api: api || (async () => { throw new Error('window.api not stubbed for this test'); })
     },
     document: {
       createElement: (tag) => new FakeElement(tag),
@@ -763,5 +778,253 @@ describe('renderRulingRow — suggestion banner (LIN-2444 Phase 2)', () => {
     // instead leave child nodes behind.
     assert.equal(reasonEl.textContent, hostileReason);
     assert.equal(reasonEl.children.length, 0);
+  });
+});
+
+// ─── Agree / Keep (LIN-2444 Phase 3+4) ───────────────────────────────────────
+//
+// Agree runs the EXISTING session-auth dismiss (issueDismissRequest, shared
+// with the Dismiss button) — no new dismiss path. Keep calls the beat-1
+// withdraw route and must never touch a dismiss endpoint at all.
+describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
+  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+
+  test('Agree on a loop-backed row posts to the rulings dismiss route with the right body, targeting anchor.workspaceUrlKey', async () => {
+    let captured = null;
+    const { module } = makeSandbox({
+      api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+
+    agreeRulingRow(makeRow(), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(captured, 'expected window.api to be called');
+    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/dismiss');
+    assert.equal(captured.opts.method, 'POST');
+    assert.deepEqual(JSON.parse(captured.opts.body), { decisionLoopId: 'loop-gone-1', decisionId: 'd-gone-1' });
+  });
+
+  test('Agree on a task-bound row posts to the scan dismiss route with {id: taskDecisionId}', async () => {
+    let captured = null;
+    const { module } = makeSandbox({
+      api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const taskBoundRow = makeRow({
+      anchor: { loopId: null, taskDecisionId: 'td-1' },
+      disposition: 'task-bound'
+    });
+
+    agreeRulingRow(taskBoundRow, li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(captured, 'expected window.api to be called');
+    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/scan/issue-1/dismiss');
+    assert.deepEqual(JSON.parse(captured.opts.body), { id: 'td-1' });
+  });
+
+  test('Agree targets anchor.workspaceUrlKey, never a page urlKey', async () => {
+    let capturedUrl = null;
+    const { module } = makeSandbox({
+      api: async (url) => { capturedUrl = url; return { success: true }; }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = makeRow({ anchor: { workspaceUrlKey: 'some-other-workspace' } });
+
+    agreeRulingRow(row, li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedUrl.startsWith('/workspace/some-other-workspace/'), `expected the anchor's own workspace in the URL, got ${capturedUrl}`);
+  });
+
+  test('Agree issues no proxy-prefixed request', async () => {
+    let capturedUrl = null;
+    const { module } = makeSandbox({
+      api: async (url) => { capturedUrl = url; return { success: true }; }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+
+    agreeRulingRow(makeRow(), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedUrl, 'expected a request to have been made');
+    assert.ok(!capturedUrl.includes('/api/proxy'), `expected no proxy-prefixed request, got ${capturedUrl}`);
+  });
+
+  test('a successful Agree writes "agreed" feedback and re-enables its row (no dangling pending state)', async () => {
+    const { module } = makeSandbox({ api: async () => ({ success: true }) });
+    const { agreeRulingRow, rulingsPending, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow();
+
+    await agreeRulingRow(row, li);
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'agreed');
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), false);
+    assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', 'd-gone-1')), false);
+  });
+
+  test('a failed Agree surfaces an error and re-enables the row for retry', async () => {
+    const { module } = makeSandbox({ api: async () => { throw new Error('boom'); } });
+    const { agreeRulingRow, rulingsPending, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow();
+
+    await agreeRulingRow(row, li);
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /agree failed/);
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
+    assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', 'd-gone-1')), false, 'must not be stranded pending after a failure');
+  });
+
+  test('Keep posts to the keep route with {decisionId}, never a dismiss endpoint', async () => {
+    let captured = null;
+    const { module } = makeSandbox({
+      api: async (url, opts) => { captured = { url, opts }; return { success: true, suggestion: { withdrawn: true } }; }
+    });
+    const { keepRulingRow } = module.exports;
+    const li = makeLi();
+
+    keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(captured, 'expected window.api to be called');
+    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/keep');
+    assert.equal(captured.opts.method, 'POST');
+    assert.deepEqual(JSON.parse(captured.opts.body), { decisionId: 'd-gone-1' });
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'kept');
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), false, 'a successful Keep is not an error state');
+  });
+
+  test('Keep\'s 404 (no matching suggestion) is handled benignly — not surfaced as an error', async () => {
+    const { module } = makeSandbox({
+      api: async () => { const err = new Error('No matching suggestion to keep'); err.status = 404; throw err; }
+    });
+    const { keepRulingRow } = module.exports;
+    const li = makeLi();
+
+    keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'already withdrawn');
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), false, 'a 404 on Keep is the benign already-withdrawn case, not an alarm');
+  });
+
+  test('a non-404 Keep failure IS surfaced as an error', async () => {
+    const { module } = makeSandbox({
+      api: async () => { const err = new Error('store down'); err.status = 500; throw err; }
+    });
+    const { keepRulingRow } = module.exports;
+    const li = makeLi();
+
+    keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /keep failed/);
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
+  });
+});
+
+// ─── Widened control-disable set (LIN-2444 Phase 4) ──────────────────────────
+//
+// rulingRowControls must cover .obs-ruling-agree/.obs-ruling-keep too, or an
+// in-flight Agree/Keep leaves the OTHER controls on the row double-firable.
+// Driven through the real render + click path (not the bare handler) so the
+// assertion is against the actual DOM the plan says is load-bearing.
+describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
+  function makeRenderSandbox(api) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      api,
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  test('pressing Agree disables every control on the row, including Agree and Keep themselves', async () => {
+    let resolveApi;
+    const pending = new Promise((resolve) => { resolveApi = resolve; });
+    const { module, list } = makeRenderSandbox(async () => pending);
+    const { renderRulings } = module.exports;
+
+    const row = makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } });
+    renderRulings([row]);
+    const li = list.children[0];
+    const agreeBtn = li.querySelector('.obs-ruling-agree');
+    const keepBtn = li.querySelector('.obs-ruling-keep');
+    const dismissBtn = li.querySelector('.obs-ruling-dismiss');
+    const shelveBtn = li.querySelector('.obs-ruling-shelve');
+    assert.ok(agreeBtn && keepBtn, 'Agree/Keep must render on a suggested row');
+
+    agreeBtn.click();
+
+    assert.equal(agreeBtn.disabled, true, 'Agree itself must disable while its own request is in flight');
+    assert.equal(keepBtn.disabled, true, 'Keep must be disabled too — the double-fire hole this phase closes');
+    assert.equal(dismissBtn.disabled, true);
+    assert.equal(shelveBtn.disabled, true);
+
+    resolveApi({ success: true });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(agreeBtn.disabled, false, 're-enabled once the request settles');
+    assert.equal(keepBtn.disabled, false);
+  });
+
+  test('pressing Keep disables every control on the row, including Agree and Keep themselves', async () => {
+    let resolveApi;
+    const pending = new Promise((resolve) => { resolveApi = resolve; });
+    const { module, list } = makeRenderSandbox(async () => pending);
+    const { renderRulings } = module.exports;
+
+    const row = makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } });
+    renderRulings([row]);
+    const li = list.children[0];
+    const agreeBtn = li.querySelector('.obs-ruling-agree');
+    const keepBtn = li.querySelector('.obs-ruling-keep');
+
+    keepBtn.click();
+
+    assert.equal(agreeBtn.disabled, true);
+    assert.equal(keepBtn.disabled, true);
+
+    resolveApi({ success: true, suggestion: { withdrawn: true } });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(agreeBtn.disabled, false);
+    assert.equal(keepBtn.disabled, false);
+  });
+
+  test('Agree/Keep render only when row.suggestedDismissal is set — absent otherwise', () => {
+    const { module, list } = makeRenderSandbox(async () => ({ success: true }));
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ suggestedDismissal: null })]);
+    const li = list.children[0];
+    assert.equal(li.querySelector('.obs-ruling-agree'), null);
+    assert.equal(li.querySelector('.obs-ruling-keep'), null);
   });
 });
