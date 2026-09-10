@@ -56,6 +56,22 @@ describe('renderFlightCompanionPage — LIN-2435 Commit 2: chat-thread render + 
     assert.ok(chatJsIdx < fcJsIdx, 'chat.js must load before flight-companion.js');
   });
 
+  // LIN-2670: purify.min.js < marked.min.js < flight-companion.js, in the
+  // session page's order (lib/render-session.js). Stricter than the
+  // render-task-edit.test.js precedent, which pins marked-before-page-script
+  // and purify-before-page-script but NOT purify-before-marked — this ticket's
+  // own constraint is specifically purify-before-marked, so the chain below
+  // must catch a purify-after-marked ordering, not just an absent script.
+  test('loads the vendored purify + marked pair, in that order, before flight-companion.js (LIN-2670)', () => {
+    assert.ok(html.includes('src="/purify.min.js"'));
+    assert.ok(html.includes('src="/marked.min.js"'));
+    const purifyIdx = html.indexOf('src="/purify.min.js"');
+    const markedIdx = html.indexOf('src="/marked.min.js"');
+    const fcJsIdx = html.indexOf('src="/flight-companion.js"');
+    assert.ok(purifyIdx < markedIdx, 'purify.min.js must load before marked.min.js');
+    assert.ok(markedIdx < fcJsIdx, 'marked.min.js must load before flight-companion.js');
+  });
+
   test('every pre-existing +proxy gating assertion still passes unchanged (re-run against the extended markup)', () => {
     const onHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
     assert.ok(onHtml.includes('data-proxy-feature="true"'));

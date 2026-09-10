@@ -1119,8 +1119,21 @@
             // diverges by turn kind (AC1 vs AC2).
             if (answerText) {
               answerEl.classList.remove('chat-cursor');
+              // Raw Markdown goes into chatHistory FIRST — the render below is
+              // display-only and never touches what gets sent back to the
+              // model or saved to a transcript (LIN-2670).
               chatHistory.push({ role: 'assistant', content: answerText });
               capHistory(chatHistory);
+              // LIN-2670: swap the streamed raw text for rendered Markdown,
+              // once, here on the done frame — never per token. Updates
+              // answerEl IN PLACE (window.ChatUI.renderMarkdownText assigns
+              // innerHTML on the same element, never replacing it), which is
+              // load-bearing: appendTurnMeta below appends `.fc-msg-meta` as
+              // a SIBLING of answerEl via answerEl.parentNode.appendChild,
+              // and early-returns if answerEl.parentNode is gone. Element
+              // replacement (rather than an in-place innerHTML write) is the
+              // one thing that could trip that guard.
+              window.ChatUI.renderMarkdownText(answerEl, answerText);
               setBubbleState(answerLi, 'done');
             } else if (turnKind === 'user-initiated' || turnKind === 'boot') {
               // AC2: the human asked and deserves a row. Display-only — this

@@ -39,6 +39,24 @@ describe('renderTaskChatPage', () => {
     assert.match(html, /class="task-chat-ask chat-composer chat-composer--inline"/, 'the ask bar is an inline shared composer');
   });
 
+  // LIN-2670: purify.min.js < marked.min.js < task-chat.js, in the session
+  // page's order (lib/render-session.js). Stricter than the
+  // render-task-edit.test.js precedent, which pins marked-before-page-script
+  // and purify-before-page-script but NOT purify-before-marked — this
+  // ticket's own constraint is specifically purify-before-marked, so the
+  // chain below must catch a purify-after-marked ordering, not just an
+  // absent script.
+  test('loads the vendored purify + marked pair, in that order, before task-chat.js (LIN-2670)', () => {
+    const html = render();
+    assert.ok(html.includes('src="/purify.min.js"'));
+    assert.ok(html.includes('src="/marked.min.js"'));
+    const purifyIdx = html.indexOf('src="/purify.min.js"');
+    const markedIdx = html.indexOf('src="/marked.min.js"');
+    const taskChatJsIdx = html.indexOf('src="/task-chat.js"');
+    assert.ok(purifyIdx < markedIdx, 'purify.min.js must load before marked.min.js');
+    assert.ok(markedIdx < taskChatJsIdx, 'marked.min.js must load before task-chat.js');
+  });
+
   test('prefills the task input from defaultTask', () => {
     const html = render({ defaultTask: 'LIN-123' });
     assert.match(html, /id="task-chat-id"[^>]*value="LIN-123"/);

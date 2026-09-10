@@ -70,6 +70,12 @@ class FakeElement {
     this._listeners = {};
     this.classList = new FakeClassList();
     this._text = '';
+    // LIN-2670 finding 3/5: a plain write-recorder, not a parser — stores
+    // the assigned string verbatim so tests can check SINK IDENTITY (did
+    // renderMarkdownText's output land here?) without reading content back
+    // out of markup, the same distinction tests/unit/chat-append-options.test.js
+    // draws for its own deliberate omission of innerHTML.
+    this._innerHTML = null;
     this.value = '';
     this.disabled = false;
     this.hidden = false;
@@ -78,6 +84,8 @@ class FakeElement {
   }
   get textContent() { return this._text; }
   set textContent(v) { this._text = v == null ? '' : String(v); this.children = []; }
+  get innerHTML() { return this._innerHTML; }
+  set innerHTML(v) { this._innerHTML = v; }
   get className() { return Array.from(this.classList._set).join(' '); }
   set className(v) {
     this.classList = new FakeClassList();
@@ -156,6 +164,10 @@ function makeChatUI(doc) {
     // shared label helper fails these tests too, not just its own.
     toolBreadcrumbLabel: realChatUI.toolBreadcrumbLabel,
     appendOptions: realChatUI.appendOptions,
+    // LIN-2670: same reuse-evidence pattern as the two lines above — sourced
+    // from the REAL chat.js rather than a second hand-rolled fake, so a real
+    // regression in the shared helper fails these tests too.
+    renderMarkdownText: realChatUI.renderMarkdownText,
     appendMessage(thread, opts) {
       calls.appendMessage.push(opts);
       const li = new FakeElement('li');
@@ -1215,6 +1227,83 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
   });
 });
 
+describe('flight-companion.js — LIN-2670: done-frame Markdown swap, in place', () => {
+  test('renders Markdown IN PLACE — the same element/li instance before and after the done frame — and the .fc-msg-meta line survives it', async () => {
+    const usage = { total_tokens: 5, cost: 0.001 };
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: '**hi**' }), sseFrame('done', { usage })]),
+    });
+    questionInput.value = 'hello';
+    m.submitQuestion();
+
+    // ensureAssistantBubble() runs synchronously, before the fetch even goes
+    // out (public/flight-companion.js's own comment on sendTurn) — so the
+    // bubble already exists here, before any SSE frame has been processed.
+    const answerLiBeforeDone = thread.children[1];
+    const answerElBeforeDone = answerLiBeforeDone.querySelector('.fc-msg-body');
+    assert.ok(answerElBeforeDone, 'expected the assistant bubble to exist eagerly');
+
+    await flush();
+
+    const answerLiAfterDone = thread.children[1];
+    const answerElAfterDone = answerLiAfterDone.querySelector('.fc-msg-body');
+    // Finding 3's crisp proof of "in place": the identical object, not a
+    // same-shaped replacement.
+    assert.strictEqual(answerElAfterDone, answerElBeforeDone, 'the SAME element must be updated in place — never replaced');
+    assert.strictEqual(answerLiAfterDone, answerLiBeforeDone, 'the surrounding <li> is untouched too');
+
+    // The finding-1 opt-out (keepWholeFence=true) and the shared class.
+    assert.ok(answerElAfterDone.classList.contains('chat-md'));
+    assert.strictEqual(answerElAfterDone.innerHTML, '<p data-rendered="true">**hi**</p>');
+
+    // Meta survival (finding 3): appendTurnMeta early-returns on
+    // !answerEl.parentNode and appends .fc-msg-meta as a SIBLING — in-place
+    // update leaves parentNode untouched, so it must still be there.
+    const meta = answerLiAfterDone.querySelector('.fc-msg-meta');
+    assert.ok(meta, 'expected the .fc-msg-meta line to survive the in-place swap');
+    assert.strictEqual(meta.textContent, '5 tokens · $0.0010');
+
+    // Raw Markdown — not the rendered HTML — is what reaches chatHistory.
+    // looseDeepEqual (not assert.deepEqual/strict): getChatHistory() returns
+    // objects built inside the vm sandbox, a distinct realm whose Object
+    // prototype differs from this file's — strict deepEqual would fail on
+    // that alone even when every own property matches (same reasoning as
+    // this file's other chatHistory assertions above).
+    looseDeepEqual(m.getChatHistory(), [
+      { role: 'user', content: 'hello' },
+      { role: 'assistant', content: '**hi**' },
+    ]);
+  });
+
+  test('the mid-stream error path keeps textContent and never gains chat-md', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: '**partial**' }), sseFrame('error', { message: 'boom' })]),
+    });
+    questionInput.value = 'hello';
+    m.submitQuestion();
+    await flush();
+
+    const answerEl = thread.children[1].querySelector('.fc-msg-body');
+    assert.strictEqual(answerEl.textContent, '**partial**\n[error: boom]');
+    assert.strictEqual(answerEl.innerHTML, null, 'the error path must never assign innerHTML');
+    assert.ok(!answerEl.classList.contains('chat-md'));
+  });
+
+  test('AC2\'s "no reply" empty-answer path keeps textContent and never gains chat-md', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'anything to report?';
+    m.submitQuestion();
+    await flush();
+
+    const answerEl = thread.children[1].querySelector('.fc-msg-body');
+    assert.strictEqual(answerEl.textContent, 'no reply — nothing to add');
+    assert.strictEqual(answerEl.innerHTML, null, 'the no-reply path must never assign innerHTML');
+    assert.ok(!answerEl.classList.contains('chat-md'));
+  });
+});
+
 // ─── The thinking state + "checking in…" status line (LIN-2632 beat 3) ─────
 
 describe('flight-companion.js — the thinking state (typed turns) and "checking in…" (auto-wake)', () => {
@@ -2134,6 +2223,19 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
 function loadChatUI(doc) {
   const sandbox = { window: {}, console };
   if (doc) sandbox.document = doc;
+  // LIN-2670: a stub renderMarkdown + DOMPurify + marked so a REAL chat.js
+  // renderMarkdownText, sourced below by makeChatUI for the Flight
+  // Companion client tests, actually runs rather than silently no-op'ing on
+  // one of its own missing-global guards — each of which has its own
+  // dedicated coverage in tests/unit/chat-render-markdown-text.test.js.
+  sandbox.window.renderMarkdown = function (text, opts, keepWholeFence) {
+    return '<p data-rendered="' + String(!!keepWholeFence) + '">' + text + '</p>';
+  };
+  sandbox.DOMPurify = { sanitize: (html) => html };
+  // The marked guard (close-out ledger L2) reads the GLOBAL, not anything
+  // reachable through the stubbed renderMarkdown above, so the sandbox has
+  // to carry one. Never called — renderMarkdown is stubbed.
+  sandbox.marked = { parse: () => { throw new Error('marked.parse must not be reached — renderMarkdown is stubbed'); } };
   vm.createContext(sandbox);
   vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
   return sandbox.window.ChatUI;

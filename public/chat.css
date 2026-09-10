@@ -102,6 +102,99 @@
   font-style: italic;
 }
 
+/* Rendered-Markdown typography (LIN-2670), applied by
+ * `window.ChatUI.renderMarkdownText` alongside `.chat-msg__text` once a
+ * turn's `innerHTML` carries sanitized HTML instead of raw streamed text.
+ *
+ * This is a DELIBERATE LOCAL COPY, not a widening of a shared class —
+ * `.desc-full-content` (style.css), `.swipe-accordion-body` and
+ * `.comment-body` each hand-roll a different Markdown subset today, and
+ * LIN-1622 is the tracked ticket for the shared `.markdown-body` layer that
+ * eventually retires all of these local copies, this one included (its
+ * migration scope grows from four consumers to six by this addition,
+ * declared on LIN-2670's plan for ratification).
+ *
+ * Rules below are copied AS-IS from the ratified prototype
+ * (prototypes/lin-1412-chat/chat-next.css:96-131) — including `table`/`th`/
+ * `td` (finding 2): the `.task-edit-preview` precedent that leaves tables
+ * unstyled is itself the defect LIN-1622 measures (a 2x2 table there lays
+ * out 25.4px wide), and that precedent's own stated reason ("styling it
+ * here would make the preview diverge from what it previews") does not
+ * transfer to a bubble that previews nothing. Every custom property below
+ * is defined in style.css.
+ */
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child { margin-bottom: 0; }
+.chat-md h1, .chat-md h2, .chat-md h3, .chat-md h4 {
+  font-family: var(--font-content);
+  font-size: 1rem;
+  line-height: 1.4;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.chat-md h3, .chat-md h4 { font-size: 0.9375rem; color: var(--muted); }
+.chat-md p { margin: 0 0 var(--space-2); }
+.chat-md ul, .chat-md ol { margin: 0 0 var(--space-2); padding-left: var(--space-4); }
+.chat-md li { margin-bottom: var(--space-1); }
+/* marked emits <p> inside a loose list item; without this the list breathes
+   twice and the rhythm stops being the scale's. */
+.chat-md li > p { margin: 0; }
+.chat-md a { color: var(--brand); }
+.chat-md blockquote {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+}
+.chat-md code {
+  font-size: 0.875em;
+  background: var(--inset);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+}
+.chat-md table {
+  border-collapse: collapse;
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+}
+.chat-md th, .chat-md td {
+  border: 1px solid var(--line-soft);
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+}
+
+/* `.chat-msg__text`'s base `white-space: pre-wrap` is for streamed raw
+ * text; marked owns whitespace once rendered, and `pre-wrap` would double
+ * up its own newlines against marked's. `overflow-wrap: anywhere` guards a
+ * long unbreakable token (a URL, a hash) from widening the bubble. */
+.chat-md { white-space: normal; overflow-wrap: anywhere; }
+
+/* Two additions beyond the prototype's own block: the prototype handles
+ * code blocks and images through a JS-built `.chat-code` wrapper (with a
+ * copy button) that is LIN-1578's scope, not built here.
+ *
+ * (a) is load-bearing for the finding-1 whole-answer-fence ruling: a
+ * whole-answer fence now renders a real `<pre>`, and `overflow-x: auto` is
+ * what stops a long unbroken line dragging the bubble wide (shape from
+ * task-edit.css's `.task-edit-preview pre`/`pre code`, expressed in this
+ * file's tokens). (b) stops a DOMPurify-surviving handler-less `<img>`
+ * (e.g. `<img src=x onerror="...">`, whose handler DOMPurify strips but
+ * whose bare `<img>` tag survives) from blowing out the bubble's width. */
+.chat-md pre {
+  background: var(--inset);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin: 0 0 var(--space-2);
+}
+.chat-md pre code {
+  background: none;
+  padding: 0;
+}
+.chat-md img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Blocked/pending turn (LIN-1163, opt-in): a `[blocked]`/`[pending]`-marked
    feedback entry gets an amber accent on its surface body — same running-
    family vocabulary as the session waiting banner/flag. Additive only; no
