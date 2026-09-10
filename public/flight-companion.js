@@ -1347,7 +1347,15 @@
   // depends on landing the composer flush with the viewport's bottom edge.
   // Re-align on focus so the mobile reachability contract (LIN-2632) holds
   // for a textarea the same way it happened to for the old <input>.
+  //
+  // LIN-2717 review F1: the phone-shape column this compensates for exists
+  // ONLY inside flight-companion.css's `@media (max-width: 600px)` block —
+  // outside it, `block: 'end'` is not a minimal scroll (it bottom-aligns
+  // even when the composer is already fully visible), so the unconditional
+  // listener yanked the whole page to the top on every desktop focus. Gate
+  // it to the shape it exists for, on the SAME breakpoint that block uses.
   questionInput.addEventListener('focus', function () {
+    if (!window.matchMedia('(max-width: 600px)').matches) return;
     questionInput.scrollIntoView({ block: 'end', inline: 'nearest' });
   });
   if (startBtn) startBtn.addEventListener('click', startBoot);

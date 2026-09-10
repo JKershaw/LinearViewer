@@ -455,6 +455,31 @@ test.describe('Flight Companion Page (experimental)', () => {
       });
     });
 
+    // LIN-2717 review F1: the focus listener's `scrollIntoView({block:'end'})`
+    // re-align only exists to compensate for the phone-shape column, which
+    // flight-companion.css scopes to `@media (max-width: 600px)` — outside
+    // that width the listener ran unconditionally anyway and yanked a
+    // mid-page scroll position back to the top on every composer focus,
+    // e.g. scroll down to read the kickoff prompt or the latest observer
+    // report, click the composer to ask about it, and the page jumps away.
+    // Desktop-width witness, deliberately outside the 390x844 describe above
+    // (that describe proves the mobile reveal; nothing there exercises any
+    // other width). Viewport matches the review's own measurement.
+    test.describe('Desktop viewport (1280x800) — focus must not move the scroll position', () => {
+      test.use({ viewport: { width: 1280, height: 800 } });
+
+      test('focusing the composer after a mid-page scroll leaves scrollY unchanged', async ({ page }) => {
+        await page.evaluate(() => window.scrollTo(0, 200));
+        const before = await page.evaluate(() => window.scrollY);
+        expect(before).toBeGreaterThan(0);
+
+        await page.locator('#flight-companion-question').click();
+
+        const after = await page.evaluate(() => window.scrollY);
+        expect(after).toBe(before);
+      });
+    });
+
     test.describe('Below the fold on a phone viewport (LIN-2632 beat 4)', () => {
       test.use({ viewport: { width: 390, height: 844 } });
 

@@ -209,7 +209,13 @@
    themes. */
 .fc-composer-input {
   flex: 1 1 auto;
-  min-width: 0;          /* AC: releases the textarea's cols-driven min-content floor */
+  /* LIN-2717 review F2: NOT load-bearing on a <textarea> — it is always an
+     inline-axis scroll container, and a non-visible-overflow flex item
+     already gets an automatic min-content size of zero, so there is no
+     cols-driven floor here to release. Kept as a defensive no-op, for
+     symmetry with LIN-1412's composer. Measured: no overflow/overlap at
+     any width down to 220px with this line removed. */
+  min-width: 0;
   box-sizing: border-box;
   min-height: 2.2rem;    /* the resting one-row height — the shrink floor */
   max-height: 8.5rem;    /* the cap; JS never needs to know it */
@@ -227,7 +233,11 @@
 .fc-composer-input:focus { outline: none; border-color: var(--brand); }
 
 .fc-chat-composer .action-btn {
-  flex: 0 0 auto;        /* AC: the send button never shrinks or is pushed off */
+  /* LIN-2717 review F2: right on design grounds, but not "the AC fix" — with
+     the button set to `flex: 1 1 auto` instead there is still no overflow
+     or overlap at 375px. Not load-bearing for any witness; kept because it
+     is the correct declaration for a button that should never shrink. */
+  flex: 0 0 auto;
   align-self: flex-end;  /* stays on the composer's bottom edge as the textarea grows */
 }
 

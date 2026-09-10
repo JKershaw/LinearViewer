@@ -2737,6 +2737,49 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
   });
 });
 
+// ─── LIN-2717: composer key handler (U6) ───────────────────────────────────
+//
+// Not in the original plan's ledger (L4 of the review): three E2E tests
+// (tests/e2e/flight-companion.spec.js, real `keydown` via Playwright's
+// keyboard) already cover Enter-sends / Shift+Enter-newlines and go red
+// when the markup reverts to <input> — the review accepted that as
+// substantive coverage. Added alongside the F1 fix since the seam
+// (FakeElement#dispatch's optional `evt` param, S4-a) was already staged
+// for exactly this and the cost is low.
+
+describe('flight-companion.js — LIN-2717: composer key handler (U6)', () => {
+  test('Enter without Shift prevents the default newline and submits', () => {
+    const { questionInput, fetchCalls } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'hello';
+    let prevented = 0;
+    questionInput.dispatch('keydown', { key: 'Enter', shiftKey: false, preventDefault: () => { prevented += 1; } });
+    assert.strictEqual(prevented, 1);
+    assert.strictEqual(fetchCalls.length, 1, 'submitQuestion ran');
+  });
+
+  test('Shift+Enter does not submit, and leaves the newline to the browser default', () => {
+    const { questionInput, fetchCalls } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'hello';
+    let prevented = 0;
+    questionInput.dispatch('keydown', { key: 'Enter', shiftKey: true, preventDefault: () => { prevented += 1; } });
+    assert.strictEqual(prevented, 0);
+    assert.strictEqual(fetchCalls.length, 0);
+  });
+
+  test('a non-Enter key never submits', () => {
+    const { questionInput, fetchCalls } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'hello';
+    questionInput.dispatch('keydown', { key: 'a', shiftKey: false, preventDefault: () => { throw new Error('must not be called'); } });
+    assert.strictEqual(fetchCalls.length, 0);
+  });
+});
+
 // ─── LIN-2717: composer auto-grow (S4 unit witnesses) ──────────────────────
 //
 // U7/U8/U9 below are exact-value assertions, not "a write happened" checks —
