@@ -1019,6 +1019,208 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.match(feedback.textContent, /keep failed/);
     assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
   });
+
+  // ─── Second review (LIN-2444) — F6/F7: the F1 class was not isolated ──────
+  //
+  // F1 fixed bulkAgreeRow deleting its own key from rulingsSelected on
+  // success. agreeRulingRow and keepRulingRow never did — so a row could
+  // succeed via the single-click path and still be posted again from a
+  // bulk-agree press in the SAME tab, before any poll ever landed. Both
+  // tests below reproduce the reviewer's own PROBE-D/PROBE-E scenarios.
+
+  // Review F6 — the bulk bar computes `total` from `rulingsSelectableKeys()`
+  // (excludes settled) but `selectedCount` from `rulingsSelected.size`
+  // (didn't). A settled-but-still-selected row desyncs the two: the count
+  // over-reports, select-all renders checked, and "Agree selected" renders
+  // enabled over a real selection of nothing.
+  test('a successful single-click Agree clears the row from rulingsSelected, keeping the bulk bar honest (review F6)', async () => {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const bar = new FakeElement('div');
+    const selectAll = new FakeElement('input');
+    const countEl = new FakeElement('span');
+    const agreeBtn = new FakeElement('button');
+    const { module } = makeSandbox({
+      api: async () => ({ success: true }),
+      elements: {
+        'obs-rulings': list, 'obs-rulings-empty': empty, 'obs-ruling-bulk-bar': bar,
+        'obs-ruling-select-all': selectAll, 'obs-ruling-selected-count': countEl,
+        'obs-ruling-agree-selected': agreeBtn
+      }
+    });
+    const { renderRulings, agreeRulingRow, toggleRulingSelection, rulingsSelected, rulingKey } = module.exports;
+
+    const rowA = makeRow({ suggestedDismissal: SUGGESTION });
+    const rowB = makeRow({ decision: { decision_id: 'd-b' }, suggestedDismissal: SUGGESTION });
+    renderRulings([rowA, rowB]);
+    const keyA = rulingKey('the-ruling-workspace', 'd-gone-1');
+    toggleRulingSelection(keyA, true);
+    const liA = list.children[0];
+
+    await agreeRulingRow(rowA, liA);
+    assert.equal(rulingsSelected.has(keyA), false, 'the succeeded row must be deselected at the moment of success, not on the next poll');
+
+    // The stale loop-backed cache still serves the same suggested row A —
+    // exactly the window PROBE-D exercised.
+    renderRulings([rowA, rowB]);
+    assert.equal(countEl.textContent, '0 selected', 'the bulk bar must not over-report a settled row as still selected');
+    assert.equal(agreeBtn.textContent, 'Agree selected (0)');
+    assert.equal(agreeBtn.disabled, true, '"Agree selected" must not render enabled over an empty real selection');
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, false);
+
+    const checkbox = liA.querySelector('.obs-ruling-select');
+    assert.equal(checkbox.checked, false, 'the checkbox itself is explicitly unchecked on success, matching bulkAgreeRow');
+  });
+
+  // Review F7 — Keep never cleared selection, so a same-tab bulk-agree press
+  // (before the next poll lands) reads the still-cached pre-Keep row and
+  // dismisses the very suggestion the operator just protected. This is F1's
+  // exact harm, reached through the Keep door instead of Agree's.
+  test('a same-tab bulk-agree press does not dismiss a ruling the operator just pressed Keep on (review F7)', async () => {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const posted = { keep: [], dismiss: [] };
+    const api = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      if (url.includes('/keep')) { posted.keep.push(body.decisionId); return { success: true }; }
+      posted.dismiss.push(body.decisionId);
+      return { success: true };
+    };
+    const { module } = makeSandbox({ api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, keepRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const kept = makeRow({ suggestedDismissal: SUGGESTION });
+    const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
+    renderRulings([kept, other]);
+    const li = list.children[0];
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-gone-1'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-other'), true);
+
+    keepRulingRow(kept, li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(posted.keep, ['d-gone-1']);
+
+    // NO poll has landed yet — rulingsRowByKey still holds the pre-Keep row.
+    await bulkAgreeSelected();
+
+    assert.deepEqual(posted.dismiss, ['d-other'], 'the kept ruling must never be dismissed by a same-tab bulk press');
+  });
+
+  test('Keep\'s benign 404 (already withdrawn) also clears the row from rulingsSelected (review F7)', async () => {
+    const { module } = makeSandbox({
+      api: async () => { const err = new Error('No matching suggestion to keep'); err.status = 404; throw err; }
+    });
+    const { keepRulingRow, rulingsSelected, rulingKey } = module.exports;
+    const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    rulingsSelected.add(key);
+
+    keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(rulingsSelected.has(key), false, 'the benign already-withdrawn path must clear selection too, not just the happy path');
+  });
+});
+
+// ─── Second review (LIN-2444) — third open instance: pre-existing Dismiss ──
+//
+// Dismiss predates the selection seam (#1432) entirely, so its own verb is
+// out of scope — but the seam it now desyncs ships on this branch, making it
+// reachable the same way F6/F7 are. Same one-line fix, same class.
+describe('dismissRulingRow selection-clearing (LIN-2444 review — third open instance)', () => {
+  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+
+  test('a successful Dismiss clears the row from rulingsSelected at the moment of success', async () => {
+    const { module } = makeSandbox({ api: async () => ({ success: true }) });
+    const { dismissRulingRow, rulingsSelected, rulingKey } = module.exports;
+    const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    rulingsSelected.add(key);
+
+    dismissRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(rulingsSelected.has(key), false, 'a dismissed row must not survive selection into the next bulk-agree batch');
+  });
+
+  test('a same-tab bulk-agree press after Dismiss does not re-act on the dismissed row', async () => {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const posted = [];
+    const api = async (url, opts) => { posted.push(JSON.parse(opts.body).decisionId); return { success: true }; };
+    const { module } = makeSandbox({ api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, dismissRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const dismissed = makeRow({ suggestedDismissal: SUGGESTION });
+    const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
+    renderRulings([dismissed, other]);
+    const li = list.children[0];
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-gone-1'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-other'), true);
+
+    dismissRulingRow(dismissed, li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    posted.length = 0; // clear the dismiss call itself; only the bulk phase matters below
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(posted, ['d-other'], 'the already-dismissed row must not receive a second write from the bulk path');
+  });
+});
+
+// ─── Second review (LIN-2444) — fifth instance, found closing F6/F7 ────────
+//
+// appendSuggestionActions renders Agree/Keep on a suggested row REGARDLESS
+// of canReply (LIN-2444 Phase 3's own comment), so a repliable row can also
+// carry a live suggestion and be bulk-selected. Answering it via reply/free
+// text/option press — deliverRulingReply — is just as terminal an action as
+// Agree, but never cleared rulingsSelected either: the exact same class,
+// found while closing the two named instances rather than invented as a
+// sixth ticket.
+describe('deliverRulingReply also clears bulk selection (LIN-2444 review — fifth instance found while closing F6/F7)', () => {
+  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+
+  test('answering a selected, repliable-and-suggested row via reply clears it from rulingsSelected on full success', async () => {
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'dispatched-1' })
+    });
+    const { deliverRulingReply, rulingsSelected, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow({ suggestedDismissal: SUGGESTION });
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    rulingsSelected.add(key);
+
+    deliverRulingReply(row, 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(rulingsSelected.has(key), false, 'a row answered via reply is just as terminally answered as Agree, and must clear selection the same way');
+  });
+
+  test('a partial-failure reply (comment recorded, dispatch failed to start) also clears selection — the answer is already durable', async () => {
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => { throw new Error('queue temporarily unavailable'); }
+    });
+    const { deliverRulingReply, rulingsSelected, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow({ suggestedDismissal: SUGGESTION });
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    rulingsSelected.add(key);
+
+    deliverRulingReply(row, 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(rulingsSelected.has(key), false, 'the comment already durably recorded the answer even though the run failed to start');
+  });
 });
 
 // ─── Widened control-disable set (LIN-2444 Phase 4) ──────────────────────────
@@ -1197,6 +1399,43 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     assert.ok(rulingsSelected.has(rulingKey('the-ruling-workspace', 'd-suggested')));
     assert.equal(rulingsSelected.has(rulingKey('the-ruling-workspace', 'd-plain')), false, 'a row with no suggestion must never be selectable');
     assert.equal(rulingsSelected.size, 1);
+  });
+
+  // Review F5 — every key in this describe block up to this point is built
+  // from the single workspace 'the-ruling-workspace'. The selection seam is
+  // keyed by rulingKey(workspaceUrlKey, decisionId) (LIN-2293's composite
+  // key), never a bare decision_id, so a decision_id COLLIDING across two
+  // DIFFERENT workspaces must still select and bulk-agree independently —
+  // the regression the plan named that neither prior implementation round
+  // wrote. Mirrors the fixture shape of the existing LIN-2293 renderRulings
+  // collision tests above, but drives the selection/bulk-agree seam those
+  // tests don't touch.
+  test('two rows sharing decision_id across DIFFERENT workspaces select and bulk-agree independently (review F5)', async () => {
+    const calls = [];
+    const { module } = makeBulkSandbox({
+      api: async (url, opts) => { calls.push({ url, decisionId: JSON.parse(opts.body).decisionId }); return { success: true }; }
+    });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+
+    const rowWsA = suggestedRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
+    const rowWsB = suggestedRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
+    renderRulings([rowWsA, rowWsB]);
+
+    const keyA = rulingKey('workspace-a', 'shared-decision');
+    const keyB = rulingKey('workspace-b', 'shared-decision');
+    assert.notEqual(keyA, keyB, 'the composite key must distinguish the two workspaces even though decision_id collides');
+
+    // Select ONLY workspace A's row.
+    toggleRulingSelection(keyA, true);
+    assert.ok(rulingsSelected.has(keyA));
+    assert.equal(rulingsSelected.has(keyB), false, "selecting one workspace's row must never select the other's, despite the shared decision_id");
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(calls.map((c) => c.decisionId), ['shared-decision'], 'exactly one POST for the whole batch — workspace B was never selected');
+    assert.ok(calls[0].url.includes('/workspace/workspace-a/'), `the POST must target workspace A, never B, got ${calls[0].url}`);
+    assert.equal(rulingsSelected.has(keyA), false, "workspace A's row settles");
+    assert.equal(rulingsSelected.has(keyB), false, "workspace B's row was never touched — never selected, never posted");
   });
 
   test('bulk-agree acts only on selected suggested rows — an unselected suggested row is left untouched', async () => {

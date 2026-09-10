@@ -2141,6 +2141,11 @@ function dismissRulingRow(row, li) {
   issueDismissRequest(anchor, decisionId).then(() => {
     restore();
     setFeedback('dismissed', false);
+    // Same class as F6/F7 (review): the selection seam #1432 ships is what
+    // makes a dismissed-but-still-selected row reachable by bulk-agree
+    // within the stale poll window, even though this verb itself predates
+    // that seam and is otherwise out of scope.
+    rulingsSelected.delete(key);
     pollRulings();
     refreshBadge();
   }).catch((err) => {
@@ -2189,7 +2194,14 @@ function agreeRulingRow(row, li) {
   return issueDismissRequest(anchor, decisionId).then(() => {
     rulingsPending.delete(key);
     setFeedback('agreed', false);
+    // Review F6: clear selection at the moment of success, exactly as
+    // `bulkAgreeRow` already does — otherwise a settled-but-still-selected
+    // row survives the stale poll window and desyncs the bulk bar's count
+    // against `rulingsSelectableKeys()` (which excludes settled rows).
+    rulingsSelected.delete(key);
     rulingsSettled.add(key);
+    const checkbox = li.querySelector('.obs-ruling-select');
+    if (checkbox) checkbox.checked = false;
     pollRulings();
     refreshBadge();
   }).catch((err) => {
@@ -2237,6 +2249,11 @@ function keepRulingRow(row, li) {
   }).then(() => {
     restore();
     setFeedback('kept', false);
+    // Review F7: clear selection the moment Keep succeeds — otherwise the
+    // withdrawal only reaches `rulingsRowByKey` via the next poll, and a
+    // bulk-agree press in the same tab can still dismiss the ruling the
+    // operator just pressed Keep on.
+    rulingsSelected.delete(key);
     pollRulings();
   }).catch((err) => {
     restore();
@@ -2245,6 +2262,7 @@ function keepRulingRow(row, li) {
     // not something the operator needs alarmed about.
     if (err && err.status === 404) {
       setFeedback('already withdrawn', false);
+      rulingsSelected.delete(key);
       pollRulings();
       return;
     }
@@ -2515,6 +2533,13 @@ function deliverRulingReply(row, prompt, li) {
   const onDelivered = () => {
     restore();
     setFeedback('recorded ✓', false);
+    // Fifth instance of the review's class, found while closing F6/F7: a
+    // repliable row can ALSO carry a live suggestion (appendSuggestionActions
+    // renders regardless of canReply), so it can be bulk-selected and then
+    // answered via reply/option press instead of Agree. That answers the
+    // decision just as terminally as Agree does, so the same
+    // selection-clearing is owed here.
+    rulingsSelected.delete(key);
     pollRulings();
     refreshBadge();
   };
@@ -2532,6 +2557,10 @@ function deliverRulingReply(row, prompt, li) {
   // reappearing, until the retry succeeds and releases it below.
   const makePartialFailureHandler = (label) => (err, retryRun) => {
     restore();
+    // The comment (the answer) already succeeded by the time this fires —
+    // only the run failed to start/resume — so the answer is already
+    // durable, same reasoning as `onDelivered` above.
+    rulingsSelected.delete(key);
     preservedRulingRows.set(key, li);
     setFeedback(`Recorded. Could not ${label}: ${err.message}. `, true);
     if (feedback) {
@@ -3532,7 +3561,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.
-    issueDismissRequest, agreeRulingRow, keepRulingRow, rulingRowControls,
+    // dismissRulingRow (LIN-2225, pre-existing) is exposed alongside them so
+    // the review's third open selection-clearing instance is directly
+    // testable, not just inferred from Agree/Keep's coverage.
+    issueDismissRequest, agreeRulingRow, keepRulingRow, dismissRulingRow, rulingRowControls,
     // Review F2: rulingsSettled is exposed below (shared with LIN-2444
     // Phase 5's own export block) so the settled-state regression pins the
     // same seam both the single-click and bulk fixes read/write.
