@@ -227,6 +227,28 @@ describe('public/scan.js — retire action (LIN-2650 WS4)', () => {
     assert.doesNotMatch(container.innerHTML, /scan-outcome-self-resolved/);
     assert.match(container.innerHTML, new RegExp(attrOf(RETIRE_SEL)), 'back to the interactive view — nothing was touched');
   });
+
+  // LIN-2650 review F3: lib/http-keepalive.js commits HTTP 200 once its 25s
+  // flush fires, then carries a real failure as a `statusCode` field INSIDE
+  // that 200 body. window.api only throws on `!response.ok`, so a flushed
+  // error body resolves normally — before the fix, runRetire's `result &&
+  // result.retired` check read this as falsy and silently restored the
+  // prior view, exactly as if nothing were wrong. This reproduces the
+  // reviewer's by-hand repro as a real, permanent test.
+  test('a keepalive-flushed error body (statusCode present) surfaces as an error, not a silent no-op', async () => {
+    const { ScanSection } = loadScanSection({
+      responder: (url, method) => (method === 'POST'
+        ? { error: 'This ruling no longer exists — it may have been pruned or superseded by a newer scan', code: 'ROW_GONE', statusCode: 404 }
+        : unansweredDecision())
+    });
+    const container = makeContainer();
+    await ScanSection.init(container, OPTS);
+    await container.click(RETIRE_SEL);
+
+    assert.match(container.innerHTML, /scan-error/, 'the flushed failure must render as an error, not a quiet restore');
+    assert.match(container.innerHTML, /This ruling no longer exists/);
+    assert.doesNotMatch(container.innerHTML, new RegExp(attrOf(RETIRE_SEL)), 'not simply restored to the interactive view');
+  });
 });
 
 describe('public/scan.js — un-retire action (LIN-2650 WS4)', () => {
@@ -240,6 +262,22 @@ describe('public/scan.js — un-retire action (LIN-2650 WS4)', () => {
 
     assert.equal(confirmCalls.length, 1);
     assert.match(confirmCalls[0], /does not undo whatever caused it to self-resolve/);
+  });
+
+  // LIN-2650 review F1 (required change): LIN-2241 criterion 5's
+  // backstop-not-guarantee disclaimer must appear on both retire's AND
+  // un-retire's confirmation copy — the restored ruling still comes from an
+  // LLM judgement, even though the un-retire write itself is deterministic.
+  test('confirm() also carries the backstop-not-guarantee disclaimer, attached to the restored scan judgement', async () => {
+    const { ScanSection, confirmCalls } = loadScanSection({
+      responder: (url, method) => (method === 'POST' ? { status: 'fresh', ...unansweredDecision() } : selfResolvedRow())
+    });
+    const container = makeContainer();
+    await ScanSection.init(container, OPTS);
+    await container.click(UNRETIRE_SEL);
+
+    assert.equal(confirmCalls.length, 1);
+    assert.match(confirmCalls[0], /backstop, not a guarantee/);
   });
 
   test('a successful un-retire returns to the interactive answer/dismiss/retire view', async () => {
@@ -257,5 +295,23 @@ describe('public/scan.js — un-retire action (LIN-2650 WS4)', () => {
     assert.doesNotMatch(container.innerHTML, /scan-outcome-self-resolved/);
     assert.match(container.innerHTML, new RegExp(attrOf(RETIRE_SEL)));
     assert.match(container.innerHTML, new RegExp(attrOf(DISMISS_SEL)));
+  });
+
+  // LIN-2650 review F3, for symmetry with retire's own case above:
+  // runUnretire had no branch on the result shape at all, so a flushed
+  // error body would have rendered straight through as if it were a real
+  // restored record.
+  test('a keepalive-flushed error body (statusCode present) surfaces as an error, not a bogus render', async () => {
+    const { ScanSection } = loadScanSection({
+      responder: (url, method) => (method === 'POST'
+        ? { error: 'This ruling is not currently self-resolved and cannot be un-retired', code: 'NOT_SELF_RESOLVED', statusCode: 409 }
+        : selfResolvedRow())
+    });
+    const container = makeContainer();
+    await ScanSection.init(container, OPTS);
+    await container.click(UNRETIRE_SEL);
+
+    assert.match(container.innerHTML, /scan-error/, 'the flushed failure must render as an error');
+    assert.match(container.innerHTML, /not currently self-resolved/);
   });
 });

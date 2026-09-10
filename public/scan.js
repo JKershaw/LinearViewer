@@ -118,7 +118,13 @@
   // change and a grep target a test can assert against. Both carry the
   // ticket's backstop-not-guarantee disclaimer, required on both actions.
   const RETIRE_CONFIRM_TEXT = 'Retire this ruling? Harbour will re-check the task right now and only retire it if that check finds nothing pending — this is a backstop, not a guarantee. An uncertain or failed check leaves the ruling exactly as it is.';
-  const UNRETIRE_CONFIRM_TEXT = 'Un-retire this ruling? It returns to your queue as unanswered. This does not undo whatever caused it to self-resolve — check the task yourself before acting on it again.';
+  // LIN-2650 review F1 (required change, not a unilateral rewrite): un-retire
+  // performs no LLM judgement of its own, but the ruling it restores to the
+  // queue DOES — LIN-2241 criterion 5's backstop-not-guarantee disclaimer
+  // attaches to that scan judgement, not to the un-retire write itself, so
+  // the middle clause below names the judgement explicitly rather than
+  // disclaiming the deterministic action performing it.
+  const UNRETIRE_CONFIRM_TEXT = 'Un-retire this ruling? It returns to your queue as unanswered. Harbour is not re-checking anything now, and scan rulings come from an LLM judgement that is a backstop, not a guarantee. This does not undo whatever caused it to self-resolve — check the task yourself before acting on it again.';
 
   function actionButton(action, label) {
     return `<button type="button" class="scan-action" data-scan-action="${esc(action)}">${label}</button>`;
@@ -389,6 +395,17 @@
     try {
       const identifier = data.issueId || ctx.identifier;
       const result = await postRetire(ctx.urlKey, identifier, ctx.source, data.id);
+      // LIN-2650 review F3: a keepalive-flushed error (lib/http-keepalive.js)
+      // commits HTTP 200 before the real status is known, then carries the
+      // failure as a `statusCode` field inside that 200 body — `window.api`
+      // throws only on `!response.ok`, so this is otherwise silently treated
+      // as a healthy response. Same presence-check convention as
+      // public/observation.js's `classifyBulkScanResult` (:2806). A healthy
+      // retire body is never `retired: true` AND `statusCode`-bearing, so
+      // this must be checked before the `retired` branch below.
+      if (result && Object.prototype.hasOwnProperty.call(result, 'statusCode')) {
+        throw new Error(result.error || `Retire failed (${result.statusCode})`);
+      }
       if (result && result.retired) {
         ctx.lastData = result;
         applyState(container, renderFresh(result), 'fresh');
@@ -412,6 +429,12 @@
     try {
       const identifier = (ctx.lastData && ctx.lastData.issueId) || ctx.identifier;
       const data = await postUnretire(ctx.urlKey, identifier, ctx.source, id);
+      // LIN-2650 review F3, for symmetry with runRetire above: un-retire has
+      // no branch on the result shape at all today, so a flushed error body
+      // would otherwise render straight through as if it were a real record.
+      if (data && Object.prototype.hasOwnProperty.call(data, 'statusCode')) {
+        throw new Error(data.error || `Un-retire failed (${data.statusCode})`);
+      }
       ctx.lastData = data;
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
