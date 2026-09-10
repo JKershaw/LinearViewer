@@ -3635,6 +3635,13 @@ describe('GET /api/dashboard/rulings — suggestedDismissal join (LIN-2444)', ()
     for (const row of body.rulings) assert.equal(row.suggestedDismissal, null);
   });
 
+  test('count is unchanged by attaching a suggestion — the join adds a field, never filters a row (LIN-2444 Phase 7)', async () => {
+    const withoutSuggestion = await rulingsFrom([]);
+    const withSuggestion = await rulingsFrom([suggestion()]);
+    assert.equal(withSuggestion.count, withoutSuggestion.count, 'a standing suggestion must not change how many rulings are reported');
+    assert.equal(withSuggestion.rulings.length, withoutSuggestion.rulings.length);
+  });
+
   test('a WITHDRAWN proposal does not reach the surface — Keep means keep', async () => {
     const body = await rulingsFrom([suggestion({ withdrawn: true, withdrawnAt: NOW_ISO })]);
     const row = body.rulings.find(r => r.decision.decision_id === 'shared-id');
