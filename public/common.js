@@ -394,11 +394,16 @@ window.stripCodeBlockWrapper = function(text) {
  * @global
  * @param {string} text            Markdown source
  * @param {Object} [opts]          Passed through to `marked.parse` (e.g. {breaks:true})
+ * @param {boolean} [keepWholeFence] Skip the whole-string fence strip (LIN-2670): a chat
+ *   bubble's contract is the opposite of LIN-421's prompt-packaging one — a whole-answer
+ *   fence there is a deliberate snippet, not packaging around a document, so stripping it
+ *   would let its contents be re-interpreted as Markdown. Additive; falsy default preserves
+ *   every other caller's behaviour unchanged.
  * @returns {string} Sanitized HTML (or escaped text when marked is absent).
  */
-window.renderMarkdown = function(text, opts) {
+window.renderMarkdown = function(text, opts, keepWholeFence) {
   if (!text) return '';
-  const cleaned = window.stripCodeBlockWrapper(text);
+  const cleaned = keepWholeFence ? text : window.stripCodeBlockWrapper(text);
   const html = typeof marked !== 'undefined' ? marked.parse(cleaned, opts) : window.escapeHtml(cleaned);
   return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
 };
