@@ -490,3 +490,78 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     assert.deepEqual(after.body.decision, dismissed.body.decision);
   });
 });
+
+// LIN-2650 WS0 §5a: outcomeReason/outcomeBasisHash on the four EXISTING
+// route-response projections (GET stale/fresh, POST scan, dismiss) —
+// `toRecord` alone does not reach the wire, since none of these four routes
+// spreads the record; each hand-builds its own response object. Seeds a
+// self-resolved row directly via the real store (the retire route that
+// would normally produce one lands in a later beat), then exercises each
+// route the way a self-resolved row is genuinely reachable through it:
+// POST-scan and dismiss both go through unchanged terminal-row/first-stamp-
+// wins guards that return the existing self-resolved row untouched.
+describe('scan routes — outcomeReason/outcomeBasisHash projection (LIN-2650 WS0 §5a)', () => {
+  async function selfResolvedRow() {
+    const scanned = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    await taskDecisionsStore.markOutcome({
+      urlKey: 'test-workspace', issueId: scanned.body.issueId, id: scanned.body.id,
+      outcome: 'self-resolved', outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+    return scanned;
+  }
+
+  test('GET · fresh carries outcomeReason/outcomeBasisHash for a self-resolved row', async () => {
+    await selfResolvedRow();
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.body.status, 'fresh');
+    assert.equal(got.body.outcome, 'self-resolved');
+    assert.equal(got.body.outcomeReason, 'nothing pending');
+    assert.equal(got.body.outcomeBasisHash, 'basis-xyz');
+  });
+
+  test('GET · stale carries outcomeReason/outcomeBasisHash for a self-resolved row whose content has since changed', async () => {
+    const scanned = await selfResolvedRow();
+    const row = collection._docs.find(d => d._id === scanned.body.id);
+    row.inputHash = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.body.status, 'stale');
+    assert.equal(got.body.outcome, 'self-resolved');
+    assert.equal(got.body.outcomeReason, 'nothing pending');
+    assert.equal(got.body.outcomeBasisHash, 'basis-xyz');
+  });
+
+  // Reachable exactly as WS0 item 5a's plan analysis describes: recordScan's
+  // unchanged terminal-row guard (:181) returns the existing self-resolved
+  // row untouched, and this route hands it straight to renderFresh.
+  test('POST scan · a rescan of unchanged content on a self-resolved row carries outcomeReason/outcomeBasisHash', async () => {
+    await selfResolvedRow();
+    const rescanned = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(rescanned.body.outcome, 'self-resolved');
+    assert.equal(rescanned.body.outcomeReason, 'nothing pending');
+    assert.equal(rescanned.body.outcomeBasisHash, 'basis-xyz');
+  });
+
+  // Reachable exactly as WS0 item 5a's plan analysis describes: markOutcome's
+  // unchanged first-stamp-wins guard (:296) returns the existing
+  // self-resolved row untouched when a dismiss races it.
+  test('POST dismiss · a dismiss racing a self-resolved row carries outcomeReason/outcomeBasisHash, not a silently empty reason', async () => {
+    const scanned = await selfResolvedRow();
+    const dismissed = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: scanned.body.id });
+    assert.equal(dismissed.status, 200);
+    assert.equal(dismissed.body.outcome, 'self-resolved', 'first-stamp-wins — the dismiss must not flip an already self-resolved row');
+    assert.equal(dismissed.body.outcomeReason, 'nothing pending');
+    assert.equal(dismissed.body.outcomeBasisHash, 'basis-xyz');
+  });
+
+  test('a fixture with outcomeReason/outcomeBasisHash absent (an ordinary dismissed row) returns null for both at every site, not undefined', async () => {
+    const scanned = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    const dismissed = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: scanned.body.id });
+    assert.equal(dismissed.body.outcomeReason, null);
+    assert.equal(dismissed.body.outcomeBasisHash, null);
+
+    const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+    assert.equal(got.body.outcomeReason, null);
+    assert.equal(got.body.outcomeBasisHash, null);
+  });
+});

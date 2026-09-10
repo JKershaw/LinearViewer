@@ -2398,6 +2398,8 @@ ${goal}`
           scannedAt: cached.scannedAt,
           outcome: cached.outcome,
           outcomeAt: cached.outcomeAt,
+          outcomeReason: cached.outcomeReason ?? null,
+          outcomeBasisHash: cached.outcomeBasisHash ?? null,
           basisChanged
         });
       }
@@ -2409,6 +2411,8 @@ ${goal}`
         scannedAt: cached.scannedAt,
         outcome: cached.outcome,
         outcomeAt: cached.outcomeAt,
+        outcomeReason: cached.outcomeReason ?? null,
+        outcomeBasisHash: cached.outcomeBasisHash ?? null,
         basisChanged
       });
     } catch (error) {
@@ -2600,6 +2604,8 @@ ${goal}`
         scannedAt: record.scannedAt,
         outcome: record.outcome,
         outcomeAt: record.outcomeAt,
+        outcomeReason: record.outcomeReason ?? null,
+        outcomeBasisHash: record.outcomeBasisHash ?? null,
         model: modelUsed
       });
     } catch (error) {
@@ -2700,6 +2706,8 @@ ${goal}`
         decision: record.decision,
         outcome: record.outcome,
         outcomeAt: record.outcomeAt,
+        outcomeReason: record.outcomeReason ?? null,
+        outcomeBasisHash: record.outcomeBasisHash ?? null,
         scannedAt: record.scannedAt
       });
     } catch (error) {
