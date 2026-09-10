@@ -2054,6 +2054,12 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
     const panel = li.querySelector('.obs-ruling-shelve-panel');
     if (panel) panel.remove();
     setFeedback('shelved', false);
+    // Review F8: same class as Dismiss/Agree/Keep/reply — a shelved row still
+    // carries `suggestedDismissal` (shelving doesn't withdraw the
+    // suggestion), so `rulingsRowByKey` keeps it live and a same-tab
+    // bulk-agree would otherwise re-dismiss a ruling the operator just
+    // deferred with a re-surface timer.
+    rulingsSelected.delete(key);
     pollRulings();
     refreshBadge();
   }).catch((err) => {
@@ -3563,8 +3569,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // control-disable set — each unit-testable without simulating a DOM click.
     // dismissRulingRow (LIN-2225, pre-existing) is exposed alongside them so
     // the review's third open selection-clearing instance is directly
-    // testable, not just inferred from Agree/Keep's coverage.
-    issueDismissRequest, agreeRulingRow, keepRulingRow, dismissRulingRow, rulingRowControls,
+    // testable, not just inferred from Agree/Keep's coverage. shelveRulingRow
+    // is exposed the same way (review F8, `0708a260`) — the sixth instance
+    // of the class, found in the round-3 review.
+    issueDismissRequest, agreeRulingRow, keepRulingRow, dismissRulingRow, shelveRulingRow, rulingRowControls,
     // Review F2: rulingsSettled is exposed below (shared with LIN-2444
     // Phase 5's own export block) so the settled-state regression pins the
     // same seam both the single-click and bulk fixes read/write.

@@ -1173,6 +1173,63 @@ describe('dismissRulingRow selection-clearing (LIN-2444 review — third open in
   });
 });
 
+// ─── Third review (LIN-2444, `0708a260`) — F8: sixth open instance ────────
+//
+// shelveRulingRow belongs to the class by the same reasoning Dismiss did:
+// shelving does not withdraw the suggestion (`suggestedDismissal` stays
+// set), so `rulingsRowByKey` still holds the row as live and a same-tab
+// bulk-agree can dismiss a ruling the operator just deferred with a
+// re-surface timer (LIN-1727: no silent muting).
+describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open instance)', () => {
+  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+
+  test('a successful Shelve clears the row from rulingsSelected at the moment of success', async () => {
+    const { module } = makeSandbox({ api: async () => ({ success: true }) });
+    const { shelveRulingRow, rulingsSelected, rulingKey } = module.exports;
+    const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    rulingsSelected.add(key);
+
+    shelveRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(rulingsSelected.has(key), false, 'a shelved row must not survive selection into the next bulk-agree batch');
+  });
+
+  test('a same-tab bulk-agree press after Shelve does not dismiss the shelved row', async () => {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const posted = { shelve: [], dismiss: [] };
+    const api = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      if (url.includes('/shelve')) { posted.shelve.push(body.decisionId); return { success: true }; }
+      posted.dismiss.push(body.decisionId);
+      return { success: true };
+    };
+    const { module } = makeSandbox({ api, elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, shelveRulingRow, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const shelved = makeRow({ suggestedDismissal: SUGGESTION });
+    const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
+    renderRulings([shelved, other]);
+    const li = list.children[0];
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-gone-1'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-other'), true);
+
+    shelveRulingRow(shelved, li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    assert.deepEqual(posted.shelve, ['d-gone-1']);
+
+    // NO poll has landed yet — rulingsRowByKey still holds the pre-shelve row,
+    // exactly the window the review's PROBE reproduced.
+    await bulkAgreeSelected();
+
+    assert.deepEqual(posted.dismiss, ['d-other'], 'the shelved ruling must never be dismissed by a same-tab bulk press');
+  });
+});
+
 // ─── Second review (LIN-2444) — fifth instance, found closing F6/F7 ────────
 //
 // appendSuggestionActions renders Agree/Keep on a suggested row REGARDLESS
@@ -1716,5 +1773,74 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     await bulkAgreeSelected();
 
     assert.deepEqual(calls, [], 'bulkAgreeRow must independently refuse a row with no live suggestedDismissal');
+  });
+});
+
+// ─── The selection-clearing INVARIANT, not just its six known instances ───
+//
+// Three review rounds each closed the *named* instances and a new one kept
+// turning up (F1/F2 → F6/F7/Dismiss/deliverRulingReply → F8/shelve). Rather
+// than trust the next reader to re-derive "every terminal rulings-row
+// action" by eye again, this pins the REPRODUCIBLE QUERY that enumeration
+// was built from (the LIN-1873 cited-sweep convention this repo already
+// uses for a class check): every per-row write handler in this file marks
+// itself in flight via the established `rulingsPending.add(key)` idiom
+// before issuing its request — that is how the pending-guard/disable/
+// restore dance every one of them needs is written, not a convention
+// invented for this test. So a source-level query is a genuine population
+// enumeration, not an approximation of one: for every TOP-LEVEL function in
+// public/observation.js whose body contains `rulingsPending.add(key)`,
+// its body must also contain `rulingsSelected.delete(key)` — the fix every
+// prior instance got.
+//
+// This is deliberately NOT a `settleRulingSelection(key)` shared-funnel
+// refactor. Six independently-reviewed, CI-green verbs (three review
+// rounds deep, one review left per John's ceiling) would all need touching
+// to route through a new helper — real risk to working code for a
+// cosmetic win, exactly what the ticket's own instructions warn against
+// this late. The cheaper thing that still genuinely holds: a future verb
+// that follows the SAME idiom every current one does (guard-in-flight via
+// `rulingsPending.add(key)`, disable controls, issue the request) trips
+// this test the moment it's added, before it ever reaches review — because
+// the query re-runs over the CURRENT source, not a hard-coded list of six
+// names. The one gap this doesn't close: a new verb that skips the
+// `rulingsPending.add(key)` idiom entirely bypasses the query — every
+// verb on this surface uses it today (there is no other way instances get
+// their controls disabled while in flight), so a verb author would have to
+// deliberately diverge from the file's own established pattern to evade
+// this, not merely omit one line.
+describe('the rulings selection-clearing invariant (LIN-2444 review — closing the enumeration itself)', () => {
+  test('every top-level function that guards itself via rulingsPending.add(key) also clears rulingsSelected.delete(key) on success', () => {
+    const lines = OBSERVATION_JS_SRC.split('\n');
+    const starts = [];
+    const fnHeaderRe = /^(async )?function (\w+)\(/;
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(fnHeaderRe);
+      if (m) starts.push({ line: i, name: m[2] });
+    }
+    assert.ok(starts.length > 0, 'sanity: the source must contain top-level function declarations for this query to mean anything');
+
+    const guardedWithoutClear = [];
+    const guardedFns = [];
+    for (let idx = 0; idx < starts.length; idx++) {
+      const { line: start, name } = starts[idx];
+      const end = idx + 1 < starts.length ? starts[idx + 1].line : lines.length;
+      const body = lines.slice(start, end).join('\n');
+      if (body.includes('rulingsPending.add(key)')) {
+        guardedFns.push(name);
+        if (!body.includes('rulingsSelected.delete(key)')) guardedWithoutClear.push(name);
+      }
+    }
+
+    // The population itself, asserted so a change to the guard idiom (or a
+    // rename) surfaces as a visible test-list change rather than the query
+    // silently enumerating zero functions and the invariant vacuously
+    // "passing".
+    assert.deepEqual(
+      guardedFns.sort(),
+      ['agreeRulingRow', 'bulkAgreeRow', 'deliverRulingReply', 'dismissRulingRow', 'keepRulingRow', 'shelveRulingRow'].sort(),
+      'the enumerated population of per-row rulings write handlers changed — update this list deliberately, or a new/renamed handler slipped past unexamined'
+    );
+    assert.deepEqual(guardedWithoutClear, [], `every rulingsPending.add(key)-guarded handler must also call rulingsSelected.delete(key) on success — missing in: ${guardedWithoutClear.join(', ')}`);
   });
 });
