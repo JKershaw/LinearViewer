@@ -2620,6 +2620,72 @@ describe('pass-4 fleet reads — review-ledger witnesses (LIN-2617)', () => {
     );
   });
 
+  // LIN-2704 review ledger L1 (finding F1). The full-cap fixture ABOVE is 20
+  // LOOP-anchored rows, where both fields LIN-2704 added are at their cheapest:
+  // `anchor.issueId` is null for essentially every autopilot-dispatched loop
+  // (recommend-and-dispatch never resolves a provider id — see the note at
+  // public/flight-companion.js's `gone` branch) and `taskDecisionId` has no
+  // loop-anchor counterpart at all, so both serialize as bare nulls there.
+  //
+  // That is the WRONG class to size the budget on: the row class LIN-2704
+  // exists to enable is the TASK-BOUND one, which carries a real 36-char UUID
+  // in `issueId` AND a real 26-char store id in `taskDecisionId` — the only
+  // rows where the raise is actually spent. Sizing the cap on the loop shape
+  // and asserting the margin in a prose comment is what F1 objected to, so the
+  // task-bound figure is measured HERE, by the suite, instead.
+  test('a full-cap TASK-BOUND payload — the row class LIN-2704 enables — still fits the raised budget', async () => {
+    // Faithful id shapes, not stubs: TaskDecisionsStore's `_id` and the
+    // decision's own `decision_id` are the SAME 26-char value
+    // (`scan_<issueId8>_<inputHash12>` — lib/task-decisions-store.js:26, reused
+    // as decision_id at lib/scan.js:148), and `issueId` is a canonical UUID
+    // because `markOutcome` rejects anything else. Content is the worst case
+    // the field caps admit, matching the loop fixture above.
+    const long = 'x'.repeat(4000);
+    const taskDecisions = Array.from({ length: 25 }, (_, i) => {
+      // Distinct issueIds: collectUnansweredDecisions keeps only the latest row
+      // per (urlKey, issueId), so a shared id would collapse 25 rows into 1.
+      const issueId = `3fa85f64-5717-4562-b3fc-2c963f66af${String(i).padStart(2, '0')}`;
+      const rowId = `scan_${issueId.slice(0, 8)}_${String(i).padStart(2, '0')}c1170e5832`;
+      return {
+        id: rowId, urlKey: URL_KEY, issueId, issueIdentifier: `LIN-27${i}`,
+        scannedAt: T_FLEET_MID, outcome: null,
+        decision: {
+          decision_id: rowId, question: long, recommended: 'o1',
+          options: Array.from({ length: 8 }, (_, j) => ({ id: `o${j}`, label: 'y'.repeat(400) })),
+        },
+      };
+    });
+    const { executeTool } = makeDecisionsCatalog({ history: [], taskDecisions, shelvedRulings: [] });
+
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    const size = JSON.stringify(result).length;
+    const budget = CHAT_TOOL_RESULT_BUDGETS.list_pending_decisions;
+
+    // Structural, as everywhere else in this file: whatever the rows contain,
+    // what reaches the model is valid JSON inside the budget.
+    assert.ok(size <= budget, `task-bound rows serialize to ${size}, over the ${budget} budget`);
+    assert.doesNotThrow(() => JSON.parse(JSON.stringify(result)));
+
+    // THE ledger assertion. Measured at this commit: 19993 bytes against the
+    // 20000 cap — 7 bytes of headroom, i.e. the raise is spent almost exactly
+    // by the task-bound class and NOT the ~6.5% margin a loop-shaped
+    // measurement suggests. If any future field widens a decision row, this
+    // fails rather than silently withholding a pending decision from the one
+    // page whose whole job is "what needs me?" — fitToBudget pops from the
+    // TAIL and the sort is oldest-first, so the row lost is the newest-parked.
+    // A failure here is not "bump the number": it is a prompt to re-derive the
+    // cap from this class and re-record it, the way LIN-2704 had to.
+    assert.strictEqual(
+      result.decisions.length, 20,
+      `all 20 task-bound rows must survive the byte trim; serialized to ${size} against ${budget} `
+      + `(headroom ${budget - size}B). A dropped row means the raised cap no longer covers the row class LIN-2704 enabled.`
+    );
+    // `truncated` is honest here about the ROW CAP (25 pending, 20 returned),
+    // which is the pre-existing limit — not about a byte trim.
+    assert.strictEqual(result.truncated, true);
+    assert.strictEqual(result.count, 25);
+  });
+
   test('noise.terminalOmitted counts what THIS read withheld, never the fleet', async () => {
     const { executeTool } = makeFleetCatalog(fleetHistory());
 
