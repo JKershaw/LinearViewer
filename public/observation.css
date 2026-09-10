@@ -479,6 +479,18 @@
 .obs-ruling-bulk-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
 .obs-ruling-bulk-agree:disabled { opacity: 0.5; cursor: default; }
 
+/* Same 44px-ladder tap-target bump Agree/Keep get above (`.detail-toggle`'s
+   convention, public/style.css) — it is a real tappable action button, same
+   as they are. The select-all affordance needs no bump of its own: it is a
+   <label> wrapping the checkbox, so the whole label — not just the small
+   native checkbox — is already the tap target, the same zero-extra-CSS
+   shape `.obs-bulk-scan-select-all` (Scan-due) relies on. */
+@media (max-width: 640px) {
+  .obs-ruling-bulk-agree {
+    padding: 0.5rem 0.7rem;
+  }
+}
+
 /* At the narrowest phone widths the select-all LABEL collapses to just its
    checkbox — the exact count beside it already carries the same meaning
    more compactly. */
