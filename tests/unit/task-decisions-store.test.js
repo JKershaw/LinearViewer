@@ -451,14 +451,26 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
 
   // LIN-2650 WS0 §3: a 'self-resolved' row joins the SAME unconditionally-exempt
   // bucket as a decision-bearing unanswered row, not bucket 2 (terminal,
-  // evictable) — otherwise reversibility silently expires at the cap. Mirrors
-  // the shape of "an outcome-stamped row survives a capacity prune..." above
-  // (L2), but self-resolved-specifically: that existing test's push count is
-  // absorbed by the zero-finding bucket alone, which is exactly why it does
-  // NOT already cover this — an 'answered'/'dismissed' row and a
-  // 'self-resolved' one now fall into different buckets.
+  // evictable) — otherwise reversibility silently expires at the cap.
+  //
+  // LIN-2650 review F2: an earlier version of this test used maxPerTask: 2
+  // plus three following zero-finding pushes (mirroring the L2 test above).
+  // That push count is fully absorbed by the zero-finding bucket alone
+  // (toEvict === 2, exactly the two non-newest zero-finding rows available),
+  // so the eviction loop's `toEvict <= 0` break always fires before it ever
+  // reaches the self-resolved row's bucket — mutating away the exemption
+  // branch at `_pruneToCapacity` left this test green (0 fails), because the
+  // fixture never drove a prune that actually needed to consult it. Fixed
+  // per the approved plan's own guidance: drive `toEvict` past what the
+  // zero-finding bucket alone can satisfy — maxPerTask: 1 with a single
+  // following scan. The newest-row exemption absorbs that one push on its
+  // own (so the shipped exemption is never exercised by eviction pressure,
+  // and the row survives either way), but with the self-resolved exemption
+  // branch deleted, the self-resolved row itself becomes the only remaining
+  // eviction candidate and toEvict has a target to consume — see the
+  // reproduction recorded in the beat-1 report.
   test('a self-resolved row survives a capacity prune even when pushed past maxPerTask (LIN-2650)', async () => {
-    const capped = new TaskDecisionsStore({ collection, maxPerTask: 2 });
+    const capped = new TaskDecisionsStore({ collection, maxPerTask: 1 });
     await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
     const idSelfResolved = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
     await capped.markOutcome({
@@ -466,16 +478,16 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
       outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
     });
 
-    // Push three more distinct-hash zero-finding scans past the cap — exhausts
-    // bucket 1 entirely (same push shape as the L2 test above).
-    for (const h of ['h1', 'h2', 'h3']) {
-      await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: h.padEnd(64, '0'), decision: null });
-    }
+    // One further zero-finding scan at maxPerTask: 1 — toEvict === 1 with no
+    // zero-finding candidate available (the only zero-finding row is docs[0],
+    // exempt as the newest row), so the self-resolved row is the sole
+    // candidate the eviction loop can reach.
+    await capped.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: 'h1'.padEnd(64, '0'), decision: null });
 
     const rows = collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === ISSUE_ID);
     const ids = rows.map(r => r._id);
     assert.ok(ids.includes(idSelfResolved), 'the self-resolved row must survive the prune');
-    assert.equal(rows.length, 2, 'exempt self-resolved row + whichever single zero-finding row is newest');
+    assert.equal(rows.length, 2, 'exempt self-resolved row + the newest zero-finding row (newest-row exemption)');
 
     const afterRevert = await capped.getStatus(URL_KEY, ISSUE_ID, HASH_A);
     assert.equal(afterRevert.id, idSelfResolved);
@@ -771,6 +783,25 @@ describe('TaskDecisionsStore.reverseOutcome (LIN-2650)', () => {
     assert.equal(reversed.inputHash, before.inputHash);
     assert.deepEqual(reversed.decision, before.decision);
     assert.equal(reversed.scannedAt, before.scannedAt);
+  });
+
+  // LIN-2650 review F5: the ticket's own required round-trip assertion
+  // ("Un-retire restores the row to unanswered and it re-appears in
+  // listUnansweredForWorkspaces") was missing — the reversal tests above
+  // only asserted the cleared fields and a getStatus read-back, never the
+  // bulk rulings-feed read un-retire is supposed to restore the row into.
+  test('a self-resolved row is excluded from listUnansweredForWorkspaces, and reverseOutcome puts it back (LIN-2650)', async () => {
+    const id = await selfResolvedRow();
+
+    const whileRetired = await store.listUnansweredForWorkspaces([URL_KEY]);
+    assert.deepEqual(whileRetired, [], 'a self-resolved row must not appear as an unanswered ruling');
+
+    await store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+
+    const afterReverse = await store.listUnansweredForWorkspaces([URL_KEY]);
+    assert.equal(afterReverse.length, 1, 'the un-retired row must re-enter the unanswered set');
+    assert.equal(afterReverse[0].id, id);
+    assert.equal(afterReverse[0].outcome, null);
   });
 });
 
