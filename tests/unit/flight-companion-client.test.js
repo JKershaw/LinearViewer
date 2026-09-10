@@ -77,10 +77,33 @@ class FakeElement {
     // draws for its own deliberate omission of innerHTML.
     this._innerHTML = null;
     this.value = '';
-    this.disabled = false;
+    // LIN-2718: `disabled` is a getter/setter (not a plain field) so tests can
+    // observe EVERY write, not just the current value — the busy-by-turn-kind
+    // split is a claim about writes that never happen (auto-wake), which a
+    // bare value read can't distinguish from "happened to end up false".
+    // `_ownerDocument`/focus()'s blur-on-disable mirror real browser behavior
+    // (disabling the focused element blurs it) so a regression that captures
+    // "did the input have focus" AFTER locking the composer, instead of
+    // before, fails this fake the same way it would fail in a real browser.
+    this._disabled = false;
+    this._disabledWriteCount = 0;
+    this._focusCallCount = 0;
+    this._ownerDocument = null;
     this.hidden = false;
     this.scrollTop = 0;
     this.scrollHeight = 0;
+  }
+  get disabled() { return this._disabled; }
+  set disabled(v) {
+    this._disabled = v;
+    this._disabledWriteCount += 1;
+    if (v && this._ownerDocument && this._ownerDocument.activeElement === this) {
+      this._ownerDocument.activeElement = null;
+    }
+  }
+  focus() {
+    this._focusCallCount += 1;
+    if (this._ownerDocument) this._ownerDocument.activeElement = this;
   }
   get textContent() { return this._text; }
   set textContent(v) { this._text = v == null ? '' : String(v); this.children = []; }
@@ -120,7 +143,6 @@ class FakeElement {
   setAttribute(name, value) { (this._attrs = this._attrs || {})[name] = String(value); }
   getAttribute(name) { return (this._attrs && this._attrs[name]) ?? null; }
   dispatch(type) { (this._listeners[type] || []).forEach(fn => fn()); }
-  focus() {}
 }
 
 function makeDocument({ hiddenInitial = false } = {}) {
@@ -131,6 +153,13 @@ function makeDocument({ hiddenInitial = false } = {}) {
     get hidden() { return doc._hidden; },
     set hidden(v) { doc._hidden = v; },
     _hidden: hiddenInitial,
+    // LIN-2718: real document.activeElement, read by sendTurn (captured
+    // BEFORE the composer lock, so a regression that reads it after would
+    // see it already cleared by the disabled-setter's blur simulation
+    // above) and written by FakeElement#focus().
+    get activeElement() { return doc._activeElement || null; },
+    set activeElement(v) { doc._activeElement = v; },
+    _activeElement: null,
     getElementById(id) { return byId[id] || null; },
     querySelector(sel) { return sel === '.flight-companion-page' ? page : null; },
     createElement(tag) { return new FakeElement(tag); },
@@ -330,6 +359,10 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   doc._byId['flight-companion-reorient'] = reorientBtn;
   doc._byId['flight-companion-strip-next'] = stripNextEl;
   doc._byId['flight-companion-strip-tab-total'] = stripTabTotalEl;
+  // LIN-2718: only the composer's own input is ever focused/blurred by this
+  // module — wiring the owner document lets FakeElement#focus() and the
+  // `disabled` setter's blur-on-disable simulate real activeElement changes.
+  questionInput._ownerDocument = doc;
 
   const chatUI = makeChatUI(doc);
   const fetchSpy = makeFetchSpy(fetchImpl || (() => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' })));
@@ -843,6 +876,113 @@ describe('flight-companion.js — single-flight guard (client overlap)', () => {
     assert.strictEqual(fetchCalls.length, 1, 'no overlapping auto-wake request while the user turn is in flight');
 
     resolveUserFetch(sseResponse([sseFrame('done', {})]));
+    await flush();
+  });
+});
+
+describe('flight-companion.js — LIN-2718: composer busy/focus split by turn kind', () => {
+  test('a user-initiated turn locks the composer while streaming, and releases it on completion', async () => {
+    let resolveFetch;
+    const { exports: m, questionInput, sendBtn, startBtn, reorientBtn } = loadClient({
+      fetchImpl: () => new Promise((resolve) => { resolveFetch = resolve; }),
+    });
+    questionInput.value = 'hello';
+    m.submitQuestion();
+    assert.strictEqual(questionInput.disabled, true, 'the composer locks synchronously, before the fetch even resolves');
+    assert.strictEqual(sendBtn.disabled, true);
+    assert.strictEqual(startBtn.disabled, true);
+    assert.strictEqual(reorientBtn.disabled, true);
+    await flush(); // let the fetch spy's deferred responder assign resolveFetch
+
+    resolveFetch(sseResponse([sseFrame('done', {})]));
+    await flush();
+    assert.strictEqual(questionInput.disabled, false, 'released once the user turn completes');
+    assert.strictEqual(sendBtn.disabled, false);
+  });
+
+  test('a boot turn locks and releases the composer, but never restores focus on completion', async () => {
+    const { exports: m, doc, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    doc.activeElement = questionInput;
+    m.startBoot();
+    assert.strictEqual(questionInput.disabled, true, 'a boot turn locks the composer, same as a user-initiated one');
+    await flush();
+    assert.strictEqual(questionInput.disabled, false, 'released once the boot turn completes');
+    assert.strictEqual(questionInput._focusCallCount, 0, 'a boot never restores focus, even though the input held it at turn start');
+  });
+
+  test('an auto-wake turn never touches the composer\'s disabled state, on a clean silent done', async () => {
+    const { exports: m, questionInput, sendBtn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { surface: true })]),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(questionInput.disabled, false, 'no lock on the way in');
+    assert.strictEqual(questionInput._disabledWriteCount, 0, 'no write to .disabled at all — not true, not even a no-op false');
+    await flush();
+    assert.strictEqual(questionInput.disabled, false, 'no lock on the way out either');
+    assert.strictEqual(questionInput._disabledWriteCount, 0);
+    assert.strictEqual(sendBtn._disabledWriteCount, 0, 'the same holds for every element setComposerBusy would otherwise touch');
+  });
+
+  test('an auto-wake turn never touches the composer\'s disabled state on a mid-stream SSE error', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('error', { message: 'boom' })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(questionInput._disabledWriteCount, 0);
+    assert.strictEqual(questionInput.disabled, false);
+  });
+
+  test('an auto-wake turn never touches the composer\'s disabled state on a network failure', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => Promise.reject(new Error('network down')),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(questionInput._disabledWriteCount, 0);
+    assert.strictEqual(questionInput.disabled, false);
+  });
+
+  test('focus is restored after a user-initiated turn when the input held focus at turn start', async () => {
+    const { exports: m, doc, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    doc.activeElement = questionInput;
+    questionInput.value = 'hello';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(doc.activeElement, questionInput, 'focus restored: the input had it when the turn began');
+    assert.strictEqual(questionInput._focusCallCount, 1);
+  });
+
+  test('focus is NOT restored after a user-initiated turn when the input did not hold focus at turn start', async () => {
+    const { exports: m, doc, questionInput, sendBtn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    doc.activeElement = sendBtn; // something else had focus (e.g. the Send button, on click)
+    questionInput.value = 'hello';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(questionInput._focusCallCount, 0, 'must not steal focus onto the input if it did not already have it');
+  });
+
+  test('the inFlight guard still rejects a second concurrent turn during an in-flight auto-wake tick, even though the composer is left enabled', async () => {
+    let resolveFetch;
+    const { exports: m, fetchCalls, questionInput } = loadClient({
+      fetchImpl: () => new Promise((resolve) => { resolveFetch = resolve; }),
+    });
+    m.autoWakeTick();
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(questionInput.disabled, false, 'exclusion must not be expressed by disabling the input');
+
+    questionInput.value = 'a message typed during the tick';
+    m.submitQuestion();
+    assert.strictEqual(fetchCalls.length, 1, 'inFlight rejects the concurrent user submit before it ever reaches fetch');
+
+    await flush(); // let the fetch spy's deferred responder assign resolveFetch
+    resolveFetch(sseResponse([sseFrame('done', {})]));
     await flush();
   });
 });
