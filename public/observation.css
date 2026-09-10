@@ -349,6 +349,16 @@
   color: var(--muted);
   margin: 0;
 }
+/* Selection checkbox + label row (LIN-2444 Phase 5) — the checkbox itself
+   needs no rule of its own, same as .obs-due-select needs none; only the
+   row it sits in does. */
+.obs-ruling-suggestion-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.2rem;
+}
+.obs-ruling-suggestion-head .obs-ruling-suggestion-label { margin: 0; }
 
 /* Free-text answer + dismiss (LIN-2225). Mirrors .sess-inline-reply-input /
    .sess-inline-reply-actions (session.css) — same textarea + action-row shape,
@@ -431,6 +441,49 @@
   .obs-ruling-keep {
     padding: 0.5rem 0.7rem;
   }
+}
+
+/* Bulk-agree bar (LIN-2444 Phase 5) — select-all-suggested + exact count +
+   Agree selected, inline above the feed. Own .obs-ruling-bulk-* names with
+   REAL rules: LIN-2711 found the Scan-due bulk bar's nine class names ship
+   with zero CSS between them, and reusing those names would inherit that
+   gap along with the unstyled controls. Same flex/wrap/margin idiom as
+   .obs-bulk-scan-bar (base rules ARE the phone form, per this file's own
+   mobile-first convention — the file's one width query is a desktop
+   enhancement, never a rewrite). */
+.obs-ruling-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.6rem;
+}
+.obs-ruling-bulk-bar[hidden] { display: none; }
+.obs-ruling-bulk-select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.obs-ruling-bulk-count {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.obs-ruling-bulk-agree {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.obs-ruling-bulk-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
+.obs-ruling-bulk-agree:disabled { opacity: 0.5; cursor: default; }
+
+/* At the narrowest phone widths the select-all LABEL collapses to just its
+   checkbox — the exact count beside it already carries the same meaning
+   more compactly. */
+@media (max-width: 400px) {
+  .obs-ruling-bulk-select-all-text { display: none; }
 }
 
 .obs-ruling-shelve-panel {

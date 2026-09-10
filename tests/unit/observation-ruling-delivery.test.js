@@ -153,9 +153,17 @@ function makeLi({ withFeedback = true } = {}) {
 // promise chain — `observationData` stays null in every sandbox (it is
 // never set here), so `pollRulings()`/`refreshBadge()` no-op safely off
 // `observationData?.urlKey` being undefined, needing no stub of their own.
-function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements = {} }) {
+function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements = {}, confirm: confirmImpl } = {}) {
   const sandbox = {
     module: { exports: {} },
+    // observation.js calls the bare global `confirm(...)` (LIN-511's
+    // ratified destructive-action primitive — public/scan.js's own
+    // RETIRE_CONFIRM_TEXT precedent), not `window.confirm` — the vm
+    // sandbox's free-variable lookup resolves that against the CONTEXT
+    // object itself (tests/unit/scan-retire-ui.test.js's same note), so
+    // `confirm` is stubbed at the top level, a sibling of `window`. Defaults
+    // to accepting, since most tests here aren't exercising the gate itself.
+    confirm: confirmImpl || (() => true),
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
@@ -1099,5 +1107,300 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
     const li = list.children[0];
     assert.equal(li.querySelector('.obs-ruling-agree'), null);
     assert.equal(li.querySelector('.obs-ruling-keep'), null);
+  });
+});
+
+// ─── Bulk-agree (LIN-2444 Phase 5) ───────────────────────────────────────────
+//
+// Selection is a module Set keyed rulingKey(urlKey, decisionId) — never a
+// bare issueId or checkbox DOM state, since renderRulings can rebuild the
+// <li> on every poll (the comment atop public/observation.js). Bulk-agree
+// drives the SAME issueDismissRequest core Agree/Dismiss already share,
+// sequentially, gated by a native confirm(). A succeeded key is deleted
+// from the selection Set at the moment of success and marked settled, so
+// the row stays REUSED with its controls disabled for as long as the stale
+// feed cache keeps serving it — the plan-review finding: without this, a
+// second bulk-agree inside that window would re-POST a duplicate
+// decision-answer (markDecisionAnswered's unconditional $push has no
+// idempotence guard on the loop-backed branch).
+describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
+  function makeBulkSandbox({ api, confirm } = {}) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const bar = new FakeElement('div');
+    const selectAll = new FakeElement('input');
+    const countEl = new FakeElement('span');
+    const agreeBtn = new FakeElement('button');
+    const sandbox = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      api,
+      confirm,
+      elements: {
+        'obs-rulings': list,
+        'obs-rulings-empty': empty,
+        'obs-ruling-bulk-bar': bar,
+        'obs-ruling-select-all': selectAll,
+        'obs-ruling-selected-count': countEl,
+        'obs-ruling-agree-selected': agreeBtn
+      }
+    });
+    return { sandbox, module: sandbox.module, list, bar, selectAll, countEl, agreeBtn };
+  }
+
+  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+
+  function suggestedRow(overrides = {}) {
+    return makeRow({ suggestedDismissal: SUGGESTION, ...overrides });
+  }
+
+  test('a checkbox renders only on a suggested row', () => {
+    const { module, list } = makeBulkSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ suggestedDismissal: null })]);
+    const li = list.children[0];
+    assert.equal(li.querySelector('.obs-ruling-select'), null);
+  });
+
+  test('selection survives a repaint — the checkbox reflects rulingsSelected, never its own prior DOM state', () => {
+    const { module, list } = makeBulkSandbox();
+    const { renderRulings, toggleRulingSelection, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+
+    renderRulings([suggestedRow()]);
+    const firstLi = list.children[0];
+    toggleRulingSelection(key, true);
+
+    // Simulate the next 5s poll landing with the SAME row — an ordinary
+    // repaint (not pending/settled/preserved), so the <li> is REBUILT.
+    renderRulings([suggestedRow()]);
+    const secondLi = list.children[0];
+
+    assert.notEqual(secondLi, firstLi, 'an ordinary repaint rebuilds the row fresh');
+    const checkbox = secondLi.querySelector('.obs-ruling-select');
+    assert.ok(checkbox, 'expected a selection checkbox on a suggested row');
+    assert.equal(checkbox.checked, true, 'the rebuilt checkbox must restore checked state from rulingsSelected, not default to unchecked');
+  });
+
+  test('setAllRulingsSelected selects only currently-rendered suggested rows', () => {
+    const { module } = makeBulkSandbox();
+    const { renderRulings, setAllRulingsSelected, rulingsSelected, rulingKey } = module.exports;
+
+    const suggested = suggestedRow({ decision: { decision_id: 'd-suggested' } });
+    const plain = makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-plain' } });
+    renderRulings([suggested, plain]);
+
+    setAllRulingsSelected(true);
+
+    assert.ok(rulingsSelected.has(rulingKey('the-ruling-workspace', 'd-suggested')));
+    assert.equal(rulingsSelected.has(rulingKey('the-ruling-workspace', 'd-plain')), false, 'a row with no suggestion must never be selectable');
+    assert.equal(rulingsSelected.size, 1);
+  });
+
+  test('bulk-agree acts only on selected suggested rows — an unselected suggested row is left untouched', async () => {
+    const calls = [];
+    const { module } = makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
+    const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
+    renderRulings([rowA, rowB]);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-a'), true);
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(calls, ['d-a'], 'only the selected row must be agreed');
+  });
+
+  test('the confirm() gate is honoured — cancelling sends no request and leaves the selection untouched', async () => {
+    let apiCalled = false;
+    const confirmCalls = [];
+    const { module } = makeBulkSandbox({
+      api: async () => { apiCalled = true; return { success: true }; },
+      confirm: (msg) => { confirmCalls.push(msg); return false; }
+    });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+
+    renderRulings([suggestedRow()]);
+    toggleRulingSelection(key, true);
+
+    await bulkAgreeSelected();
+
+    assert.equal(apiCalled, false, 'declining the confirm() dialog must send no request');
+    assert.equal(confirmCalls.length, 1);
+    assert.match(confirmCalls[0], /1 selected suggestion/);
+    assert.ok(rulingsSelected.has(key), 'the selection must survive a decline');
+  });
+
+  test('an empty selection is a no-op — no confirm(), no request', async () => {
+    let confirmCalled = false;
+    let apiCalled = false;
+    const { module } = makeBulkSandbox({
+      api: async () => { apiCalled = true; return { success: true }; },
+      confirm: () => { confirmCalled = true; return true; }
+    });
+    const { bulkAgreeSelected } = module.exports;
+
+    await bulkAgreeSelected();
+
+    assert.equal(confirmCalled, false);
+    assert.equal(apiCalled, false);
+  });
+
+  test('a succeeded key is deleted from the selection Set at the moment of success', async () => {
+    const { module } = makeBulkSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingsSettled, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+
+    renderRulings([suggestedRow()]);
+    toggleRulingSelection(key, true);
+
+    await bulkAgreeSelected();
+
+    assert.equal(rulingsSelected.has(key), false);
+    assert.ok(rulingsSettled.has(key), 'a succeeded key must be marked settled');
+  });
+
+  test('a mid-batch failure leaves later rows still processed, and the failed row stays selected', async () => {
+    const calls = [];
+    const { module } = makeBulkSandbox({
+      api: async (url, opts) => {
+        const { decisionId } = JSON.parse(opts.body);
+        calls.push(decisionId);
+        if (decisionId === 'd-b') throw new Error('boom');
+        return { success: true };
+      }
+    });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+
+    const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
+    const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
+    const rowC = suggestedRow({ decision: { decision_id: 'd-c' } });
+    renderRulings([rowA, rowB, rowC]);
+    const keyA = rulingKey('the-ruling-workspace', 'd-a');
+    const keyB = rulingKey('the-ruling-workspace', 'd-b');
+    const keyC = rulingKey('the-ruling-workspace', 'd-c');
+    [keyA, keyB, keyC].forEach((k) => toggleRulingSelection(k, true));
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(calls, ['d-a', 'd-b', 'd-c'], 'the loop must continue past a mid-batch failure');
+    assert.equal(rulingsSelected.has(keyA), false, 'the succeeded row before the failure is deselected');
+    assert.ok(rulingsSelected.has(keyB), 'the FAILED row must stay selected — recoverable, retryable');
+    assert.equal(rulingsSelected.has(keyC), false, 'the succeeded row after the failure is deselected too — the loop did not stop');
+  });
+
+  test('a second bulk-agree inside the stale window does not re-POST a succeeded row (plan-review finding)', async () => {
+    let apiCalls = 0;
+    const { module } = makeBulkSandbox({ api: async () => { apiCalls++; return { success: true }; } });
+    const { renderRulings, toggleRulingSelection, setAllRulingsSelected, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const row = suggestedRow();
+
+    renderRulings([row]);
+    toggleRulingSelection(key, true);
+    await bulkAgreeSelected();
+    assert.equal(apiCalls, 1);
+
+    // The stale feed cache still serves the SAME row, suggestion intact, on
+    // the next poll — exactly the loop-backed window this phase exists for.
+    renderRulings([row]);
+
+    // A direct re-select attempt must be refused outright.
+    toggleRulingSelection(key, true);
+    assert.equal(rulingsSelected.has(key), false, 'a settled key must refuse re-selection');
+
+    // select-all-suggested must not sweep it back in either.
+    setAllRulingsSelected(true);
+    assert.equal(rulingsSelected.has(key), false);
+
+    await bulkAgreeSelected();
+    assert.equal(apiCalls, 1, 'a second bulk-agree must not re-POST an already-succeeded row');
+  });
+
+  test('a settled row is REUSED (not rebuilt) with its controls still disabled, until it finally leaves the payload', async () => {
+    const { module, list } = makeBulkSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const row = suggestedRow();
+
+    renderRulings([row]);
+    toggleRulingSelection(key, true);
+    await bulkAgreeSelected();
+    const settledLi = list.children[0];
+    const checkbox = settledLi.querySelector('.obs-ruling-select');
+    assert.equal(checkbox.disabled, true, 'a settled row keeps its controls disabled after success');
+    assert.equal(checkbox.checked, false, 'the checkbox itself is explicitly unchecked on success');
+
+    // Stale cache still serves it — must be the SAME node, still disabled.
+    renderRulings([row]);
+    assert.equal(list.children[0], settledLi, 'a settled row must be REUSED, not rebuilt re-armed');
+    assert.equal(list.children[0].querySelector('.obs-ruling-select').disabled, true);
+
+    // The row finally leaves the payload for real.
+    renderRulings([]);
+    // A later re-suggestion (or the same one, re-raised) starts fully re-armed.
+    renderRulings([row]);
+    const rebuiltLi = list.children[0];
+    assert.notEqual(rebuiltLi, settledLi, 'once truly absent, the settled mark releases and a later row is rebuilt fresh');
+    assert.equal(rebuiltLi.querySelector('.obs-ruling-select').disabled, false);
+  });
+
+  test('exactly one pollRulings() and one badge refresh per batch, never one per row', async () => {
+    const { sandbox, module } = makeBulkSandbox({ api: async () => ({ success: true }) });
+    let pollCalls = 0;
+    sandbox.pollRulings = () => { pollCalls++; };
+    let badgeCalls = 0;
+    sandbox.refreshRulingsBadge = () => { badgeCalls++; };
+
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
+    const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
+    const rowC = suggestedRow({ decision: { decision_id: 'd-c' } });
+    renderRulings([rowA, rowB, rowC]);
+    [
+      rulingKey('the-ruling-workspace', 'd-a'),
+      rulingKey('the-ruling-workspace', 'd-b'),
+      rulingKey('the-ruling-workspace', 'd-c')
+    ].forEach((k) => toggleRulingSelection(k, true));
+
+    await bulkAgreeSelected();
+
+    assert.equal(pollCalls, 1, 'exactly one pollRulings() for the whole batch');
+    assert.equal(badgeCalls, 1, 'exactly one badge refresh for the whole batch');
+  });
+
+  test('the bulk bar\'s Agree-selected label and select-all tri-state track the selection', () => {
+    const { module, agreeBtn, selectAll, bar } = makeBulkSandbox();
+    const { renderRulings, toggleRulingSelection, rulingKey } = module.exports;
+
+    const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
+    const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
+    renderRulings([rowA, rowB]);
+
+    assert.equal(bar.hidden, false, 'the bar must show once a suggested row is on screen');
+    assert.equal(agreeBtn.textContent, 'Agree selected (0)');
+    assert.equal(agreeBtn.disabled, true);
+
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-a'), true);
+    assert.equal(agreeBtn.textContent, 'Agree selected (1)');
+    assert.equal(agreeBtn.disabled, false);
+    assert.equal(selectAll.indeterminate, true);
+
+    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-b'), true);
+    assert.equal(agreeBtn.textContent, 'Agree selected (2)');
+    assert.equal(selectAll.checked, true);
+    assert.equal(selectAll.indeterminate, false);
+  });
+
+  test('the bulk bar hides when no row on screen is suggested', () => {
+    const { module, bar } = makeBulkSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ suggestedDismissal: null })]);
+    assert.equal(bar.hidden, true);
   });
 });
