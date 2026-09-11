@@ -73,12 +73,13 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MangoClient } from '@jkershaw/mangodb';
-import { createFlightCompanionRoutes, buildCensusSeedText, buildFlightCompanionStripData } from '../../routes/flight-companion.js';
+import { createFlightCompanionRoutes, buildCensusSeedText, buildFlightCompanionStripData, resolveTurnModelOverride } from '../../routes/flight-companion.js';
 import {
   buildFlightCompanionMessages, renderStaleAttentionLine, formatFossilThreshold,
 } from '../../lib/prompts/flight-companion-brief.js';
 import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
+import { DEFAULT_MODEL } from '../../lib/openrouter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js'), 'utf8');
@@ -687,6 +688,147 @@ describe('Flight Companion turn endpoint (LIN-2432 beat 4) — live-model-call s
     assert.strictEqual(catalogCalls[0].followUpMode, 'propose');
     assert.strictEqual(catalogCalls[0].followUpEnabled, true, 'auto-wake can still REASON ABOUT a follow-up — only execution is withheld');
     assert.strictEqual(catalogCalls[0].sessionIsTerminalType, 'function', 'the beat-1-flagged coupling: propose mode is gated by the SAME "not configured" check execute mode is');
+  });
+});
+
+describe('resolveTurnModelOverride (LIN-2623 beat 2) — pure allow-list validation', () => {
+  test('absent, null, or empty string: no override, not an error', () => {
+    assert.deepStrictEqual(resolveTurnModelOverride(undefined), { model: null, error: null });
+    assert.deepStrictEqual(resolveTurnModelOverride(null), { model: null, error: null });
+    assert.deepStrictEqual(resolveTurnModelOverride(''), { model: null, error: null });
+    assert.deepStrictEqual(resolveTurnModelOverride('   '), { model: null, error: null });
+  });
+
+  test('a non-string value is an error', () => {
+    const { model, error } = resolveTurnModelOverride(12345);
+    assert.strictEqual(model, null);
+    assert.match(error, /must be a string/);
+  });
+
+  test('a curated id is accepted verbatim (trimmed)', () => {
+    assert.deepStrictEqual(resolveTurnModelOverride('  anthropic/claude-opus-5  '), { model: 'anthropic/claude-opus-5', error: null });
+  });
+
+  test('an uncurated id is rejected, naming the rejected id', () => {
+    const { model, error } = resolveTurnModelOverride('evil/undisclosed-expensive-model');
+    assert.strictEqual(model, null);
+    assert.match(error, /evil\/undisclosed-expensive-model/);
+    assert.match(error, /not a curated model id/);
+  });
+});
+
+describe('Flight Companion turn endpoint (LIN-2623 beat 2) — per-turn model override', () => {
+  // Captures the `model` actually passed to the model call — the ground truth
+  // for "which model won", independent of resolveTurnModelOverride's own
+  // (separately tested above) validation logic.
+  function fakeChatClient(calls) {
+    return {
+      async streamChat(messages, opts, onEvent) {
+        calls.push({ fn: 'streamChat', model: opts.model });
+        onEvent('done', {});
+      },
+      async streamChatWithTools(messages, opts, onEvent) {
+        calls.push({ fn: 'streamChatWithTools', model: opts.model });
+        onEvent('done', {});
+      },
+    };
+  }
+
+  test('1. an explicit uncurated model 400s, before any store is touched', async () => {
+    const observerStateStore = fakeObserverStateStore();
+    const app = buildApp({ observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }) });
+
+    const { status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+      message: 'status please', model: 'evil/undisclosed-expensive-model',
+    });
+
+    assert.strictEqual(status, 400);
+    assert.match(json.error, /not a curated model id/);
+    assert.deepStrictEqual(observerStateStore.calls, [], 'the 400 must fire before any store is touched');
+  });
+
+  test('a malformed (non-string) model 400s the same way', async () => {
+    const observerStateStore = fakeObserverStateStore();
+    const app = buildApp({ observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }) });
+
+    const { status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+      message: 'status please', model: 12345,
+    });
+
+    assert.strictEqual(status, 400);
+    assert.match(json.error, /must be a string/);
+  });
+
+  test('2. an explicit curated model wins over the workspace/op-kind default', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present, isFreeTier must be false'); } };
+    // The workspace/op-kind default resolves to a DIFFERENT curated model, so
+    // a 200 with this model proves the override — not the default — was used.
+    const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } };
+    const app = buildApp({
+      observerStateStore, freeTierStore, workspacePreferencesStore, chatClient,
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+      message: 'status please', model: 'anthropic/claude-opus-5',
+    });
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(calls, [{ fn: 'streamChatWithTools', model: 'anthropic/claude-opus-5' }]);
+  });
+
+  test('3. no `model` field: beat 1\'s resolveAiOperationModel path is unchanged', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present, isFreeTier must be false'); } };
+    const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } };
+    const app = buildApp({
+      observerStateStore, freeTierStore, workspacePreferencesStore, chatClient,
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'status please' });
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(calls[0].model, 'anthropic/claude-sonnet-5', 'no override present -> resolveAiOperationModel decides, exactly as beat 1 left it');
+  });
+
+  test('4. free tier + a valid explicit model: the forceDefault clamp still wins', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } };
+    const app = buildApp({
+      observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }), workspacePreferencesStore, chatClient,
+    });
+
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
+      const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+        message: 'status please', model: 'anthropic/claude-opus-5',
+      });
+      assert.strictEqual(status, 200);
+    });
+
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0].model, DEFAULT_MODEL, 'a valid explicit override must still be clamped to DEFAULT_MODEL on free tier');
+  });
+
+  test('5. free tier + an uncurated explicit model: still 400 (validate-then-clamp ordering)', async () => {
+    const observerStateStore = fakeObserverStateStore();
+    const app = buildApp({ observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }) });
+
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
+      const { status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+        message: 'status please', model: 'evil/undisclosed-expensive-model',
+      });
+      assert.strictEqual(status, 400);
+      assert.match(json.error, /not a curated model id/);
+    });
+    assert.deepStrictEqual(observerStateStore.calls, [], 'a bad id 400s even on free tier, before any store is touched');
   });
 });
 

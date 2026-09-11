@@ -81,7 +81,7 @@ import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kic
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey, AVAILABLE_MODELS } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
@@ -150,6 +150,40 @@ const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
 // having drifted away from it is the defect LIN-2618 exists to fix. The seed
 // itself deliberately stays here: it is coupled to this route's census read and
 // to `buildCompanionSnapshot`, neither of which belongs in a prompt module.
+/**
+ * Validate the turn endpoint's optional per-turn `model` override against the
+ * curated AVAILABLE_MODELS allow-list (LIN-2623 beat 2).
+ *
+ * Modeled on `resolveRoadmapModelOverride` (routes/workspace-api-roadmap.js)'s
+ * allow-list source, but DELIBERATELY does not share its silent-fallback
+ * behaviour: that function degrades an uncurated id to the workspace default,
+ * which this ticket forbids — a bad explicit id must 400, never silently
+ * degrade to the workspace default or drop to tools-off. This is validation
+ * only; it never resolves a final model itself, so the turn core
+ * (`lib/flight-companion-turn.js`) stays the single resolution site.
+ *
+ * @param {*} rawModel - Raw `req.body.model` (untrusted)
+ * @returns {{model: string|null, error: string|null}} `model` is the trimmed
+ *   curated id when one was supplied and valid; `null` when the field was
+ *   absent/null/empty (not an error — the turn core falls back to
+ *   `resolveAiOperationModel`). `error` is a user-facing message when an
+ *   explicitly supplied value is non-string or not a curated id.
+ */
+export function resolveTurnModelOverride(rawModel) {
+  if (rawModel === undefined || rawModel === null || rawModel === '') {
+    return { model: null, error: null };
+  }
+  if (typeof rawModel !== 'string') {
+    return { model: null, error: 'model must be a string' };
+  }
+  const id = rawModel.trim();
+  if (!id) return { model: null, error: null };
+  if (!AVAILABLE_MODELS.some(m => m.id === id)) {
+    return { model: null, error: `model "${id}" is not a curated model id` };
+  }
+  return { model: id, error: null };
+}
+
 export function buildCensusSeedText(currentCensusDoc) {
   if (!currentCensusDoc) {
     return 'CURRENT CENSUS: not available yet for this workspace (no sweep has run).';
@@ -522,6 +556,16 @@ export function createFlightCompanionRoutes({
       return res.status(400).json({ error: `message must be ${MAX_MESSAGE_LENGTH} characters or fewer` });
     }
 
+    // LIN-2623 beat 2: validate BEFORE the free-tier clamp is even consulted,
+    // so an uncurated id 400s the same way on every tier. A curated id is
+    // still threaded through — the turn core (`runFlightCompanionTurn`)
+    // decides whether it actually wins, since free tier must keep clamping to
+    // the default regardless of what a valid override asked for.
+    const { model: requestedModel, error: modelError } = resolveTurnModelOverride(body.model);
+    if (modelError) {
+      return res.status(400).json({ error: modelError });
+    }
+
     const safeHistory = filterChatTurns(body.history);
 
     const sessionApiKey = req.session.openRouterApiKey;
@@ -576,6 +620,7 @@ export function createFlightCompanionRoutes({
         history: safeHistory,
         apiKey: apiKeyToUse,
         isFreeTier,
+        model: requestedModel,
         onStreamStart: startStream,
         onEvent: (type, data) => {
           sendSSE(res, type, data);
