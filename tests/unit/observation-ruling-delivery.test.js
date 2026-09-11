@@ -689,6 +689,54 @@ describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F
   });
 });
 
+// LIN-2756 — the sibling of LIN-2293's fix above, one dimension over: THAT
+// bug was two rows sharing a decision_id across two different WORKSPACES;
+// THIS bug is two rows sharing a decision_id in the SAME workspace but two
+// different LOOPS (an agent re-emitting the same `DECISION:` block from two
+// separate loops within one session — the ticket's live repro: session
+// `74869c9c`'s review loop `07509b1e` and close-out loop `0c912018` both
+// emitted `lin2384-f6-gate`). `rulingKey(urlKey, decisionId)` already keeps
+// different workspaces apart (LIN-2293), but carries no loop dimension at
+// all, so two same-workspace loops collapse onto ONE key exactly the way
+// LIN-2293's bare `decision_id` key used to collapse workspaces. Expected
+// RED until the fix threads `anchor.loopId ?? anchor.taskDecisionId` into
+// the key (LIN-2756 Proposal).
+describe('renderRulings — same-workspace, different-loop decision_id collision (LIN-2756)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  const REVIEW_LOOP = '07509b1e';
+  const CLOSEOUT_LOOP = '0c912018';
+
+  function loopRow(loopId) {
+    return makeRow({ anchor: { loopId }, decision: { decision_id: 'lin2384-f6-gate' } });
+  }
+
+  test('two loops in one workspace sharing decision_id get independent <li> nodes (LIN-2756 Acceptance #1)', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, renderedRulingRows } = module.exports;
+
+    renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
+
+    // Both rows DO attach visually (renderRulings pushes a fresh <li> per
+    // row regardless of key collision) — the bug is entirely in the
+    // bookkeeping maps collapsing onto one shared key behind them, which is
+    // exactly what the size/distinctness assertions below pin.
+    assert.equal(list.children.length, 2, 'both loops’ rows must be attached');
+    assert.notEqual(list.children[0], list.children[1], 'the two attached nodes must be distinct');
+    assert.equal(renderedRulingRows.size, 2, 'each loop must keep its own renderedRulingRows entry, not collapse onto one shared (urlKey, decisionId) key — this is the ticket’s "kept only the last <li>" Finding');
+  });
+});
+
 // ─── Suggestion banner (LIN-2444 Phase 2) ────────────────────────────────────
 //
 // Render-only: a proposed-dismissal suggestion attaches as a sibling of
@@ -1773,6 +1821,111 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     await bulkAgreeSelected();
 
     assert.deepEqual(calls, [], 'bulkAgreeRow must independently refuse a row with no live suggestedDismissal');
+  });
+});
+
+// LIN-2756 Acceptance #2/#3/#4 — same-workspace, different-loop decision_id
+// collision, exercised through the bulk-selection and single-row-Agree
+// seams. Mirrors the fixture shape of the renderRulings collision describe
+// above (REVIEW_LOOP/CLOSEOUT_LOOP, 'lin2384-f6-gate'), but drives the
+// selection-count/bulk-agree/single-agree seams that describe doesn't touch.
+// Both loop rows carry a live suggestedDismissal so they are selectable —
+// `issueDismissRequest` already threads `decisionLoopId: anchor.loopId` onto
+// the wire (the dismiss stamp is already per-loop, per the ticket's
+// Finding), so the mock API below can distinguish which loop's row actually
+// got dismissed.
+describe('bulk-agree / single-agree — same-workspace, different-loop decision_id collision (LIN-2756)', () => {
+  function makeLoopCollisionSandbox({ api } = {}) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const bar = new FakeElement('div');
+    const selectAll = new FakeElement('input');
+    const countEl = new FakeElement('span');
+    const agreeBtn = new FakeElement('button');
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      api,
+      confirm: () => true,
+      elements: {
+        'obs-rulings': list, 'obs-rulings-empty': empty, 'obs-ruling-bulk-bar': bar,
+        'obs-ruling-select-all': selectAll, 'obs-ruling-selected-count': countEl,
+        'obs-ruling-agree-selected': agreeBtn
+      }
+    });
+    return { module, list, bar, selectAll, countEl, agreeBtn };
+  }
+
+  const LOOP_SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+  const REVIEW_LOOP = '07509b1e';
+  const CLOSEOUT_LOOP = '0c912018';
+
+  function loopRow(loopId) {
+    return makeRow({ anchor: { loopId }, decision: { decision_id: 'lin2384-f6-gate' }, suggestedDismissal: LOOP_SUGGESTION });
+  }
+
+  test('select-all counts BOTH loop rows, not one (LIN-2756 Acceptance #2)', () => {
+    const { module } = makeLoopCollisionSandbox();
+    const { renderRulings, setAllRulingsSelected, rulingsSelected } = module.exports;
+
+    renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
+    setAllRulingsSelected(true);
+
+    assert.equal(rulingsSelected.size, 2, 'select-all must count both loops’ rows — pre-fix they collapse onto one shared key, so only one gets selected');
+  });
+
+  test('bulk agree dismisses BOTH loop rows, not just the one left standing in the shared-key map (LIN-2756 Acceptance #3)', async () => {
+    const calls = [];
+    const api = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push({ decisionLoopId: body.decisionLoopId, decisionId: body.decisionId });
+      return { success: true };
+    };
+    const { module } = makeLoopCollisionSandbox({ api });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = module.exports;
+
+    renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    const loopIds = calls.map((c) => c.decisionLoopId).sort();
+    assert.deepEqual(
+      loopIds, [CLOSEOUT_LOOP, REVIEW_LOOP].sort(),
+      'bulk agree must dismiss both loops’ decisions — pre-fix, rulingsSelected only ever held one shared key, so only one POST fired and the other loop’s ruling was left exactly as the ticket found it: still carrying the suggestion'
+    );
+  });
+
+  test('agreeing one loop’s row must not silently block the other loop’s independent Agree (LIN-2756 Acceptance #4)', async () => {
+    const calls = [];
+    const api = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push({ decisionLoopId: body.decisionLoopId, decisionId: body.decisionId });
+      return { success: true };
+    };
+    const { module, list } = makeLoopCollisionSandbox({ api });
+    const { renderRulings, agreeRulingRow } = module.exports;
+
+    const rowReview = loopRow(REVIEW_LOOP);
+    const rowCloseout = loopRow(CLOSEOUT_LOOP);
+    renderRulings([rowReview, rowCloseout]);
+    const [liReview, liCloseout] = list.children;
+
+    await agreeRulingRow(rowReview, liReview);
+    assert.deepEqual(calls.map((c) => c.decisionLoopId), [REVIEW_LOOP], 'the review loop’s row must be agreed');
+
+    // Pre-fix, agreeing the review loop adds the SHARED (urlKey, decisionId)
+    // key to rulingsSettled — and agreeRulingRow's own guard
+    // (`rulingsSettled.has(key)`) then silently no-ops the close-out loop's
+    // press: no second API call, no error, no feedback. A suggestion/agree
+    // on one loop's row must never suppress the other's — this is the
+    // ticket's "a suggestion or shelve addresses one loop's row without
+    // touching the other" acceptance limb.
+    await agreeRulingRow(rowCloseout, liCloseout);
+    assert.deepEqual(
+      calls.map((c) => c.decisionLoopId).sort(),
+      [CLOSEOUT_LOOP, REVIEW_LOOP].sort(),
+      'the close-out loop’s row must be independently agreeable — it must not be silently swallowed by rulingsSettled just because it shares decision_id with the already-agreed review loop'
+    );
   });
 });
 
