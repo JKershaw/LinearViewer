@@ -1155,6 +1155,7 @@ decide for itself whether a periodical is due.
 ```
 GET  /api/proxy/rulings
 POST /api/proxy/rulings/{decisionId}/suggest-dismissal
+POST /api/proxy/rulings/{decisionId}/suggest-answer
 ```
 
 `GET` returns every **unanswered** operator decision in this workspace — the exact same set
@@ -1208,8 +1209,18 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
   progress on the same anchor issue forces `record`, even over a declared `dispatch`.
 - **`alternate`** names the untaken option ONLY when a genuine declared-vs-default choice
   existed and no evidence forced the outcome; otherwise `null`.
-- **`suggestedDismissal`** is the standing proposal on that ruling, if any (see the `POST`
+- **`suggestedDismissal`** is the standing proposal on that ruling, if any (see the `POST`s
   below) — a SUGGESTION a human has not yet acted on, never evidence the ruling is resolved.
+  The field name is a legacy holdover that now covers BOTH proposal kinds:
+  ```json
+  { "reason": "...", "suggestedBy": "...", "suggestedAt": "...", "decisionLoopId": "..." | null,
+    "proposedOutcome": "dismissed" | "answered", "optionId": "..." | null }
+  ```
+  `proposedOutcome` tells the two kinds apart — `"dismissed"` proposes dismissing the ruling,
+  `"answered"` proposes answering it with `optionId` (present only when `proposedOutcome` is
+  `"answered"`). A record written before this field existed reads as `proposedOutcome:
+  "dismissed"`, `optionId: null` — byte-compatible with what it always meant. Check this before
+  proposing over an existing standing suggestion, since re-proposing overwrites it in place.
 
 `POST /api/proxy/rulings/{decisionId}/suggest-dismissal` requires **readWrite**. It does
 **NOT** dismiss a ruling, and there is deliberately no endpoint that does — only a human
@@ -1239,6 +1250,49 @@ Returns 201:
 }
 ```
 Attribution comes from the token's own `createdBy`, never from the request body.
+
+`POST /api/proxy/rulings/{decisionId}/suggest-answer` requires **readWrite**. It does **NOT**
+answer a ruling, and there is deliberately no endpoint that does — only a human discharges a
+ruling, by agreeing to the suggestion in the UI. This is the sibling of `suggest-dismissal`
+above: an agent proposes an ANSWER instead of a dismissal.
+
+Body:
+```json
+{ "optionId": "a", "reason": "why this is the right answer", "decisionLoopId": "..." }
+```
+- **`optionId`** — required, non-empty string. Must name one of the decision's own
+  `options[].id` (from the `GET` above).
+- **`reason`** — required, non-empty, ≤ 500 chars. Same mandatory-justification rule as
+  `suggest-dismissal`.
+- **`decisionLoopId`** — optional but strongly preferred, same convention as
+  `suggest-dismissal` above.
+
+Returns 201:
+```json
+{
+  "success": true,
+  "suggestion": { "reason": "...", "suggestedBy": "...", "suggestedAt": "...", "withdrawn": false,
+                   "decisionLoopId": "..." | null, "proposedOutcome": "answered", "optionId": "a" },
+  "note": "Recorded as a SUGGESTION only. The ruling is still unanswered until a human agrees to it."
+}
+```
+Attribution comes from the token's own `createdBy`, never from the request body.
+
+Error shapes:
+- **400** — `optionId` missing/blank/not a string; `reason` missing/blank/over 500 chars;
+  `decisionLoopId` present but not a non-empty string.
+- **422** — `optionId` does not name one of the decision's own `options[].id`, including when
+  the decision is free-text and carries no `options[]` at all. This route REFUSES an
+  unanswerable proposal rather than silently recording an answer to nothing.
+- **404** — unknown `decisionId`, or a `decisionLoopId` that names no unanswered row carrying
+  that `decisionId` — same conditions as `suggest-dismissal`.
+- **403** — without a `readWrite` token.
+
+This route stays disposition-agnostic: it never checks the ruling's current
+disposition/canReply/effect, because those are resolved fresh at press time, not at propose
+time (see `disposition`/`effect` above). Nothing here — or on `suggest-dismissal` — ever writes
+`agreed`, `agreedAt`, or `acceptedAt`; those are the human's own Agree stamp, written only by
+the session-authed discharge path.
 
 ### Task Automation Endpoints
 

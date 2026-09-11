@@ -82,6 +82,36 @@ describe('DismissalSuggestionsStore.suggest', () => {
     assert.equal(collection._docs[0]._id, 'acme::d-1');
   });
 
+  // LIN-2790: the widened shape.
+  test('proposedOutcome defaults to "dismissed" and optionId to null when omitted', async () => {
+    const rec = await store.suggest({
+      urlKey: 'acme', decisionId: 'd-1', reason: 'r', suggestedBy: 'x', now: NOW
+    });
+    assert.equal(rec.proposedOutcome, 'dismissed');
+    assert.equal(rec.optionId, null);
+    assert.equal(collection._docs[0].proposedOutcome, 'dismissed');
+    assert.equal(collection._docs[0].optionId, null);
+  });
+
+  test('an "answered" proposal records its proposedOutcome and optionId', async () => {
+    const rec = await store.suggest({
+      urlKey: 'acme', decisionId: 'd-1', proposedOutcome: 'answered', optionId: 'opt-a',
+      reason: 'this is the right call', suggestedBy: 'lane-e', now: NOW
+    });
+    assert.equal(rec.proposedOutcome, 'answered');
+    assert.equal(rec.optionId, 'opt-a');
+  });
+
+  test('the store is a dumb writer — it does not validate optionId against anything (that is the route\'s job)', async () => {
+    // No decision/options object is even in scope at this layer; the store
+    // only ever sees the two bare strings the route already validated.
+    const rec = await store.suggest({
+      urlKey: 'acme', decisionId: 'd-1', proposedOutcome: 'answered', optionId: 'not-a-real-option',
+      reason: 'r', suggestedBy: 'x', now: NOW
+    });
+    assert.equal(rec.optionId, 'not-a-real-option');
+  });
+
   test('a reason is REQUIRED — an unexplained proposal is refused', async () => {
     // Same rule shelving already enforces (docs/escalation-philosophy.md §6):
     // a disposition nobody justified is one the operator cannot evaluate, so
@@ -197,12 +227,16 @@ describe('DismissalSuggestionsStore.withdraw', () => {
 
   test('withdrawal does not touch any answer state — it only clears the offer', async () => {
     // The structural point of the whole ticket: neither suggest nor withdraw
-    // may resemble an answer. This store writes exactly four fields beyond its
-    // key, and none of them is an outcome.
-    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'r', suggestedBy: 'x', now: NOW });
+    // may resemble an answer, including a stamped answer proposal. LIN-2790
+    // adds the proxy-proposal-only boundary explicitly: the proxy may never
+    // write agreed/agreedAt/acceptedAt on its own proposal row.
+    await store.suggest({
+      urlKey: 'acme', decisionId: 'd-1', proposedOutcome: 'answered', optionId: 'opt-a',
+      reason: 'r', suggestedBy: 'x', now: NOW
+    });
     await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', now: LATER });
     const doc = collection._docs[0];
-    for (const forbidden of ['outcome', 'outcomeAt', 'answered', 'answeredDecisionId', 'decision-answer']) {
+    for (const forbidden of ['outcome', 'outcomeAt', 'answered', 'answeredDecisionId', 'decision-answer', 'agreed', 'agreedAt', 'acceptedAt']) {
       assert.ok(!(forbidden in doc), `a suggestion row must never carry '${forbidden}'`);
     }
   });
@@ -426,5 +460,24 @@ describe('attachStandingSuggestions — loop-aware join (LIN-2756)', () => {
     const rows = [row('07509b1e', 'lin2384-f6-gate', 'other-workspace')];
     const suggestions = [suggestion({ decisionLoopId: '07509b1e' })]; // urlKey: 'acme'
     assert.equal(attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal, null);
+  });
+
+  // LIN-2790: the widened projection. `suggestion()` above builds a doc with
+  // no `proposedOutcome`/`optionId` key at all — exactly the shape a
+  // pre-LIN-2790 row has — so reusing it unmodified IS the legacy-record case.
+  test('a legacy suggestion with no proposedOutcome field reads as an ordinary dismissal proposal — the one and only default read path', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate')];
+    const suggestions = [suggestion({ decisionLoopId: '07509b1e' })];
+    const attached = attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal;
+    assert.equal(attached.proposedOutcome, 'dismissed');
+    assert.equal(attached.optionId, null);
+  });
+
+  test('an "answered" proposal carries its proposedOutcome and optionId through the join', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate')];
+    const suggestions = [suggestion({ decisionLoopId: '07509b1e', proposedOutcome: 'answered', optionId: 'opt-a' })];
+    const attached = attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal;
+    assert.equal(attached.proposedOutcome, 'answered');
+    assert.equal(attached.optionId, 'opt-a');
   });
 });
