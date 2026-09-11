@@ -154,7 +154,11 @@ test.describe('Feedback widget', () => {
     })
 
     await page.getByTestId('feedback-message').fill('use a specific model')
-    await exec.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4')
+    // Not curated/catalog — the escape hatch (LIN-2719 HARD RULE 2/3). A
+    // harness switch afterwards must not clear it (rebuildDispatchModelOptions
+    // preserves an `other…` selection across a harness rebuild).
+    await exec.locator('.dispatch-exec-model').selectOption('__other__')
+    await exec.locator('.dispatch-exec-model-other').fill('anthropic/claude-opus-4')
     await exec.locator('.dispatch-exec-harness-select').selectOption('opencode')
     await page.getByTestId('feedback-submit-triage').click()
 
@@ -184,7 +188,9 @@ test.describe('Feedback widget', () => {
     })
 
     await page.getByTestId('feedback-message').fill('just save, no dispatch')
-    await exec.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4')
+    // Not curated/catalog — the escape hatch (LIN-2719 HARD RULE 2/3).
+    await exec.locator('.dispatch-exec-model').selectOption('__other__')
+    await exec.locator('.dispatch-exec-model-other').fill('anthropic/claude-opus-4')
     await page.getByTestId('feedback-submit').click()
 
     await expect(page.getByTestId('feedback-status')).toContainText('Filed LIN-779')

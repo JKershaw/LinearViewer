@@ -198,7 +198,7 @@
       const defaultModel = root.dataset.defaultModel || '';
       const defaultHarness = root.dataset.defaultHarness || '';
       execMount.innerHTML = window.renderDispatchExecControls('feedback', {
-        modelPlaceholder: defaultModel ? `model (default: ${defaultModel})` : 'model',
+        modelDefault: defaultModel || undefined,
         harnessDefault: defaultHarness || undefined
       });
     }

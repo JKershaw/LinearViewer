@@ -11,12 +11,12 @@ import assert from 'node:assert/strict';
 import http from 'http';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
-import { MOCK_CATALOG_MODELS, _resetCatalogCacheForTests } from '../../lib/openrouter-catalog.js';
+import { MOCK_CATALOG_MODELS, isFreeModel, _resetCatalogCacheForTests } from '../../lib/openrouter-catalog.js';
 
 // getModelCatalog({mock:true}) normalizes MOCK_CATALOG_MODELS (LIN-2384 F2),
-// so the wire response carries the widened {id, name, pricing} shape rather
-// than the raw {id, name} literal.
-const NORMALIZED_MOCK_CATALOG_MODELS = MOCK_CATALOG_MODELS.map(m => ({ id: m.id, name: m.name, pricing: null }));
+// and the route widens the response with a derived `free` boolean per model
+// (LIN-2719 S0) — the wire shape is {id, name, free}, never raw pricing.
+const NORMALIZED_MOCK_CATALOG_MODELS = MOCK_CATALOG_MODELS.map(m => ({ id: m.id, name: m.name, free: isFreeModel(m) }));
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -108,7 +108,19 @@ test('a non-mocked workspace hits the real (mocked-fetch) catalog path', async (
   const app = buildApp({ accessToken: 'real-linear-token', urlKey: 'test-workspace' });
   const { status, body } = await get(app, '/workspace/test-workspace/api/openrouter/models');
   assert.equal(status, 200);
-  assert.deepEqual(body.models, [{ id: 'openai/gpt-x', name: 'GPT X', pricing: null }]);
+  assert.deepEqual(body.models, [{ id: 'openai/gpt-x', name: 'GPT X', free: false }]);
+});
+
+test('a $0 live-catalog entry rides the `free` boolean (LIN-2719 S0)', async () => {
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ data: [{ id: 'openai/gpt-free', name: 'Free GPT', pricing: { prompt: '0', completion: '0' } }] })
+  });
+  const app = buildApp({ accessToken: 'real-linear-token', urlKey: 'test-workspace' });
+  const { status, body } = await get(app, '/workspace/test-workspace/api/openrouter/models');
+  assert.equal(status, 200);
+  assert.deepEqual(body.models, [{ id: 'openai/gpt-free', name: 'Free GPT', free: true }]);
 });
 
 test('degrades to 200 {models: []} — never 500s — when the live catalog is unreachable', async () => {

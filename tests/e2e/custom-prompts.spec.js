@@ -568,7 +568,9 @@ test.describe('Custom Prompts on Swipe Page', () => {
     await expect(controls).toBeVisible();
 
     await controls.locator('.dispatch-exec-harness-select').selectOption('opencode');
-    await controls.locator('.dispatch-exec-model').fill('openrouter/anthropic/claude-opus-4.8');
+    // Not curated/catalog — the escape hatch (LIN-2719 HARD RULE 2/3).
+    await controls.locator('.dispatch-exec-model').selectOption('__other__');
+    await controls.locator('.dispatch-exec-model-other').fill('openrouter/anthropic/claude-opus-4.8');
 
     const dispatchReq = page.waitForRequest(req =>
       req.url().includes('/api/dispatch') && req.method() === 'POST');

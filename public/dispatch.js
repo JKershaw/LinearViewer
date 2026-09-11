@@ -225,10 +225,37 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
 // =============================================================================
 
 /**
+ * Read-only resolved-selection reflection text for a chosen preset (LIN-2719
+ * S4) — "so it is clear what will run", per the ticket's Expected bullet,
+ * WITHOUT filling the authorable exec-controls inputs (see the deviation note
+ * on dispatchPageCustomPrompt below: filling them would post explicit values
+ * that outrank the very preset they came from, per
+ * lib/dispatch-factory.js's precedence chain). Effort is reflected here but
+ * has no authorable exec-controls counterpart on Dispatch (Settings-only,
+ * LIN-2616) — this line is the only place it's visible on this page.
+ * @param {{harness?: string, model?: string, effort?: string, byKind?: Object}} [config]
+ * @returns {string}
+ */
+function formatDispatchPresetReflection(config) {
+  if (!config) return ''
+  const parts = []
+  if (config.harness) parts.push(`harness: ${config.harness}`)
+  if (config.model) parts.push(`model: ${config.model}`)
+  if (config.effort) parts.push(`effort: ${config.effort}`)
+  let text = parts.length ? parts.join(' · ') : 'no top-level overrides'
+  if (config.byKind && Object.keys(config.byKind).length) {
+    text += ' — per-type overrides apply'
+  }
+  return text
+}
+
+/**
  * Fetch the workspace's saved dispatch presets and render a `<select>` picker
- * into the given container. Non-fatal on failure: an empty/failed fetch just
- * leaves the picker with only the "— none —" option, same as an empty preset
- * list — Settings (LIN-1391 S7) is where presets are actually managed.
+ * plus a read-only resolved-selection reflection (LIN-2719 S4) into the given
+ * container. Non-fatal on failure: an empty/failed fetch just leaves the
+ * picker with only the "— none —" option, same as an empty preset list — and
+ * both collapse to the same `presets = []`, so the empty-state "create a
+ * preset" link (LIN-2719 S3) covers both cases from one branch.
  */
 async function loadDispatchPresetPicker(container) {
   const urlKey = container.dataset.urlKey
@@ -245,10 +272,38 @@ async function loadDispatchPresetPicker(container) {
   const optionsHtml = presets.map(p =>
     `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`
   ).join('')
+  // Nothing on this page said where a preset comes from — link to where one
+  // is actually created (LIN-2719 S3), the reverse direction of Settings'
+  // "use on Dispatch" link (lib/render-settings.js).
+  const emptyLinkHtml = presets.length
+    ? ''
+    : `<a href="/workspace/${encodeURIComponent(urlKey)}/settings#dispatch-presets" class="settings-action dispatch-preset-create-link" data-testid="dispatch-preset-create-link">create a preset &rarr;</a>`
   container.innerHTML = `<select class="dispatch-preset-select" aria-label="Preset">
     <option value="">&mdash; none &mdash;</option>
     ${optionsHtml}
-  </select>`
+  </select>
+  <span class="dispatch-preset-reflection" data-testid="dispatch-preset-reflection"></span>
+  ${emptyLinkHtml}`
+
+  const select = container.querySelector('.dispatch-preset-select')
+  const reflectionEl = container.querySelector('[data-testid="dispatch-preset-reflection"]')
+  const updateReflection = () => {
+    const preset = presets.find(p => p.id === select.value)
+    reflectionEl.textContent = preset ? formatDispatchPresetReflection(preset.config) : ''
+  }
+  select.addEventListener('change', updateReflection)
+
+  // Deep link from Settings' "use on Dispatch" affordance (LIN-2719 S3):
+  // pre-select the picker only — never the authorable exec-controls inputs.
+  try {
+    const presetParam = new URLSearchParams(window.location.search).get('preset')
+    if (presetParam && presets.some(p => p.id === presetParam)) {
+      select.value = presetParam
+    }
+  } catch (e) {
+    // Non-fatal: just don't pre-select
+  }
+  updateReflection()
 }
 
 /**
@@ -290,7 +345,7 @@ function initDispatchPagePrompt() {
     const defaultModel = execContainer.dataset.defaultModel || ''
     const defaultHarness = execContainer.dataset.defaultHarness || ''
     execContainer.innerHTML = window.renderDispatchExecControls('dispatch-page', {
-      modelPlaceholder: defaultModel ? `model (default: ${defaultModel})` : 'model',
+      modelDefault: defaultModel || undefined,
       harnessDefault: defaultHarness || undefined
     })
   }

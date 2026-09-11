@@ -424,8 +424,12 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     });
     assert.match(html, /data-testid="dispatch-default-row-autopilot"/, 'expected an autopilot per-type override row');
     const rowStart = html.indexOf('data-testid="dispatch-default-row-autopilot"');
-    const row = html.slice(rowStart, rowStart + 1200);
-    assert.match(row, /name="kind__autopilot__Model"[^>]*value="anthropic\/claude-sonnet-5"/);
+    const row = html.slice(rowStart, rowStart + 3000);
+    // The stored model (an OpenCode curated id) isn't in the claude-code row's
+    // preset-only option set, so it degrades onto the `other…` escape hatch
+    // (HARD RULE 2/3) rather than being silently dropped.
+    assert.match(row, /name="kind__autopilot__Model"[^>]*>[\s\S]*?<option value="__other__" selected>/);
+    assert.match(row, /class="dispatch-model-input-other"[^>]*value="anthropic\/claude-sonnet-5"/);
     assert.match(row, /<option value="claude-code" selected>/);
   });
 
@@ -434,7 +438,8 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       ...BASE,
       dispatchDefaults: { model: 'anthropic/claude-opus-4.8', harness: 'opencode' }
     });
-    assert.match(html, /name="defaultModel"[^>]*value="anthropic\/claude-opus-4\.8"/);
+    // A curated OpenCode id, on an opencode row, IS reachable via the select.
+    assert.match(html, /name="defaultModel"[^>]*>[\s\S]*?<option value="anthropic\/claude-opus-4\.8" selected>/);
     assert.match(html, /name="defaultHarnessSelect"[^>]*>[\s\S]*?<option value="opencode" selected>/);
   });
 
@@ -446,7 +451,7 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       dispatchDefaults: { effort: 'high' }
     });
     const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
-    const row = html.slice(rowStart, rowStart + 1200);
+    const row = html.slice(rowStart, rowStart + 3000);
     assert.match(row, /name="defaultEffort"[^>]*value="high"/);
   });
 
@@ -466,7 +471,7 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       dispatchDefaults: { harness: 'my-bespoke-harness' }
     });
     const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
-    const row = html.slice(rowStart, rowStart + 1200);
+    const row = html.slice(rowStart, rowStart + 3000);
     // The custom value has nowhere to live in the dispatch-defaults control anymore.
     assert.doesNotMatch(row, /my-bespoke-harness/);
     // Neither real harness is marked selected — the select falls to its blank default.
@@ -482,8 +487,10 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       }
     });
     const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
-    const row = html.slice(rowStart, rowStart + 1200);
-    assert.match(row, /name="kind__implementation__Model"[^>]*value="anthropic\/claude-sonnet-5"/);
+    const row = html.slice(rowStart, rowStart + 3000);
+    // Same escape-hatch degradation as the autopilot row above.
+    assert.match(row, /name="kind__implementation__Model"[^>]*>[\s\S]*?<option value="__other__" selected>/);
+    assert.match(row, /class="dispatch-model-input-other"[^>]*value="anthropic\/claude-sonnet-5"/);
     assert.match(row, /<option value="claude-code" selected>/);
   });
 
@@ -497,7 +504,7 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       }
     });
     const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
-    const row = html.slice(rowStart, rowStart + 1200);
+    const row = html.slice(rowStart, rowStart + 3000);
     assert.match(row, /name="kind__implementation__Effort"[^>]*value="xhigh"/);
   });
 
@@ -507,8 +514,8 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       dispatchDefaults: { model: 'anthropic/claude-opus-4.8', byKind: {} }
     });
     const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
-    const row = html.slice(rowStart, rowStart + 1200);
-    assert.match(row, /name="kind__implementation__Model"[^>]*value=""/);
+    const row = html.slice(rowStart, rowStart + 3000);
+    assert.match(row, /name="kind__implementation__Model"[^>]*>\s*<option value="" selected>/);
   });
 
   // LIN-2616 (L5) — blank-by-construction (LIN-1747): a per-kind row's effort
@@ -521,7 +528,7 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
       dispatchDefaults: { effort: 'high', byKind: {} }
     });
     const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
-    const row = html.slice(rowStart, rowStart + 1200);
+    const row = html.slice(rowStart, rowStart + 3000);
     assert.match(row, /name="kind__implementation__Effort"[^>]*value=""/);
   });
 
@@ -529,15 +536,25 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     test('the workspace-wide row pre-selects claude-code when no harness is configured', () => {
       const html = renderSettingsPage('Acme', BASE);
       const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
-      const row = html.slice(rowStart, rowStart + 1200);
-      assert.match(row, /<option value="claude-code" selected>/);
-      assert.doesNotMatch(row, /<option value=""[^>]* selected>/);
+      const row = html.slice(rowStart, rowStart + 3000);
+      const harnessSelectStart = row.indexOf('class="harness-select"');
+      const harnessSelectEnd = row.indexOf('</select>', harnessSelectStart);
+      const harnessSelect = row.slice(harnessSelectStart, harnessSelectEnd);
+      assert.match(harnessSelect, /<option value="claude-code" selected>/);
+      assert.doesNotMatch(harnessSelect, /<option value=""[^>]* selected>/);
+      // The MODEL select is a separate control — HARD RULE 1 (LIN-2719) says
+      // it must never pre-select even on this row, only the blank/"— none —"
+      // option, unlike the harness select above.
+      const modelSelectStart = row.indexOf('class="dispatch-model-input"');
+      const modelSelectEnd = row.indexOf('</select>', modelSelectStart);
+      const modelSelect = row.slice(modelSelectStart, modelSelectEnd);
+      assert.match(modelSelect, /<option value="" selected>— none —<\/option>/);
     });
 
     test('an explicitly configured non-default workspace harness still wins over the pre-select', () => {
       const html = renderSettingsPage('Acme', { ...BASE, dispatchDefaults: { harness: 'opencode' } });
       const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
-      const row = html.slice(rowStart, rowStart + 1200);
+      const row = html.slice(rowStart, rowStart + 3000);
       assert.match(row, /<option value="opencode" selected>/);
       assert.doesNotMatch(row, /<option value="claude-code" selected>/);
     });
@@ -545,41 +562,21 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
     test('per-kind override rows do NOT pre-select claude-code when blank (blank must keep meaning "inherit")', () => {
       const html = renderSettingsPage('Acme', BASE);
       const rowStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
-      const row = html.slice(rowStart, rowStart + 1200);
+      const row = html.slice(rowStart, rowStart + 3000);
       assert.doesNotMatch(row, /<option value="claude-code" selected>/);
       assert.match(row, /<option value=""[^>]* selected>/);
     });
 
-    test('renders both the OpenCode and Claude Code model datalists (LIN-1282)', () => {
-      const html = renderSettingsPage('Acme', BASE);
-      assert.match(html, /<datalist id="dispatch-model-suggestions">/);
-      assert.match(html, /<datalist id="dispatch-model-suggestions-claude">/);
-    });
+    // RETIRE (LIN-2719): "every model input names both datalists via
+    // data-model-list-claude/-opencode" had no successor to migrate to — a
+    // <select> has no `list` attribute, so there's no id-naming subject left.
+    // The BEHAVIOUR it guarded (harness-aware option content) survives via
+    // the tests below, which assert the option sets directly.
 
-    test('LIN-1282/LIN-1763: the Claude Code datalist offers exactly the four presets (haiku/sonnet/opus/fable), no catalog', () => {
-      const html = renderSettingsPage('Acme', {
-        ...BASE,
-        dispatchModelCatalog: [{ id: 'mock-provider/catalog-model-one', name: 'Catalog Model One' }]
-      });
-      const start = html.indexOf('<datalist id="dispatch-model-suggestions-claude">');
-      const end = html.indexOf('</datalist>', start);
-      const datalist = html.slice(start, end);
-      assert.equal((datalist.match(/<option/g) || []).length, 4);
-      assert.match(datalist, /<option value="haiku">/);
-      assert.match(datalist, /<option value="sonnet">/);
-      assert.match(datalist, /<option value="opus">/);
-      assert.match(datalist, /<option value="fable">/);
-      // The live catalog is never merged into the Claude list.
-      assert.doesNotMatch(datalist, /catalog-model-one/);
-    });
-
-    test('LIN-1282: every model input names both datalists via data-model-list-claude/-opencode', () => {
-      const html = renderSettingsPage('Acme', BASE);
-      assert.match(html, /name="defaultModel"[^>]*data-model-list-claude="dispatch-model-suggestions-claude"[^>]*data-model-list-opencode="dispatch-model-suggestions"/);
-      assert.match(html, /name="kind__implementation__Model"[^>]*data-model-list-claude="dispatch-model-suggestions-claude"[^>]*data-model-list-opencode="dispatch-model-suggestions"/);
-    });
-
-    test('LIN-1282: a claude-code row starts on the Claude datalist; an opencode row on the OpenCode datalist', () => {
+    // RE-EXPRESS (LIN-2719 migration table #1/#3): the page-level datalists
+    // are gone — each row now builds its own inline option set — so this
+    // asserts the same harness-scoped content directly on a row's <select>.
+    test('a claude-code row offers only its own preset option set; an opencode row offers the curated+catalog one (LIN-1282)', () => {
       const html = renderSettingsPage('Acme', {
         ...BASE,
         dispatchDefaults: {
@@ -588,51 +585,98 @@ describe('renderSettingsPage — Dispatch defaults section (LIN-1095)', () => {
         }
       });
       const defStart = html.indexOf('data-testid="dispatch-default-row-default"');
-      const defRow = html.slice(defStart, defStart + 1200);
-      assert.match(defRow, /name="defaultModel"[^>]*list="dispatch-model-suggestions-claude"/);
+      const defSelectStart = html.indexOf('class="dispatch-model-input"', defStart);
+      const defSelect = html.slice(defSelectStart, html.indexOf('</select>', defSelectStart));
+      assert.match(defSelect, /<option value="opus">/);
+      assert.doesNotMatch(defSelect, /<option value="openai\/gpt-5\.4-mini">/);
 
       const implStart = html.indexOf('data-testid="dispatch-default-row-implementation"');
-      const implRow = html.slice(implStart, implStart + 1200);
-      assert.match(implRow, /name="kind__implementation__Model"[^>]*list="dispatch-model-suggestions"/);
+      const implSelectStart = html.indexOf('class="dispatch-model-input"', implStart);
+      const implSelect = html.slice(implSelectStart, html.indexOf('</select>', implSelectStart));
+      assert.match(implSelect, /<option value="openai\/gpt-5\.4-mini">/);
+      assert.doesNotMatch(implSelect, /<option value="opus">/);
     });
 
-    test('LIN-1282: the workspace default row (pre-selecting claude-code) starts on the Claude datalist', () => {
-      const html = renderSettingsPage('Acme', BASE);
-      const defStart = html.indexOf('data-testid="dispatch-default-row-default"');
-      const defRow = html.slice(defStart, defStart + 1200);
-      assert.match(defRow, /name="defaultModel"[^>]*list="dispatch-model-suggestions-claude"/);
-    });
-
-    test('with no dispatchModelCatalog, the datalist is unchanged (static suggestions only)', () => {
-      const html = renderSettingsPage('Acme', BASE);
-      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
-      const end = html.indexOf('</datalist>', start);
-      const datalist = html.slice(start, end);
-      assert.equal((datalist.match(/<option/g) || []).length, 10);
-    });
-
-    test('LIN-1111 Session 2: merges the live OpenRouter catalog into the shared model datalist', () => {
+    test('LIN-1282/LIN-1763: a claude-code row offers exactly the four presets (haiku/sonnet/opus/fable), no catalog', () => {
       const html = renderSettingsPage('Acme', {
         ...BASE,
         dispatchModelCatalog: [{ id: 'mock-provider/catalog-model-one', name: 'Catalog Model One' }]
       });
-      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
-      const end = html.indexOf('</datalist>', start);
-      const datalist = html.slice(start, end);
-      assert.match(datalist, /<option value="mock-provider\/catalog-model-one">/);
+      // The workspace-default row pre-selects claude-code (LIN-1111) when unconfigured.
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 3000);
+      const selectStart = row.indexOf('class="dispatch-model-input"');
+      const selectEnd = row.indexOf('</select>', selectStart);
+      const select = row.slice(selectStart, selectEnd);
+      // blank + 4 presets + other… = 6 total options — an exact count, not a
+      // brittle bare number, backed by the id-specific assertions below.
+      assert.equal((select.match(/<option/g) || []).length, 6);
+      assert.match(select, /<option value="haiku">/);
+      assert.match(select, /<option value="sonnet">/);
+      assert.match(select, /<option value="opus">/);
+      assert.match(select, /<option value="fable">/);
+      // The live catalog is never merged into the Claude option set.
+      assert.doesNotMatch(select, /catalog-model-one/);
+      assert.doesNotMatch(select, /openai\/gpt-5\.4-mini/);
+    });
+
+    test('with no dispatchModelCatalog, an opencode row offers only the 10 curated suggestions (plus blank/other)', () => {
+      const html = renderSettingsPage('Acme', { ...BASE, dispatchDefaults: { harness: 'opencode' } });
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 3000);
+      const selectStart = row.indexOf('class="dispatch-model-input"');
+      const selectEnd = row.indexOf('</select>', selectStart);
+      const select = row.slice(selectStart, selectEnd);
+      // blank + 10 curated + other… = 12 total options.
+      assert.equal((select.match(/<option/g) || []).length, 12);
+    });
+
+    test('LIN-1111 Session 2: merges the live OpenRouter catalog into an opencode row\'s model option set', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchDefaults: { harness: 'opencode' },
+        dispatchModelCatalog: [{ id: 'mock-provider/catalog-model-one', name: 'Catalog Model One' }]
+      });
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 3000);
+      assert.match(row, /<option value="mock-provider\/catalog-model-one"[^>]*>Catalog Model One<\/option>/);
       // Still lists every curated suggestion too — supplement, not replace.
-      assert.match(datalist, /<option value="openai\/gpt-5\.4-mini">/);
+      assert.match(row, /<option value="openai\/gpt-5\.4-mini">/);
+    });
+
+    // LIN-2719 S0/S1: a $0-priced catalog entry carries a `data-free` marker
+    // into the option (never option text — render-settings.js:1141-1143's
+    // ratified convention).
+    test('a free catalog model carries a data-free marker on its option', () => {
+      const html = renderSettingsPage('Acme', {
+        ...BASE,
+        dispatchDefaults: { harness: 'opencode' },
+        dispatchModelCatalog: [
+          { id: 'mock-provider/free-model', name: 'Free Model', pricing: { prompt: '0', completion: '0' } },
+          { id: 'mock-provider/priced-model', name: 'Priced Model', pricing: { prompt: '0.00001', completion: '0.00002' } }
+        ]
+      });
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 3000);
+      assert.match(row, /<option value="mock-provider\/free-model" data-free="true">/);
+      assert.doesNotMatch(row, /<option value="mock-provider\/priced-model"[^>]*data-free/);
     });
 
     test('LIN-1111 Session 2: de-dupes a catalog entry that collides with a curated suggestion', () => {
       const html = renderSettingsPage('Acme', {
         ...BASE,
+        dispatchDefaults: { harness: 'opencode' },
         dispatchModelCatalog: [{ id: 'openai/gpt-5.4-mini', name: 'duplicate of a curated suggestion' }]
       });
-      const start = html.indexOf('<datalist id="dispatch-model-suggestions">');
-      const end = html.indexOf('</datalist>', start);
-      const datalist = html.slice(start, end);
-      const occurrences = datalist.split('openai/gpt-5.4-mini').length - 1;
+      const rowStart = html.indexOf('data-testid="dispatch-default-row-default"');
+      const row = html.slice(rowStart, rowStart + 3000);
+      const selectStart = row.indexOf('class="dispatch-model-input"');
+      const selectEnd = row.indexOf('</select>', selectStart);
+      const select = row.slice(selectStart, selectEnd);
+      // Count OPTION tags, not raw substring occurrences — a curated id's
+      // label equals its id, so a single <option value="x">x</option> tag
+      // legitimately contains the string twice.
+      const occurrences = (select.match(/<option value="openai\/gpt-5\.4-mini"/g) || []).length;
       assert.equal(occurrences, 1);
     });
   });
@@ -718,16 +762,19 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
     assert.doesNotMatch(html, /data-testid="dispatch-presets-empty"/);
 
     const p1Start = html.indexOf('data-testid="dispatch-preset-item-p1"');
-    const p1 = html.slice(p1Start, p1Start + 1500);
+    const p1 = html.slice(p1Start, p1Start + 3000);
     assert.match(p1, /class="dispatch-preset-name-input"[^>]*value="Claude preset"/);
-    assert.match(p1, /name="preset__p1__Model"[^>]*value="anthropic\/claude-opus-4\.8"/);
+    // A curated OpenCode id on a claude-code row isn't in that row's preset-only
+    // option set, so it degrades onto the escape hatch (HARD RULE 2/3).
+    assert.match(p1, /name="preset__p1__Model"[^>]*>[\s\S]*?<option value="__other__" selected>/);
+    assert.match(p1, /class="dispatch-model-input-other"[^>]*value="anthropic\/claude-opus-4\.8"/);
     assert.match(p1, /<option value="claude-code" selected>/);
     assert.match(p1, /data-preset-id="p1"/);
 
     const p2Start = html.indexOf('data-testid="dispatch-preset-item-p2"');
-    const p2 = html.slice(p2Start, p2Start + 1500);
+    const p2 = html.slice(p2Start, p2Start + 3000);
     assert.match(p2, /class="dispatch-preset-name-input"[^>]*value="OpenCode preset"/);
-    assert.match(p2, /name="preset__p2__Model"[^>]*value=""/);
+    assert.match(p2, /name="preset__p2__Model"[^>]*>\s*<option value="" selected>/);
     assert.match(p2, /<option value="opencode" selected>/);
   });
 
@@ -740,7 +787,7 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
       dispatchPresets: [{ id: 'p1', name: 'Effort preset', config: { model: 'm1', effort: 'high' } }]
     });
     const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
-    const row = html.slice(rowStart, rowStart + 1800);
+    const row = html.slice(rowStart, rowStart + 3000);
     assert.match(row, /name="preset__p1__Effort"[^>]*value="high"/);
   });
 
@@ -750,7 +797,7 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
       dispatchPresets: [{ id: 'p1', name: 'No effort', config: { model: 'm1' } }]
     });
     const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
-    const row = html.slice(rowStart, rowStart + 1800);
+    const row = html.slice(rowStart, rowStart + 3000);
     assert.match(row, /name="preset__p1__Effort"[^>]*value=""/);
   });
 
@@ -760,7 +807,7 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
       dispatchPresets: [{ id: 'p1', name: 'Blank harness preset', config: { model: 'anthropic/claude-opus-4.8' } }]
     });
     const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
-    const row = html.slice(rowStart, rowStart + 1500);
+    const row = html.slice(rowStart, rowStart + 3000);
     assert.doesNotMatch(row, /<option value="claude-code" selected>/);
     assert.doesNotMatch(row, /<option value="opencode" selected>/);
     assert.match(row, /<option value=""[^>]* selected>/);
@@ -770,20 +817,26 @@ describe('renderSettingsPage — Dispatch presets section (LIN-1391 S7)', () => 
     const html = renderSettingsPage('Acme', BASE);
     const rowStart = html.indexOf('data-testid="dispatch-preset-new-row"');
     assert.ok(rowStart > -1, 'expected a new-preset config row');
-    const row = html.slice(rowStart, rowStart + 1200);
+    const row = html.slice(rowStart, rowStart + 3000);
     assert.doesNotMatch(row, /<option value="claude-code" selected>/);
     assert.match(row, /<option value=""[^>]* selected>/);
   });
 
-  test('each preset config row reuses the shared harness-aware model datalists (LIN-1282)', () => {
+  // RE-EXPRESS (LIN-2719): no shared page-level datalist any more — the
+  // preset row builds its own harness-scoped option set the same way a
+  // dispatch-defaults row does.
+  test('each preset config row builds its own harness-aware model option set (LIN-1282)', () => {
     const html = renderSettingsPage('Acme', {
       ...BASE,
       dispatchPresets: [{ id: 'p1', name: 'Claude preset', config: { harness: 'claude-code' } }]
     });
     const rowStart = html.indexOf('data-testid="dispatch-preset-item-p1"');
-    const row = html.slice(rowStart, rowStart + 1500);
-    assert.match(row, /name="preset__p1__Model"[^>]*data-model-list-claude="dispatch-model-suggestions-claude"[^>]*data-model-list-opencode="dispatch-model-suggestions"/);
-    assert.match(row, /list="dispatch-model-suggestions-claude"/);
+    const row = html.slice(rowStart, rowStart + 3000);
+    const selectStart = row.indexOf('name="preset__p1__Model"');
+    const selectEnd = row.indexOf('</select>', selectStart);
+    const select = row.slice(selectStart, selectEnd);
+    assert.match(select, /<option value="opus">/);
+    assert.doesNotMatch(select, /<option value="openai\/gpt-5\.4-mini">/);
   });
 
   test('loads /settings.js so the preset CRUD handlers are wired', () => {
@@ -863,12 +916,18 @@ describe('renderSettingsPage — User/Workspace Settings groups (LIN-1399)', () 
     }
   });
 
-  test('Dispatch defaults still renders before Dispatch presets inside the Workspace group (shared datalist dependency)', () => {
-    const html = renderSettingsPage('Acme', BASE);
-    const ddIdx = html.indexOf('data-testid="settings-section-dispatch-defaults"');
-    const dpIdx = html.indexOf('data-testid="settings-section-dispatch-presets"');
-    assert.ok(ddIdx > -1 && dpIdx > -1 && ddIdx < dpIdx, 'dispatch defaults must render before dispatch presets');
-  });
+  // RETIRE (LIN-2719 S2, F4): this guard protected a forward id reference —
+  // the two page-level `<datalist>`s were emitted inside the Dispatch-defaults
+  // section and referenced by `list="…"` (by id) from preset rows rendered
+  // later, and HTML resolves `list=` by document id, so source order mattered.
+  // Under the select-per-row rewrite each row builds its own inline option
+  // set from `dispatchModelOptionSetFor` — there is no shared datalist, no id
+  // reference, and therefore no ordering dependency; a test that would pass
+  // for either order is not a guard. The coverage that matters is elsewhere:
+  // both sections' group membership and presence are already asserted below
+  // ("every settings section lands in its correct group") and in the
+  // Dispatch presets describe block ("always renders the section header as a
+  // sibling of Dispatch defaults, not nested inside it").
 
   test('does not invent a Theme control on the settings page', () => {
     const html = renderSettingsPage('Acme', BASE);
@@ -950,7 +1009,10 @@ describe('renderSettingsPage — Dispatch preset per-kind (byKind) overrides (LI
       }]
     });
     assert.match(html, /<details class="dispatch-preset-kind-overrides" open data-testid="dispatch-preset-row-p1-kind-overrides">/);
-    assert.match(html, /name="preset__p1__kind__review__Model"[^>]*value="opus-model"/);
+    // 'opus-model' isn't one of the four claude-code presets, so it degrades
+    // onto the escape hatch (HARD RULE 2/3) rather than being silently dropped.
+    assert.match(html, /name="preset__p1__kind__review__Model"[^>]*>[\s\S]*?<option value="__other__" selected>/);
+    assert.match(html, /name="preset__p1__kind__review__Model"[\s\S]{0,600}class="dispatch-model-input-other"[^>]*value="opus-model"/);
     assert.match(html, /name="preset__p1__kind__review__HarnessSelect"[\s\S]{0,200}<option value="claude-code" selected>/);
   });
 

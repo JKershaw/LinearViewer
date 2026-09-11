@@ -522,7 +522,9 @@ test.describe('Dispatch Queue', () => {
     await expect(controls).toBeVisible();
 
     await controls.locator('.dispatch-exec-harness-select').selectOption('claude-code');
-    await controls.locator('.dispatch-exec-model').fill('anthropic/claude-opus-4.8');
+    // Not one of the four Claude presets — the escape hatch (LIN-2719 HARD RULE 2/3).
+    await controls.locator('.dispatch-exec-model').selectOption('__other__');
+    await controls.locator('.dispatch-exec-model-other').fill('anthropic/claude-opus-4.8');
 
     const dispatchReq = page.waitForRequest(req =>
       req.url().includes('/api/dispatch') && req.method() === 'POST');
