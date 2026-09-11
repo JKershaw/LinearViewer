@@ -9,7 +9,7 @@
  * asserts that all 55 registrations still resolve"). This file is that
  * replacement, landed as PR-0 (no handler moves) before any group is moved.
  *
- * All 66 (method, URL) forms — 56 route registrations, 10 of them
+ * All 67 (method, URL) forms — 57 route registrations, 10 of them
  * array-path aliases (2 URL forms each) — are driven through
  * `createProxyRoutes` over REAL HTTP (an express app + `fetch`, the pattern
  * already established by tests/unit/proxy-route-aliases.test.js), each
@@ -447,6 +447,12 @@ const ROWS = [
     note: 'message must be <=2000 chars — the cheapest branch past auth+resolveProviderAccess, before any store is touched',
     run: () => call(buildApp(), 'POST', '/api/proxy/flight-companion/turn', { body: { message: 'x'.repeat(2001) } }),
   },
+  {
+    group: 'J', method: 'GET', url: '/api/proxy/flight-companion/transcripts', expect: 503,
+    note: 'LIN-2634: BASE_DEPS() carries no savedChatStore — the cheapest branch past auth, before any store is touched',
+    expectBody: { error: 'Saved chat transcripts store is not configured' },
+    run: () => call(buildApp(), 'GET', '/api/proxy/flight-companion/transcripts'),
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -475,14 +481,17 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // LIN-2620: group J adds 1 more registration, but it lands directly in
   // routes/proxy-flight-companion.js via router.use() (like every other
   // group above it) — routes/proxy.js's OWN registration count is unchanged.
-  test('routes/proxy.js has exactly 1 router.* registration (66 URL forms across the whole proxy surface)', () => {
+  // LIN-2634: group J adds a SECOND registration (GET .../transcripts) the
+  // same way — still invisible to this regex, still no change to
+  // routes/proxy.js's own count.
+  test('routes/proxy.js has exactly 1 router.* registration (67 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
     assert.equal(matches.length, 1,
       `expected 1 route registration in routes/proxy.js, found ${matches.length} — ` +
-      `this file's 66-row ROWS table must be re-derived from source before trusting it`);
-    assert.equal(ROWS.length, 66,
-      `this file's ROWS table must cover exactly 66 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 1 in routes/proxy-flight-companion.js + 10 array-path aliases), found ${ROWS.length}`);
+      `this file's 67-row ROWS table must be re-derived from source before trusting it`);
+    assert.equal(ROWS.length, 67,
+      `this file's ROWS table must cover exactly 67 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 13 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 2 in routes/proxy-flight-companion.js + 10 array-path aliases), found ${ROWS.length}`);
   });
 });
 
@@ -490,7 +499,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (all 66 URL forms resolve)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (all 67 URL forms resolve)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();

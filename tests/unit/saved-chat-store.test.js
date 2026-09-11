@@ -18,6 +18,7 @@ import { SavedChatStore } from '../../lib/saved-chat-store.js';
 function createMockCollection() {
   const docs = [];
   function matches(doc, query) {
+    if (query.taskIdentifier !== undefined && doc.taskIdentifier !== query.taskIdentifier) return false;
     if (query._id !== undefined && doc._id !== query._id) return false;
     if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
     if (query.accountId !== undefined && doc.accountId !== query.accountId) return false;
@@ -195,5 +196,96 @@ describe('SavedChatStore (LIN-1008)', () => {
   test('create requires urlKey and accountId', async () => {
     await assert.rejects(() => store.create('', USER_A, { transcript: sampleTranscript() }), /urlKey is required/);
     await assert.rejects(() => store.create(URL_KEY, '', { transcript: sampleTranscript() }), /accountId is required/);
+  });
+});
+
+describe('SavedChatStore.listByTask (LIN-2634)', () => {
+  let collection;
+  let store;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new SavedChatStore({ collection });
+  });
+
+  test('positive-content: returns exactly the taskIdentifier-matching chats, newest-first, with transcripts', async () => {
+    const first = await store.create(URL_KEY, USER_A, {
+      taskIdentifier: 'flight-companion',
+      transcript: [{ role: 'user', content: 'first companion chat' }]
+    });
+    const second = await store.create(URL_KEY, USER_A, {
+      taskIdentifier: 'flight-companion',
+      transcript: [{ role: 'user', content: 'second companion chat' }]
+    });
+    await store.create(URL_KEY, USER_A, {
+      taskIdentifier: 'LIN-1',
+      transcript: [{ role: 'user', content: 'ordinary task chat' }]
+    });
+
+    const result = await store.listByTask(URL_KEY, USER_A, 'flight-companion');
+    assert.deepStrictEqual(result.map(c => c.id), [second.id, first.id]);
+    assert.deepStrictEqual(result[0].transcript, [{ role: 'user', content: 'second companion chat' }]);
+    assert.deepStrictEqual(result[1].transcript, [{ role: 'user', content: 'first companion chat' }]);
+  });
+
+  test('non-leakage: another creator\'s companion chats are never returned (set equality, not containment)', async () => {
+    const aChat = await store.create(URL_KEY, USER_A, {
+      taskIdentifier: 'flight-companion',
+      transcript: [{ role: 'user', content: 'a companion chat' }]
+    });
+    await store.create(URL_KEY, USER_B, {
+      taskIdentifier: 'flight-companion',
+      transcript: [{ role: 'user', content: 'b companion chat' }]
+    });
+
+    const result = await store.listByTask(URL_KEY, USER_A, 'flight-companion');
+    assert.deepStrictEqual(result.map(c => c.id), [aChat.id]);
+  });
+
+  test('falsy accountId short-circuits to [] even against a matching legacy row', async () => {
+    await store.create(URL_KEY, USER_A, {
+      taskIdentifier: 'flight-companion',
+      transcript: [{ role: 'user', content: 'companion chat' }]
+    });
+    // A pure unit-test device: a legacy/corrupted row seeded directly into the
+    // mock, bypassing create() (which itself refuses a falsy accountId). Without
+    // this fixture the mutation below (dropping the guard) would still yield []
+    // vacuously, since no seeded doc has accountId: null.
+    collection._docs.push({
+      _id: 'legacy-row',
+      urlKey: URL_KEY,
+      accountId: null,
+      taskIdentifier: 'flight-companion',
+      title: 'legacy',
+      transcript: [{ role: 'user', content: 'legacy companion chat' }],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      seq: 0
+    });
+
+    const result = await store.listByTask(URL_KEY, null, 'flight-companion');
+    assert.deepStrictEqual(result, []);
+  });
+
+  test('two urlKeys: each workspace sees only its own companion chat', async () => {
+    const w1 = await store.create('workspace-1', USER_A, {
+      taskIdentifier: 'flight-companion',
+      transcript: [{ role: 'user', content: 'workspace 1 chat' }]
+    });
+    const w2 = await store.create('workspace-2', USER_A, {
+      taskIdentifier: 'flight-companion',
+      transcript: [{ role: 'user', content: 'workspace 2 chat' }]
+    });
+
+    const w1Result = await store.listByTask('workspace-1', USER_A, 'flight-companion');
+    assert.deepStrictEqual(w1Result.map(c => c.id), [w1.id]);
+
+    const w2Result = await store.listByTask('workspace-2', USER_A, 'flight-companion');
+    assert.deepStrictEqual(w2Result.map(c => c.id), [w2.id]);
+  });
+
+  test('store failure throws rather than resolving empty', async () => {
+    collection.find = () => ({ async toArray() { throw new Error('boom'); } });
+    await assert.rejects(() => store.listByTask(URL_KEY, USER_A, 'flight-companion'), /boom/);
   });
 });

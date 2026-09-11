@@ -137,6 +137,11 @@ function mergeToolEvents(events) {
  * @param {Object} deps.proxyTokenStore - Tool dep: `send_follow_up`'s bootstrap-provisioning seam (turn-core dep; inert under propose mode, kept for parity with the session route)
  * @param {Object} [deps.taskDecisionsStore] - Optional tool dep (LIN-2617); absent → that one tool reports "not configured"
  * @param {Object} [deps.shelvedRulingsStore] - Optional tool dep (LIN-2617); absent → that one tool reports "not configured"
+ * @param {Object} [deps.savedChatStore] - Optional (LIN-2634): backs GET .../flight-companion/transcripts,
+ *   a creator-scoped read of the token creator's own saved companion chats (never wired for write here —
+ *   see that route's own docstring). Absent → that one route 503s, matching GET /api/proxy/north-star's
+ *   degrade-to-503 posture (routes/proxy-compute.js) rather than the default: null, silent-empty
+ *   convention every other optional dep on this factory otherwise follows.
  * @param {{streamChat: Function, streamChatWithTools: Function}} [deps.chatClient] - Test seam; defaults to the real lib/openrouter.js exports
  * @param {Function} [deps.createToolCatalog] - Test seam; defaults to the real lib/chat-tools.js factory
  * @returns {Router}
@@ -159,6 +164,7 @@ export function createProxyFlightCompanionRoutes({
   proxyTokenStore,
   taskDecisionsStore = null,
   shelvedRulingsStore = null,
+  savedChatStore = null,
   chatClient = { streamChat: defaultStreamChat, streamChatWithTools: defaultStreamChatWithTools },
   createToolCatalog = defaultCreateChatToolCatalog,
 }) {
@@ -330,6 +336,46 @@ export function createProxyFlightCompanionRoutes({
       }
     }
   );
+
+  /**
+   * GET /api/proxy/flight-companion/transcripts (LIN-2634)
+   *
+   * Read-only: the token creator's own saved companion transcripts
+   * (`taskIdentifier: 'flight-companion'`, LIN-2437's opt-in saved chats),
+   * never another user's — the missing half of the feedback loop the ticket
+   * exists to add. Follows the SAME posture as GET /api/proxy/north-star
+   * (routes/proxy-compute.js) — `read` scope only, no `requireWriteScope`,
+   * no provider fetch: `savedChatStore` is a Harbour-local store, not
+   * Linear-backed. Identity comes from `req.proxyCreatedBy`/`req.proxyUrlKey`
+   * (never a session), so an ownerless/legacy token fails closed to `[]` —
+   * `listByTask` itself refuses a falsy `accountId` rather than this route
+   * doing so, matching the store's own `list()` convention.
+   *
+   * Failure is kept distinguishable from "genuinely no matches": an absent
+   * `savedChatStore` dependency 503s ("not configured", north-star's exact
+   * wording posture); a rejected store read 500s. Neither collapses to a
+   * bare `{ chats: [] }`.
+   *
+   * No `limit`/projection here — bounded by the store's own write-time
+   * 50-per-user cap (`lib/saved-chat-store.js`), not re-derived at this
+   * route. Revisit only if that cap or the per-chat content caps are raised,
+   * or this route's observed latency approaches problematic territory.
+   */
+  router.get('/api/proxy/flight-companion/transcripts', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    const TRANSCRIPTS_ENDPOINT = '/api/proxy/flight-companion/transcripts';
+    if (!savedChatStore) {
+      logEvent(req, TRANSCRIPTS_ENDPOINT, 503);
+      return jsonError(res, 503, 'Saved chat transcripts store is not configured');
+    }
+    try {
+      const chats = await savedChatStore.listByTask(req.proxyUrlKey, req.proxyCreatedBy, 'flight-companion');
+      logEvent(req, TRANSCRIPTS_ENDPOINT, 200);
+      res.json({ chats });
+    } catch (err) {
+      logEvent(req, TRANSCRIPTS_ENDPOINT, 500);
+      jsonError(res, 500, 'Failed to read saved chat transcripts');
+    }
+  });
 
   return router;
 }
