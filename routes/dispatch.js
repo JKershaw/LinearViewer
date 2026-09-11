@@ -663,6 +663,23 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (err && err.proxyAttachFailed) {
         return serviceUnavailable.json(res, 'Proxy context was requested but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
       }
+      // Terminal-anchor refusal (LIN-2775 Area 8): same tagged-throw relay
+      // convention as the duplicate/budget guards above — the body was
+      // already constructed once by createDispatchItem, this is a relay,
+      // not a second construction site. Beat 5 correction: this branch was
+      // MISSING entirely — a correct, deliberate safety refusal (409,
+      // `code: 'ANCHOR_TERMINAL'`) was falling through to the generic 500
+      // below, so the stable code this guard's own unit tests assert on
+      // never actually reached the wire.
+      if (err && err.anchorTerminalRefusal) {
+        return jsonError(res, 409, err.message, err.anchorTerminalRefusal);
+      }
+      // An invalid `composedRunMarker` (LIN-2775 Area 8): a genuine caller
+      // validation error, not a fault — same beat-5 correction, this was
+      // also falling through to the 500 below.
+      if (err && err.composedRunMarkerInvalid) {
+        return badRequest.json(res, err.message);
+      }
       console.error('Dispatch error:', err.message);
       jsonError(res, 500, 'Failed to dispatch prompt');
     }

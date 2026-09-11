@@ -1537,6 +1537,7 @@ describe('createDispatchItem — terminal-anchor guard (LIN-2775 Area 8)', () =>
 
     assert.ok(err);
     assert.equal(err.status, 400);
+    assert.ok(err.composedRunMarkerInvalid, 'must be a tagged relay-able error, not a bare status check');
     assert.equal(providerCalls, 0, 'validation must precede any read');
     assert.equal(store.captured.item, undefined);
   });
