@@ -414,6 +414,19 @@
     flex: 1 1 auto;
     min-height: 0;
     --chat-thread-max-height: none;
+    /* LIN-2715: `.flight-companion-chat-empty` is shrinkable (`min-height: 0`)
+       with no `overflow` rule of its own, so a long client-loaded playbook
+       (public/flight-companion.js's loadPlaybookEmptyState) can exceed this
+       box's height and, with the default `overflow: visible`, paint straight
+       out onto the next siblings in flow — `#flight-companion-start` first,
+       then the composer. `#flight-companion-thread`'s pairing sibling
+       `.chat-thread` already gets this from chat.css:50; this completes the
+       same pattern on the empty state's half of the pair. Measured (LIN-2715
+       investigation) as the only candidate that removes the overlap without
+       pushing Start/composer out of this section into the next one — unlike
+       `min-height: auto` or `flex: 0 0 auto`, which stop the overlap by
+       growing the column past its `100dvh` cap and leave Start unclickable. */
+    overflow-y: auto;
   }
   /* LIN-2621: the status strip is a new direct child, prepended above the
      thread — it takes its natural (wrapped) height like the section-header
