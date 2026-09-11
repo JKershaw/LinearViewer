@@ -1170,7 +1170,7 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
       "decision": { "decision_id": "...", "question": "...", "options": [{ "id": "a", "label": "..." }] },
       "anchor": { "issueId": "<raw uuid>", "issueIdentifier": "LIN-42", "workspaceUrlKey": "...", "loopId": "...", "taskDecisionId": "..." },
       "disposition": "resumable|gone|mid-turn|indeterminate|task-bound",
-      "effect": "resume|dispatch|record",
+      "effect": "resume|dispatch|record" | null,
       "declaredEffect": "resume|dispatch|record" | null,
       "alternate": "resume|dispatch|record" | null,
       "canReply": true,
@@ -1194,11 +1194,14 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
   read-only disposition (`mid-turn`/`indeterminate`) never surfaces a **declared** effect — but
   live evidence on the anchor, including the read-only row's own loop (which is itself
   non-terminal by definition of `mid-turn`/`indeterminate`), still resolves `effect` to
-  `record`. So a read-only row is **not** guaranteed a `null` `effect`; only its
-  `declaredEffect` is guaranteed `null`.
+  `record`. So a read-only row never surfaces its declared effect **in** `effect` —
+  `declaredEffect` is **not** guaranteed `null` on such a row; it still reports whatever the
+  block declared, if anything.
 - **`declaredEffect`** is what the runner's own `DECISION:` block requested, via an optional
-  `on_answer: { "effect": "..." }` field — `null` when nothing was declared (always `null` on a
-  read-only row, per the previous bullet).
+  `on_answer: { "effect": "..." }` field — `null` when nothing was declared. This is
+  disposition-independent: a read-only row can still carry a non-null `declaredEffect` if the
+  runner declared one, even though that declaration never surfaces in `effect` (per the
+  previous bullet).
 - **`effect`** can differ from **`declaredEffect`**: live evidence always overrides a
   declaration — an already-`resumable` disposition always resolves to `resume` regardless of
   what was declared, and a live run already in progress on the same anchor issue always forces

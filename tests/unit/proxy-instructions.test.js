@@ -153,10 +153,19 @@ describe('buildInstructions — GET /api/proxy/rulings publishes the effect enum
     assert.doesNotMatch(text, /is null only for the two read-only dispositions/);
   });
 
-  test('declaredEffect, not effect, is documented as guaranteed null on a read-only row', () => {
+  // LIN-2777: the corrective commit for finding 1 (a6effb29) introduced a
+  // NEW false guarantee of the same class — claiming "declaredEffect" is
+  // guaranteed null on a read-only row. It is not: declaredEffect is read
+  // straight off decision.on_answer.effect (lib/unanswered-decisions.js)
+  // and every one of resolveEffect's branches, including the read-only
+  // branch, returns it unchanged. Only "effect" is suppressed on a
+  // read-only row — declaredEffect still reports whatever was declared.
+  test('a read-only row never surfaces its declared effect IN "effect", but "declaredEffect" is documented as NOT guaranteed null there', () => {
     const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
     assert.match(text, /read-only disposition \("mid-turn"\/"indeterminate"\) never\s*\n\s*surfaces a DECLARED effect/);
     assert.match(text, /still resolves "effect" to "record"/);
-    assert.match(text, /"declaredEffect" is guaranteed null/);
+    assert.match(text, /read-only row never surfaces its declared effect IN\s*"effect"/);
+    assert.match(text, /"declaredEffect" is NOT guaranteed null on such a row; it still reports\s*\n\s*whatever the block declared, if anything\./);
+    assert.doesNotMatch(text, /"declaredEffect" is guaranteed null/);
   });
 });
