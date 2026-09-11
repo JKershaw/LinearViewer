@@ -328,3 +328,23 @@ describe('render-observation: the three disclaimers stay textually distinct (LIN
     }
   });
 });
+
+describe('render-observation: bulk select-all checkbox accessible name (LIN-2444 review, Minor — ≤400px a11y nit)', () => {
+  // At max-width:400px, public/observation.css hides `.obs-ruling-bulk-select-all-text`
+  // via `display:none`, which drops it from the accessible-name computation —
+  // the wrapping <label>'s only text was that span, so the checkbox lost its
+  // only name at that viewport. An explicit aria-label on the input itself
+  // always wins over the implicit wrapping-label association, so the name
+  // survives regardless of the span's visibility.
+  test('the select-all checkbox carries its own aria-label, independent of the visible label text', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a' }
+    );
+    assert.match(
+      html,
+      /<input type="checkbox" id="obs-ruling-select-all" aria-label="select all suggested">/,
+      'the select-all checkbox must carry an aria-label so it has a name even when the sibling text span is display:none at ≤400px'
+    );
+  });
+});

@@ -564,6 +564,139 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
   });
 });
 
+// LIN-2444 review F4 — no e2e coverage existed anywhere for the suggested-
+// dismissal UI: the native confirm() gate, a real <input type="checkbox">
+// selection, the bulk bar's real `hidden`, or `selectAll.indeterminate`.
+// Seeds a real standing suggestion via the actual proxy suggest-dismissal
+// route (the same one an agent uses in production), never a fabricated
+// client-side `suggestedDismissal` field.
+async function suggestDismissal(page, decisionId, { urlKey = URL_KEY, reason = 'shipped separately' } = {}) {
+  const tokenResp = await page.request.get(`/test/create-proxy-token?scope=readWrite&label=suggest&urlKey=${urlKey}`);
+  const { token } = await tokenResp.json();
+  const resp = await page.request.post(`/api/proxy/rulings/${decisionId}/suggest-dismissal`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { reason }
+  });
+  expect(resp.status(), `suggest-dismissal failed: ${await resp.text()}`).toBe(201);
+}
+
+test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearRuns(page);
+    await page.goto(`/test/clear-dismissal-suggestions?urlKey=${URL_KEY}`);
+  });
+
+  test('a suggested row renders the banner + a real checkbox, and selecting rows drives the bulk bar\'s real hidden/count/indeterminate state', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2444-BULK-1', issueTitle: 'Bulk suggested A', decisionId: 'd-bulk-a', blocked: true });
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2444-BULK-2', issueTitle: 'Bulk suggested B', decisionId: 'd-bulk-b', blocked: true });
+    await suggestDismissal(page, 'd-bulk-a');
+    await suggestDismissal(page, 'd-bulk-b');
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-1' });
+    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-2' });
+    await expect(rowA).toBeVisible();
+    await expect(rowB).toBeVisible();
+    await expect(rowA).toContainText('proposed dismissal');
+
+    const bar = page.locator('#obs-ruling-bulk-bar');
+    await expect(bar).toBeVisible();
+    const selectAll = page.locator('#obs-ruling-select-all');
+    const count = page.locator('#obs-ruling-selected-count');
+    const agreeSelected = page.locator('#obs-ruling-agree-selected');
+    await expect(count).toHaveText('0 selected');
+    await expect(agreeSelected).toBeDisabled();
+
+    const checkboxA = rowA.locator('.obs-ruling-select');
+    await expect(checkboxA).toBeVisible();
+    await checkboxA.check();
+
+    await expect(count).toHaveText('1 selected');
+    await expect(agreeSelected).toBeEnabled();
+    await expect(agreeSelected).toHaveText('Agree selected (1)');
+    // A real DOM tri-state: one of two selectable rows selected.
+    expect(await selectAll.evaluate((el) => el.indeterminate)).toBe(true);
+    expect(await selectAll.evaluate((el) => el.checked)).toBe(false);
+
+    await rowB.locator('.obs-ruling-select').check();
+    await expect(count).toHaveText('2 selected');
+    await expect(selectAll).toBeChecked();
+    expect(await selectAll.evaluate((el) => el.indeterminate)).toBe(false);
+
+    await checkboxA.uncheck();
+    await expect(count).toHaveText('1 selected');
+    expect(await selectAll.evaluate((el) => el.indeterminate)).toBe(true);
+  });
+
+  test('cancelling the native confirm() sends no dismiss request and leaves the row(s) selected and unanswered', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2444-BULK-3', issueTitle: 'Bulk cancel', decisionId: 'd-bulk-cancel', blocked: true });
+    await suggestDismissal(page, 'd-bulk-cancel');
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-3' });
+    await row.locator('.obs-ruling-select').check();
+
+    let dialogText = null;
+    let dismissRequested = false;
+    await page.route('**/api/dashboard/rulings/dismiss', async (route) => { dismissRequested = true; return route.continue(); });
+    page.once('dialog', async (dialog) => {
+      dialogText = dialog.message();
+      await dialog.dismiss();
+    });
+    await page.locator('#obs-ruling-agree-selected').click();
+    await page.waitForTimeout(200);
+
+    expect(dialogText).toContain('Agree 1 selected suggestion');
+    expect(dialogText).toContain('cannot be undone');
+    expect(dismissRequested, 'declining the confirm() dialog must send no dismiss request').toBe(false);
+    // Still there, still selected, still checked — nothing was silently discarded.
+    await expect(row).toBeVisible();
+    await expect(row.locator('.obs-ruling-select')).toBeChecked();
+    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('1 selected');
+  });
+
+  test('accepting the native confirm() agrees every selected row for real: both settle immediately, and the feed eventually clears', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2444-BULK-4', issueTitle: 'Bulk accept A', decisionId: 'd-bulk-accept-a', blocked: true });
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2444-BULK-5', issueTitle: 'Bulk accept B', decisionId: 'd-bulk-accept-b', blocked: true });
+    await suggestDismissal(page, 'd-bulk-accept-a');
+    await suggestDismissal(page, 'd-bulk-accept-b');
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-4' });
+    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-5' });
+    await page.locator('#obs-ruling-select-all').check();
+    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('2 selected');
+
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.locator('#obs-ruling-agree-selected').click();
+
+    // Both rows settle at the moment of success — no wait for a poll: controls
+    // disabled, feedback recorded, selection emptied, bar hidden.
+    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('agreed');
+    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('agreed');
+    await expect(rowA.locator('.obs-ruling-select')).toBeDisabled();
+    await expect(page.locator('#obs-ruling-bulk-bar')).toBeHidden();
+    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('0 selected');
+
+    // Genuinely dismissed server-side, not just locally settled — same
+    // sessionsFeedCache SWR TTL budget as the existing option-press test above.
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-4' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-5' })).toHaveCount(0, { timeout: 20000 });
+  });
+});
+
 // LIN-2215 — the task-bound row end to end: a scan-produced decision
 // (LIN-2197's third producer) reaching the rulings surface and its reply
 // path actually delivering. Seeded through a GENUINE local-provider

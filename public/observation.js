@@ -102,24 +102,6 @@ function rulingKey(urlKey, decisionId) {
   return `${urlKey}::${decisionId}`;
 }
 const rulingsPending = new Set();          // rulingKey → currently mid-reply (disables its buttons)
-// A key moves here the instant its Agree succeeds (review F2 — the plan's own
-// Phase 5 wording: "on success the Agree path marks the key in a small
-// `rulingsSettled` Set"). Needed even for the single-row press, not only a
-// future bulk batch: a succeeded loop-backed row is served from the stale
-// feed cache for TTL + two reads, so it keeps appearing in the payload with
-// `suggestedDismissal` still set. Without this, the next 5s poll rebuilds the
-// row FULLY RE-ARMED (renderRulingRow renders fresh, enabled controls), and a
-// second press re-POSTs — `markDecisionAnswered`'s unconditional `$push` has
-// no idempotence guard on that branch, so this stamps TWO `decision-answer`
-// entries on one decision. `rulingsSettled` is OR-ed into `renderRulings`'
-// `mustReuse` below so such a row is REUSED with its controls still disabled
-// rather than rebuilt re-armed, and it is released once the key is absent
-// from a poll's actual payload (the row has finally left the feed for real).
-// Deliberately its OWN Set — not `preservedRulingRows` (purpose-built for
-// partial-failure retry state) and not a second dismiss/answer-state
-// mutation (Agree still runs the one existing dismiss path; nothing about
-// answer state changes here).
-const rulingsSettled = new Set();
 const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across a poll's repaint (partial-failure retry state)
 // rulingKey → the <li> currently attached to #obs-rulings for it (LIN-1728
 // review F3). Populated on every renderRulings pass and consulted whenever a
@@ -129,6 +111,42 @@ const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across
 // press and completion rebuilds a fresh (enabled) row while the closure keeps
 // writing into the now-detached old one — see the renderRulings comment below.
 const renderedRulingRows = new Map();
+
+// ─── Bulk-agree selection (LIN-2444 Phase 5) ────────────────────────────────
+//
+// `rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, decisionId)` —
+// mirrors the established `dueSelectedIds` discipline (below) for the SAME
+// reason: `renderRulings` rebuilds/reuses each <li> every 5s poll, so
+// checkbox DOM state can never be the source of truth, only a reflection of
+// this Set. A bare `decision_id` is not enough here either — the same
+// cross-workspace collision `rulingKey` exists to prevent (LIN-2293, see the
+// comment above `rulingKey` itself).
+const rulingsSelected = new Set();
+// A key moves here the instant its Agree succeeds — a single-click press
+// (review F2) or a row's turn inside a bulk batch (never a plain
+// Dismiss/Shelve/Keep — the plan's scope note keeps those untouched). This is
+// the plan-review finding's fix, and per the plan's own Phase 5 wording it
+// applies to "the Agree path" as a whole, not only bulk: a succeeded
+// loop-backed row is served from the stale feed cache for TTL + two reads, so
+// it keeps appearing in the payload with `suggestedDismissal` still set,
+// fully re-armed, inviting a second press that would re-POST a duplicate
+// `decision-answer` (`markDecisionAnswered`'s unconditional `$push` has no
+// idempotence guard on that branch). `rulingsSettled` is OR-ed into
+// `renderRulings`' `mustReuse` below so such a row is REUSED with its
+// controls still disabled rather than rebuilt re-armed, and it is released
+// once the key is absent from a poll's actual payload (the row has finally
+// left the feed for real). Deliberately its OWN Set — not
+// `preservedRulingRows` (purpose-built for partial-failure retry state) and
+// not a second dismiss/answer-state mutation (Agree still runs the one
+// existing dismiss path; nothing about answer state changes here).
+const rulingsSettled = new Set();
+// rulingKey → the row payload from the poll that currently renders it.
+// Populated/pruned in lockstep with `renderedRulingRows` (same `seen`
+// bookkeeping in renderRulings), so a key can never outlive the <li> it
+// names. This is bulk-agree's only source of a selected key's
+// `anchor`/`decisionId` at press time — row objects are otherwise local to
+// whichever `pollRulings()` call produced them.
+const rulingsRowByKey = new Map();
 
 // Archive pagination state (LIN-631). The live poll always refreshes the first
 // page (offset 0); "load more" requests subsequent offsets and those extra
@@ -1581,16 +1599,28 @@ function renderRulings(rulings) {
     const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
     nodes.push(li);
-    if (key) { seen.add(key); renderedRulingRows.set(key, li); }
+    if (key) {
+      seen.add(key);
+      renderedRulingRows.set(key, li);
+      rulingsRowByKey.set(key, row);
+      // A withdrawn suggestion (row.suggestedDismissal gone null — e.g. a
+      // human pressed Keep in another tab) must drop out of selection HERE,
+      // in this same sweep, not only when the key later leaves `seen`
+      // entirely (review F1): the ruling itself is still unanswered, so it
+      // never leaves the payload, and a selected-but-withdrawn key would
+      // otherwise survive to the next "Agree selected" press and dismiss a
+      // ruling the human just said to keep.
+      if (!row?.suggestedDismissal) rulingsSelected.delete(key);
+    }
   }
 
-  // Release a settled key (review F2) the moment its row is absent from THIS
-  // poll's actual payload — checked against `seen` here, BEFORE the
-  // preserved/pending re-add loops below re-inject stale nodes for their own,
-  // unrelated reasons, so a settled row that has genuinely left the feed
-  // (task-bound: next poll; loop-backed: once the stale cache catches up)
-  // stops being force-reused. A later re-suggestion on the same key then
-  // starts fully re-armed rather than permanently disabled.
+  // Release a settled key (review F2 / LIN-2444 Phase 5) the moment its row
+  // is absent from THIS poll's actual payload — checked against `seen` here,
+  // BEFORE the preserved/pending re-add loops below re-inject stale nodes for
+  // their own, unrelated reasons, so a settled row that has genuinely left
+  // the feed (task-bound: next poll; loop-backed: once the stale cache
+  // catches up) stops being force-reused. A later re-suggestion on the same
+  // key then starts fully re-armed rather than permanently disabled.
   for (const key of Array.from(rulingsSettled)) {
     if (!seen.has(key)) rulingsSettled.delete(key);
   }
@@ -1609,14 +1639,21 @@ function renderRulings(rulings) {
     }
   }
   // Drop bookkeeping for rows no longer worth remembering (answered and
-  // neither pending nor mid partial-failure-retry).
+  // neither pending nor mid partial-failure-retry) — also prunes the
+  // bulk-agree selection/row-data seams (LIN-2444 Phase 5) so a vanished
+  // row's key can never remain selected or resolvable.
   for (const key of Array.from(renderedRulingRows.keys())) {
-    if (!seen.has(key)) renderedRulingRows.delete(key);
+    if (!seen.has(key)) {
+      renderedRulingRows.delete(key);
+      rulingsRowByKey.delete(key);
+      rulingsSelected.delete(key);
+    }
   }
 
   list.textContent = '';
   for (const node of nodes) list.appendChild(node);
   if (empty) empty.hidden = nodes.length > 0;
+  syncRulingsBulkBar();
 }
 
 // ─── Basis-freshness check for a task-bound ruling (LIN-2241 tier 1) ────────
@@ -1769,10 +1806,38 @@ function renderRulingRow(row) {
     const banner = document.createElement('div');
     banner.className = 'obs-ruling-suggestion';
 
+    // Bulk-agree selection checkbox (LIN-2444 Phase 5). Renders ONLY on a
+    // suggested row — there is nothing to bulk-agree without one. Checked
+    // state is restored from `rulingsSelected` at creation time (the Set is
+    // authoritative, never the checkbox's own DOM state — renderRulings can
+    // rebuild this <li> from scratch on the next poll). `toggleRulingSelection`
+    // itself refuses a settled key, so a row currently locked post-success
+    // (still visible in the stale cache window) cannot be re-selected even
+    // if this checkbox somehow fires while `rulingRowControls`' disabled
+    // pass hasn't caught it.
+    const suggestionHead = document.createElement('div');
+    suggestionHead.className = 'obs-ruling-suggestion-head';
+    const selectionKey = (decision?.decision_id && anchor?.workspaceUrlKey)
+      ? rulingKey(anchor.workspaceUrlKey, decision.decision_id)
+      : null;
+    if (selectionKey) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'obs-ruling-select';
+      // LIN-2706 §B.3's convention: the identifier lives in the sibling
+      // `idLabel` span above, so an unlabeled checkbox announces nothing
+      // useful to a screen reader.
+      checkbox.setAttribute('aria-label', `select ${idLabel} for bulk agree`);
+      checkbox.checked = rulingsSelected.has(selectionKey);
+      checkbox.addEventListener('change', () => toggleRulingSelection(selectionKey, checkbox.checked));
+      suggestionHead.appendChild(checkbox);
+    }
+
     const label = document.createElement('p');
     label.className = 'obs-ruling-suggestion-label';
     label.textContent = 'proposed dismissal';
-    banner.appendChild(label);
+    suggestionHead.appendChild(label);
+    banner.appendChild(suggestionHead);
 
     const reason = document.createElement('p');
     reason.className = 'obs-ruling-suggestion-reason';
@@ -1989,6 +2054,12 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
     const panel = li.querySelector('.obs-ruling-shelve-panel');
     if (panel) panel.remove();
     setFeedback('shelved', false);
+    // Review F8: same class as Dismiss/Agree/Keep/reply — a shelved row still
+    // carries `suggestedDismissal` (shelving doesn't withdraw the
+    // suggestion), so `rulingsRowByKey` keeps it live and a same-tab
+    // bulk-agree would otherwise re-dismiss a ruling the operator just
+    // deferred with a re-surface timer.
+    rulingsSelected.delete(key);
     pollRulings();
     refreshBadge();
   }).catch((err) => {
@@ -2006,8 +2077,15 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
 // buttons live, and Agree drives the same unconditional-`$push` dismiss
 // stamp `markDecisionAnswered` writes, which has no idempotence guard of its
 // own on the loop-backed branch).
+//
+// `.obs-ruling-select` (LIN-2444 Phase 5) joins the set for the same reason:
+// it is a new interactive control a suggested row carries, and — more than
+// cosmetic here — it must stay disabled for as long as a bulk-agreed row is
+// held in `rulingsSettled`, which is exactly what stops the operator
+// re-selecting and re-agreeing a row that already succeeded but is still
+// showing (stale cache window).
 function rulingRowControls(li) {
-  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep');
+  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep, .obs-ruling-select');
 }
 
 // The actual dismiss request (LIN-2444 Phase 3, extracted from the body
@@ -2069,6 +2147,11 @@ function dismissRulingRow(row, li) {
   issueDismissRequest(anchor, decisionId).then(() => {
     restore();
     setFeedback('dismissed', false);
+    // Same class as F6/F7 (review): the selection seam #1432 ships is what
+    // makes a dismissed-but-still-selected row reachable by bulk-agree
+    // within the stale poll window, even though this verb itself predates
+    // that seam and is otherwise out of scope.
+    rulingsSelected.delete(key);
     pollRulings();
     refreshBadge();
   }).catch((err) => {
@@ -2117,7 +2200,14 @@ function agreeRulingRow(row, li) {
   return issueDismissRequest(anchor, decisionId).then(() => {
     rulingsPending.delete(key);
     setFeedback('agreed', false);
+    // Review F6: clear selection at the moment of success, exactly as
+    // `bulkAgreeRow` already does — otherwise a settled-but-still-selected
+    // row survives the stale poll window and desyncs the bulk bar's count
+    // against `rulingsSelectableKeys()` (which excludes settled rows).
+    rulingsSelected.delete(key);
     rulingsSettled.add(key);
+    const checkbox = li.querySelector('.obs-ruling-select');
+    if (checkbox) checkbox.checked = false;
     pollRulings();
     refreshBadge();
   }).catch((err) => {
@@ -2165,6 +2255,11 @@ function keepRulingRow(row, li) {
   }).then(() => {
     restore();
     setFeedback('kept', false);
+    // Review F7: clear selection the moment Keep succeeds — otherwise the
+    // withdrawal only reaches `rulingsRowByKey` via the next poll, and a
+    // bulk-agree press in the same tab can still dismiss the ruling the
+    // operator just pressed Keep on.
+    rulingsSelected.delete(key);
     pollRulings();
   }).catch((err) => {
     restore();
@@ -2173,6 +2268,7 @@ function keepRulingRow(row, li) {
     // not something the operator needs alarmed about.
     if (err && err.status === 404) {
       setFeedback('already withdrawn', false);
+      rulingsSelected.delete(key);
       pollRulings();
       return;
     }
@@ -2206,6 +2302,182 @@ function appendSuggestionActions(actions, row, li) {
   if (!row?.suggestedDismissal) return;
   actions.appendChild(makeAgreeButton(row, li));
   actions.appendChild(makeKeepButton(row, li));
+}
+
+// ─── Bulk-agree (LIN-2444 Phase 5) ──────────────────────────────────────────
+
+// The currently-selectable population: every key with a live suggestion
+// that has not already succeeded this stale-cache window. Recomputed fresh
+// on every call (the `syncDueBulkBar` discipline) rather than cached, so it
+// can never desync from `rulingsRowByKey`/`rulingsSettled`.
+function rulingsSelectableKeys() {
+  const keys = [];
+  for (const [key, row] of rulingsRowByKey) {
+    if (row?.suggestedDismissal && !rulingsSettled.has(key)) keys.push(key);
+  }
+  return keys;
+}
+
+// Re-applies `rulingsSelected` membership onto every currently-rendered
+// checkbox (LIN-2444 Phase 5) — used after a change to the SELECTION alone
+// (select-all-suggested), when the underlying rows themselves haven't
+// changed, mirroring `repaintDueRows`' rationale exactly.
+function repaintRulingsSelection() {
+  for (const [key, li] of renderedRulingRows) {
+    const checkbox = li.querySelector('.obs-ruling-select');
+    if (checkbox) checkbox.checked = rulingsSelected.has(key);
+  }
+}
+
+// The per-row checkbox's own entry point (mirrors `toggleDueSelection`'s
+// extraction rationale — directly callable without simulating a DOM change
+// event). A settled key refuses selection outright: it already succeeded
+// and is only still visible because the feed cache hasn't caught up, so
+// re-selecting it would just re-open the double-post hole `rulingsSettled`
+// exists to close.
+function toggleRulingSelection(key, checked) {
+  if (!key || rulingsSettled.has(key)) return;
+  if (checked) rulingsSelected.add(key);
+  else rulingsSelected.delete(key);
+  syncRulingsBulkBar();
+}
+
+// Select-all-suggested (mirrors `setAllDueSelected`'s extraction rationale).
+// Scoped to `rulingsSelectableKeys()`, so a settled row can never be swept
+// into the selection by this control either.
+function setAllRulingsSelected(checked) {
+  for (const key of rulingsSelectableKeys()) {
+    if (checked) rulingsSelected.add(key);
+    else rulingsSelected.delete(key);
+  }
+  repaintRulingsSelection();
+  syncRulingsBulkBar();
+}
+
+// Re-syncs the bulk bar's visibility, the select-all checkbox's tri-state,
+// the exact count, and the Agree-selected button's enabled state/label —
+// all DERIVED here, never stored, so none of them can desync from
+// `rulingsSelected` (the `syncDueBulkBar` discipline). Called after every
+// rulings repaint and every selection change.
+function syncRulingsBulkBar() {
+  const bar = document.getElementById('obs-ruling-bulk-bar');
+  const selectAll = document.getElementById('obs-ruling-select-all');
+  const countEl = document.getElementById('obs-ruling-selected-count');
+  const agreeBtn = document.getElementById('obs-ruling-agree-selected');
+
+  const selectable = rulingsSelectableKeys();
+  const total = selectable.length;
+  const selectedCount = rulingsSelected.size;
+
+  if (bar) bar.hidden = total === 0;
+  if (selectAll) {
+    selectAll.checked = total > 0 && selectedCount === total;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+  }
+  if (countEl) countEl.textContent = `${selectedCount} selected`;
+  if (agreeBtn) {
+    agreeBtn.disabled = selectedCount === 0;
+    agreeBtn.textContent = `Agree selected (${selectedCount})`;
+  }
+}
+
+// Native confirm() (LIN-511's ratified destructive-action primitive, in the
+// form LIN-2650 landed — RETIRE_CONFIRM_TEXT, public/scan.js) behind a named
+// function beside its one call site, interpolating the count so the
+// operator sees exactly what they are about to discharge.
+function bulkAgreeConfirmText(count) {
+  return `Agree ${count} selected suggestion${count === 1 ? '' : 's'}? `
+    + 'Each is a real dismissal, exactly like pressing Agree on that row one at a time — this cannot be undone from here.';
+}
+
+// Extracted to its own top-level function, unlike the inline `refreshBadge`
+// closure every other rulings write carries — this one is called exactly
+// ONCE per batch (see bulkAgreeSelected), and being a named top-level
+// function makes it directly test-observable without needing
+// `observationData` populated (vm-sandboxed unit tests never call `init()`,
+// the only site that sets it).
+function refreshRulingsBadge(pageUrlKey) {
+  if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey);
+}
+
+// Bulk-agree's per-row execution. Runs the SAME `issueDismissRequest` core
+// Agree/Dismiss already share — no new dismiss path — inside its own
+// pending guard/disable/feedback wiring, but UNLIKE `agreeRulingRow` it
+// does NOT call `pollRulings()`/refresh the badge itself (the caller owns
+// exactly one of each per BATCH, never one per row), and on SUCCESS it does
+// NOT re-enable the row's controls. That asymmetry is deliberate: a
+// succeeded key is deleted from `rulingsSelected` right here, at the moment
+// of success — never inferred from the row leaving a later poll's payload
+// (the plan-review finding) — and marked in `rulingsSettled` so
+// `renderRulings` reuses this exact <li>, controls still disabled, for as
+// long as the row keeps showing up in the stale cache. A FAILED row is
+// restored (re-enabled) and left selected, so it stays visible, stays
+// recoverable, and a later "Agree selected" press retries only it.
+function bulkAgreeRow(key, row, li) {
+  const { decision, anchor } = row || {};
+  const decisionId = decision?.decision_id;
+  // Belt and braces alongside the `renderRulings` prune above (review F1):
+  // the row looked up here is whatever the most recent poll last wrote into
+  // `rulingsRowByKey`, which can have changed between the batch's `confirm()`
+  // and this key's own turn in the sequential loop — re-check the suggestion
+  // is still live rather than trusting the snapshot taken at confirm time.
+  if (!key || !anchor?.workspaceUrlKey || !decisionId || !row?.suggestedDismissal || rulingsPending.has(key) || rulingsSettled.has(key)) {
+    return Promise.resolve();
+  }
+
+  rulingsPending.add(key);
+  const controls = rulingRowControls(li);
+  controls.forEach(el => { el.disabled = true; });
+
+  const feedback = li.querySelector('.obs-ruling-feedback');
+  const setFeedback = (text, isError) => {
+    if (!feedback) return;
+    feedback.textContent = text;
+    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+  };
+
+  return issueDismissRequest(anchor, decisionId).then(() => {
+    rulingsPending.delete(key);
+    setFeedback('agreed', false);
+    rulingsSelected.delete(key);
+    rulingsSettled.add(key);
+    const checkbox = li.querySelector('.obs-ruling-select');
+    if (checkbox) checkbox.checked = false;
+  }).catch((err) => {
+    console.error('Bulk agree failed for a row:', err);
+    rulingsPending.delete(key);
+    controls.forEach(el => { el.disabled = false; });
+    setFeedback('agree failed: ' + err.message, true);
+  });
+}
+
+// Bulk-agree entry point — the confirmed, SEQUENTIAL loop over
+// `rulingsSelected`. Deliberately NOT `startBulkScan`/the pool: that pool's
+// defect is structural (`onResult` is called unguarded inside `finally`,
+// BEFORE `teardown()`/`pump()`, so a throwing callback strands the whole
+// run — LIN-2709) and sequencing avoids it BY CONSTRUCTION rather than by a
+// guard, needing no `AbortController`, no teardown, no module-level run
+// pointer. Per-row failure cannot wedge this loop: `bulkAgreeRow` never
+// rejects (its own `.catch` swallows), so this `for…of` always reaches the
+// next key regardless of what happened to the last one.
+async function bulkAgreeSelected() {
+  const keys = Array.from(rulingsSelected);
+  if (keys.length === 0) return;
+  if (!confirm(bulkAgreeConfirmText(keys.length))) return;
+
+  for (const key of keys) {
+    const row = rulingsRowByKey.get(key);
+    const li = renderedRulingRows.get(key);
+    if (!row || !li) continue; // vanished since the press — nothing left to act on
+    await bulkAgreeRow(key, row, li);
+  }
+
+  // Exactly one pollRulings() and one badge refresh for the WHOLE batch —
+  // N per-row calls would be N redundant reads of the same cached value and
+  // could not show progress either way.
+  pollRulings();
+  refreshRulingsBadge(observationData?.urlKey);
+  syncRulingsBulkBar();
 }
 
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
@@ -2267,6 +2539,13 @@ function deliverRulingReply(row, prompt, li) {
   const onDelivered = () => {
     restore();
     setFeedback('recorded ✓', false);
+    // Fifth instance of the review's class, found while closing F6/F7: a
+    // repliable row can ALSO carry a live suggestion (appendSuggestionActions
+    // renders regardless of canReply), so it can be bulk-selected and then
+    // answered via reply/option press instead of Agree. That answers the
+    // decision just as terminally as Agree does, so the same
+    // selection-clearing is owed here.
+    rulingsSelected.delete(key);
     pollRulings();
     refreshBadge();
   };
@@ -2284,6 +2563,10 @@ function deliverRulingReply(row, prompt, li) {
   // reappearing, until the retry succeeds and releases it below.
   const makePartialFailureHandler = (label) => (err, retryRun) => {
     restore();
+    // The comment (the answer) already succeeded by the time this fires —
+    // only the run failed to start/resume — so the answer is already
+    // durable, same reasoning as `onDelivered` above.
+    rulingsSelected.delete(key);
     preservedRulingRows.set(key, li);
     setFeedback(`Recorded. Could not ${label}: ${err.message}. `, true);
     if (feedback) {
@@ -3189,6 +3472,18 @@ function initControls() {
   const dueStop = document.getElementById('obs-due-stop');
   if (dueStop) dueStop.addEventListener('click', stopBulkScan);
 
+  // Bulk-agree bar (LIN-2444 Phase 5) — both static controls, attached
+  // once, same rationale as the Scan-due pair just above.
+  const rulingSelectAll = document.getElementById('obs-ruling-select-all');
+  if (rulingSelectAll) {
+    rulingSelectAll.addEventListener('click', (e) => {
+      setAllRulingsSelected(!!e.target.checked);
+    });
+  }
+
+  const rulingAgreeSelected = document.getElementById('obs-ruling-agree-selected');
+  if (rulingAgreeSelected) rulingAgreeSelected.addEventListener('click', bulkAgreeSelected);
+
   const chips = document.getElementById('obs-chips');
   if (chips) {
     chips.addEventListener('click', (e) => {
@@ -3272,10 +3567,25 @@ if (typeof module !== 'undefined' && module.exports) {
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.
-    issueDismissRequest, agreeRulingRow, keepRulingRow, rulingRowControls,
-    // Review F2: expose rulingsSettled so the settled-state regression pins
-    // the same seam the fix actually reads/writes.
-    rulingsSettled,
+    // dismissRulingRow (LIN-2225, pre-existing) is exposed alongside them so
+    // the review's third open selection-clearing instance is directly
+    // testable, not just inferred from Agree/Keep's coverage. shelveRulingRow
+    // is exposed the same way (review F8, `0708a260`) — the sixth instance
+    // of the class, found in the round-3 review.
+    issueDismissRequest, agreeRulingRow, keepRulingRow, dismissRulingRow, shelveRulingRow, rulingRowControls,
+    // Review F2: rulingsSettled is exposed below (shared with LIN-2444
+    // Phase 5's own export block) so the settled-state regression pins the
+    // same seam both the single-click and bulk fixes read/write.
+    //
+    // LIN-2444 Phase 5: the bulk-agree selection/execution seam — the
+    // selection Set + its per-row/select-all toggles, the settled-Set +
+    // row-data map renderRulings/bulk-agree share, and the confirm-gated
+    // batch runner + its per-row core, each directly unit-testable without
+    // simulating a DOM click/change event.
+    rulingsSelected, rulingsSettled, rulingsRowByKey,
+    toggleRulingSelection, setAllRulingsSelected, rulingsSelectableKeys,
+    syncRulingsBulkBar, repaintRulingsSelection,
+    bulkAgreeConfirmText, refreshRulingsBadge, bulkAgreeRow, bulkAgreeSelected,
     // LIN-2293 review (F1): the collision has TWO halves — "disables both"
     // (deliverRulingReply/rulingsPending, covered above) and "re-renders
     // both", which lives entirely in renderRulings' reuse lookup against
