@@ -243,6 +243,158 @@ describe('appendBubble (LIN-2437 A.11 review finding 1) — assistant bubble spe
 // LIN-2445 — the pill's two write paths, at the unit level. The end-to-end
 // witnesses are in tests/e2e/task-chat.spec.js; these pin the mechanism
 // directly so a regression names the function rather than a rendered class.
+// LIN-2483/LIN-2634 — openSavedChat's empty-field fix: resuming a companion
+// sentinel chat must never seed the raw sentinel into idInput.value (which
+// isValidIssueId would pass, so send() would post it as an issue id and
+// 404). activeTask keeps the sentinel either way, so the label/pill/save
+// path (which all read activeTask, not idInput.value) are unaffected.
+function extractOpenSavedChatSrc() {
+  const start = TASK_CHAT_JS_SRC.indexOf('  function openSavedChat(id) {');
+  assert.notEqual(start, -1, 'openSavedChat found in public/task-chat.js');
+  const end = TASK_CHAT_JS_SRC.indexOf('\n  function deleteSavedChat', start);
+  assert.notEqual(end, -1, 'the next top-level function marks the end of the slice');
+  return TASK_CHAT_JS_SRC.slice(start, end);
+}
+
+function makeOpenSavedChatSandbox({ apiResponse, apiRejects = false } = {}) {
+  const appendBubbleCalls = [];
+  const toasts = [];
+  const sandbox = {
+    urlKey: 'acme',
+    activeTask: '',
+    chatHistory: [],
+    idInput: { value: '' },
+    questionInput: { focus: () => {} },
+    transcript: new FakeElement('ol'),
+    activeLabel: { textContent: '' },
+    resetBtn: { classList: { remove: () => {} } },
+    setEmptyVisible: () => {},
+    updateSaveVisibility: () => {},
+    appendBubble: (role, text, state) => {
+      appendBubbleCalls.push({ role, text, state });
+      return { classList: { add: () => {} } };
+    },
+    window: {
+      api: () => (apiRejects ? Promise.reject(new Error('fail')) : Promise.resolve(apiResponse)),
+      ChatUI: { renderMarkdownText: () => {} },
+      toast: (msg, opts) => { toasts.push({ msg, opts }); },
+    },
+    console,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(extractMaskFnSrc(), sandbox, { filename: 'task-chat.js-mask-slice' });
+  vm.runInContext(extractOpenSavedChatSrc(), sandbox, { filename: 'task-chat.js-open-saved-chat-slice' });
+  return { sandbox, appendBubbleCalls, toasts };
+}
+
+// One microtask-chain flush past window.api()'s .then/.catch — a Node
+// setImmediate (macrotask) runs strictly after every pending microtask, so
+// this is enough regardless of how many .then hops the resolved chain has.
+function flush() {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+describe('openSavedChat (LIN-2483/LIN-2634) — resume never seeds the raw sentinel into idInput', () => {
+  test('a companion sentinel chat resumes with idInput EMPTY, while activeTask keeps the sentinel and the label reads the masked name', async () => {
+    const { sandbox } = makeOpenSavedChatSandbox({
+      apiResponse: { chat: { taskIdentifier: 'flight-companion', transcript: [{ role: 'assistant', content: 'Standing by.' }] } },
+    });
+    sandbox.openSavedChat('c1');
+    await flush();
+
+    assert.equal(sandbox.idInput.value, '', 'idInput must be left empty, never the raw sentinel');
+    assert.equal(sandbox.activeTask, 'flight-companion', 'activeTask must still carry the sentinel — the save path reads this');
+    assert.equal(sandbox.activeLabel.textContent, 'talking to Flight Companion');
+  });
+
+  test('an ordinary saved task chat still seeds idInput with the real identifier', async () => {
+    const { sandbox } = makeOpenSavedChatSandbox({
+      apiResponse: { chat: { taskIdentifier: 'TEST-1', transcript: [{ role: 'user', content: 'hi' }] } },
+    });
+    sandbox.openSavedChat('c2');
+    await flush();
+
+    assert.equal(sandbox.idInput.value, 'TEST-1');
+    assert.equal(sandbox.activeTask, 'TEST-1');
+    assert.equal(sandbox.activeLabel.textContent, 'talking to TEST-1');
+  });
+});
+
+// LIN-2483/LIN-2634 — send()'s label-rebuild mask, on the whole-function
+// slice + stubbed global fetch technique (correction 2): the harness parses
+// whole top-level statements between markers, so a partial-body slice up to
+// the label assignment (stopping short of the raw fetch call, the original
+// plan's technique) cannot parse. The label assignment runs synchronously
+// BEFORE the fetch call, so a fetch that never settles is sufficient — no
+// downstream SSE/tool-breadcrumb machinery needs to exist in the sandbox.
+function extractSendSrc() {
+  const start = TASK_CHAT_JS_SRC.indexOf('  function send() {');
+  assert.notEqual(start, -1, 'send found in public/task-chat.js');
+  const end = TASK_CHAT_JS_SRC.indexOf('\n  sendBtn.addEventListener', start);
+  assert.notEqual(end, -1, 'the whole send() function body must be captured before the next top-level statement');
+  return TASK_CHAT_JS_SRC.slice(start, end);
+}
+
+function makeSendSandbox({ idValue, activeTask }) {
+  const appendBubbleCalls = [];
+  const sandbox = {
+    streaming: false,
+    idInput: { value: idValue, focus: () => {} },
+    questionInput: { value: 'a question', focus: () => {} },
+    activeTask,
+    chatHistory: [],
+    transcript: new FakeElement('ol'),
+    activeLabel: { textContent: '' },
+    resetBtn: { classList: { remove: () => {} } },
+    prefillTask: '',
+    prefillSource: '',
+    urlKey: 'acme',
+    appendBubble: (role, text) => {
+      appendBubbleCalls.push({ role, text });
+      return { classList: { add: () => {} }, closest: () => ({}) };
+    },
+    updateSaveVisibility: () => {},
+    setBusy: () => {},
+    // A real, never-settling native Promise — send()'s .then()/.catch() chain
+    // registers callbacks that simply never run, so nothing downstream of the
+    // synchronous label assignment (readSSEStream, tool breadcrumbs, done/
+    // error handling) needs to exist in this sandbox.
+    fetch: () => new Promise(() => {}),
+    console,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(extractMaskFnSrc(), sandbox, { filename: 'task-chat.js-mask-slice' });
+  vm.runInContext(extractSendSrc(), sandbox, { filename: 'task-chat.js-send-slice' });
+  return { sandbox, appendBubbleCalls };
+}
+
+describe('send() (LIN-2483/LIN-2634) — the label rebuild never re-exposes the raw sentinel', () => {
+  test('re-editing the id field back to the raw sentinel masks the label on the very next send', () => {
+    const { sandbox } = makeSendSandbox({ idValue: 'flight-companion', activeTask: '' });
+    sandbox.send();
+
+    assert.equal(sandbox.activeLabel.textContent, 'talking to Flight Companion');
+    assert.ok(!sandbox.activeLabel.textContent.includes('flight-companion'), 'the raw sentinel must never reach the label');
+  });
+
+  test('an ordinary task id leaves the mask a no-op', () => {
+    const { sandbox } = makeSendSandbox({ idValue: 'TEST-1', activeTask: '' });
+    sandbox.send();
+
+    assert.equal(sandbox.activeLabel.textContent, 'talking to TEST-1');
+  });
+
+  test('switching FROM the companion chat to a real task id does not rebuild the label a second time with stale masking', () => {
+    // activeTask already equals taskId (both real), so the switching branch
+    // — and therefore the label rebuild — does not run at all here; this
+    // pins that the mask fix didn't accidentally make the branch run always.
+    const { sandbox } = makeSendSandbox({ idValue: 'TEST-1', activeTask: 'TEST-1' });
+    sandbox.send();
+
+    assert.equal(sandbox.activeLabel.textContent, '', 'no switch happened, so the label is untouched by this send()');
+  });
+});
+
 describe('appendBubble / setBubbleState (LIN-2445) — the assistant pill settles', () => {
   test('a live assistant turn still OPENS in-progress', () => {
     const { sandbox, captured } = makeBubbleSandbox('TEST-1');

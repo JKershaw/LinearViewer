@@ -175,8 +175,21 @@
   //      quietest: an assistant-only transcript repeats it N times).
   // `idInput.value` is deliberately NOT masked — the input holds a real,
   // editable identifier that send() posts as an issue id, so masking it there
-  // would break the value rather than the label. That is a separate fix,
-  // routed to its own follow-up.
+  // would break the value rather than the label. LIN-2483/LIN-2634: for a
+  // companion sentinel chat specifically, openSavedChat() below leaves
+  // `idInput.value` EMPTY rather than seeding the raw sentinel into it (which
+  // `isValidIssueId` would pass, so send() would post it as an issue id and
+  // 404 — the original LIN-2483 bug). Masking the field instead of emptying
+  // it was considered and rejected: a masked label differs from `activeTask`
+  // (which keeps the raw sentinel), which trips send()'s switching branch
+  // (below, `taskId !== activeTask`) on the very next send attempt and wipes
+  // the just-resumed transcript before the request even fires — worse than
+  // the plain no-op an empty field produces. The accepted consequence: a
+  // resumed companion chat is silently unsendable until a real task id is
+  // typed in (send()'s own `if (!taskId)` guard below fires first, before
+  // the history-clearing branch, so nothing is lost) — a deliberate,
+  // recorded trade, not an oversight. A visible affordance for this is a
+  // named LIN-2437 follow-up, not built here.
   var FLIGHT_COMPANION_SENTINEL = 'flight-companion';
   var FLIGHT_COMPANION_LABEL = 'Flight Companion';
 
@@ -257,7 +270,12 @@
         if (!chat) return;
         chatHistory = (chat.transcript || []).map(function (t) { return { role: t.role, content: t.content }; });
         activeTask = chat.taskIdentifier || '';
-        idInput.value = activeTask;
+        // LIN-2483: never seed the raw sentinel into the visible field — see
+        // the standing comment above for why emptying (not masking) is the
+        // fix. `activeTask` keeps the sentinel either way, so the label
+        // below, the speaker pill (appendBubble), and the save path all
+        // still work unchanged.
+        idInput.value = (activeTask === FLIGHT_COMPANION_SENTINEL) ? '' : activeTask;
         transcript.innerHTML = '';
         // LIN-2445: every replayed turn is finished by definition — it was
         // persisted. Open it settled rather than appending an in-progress pill
@@ -313,7 +331,12 @@
       chatHistory = [];
       transcript.innerHTML = '';
       activeTask = taskId;
-      if (activeLabel) activeLabel.textContent = 'talking to ' + taskId;
+      // LIN-2483: mask the sentinel here too — the field can be re-edited
+      // back to the raw 'flight-companion' string (e.g. the user retypes it
+      // after it was emptied on resume, see openSavedChat above), and this
+      // label rebuild must never re-expose it just because idInput.value
+      // itself is deliberately unmasked.
+      if (activeLabel) activeLabel.textContent = 'talking to ' + maskFlightCompanionSentinel(taskId);
       if (resetBtn) resetBtn.classList.remove('hidden');
     }
 
