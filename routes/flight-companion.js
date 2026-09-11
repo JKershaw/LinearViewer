@@ -436,9 +436,13 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
  * createChatToolCatalog" framing does not hold for this one store at HEAD.
  * Threading a store reference through with zero readers would be inert,
  * untestable plumbing — worse than not passing it, since nothing would ever
- * catch it going stale. LIN-2437 is the natural, sole owner of wiring
- * `savedChatStore` alongside the CRUD routes it will add, the same one-piece
- * shape LIN-1008 used for Task Chat.
+ * catch it going stale. LIN-2437 remains the sole owner of any FUTURE
+ * write/CRUD surface here, the same one-piece shape LIN-1008 used for Task
+ * Chat — but is no longer the sole place `savedChatStore` is wired at all:
+ * LIN-2634 threads it into the PROXY surface instead (routes/proxy-flight-
+ * companion.js's read-only `GET .../transcripts`), a different file, a
+ * different auth boundary, and read-only. This route itself still takes no
+ * `savedChatStore` param, unchanged.
  * @param {{streamChat: Function, streamChatWithTools: Function}} [deps.chatClient] -
  *   LIN-2432 beat 4: the ONLY seam this route adds beyond what
  *   `routes/task-chat.js` has, and deliberately narrow — it overrides just the
