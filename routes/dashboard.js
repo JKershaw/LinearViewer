@@ -195,7 +195,12 @@ function effectiveAgentState(loop) {
   return marker ? MARKER_TO_AGENT_STATE[marker] : loop.agentState;
 }
 
-function isTerminalLoop(loop) {
+// Exported (LIN-2773 Area 4) so routes/proxy-rulings.js can reuse this EXACT
+// predicate for `liveDispatchOnAnchor` rather than hand-rolling an
+// equivalent — two independently-maintained "is this loop terminal" checks
+// is exactly the disagreement class LIN-1728's own module doc (top of
+// lib/unanswered-decisions.js) already names as a prior incident.
+export function isTerminalLoop(loop) {
   return !!loop && TERMINAL_AGENT_STATES.has(loop.agentState);
 }
 
@@ -1514,8 +1519,25 @@ export function createDashboardRoutes({
       // legacy suggestion). Previously this route and the proxy route each
       // hand-rolled their own (different, neither loop-aware) version of
       // this join — now there is exactly one.
+      //
+      // LIN-2773 Area 4: `liveDispatchOnAnchor` — is there a live (non-terminal)
+      // run on this row's own anchor issue, elsewhere in the SAME already-fetched
+      // `merged` set? Zero new reads: `merged` is the exact loop set this route
+      // already holds above. No `agentState === 'running'` conjunct — that would
+      // miss `queued` (created, not yet claimed) and `waiting` (parked `blocked`
+      // on that very anchor), both of which are live runs on the anchor.
+      // `anchorTerminal` is deliberately NOT passed here: this route backs the
+      // 5s ambient nav-badge poll (see the comment atop this handler), which
+      // must never evaluate it — full stop, not merely omitted by convention.
       const rulings = attachStandingSuggestions(
-        collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings }, { now: new Date() }),
+        collectUnansweredDecisions(
+          { loops: merged, taskDecisions, shelvedRulings },
+          {
+            now: new Date(),
+            liveDispatchOnAnchor: (issueIdentifier) =>
+              merged.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
+          }
+        ),
         suggestions
       );
 
