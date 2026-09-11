@@ -157,9 +157,12 @@
 
   // ─── Saved chats (LIN-1008) ─────────────────────────────────────────────────
 
-  // LIN-2437: Flight Companion sessions save through this SAME endpoint under
-  // the sentinel task identifier 'flight-companion' (not a real task id — kept
-  // regex-clean so the existing resume/send validation path is untouched). The
+  // LIN-2437: a Flight Companion session would save through this SAME endpoint
+  // under the sentinel task identifier 'flight-companion' (not a real task id —
+  // kept regex-clean so the existing resume/send validation path is untouched)
+  // — no shipped code emits that tag today, so this is the contract this file
+  // renders for, not a claim that it happens in production yet (a Save control
+  // on the Flight Companion page is a tracked LIN-2437 follow-up). The
   // sentinel is never rewritten in storage; it is masked once, here, at render
   // time, and every surface that echoes a saved chat's task identifier reuses
   // this one helper so none of them can drift. The four render surfaces:

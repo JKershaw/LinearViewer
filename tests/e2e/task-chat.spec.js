@@ -571,9 +571,12 @@ test.describe('Task Chat Page (experimental)', () => {
     });
 
     test('a saved Flight Companion chat (sentinel taskIdentifier) renders a readable label, never the raw sentinel (LIN-2437)', async ({ page }) => {
-      // Flight Companion sessions save through this SAME saved-chat endpoint
-      // (not through the live send() flow), under the 'flight-companion'
-      // sentinel task identifier — and an assistant-only transcript (no user
+      // A Flight Companion session would save through this SAME saved-chat
+      // endpoint (not through the live send() flow), under the
+      // 'flight-companion' sentinel task identifier — no shipped producer
+      // emits that tag today (LIN-2437 follow-up), so this fixture writes it
+      // directly, the same way this test's own real-world population would
+      // once that producer exists. An assistant-only transcript (no user
       // turn) hits the auto-derived title's "Chat about …" fallback, the
       // exact leak this beat masks.
       const saveRes = await page.request.post(`${CHAT_API}/saved`, {

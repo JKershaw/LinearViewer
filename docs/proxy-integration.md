@@ -1054,6 +1054,54 @@ endpoint's copy is the best-effort cross-device mirror of it.
   never a 503.
 - **503** when roadmap report history isn't configured on this deployment.
 
+#### Get Flight Companion Transcripts
+
+```
+GET /api/proxy/flight-companion/transcripts
+```
+
+Returns the token **creator's** own saved Flight Companion transcripts (LIN-2634) —
+saved chats tagged `taskIdentifier: 'flight-companion'` (LIN-2437's opt-in saved-chat
+control) — never another user's, and never an ordinary Task Chat transcript. Pure
+Harbour-local read: no Linear fetch, no LLM call. Read scope is sufficient; there is no
+write path on this route.
+
+Identity is `req.proxyCreatedBy` (the token creator's account) paired with the token's
+own workspace (`req.proxyUrlKey`), never a session — a creator-less/ownerless token
+resolves an empty list, always (fails closed, same posture as [Get North
+Star](#get-north-star)).
+
+```json
+{
+  "chats": [
+    {
+      "id": "uuid",
+      "taskIdentifier": "flight-companion",
+      "title": "Chat about flight-companion",
+      "transcript": [
+        { "role": "user", "content": "..." },
+        { "role": "assistant", "content": "..." }
+      ],
+      "createdAt": "2026-09-11T15:27:17.477Z",
+      "updatedAt": "2026-09-11T15:27:17.477Z"
+    }
+  ]
+}
+```
+
+- Newest-first. Each entry carries its full transcript — unlike the session-auth
+  `list()` endpoint's summaries, this route's sole consumer (an agent grading the
+  companion's own boot against it) actually needs the content.
+- No `limit`/pagination/projection: bounded by the saved-chat store's own write-time
+  cap (50 chats per `{urlKey, accountId}` pair, LIN-1008) rather than re-derived here.
+  Revisit only if that cap, or the store's per-chat content caps, are ever raised.
+- **503** when the saved-chat store isn't configured on this deployment (this route's
+  dependency is optional, unlike most others on this surface).
+- **500**, never a bare `{ "chats": [] }`, on a store-level read failure — kept
+  distinguishable from "the creator genuinely has none".
+- No shipped code emits the sentinel today — a fresh deployment's list is empty until
+  a Save control on the Flight Companion page (a tracked LIN-2437 follow-up) lands.
+
 #### Get Periodicals
 
 ```

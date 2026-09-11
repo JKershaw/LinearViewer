@@ -503,9 +503,12 @@ const harbourCommentsStore = new HarbourCommentsStore({
 })
 
 // Saved chats (LIN-1008): durable, resumable task-chat transcripts, private per
-// {urlKey, accountId}. Content-bearing → session-auth only: deliberately NOT
-// passed to createProxyRoutes / createWorkspaceApiRoutes / kpi-stats below (the
-// prompt-trace privacy boundary), only into the task-chat + test route factories.
+// {urlKey, accountId}. Content-bearing → session-auth only, with ONE narrow,
+// deliberate exception (LIN-2634): passed to createProxyRoutes below for
+// exactly one creator-scoped, read-only query (GET .../flight-companion/
+// transcripts) — still never passed to createWorkspaceApiRoutes / kpi-stats
+// (the prompt-trace privacy boundary), and otherwise still only into the
+// task-chat + test route factories.
 const savedChatsCollection = db.collection('saved-chats')
 const savedChatStore = new SavedChatStore({
   collection: savedChatsCollection
