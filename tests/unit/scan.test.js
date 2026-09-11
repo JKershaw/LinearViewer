@@ -153,6 +153,27 @@ describe('parseScanResponse — outcome ordering', () => {
     const result = parseScanResponse(raw, { issueId: ISSUE_ID, inputHash: HASH });
     assert.equal(result.decision.decision_id, TaskDecisionsStore.buildId(ISSUE_ID, HASH));
   });
+
+  // LIN-2773 Area 2: scan-produced decisions are `record` by construction —
+  // injected at persistence time, never exposed via the LLM schema.
+  test('a scan-produced decision always carries on_answer: { effect: "record" }', () => {
+    const raw = JSON.stringify({ has_decision: true, question: 'Q?', free_text: true });
+    const result = parseScanResponse(raw, { issueId: ISSUE_ID, inputHash: HASH });
+    assert.equal(result.outcome, 'decision');
+    assert.deepEqual(result.decision.on_answer, { effect: 'record' });
+  });
+
+  test('a model that smuggles its own on_answer is overridden — the injected "record" always wins, regardless of model output', () => {
+    const raw = JSON.stringify({
+      has_decision: true,
+      question: 'Q?',
+      free_text: true,
+      on_answer: { effect: 'dispatch', record_on: 'LIN-999' },
+    });
+    const result = parseScanResponse(raw, { issueId: ISSUE_ID, inputHash: HASH });
+    assert.equal(result.outcome, 'decision');
+    assert.deepEqual(result.decision.on_answer, { effect: 'record' });
+  });
 });
 
 describe('generateScan — fail-closed at the generateScan level (LIN-2197 Phase 4 close-out ledger item L5)', () => {

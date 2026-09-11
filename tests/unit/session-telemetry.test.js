@@ -821,6 +821,95 @@ describe('parseDecision (LIN-2181)', () => {
     const scalarMessage = `[decision] ${JSON.stringify({ decision_id: 'd-1', if_unanswered: 'stop' })}`;
     assert.ok(!('if_unanswered' in parseDecision(scalarMessage)));
   });
+
+  // LIN-2773 Area 1: additive, validating on_answer parse.
+  describe('on_answer (LIN-2773)', () => {
+    test('a DECISION: block without on_answer produces a row byte-identical to today\'s', () => {
+      const decision = parseDecision(decisionMessage());
+      assert.deepEqual(decision, {
+        decision_id: 'd-1',
+        question: 'Proceed with the migration?',
+        options: [
+          { id: 'yes', label: 'Proceed' },
+          { id: 'no', label: 'Hold', cost: 2 },
+        ],
+        recommended: 'yes',
+        free_text: true,
+        if_unanswered: { disposition: 'a', note: 'default to hold' },
+      });
+      assert.ok(!('on_answer' in decision));
+    });
+
+    test('a well-formed on_answer survives hook.js\'s re-serialization + parseDecision, end-to-end', () => {
+      // Mirrors simple-dispatcher's hook.js scanDecisionBlock (confirmed by
+      // reading hook.js:562-566): it JSON.parses the raw DECISION: block's
+      // payload, then re-serialises the WHOLE parsed object with no
+      // per-field allow-list — `${DECISION_PREFIX}${JSON.stringify(parsed)}`
+      // — before the `[decision]` feedback entry ever reaches
+      // session-telemetry's parseDecision. Reproduced here (JSON.parse then
+      // JSON.stringify, matching that shape) rather than importing across
+      // the repo boundary, since hook.js lives in the sibling
+      // simple-dispatcher repo (out of scope for this ticket).
+      const rawPayload = {
+        decision_id: 'd-1',
+        question: 'Resume or record?',
+        options: [{ id: 'yes', label: 'Yes' }],
+        on_answer: { effect: 'resume', record_on: 'LIN-123' },
+      };
+      const reSerialized = JSON.parse(JSON.stringify(rawPayload));
+      const message = `[decision] ${JSON.stringify(reSerialized)}`;
+      const decision = parseDecision(message);
+      assert.deepEqual(decision.on_answer, { effect: 'resume', record_on: 'LIN-123' });
+    });
+
+    test('effect is validated against the closed {resume, dispatch, record} set', () => {
+      for (const effect of ['resume', 'dispatch', 'record']) {
+        const decision = parseDecision(decisionMessage({ on_answer: { effect } }));
+        assert.equal(decision.on_answer.effect, effect);
+      }
+    });
+
+    test('an invalid effect drops only that field, keeping a valid record_on and the rest of the entry', () => {
+      const message = decisionMessage({ on_answer: { effect: 'bogus', record_on: 'LIN-123' } });
+      const decision = parseDecision(message);
+      assert.ok(decision);
+      assert.equal(decision.decision_id, 'd-1');
+      assert.deepEqual(decision.on_answer, { record_on: 'LIN-123' });
+    });
+
+    test('an invalid record_on drops only that field, keeping a valid effect', () => {
+      const message = decisionMessage({ on_answer: { effect: 'record', record_on: 'not a valid id!' } });
+      const decision = parseDecision(message);
+      assert.deepEqual(decision.on_answer, { effect: 'record' });
+    });
+
+    test('record_on is validated with the shared ISSUE_ID_REGEX (lib/workspace.js), not a re-derived pattern', () => {
+      const decision = parseDecision(decisionMessage({ on_answer: { record_on: 'ABC-9' } }));
+      assert.equal(decision.on_answer.record_on, 'ABC-9');
+    });
+
+    test('both fields invalid collapses on_answer to absent — never null, never drops the whole entry', () => {
+      const message = decisionMessage({ on_answer: { effect: 'bogus', record_on: '   nope   ' } });
+      assert.doesNotThrow(() => parseDecision(message));
+      const decision = parseDecision(message);
+      assert.ok(decision);
+      assert.equal(decision.decision_id, 'd-1');
+      assert.ok(!('on_answer' in decision));
+    });
+
+    test('a non-object on_answer (array or scalar) is dropped entirely, never throws', () => {
+      const arrayMessage = decisionMessage({ on_answer: [1, 2] });
+      assert.doesNotThrow(() => parseDecision(arrayMessage));
+      assert.ok(!('on_answer' in parseDecision(arrayMessage)));
+      const scalarMessage = decisionMessage({ on_answer: 'resume' });
+      assert.ok(!('on_answer' in parseDecision(scalarMessage)));
+    });
+
+    test('an empty on_answer object yields no on_answer field', () => {
+      const decision = parseDecision(decisionMessage({ on_answer: {} }));
+      assert.ok(!('on_answer' in decision));
+    });
+  });
 });
 
 describe('parseDecisions (LIN-2181)', () => {
