@@ -1204,8 +1204,8 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
   previous bullet).
 - **`effect`** can differ from **`declaredEffect`**: live evidence always overrides a
   declaration — an already-`resumable` disposition always resolves to `resume` regardless of
-  what was declared, and a live run already in progress on the same anchor issue always forces
-  `record`, even over a declared `dispatch`.
+  what was declared, and, on any row that is not already `resumable`, a live run already in
+  progress on the same anchor issue forces `record`, even over a declared `dispatch`.
 - **`alternate`** names the untaken option ONLY when a genuine declared-vs-default choice
   existed and no evidence forced the outcome; otherwise `null`.
 - **`suggestedDismissal`** is the standing proposal on that ruling, if any (see the `POST`
