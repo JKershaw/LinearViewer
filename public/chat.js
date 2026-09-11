@@ -184,6 +184,11 @@
    * @param {Object} opts
    * @param {Array<{id: string, label: string, cost?: number}>} [opts.options] - decision options.
    * @param {string} [opts.recommended] - the recommended option's `id`, if any.
+   * @param {string} [opts.recommendedLabel] - opt-in marker text (e.g. "agent recommends") rendered
+   *   next to the recommended option's button, as a DOM text node (never innerHTML), matching the
+   *   `opt.label` discipline below. Omitted by default so existing callers (Flight Companion's
+   *   `.fc-decision` cards) render byte-identically to today — this is additive, never a rename of
+   *   the existing `.chat-option--recommended` CSS star.
    * @param {'resumable'|'gone'|'mid-turn'|'indeterminate'|'task-bound'} opts.disposition - press-time disposition (see `lib/unanswered-decisions.js`).
    * @param {'resume'|'dispatch'|'record'|null} [opts.effect] - press-time resolved effect (`lib/unanswered-decisions.js`'s `resolveEffect`), used effect-first for the caption on a row that can act; ignored (never claimed) on a read-only disposition (LIN-2775 Area 5).
    * @param {function(string, string): void} [opts.onSelect] - called with `(optionId, optionLabel)` on a button press. Never called for a read-only disposition — an ALLOW-list of `resumable`/`gone`/`task-bound` is interactive; every other value, including one not yet in this list, is read-only (LIN-2215 F2) — or when `options` is empty.
@@ -232,7 +237,21 @@
       // DOM text, never innerHTML — opt.label is agent-authored and must never
       // reach a markup sink (this is the constraint's targeted regression case:
       // a label containing markup must render as literal text, not execute).
+      // Set BEFORE the recommended-marker span below: `textContent =` clears
+      // any existing children, so appending the marker first would be wiped.
       btn.textContent = opt.label;
+      if (opts.recommended && opt.id === opts.recommended && opts.recommendedLabel) {
+        // DOM text node, never innerHTML — same discipline as opt.label
+        // above. Opt-in only: omitting opts.recommendedLabel (the default)
+        // adds no DOM here, which is the whole guarantee that Flight
+        // Companion's `.fc-decision` cards (public/flight-companion.js's
+        // renderOneDecision, which never sets this option) stay byte-
+        // identical to today.
+        var marker = document.createElement('span');
+        marker.className = 'chat-option-recommended-label';
+        marker.textContent = opts.recommendedLabel;
+        btn.appendChild(marker);
+      }
       btn.addEventListener('click', function () { onSelect(opt.id, opt.label); });
       row.appendChild(btn);
     });

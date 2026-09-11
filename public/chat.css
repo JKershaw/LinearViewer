@@ -309,6 +309,12 @@
 .chat-option-btn.chat-option--recommended::after {
   content: ' ★';
 }
+.chat-option-recommended-label {
+  margin-left: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  opacity: 0.75;
+}
 
 /* ── Composer ────────────────────────────────────────────────────────────── */
 

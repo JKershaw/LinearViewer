@@ -1963,6 +1963,7 @@ function renderRulingRow(row) {
   window.ChatUI.appendOptions(li, {
     options: decision?.options,
     recommended: decision?.recommended,
+    recommendedLabel: 'agent recommends',
     disposition,
     effect: effectiveEffect,
     onSelect: (optionId, optionLabel) => {
