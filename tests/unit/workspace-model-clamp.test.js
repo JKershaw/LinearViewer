@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveWorkspaceModel, resolveAiOperationModel, AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { AI_OPERATION_LABELS } from '../../lib/render-settings.js';
 
 // A store stub whose getWorkspacePreferences both returns a stored preference AND
 // records that it was consulted — so we can assert the clamp short-circuits BEFORE
@@ -81,8 +82,17 @@ test('missing urlKey or store still returns DEFAULT_MODEL (unchanged guard)', as
 // resolveAiOperationModel (LIN-1145)
 // =============================================================================
 
-test('AI_OPERATION_KINDS covers the 7 scoped v1 operations', () => {
-  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'next-run']);
+test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion and ship-biscuit (LIN-2623)', () => {
+  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'next-run', 'flight-companion', 'ship-biscuit']);
+});
+
+// R2 (LIN-2623 review, PR #1442): pins the settings label map to the class rather
+// than a single hard-coded label string, so a future AI_OPERATION_KINDS addition
+// with no matching AI_OPERATION_LABELS entry fails here instead of silently
+// rendering a raw kebab-case row (the `|| kind` fallback in
+// lib/render-settings.js's renderAiModelOverridesSection).
+test('every AI_OPERATION_KINDS entry has an AI_OPERATION_LABELS entry (LIN-2623 R2)', () => {
+  assert.ok(AI_OPERATION_KINDS.every(k => k in AI_OPERATION_LABELS));
 });
 
 test('resolveAiOperationModel: no overrides → falls back to modelId → DEFAULT_MODEL', async () => {
@@ -132,7 +142,7 @@ test('resolveAiOperationModel: missing urlKey or store returns DEFAULT_MODEL', a
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: null, opKind: 'recommend' }), DEFAULT_MODEL);
 });
 
-test('resolveAiOperationModel: each of the 6 operation kinds resolves independently', async () => {
+test('resolveAiOperationModel: each operation kind resolves independently', async () => {
   const store = makeStore({
     modelId: 'openai/gpt-5.4-mini',
     aiModelOverrides: {
@@ -148,6 +158,41 @@ test('resolveAiOperationModel: each of the 6 operation kinds resolves independen
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'run-summary' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'session-summary' }), 'openai/gpt-5.4-mini');
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'next-run' }), 'openai/gpt-5.4-mini');
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'flight-companion' }), 'openai/gpt-5.4-mini');
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'ship-biscuit' }), 'openai/gpt-5.4-mini');
+});
+
+// LIN-2623: flight-companion and ship-biscuit resolve through the same
+// precedence chain as the pre-existing kinds — a per-operation override wins
+// over the workspace default, and the free-tier forceDefault clamp still
+// beats both.
+test('resolveAiOperationModel: flight-companion and ship-biscuit honor a per-operation override over modelId', async () => {
+  const store = makeStore({
+    modelId: 'openai/gpt-5.4-mini',
+    aiModelOverrides: {
+      byKind: {
+        'flight-companion': { model: 'openai/gpt-5.5-pro' },
+        'ship-biscuit': { model: 'openai/gpt-5.5' }
+      }
+    }
+  });
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'flight-companion' }), 'openai/gpt-5.5-pro');
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'ship-biscuit' }), 'openai/gpt-5.5');
+});
+
+test('resolveAiOperationModel: forceDefault clamps flight-companion and ship-biscuit even with an override set', async () => {
+  const store = makeStore({
+    modelId: 'openai/gpt-5.4-mini',
+    aiModelOverrides: {
+      byKind: {
+        'flight-companion': { model: 'openai/gpt-5.5-pro' },
+        'ship-biscuit': { model: 'openai/gpt-5.5' }
+      }
+    }
+  });
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'flight-companion', forceDefault: true }), DEFAULT_MODEL);
+  assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: store, opKind: 'ship-biscuit', forceDefault: true }), DEFAULT_MODEL);
+  assert.deepEqual(store.calls, []); // still fails closed before the prefs lookup
 });
 
 // =============================================================================

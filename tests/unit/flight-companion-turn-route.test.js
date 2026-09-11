@@ -73,12 +73,13 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MangoClient } from '@jkershaw/mangodb';
-import { createFlightCompanionRoutes, buildCensusSeedText, buildFlightCompanionStripData } from '../../routes/flight-companion.js';
+import { createFlightCompanionRoutes, buildCensusSeedText, buildFlightCompanionStripData, resolveTurnModelOverride } from '../../routes/flight-companion.js';
 import {
   buildFlightCompanionMessages, renderStaleAttentionLine, formatFossilThreshold,
 } from '../../lib/prompts/flight-companion-brief.js';
 import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
+import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js'), 'utf8');
@@ -259,6 +260,21 @@ function fakeWorkspacePreferencesStore(modelId, calls = []) {
     async getWorkspacePreferences(urlKey) {
       calls.push({ method: 'getWorkspacePreferences', urlKey });
       return { modelId };
+    },
+  };
+}
+
+// LIN-2623 R1: same shape as fakeWorkspacePreferencesStore above, but also
+// carries `aiModelOverrides` — needed to distinguish resolveAiOperationModel
+// (reads byKind[opKind].model) from resolveWorkspaceModel (reads modelId
+// only) on the GET page, which fakeWorkspacePreferencesStore's bare
+// `{modelId}` shape can't do.
+function fakeWorkspacePreferencesStoreWithOverrides(modelId, aiModelOverrides, calls = []) {
+  return {
+    calls,
+    async getWorkspacePreferences(urlKey) {
+      calls.push({ method: 'getWorkspacePreferences', urlKey });
+      return { modelId, aiModelOverrides };
     },
   };
 }
@@ -687,6 +703,147 @@ describe('Flight Companion turn endpoint (LIN-2432 beat 4) — live-model-call s
     assert.strictEqual(catalogCalls[0].followUpMode, 'propose');
     assert.strictEqual(catalogCalls[0].followUpEnabled, true, 'auto-wake can still REASON ABOUT a follow-up — only execution is withheld');
     assert.strictEqual(catalogCalls[0].sessionIsTerminalType, 'function', 'the beat-1-flagged coupling: propose mode is gated by the SAME "not configured" check execute mode is');
+  });
+});
+
+describe('resolveTurnModelOverride (LIN-2623 beat 2) — pure allow-list validation', () => {
+  test('absent, null, or empty string: no override, not an error', () => {
+    assert.deepStrictEqual(resolveTurnModelOverride(undefined), { model: null, error: null });
+    assert.deepStrictEqual(resolveTurnModelOverride(null), { model: null, error: null });
+    assert.deepStrictEqual(resolveTurnModelOverride(''), { model: null, error: null });
+    assert.deepStrictEqual(resolveTurnModelOverride('   '), { model: null, error: null });
+  });
+
+  test('a non-string value is an error', () => {
+    const { model, error } = resolveTurnModelOverride(12345);
+    assert.strictEqual(model, null);
+    assert.match(error, /must be a string/);
+  });
+
+  test('a curated id is accepted verbatim (trimmed)', () => {
+    assert.deepStrictEqual(resolveTurnModelOverride('  anthropic/claude-opus-5  '), { model: 'anthropic/claude-opus-5', error: null });
+  });
+
+  test('an uncurated id is rejected, naming the rejected id', () => {
+    const { model, error } = resolveTurnModelOverride('evil/undisclosed-expensive-model');
+    assert.strictEqual(model, null);
+    assert.match(error, /evil\/undisclosed-expensive-model/);
+    assert.match(error, /not a curated model id/);
+  });
+});
+
+describe('Flight Companion turn endpoint (LIN-2623 beat 2) — per-turn model override', () => {
+  // Captures the `model` actually passed to the model call — the ground truth
+  // for "which model won", independent of resolveTurnModelOverride's own
+  // (separately tested above) validation logic.
+  function fakeChatClient(calls) {
+    return {
+      async streamChat(messages, opts, onEvent) {
+        calls.push({ fn: 'streamChat', model: opts.model });
+        onEvent('done', {});
+      },
+      async streamChatWithTools(messages, opts, onEvent) {
+        calls.push({ fn: 'streamChatWithTools', model: opts.model });
+        onEvent('done', {});
+      },
+    };
+  }
+
+  test('1. an explicit uncurated model 400s, before any store is touched', async () => {
+    const observerStateStore = fakeObserverStateStore();
+    const app = buildApp({ observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }) });
+
+    const { status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+      message: 'status please', model: 'evil/undisclosed-expensive-model',
+    });
+
+    assert.strictEqual(status, 400);
+    assert.match(json.error, /not a curated model id/);
+    assert.deepStrictEqual(observerStateStore.calls, [], 'the 400 must fire before any store is touched');
+  });
+
+  test('a malformed (non-string) model 400s the same way', async () => {
+    const observerStateStore = fakeObserverStateStore();
+    const app = buildApp({ observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }) });
+
+    const { status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+      message: 'status please', model: 12345,
+    });
+
+    assert.strictEqual(status, 400);
+    assert.match(json.error, /must be a string/);
+  });
+
+  test('2. an explicit curated model wins over the workspace/op-kind default', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present, isFreeTier must be false'); } };
+    // The workspace/op-kind default resolves to a DIFFERENT curated model, so
+    // a 200 with this model proves the override — not the default — was used.
+    const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } };
+    const app = buildApp({
+      observerStateStore, freeTierStore, workspacePreferencesStore, chatClient,
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+      message: 'status please', model: 'anthropic/claude-opus-5',
+    });
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(calls, [{ fn: 'streamChatWithTools', model: 'anthropic/claude-opus-5' }]);
+  });
+
+  test('3. no `model` field: beat 1\'s resolveAiOperationModel path is unchanged', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const freeTierStore = { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present, isFreeTier must be false'); } };
+    const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } };
+    const app = buildApp({
+      observerStateStore, freeTierStore, workspacePreferencesStore, chatClient,
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'status please' });
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(calls[0].model, 'anthropic/claude-sonnet-5', 'no override present -> resolveAiOperationModel decides, exactly as beat 1 left it');
+  });
+
+  test('4. free tier + a valid explicit model: the forceDefault clamp still wins', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const workspacePreferencesStore = { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } };
+    const app = buildApp({
+      observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }), workspacePreferencesStore, chatClient,
+    });
+
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
+      const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+        message: 'status please', model: 'anthropic/claude-opus-5',
+      });
+      assert.strictEqual(status, 200);
+    });
+
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0].model, DEFAULT_MODEL, 'a valid explicit override must still be clamped to DEFAULT_MODEL on free tier');
+  });
+
+  test('5. free tier + an uncurated explicit model: still 400 (validate-then-clamp ordering)', async () => {
+    const observerStateStore = fakeObserverStateStore();
+    const app = buildApp({ observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }) });
+
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
+      const { status, json } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+        message: 'status please', model: 'evil/undisclosed-expensive-model',
+      });
+      assert.strictEqual(status, 400);
+      assert.match(json.error, /not a curated model id/);
+    });
+    assert.deepStrictEqual(observerStateStore.calls, [], 'a bad id 400s even on free tier, before any store is touched');
   });
 });
 
@@ -1926,12 +2083,50 @@ describe('buildFlightCompanionStripData (LIN-2621) — pure derivation, no I/O',
     const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
     assert.strictEqual(strip.nextCheckInAt, null);
   });
+
+  // LIN-2623 beat 3
+  test('modelOptions is exactly the curated AVAILABLE_MODELS set — Trap 1: the same set resolveTurnModelOverride accepts, never widened', () => {
+    const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.deepEqual(strip.modelOptions.map((m) => m.id), AVAILABLE_MODELS.map((m) => m.id));
+    for (const m of strip.modelOptions) {
+      assert.strictEqual(typeof m.name, 'string');
+      assert.ok(m.name.length > 0);
+    }
+  });
+
+  test('currentPricing is the resolved default\'s own rate-card hint, and null for an uncurated default — never fabricated', () => {
+    const curated = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(typeof curated.currentPricing, 'string');
+
+    const uncurated = buildFlightCompanionStripData({ model: 'some-vendor/not-in-the-allowlist', companionDoc: null, censusDoc: null });
+    assert.strictEqual(uncurated.currentPricing, null);
+  });
+
+  test('isFreeTier passes through unchanged, defaulting to false', () => {
+    const defaulted = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(defaulted.isFreeTier, false);
+
+    const freeTier = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null, isFreeTier: true });
+    assert.strictEqual(freeTier.isFreeTier, true);
+  });
 });
 
 // ─── LIN-2621 beat 2: the GET page handler's server-side strip resolution ──
 
 describe('Flight Companion GET page (LIN-2621) — model resolution + status strip', () => {
-  test('resolves the model exactly once per page load, via resolveWorkspaceModel (never resolveAiOperationModel)', async () => {
+  // LIN-2623 R1 (review, PR #1442): this used to pin "via resolveWorkspaceModel
+  // (never resolveAiOperationModel)" — that was the deliberate LIN-2621 interim
+  // contract, and the comment above routes/flight-companion.js's GET handler
+  // said explicitly why. LIN-2623 IS the one-site switch that comment deferred:
+  // the page now resolves via the SAME resolveAiOperationModel({opKind:
+  // 'flight-companion'}) call the turn core uses (lib/flight-companion-turn.js),
+  // so the two can never diverge. This test still only proves the read count is
+  // exactly one per page load (resolveWorkspaceModel and resolveAiOperationModel
+  // both back onto the identical getWorkspacePreferences call, so this alone
+  // can't distinguish which resolver ran) — the test below this one is what
+  // proves it's actually resolveAiOperationModel, by asserting the per-kind
+  // override is honored end-to-end on the rendered strip.
+  test('resolves the model exactly once per page load, via resolveAiOperationModel', async () => {
     const prefCalls = [];
     const app = buildApp({
       observerStateStore: fakeObserverStateStore({ censusDoc: null }),
@@ -1940,7 +2135,36 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     const { status } = await get(app, '/workspace/acme/flight-companion');
     assert.strictEqual(status, 200);
-    assert.strictEqual(prefCalls.length, 1, 'exactly one resolveWorkspaceModel-backing read per page load');
+    assert.strictEqual(prefCalls.length, 1, 'exactly one resolveAiOperationModel-backing read per page load');
+  });
+
+  // LIN-2623 R1 (review, PR #1442) — the mandated red-first case: before the
+  // fix, the GET page resolved via resolveWorkspaceModel, which reads only
+  // `modelId` and has no idea `aiModelOverrides.byKind['flight-companion']`
+  // exists — so a workspace with an uncurated flight-companion override showed
+  // a curated/default model, `tools: on`, and no warning on the strip, while
+  // the turn itself (resolveAiOperationModel) would actually use the uncurated
+  // override with tools off. Red against the pre-fix resolveWorkspaceModel
+  // call, green once the GET handler resolves via resolveAiOperationModel({
+  // opKind: 'flight-companion'}) — the SAME call the turn core makes.
+  test('an uncurated PER-KIND override renders that model, tools off, and the tools-off warning (LIN-2623 R1)', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStoreWithOverrides('openai/gpt-5.4-mini', {
+        byKind: { 'flight-companion': { model: 'meta-llama/llama-3-70b-instruct' } },
+      }),
+      flightCompanionEnabled: true,
+    });
+    const { status, text } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 200);
+    // Scoped to the strip's own model span, not the page as a whole — the
+    // picker's <option> list always includes every curated id (including
+    // openai/gpt-5.4-mini) regardless of which one is currently resolved.
+    assert.match(text, /fc-strip-model">model: <code>meta-llama\/llama-3-70b-instruct<\/code><\/span>/);
+    assert.doesNotMatch(text, /fc-strip-model">model: <code>openai\/gpt-5\.4-mini<\/code><\/span>/);
+    assert.match(text, /fc-strip-tools">tools: off</);
+    assert.doesNotMatch(text, /fc-strip-tools">tools: on</);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
   });
 
   test('the rendered strip reports an uncurated model as tools off', async () => {
@@ -1984,5 +2208,64 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     const { status, headers } = await get(app, '/workspace/acme/flight-companion');
     assert.strictEqual(status, 302);
     assert.match(headers.get('location'), /\/settings$/);
+  });
+
+  // LIN-2623 beat 3 — mandated red-first case, exercised on the real page.
+  test('an uncurated workspace default renders the tools-off warning on the real page', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('some-vendor/not-in-the-allowlist'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
+  });
+
+  test('a curated workspace default renders no tools-off warning', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.doesNotMatch(text, /fc-strip-tools-warning/);
+  });
+
+  test('the picker renders every curated model as a selectable option', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    for (const m of AVAILABLE_MODELS) {
+      assert.ok(text.includes(`value="${m.id}"`), `expected an <option> for ${m.id}`);
+    }
+  });
+
+  test('free tier renders the picker disabled with the legibility note, on the real page', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
+      const { text } = await get(app, '/workspace/acme/flight-companion');
+      assert.match(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled>/);
+      assert.match(text, /<span class="fc-strip-freetier" id="flight-companion-freetier-note">/);
+    });
+  });
+
+  test('non-free-tier renders the picker enabled, with no free-tier note, on the real page', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: undefined }, async () => {
+      const { text } = await get(app, '/workspace/acme/flight-companion');
+      assert.doesNotMatch(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled/);
+      assert.doesNotMatch(text, /fc-strip-freetier/);
+    });
   });
 });

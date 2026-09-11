@@ -81,11 +81,12 @@ import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kic
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
+import { buildModelOptions } from '../lib/openrouter-catalog.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
 import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
@@ -150,6 +151,40 @@ const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
 // having drifted away from it is the defect LIN-2618 exists to fix. The seed
 // itself deliberately stays here: it is coupled to this route's census read and
 // to `buildCompanionSnapshot`, neither of which belongs in a prompt module.
+/**
+ * Validate the turn endpoint's optional per-turn `model` override against the
+ * curated AVAILABLE_MODELS allow-list (LIN-2623 beat 2).
+ *
+ * Modeled on `resolveRoadmapModelOverride` (routes/workspace-api-roadmap.js)'s
+ * allow-list source, but DELIBERATELY does not share its silent-fallback
+ * behaviour: that function degrades an uncurated id to the workspace default,
+ * which this ticket forbids — a bad explicit id must 400, never silently
+ * degrade to the workspace default or drop to tools-off. This is validation
+ * only; it never resolves a final model itself, so the turn core
+ * (`lib/flight-companion-turn.js`) stays the single resolution site.
+ *
+ * @param {*} rawModel - Raw `req.body.model` (untrusted)
+ * @returns {{model: string|null, error: string|null}} `model` is the trimmed
+ *   curated id when one was supplied and valid; `null` when the field was
+ *   absent/null/empty (not an error — the turn core falls back to
+ *   `resolveAiOperationModel`). `error` is a user-facing message when an
+ *   explicitly supplied value is non-string or not a curated id.
+ */
+export function resolveTurnModelOverride(rawModel) {
+  if (rawModel === undefined || rawModel === null || rawModel === '') {
+    return { model: null, error: null };
+  }
+  if (typeof rawModel !== 'string') {
+    return { model: null, error: 'model must be a string' };
+  }
+  const id = rawModel.trim();
+  if (!id) return { model: null, error: null };
+  if (!AVAILABLE_MODELS.some(m => m.id === id)) {
+    return { model: null, error: `model "${id}" is not a curated model id` };
+  }
+  return { model: id, error: null };
+}
+
 export function buildCensusSeedText(currentCensusDoc) {
   if (!currentCensusDoc) {
     return 'CURRENT CENSUS: not available yet for this workspace (no sweep has run).';
@@ -271,17 +306,46 @@ export function buildCensusSeedText(currentCensusDoc) {
  * checks the SAME null-ness the gate itself keys off and prints the SAME
  * established phrase, rather than re-deriving the no-census classification.
  *
+ * LIN-2623 beat 3 adds the per-turn model picker's own data: `modelOptions`
+ * (the exact curated set `resolveTurnModelOverride`, routes/flight-
+ * companion.js, accepts — never widened by the live OpenRouter catalog,
+ * which would offer a selection the turn endpoint could then 400. The set
+ * itself is built via the shared `buildModelOptions` merge (lib/openrouter-
+ * catalog.js), reused rather than forked, over `AVAILABLE_MODELS`' own ids;
+ * display name/pricing for each entry come straight from `AVAILABLE_MODELS`,
+ * which already carries both) and `currentPricing` (the resolved default's
+ * own rate-card hint, `null` when unpriced — never fabricated, matching
+ * `getModelPricingHint`'s own contract).
+ *
  * @param {Object} p
- * @param {string} p.model - the model id this page load resolved (`resolveWorkspaceModel`)
+ * @param {string} p.model - the model id this page load resolved (`resolveAiOperationModel({ opKind: 'flight-companion' })`)
  * @param {Object|null} p.companionDoc - `observerStateStore.readCurrent('companion:v1:<urlKey>')` result, or null
  * @param {Object|null} p.censusDoc - `observerStateStore.readCurrent('sweep:v1:<urlKey>')` result, or null
+ * @param {boolean} [p.isFreeTier] - LIN-2623 beat 3: whether this page load's
+ *   requests will be free-tier clamped — surfaced so the page can make that
+ *   clamp legible rather than silently overriding a visible picker choice.
  * @param {number} [p.now] - injected clock (epoch ms), for deterministic tests
- * @returns {{model: string, toolsOn: boolean, lastCheckInAt: string|null, nextCheckInAt: null, sweepStatus: 'no-census'|'alive'|'stale', sweepLastSeenAt: string|null, mode: string}}
+ * @returns {{model: string, toolsOn: boolean, lastCheckInAt: string|null, nextCheckInAt: null, sweepStatus: 'no-census'|'alive'|'stale', sweepLastSeenAt: string|null, mode: string, isFreeTier: boolean, modelOptions: Array<{id: string, name: string, pricing: string|null}>, currentPricing: string|null}}
  */
-export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, now = Date.now() } = {}) {
+export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier = false, now = Date.now() } = {}) {
   const toolsOn = isToolCapableModel(model);
   const lastTurnAt = companionDoc?.state?.lastTurnAt || null;
   const lastCheckInAt = lastTurnAt ? new Date(lastTurnAt).toISOString() : null;
+
+  // LIN-2623 beat 3 — Trap 1/Trap 2: `buildModelOptions` is reused ONLY for
+  // its curated-id merge/dedup machinery, called with curatedIds alone (no
+  // live catalog). Passing the live catalog in as `catalog` here would widen
+  // the SELECTABLE set past AVAILABLE_MODELS (a picker option the turn
+  // endpoint's own curated allow-list would then 400) — the coherent reading
+  // this beat settled on. Display name/pricing intentionally come from
+  // AVAILABLE_MODELS directly (already rich: name + a resolved rate card),
+  // not from the descriptor's own `label`/`free` fields, which are shaped for
+  // the DIFFERENT dispatch-harness suggestion lists that have no such source.
+  const modelOptions = buildModelOptions({ curatedIds: AVAILABLE_MODELS.map((m) => m.id) }).map((d) => {
+    const curated = AVAILABLE_MODELS.find((m) => m.id === d.id);
+    return { id: d.id, name: curated ? curated.name : d.id, pricing: getModelPricingHint(d.id) };
+  });
+  const currentPricing = getModelPricingHint(model);
 
   let sweepStatus;
   let sweepLastSeenAt = null;
@@ -316,6 +380,9 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
     // LIN-2626 turns this into the control; rung 1 is correct while no toggle
     // exists.
     mode: 'read-only · proposes, never acts · rung 1 of 3',
+    isFreeTier,
+    modelOptions,
+    currentPricing,
   };
 }
 
@@ -333,7 +400,7 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
  * @param {Object} [deps.freeTierStore] - LIN-2432 §A.3: free-tier usage store
  *   (`tryUse`), mirroring Task Chat's own gate. Wired in server.js §A.12.
  * @param {Object} [deps.workspacePreferencesStore] - LIN-2432 §A.3/§A.4: model
- *   selection (`resolveWorkspaceModel`) AND threaded into `createChatToolCatalog`
+ *   selection (`resolveAiOperationModel`) AND threaded into `createChatToolCatalog`
  *   for the `send_follow_up` tool's dispatch-factory defaults (LIN-1139) — this
  *   is the one whose absence silently loses the LIN-1139 model/harness
  *   inheritance a §A.6 approval-time enqueue would otherwise get, so its
@@ -426,19 +493,18 @@ export function createFlightCompanionRoutes({
         ? await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
         : null;
 
-      // LIN-2621: resolve the model ONCE per page load, via the SAME
-      // `resolveWorkspaceModel` function (and the SAME free-tier `forceDefault`
-      // derivation, mirrored from the turn endpoint below) the turn core
-      // resolves with today — deliberately NOT `resolveAiOperationModel`,
-      // since LIN-2623 has not landed and the eventual one-site switch needs
-      // to move both call sites together. Tools-on/off derives from
+      // LIN-2623: resolve the model ONCE per page load, via the SAME
+      // `resolveAiOperationModel({ opKind: 'flight-companion' })` call (and
+      // the SAME free-tier `forceDefault` derivation) the turn core resolves
+      // with (lib/flight-companion-turn.js) — the one-site switch this
+      // ticket's own comment used to defer. Tools-on/off derives from
       // `isToolCapableModel` on this SAME resolved id (via
       // `buildFlightCompanionStripData`), never a second, independent guess.
       const sessionApiKey = req.session.openRouterApiKey;
       const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
       const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-      const model = await resolveWorkspaceModel({
-        urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier,
+      const model = await resolveAiOperationModel({
+        urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier, opKind: 'flight-companion',
       });
       // Read-only, same discipline as observerReportDoc above: readCurrent
       // ONLY, feeding the strip's last-check-in / sweep-liveness / no-census
@@ -449,7 +515,7 @@ export function createFlightCompanionRoutes({
       const censusDoc = observerStateStore
         ? await observerStateStore.readCurrent(`${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
         : null;
-      const strip = buildFlightCompanionStripData({ model, companionDoc, censusDoc });
+      const strip = buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier });
 
       const html = renderFlightCompanionPage(
         { prompt, observerReportDoc, strip },
@@ -522,6 +588,16 @@ export function createFlightCompanionRoutes({
       return res.status(400).json({ error: `message must be ${MAX_MESSAGE_LENGTH} characters or fewer` });
     }
 
+    // LIN-2623 beat 2: validate BEFORE the free-tier clamp is even consulted,
+    // so an uncurated id 400s the same way on every tier. A curated id is
+    // still threaded through — the turn core (`runFlightCompanionTurn`)
+    // decides whether it actually wins, since free tier must keep clamping to
+    // the default regardless of what a valid override asked for.
+    const { model: requestedModel, error: modelError } = resolveTurnModelOverride(body.model);
+    if (modelError) {
+      return res.status(400).json({ error: modelError });
+    }
+
     const safeHistory = filterChatTurns(body.history);
 
     const sessionApiKey = req.session.openRouterApiKey;
@@ -576,6 +652,7 @@ export function createFlightCompanionRoutes({
         history: safeHistory,
         apiKey: apiKeyToUse,
         isFreeTier,
+        model: requestedModel,
         onStreamStart: startStream,
         onEvent: (type, data) => {
           sendSSE(res, type, data);

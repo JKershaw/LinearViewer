@@ -132,6 +132,17 @@
   // handling below) — the whole point being that a silent tick's cost is
   // otherwise invisible nowhere else on the page.
   var tabTotalEl = document.getElementById('flight-companion-strip-tab-total');
+  // LIN-2623 beat 3: the per-turn model picker + its rate-card mount —
+  // server-rendered (lib/render-flight-companion.js's renderStatusStrip)
+  // with a leading, always-selected-by-default EMPTY-value option ("current
+  // default") followed by the curated options `resolveTurnModelOverride`
+  // (routes/flight-companion.js) accepts. An empty `.value` means "no
+  // override" — never resolved to some other curated id client-side, so an
+  // untouched picker cannot silently swap the workspace's real (possibly
+  // uncurated) default for a curated stand-in. Optional-guarded like every
+  // other strip mount here.
+  var modelSelectEl = document.getElementById('flight-companion-model-select');
+  var modelPriceEl = document.getElementById('flight-companion-model-price');
 
   if (!thread || !questionInput || !sendBtn) return;
 
@@ -191,7 +202,7 @@
   }
 
   function emptyStoredSession() {
-    return { history: [], tabCheckInCount: 0, tabTotalCost: 0 };
+    return { history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null };
   }
 
   // Never throws into the page: a missing entry, a JSON.parse failure, and
@@ -214,7 +225,12 @@
       capHistory(history);
       var tabCheckInCount = typeof parsed.tabCheckInCount === 'number' && isFinite(parsed.tabCheckInCount) ? parsed.tabCheckInCount : 0;
       var tabTotalCost = typeof parsed.tabTotalCost === 'number' && isFinite(parsed.tabTotalCost) ? parsed.tabTotalCost : 0;
-      return { history: history, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost };
+      // LIN-2623 beat 3: the picker's own persisted choice, round-tripped
+      // through the SAME sessionStorage blob as history/totals — a non-empty
+      // string or nothing at all; anything else (a hand-edited or stale
+      // shape) degrades to "no override", same as a fresh session.
+      var selectedModel = typeof parsed.selectedModel === 'string' && parsed.selectedModel ? parsed.selectedModel : null;
+      return { history: history, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost, selectedModel: selectedModel };
     } catch (e) {
       return emptyStoredSession();
     }
@@ -230,6 +246,7 @@
         history: history,
         tabCheckInCount: session.tabCheckInCount || 0,
         tabTotalCost: session.tabTotalCost || 0,
+        selectedModel: session.selectedModel || null,
       }));
     } catch (e) {
       // Nothing to do — the in-memory state stays authoritative for this tab.
@@ -624,6 +641,33 @@
     tabTotalEl.textContent = formatTabTotal(tabCheckInCount, tabTotalCost);
   }
 
+  // LIN-2623 beat 3: mirrors lib/render-settings.js's own inline model-select
+  // updater byte-for-byte in idiom — the selected <option>'s own `data-
+  // pricing` attribute (server-rendered, never fabricated client-side) is
+  // the ONLY source for this text, so a model with no known rate renders the
+  // SAME `—` fallback the server itself would have rendered for it.
+  function updateModelPriceDisplay() {
+    if (!modelSelectEl || !modelPriceEl) return;
+    var opt = modelSelectEl.options && modelSelectEl.options[modelSelectEl.selectedIndex];
+    modelPriceEl.textContent = (opt && opt.getAttribute && opt.getAttribute('data-pricing')) || '—';
+  }
+
+  if (modelSelectEl) {
+    modelSelectEl.addEventListener('change', function () {
+      updateModelPriceDisplay();
+      // Persisted immediately (not only at the next finishTurn) so a pick
+      // survives a reload even before the human sends anything with it —
+      // "the selection persists across a reload" (LIN-2623 beat 3) reads as
+      // a property of the CHOICE, not of having already sent a turn with it.
+      if (urlKey) {
+        saveStoredSession(urlKey, {
+          history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost,
+          selectedModel: modelSelectEl.value,
+        });
+      }
+    });
+  }
+
   function appendUserBubble(text) {
     window.ChatUI.appendMessage(thread, {
       who: 'you', self: true, text: text, textClass: 'fc-msg-body', bodyClass: 'fc-msg-surface', liClass: 'fc-msg',
@@ -999,7 +1043,10 @@
     // conversation is never lost — only the boot turn's own bubble is
     // absent from storage until a later turn carries it along.
     if (urlKey && turnKind !== 'boot') {
-      saveStoredSession(urlKey, { history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost });
+      saveStoredSession(urlKey, {
+        history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost,
+        selectedModel: modelSelectEl ? modelSelectEl.value : null,
+      });
     }
     // LIN-2718: release the lock only for the turn kinds that took it —
     // an auto-wake tick never called setComposerBusy(true), so it must never
@@ -1263,6 +1310,16 @@
     // (LIN-2432's "never client-asserted" rule, extended here); sending it
     // anyway would suggest the client's text is what the model actually saw.
     if (message && turnKind !== 'boot') body.message = message;
+    // LIN-2623 beat 3: the picker's choice rides only a user-initiated turn
+    // — never boot (its own endpoint never reads `model` either, matching
+    // the "never client-asserted" posture above) and never auto-wake (an
+    // unattended tick has no human choice to carry). An empty `.value`
+    // (the always-present "current default" option) sends no `model` field
+    // at all, so beat 1's `resolveAiOperationModel` decides exactly as it
+    // did before this picker existed.
+    if (turnKind === 'user-initiated' && modelSelectEl && modelSelectEl.value) {
+      body.model = modelSelectEl.value;
+    }
     // LIN-2622: a boot posts to its own endpoint, never `/turn` — the turn
     // kind is endpoint-selected, not body-selected, so the client's choice
     // of URL is the ONLY thing that distinguishes a boot from here on.
@@ -1531,6 +1588,15 @@
     tabCheckInCount = restoredSession.tabCheckInCount;
     tabTotalCost = restoredSession.tabTotalCost;
     updateTabTotalDisplay();
+    // LIN-2623 beat 3: restore the picker's own choice. A real <select>
+    // silently ignores an assigned value that matches none of its options
+    // (e.g. a curated id removed from AVAILABLE_MODELS since it was stored),
+    // leaving `.value` at `''` — the same safe "no override" state a fresh
+    // session starts in, so no extra validation is needed here.
+    if (modelSelectEl && restoredSession.selectedModel) {
+      modelSelectEl.value = restoredSession.selectedModel;
+      updateModelPriceDisplay();
+    }
   }
 
   window.addEventListener('beforeunload', function () {
@@ -1561,6 +1627,8 @@
       getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
       getTabTotalText: function () { return tabTotalEl ? tabTotalEl.textContent : null; },
       getTabTotals: function () { return { count: tabCheckInCount, cost: tabTotalCost }; },
+      updateModelPriceDisplay: updateModelPriceDisplay,
+      getModelPriceText: function () { return modelPriceEl ? modelPriceEl.textContent : null; },
       CADENCE_BASE_MS: CADENCE_BASE_MS, CADENCE_CAP_MS: CADENCE_CAP_MS, HISTORY_CAP: HISTORY_CAP,
     };
   }

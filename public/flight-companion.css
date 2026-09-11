@@ -140,6 +140,53 @@
   color: var(--text);
 }
 
+/* LIN-2623 beat 3: the tools-off warning — visible before the user sends
+   anything, exactly one trigger (the resolved workspace default is not
+   tool-capable). Reuses the same --red token as the sweep-not-seen relabel
+   above (.fc-checkin--warning) rather than inventing a second warning
+   color for this page. */
+.fc-strip-tools-warning {
+  color: var(--red);
+}
+
+/* LIN-2623 beat 3: the per-turn model picker + its rate card, and the
+   free-tier legibility note. Inline-flex so the label/select/price group
+   stays together as one strip item while the strip's own flex-wrap still
+   wraps the WHOLE group onto its own line on narrow viewports. */
+.fc-strip-model-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.fc-model-select {
+  font-family: var(--font-content);
+  font-size: 1em;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.1rem 0.3rem;
+}
+
+.fc-model-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fc-strip-price {
+  font-family: var(--font-structural);
+  color: var(--muted);
+}
+
+/* Informational, not alarming (unlike .fc-strip-tools-warning above) — the
+   free tier isn't broken, it just doesn't honor the picker, so this stays
+   on the strip's own muted default rather than a warning color. */
+.fc-strip-freetier {
+  color: var(--muted);
+}
+
 /* A visible turn's own per-bubble cost meta line (LIN-2621 beat 3): tokens +
    cost, appended as a trailing sub-line inside the bubble's own surface.
    Page-local addition (`.fc-*`), not chat.css's `.chat-msg__time` — that

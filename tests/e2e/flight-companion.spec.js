@@ -1261,3 +1261,66 @@ test.describe('LIN-2716: reload persists and resumes the session', () => {
     ]);
   });
 });
+
+// LIN-2623 beat 3: the per-turn model picker. Real <select>/<option>
+// semantics (selectedIndex, the selected option's own data-pricing
+// attribute) are exactly what the vm-sandboxed client-unit harness
+// (tests/unit/flight-companion-client.test.js) does NOT model — its fake
+// picker only tracks `.value` — so the round trip through an ACTUAL <select>
+// and the live rate-card update belong here, in a real browser, rather than
+// forcing that fidelity into the fake DOM shim. The markup itself (which
+// options exist, their data-pricing attributes, the tools-off warning) is
+// already covered deterministically by tests/unit/render-flight-companion.test.js.
+test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('choosing a curated model in the picker sends it as `model` on the turn request', async ({ page }) => {
+    let posted = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
+    });
+
+    const select = page.locator('#flight-companion-model-select');
+    await expect(select).toBeVisible();
+    await select.selectOption('anthropic/claude-opus-5');
+
+    await page.locator('#flight-companion-question').fill('status please');
+    await page.locator('#flight-companion-send').click();
+
+    await expect.poll(() => posted).not.toBeNull();
+    expect(posted.model).toBe('anthropic/claude-opus-5');
+  });
+
+  test('an untouched picker (left on "current default") sends no `model` field at all', async ({ page }) => {
+    let posted = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
+    });
+
+    await page.locator('#flight-companion-question').fill('status please');
+    await page.locator('#flight-companion-send').click();
+
+    await expect.poll(() => posted).not.toBeNull();
+    expect(posted.model).toBeUndefined();
+  });
+
+  test('choosing a model live-updates the rate card from the selected option\'s own data-pricing attribute', async ({ page }) => {
+    const select = page.locator('#flight-companion-model-select');
+    const priceEl = page.locator('#flight-companion-model-price');
+
+    const selectedOption = select.locator('option[value="anthropic/claude-opus-5"]');
+    const expectedPrice = await selectedOption.getAttribute('data-pricing');
+    expect(expectedPrice).toBeTruthy(); // sanity: a real curated model must have a known rate
+
+    await select.selectOption('anthropic/claude-opus-5');
+    await expect(priceEl).toHaveText(expectedPrice);
+  });
+});
