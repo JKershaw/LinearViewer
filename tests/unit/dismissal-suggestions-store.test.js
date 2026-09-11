@@ -325,6 +325,32 @@ describe('DismissalSuggestionsStore — per-loop identity (LIN-2756)', () => {
     const after = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
     assert.equal(after[0].suggestedDismissal, null, 'the banner must be gone — the withdrawal actually took effect, not a false "already withdrawn"');
   });
+
+  test('LIN-2756 F3: a withdrawn loop-scoped doc must not shadow a standing legacy one — the SECOND Keep must still find and withdraw the doc the banner is actually showing', async () => {
+    // Re-review's repro: beat 6's fallback picks scoped-over-legacy by
+    // PRESENCE, not by which one is still standing. Once the scoped doc is
+    // itself withdrawn, a fresh (non-upgraded, decisionId-only) proposal
+    // creates a standing legacy doc that the read side (attachStandingSuggestions)
+    // correctly falls back to and displays — but a write-side lookup that
+    // still prefers "scoped, present-or-not" over "standing" finds the
+    // ALREADY-withdrawn scoped doc, takes the idempotent branch, and reports
+    // success while the legacy doc underneath the banner is never touched.
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', reason: 'scoped', suggestedBy: 'x', now: NOW });
+    await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: NOW }); // Keep #1: withdraws the scoped doc
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'a non-upgraded caller proposes again, workspace-wide', suggestedBy: 'y', now: LATER });
+
+    const row = { anchor: { workspaceUrlKey: 'acme', loopId: '07509b1e' }, decision: { decision_id: 'd-1' } };
+    const before = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.ok(before[0].suggestedDismissal, 'the read side falls back to the standing legacy doc — the banner renders');
+
+    await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: LATER }); // Keep #2
+
+    const legacy = collection._docs.find(d => d._id === 'acme::d-1');
+    assert.equal(legacy.withdrawn, true, 'the standing legacy doc — the one the banner actually displayed — must be the one withdrawn');
+
+    const after = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.equal(after[0].suggestedDismissal, null, 'the banner must actually clear, not silently persist behind a false "already withdrawn" success');
+  });
 });
 
 describe('attachStandingSuggestions — loop-aware join (LIN-2756)', () => {

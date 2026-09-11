@@ -130,10 +130,13 @@ let currentView = 'autopilot';
 // shelf documents written before this ticket, or by a caller that hasn't
 // upgraded (e.g. routes/proxy-rulings.js's decisionLoopId-optional
 // suggest-dismissal route). A legacy document therefore still fans out to
-// every loop sharing that decisionId, and `withdraw()` mirrors the same
-// two-tier lookup (LIN-2766) so a Keep on any one of those rows actually
-// finds and withdraws it, rather than 404ing against a loop-scoped `_id` no
-// document was ever written under.
+// every loop sharing that decisionId, and `withdraw()` shares the SAME
+// standing-first precedence rule as `attachStandingSuggestions`
+// (`pickStandingDoc`, LIN-2766 then re-review F3) so a Keep on any one of
+// those rows actually finds and withdraws whichever document the banner it
+// was pressed on actually displayed — never 404ing against a loop-scoped
+// `_id` no document was ever written under, and never silently targeting an
+// already-withdrawn scoped document while a standing legacy one persists.
 function rulingKey(urlKey, anchor, decisionId) {
   const loopKey = anchor?.loopId ?? anchor?.taskDecisionId;
   if (!urlKey || !loopKey || !decisionId) return null;

@@ -461,4 +461,27 @@ describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
     );
     assert.deepStrictEqual(rows, [], 'a decisionLoopId-less shelf applies to every loop carrying the id, exactly as it did pre-LIN-2756');
   });
+
+  // LIN-2756 re-review F4: shelfGate picks the loop-scoped shelf over the
+  // legacy one by PRESENCE, before checking either one's activeness —
+  // unlike attachStandingSuggestions (dismissal-suggestions-store.js), which
+  // resolves standing-vs-withdrawn first. This pins the CURRENT behaviour
+  // (a lapsed loop-scoped shelf wins over a still-active legacy one, so the
+  // row resurfaces) — it is not a statement that this is the intended
+  // product semantics; see the F4 follow-up ticket for that open question.
+  test('F4: a LAPSED loop-scoped shelf overrides a still-ACTIVE legacy one — shelfGate checks precedence before activeness', () => {
+    const l = loop({ loopId: '07509b1e', wakeMarker: 'blocked', decision: decision('d-1') });
+    const rows = collectUnansweredDecisions(
+      {
+        loops: [l],
+        shelvedRulings: [
+          shelf('d-1', { decisionLoopId: '07509b1e', resurfaceAt: '2026-08-20T00:00:00.000Z', lapseCount: 3 }), // this loop's own shelf, lapsed
+          shelf('d-1', { resurfaceAt: '2026-08-23T00:00:00.000Z' }) // legacy/workspace-wide, still active
+        ]
+      },
+      { now: NOW }
+    );
+    assert.strictEqual(rows.length, 1, "the row's own loop-scoped shelf wins precedence over the legacy one, and it has lapsed, so the row surfaces even though a still-active legacy shelf also exists");
+    assert.strictEqual(rows[0].shelvedLapseCount, 3, 'the lapse count comes from the loop-scoped shelf that actually won precedence');
+  });
 });
