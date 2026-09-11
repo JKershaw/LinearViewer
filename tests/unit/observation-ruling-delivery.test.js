@@ -52,6 +52,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
@@ -87,6 +88,7 @@ class FakeElement {
     this.type = undefined;
     this.classList = new FakeClassList(this);
     this.attrs = {};
+    this.parentNode = null;
   }
   get className() { return this._className; }
   set className(v) {
@@ -97,7 +99,17 @@ class FakeElement {
   set textContent(v) { this._textContent = v; this.children = []; }
   setAttribute(name, value) { this.attrs[name] = String(value); }
   getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attrs, name) ? this.attrs[name] : null; }
-  appendChild(child) { this.children.push(child); return child; }
+  appendChild(child) { this.children.push(child); child.parentNode = this; return child; }
+  // LIN-2775 Area 5's flip control swaps its own <li> in place
+  // (li.parentNode.replaceChild(fresh, li)) — the one production caller of
+  // either method in this whole shim.
+  replaceChild(newChild, oldChild) {
+    const idx = this.children.indexOf(oldChild);
+    if (idx !== -1) this.children[idx] = newChild;
+    newChild.parentNode = this;
+    oldChild.parentNode = null;
+    return oldChild;
+  }
   addEventListener(type, handler) {
     (this.listeners[type] = this.listeners[type] || []).push(handler);
   }
@@ -139,6 +151,14 @@ function makeLi({ withFeedback = true } = {}) {
     li.appendChild(feedback);
   }
   return li;
+}
+
+// LIN-2775 Area 8: the press-time check's `window.api` hydrate mock, for
+// tests exercising the ORDINARY `gone`+dispatch path — a non-terminal
+// anchor state, so the check confirms and lets the dispatch proceed
+// unchanged. Tests exercising the downgrade itself stub their own `api`.
+function nonTerminalHydrateApi() {
+  return async () => ({ hydrated: true, identifier: ANCHOR.issueIdentifier, state: { name: 'In Progress', type: 'started' } });
 }
 
 // `elements` seeds document.getElementById (default: none, so it answers null
@@ -208,6 +228,15 @@ function makeRow({ decision, anchor, ...rest } = {}) {
     decision: decision || { decision_id: 'd-gone-1' },
     anchor: { ...ANCHOR, ...(anchor || {}) },
     disposition: 'gone',
+    // LIN-2775 Area 7: a `gone` row's resolveEffect default IS 'dispatch'
+    // (ON_ANSWER_EFFECT_DEFAULTS.gone, lib/unanswered-decisions.js) — every
+    // caller below that doesn't override `effect`/`alternate` via `rest` is
+    // now explicitly re-anchored on the row shape the real feed actually
+    // sends for an ordinary gone ruling, rather than relying on `effect`
+    // being silently `undefined` (which happened to take the same branch,
+    // by accident of `!== 'record'`, not by declared intent).
+    effect: 'dispatch',
+    alternate: null,
     ...rest
   };
 }
@@ -217,7 +246,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let capturedUrlKey = null;
     const { module } = makeSandbox({
       postComment: async (urlKey) => { capturedUrlKey = urlKey; return { ok: true, status: 201, data: {} }; },
-      dispatchPrompt: async () => ({ id: 'dispatched-1' })
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply } = module.exports;
     const li = makeLi();
@@ -234,7 +264,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let capturedOpts = null;
     const { module } = makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
-      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; }
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply } = module.exports;
     const li = makeLi();
@@ -242,11 +273,62 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     deliverRulingReply(makeRow(), 'Approve', li);
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
 
     assert.ok(capturedOpts, 'expected dispatchPrompt to be called');
     assert.equal(capturedOpts.urlKey, 'the-ruling-workspace');
     assert.equal(capturedOpts.issue.id, 'issue-1');
     assert.equal(capturedOpts.issue.identifier, 'LIN-1728-G');
+  });
+
+  // ── LIN-2775 Area 7 — THE HEADLINE WITNESS ──────────────────────────────
+  //
+  // This is the ticket's own reason to exist: tapping "preserve" on a
+  // ruling today launches an agent whose ENTIRE brief is the word
+  // "preserve" — `dispatchPrompt` receives the raw pressed-option text (or
+  // free text) as `prompt`, verbatim, and nothing else. No test anywhere in
+  // this suite previously asserted on `.prompt` — every existing
+  // dispatchPrompt-opts assertion above (F1, G1 below) checks only
+  // urlKey/issue.id/issue.identifier — which is exactly why this defect
+  // shipped and stayed unnoticed. This test MUST fail against that
+  // raw-reply-text behaviour; confirmed red-first (see beat 3's own report).
+  test('HEADLINE: the composed dispatch prompt carries the question, the chosen answer, and the decisionCase recap — never just the raw pressed text', async () => {
+    let capturedOpts = null;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
+    });
+    const { deliverRulingReply, RULING_COMPOSED_RUN_MARKER } = module.exports;
+    const li = makeLi();
+
+    const row = makeRow({
+      decision: { decision_id: 'd-headline-1', question: 'Preserve the legacy adapter, or retire it?' },
+      decisionCase: ['The adapter has zero callers in prod.', 'Staging still references it via a feature flag.']
+    });
+
+    deliverRulingReply(row, 'Preserve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedOpts, 'expected dispatchPrompt to be called');
+    // The regression this witness exists to catch: pre-fix, capturedOpts.prompt
+    // was LITERALLY just 'Preserve' — the pressed option's bare label, nothing
+    // else. Asserting `.prompt === 'Preserve'` would PASS against that bug, so
+    // this checks for the presence of everything the bug's prompt lacked.
+    assert.notEqual(capturedOpts.prompt, 'Preserve', 'the raw pressed text alone is exactly the pre-fix regression this witness exists to catch');
+    assert.match(capturedOpts.prompt, /Preserve the legacy adapter, or retire it\?/, 'must carry the decision\'s own question');
+    assert.match(capturedOpts.prompt, /Preserve/, 'must carry the chosen option\'s label (or free text)');
+    assert.match(capturedOpts.prompt, /The adapter has zero callers in prod\./, 'must carry the decisionCase recap');
+    assert.match(capturedOpts.prompt, /Staging still references it via a feature flag\./);
+    assert.equal(capturedOpts.promptName, 'Ruling reply');
+    assert.ok(DISPATCH_KINDS.includes(capturedOpts.kind), `capturedOpts.kind ("${capturedOpts.kind}") must be a member of DISPATCH_KINDS`);
+    assert.equal(capturedOpts.kind, 'custom', 'nothing more specific than the neutral default is derivable from a ruling row today');
+    // LIN-2775 Area 8: the composed-run marker must ride along on every
+    // ordinary composed dispatch, activating the server-side terminal-anchor
+    // guard for this call specifically.
+    assert.equal(capturedOpts.composedRunMarker, RULING_COMPOSED_RUN_MARKER);
   });
 
   test('F2: comment succeeds, the fresh run fails to start — a durable partial-failure surfaces with a retry affordance, the comment is never reposted', async () => {
@@ -258,7 +340,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
         dispatchCalls += 1;
         if (dispatchCalls === 1) throw new Error('queue temporarily unavailable');
         return { id: 'dispatched-1' };
-      }
+      },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
@@ -268,7 +351,9 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     deliverRulingReply(row, 'Approve', li);
     assert.ok(rulingsPending.has(key), 'expected the decision to be marked pending immediately');
 
-    // Flush postComment -> dispatchPrompt (rejects) -> onPartialFailure.
+    // Flush the press-time hydrate check -> postComment -> dispatchPrompt
+    // (rejects) -> onPartialFailure.
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
@@ -305,13 +390,15 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let dispatchCalls = 0;
     const { module } = makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: false, status: 502, data: { error: 'upstream write rejected' } }; },
-      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; }
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-2');
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-gone-2' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -337,12 +424,14 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let capturedDispatchOpts = null;
     const { module } = makeSandbox({
       postComment: async (urlKey, issueId) => { capturedCommentIssueId = issueId; return { ok: true, status: 201, data: {} }; },
-      dispatchPrompt: async (opts) => { capturedDispatchOpts = opts; return { id: 'dispatched-1' }; }
+      dispatchPrompt: async (opts) => { capturedDispatchOpts = opts; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply } = module.exports;
     const li = makeLi();
 
     deliverRulingReply(makeRow({ anchor: { issueId: null, issueIdentifier: 'LIN-1728-G' }, decision: { decision_id: 'd-gone-4' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -368,6 +457,358 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     await new Promise((r) => setImmediate(r));
 
     assert.equal(postCommentCalled, false);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /no linked issue/);
+  });
+});
+
+// ─── Record delivery (LIN-2775 Area 6) ──────────────────────────────────────
+//
+// A `gone`-disposition row whose resolved `effect` is `record` (server-
+// resolved, or an operator's own flip override — LIN-2775 Area 5) must
+// comment-and-stamp only, never dispatch. This is a NEW sibling branch, not a
+// reroute through the pre-existing `task-bound` branch (that branch's stamp
+// payload — {taskDecisionId, taskDecisionIssueId} — has no meaning for a
+// loop-backed row and would silently never mark the decision answered).
+function neighborhoodOf({ parent = null, siblings = [], children = [], cousins = [] } = {}) {
+  return { parent, siblings, children, cousins };
+}
+function hydrateOk(neighborhood, state = null) {
+  return { hydrated: true, identifier: ANCHOR.issueIdentifier, state, neighborhood: neighborhoodOf(neighborhood) };
+}
+function neighbor(identifier, type = 'started') {
+  return { id: `id-${identifier}`, identifier, title: identifier, state: { name: type, type } };
+}
+
+describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
+  test('a gone row with effect "record" and no declared record_on comments to the anchor and never dispatches', async () => {
+    let commentCalls = 0;
+    let capturedIssueId = null;
+    let capturedExtra = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => {
+        commentCalls += 1; capturedIssueId = issueId; capturedExtra = extra;
+        return { ok: true, status: 201, data: {} };
+      },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-record-1' }, effect: 'record', alternate: null }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'the fallback prefers the real issueId, mirroring the gone branch\'s own issueId || issueIdentifier convention');
+    // The stamp-triggering pair — proof this went through the NEW record
+    // branch, not the task-bound branch's {taskDecisionId, taskDecisionIssueId}.
+    // Field-by-field, not deepEqual — capturedExtra crosses the vm sandbox
+    // boundary, so it is structurally but not reference-equal to a same-realm
+    // object literal (same convention as the task-bound test above).
+    assert.equal(capturedExtra.decisionLoopId, ANCHOR.loopId);
+    assert.equal(capturedExtra.decisionId, 'd-record-1');
+    assert.equal(capturedExtra.taskDecisionId, undefined);
+    assert.equal(capturedExtra.taskDecisionIssueId, undefined);
+    assert.equal(dispatchCalls, 0, 'a record delivery must never dispatch');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+  });
+
+  test('record_on misrouting: an UNKNOWN record_on (matches nothing in the neighbourhood) targets the anchor, and the note renders', async () => {
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({ siblings: [neighbor('LIN-9001')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-2', on_answer: { effect: 'record', record_on: 'LIN-NOWHERE' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'the comment target must be the ANCHOR (issueId preferred), never the unresolved record_on value');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /outside the checked neighbourhood/, 'the note must render, and must not word this as "invalid"');
+  });
+
+  test('record_on misrouting: a TERMINAL in-neighbourhood record_on targets the anchor, and the note renders', async () => {
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      // In the neighbourhood, but itself Done — must not receive the comment.
+      api: async () => hydrateOk({ siblings: [neighbor('LIN-DONE', 'completed')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-3', on_answer: { effect: 'record', record_on: 'LIN-DONE' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'a terminal target — even one found in the neighbourhood — must not receive the comment');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    // Beat 3 correction: this case is NOT "outside the checked neighbourhood"
+    // — LIN-DONE WAS found there. Reusing that note here would itself be a
+    // false claim, so the terminal case gets its own honest wording.
+    assert.match(feedback.textContent, /already closed/);
+    assert.doesNotMatch(feedback.textContent, /outside the checked neighbourhood/, 'the terminal case must not borrow the not-found note — the target WAS in the checked neighbourhood');
+  });
+
+  test('record_on misrouting: a CROSS-WORKSPACE record_on (absent from THIS workspace\'s neighbourhood) targets the anchor, and the note renders', async () => {
+    // The hydrate call is always scoped to the ANCHOR's own workspace token
+    // (targetUrlKey) — a record_on value that happens to name a real issue in
+    // a DIFFERENT workspace can never appear in this neighbourhood at all, so
+    // it is indistinguishable from "unknown" at this check, which is exactly
+    // the safety property under test: this workspace's neighbourhood can
+    // never accidentally validate an identifier that belongs to another one.
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({ siblings: [neighbor('LIN-9001')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-4', on_answer: { effect: 'record', record_on: 'OTHER-WS-42' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'the fallback prefers the real issueId, mirroring the gone branch\'s own issueId || issueIdentifier convention');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /outside the checked neighbourhood/);
+  });
+
+  test('a valid, in-neighbourhood, non-terminal record_on targets ITS OWN identifier, not the anchor, and that identifier is shown', async () => {
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({ children: [neighbor('LIN-CHILD-1')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-5', on_answer: { effect: 'record', record_on: 'LIN-CHILD-1' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, 'id-LIN-CHILD-1', 'the comment must target the resolved record_on identifier, not the anchor');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+    assert.match(feedback.textContent, /LIN-CHILD-1/, 'the resolved target identifier must actually render — it is the entire mitigation for the stated S15 residual');
+    assert.doesNotMatch(feedback.textContent, /outside the checked neighbourhood/);
+  });
+
+  test('a record delivery stamps the decision answered (decisionLoopId/decisionId) and never calls startRun/dispatchPrompt', async () => {
+    let capturedExtra = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({})
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-6', on_answer: { effect: 'record' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    // Exactly the pair stampDecisionAnswers (routes/workspace-api.js) keys on
+    // — never the task-bound {taskDecisionId, taskDecisionIssueId} shape,
+    // which would leave this decision permanently unanswered. Field-by-field,
+    // not deepEqual — see the note on the sibling test above.
+    assert.equal(capturedExtra.decisionLoopId, ANCHOR.loopId);
+    assert.equal(capturedExtra.decisionId, 'd-record-6');
+    assert.equal(capturedExtra.taskDecisionId, undefined);
+    assert.equal(capturedExtra.taskDecisionIssueId, undefined);
+    assert.equal(dispatchCalls, 0, 'startRun/dispatchPrompt must never be called on a record delivery');
+  });
+
+  test('an operator\'s flip override (LIN-2775 Area 5) to "record" is honoured — a row whose server-resolved effect is "dispatch" still records, not dispatches', async () => {
+    let commentCalls = 0;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({})
+    });
+    const { deliverRulingReply, rulingEffectOverride, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow({ decision: { decision_id: 'd-record-7' }, effect: 'dispatch', alternate: 'record' });
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-record-7');
+    rulingEffectOverride.set(key, 'record');
+
+    deliverRulingReply(row, 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.equal(dispatchCalls, 0, 'the operator\'s override must be honoured over the row\'s own server-resolved default effect');
+  });
+});
+
+// ─── Press-time check (LIN-2775 Area 8) ─────────────────────────────────────
+//
+// Before a `dispatch`-effect row actually composes and sends anything, the
+// anchor's OWN current `state.type` is read via the widened hydrate route.
+// Two outcomes, both specified: disagreement (the anchor is now terminal)
+// downgrades to record IN PLACE; a hydration failure — every failure mode
+// swallowed identically — fails CLOSED to record too. Never a silent
+// dispatch, never a silent no-op: both routes through the SAME record
+// delivery, so the row always ends up commented, stamped, and cleared.
+describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
+  for (const terminalType of ['completed', 'canceled', 'duplicate']) {
+    test(`disagreement: an anchor now ${terminalType} downgrades to record, dispatchPrompt is never called, and the note renders`, async () => {
+      let commentCalls = 0;
+      let dispatchCalls = 0;
+      const { module } = makeSandbox({
+        postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+        dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+        api: async () => hydrateOk({}, { name: 'Terminal', type: terminalType })
+      });
+      const { deliverRulingReply } = module.exports;
+      const li = makeLi();
+
+      deliverRulingReply(makeRow({ decision: { decision_id: `d-presstime-${terminalType}` } }), 'Approve', li);
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+
+      assert.equal(commentCalls, 1, 'the row must still be delivered — commented and stamped — never silently dropped');
+      assert.equal(dispatchCalls, 0, `a ${terminalType} anchor must never be dispatched to`);
+      const feedback = li.querySelector('.obs-ruling-feedback');
+      assert.match(feedback.textContent, /recorded ✓/);
+      assert.match(feedback.textContent, /now closed/, 'the note must say why — a downgrade, not an unexplained record');
+    });
+  }
+
+  for (const reason of ['no_token', 'not_found', 'unavailable']) {
+    test(`hydration failure (${reason}): fails CLOSED to record, dispatchPrompt is never called, and the note renders`, async () => {
+      let commentCalls = 0;
+      let dispatchCalls = 0;
+      const { module } = makeSandbox({
+        postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+        dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+        api: async () => ({ hydrated: false, reason })
+      });
+      const { deliverRulingReply } = module.exports;
+      const li = makeLi();
+
+      deliverRulingReply(makeRow({ decision: { decision_id: `d-presstime-fail-${reason}` } }), 'Approve', li);
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+
+      assert.equal(commentCalls, 1, `a ${reason} hydration failure must still deliver — never a silent no-op`);
+      assert.equal(dispatchCalls, 0, `a ${reason} hydration failure must fail CLOSED, never dispatch unverified`);
+      const feedback = li.querySelector('.obs-ruling-feedback');
+      assert.match(feedback.textContent, /recorded ✓/);
+      assert.match(feedback.textContent, /could not confirm/, 'the note must say why — swallowed identically regardless of the specific reason');
+    });
+  }
+
+  test('a network-level rejection from the hydrate call itself (not a well-formed {hydrated:false}) also fails CLOSED to record', async () => {
+    let commentCalls = 0;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => { throw new Error('network unreachable'); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-presstime-throw' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+    assert.match(feedback.textContent, /could not confirm/);
+  });
+
+  test('a non-terminal anchor confirmed at press time proceeds to the ordinary dispatch path, composedRunMarker included', async () => {
+    let commentCalls = 0;
+    let capturedOpts = null;
+    const { module } = makeSandbox({
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({}, { name: 'In Progress', type: 'started' })
+    });
+    const { deliverRulingReply, RULING_COMPOSED_RUN_MARKER } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-presstime-ok' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.ok(capturedOpts, 'a confirmed non-terminal anchor must still dispatch');
+    assert.equal(capturedOpts.composedRunMarker, RULING_COMPOSED_RUN_MARKER);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+    assert.doesNotMatch(feedback.textContent, /now closed|could not confirm/, 'a confirmed non-terminal anchor must not carry a downgrade note');
+  });
+
+  test('a row with no linked issue at all is refused before ever reaching the press-time hydrate call', async () => {
+    let apiCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: async () => { apiCalls += 1; return hydrateOk({}, { type: 'started' }); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ anchor: { ...ANCHOR, issueId: null, issueIdentifier: null }, decision: { decision_id: 'd-presstime-noissue' } }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(apiCalls, 0, 'nothing to hydrate — the refusal must precede the press-time call entirely');
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /no linked issue/);
   });
@@ -581,7 +1022,8 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
       dispatchPrompt: async (opts) => {
         if (opts.urlKey === 'workspace-a') dispatchCallsA += 1; else dispatchCallsB += 1;
         return { id: 'dispatched-1' };
-      }
+      },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
 
@@ -602,6 +1044,7 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
     deliverRulingReply(rowB, 'Approve', liB);
     assert.ok(rulingsPending.has(keyB), 'workspace B row must be independently answerable while workspace A is still mid-flight');
 
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -2030,5 +2473,294 @@ describe('the rulings selection-clearing invariant (LIN-2444 review — closing 
       'the enumerated population of per-row rulings write handlers changed — update this list deliberately, or a new/renamed handler slipped past unexamined'
     );
     assert.deepEqual(guardedWithoutClear, [], `every rulingsPending.add(key)-guarded handler must also call rulingsSelected.delete(key) on success — missing in: ${guardedWithoutClear.join(', ')}`);
+  });
+});
+
+// ─── rulingEffectOverride lifecycle (LIN-2775 Area 5) ───────────────────────
+//
+// The override Map is consulted from TWO different places in renderRulings'
+// per-row loop depending on which branch a row takes: a fresh row goes
+// through renderRulingRow, which restores it at creation time; a row held by
+// `mustReuse` (pending/preserved/settled) skips renderRulingRow entirely and
+// simply reuses whatever <li> is already attached. The staleness prune must
+// therefore run in renderRulings itself, ahead of that branch, not only
+// inside renderRulingRow — S12's mechanism correction, and the exact bug
+// class `8feb02c7`/LIN-2262 already fixed once in the shelf-gate keying.
+describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  function flippableRow(overrides = {}) {
+    return makeRow({
+      decision: { decision_id: 'd-effect-1' },
+      effect: 'dispatch',
+      alternate: 'record',
+      ...overrides
+    });
+  }
+
+  test('pressing the flip control sets an override and swaps the row\'s caption/flip label in place', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    assert.equal(rulingEffectOverride.has(key), false, 'no override before any press');
+
+    const li = list.children[0];
+    const flip = li.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(flip, 'a row with a non-null alternate must render the flip control');
+    assert.equal(flip.textContent, 'Use "record" instead');
+
+    flip.click();
+
+    assert.equal(rulingEffectOverride.get(key), 'record', 'flipping stores the row\'s own alternate as the override value');
+    // The click swapped `li` for a freshly rendered node in the list.
+    const flippedLi = list.children[0];
+    assert.notEqual(flippedLi, li, 'the flip control re-renders its own row rather than mutating the old node');
+    const flippedFlip = flippedLi.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(flippedFlip.classList.contains('obs-ruling-effect-flip--active'));
+    assert.equal(flippedFlip.textContent, 'Use "dispatch" instead', 'label now offers to flip back to the row\'s own default effect');
+
+    flippedFlip.click();
+    assert.equal(rulingEffectOverride.has(key), false, 'a second press clears the override entirely rather than storing the default back into the map');
+  });
+
+  test('an override survives a repaint with the SAME payload (row.alternate unchanged) — fresh-render path', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    const row = flippableRow();
+    renderRulings([row]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // Next poll: a NEW row object, but the same alternate — this is what a
+    // real repaint looks like (renderRulings is always handed a fresh
+    // payload array). Nothing here marks the row as mustReuse, so this goes
+    // through the fresh renderRulingRow path, which must restore the
+    // override at creation time.
+    const repaintedRow = flippableRow();
+    renderRulings([repaintedRow]);
+
+    assert.equal(rulingEffectOverride.get(key), 'record', 'the override must still be present after a same-payload repaint');
+    const repaintedLi = list.children[0];
+    const repaintedFlip = repaintedLi.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(repaintedFlip.classList.contains('obs-ruling-effect-flip--active'), 'the restored row must render the flip control already in its overridden state');
+  });
+
+  test('a stale override (payload\'s alternate changed) is pruned — fresh-render path, row.effect wins', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // A later evidence swing: the SAME row now resolves a different
+    // alternate (e.g. a live dispatch appeared on the anchor between polls).
+    // The stored override ('record') no longer equals the new alternate
+    // ('resume'), so it must be pruned outright, not merely ignored.
+    const swungRow = flippableRow({ effect: 'dispatch', alternate: 'resume' });
+    renderRulings([swungRow]);
+
+    assert.equal(rulingEffectOverride.has(key), false, 'a stale override must be pruned, not just ignored');
+    const freshLi = list.children[0];
+    const freshFlip = freshLi.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(!freshFlip.classList.contains('obs-ruling-effect-flip--active'), 'row.effect must win — the row renders un-overridden');
+    assert.equal(freshFlip.textContent, 'Use "resume" instead', 'the flip control now offers the NEW alternate, not the stale one');
+  });
+
+  test('an override survives a repaint on the mustReuse (pending) reuse path — the same <li> is kept as-is', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = module.exports;
+
+    const row = flippableRow();
+    renderRulings([row]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    const flippedLi = (() => {
+      list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+      return list.children[0];
+    })();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // Mark the row mid-flight (mustReuse), matching a poll landing between a
+    // press and its network round trip completing — renderRulings must NOT
+    // rebuild the row (renderRulingRow is never called on this path), it
+    // must reuse the exact same <li> the operator is looking at.
+    rulingsPending.add(key);
+    renderRulings([flippableRow()]);
+
+    assert.equal(rulingEffectOverride.get(key), 'record', 'the override must still be present after a mustReuse repaint');
+    assert.equal(list.children[0], flippedLi, 'the mustReuse path must reuse the exact already-flipped <li>, never rebuild it');
+
+    rulingsPending.delete(key);
+  });
+
+  test('a stale override is pruned on the mustReuse (pending) reuse path too — the staleness check does not live only inside renderRulingRow', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // mustReuse this time (unlike the fresh-render staleness test above) —
+    // renderRulingRow is never invoked on this branch, so if the prune were
+    // written only inside it (the S12 trap this ticket calls out by name),
+    // this assertion is exactly what would catch it: the map would still
+    // hold the stale 'record' value here.
+    rulingsPending.add(key);
+    const swungRow = flippableRow({ effect: 'dispatch', alternate: 'resume' });
+    renderRulings([swungRow]);
+
+    assert.equal(rulingEffectOverride.has(key), false, 'the staleness prune must run on the mustReuse path too, not only inside renderRulingRow');
+
+    rulingsPending.delete(key);
+  });
+
+  test('a row with row.alternate === null never renders the flip control (a hard override can never surface here)', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ decision: { decision_id: 'd-hard-1' }, effect: 'resume', alternate: null })]);
+
+    const li = list.children[0];
+    assert.equal(li.querySelectorAll('.obs-ruling-effect-flip').length, 0);
+  });
+
+  test('a vanished row\'s override is pruned in the seen sweep, so a later reused key never inherits a stale flip', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // The ruling leaves the feed entirely (answered, or otherwise gone) —
+    // not mustReuse, not present in the new payload at all.
+    renderRulings([]);
+
+    assert.equal(rulingEffectOverride.has(key), false, 'the override must not survive its row leaving the feed');
+  });
+});
+
+// ─── resolveRecordTarget (LIN-2775 Area 6) — pure, no DOM/network ──────────
+describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
+  function sandboxExports() {
+    return makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) }).module.exports;
+  }
+
+  test('no record_on declared → the anchor, no note', () => {
+    const { resolveRecordTarget } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, null, { hydrated: true, neighborhood: { parent: null, siblings: [], children: [], cousins: [] } });
+    assert.equal(result.issueId, ANCHOR.issueId);
+    assert.equal(result.issueIdentifier, ANCHOR.issueIdentifier);
+    assert.equal(result.note, null);
+  });
+
+  test('record_on matches nothing in the neighbourhood → the anchor, the outside-neighbourhood note', () => {
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-NOWHERE', {
+      hydrated: true,
+      neighborhood: { parent: null, siblings: [{ id: 'id-1', identifier: 'LIN-1', state: { type: 'started' } }], children: [], cousins: [] }
+    });
+    assert.equal(result.issueId, ANCHOR.issueId);
+    assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
+  });
+
+  test('record_on matches a neighbour whose own state is terminal → the anchor, its OWN honest note (beat 3 correction)', () => {
+    // NOT the not-found note — LIN-T WAS found in the neighbourhood, so
+    // claiming "outside the checked neighbourhood" here would itself be a
+    // false claim, which is exactly what this ticket exists to eliminate.
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE, RECORD_TARGET_TERMINAL_NOTE } = sandboxExports();
+    for (const type of ['completed', 'canceled', 'duplicate']) {
+      const result = resolveRecordTarget(ANCHOR, 'LIN-T', {
+        hydrated: true,
+        neighborhood: { parent: null, siblings: [], children: [{ id: 'id-t', identifier: 'LIN-T', state: { type } }], cousins: [] }
+      });
+      assert.equal(result.issueId, ANCHOR.issueId, `terminal type ${type} must fall back to the anchor`);
+      assert.equal(result.note, RECORD_TARGET_TERMINAL_NOTE, `terminal type ${type} must carry its own note, not the not-found one`);
+      assert.notEqual(result.note, RECORD_TARGET_OUTSIDE_NOTE);
+    }
+  });
+
+  test('record_on matches a non-terminal neighbour → that neighbour, no note', () => {
+    const { resolveRecordTarget } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-COUSIN', {
+      hydrated: true,
+      neighborhood: { parent: null, siblings: [], children: [], cousins: [{ id: 'id-cousin', identifier: 'LIN-COUSIN', state: { type: 'started' } }] }
+    });
+    assert.equal(result.issueId, 'id-cousin');
+    assert.equal(result.issueIdentifier, 'LIN-COUSIN');
+    assert.equal(result.note, null);
+  });
+
+  test('record_on matches the parent specifically (not only siblings/children/cousins)', () => {
+    const { resolveRecordTarget } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-PARENT', {
+      hydrated: true,
+      neighborhood: { parent: { id: 'id-parent', identifier: 'LIN-PARENT', state: { type: 'unstarted' } }, siblings: [], children: [], cousins: [] }
+    });
+    assert.equal(result.issueId, 'id-parent');
+    assert.equal(result.note, null);
+  });
+
+  test('a failed/unavailable hydrate result (hydrated: false) → the anchor, the note — fails safe, never throws', () => {
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-SOMETHING', { hydrated: false, reason: 'unavailable' });
+    assert.equal(result.issueId, ANCHOR.issueId);
+    assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
+  });
+});
+
+// ─── composeDispatchPrompt (LIN-2775 Area 7) — pure, no DOM/network ────────
+describe('composeDispatchPrompt (LIN-2775 Area 7)', () => {
+  function sandboxExports() {
+    return makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) }).module.exports;
+  }
+
+  test('carries the question, the chosen answer, and the full decisionCase recap', () => {
+    const { composeDispatchPrompt } = sandboxExports();
+    const row = { decision: { question: 'Ship or hold?' }, decisionCase: ['Tests are green.', 'The release window closes Friday.'] };
+    const prompt = composeDispatchPrompt(row, 'Ship');
+    assert.match(prompt, /Ship or hold\?/);
+    assert.match(prompt, /Ship/);
+    assert.match(prompt, /Tests are green\./);
+    assert.match(prompt, /The release window closes Friday\./);
+  });
+
+  test('the FULL decisionCase is used, never the UI\'s DECISION_EXCERPT_CHARS-truncated preview', () => {
+    const { composeDispatchPrompt, DECISION_EXCERPT_CHARS } = sandboxExports();
+    const longChunk = 'x'.repeat(DECISION_EXCERPT_CHARS + 50);
+    const row = { decision: { question: 'Q' }, decisionCase: [longChunk] };
+    const prompt = composeDispatchPrompt(row, 'A');
+    assert.match(prompt, new RegExp(longChunk), 'a real agent brief must not be truncated to the UI\'s screen-space budget');
+  });
+
+  test('no question and no decisionCase → still carries the chosen answer, never throws', () => {
+    const { composeDispatchPrompt } = sandboxExports();
+    const prompt = composeDispatchPrompt({}, 'Approve');
+    assert.match(prompt, /Approve/);
+  });
+
+  test('free text (not a declared option label) is carried exactly as pressed', () => {
+    const { composeDispatchPrompt } = sandboxExports();
+    const row = { decision: { question: 'Why was I asked this?' }, decisionCase: [] };
+    const prompt = composeDispatchPrompt(row, 'Because the migration touches this table too.');
+    assert.match(prompt, /Because the migration touches this table too\./);
   });
 });

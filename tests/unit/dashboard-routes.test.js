@@ -61,6 +61,20 @@ function agentStatusDone(dispatchId, identifier, ts = NOW_ISO) {
   // fixture MUST carry one or the row is silently dropped (LIN-1022).
   return { id: `as-${dispatchId}`, dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'completed', summary: 'all done', timestamp: ts };
 }
+// LIN-2775 Area 7 (S1 review ledger L5): a taken run whose matched
+// agent-status entry is 'blocked' — per _deriveAgentState's truth table
+// (lib/pipeline-loops.js) this derives agentState 'waiting', the ONE live
+// (non-terminal) state the S1 handover flagged as having no fixture at all.
+function agentStatusBlocked(dispatchId, identifier, ts = NOW_ISO) {
+  return { id: `as-${dispatchId}`, dispatchId, taskIdentifier: identifier, action: 'implementation', status: 'blocked', summary: 'parked, waiting on the operator', timestamp: ts };
+}
+// A taken history item with a matching agentStatus row — paired with
+// agentStatusDone/agentStatusBlocked above to derive 'complete'/'waiting'.
+// (Distinct from `historyItem` above, which carries no decision and no
+// agent-status pairing.)
+function takenRunItem(id, identifier, ts = NOW_ISO) {
+  return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'implementation', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken' };
+}
 // A taken run that the runner finished via a [done] feedback marker but with NO
 // agentStatus 'completed' entry — pipeline-loops alone derives 'running' for this.
 function markerDoneItem(id, identifier) {
@@ -480,6 +494,74 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
 
     const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-task-3');
     assert.equal(row.effect, 'dispatch');
+  });
+
+  // LIN-2775 Area 7 / S1 review ledger item L5, named explicitly in the
+  // handover: "queued is covered (proxy test) and running via self-match.
+  // waiting has no fixture — a loop parked [blocked] on the very anchor
+  // issue." Both states are pinned HERE, side by side, sharing the same
+  // task-bound row and the same "declared dispatch, forced record" shape as
+  // the tests above — so `waiting` cannot be waved off as "basically the
+  // same as queued, already covered": it is its own fixture, asserted on
+  // its own, and it goes red on its own if the predicate regresses to check
+  // `agentState === 'running'` (which would silently exclude it, per the
+  // predicate's own doc comment in routes/dashboard.js/routes/proxy-
+  // rulings.js — no such conjunct exists in either).
+  describe('liveDispatchOnAnchor across live loop states (S1 ledger L5)', () => {
+    function makeLiveStateRouter(liveLoopItem, liveLoopAgentStatus) {
+      const taskDecisionsStore = {
+        async listUnansweredForWorkspaces() {
+          return [{
+            id: 'scan_task_l5_dddddddddddd', urlKey: 'ws-a', issueId: '44444444-5555-6666-7777-888888888888',
+            issueIdentifier: 'LIN-45',
+            decision: { decision_id: 'd-task-l5', question: 'Proceed?', on_answer: { effect: 'dispatch' } },
+            scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
+          }];
+        }
+      };
+      const perWorkspace = {
+        'ws-a': { live: liveLoopItem.source === 'live' ? [liveLoopItem.item] : [], history: liveLoopItem.source === 'history' ? [liveLoopItem.item] : [], agentStatus: liveLoopAgentStatus ? [liveLoopAgentStatus] : [] }
+      };
+      const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+      return createDashboardRoutes({
+        workspaceFromUrl: (req, res, next) => next(),
+        dispatchQueueStore, agentStatusStore,
+        runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+        freeTierStore: { async tryUse() { return { allowed: true }; } },
+        getWorkspaceAccessToken: async () => 'token',
+        fetchIssueContext: async () => ({}),
+        getOpenRouterSource: () => 'env',
+        getDeployInfo: () => ({}),
+        taskDecisionsStore
+      });
+    }
+
+    test('a QUEUED loop on the same anchor forces effect: "record", overriding a declared "dispatch"', async () => {
+      const router = makeLiveStateRouter({ source: 'live', item: activeItem('a-l5-queued', 'LIN-45') });
+      const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+      const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+      await handler(req, res);
+
+      const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-task-l5');
+      assert.ok(row, 'the task-bound row is present');
+      assert.equal(row.declaredEffect, 'dispatch');
+      assert.equal(row.effect, 'record', 'a QUEUED loop on the same anchor is live — it must force record');
+    });
+
+    test('a WAITING loop ([blocked] parked on the same anchor) forces effect: "record", overriding a declared "dispatch" — the gap S1\'s handover named by name', async () => {
+      const router = makeLiveStateRouter(
+        { source: 'history', item: takenRunItem('a-l5-waiting', 'LIN-45') },
+        agentStatusBlocked('a-l5-waiting', 'LIN-45')
+      );
+      const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+      const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+      await handler(req, res);
+
+      const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-task-l5');
+      assert.ok(row, 'the task-bound row is present');
+      assert.equal(row.declaredEffect, 'dispatch');
+      assert.equal(row.effect, 'record', 'a WAITING ([blocked]-parked) loop on the same anchor is live — it must force record, exactly like queued/running');
+    });
   });
 
   // ─── Area 8: the ambient poll stays structurally provider-free ─────────
@@ -4250,5 +4332,98 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
 
     assert.equal(res.statusCode, 500);
     assert.match(res.sentBody, /Failed to render the Observation page/);
+  });
+});
+
+// ─── Widened hydrate route — neighborhood (LIN-2775 Area 6) ────────────────
+//
+// GET /workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier is the
+// only production caller-tested route this ticket touches directly (the
+// client's only caller, ensureHydration in public/observation.js, reads only
+// hydrated/state/labels/url — the new field is additive to it with zero
+// compatibility handling needed).
+describe('GET /api/dashboard/hydrate/:wsUrlKey/:identifier — widened neighborhood (LIN-2775 Area 6)', () => {
+  const NO_OP_STORES = {
+    dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+    agentStatusStore: { async listStatus() { return { items: [] }; } }
+  };
+
+  function makeHydrateRouter({ fetchIssueContext, getWorkspaceAccessToken } = {}) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      ...NO_OP_STORES,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: getWorkspaceAccessToken || (async () => 'token'),
+      fetchIssueContext: fetchIssueContext || (async () => ({})),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+  }
+
+  function callHydrate(router, { wsUrlKey = 'ws-a', identifier = 'LIN-1' } = {}) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier');
+    const { req, res } = makeReqRes({
+      session: { workspaces: [{ urlKey: wsUrlKey, name: 'Alpha' }] },
+      params: { wsUrlKey, identifier }
+    });
+    return handler(req, res).then(() => res);
+  }
+
+  test('the response gains neighborhood: {parent, siblings, children, cousins}, additive alongside the existing fields', async () => {
+    let contextCalls = 0;
+    const context = {
+      issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [{ name: 'bug' }] }, url: 'https://example.test/LIN-1' },
+      parent: { id: 'id-parent', identifier: 'LIN-PARENT', title: 'Parent', state: { name: 'Todo', type: 'unstarted' } },
+      siblings: [{ id: 'id-sib', identifier: 'LIN-SIB', title: 'Sib', state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] }, inverseRelations: { nodes: [] } }],
+      children: [{ id: 'id-child', identifier: 'LIN-CHILD', title: 'Child', state: { name: 'Done', type: 'completed' }, updatedAt: '2026-01-01', labels: { nodes: [] } }],
+      cousins: [{ id: 'id-cousin', identifier: 'LIN-COUSIN', title: 'Cousin', state: { name: 'Todo', type: 'unstarted' } }]
+    };
+    const router = makeHydrateRouter({ fetchIssueContext: async () => { contextCalls += 1; return context; } });
+
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    // Existing fields, byte-identical to before this Area.
+    assert.equal(res.jsonBody.hydrated, true);
+    assert.deepEqual(res.jsonBody.state, { name: 'In Progress', type: 'started' });
+    assert.deepEqual(res.jsonBody.labels, ['bug']);
+    assert.equal(res.jsonBody.url, 'https://example.test/LIN-1');
+    // New field.
+    assert.deepEqual(res.jsonBody.neighborhood.parent, { id: 'id-parent', identifier: 'LIN-PARENT', title: 'Parent', state: { name: 'Todo', type: 'unstarted' } });
+    assert.deepEqual(res.jsonBody.neighborhood.siblings, [{ id: 'id-sib', identifier: 'LIN-SIB', title: 'Sib', state: { name: 'In Progress', type: 'started' } }]);
+    assert.deepEqual(res.jsonBody.neighborhood.children, [{ id: 'id-child', identifier: 'LIN-CHILD', title: 'Child', state: { name: 'Done', type: 'completed' } }]);
+    assert.deepEqual(res.jsonBody.neighborhood.cousins, [{ id: 'id-cousin', identifier: 'LIN-COUSIN', title: 'Cousin', state: { name: 'Todo', type: 'unstarted' } }]);
+    // The projection drops fields a membership/terminality check has no use
+    // for (labels/inverseRelations/etc on the raw sibling/child GraphQL nodes) —
+    // pinned by the deepEqual above matching the small shape exactly, not a
+    // superset.
+    assert.equal(contextCalls, 1, 'no second provider read — one fetchIssueContext call resolves both neighbourhood membership and target terminality');
+  });
+
+  test('a parent-less issue (top-level) gets neighborhood.parent: null, siblings/children/cousins: []', async () => {
+    const router = makeHydrateRouter({ fetchIssueContext: async () => ({ issue: { state: { name: 'Todo', type: 'unstarted' } } }) });
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody.neighborhood, { parent: null, siblings: [], children: [], cousins: [] });
+  });
+
+  test('no token → hydrated: false, reason: no_token — unchanged, no neighborhood field at all', async () => {
+    const router = makeHydrateRouter({ getWorkspaceAccessToken: async () => null });
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { hydrated: false, reason: 'no_token' });
+  });
+
+  test('fetchIssueContext throwing "not found" degrades to hydrated: false, reason: not_found — never a 500', async () => {
+    const router = makeHydrateRouter({ fetchIssueContext: async () => { throw new Error('Issue not found: LIN-1'); } });
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { hydrated: false, reason: 'not_found' });
   });
 });

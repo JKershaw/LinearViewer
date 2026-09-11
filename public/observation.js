@@ -153,6 +153,28 @@ const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across
 // writing into the now-detached old one — see the renderRulings comment below.
 const renderedRulingRows = new Map();
 
+// rulingKey → operator-chosen effect override (LIN-2775 Area 5). Set/cleared
+// by the flip control renderRulingRow attaches whenever a row's `alternate`
+// is non-null (never against a hard override — resolveEffect's hard-override
+// branches 1-3 always carry `alternate: null`, so the control simply never
+// renders there). Restored at ROW-CREATION time inside renderRulingRow
+// itself, mirroring the `rulingsSelected` bulk-checkbox precedent above —
+// deliberately NOT threaded through `mustReuse` below, whose whole point is
+// to reuse the existing (already-correct) <li> without calling
+// renderRulingRow at all.
+//
+// Pruned two ways: instantly, the moment it goes STALE against the current
+// payload's `row.alternate` (the override-vs-repaint staleness rule — see
+// the check inside renderRulings' own per-row loop, which runs on every row
+// regardless of whether that row takes the mustReuse-reuse branch or the
+// fresh-render branch, precisely because mustReuse skips renderRulingRow —
+// and with it any staleness check written only inside it — entirely for
+// pending/preserved/settled rows; `8feb02c7`/LIN-2262 fixed this exact class
+// of bug once already in the shelf-gate keying); and, same as every other
+// per-key map here, in the `seen` sweep once a key's row has genuinely left
+// the feed.
+const rulingEffectOverride = new Map();
+
 // ─── Bulk-agree selection (LIN-2444 Phase 5) ────────────────────────────────
 //
 // `rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, anchor, decisionId)` —
@@ -1636,6 +1658,20 @@ function renderRulings(rulings) {
     const decisionId = row?.decision?.decision_id;
     const urlKey = row?.anchor?.workspaceUrlKey;
     const key = rulingKey(urlKey, row?.anchor, decisionId);
+    // Override-vs-repaint staleness rule (LIN-2775 Area 5): honour an
+    // override only when it exactly equals THIS payload's row.alternate;
+    // otherwise prune it outright, not merely ignore it, so a later evidence
+    // swing cannot resurrect a flip made under different circumstances. Runs
+    // HERE, on every row, before the mustReuse branch below decides whether
+    // renderRulingRow (and the restore inside it) even runs — a check
+    // written only inside renderRulingRow would never see the mustReuse
+    // reuse path at all (S12 mechanism correction; `8feb02c7`/LIN-2262 fixed
+    // the same class of bug once already in the shelf-gate keying). A
+    // hard-overridden row (row.alternate === null) can never carry a
+    // surviving stale override, by construction.
+    if (key && rulingEffectOverride.has(key) && rulingEffectOverride.get(key) !== row?.alternate) {
+      rulingEffectOverride.delete(key);
+    }
     const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key));
     const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
@@ -1688,6 +1724,10 @@ function renderRulings(rulings) {
       renderedRulingRows.delete(key);
       rulingsRowByKey.delete(key);
       rulingsSelected.delete(key);
+      // A vanished row's key can never remain overridden either — otherwise
+      // a decision_id later reused (a fresh ruling landing on the exact same
+      // rulingKey) could inherit a stale flip it never earned.
+      rulingEffectOverride.delete(key);
     }
   }
 
@@ -1891,15 +1931,59 @@ function renderRulingRow(row) {
     li.appendChild(banner);
   }
 
+  // rulingKey — the SAME composite key `renderRulings` computes for this row
+  // (:decisionId/:urlKey re-derived identically from `row`) — restores any
+  // standing operator override at ROW-CREATION time, mirroring the
+  // `rulingsSelected` bulk-checkbox precedent above. Safe to read directly
+  // here (rather than re-checking staleness): renderRulings' own per-row
+  // loop already pruned a stale entry for this exact key, against this exact
+  // payload's `row.alternate`, before ever reaching this fresh-render branch.
+  const effectKey = rulingKey(anchor?.workspaceUrlKey, anchor, decision?.decision_id);
+  const effectiveEffect = (effectKey && rulingEffectOverride.has(effectKey))
+    ? rulingEffectOverride.get(effectKey)
+    : row?.effect;
+
   window.ChatUI.appendOptions(li, {
     options: decision?.options,
     recommended: decision?.recommended,
     disposition,
+    effect: effectiveEffect,
     onSelect: (optionId, optionLabel) => {
       if (!canReply) return;
       deliverRulingReply(row, optionLabel, li);
     }
   });
+
+  // Flip control (LIN-2775 Area 5): renders ONLY when `row.alternate` is
+  // non-null — never against a hard override, which by construction always
+  // carries `alternate: null` (resolveEffect's branches 1-3). Per-row
+  // default with an override, never a global toggle: pressing it sets/clears
+  // THIS row's own `rulingEffectOverride` entry, then re-renders this exact
+  // row via renderRulingRow itself (reusing the same restore-at-creation
+  // logic above rather than re-deriving the caption here a second time) and
+  // swaps the fresh <li> in for the old one in place.
+  if (row?.alternate) {
+    const flip = document.createElement('button');
+    flip.type = 'button';
+    flip.className = 'obs-ruling-effect-flip';
+    const overridden = !!(effectKey && rulingEffectOverride.has(effectKey));
+    flip.textContent = overridden
+      ? `Use "${row.effect}" instead`
+      : `Use "${row.alternate}" instead`;
+    flip.classList.toggle('obs-ruling-effect-flip--active', overridden);
+    flip.addEventListener('click', () => {
+      if (flip.disabled || !effectKey) return;
+      if (rulingEffectOverride.has(effectKey)) {
+        rulingEffectOverride.delete(effectKey);
+      } else {
+        rulingEffectOverride.set(effectKey, row.alternate);
+      }
+      const fresh = renderRulingRow(row);
+      if (li.parentNode) li.parentNode.replaceChild(fresh, li);
+      renderedRulingRows.set(effectKey, fresh);
+    });
+    li.appendChild(flip);
+  }
 
   // Free-text escape hatch + dismiss (LIN-2225): the declared options stay the
   // PRIMARY path (untouched above) — this is additive, not a replacement.
@@ -2130,8 +2214,14 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
 // held in `rulingsSettled`, which is exactly what stops the operator
 // re-selecting and re-agreeing a row that already succeeded but is still
 // showing (stale cache window).
+// `.obs-ruling-effect-flip` (LIN-2775 Area 5) joins the set so it is disabled
+// for the same window every other control here is: its click handler
+// replaces this row's <li> outright (renderRulingRow re-render, swapped in
+// via parentNode.replaceChild), which is exactly the "closure keeps writing
+// into a now-detached node" hazard this whole function exists to prevent if
+// pressed while a delivery on this same row is already in flight.
 function rulingRowControls(li) {
-  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep, .obs-ruling-select');
+  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep, .obs-ruling-select, .obs-ruling-effect-flip');
 }
 
 // The actual dismiss request (LIN-2444 Phase 3, extracted from the body
@@ -2529,6 +2619,114 @@ async function bulkAgreeSelected() {
   syncRulingsBulkBar();
 }
 
+// Mirrors lib/providers/models.js's TERMINAL_TYPES. Duplicated, not
+// imported — this is a plain browser script with no bundler/ESM import, the
+// same tradeoff `REAP_INACTIVITY_MS` (lib/unanswered-decisions.js) already
+// documents for this exact codebase: a small, stable, rarely-changed
+// constant, drift risk accepted rather than routed around here.
+const RECORD_TARGET_TERMINAL_TYPES = ['completed', 'canceled', 'duplicate'];
+
+// The widened hydrate route's URL (LIN-2775 Areas 6/8) — shared by the
+// record_on resolution below and the press-time terminal-anchor check
+// further down; both fetch the SAME anchor identifier, just read different
+// fields off the same response shape (`neighborhood` vs. the top-level
+// `state`), which is exactly why the route was widened in one call rather
+// than split into two.
+function hydrateUrl(pageUrlKey, wsUrlKey, identifier) {
+  return `/workspace/${encodeURIComponent(pageUrlKey)}/api/dashboard/hydrate/${encodeURIComponent(wsUrlKey)}/${encodeURIComponent(identifier)}`;
+}
+
+// Client-side, advisory-only resolution of a declared `on_answer.record_on`
+// target (LIN-2775 Area 6). Pure — takes the widened hydrate route's already-
+// fetched response for the ANCHOR issue, never fetches anything itself, so it
+// is directly unit-testable. Fails safe in every unresolved case (no
+// `recordOn` declared, the target not found in the neighbourhood, found but
+// itself terminal, or the hydrate call failed/unavailable): all of those
+// return the ANCHOR as the target. Server-side guards are unchanged — this
+// only decides what the comment call below composes, never gates it.
+//
+// The note text deliberately does not say record_on was INVALID — a
+// legitimate sibling can simply sit beyond SIBLING_CAP/COUSIN_CAP
+// (lib/openrouter.js) and never appear in the neighbourhood at all, so
+// "outside the checked neighbourhood" is honest where "invalid target" would
+// not be.
+const RECORD_TARGET_OUTSIDE_NOTE = 'outside the checked neighbourhood';
+// A SEPARATE note for the found-but-terminal case (beat 3 correction): the
+// declared target WAS in the checked neighbourhood, so reusing the
+// not-found note here would itself be the exact kind of false claim this
+// ticket exists to eliminate. Same non-invalidity-implying register as the
+// note above — the target isn't wrong, it's just already closed.
+const RECORD_TARGET_TERMINAL_NOTE = 'the declared target is already closed';
+
+function resolveRecordTarget(anchor, recordOn, hydrateResult) {
+  const fallback = { issueId: anchor?.issueId || null, issueIdentifier: anchor?.issueIdentifier || null, note: null };
+  if (!recordOn) return fallback;
+
+  const neighborhood = hydrateResult && hydrateResult.hydrated ? hydrateResult.neighborhood : null;
+  const candidates = neighborhood
+    ? [neighborhood.parent, ...(neighborhood.siblings || []), ...(neighborhood.children || []), ...(neighborhood.cousins || [])].filter(Boolean)
+    : [];
+  const match = candidates.find(c => c.identifier === recordOn);
+
+  if (!match) return { ...fallback, note: RECORD_TARGET_OUTSIDE_NOTE };
+  if (match.state && RECORD_TARGET_TERMINAL_TYPES.includes(match.state.type)) {
+    return { ...fallback, note: RECORD_TARGET_TERMINAL_NOTE };
+  }
+  // The rendered target identifier is a stated, un-eliminated residual's
+  // entire mitigation (S15): an in-neighbourhood-but-wrong sibling can still
+  // receive the human's words if the agent names it, so the caller MUST
+  // surface `issueIdentifier` back to the operator, not silently swallow it.
+  return { issueId: match.id || null, issueIdentifier: match.identifier, note: null };
+}
+
+// LIN-2775 Area 7 — this ticket's headline defect. `kind` is
+// DISPATCH_KIND_DEFAULT (lib/prompt-templates.js) — 'custom' — since nothing
+// more specific is derivable from a ruling row today: `anchor`
+// (lib/unanswered-decisions.js) carries no promptName/kind from the loop
+// that raised the decision, only loopId/issueId/issueIdentifier/
+// workspaceUrlKey/target/followUpTo.
+const RULING_DISPATCH_PROMPT_NAME = 'Ruling reply';
+const RULING_DISPATCH_KIND = 'custom';
+
+// LIN-2775 Area 8 — the scoped structural marker threaded through a
+// composed-run dispatch call specifically. Presence (not any particular
+// string content) activates routes/dispatch.js's server-side terminal-
+// anchor guard; every other client-side dispatch surface never sends this
+// field and is completely unaffected. Deliberately NOT named/valued
+// "terminal" — that already names an unrelated opaque dispatch field
+// (LIN-2452, the runner's terminal-emulator driver).
+const RULING_COMPOSED_RUN_MARKER = 'ruling-composed-run';
+
+// Press-time downgrade notes (LIN-2775 Area 8) — the SAME visible-note
+// pattern Area 6 established (RECORD_TARGET_OUTSIDE_NOTE/
+// RECORD_TARGET_TERMINAL_NOTE above): honest about WHY, never implying the
+// operator's answer itself was invalid.
+const PRESS_TIME_DOWNGRADE_NOTE = 'the linked task is now closed — recorded instead of starting a run';
+const PRESS_TIME_HYDRATION_FAILURE_NOTE = 'could not confirm the linked task is still open — recorded instead of starting a run';
+
+// Compose a REAL agent brief for a `dispatch`-effect ruling reply, copying
+// public/next-run.js's explicit-promptName/kind `dispatchPrompt` pattern.
+// Pure — no DOM/network — so directly unit-testable. Before this, the `gone`
+// branch dispatched the RAW reply text as the agent's entire prompt: tapping
+// "preserve" launched an agent whose whole brief was the word "preserve".
+//
+// `chosenAnswer` is the pressed option's LABEL or the operator's free text —
+// exactly what `deliverRulingReply`'s own `prompt` parameter already
+// carries, so it is passed straight through, never re-derived. `row`
+// supplies the decision's `question` and the `decisionCase` recap the row
+// already renders (`.obs-ruling-case`) — the FULL case here, not that
+// UI's DECISION_EXCERPT_CHARS-bounded preview: a screen-space excerpt is
+// the wrong budget for what an agent actually needs to act correctly.
+function composeDispatchPrompt(row, chosenAnswer) {
+  const question = row?.decision?.question;
+  const caseText = Array.isArray(row?.decisionCase) ? row.decisionCase.join(' ').trim() : '';
+  const parts = [];
+  if (question) parts.push(`Decision: ${question}`);
+  parts.push(`Chosen answer: ${chosenAnswer}`);
+  if (caseText) parts.push(`Context:\n${caseText}`);
+  return parts.join('\n\n');
+}
+
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
 // caller above already checks it — this is the second, structural guard);
 // branches on `disposition`, resolved server-side at poll time and never
@@ -2585,9 +2783,15 @@ function deliverRulingReply(row, prompt, li) {
     feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
   };
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
-  const onDelivered = () => {
+  // `note` (LIN-2775 Area 6) appends a parenthetical onto the standard
+  // "recorded ✓" text rather than replacing it — a record-branch delivery
+  // that fell back off a declared `record_on` still needs to say so, and the
+  // fallback note must survive all the way to the row's final feedback state,
+  // not get overwritten by it. Every other call site omits `note`, so its
+  // feedback text is byte-identical to before this Area existed.
+  const onDelivered = (note) => {
     restore();
-    setFeedback('recorded ✓', false);
+    setFeedback(note ? `recorded ✓ (${note})` : 'recorded ✓', false);
     // Fifth instance of the review's class, found while closing F6/F7: a
     // repliable row can ALSO carry a live suggestion (appendSuggestionActions
     // renders regardless of canReply), so it can be bulk-selected and then
@@ -2675,6 +2879,69 @@ function deliverRulingReply(row, prompt, li) {
   }
 
   if (disposition === 'gone') {
+    // LIN-2775 Area 6: `effect` (the operator's own flip override taking
+    // precedence over the row's server-resolved default, same lookup
+    // renderRulingRow uses to restore it) decides whether this press records
+    // or dispatches — a question the code below used to skip entirely,
+    // unconditionally dispatching every `gone` reply regardless of what
+    // `resolveEffect` (lib/unanswered-decisions.js) actually resolved.
+    const effectKey = rulingKey(targetUrlKey, anchor, decisionId);
+    const effectiveEffect = (effectKey && rulingEffectOverride.has(effectKey))
+      ? rulingEffectOverride.get(effectKey)
+      : row?.effect;
+
+    // A NEW sibling branch inside deliverRulingReply (branch inside, never
+    // fork — the LIN-2225 precedent), NOT routed through the task-bound
+    // branch below: that branch's stamp payload ({taskDecisionId,
+    // taskDecisionIssueId} → taskDecisionsStore.markOutcome) exists only
+    // for task-decision rows. A loop-backed row (this one) carries neither
+    // field, so routing it there would call stampDecisionAnswers down a
+    // branch that takes neither pair — the decision would never be marked
+    // answered and would reappear on the next 5s poll. Reuses the `gone`
+    // branch's own comment call verbatim (decisionLoopId/decisionId, the
+    // pair stampDecisionAnswers DOES key on) and stops after onDelivered()
+    // — never calls startRun/dispatchPrompt.
+    //
+    // Extracted into its own closure (LIN-2775 Area 8) so BOTH triggers that
+    // route a press here — the server-resolved/overridden `effect ===
+    // 'record'` (Area 6) AND the press-time downgrade below (Area 8) — share
+    // one implementation. `downgradeNote`, present only for the second
+    // trigger, is prepended to the record_on note (if any) rather than
+    // replacing it: a press-time downgrade AND a record_on fallback can both
+    // be true of the same delivery, and both are worth telling the operator.
+    const deliverAsRecord = (downgradeNote) => {
+      const recordOn = decision?.on_answer?.record_on || null;
+      const targetContext = recordOn
+        ? window.api(hydrateUrl(pageUrlKey, targetUrlKey, anchor.issueIdentifier), { on401: false })
+            .catch(() => ({ hydrated: false }))
+        : Promise.resolve(null);
+
+      targetContext
+        .then((hydrateResult) => resolveRecordTarget(anchor, recordOn, hydrateResult))
+        .then((resolved) => {
+          const targetId = resolved.issueId || resolved.issueIdentifier;
+          return window.ReplyDelivery.postComment(targetUrlKey, targetId, prompt, { decisionLoopId, decisionId })
+            .then((commentResult) => {
+              if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
+              // The resolved target identifier is shown to the operator here
+              // — the rendered identifier IS the mitigation for the stated,
+              // un-eliminated residual (S15): an in-neighbourhood-but-wrong
+              // sibling can still receive the human's words if the agent
+              // named it.
+              const recordOnNote = resolved.note
+                ? `${resolved.note} — recorded to ${anchor.issueIdentifier}`
+                : (resolved.issueIdentifier && resolved.issueIdentifier !== anchor.issueIdentifier ? `to ${resolved.issueIdentifier}` : null);
+              onDelivered([downgradeNote, recordOnNote].filter(Boolean).join('; ') || null);
+            });
+        })
+        .catch((err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+    };
+
+    if (effectiveEffect === 'record') {
+      deliverAsRecord(null);
+      return;
+    }
+
     // Identifier-backed targeting (LIN-1728 review G1) — same root cause as
     // F4 above, left in place on this sibling branch. `anchor.issueId` is
     // null for essentially every autopilot-dispatched loop (recommend-and-
@@ -2683,31 +2950,75 @@ function deliverRulingReply(row, prompt, li) {
     // `gone` ruling as "no linked issue" even though the row displays its
     // identifier. Both call sites below must fall back to the identifier
     // too, mirroring the `resumable` branch's `issueId || issueIdentifier`.
+    // Checked BEFORE the Area 8 press-time hydrate call below (not just
+    // before the eventual dispatch): with no issueIdentifier at all there is
+    // nothing to hydrate, so this refusal is unaffected by, and unreachable
+    // through, that check.
     if (!anchor.issueIdentifier) {
       console.error('Ruling reply: no issue to start a fresh run against, cannot reply for a gone session');
       restore();
       setFeedback('cannot start a fresh run: no linked issue', true);
       return;
     }
-    window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, { decisionLoopId, decisionId })
-      .then((commentResult) => {
-        if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
-        // Deliberately NOT window.ReplyDelivery.deliverReply — that call's
-        // built-in dispatch is scoped to the follow-up shape only (see the
-        // LIN-2200 banner in common.js); a `gone` reply starts a FRESH
-        // issue-scoped dispatch instead, so it composes its own comment-then-
-        // dispatch chain here, using the SAME shared partial-failure handler
-        // as the `resumable` branch above (review F2) rather than the bare
-        // "reply failed" catch this branch had before.
-        const startRun = () => window.dispatchPrompt({
-          urlKey: targetUrlKey,
-          prompt,
-          issue: { id: anchor.issueId || anchor.issueIdentifier, identifier: anchor.issueIdentifier },
-          target: anchor.target || 'cli'
-        });
-        return startRun().then(onDelivered, (dispatchErr) => makePartialFailureHandler('start a run')(dispatchErr, startRun));
-      })
-      .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+
+    // LIN-2775 Area 8 — press-time check. Before this dispatch-effect row
+    // actually composes and sends anything, read the anchor's own current
+    // `state.type` via the SAME widened hydrate route Area 6 uses. Two
+    // outcomes, both specified, neither left implicit: DISAGREEMENT (the
+    // anchor is now terminal) downgrades to record in place; a HYDRATION
+    // FAILURE — every failure mode (no_token/not_found/unavailable)
+    // swallowed identically — fails CLOSED to record too, with the same
+    // visible-note pattern. Never silently dispatch, never silently do
+    // nothing: both outcomes route through `deliverAsRecord` above, so a
+    // downgraded press still comments, stamps, and clears the row.
+    window.api(hydrateUrl(pageUrlKey, targetUrlKey, anchor.issueIdentifier), { on401: false })
+      .catch(() => ({ hydrated: false, reason: 'unavailable' }))
+      .then((hydrateResult) => {
+        if (!hydrateResult || !hydrateResult.hydrated) {
+          deliverAsRecord(PRESS_TIME_HYDRATION_FAILURE_NOTE);
+          return;
+        }
+        const isTerminal = !!(hydrateResult.state && RECORD_TARGET_TERMINAL_TYPES.includes(hydrateResult.state.type));
+        if (isTerminal) {
+          deliverAsRecord(PRESS_TIME_DOWNGRADE_NOTE);
+          return;
+        }
+
+        // Anchor confirmed non-terminal at press time — proceed to the
+        // ordinary dispatch path, unchanged from Area 7 except for the new
+        // `composedRunMarker` (Area 8): the scoped signal that activates
+        // routes/dispatch.js's server-side terminal-anchor guard for THIS
+        // call specifically, never inferred from `kind`.
+        window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, { decisionLoopId, decisionId })
+          .then((commentResult) => {
+            if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
+            // Deliberately NOT window.ReplyDelivery.deliverReply — that call's
+            // built-in dispatch is scoped to the follow-up shape only (see the
+            // LIN-2200 banner in common.js); a `gone` reply starts a FRESH
+            // issue-scoped dispatch instead, so it composes its own comment-then-
+            // dispatch chain here, using the SAME shared partial-failure handler
+            // as the `resumable` branch above (review F2) rather than the bare
+            // "reply failed" catch this branch had before.
+            //
+            // LIN-2775 Area 7: the DISPATCHED prompt is the composed brief
+            // (question + chosen answer + decisionCase recap), never the raw
+            // `prompt` the comment above just posted — the comment is for a
+            // human reading the issue thread, the dispatch prompt is the
+            // agent's brief, and conflating the two was the ticket's headline
+            // defect (a bare option label as an agent's entire brief).
+            const startRun = () => window.dispatchPrompt({
+              urlKey: targetUrlKey,
+              prompt: composeDispatchPrompt(row, prompt),
+              promptName: RULING_DISPATCH_PROMPT_NAME,
+              kind: RULING_DISPATCH_KIND,
+              composedRunMarker: RULING_COMPOSED_RUN_MARKER,
+              issue: { id: anchor.issueId || anchor.issueIdentifier, identifier: anchor.issueIdentifier },
+              target: anchor.target || 'cli'
+            });
+            return startRun().then(onDelivered, (dispatchErr) => makePartialFailureHandler('start a run')(dispatchErr, startRun));
+          })
+          .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+      });
     return;
   }
 
@@ -3613,6 +3924,21 @@ if (typeof module !== 'undefined' && module.exports) {
     // test asserts against the SAME composite-key function these structures
     // use, not a hard-coded copy of its `::` separator.
     deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey,
+    // LIN-2775 Area 5: expose the effect-override map and renderRulingRow
+    // itself — the override lifecycle (restore-at-creation, the
+    // override-vs-repaint staleness prune, the `seen`-sweep prune) spans
+    // both renderRulings and renderRulingRow, and the flip control's
+    // re-render-in-place behaviour is only reachable through the latter.
+    rulingEffectOverride, renderRulingRow,
+    // LIN-2775 Area 6: the pure record_on resolver, directly unit-testable
+    // against a hand-built hydrate-route response with no DOM/network.
+    resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE, RECORD_TARGET_TERMINAL_NOTE,
+    // LIN-2775 Area 7: the composed-dispatch-prompt seam, directly
+    // unit-testable against the headline "raw reply text as entire brief"
+    // regression.
+    composeDispatchPrompt, RULING_DISPATCH_PROMPT_NAME, RULING_DISPATCH_KIND,
+    // LIN-2775 Area 8: the press-time check seam.
+    RULING_COMPOSED_RUN_MARKER, PRESS_TIME_DOWNGRADE_NOTE, PRESS_TIME_HYDRATION_FAILURE_NOTE, hydrateUrl,
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.

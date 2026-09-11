@@ -11,10 +11,12 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDispatchItem, DUPLICATE_DISPATCH_WINDOW_MS } from '../../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_WINDOW_MS, ANCHOR_TERMINAL_CODE } from '../../lib/dispatch-factory.js';
 import { WorkspacePreferencesStore } from '../../lib/workspace-preferences.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection as createDocCollection } from '../fixtures/mock-collection.js';
+import { createTaskDoneCache } from '../../lib/task-done-cache.js';
+import { TERMINAL_TYPES } from '../../lib/providers/models.js';
 
 function createMockCollection() {
   const docs = [];
@@ -1381,5 +1383,176 @@ describe('createDispatchItem — terminal passthrough (LIN-2452)', () => {
       store, urlKey: 'acme', kind: 'custom', prompt: 'x', fields: { followUpTo: 'anchor-1' }
     });
     assert.strictEqual(store.captured.item.terminal, null);
+  });
+});
+
+// ─── Terminal-anchor guard (LIN-2775 Area 8) ────────────────────────────────
+//
+// SCOPED to a composed-run dispatch specifically, gated on the explicit
+// `composedRunMarker` — never on `kind`. An unconditional Done/Canceled
+// refusal would silently break `retrospective-audit`/`retro` (designed to
+// target already-merged/closed work); neither sets the marker, so neither
+// is affected regardless of the anchor's actual state.
+describe('createDispatchItem — terminal-anchor guard (LIN-2775 Area 8)', () => {
+  function providerReading(stateType) {
+    return {
+      getWorkspaceAccessToken: async () => 'tok',
+      fetchIssueContext: async () => ({ issue: { state: { name: 'x', type: stateType } } })
+    };
+  }
+
+  for (const terminalType of TERMINAL_TYPES) {
+    test(`a marker-carrying attempt against a ${terminalType} anchor is refused with a stable error code, and nothing is enqueued`, async () => {
+      const store = capturingStore();
+      const err = await createDispatchItem({
+        store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+        fields: { issueIdentifier: 'LIN-1' },
+        composedRunMarker: 'ruling-composed-run',
+        ...providerReading(terminalType),
+        guardTaskDoneCache: createTaskDoneCache()
+      }).then(() => null, e => e);
+
+      assert.ok(err, `expected a ${terminalType} anchor to be refused`);
+      assert.equal(err.status, 409);
+      assert.equal(err.anchorTerminalRefusal.code, ANCHOR_TERMINAL_CODE);
+      assert.equal(err.anchorTerminalRefusal.issueIdentifier, 'LIN-1');
+      assert.equal(err.anchorTerminalRefusal.verified, true);
+      assert.equal(store.captured.item, undefined, 'nothing must be enqueued on a refusal');
+    });
+  }
+
+  test('a non-terminal anchor is unaffected — the marker-carrying dispatch proceeds normally', async () => {
+    const store = capturingStore();
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      fields: { issueIdentifier: 'LIN-1' },
+      composedRunMarker: 'ruling-composed-run',
+      ...providerReading('started'),
+      guardTaskDoneCache: createTaskDoneCache()
+    });
+    assert.ok(store.captured.item, 'expected the dispatch to be enqueued');
+  });
+
+  test('a second attempt against the same anchor within 60s costs no second provider read (asserting the read count, not just the outcome)', async () => {
+    const store = capturingStore();
+    let tokenCalls = 0;
+    let contextCalls = 0;
+    const getWorkspaceAccessToken = async () => { tokenCalls++; return 'tok'; };
+    const fetchIssueContext = async () => { contextCalls++; return { issue: { state: { type: 'started' } } }; };
+    const guardTaskDoneCache = createTaskDoneCache();
+    const attempt = () => createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      fields: { issueIdentifier: 'LIN-1' },
+      composedRunMarker: 'ruling-composed-run',
+      getWorkspaceAccessToken, fetchIssueContext, guardTaskDoneCache
+    });
+
+    await attempt();
+    await attempt();
+
+    assert.equal(tokenCalls, 1, 'the second attempt within the cache TTL must not re-read the token');
+    assert.equal(contextCalls, 1, 'the second attempt within the cache TTL must not re-read the issue context');
+  });
+
+  test('a retrospective-audit-style dispatch WITHOUT the marker is unaffected, even against a terminal anchor — never reads the provider at all', async () => {
+    const store = capturingStore();
+    let providerCalls = 0;
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'retrospective-audit', prompt: 'x',
+      fields: { issueIdentifier: 'LIN-1' },
+      // no composedRunMarker — this dispatch never opts into the guard.
+      getWorkspaceAccessToken: async () => { providerCalls++; return 'tok'; },
+      fetchIssueContext: async () => { providerCalls++; return { issue: { state: { type: 'completed' } } }; }
+    });
+
+    assert.ok(store.captured.item, 'retrospective-audit must dispatch even against a terminal anchor — this is its whole design point');
+    assert.equal(providerCalls, 0, 'the guard must never read the provider when the marker is absent, kind or no kind');
+  });
+
+  test('a real read failure (no token) fails CLOSED — refuses rather than admitting an unverified dispatch', async () => {
+    const store = capturingStore();
+    const err = await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      fields: { issueIdentifier: 'LIN-1' },
+      composedRunMarker: 'ruling-composed-run',
+      getWorkspaceAccessToken: async () => null,
+      fetchIssueContext: async () => { throw new Error('must never be called without a token'); },
+      guardTaskDoneCache: createTaskDoneCache()
+    }).then(() => null, e => e);
+
+    assert.ok(err, 'a verification failure must refuse, not silently admit');
+    assert.equal(err.status, 409);
+    assert.equal(err.anchorTerminalRefusal.code, ANCHOR_TERMINAL_CODE);
+    assert.equal(err.anchorTerminalRefusal.verified, false);
+    assert.equal(store.captured.item, undefined);
+  });
+
+  test('a thrown provider read also fails CLOSED, and is NOT cached — a later retry gets a fresh read, never pinned as terminal', async () => {
+    const store = capturingStore();
+    let contextCalls = 0;
+    const guardTaskDoneCache = createTaskDoneCache();
+    const attempt = () => createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      fields: { issueIdentifier: 'LIN-1' },
+      composedRunMarker: 'ruling-composed-run',
+      getWorkspaceAccessToken: async () => 'tok',
+      fetchIssueContext: async () => {
+        contextCalls++;
+        if (contextCalls === 1) throw new Error('transient provider error');
+        return { issue: { state: { type: 'started' } } };
+      },
+      guardTaskDoneCache
+    });
+
+    const err = await attempt().then(() => null, e => e);
+    assert.ok(err, 'the first (throwing) attempt must refuse');
+    assert.equal(err.status, 409);
+
+    await attempt();
+    assert.ok(store.captured.item, 'the SECOND attempt must get a fresh read and succeed — the failed read must not be cached');
+    assert.equal(contextCalls, 2);
+  });
+
+  test('missing read capabilities (no getWorkspaceAccessToken/fetchIssueContext supplied) skips the guard — fail-open on a structural gap, not a signal about this anchor', async () => {
+    const store = capturingStore();
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      fields: { issueIdentifier: 'LIN-1' },
+      composedRunMarker: 'ruling-composed-run'
+      // no getWorkspaceAccessToken / fetchIssueContext at all
+    });
+    assert.ok(store.captured.item, 'a caller that never wires the read capability must not be blocked by this guard');
+  });
+
+  test('an invalid composedRunMarker (non-string) is rejected with a 400, before any provider read or enqueue', async () => {
+    const store = capturingStore();
+    let providerCalls = 0;
+    const err = await createDispatchItem({
+      store, urlKey: 'acme', kind: 'implementation', prompt: 'x',
+      fields: { issueIdentifier: 'LIN-1' },
+      composedRunMarker: 12345,
+      getWorkspaceAccessToken: async () => { providerCalls++; return 'tok'; },
+      fetchIssueContext: async () => { providerCalls++; return {}; }
+    }).then(() => null, e => e);
+
+    assert.ok(err);
+    assert.equal(err.status, 400);
+    assert.ok(err.composedRunMarkerInvalid, 'must be a tagged relay-able error, not a bare status check');
+    assert.equal(providerCalls, 0, 'validation must precede any read');
+    assert.equal(store.captured.item, undefined);
+  });
+
+  test('a marker-carrying attempt with no issueIdentifier skips the guard (nothing to verify) and dispatches issueless', async () => {
+    const store = capturingStore();
+    let providerCalls = 0;
+    await createDispatchItem({
+      store, urlKey: 'acme', kind: 'custom', prompt: 'x',
+      fields: {}, // no issueIdentifier
+      composedRunMarker: 'ruling-composed-run',
+      getWorkspaceAccessToken: async () => { providerCalls++; return 'tok'; },
+      fetchIssueContext: async () => { providerCalls++; return {}; }
+    });
+    assert.ok(store.captured.item);
+    assert.equal(providerCalls, 0);
   });
 });

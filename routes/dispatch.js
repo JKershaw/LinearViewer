@@ -134,7 +134,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null }) {
   const router = Router();
 
   // =========================================================================
@@ -230,7 +230,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, composedRunMarker } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -463,6 +463,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         harness,
         terminal,
         effort,
+        // LIN-2775 Area 8: threaded straight through, unvalidated here — the
+        // marker's own validation and the terminal-anchor guard it gates
+        // both live inside createDispatchItem (the one reusable, testable
+        // chokepoint), not duplicated at this route layer the way model/
+        // harness/terminal are via validateDispatchPayload above.
+        composedRunMarker,
+        getWorkspaceAccessToken,
+        fetchIssueContext,
         ...(wantProxyContext
           ? {
               finalizePrompt: async (resolvedHarness) => {
@@ -654,6 +662,23 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // NEVER as a success: no item was enqueued (the throw fired before addItem).
       if (err && err.proxyAttachFailed) {
         return serviceUnavailable.json(res, 'Proxy context was requested but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+      }
+      // Terminal-anchor refusal (LIN-2775 Area 8): same tagged-throw relay
+      // convention as the duplicate/budget guards above — the body was
+      // already constructed once by createDispatchItem, this is a relay,
+      // not a second construction site. Beat 5 correction: this branch was
+      // MISSING entirely — a correct, deliberate safety refusal (409,
+      // `code: 'ANCHOR_TERMINAL'`) was falling through to the generic 500
+      // below, so the stable code this guard's own unit tests assert on
+      // never actually reached the wire.
+      if (err && err.anchorTerminalRefusal) {
+        return jsonError(res, 409, err.message, err.anchorTerminalRefusal);
+      }
+      // An invalid `composedRunMarker` (LIN-2775 Area 8): a genuine caller
+      // validation error, not a fault — same beat-5 correction, this was
+      // also falling through to the 500 below.
+      if (err && err.composedRunMarkerInvalid) {
+        return badRequest.json(res, err.message);
       }
       console.error('Dispatch error:', err.message);
       jsonError(res, 500, 'Failed to dispatch prompt');
