@@ -174,9 +174,11 @@ describe('Half A: mount-completeness census against the real repo', () => {
   // logEvent, getWorkspaceOpenRouterKey, resolveProxyLLM,
   // chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore,
   // recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore,
-  // proxyTokenStore — its two optional deps (taskDecisionsStore,
-  // shelvedRulingsStore) are defaulted to null and so are not counted:
-  // 117 + 15 = 132). Unlike the test above, THIS one is not blind to a
+  // proxyTokenStore — its optional deps (taskDecisionsStore,
+  // shelvedRulingsStore, and LIN-2634's savedChatStore) are all defaulted to
+  // null and so are not counted: 117 + 15 = 132, unchanged by LIN-2634 —
+  // re-run (not assumed) after threading savedChatStore = null through both
+  // this factory's signature and createProxyRoutes's own. Unlike the test above, THIS one is not blind to a
   // signature+mount drop (removing a dep from a factory's signature shrinks
   // `required`, which this total catches) — that's a different, unrelated
   // invariant catching it, not evidence Half A's own missing/extra detectors

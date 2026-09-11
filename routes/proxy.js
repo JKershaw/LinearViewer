@@ -451,6 +451,9 @@ async function fetchWithTimeout(workFn, ms) {
  * @param {Object} [options.dispatchPresetsStore] - Dispatch presets store (LIN-1390), used by the
  *   autopilot kickoff route to validate an incoming `presetId` and resolve its config's routing
  *   precedence over workspace dispatchDefaults. Absent → `presetId` is accepted but has no effect.
+ * @param {Object} [options.savedChatStore] - Threaded into createProxyFlightCompanionRoutes (LIN-2634)
+ *   for GET .../flight-companion/transcripts, a creator-scoped read of the token creator's own saved
+ *   companion chats. Absent → that one route 503s.
  * @param {Object} [options.provider] - TEST-ONLY provider override (LIN-581). In production this is
  *   unset and the active provider is resolved per-workspace via getProviderForWorkspace inside
  *   resolveProviderAccess. Tests that need a non-registered fake provider (e.g. to observe ref
@@ -459,7 +462,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null }) {
   const router = Router();
 
   /**
@@ -1550,7 +1553,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // router's own real defaults still apply. Named distinctly from a bare
   // `chatClient`/`createToolCatalog` at this composer's own top level so a
   // future second sub-router needing the same seam cannot collide with it.
-  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, getWorkspaceOpenRouterKey, resolveProxyLLM, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
+  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, getWorkspaceOpenRouterKey, resolveProxyLLM, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, savedChatStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
 
   return router;
 }

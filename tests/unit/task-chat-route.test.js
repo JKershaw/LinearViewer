@@ -193,12 +193,16 @@ describe('task-chat saved-chats wiring (LIN-1008)', () => {
       'sanitizeHistory should be used by both the turn and save paths');
   });
 
-  test('privacy boundary: savedChatStore is NOT wired onto the proxy / workspace-api surfaces', () => {
-    // Content-bearing → session-auth only. It must reach the task-chat + test
-    // route factories but never createProxyRoutes / createWorkspaceApiRoutes.
+  test('privacy boundary: savedChatStore reaches createProxyRoutes for exactly one creator-scoped read (LIN-2634), never createWorkspaceApiRoutes', () => {
+    // Content-bearing → session-auth only, with ONE narrow, deliberate
+    // exception (LIN-2634): a creator-scoped, read-only transcripts route
+    // reachable over the token-auth proxy surface (GET
+    // /api/proxy/flight-companion/transcripts, routes/proxy-flight-companion.js).
+    // It must still reach the task-chat + test route factories, and must
+    // still never reach createWorkspaceApiRoutes at all.
     const proxyLine = SERVER_SRC.split('\n').find(l => l.includes('createProxyRoutes({'));
     const wsApiLine = SERVER_SRC.split('\n').find(l => l.includes('createWorkspaceApiRoutes({'));
-    assert.ok(proxyLine && !/savedChatStore/.test(proxyLine), 'savedChatStore must not be passed to createProxyRoutes');
+    assert.ok(proxyLine && /savedChatStore/.test(proxyLine), 'savedChatStore must be passed to createProxyRoutes (LIN-2634)');
     assert.ok(wsApiLine && !/savedChatStore/.test(wsApiLine), 'savedChatStore must not be passed to createWorkspaceApiRoutes');
     // It IS wired into the task-chat route factory.
     const taskChatLine = SERVER_SRC.split('\n').find(l => l.includes('createTaskChatRoutes({'));
