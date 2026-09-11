@@ -21,7 +21,7 @@ import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-for
 import { attachProxyContext } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, getPaidEnvKey, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
-import { getModelCatalog } from '../lib/openrouter-catalog.js';
+import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
 
@@ -3990,18 +3990,24 @@ ${goal}`
   /**
    * Live OpenRouter model catalog (LIN-1111 Session 2) — the JSON source the
    * client-rendered dispatch-exec-controls (public/common.js) fetch once per
-   * page load to supplement the static DISPATCH_MODEL_SUGGESTIONS datalist
+   * page load to supplement the static DISPATCH_MODEL_SUGGESTIONS picker
    * with the full live catalog. Same underlying cache module
    * (lib/openrouter-catalog.js) the Settings server-render path calls
    * directly, so both surfaces share one source of truth (never a fourth
    * duplicated list). Never 500s: a catalog fetch failure resolves to `[]`
    * upstream, so this always returns 200 with whatever's available.
+   *
+   * Widened additively (LIN-2719 S0) with a per-model `free` boolean —
+   * `isFreeModel` has exactly one implementation (lib/openrouter-catalog.js),
+   * so the browser reads the verdict off the wire rather than re-deriving it
+   * from raw per-token pricing strings client-side. Existing consumers read
+   * `.id` only, so this changes nothing for them.
    * @route GET /workspace/:urlKey/api/openrouter/models
    */
   router.get('/workspace/:urlKey/api/openrouter/models', workspaceFromUrl, async (req, res) => {
     try {
       const models = await getModelCatalog({ mock: shouldMockAi(req.workspace) });
-      res.json({ models });
+      res.json({ models: models.map(m => ({ id: m.id, name: m.name, free: isFreeModel(m) })) });
     } catch (error) {
       console.error('OpenRouter model catalog endpoint error:', error);
       res.json({ models: [] });

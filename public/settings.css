@@ -301,13 +301,41 @@
 }
 
 .dispatch-model-input::placeholder,
-.dispatch-effort-input::placeholder {
+.dispatch-effort-input::placeholder,
+.dispatch-model-input-other::placeholder {
   color: var(--fg-dim);
 }
 
 .dispatch-model-input {
   min-width: 20ch;
   flex: 1 1 20ch;
+}
+
+/* `other…` free-text escape hatch (LIN-2719) — same control shape as the
+   select it sits beside; .hidden (public/style.css) toggles it on the
+   `other…` sentinel. */
+.dispatch-model-input-other {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 20ch;
+  flex: 1 1 20ch;
+}
+
+.dispatch-model-input-other:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+/* Free-marker hint line (LIN-2719) — never option text, matching the
+   Workspace AI Model pricing hint's convention above. */
+.dispatch-model-hint {
+  font-size: 0.85em;
+  color: var(--fg-dim);
 }
 
 /* The effort input shares the model input's growth behaviour so the shared row
@@ -527,6 +555,7 @@
 
   .harness-select,
   .dispatch-model-input,
+  .dispatch-model-input-other,
   .dispatch-effort-input,
   .ai-override-select,
   .ai-override-input {

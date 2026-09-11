@@ -7,7 +7,7 @@
  * JSON endpoints (routes/dispatch.js, following the routes/collective.js
  * preset-CRUD convention) instead. On success this reloads the page rather
  * than re-rendering the list client-side — the config-row markup
- * (renderDispatchDefaultRow, harness-aware model datalist) lives server-side
+ * (renderDispatchDefaultRow, harness-aware model select) lives server-side
  * in lib/render-settings.js and this file deliberately doesn't duplicate it.
  *
  * Loaded only on the /settings page. Requires common.js to be loaded first
@@ -18,6 +18,29 @@
 // `preset__<id>__kind__review__HarnessSelect` or
 // `newDispatchPreset__kind__review__Model` — captures the kind in between.
 const DISPATCH_PRESET_KIND_FIELD_RE = /__kind__(.+)__(?:HarnessSelect|Model|Effort)$/
+
+/**
+ * Read a model `<select>` + its paired `other…` escape-hatch input back into
+ * one string (LIN-2719 HARD RULE 2). `.value` works identically on an
+ * `<input>` and a `<select>`, so this is the one branch the swap to a real
+ * `<select>` needed: when the select is on the `other…` sentinel, the model
+ * is the free-text escape-hatch input's value, not the literal sentinel
+ * string. WITHOUT this branch, saving a preset with `other…` selected would
+ * post `model: "__other__"` — `buildDispatchPresetConfig` (routes/dispatch.js)
+ * rebuilds preset config purely from the request body with no read-merge, so
+ * that value would silently overwrite the preset's real stored model. Shared
+ * by both the top-level and per-kind reads below.
+ * @param {Element|null} modelSelect
+ * @param {Element|null} otherInput
+ * @returns {string}
+ */
+function readDispatchModelSelect(modelSelect, otherInput) {
+  if (!modelSelect) return ''
+  if (modelSelect.value === window.DISPATCH_MODEL_OTHER_VALUE) {
+    return otherInput ? otherInput.value.trim() : ''
+  }
+  return modelSelect.value
+}
 
 /**
  * Read a preset row's `{ name, model, harness, effort, byKind }` out of its DOM.
@@ -35,7 +58,8 @@ function readDispatchPresetRow(container) {
   const nameInput = container.querySelector('.dispatch-preset-name-input')
   const topLevel = container.querySelector('.dispatch-preset-toplevel-config')
   const harnessSelect = topLevel ? topLevel.querySelector('.harness-select') : null
-  const modelInput = topLevel ? topLevel.querySelector('.dispatch-model-input') : null
+  const modelSelect = topLevel ? topLevel.querySelector('.dispatch-model-input') : null
+  const modelOtherInput = topLevel ? topLevel.querySelector('.dispatch-model-input-other') : null
   const effortInput = topLevel ? topLevel.querySelector('.dispatch-effort-input') : null
 
   const byKind = {}
@@ -45,8 +69,9 @@ function readDispatchPresetRow(container) {
     const kind = match[1]
     const row = select.closest('.dispatch-default-row')
     const modelField = row ? row.querySelector('.dispatch-model-input') : null
+    const modelOtherField = row ? row.querySelector('.dispatch-model-input-other') : null
     const effortField = row ? row.querySelector('.dispatch-effort-input') : null
-    const model = modelField ? modelField.value.trim() : ''
+    const model = readDispatchModelSelect(modelField, modelOtherField)
     const harness = select.value
     const effort = effortField ? effortField.value.trim() : ''
     if (model || harness || effort) {
@@ -60,7 +85,7 @@ function readDispatchPresetRow(container) {
   return {
     name: nameInput ? nameInput.value.trim() : '',
     harness: harnessSelect ? harnessSelect.value : '',
-    model: modelInput ? modelInput.value.trim() : '',
+    model: readDispatchModelSelect(modelSelect, modelOtherInput),
     effort: effortInput ? effortInput.value.trim() : '',
     byKind
   }

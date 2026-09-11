@@ -2653,8 +2653,46 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   border-color: var(--blue);
 }
 
-.dispatch-exec-model::placeholder {
+.dispatch-exec-model::placeholder,
+.dispatch-exec-model-other::placeholder {
   color: var(--fg-dim);
+}
+
+/* `other…` free-text escape hatch (LIN-2719) — same control shape as the
+   select it sits beside; .hidden (above) toggles it on the `other…` sentinel. */
+.dispatch-exec-model-other {
+  font-family: var(--font-content);
+  font-size: 0.8em;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--fg-vdim);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 12ch;
+}
+
+.dispatch-exec-model-other:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+/* Free-marker hint line (LIN-2719) — never option text (data-free rides the
+   <option> instead), matching the Workspace AI Model pricing hint's convention. */
+.dispatch-exec-model-hint {
+  font-size: 0.8em;
+  color: var(--fg-dim);
+}
+
+/* Mobile (LIN-2719): a real <select> replaces the free-text <input list=…>
+   this ticket was filed against, but a cramped fixed min-width control is
+   still a poor tap target at phone width — go full-width like the Settings
+   dispatch-defaults rows already do (settings.css:556-562). */
+@media (max-width: 480px) {
+  .dispatch-exec-harness-select,
+  .dispatch-exec-model,
+  .dispatch-exec-model-other {
+    min-width: 100%;
+  }
 }
 
 /* Preset picker (LIN-1391 S9) — same control shape as the exec controls above,
@@ -2673,6 +2711,18 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .dispatch-preset-select:focus {
   outline: none;
   border-color: var(--blue);
+}
+
+/* Read-only resolved-selection reflection (LIN-2719 S4) — "so it is clear
+   what will run" without filling the authorable exec-controls inputs. */
+.dispatch-preset-reflection {
+  font-size: 0.8em;
+  color: var(--fg-dim);
+}
+
+/* Empty-picker "create a preset" link (LIN-2719 S3). */
+.dispatch-preset-create-link {
+  font-size: 0.85em;
 }
 
 /* Prompt text - monospace, preserves formatting */

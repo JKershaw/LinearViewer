@@ -50,7 +50,10 @@ test.describe('Dispatch presets settings UI', () => {
     const createForm = page.locator('[data-testid="dispatch-preset-create-form"]');
     await createForm.locator('.dispatch-preset-name-input').fill('My Claude preset');
     await createForm.locator('.dispatch-preset-toplevel-config select.harness-select').selectOption('claude-code');
-    await createForm.locator('.dispatch-preset-toplevel-config input.dispatch-model-input').fill('anthropic/claude-opus-4.8');
+    // A curated OpenCode id on a claude-code row isn't in that row's
+    // preset-only option set, so it's the escape hatch (HARD RULE 2/3).
+    await createForm.locator('.dispatch-preset-toplevel-config select.dispatch-model-input').selectOption('__other__');
+    await createForm.locator('.dispatch-preset-toplevel-config .dispatch-model-input-other').fill('anthropic/claude-opus-4.8');
     await page.locator('.dispatch-preset-create-btn').click();
     await page.waitForLoadState('networkidle');
 
@@ -58,7 +61,8 @@ test.describe('Dispatch presets settings UI', () => {
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="My Claude preset"]') });
     await expect(item).toBeVisible();
     await expect(item.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('claude-code');
-    await expect(item.locator('.dispatch-preset-toplevel-config input.dispatch-model-input')).toHaveValue('anthropic/claude-opus-4.8');
+    await expect(item.locator('.dispatch-preset-toplevel-config select.dispatch-model-input')).toHaveValue('__other__');
+    await expect(item.locator('.dispatch-preset-toplevel-config .dispatch-model-input-other')).toHaveValue('anthropic/claude-opus-4.8');
 
     // Survives a reload — a real persisted write, not just DOM state.
     await page.reload();
@@ -88,7 +92,7 @@ test.describe('Dispatch presets settings UI', () => {
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Blank config preset"]') });
     await expect(item.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('');
-    await expect(item.locator('.dispatch-preset-toplevel-config input.dispatch-model-input')).toHaveValue('');
+    await expect(item.locator('.dispatch-preset-toplevel-config select.dispatch-model-input')).toHaveValue('');
     await expect(item.locator('.dispatch-preset-toplevel-config input.dispatch-effort-input')).toHaveValue('');
   });
 
@@ -105,14 +109,14 @@ test.describe('Dispatch presets settings UI', () => {
 
     await item.locator('.dispatch-preset-name-input').fill('Renamed preset');
     await item.locator('.dispatch-preset-toplevel-config select.harness-select').selectOption('claude-code');
-    await item.locator('.dispatch-preset-toplevel-config input.dispatch-model-input').fill('opus');
+    await item.locator('.dispatch-preset-toplevel-config select.dispatch-model-input').selectOption('opus');
     await item.locator('.dispatch-preset-save-btn').click();
     await page.waitForLoadState('networkidle');
 
     const renamed = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Renamed preset"]') });
     await expect(renamed).toBeVisible();
     await expect(renamed.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('claude-code');
-    await expect(renamed.locator('.dispatch-preset-toplevel-config input.dispatch-model-input')).toHaveValue('opus');
+    await expect(renamed.locator('.dispatch-preset-toplevel-config select.dispatch-model-input')).toHaveValue('opus');
     // The old name is gone — this was an in-place update, not a second preset.
     await expect(page.locator('.dispatch-preset-name-input[value="Editable preset"]')).toHaveCount(0);
 
@@ -155,7 +159,7 @@ test.describe('Dispatch presets settings UI', () => {
     await createForm.locator('[data-testid="dispatch-preset-new-row-kind-overrides"]').locator('summary').click();
     const reviewRow = createForm.locator('[data-testid="dispatch-preset-new-row-kind-review"]');
     await reviewRow.locator('select.harness-select').selectOption('opencode');
-    await reviewRow.locator('input.dispatch-model-input').fill('anthropic/claude-opus-4.8');
+    await reviewRow.locator('select.dispatch-model-input').selectOption('anthropic/claude-opus-4.8');
 
     await page.locator('.dispatch-preset-create-btn').click();
     await page.waitForLoadState('networkidle');
@@ -165,7 +169,7 @@ test.describe('Dispatch presets settings UI', () => {
     await expect(item.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('claude-code');
     const itemReviewRow = item.locator('[data-testid$="-kind-review"]');
     await expect(itemReviewRow.locator('select.harness-select')).toHaveValue('opencode');
-    await expect(itemReviewRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-opus-4.8');
+    await expect(itemReviewRow.locator('select.dispatch-model-input')).toHaveValue('anthropic/claude-opus-4.8');
 
     // Survives a reload — a real persisted write, not just DOM state.
     await page.reload();
@@ -173,7 +177,7 @@ test.describe('Dispatch presets settings UI', () => {
     const reloadedItem = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Blend preset"]') });
     const reloadedReviewRow = reloadedItem.locator('[data-testid$="-kind-review"]');
     await expect(reloadedReviewRow.locator('select.harness-select')).toHaveValue('opencode');
-    await expect(reloadedReviewRow.locator('input.dispatch-model-input')).toHaveValue('anthropic/claude-opus-4.8');
+    await expect(reloadedReviewRow.locator('select.dispatch-model-input')).toHaveValue('anthropic/claude-opus-4.8');
   });
 
   test('editing one kind of a blend preset changes only that kind', async ({ page, localWorkerUrlKey, request }) => {
@@ -189,13 +193,23 @@ test.describe('Dispatch presets settings UI', () => {
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Two-kind blend"]') });
     const reviewRow = item.locator('[data-testid$="-kind-review"]');
-    await reviewRow.locator('input.dispatch-model-input').fill('opus-updated');
+    // 'opus-updated' isn't a curated/catalog id anywhere — always the escape
+    // hatch (HARD RULE 2/3), the client-side round-trip proof plan-review F1
+    // required.
+    await reviewRow.locator('select.dispatch-model-input').selectOption('__other__');
+    await reviewRow.locator('.dispatch-model-input-other').fill('opus-updated');
     await item.locator('.dispatch-preset-save-btn').click();
     await page.waitForLoadState('networkidle');
 
     const saved = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Two-kind blend"]') });
-    await expect(saved.locator('[data-testid$="-kind-review"] input.dispatch-model-input')).toHaveValue('opus-updated');
-    await expect(saved.locator('[data-testid$="-kind-implementation"] input.dispatch-model-input')).toHaveValue('sonnet');
+    await expect(saved.locator('[data-testid$="-kind-review"] select.dispatch-model-input')).toHaveValue('__other__');
+    await expect(saved.locator('[data-testid$="-kind-review"] .dispatch-model-input-other')).toHaveValue('opus-updated');
+    // 'sonnet' is a Claude preset id, not curated for OpenCode — this row's
+    // harness is unset (blank → OpenCode-effective option set), so it too
+    // degrades onto the escape hatch. Untouched by this test, it must still
+    // round-trip through the save (HARD RULE 2's silent-deletion hazard).
+    await expect(saved.locator('[data-testid$="-kind-implementation"] select.dispatch-model-input')).toHaveValue('__other__');
+    await expect(saved.locator('[data-testid$="-kind-implementation"] .dispatch-model-input-other')).toHaveValue('sonnet');
   });
 
   test('clearing a blend preset\'s per-kind override removes it on save', async ({ page, localWorkerUrlKey, request }) => {
@@ -208,18 +222,22 @@ test.describe('Dispatch presets settings UI', () => {
 
     const item = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Clearable blend"]') });
     const reviewRow = item.locator('[data-testid$="-kind-review"]');
-    await expect(reviewRow.locator('input.dispatch-model-input')).toHaveValue('opus');
-    await reviewRow.locator('input.dispatch-model-input').fill('');
+    // 'opus' is a Claude preset id, but this row's harness is unset (blank →
+    // OpenCode-effective option set), so the stored value degrades onto the
+    // escape hatch (HARD RULE 2/3) rather than being silently dropped.
+    await expect(reviewRow.locator('select.dispatch-model-input')).toHaveValue('__other__');
+    await expect(reviewRow.locator('.dispatch-model-input-other')).toHaveValue('opus');
+    await reviewRow.locator('.dispatch-model-input-other').fill('');
     await item.locator('.dispatch-preset-save-btn').click();
     await page.waitForLoadState('networkidle');
 
     const saved = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Clearable blend"]') });
-    await expect(saved.locator('[data-testid$="-kind-review"] input.dispatch-model-input')).toHaveValue('');
+    await expect(saved.locator('[data-testid$="-kind-review"] select.dispatch-model-input')).toHaveValue('');
 
     await page.reload();
     await page.waitForLoadState('networkidle');
     const reloaded = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Clearable blend"]') });
-    await expect(reloaded.locator('[data-testid$="-kind-review"] input.dispatch-model-input')).toHaveValue('');
+    await expect(reloaded.locator('[data-testid$="-kind-review"] select.dispatch-model-input')).toHaveValue('');
   });
 
   test('a top-level-only preset edited without opening the per-kind block keeps its top-level config', async ({ page, localWorkerUrlKey, request }) => {
@@ -237,7 +255,11 @@ test.describe('Dispatch presets settings UI', () => {
 
     const saved = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Top-level only"]') });
     await expect(saved.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('claude-code');
-    await expect(saved.locator('.dispatch-preset-toplevel-config input.dispatch-model-input')).toHaveValue('anthropic/claude-opus-4.8');
+    // A curated OpenCode id on a claude-code row degrades onto the escape
+    // hatch (HARD RULE 2/3) — the save-without-opening-the-per-kind-block
+    // path must still round-trip it rather than silently dropping it.
+    await expect(saved.locator('.dispatch-preset-toplevel-config select.dispatch-model-input')).toHaveValue('__other__');
+    await expect(saved.locator('.dispatch-preset-toplevel-config .dispatch-model-input-other')).toHaveValue('anthropic/claude-opus-4.8');
   });
 
   test('lists multiple presets independently', async ({ page, localWorkerUrlKey, request }) => {
@@ -252,5 +274,24 @@ test.describe('Dispatch presets settings UI', () => {
     const b = page.locator('.dispatch-preset-item', { has: page.locator('.dispatch-preset-name-input[value="Preset B"]') });
     await expect(a.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('claude-code');
     await expect(b.locator('.dispatch-preset-toplevel-config select.harness-select')).toHaveValue('opencode');
+  });
+
+  // LIN-2719 S3: each saved preset row links to the Dispatch page,
+  // pre-selecting itself there (public/dispatch.js reads `?preset=<id>`) —
+  // the reverse direction of the Dispatch-page empty-picker "create a
+  // preset" link (tests/e2e/dispatch-page-preset-picker.spec.js).
+  test('each preset row links to "use on Dispatch"', async ({ page, localWorkerUrlKey, request }) => {
+    const createRes = await request.post(`/test/seed-dispatch-preset?urlKey=${localWorkerUrlKey}`, {
+      data: { name: 'Use me', config: { harness: 'opencode' } }
+    });
+    const preset = await createRes.json();
+    const presetId = preset.id ?? preset._id;
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    const link = page.getByTestId(`dispatch-preset-use-${presetId}`);
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', `/workspace/${localWorkerUrlKey}/dispatch?preset=${presetId}`);
   });
 });

@@ -509,47 +509,57 @@ test.describe('Dispatch Page', () => {
       await expect(controls.locator('.dispatch-exec-harness-custom')).toHaveCount(0);
     });
 
-    test('the model datalist is harness-aware: Claude Code offers only the four presets, OpenCode the full list (LIN-1282/LIN-1763)', async ({ page }) => {
+    // RE-EXPRESS (LIN-2719 migration table #2): no `list`/`data-model-list-*`
+    // attribute on a <select> — assert the rebuilt option set directly.
+    test('the model select is harness-aware: Claude Code offers only the four presets, OpenCode the full list (LIN-1282/LIN-1763/LIN-2719)', async ({ page }) => {
       const controls = page.locator('.dispatch-exec-controls');
-      const modelInput = controls.locator('.dispatch-exec-model');
+      const modelSelect = controls.locator('.dispatch-exec-model');
 
-      // Default harness is claude-code (pre-selected) → the model input points at
-      // the Claude datalist, which holds exactly haiku/sonnet/opus/fable.
-      const claudeListId = await modelInput.getAttribute('data-model-list-claude');
-      const opencodeListId = await modelInput.getAttribute('data-model-list-opencode');
-      await expect(modelInput).toHaveAttribute('list', claudeListId);
-      const claudeList = page.locator(`#${claudeListId}`);
-      await expect(claudeList.locator('option')).toHaveCount(4);
-      await expect(claudeList.locator('option[value="haiku"]')).toHaveCount(1);
-      await expect(claudeList.locator('option[value="sonnet"]')).toHaveCount(1);
-      await expect(claudeList.locator('option[value="opus"]')).toHaveCount(1);
-      await expect(claudeList.locator('option[value="fable"]')).toHaveCount(1);
-      // The full OpenRouter list is never merged into the Claude datalist.
-      await expect(claudeList.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(0);
+      // Default harness is claude-code (pre-selected) → the model select's
+      // option set holds exactly haiku/sonnet/opus/fable (+ blank + other…).
+      await expect(modelSelect.locator('option')).toHaveCount(6);
+      await expect(modelSelect.locator('option[value="haiku"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="sonnet"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="opus"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="fable"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="__other__"]')).toHaveCount(1);
+      // The full OpenRouter list is never merged into the Claude option set.
+      await expect(modelSelect.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(0);
 
-      // Switching to OpenCode swaps the input to the full-list datalist.
+      // Switching to OpenCode rebuilds the select onto the curated+catalog set.
       await controls.locator('.dispatch-exec-harness-select').selectOption('opencode');
-      await expect(modelInput).toHaveAttribute('list', opencodeListId);
-      const opencodeList = page.locator(`#${opencodeListId}`);
-      await expect(opencodeList.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="opus"]')).toHaveCount(0);
     });
 
-    test('the live OpenRouter catalog enriches the model datalist after load (LIN-1111 Session 2)', async ({ page }) => {
+    // RE-EXPRESS (LIN-2719 migration table #5): the page-level datalist is
+    // gone — the exec-controls model select carries the catalog inline.
+    test('the live OpenRouter catalog enriches the model select after load (LIN-1111 Session 2 / LIN-2719)', async ({ page }) => {
       // Local-provider sessions are mock-gated (routes/workspace-api.js
       // shouldMockAi), so window.fetchDispatchModelCatalog resolves the
       // deterministic MOCK_CATALOG_MODELS from GET .../api/openrouter/models
       // instead of a live OpenRouter call.
-      const datalist = page.locator('.dispatch-exec-model-datalist');
-      await expect(datalist.locator('option[value="mock-provider/catalog-model-one"]')).toHaveCount(1);
-      await expect(datalist.locator('option[value="mock-provider/catalog-model-two"]')).toHaveCount(1);
+      const controls = page.locator('.dispatch-exec-controls');
+      await controls.locator('.dispatch-exec-harness-select').selectOption('opencode');
+      const modelSelect = controls.locator('.dispatch-exec-model');
+      await expect(modelSelect.locator('option[value="mock-provider/catalog-model-one"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="mock-provider/catalog-model-two"]')).toHaveCount(1);
       // Still lists the curated suggestions — supplement, not replace.
-      await expect(datalist.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
+      await expect(modelSelect.locator('option[value="openai/gpt-5.4-mini"]')).toHaveCount(1);
+      // LIN-2719 S1: a $0-priced catalog entry carries the free marker.
+      await expect(modelSelect.locator('option[value="mock-provider/catalog-model-one"][data-free="true"]')).toHaveCount(1);
     });
 
-    test('dispatching with a selected harness and typed model sends both fields', async ({ page }) => {
+    // Escape-hatch round trip (LIN-2719 HARD RULE 2/3, plan-review F1
+    // must-fix): 'openrouter/anthropic/claude-opus-4.8' is neither curated
+    // nor catalog, so it can only reach the wire through readDispatchExecControls'
+    // other… branch — without that branch this dispatches the literal
+    // sentinel string as the model.
+    test('dispatching with a selected harness and a custom (escape-hatch) model sends both fields', async ({ page }) => {
       await page.locator('.dispatch-prompt-input').fill('Exec controls test');
       await page.locator('.dispatch-exec-harness-select').selectOption('opencode');
-      await page.locator('.dispatch-exec-model').fill('openrouter/anthropic/claude-opus-4.8');
+      await page.locator('.dispatch-exec-model').selectOption('__other__');
+      await page.locator('.dispatch-exec-model-other').fill('openrouter/anthropic/claude-opus-4.8');
 
       const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
       await dispatchBtn.click();
@@ -560,6 +570,26 @@ test.describe('Dispatch Page', () => {
       const item = items.find(i => i.prompt === 'Exec controls test');
       expect(item.harness).toBe('opencode');
       expect(item.model).toBe('openrouter/anthropic/claude-opus-4.8');
+    });
+
+    // The same escape-hatch round trip on a curated OpenCode id that isn't
+    // reachable on a claude-code row (only the four presets are) — proves the
+    // degrade-to-escape-hatch path reaches the wire correctly too, not just
+    // a wholly-uncurated id.
+    test('dispatching a curated OpenCode id on the claude-code harness via the escape hatch sends it verbatim', async ({ page }) => {
+      await page.locator('.dispatch-prompt-input').fill('Escape hatch curated id test');
+      await page.locator('.dispatch-exec-model').selectOption('__other__');
+      await page.locator('.dispatch-exec-model-other').fill('anthropic/claude-opus-4.8');
+
+      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+      await dispatchBtn.click();
+      await expect(dispatchBtn).toHaveText('dispatched!');
+
+      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
+      const { items } = await listResponse.json();
+      const item = items.find(i => i.prompt === 'Escape hatch curated id test');
+      expect(item.harness).toBe('claude-code');
+      expect(item.model).toBe('anthropic/claude-opus-4.8');
     });
 
     test('leaving both fields untouched sends the pre-selected claude-code harness and null model (LIN-1111)', async ({ page }) => {
@@ -588,6 +618,31 @@ test.describe('Dispatch Page', () => {
       expect(item.harness).toBeNull();
     });
 
+    // HARD RULE 4 (LIN-2719): the resolved-default hint re-expresses onto the
+    // blank option's own label rather than being dropped when the model
+    // control becomes a <select> — the blank option stays selected/value=""
+    // (HARD RULE 1), but its text now says what will run if left blank.
+    test('with a configured workspace default, the blank model option is selected and names the default (LIN-2719 HARD RULE 4)', async ({ page }) => {
+      await page.request.post(`/workspace/${WS}/settings/dispatch-defaults`, {
+        form: { defaultModel: 'anthropic/claude-opus-4.8', defaultHarnessSelect: 'opencode' }
+      });
+      try {
+        await page.goto(DISPATCH_URL);
+        await page.waitForLoadState('networkidle');
+        await page.locator('.dispatch-toggle').click();
+
+        const modelSelect = page.locator('.dispatch-exec-controls .dispatch-exec-model');
+        const blankOption = modelSelect.locator('option[value=""]');
+        await expect(blankOption).toHaveText(/anthropic\/claude-opus-4\.8/);
+        await expect(modelSelect).toHaveValue('');
+      } finally {
+        // This POST persists workspace-wide (WS is shared across this file's
+        // tests) — reset it so a later test relying on the pre-selected
+        // claude-code default (e.g. the +proxy describe block below) doesn't
+        // silently inherit 'opencode' from here.
+        await page.request.post(`/workspace/${WS}/settings/dispatch-defaults`, { form: {} });
+      }
+    });
   });
 
   // LIN-1162: a UI dispatch with +proxy ON now attaches the workspace-API block
