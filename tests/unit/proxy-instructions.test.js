@@ -111,3 +111,38 @@ describe('buildInstructions — proxy-token 401 fields + Class-B retry guidance 
     assert.match(text, /`stage: "proxy-token"`[\s\S]*?retrying it wastes the window/);
   });
 });
+
+// LIN-2773 Area 4: the published contract now carries "effect" beside
+// "disposition" on GET /api/proxy/rulings — every prior rulings-shape change
+// updated this same block in the same PR (937555cd, ad97bcf7, e4ec02f3,
+// 5feeefd0); this is that update for the on_answer/effect feature.
+describe('buildInstructions — GET /api/proxy/rulings publishes the effect enum (LIN-2773 Area 4)', () => {
+  test('the rulings example object carries "effect": "resume|dispatch|record" beside "disposition"', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /"disposition": "resumable\|gone\|mid-turn\|indeterminate\|task-bound",\s*\n\s*"effect": "resume\|dispatch\|record"/);
+  });
+
+  test('declaredEffect and alternate are documented alongside effect', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /"declaredEffect": "resume\|dispatch\|record" \| null/);
+    assert.match(text, /"alternate": "resume\|dispatch\|record" \| null/);
+  });
+
+  test('"effect" and "disposition" are documented as two distinct fields, never merged', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /"effect" is a SEPARATE field from "disposition"/);
+    assert.match(text, /never merge the two\s*\n\s*namespaces/);
+  });
+
+  test('present under both read and readWrite scope — GET /api/proxy/rulings is a read endpoint', () => {
+    for (const scope of ['read', 'readWrite']) {
+      const text = buildInstructions({ baseUrl: BASE_URL, scope });
+      assert.match(text, /"effect": "resume\|dispatch\|record"/, `missing under scope=${scope}`);
+    }
+  });
+
+  test('effect is null only for the two read-only dispositions, documented explicitly', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /is null only for the two read-only dispositions\s*\n\s*\("mid-turn"\/"indeterminate"\)/);
+  });
+});

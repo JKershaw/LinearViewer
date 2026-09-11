@@ -143,6 +143,26 @@ describe('resolveEffect (LIN-2773 Area 3)', () => {
     assert.strictEqual(result.declaredEffect, 'resume');
   });
 
+  // LIN-2773 beat 4 note, recorded for review (not a bug; the approved branch
+  // order is the parent's design of record, not something this ticket
+  // redesigns): branch 3 (liveDispatchOnAnchor) is checked BEFORE branch 4's
+  // mid-turn/indeterminate null rule, and is unconditional on disposition —
+  // so when a caller's own liveDispatchOnAnchor predicate is satisfied for a
+  // mid-turn/indeterminate row (in both live feeds, this is reachable by
+  // SELF-match: the row's own loop is non-terminal by definition, so it
+  // always matches itself — see tests/unit/dashboard-routes.test.js's
+  // "DOCUMENTED INTERACTION" test for the route-level pin), effect reads
+  // 'record', never null. This is an evidence override, not a declared
+  // effect leaking through: declaredEffect still reports exactly what was
+  // (or wasn't) declared, and canReply — the field that actually gates the
+  // reply UI — is untouched by any of this.
+  test('DOCUMENTED INTERACTION: liveDispatchOnAnchor outranks the mid-turn/indeterminate null rule — effect reads "record", not null', () => {
+    const midTurn = resolveEffect(decision('d-1'), 'mid-turn', { liveDispatchOnAnchor: true });
+    assert.deepStrictEqual(midTurn, { effect: 'record', declaredEffect: null, alternate: null });
+    const indeterminate = resolveEffect(decision('d-1', { on_answer: { effect: 'dispatch' } }), 'indeterminate', { liveDispatchOnAnchor: true });
+    assert.deepStrictEqual(indeterminate, { effect: 'record', declaredEffect: 'dispatch', alternate: null });
+  });
+
   test('gone with no declared effect falls back to the default (dispatch), alternate stays null', () => {
     const result = resolveEffect(decision('d-1'), 'gone');
     assert.deepStrictEqual(result, { effect: 'dispatch', declaredEffect: null, alternate: null });

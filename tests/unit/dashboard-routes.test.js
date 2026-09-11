@@ -520,6 +520,54 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
     assert.equal(res.jsonBody.count, 1);
     assert.equal(historyReads, 1, 'the store read actually happened — this is not a vacuous pass');
   });
+
+  // LIN-2773 beat 4 note (recorded for review, per the beat's own instruction —
+  // NOT a bug, and deliberately not "fixed" here; the approved branch order is
+  // the parent's design of record):
+  //
+  // liveDispatchOnAnchor scans the SAME loop set a row was derived from, so a
+  // non-terminal loop always matches ITSELF. For a `mid-turn` row (its own
+  // loop is non-terminal by definition — that is why the disposition is
+  // mid-turn), this means liveDispatchOnAnchor is self-satisfied on every
+  // mid-turn row that carries a decision, and resolveEffect's branch 3
+  // (liveDispatchOnAnchor === true → 'record') is checked BEFORE branch 4's
+  // mid-turn/indeterminate → null rule. So a mid-turn row's own `effect`
+  // reads "record", never null, in both feeds — this pins that this IS
+  // reachable, not merely theoretical.
+  //
+  // This does not violate any stated rule: the read-only-dispositions
+  // guarantee is "never surface a DECLARED effect" (declaredEffect stays
+  // whatever was actually declared, untouched), and branch 3's 'record' is
+  // an EVIDENCE override, not a declaration leaking through — exactly the
+  // same category as gone+anchorTerminal or a genuine second live run on the
+  // anchor. `canReply` (the field that actually gates the reply UI) stays
+  // `false` for mid-turn regardless, and no client reads `row.effect` yet
+  // (S3), so nothing rendered or actionable changes because of this.
+  test('DOCUMENTED INTERACTION: a mid-turn row self-matches liveDispatchOnAnchor (its own loop is non-terminal), so effect reads "record", not null', async () => {
+    const midTurnItem = {
+      id: 'a-running', issueIdentifier: 'LIN-70', issueTitle: 'Title LIN-70',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, status: 'taken',
+      // No [blocked]/[done]/[failed] marker and no matching agentStatus entry
+      // below: per lib/pipeline-loops.js's _deriveAgentState truth table,
+      // history + status:'taken' + no agent-status match => agentState
+      // 'running', which resolveDisposition maps to 'mid-turn'.
+      feedback: [
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-midturn-1', question: 'Proceed?' }), timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [midTurnItem], agentStatus: [] } };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-midturn-1');
+    assert.ok(row, 'the mid-turn row is present in the feed');
+    assert.equal(row.disposition, 'mid-turn');
+    assert.equal(row.canReply, false, 'mid-turn stays strictly read-only regardless of effect');
+    assert.equal(row.declaredEffect, null, 'nothing was declared on this decision');
+    assert.equal(row.effect, 'record', 'self-match reachability: branch 3 outranks the mid-turn null rule, by the approved precedence order');
+  });
 });
 
 describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
