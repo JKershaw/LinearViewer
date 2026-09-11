@@ -86,7 +86,7 @@ import { buildModelOptions } from '../lib/openrouter-catalog.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
 import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
@@ -318,7 +318,7 @@ export function buildCensusSeedText(currentCensusDoc) {
  * `getModelPricingHint`'s own contract).
  *
  * @param {Object} p
- * @param {string} p.model - the model id this page load resolved (`resolveWorkspaceModel`)
+ * @param {string} p.model - the model id this page load resolved (`resolveAiOperationModel({ opKind: 'flight-companion' })`)
  * @param {Object|null} p.companionDoc - `observerStateStore.readCurrent('companion:v1:<urlKey>')` result, or null
  * @param {Object|null} p.censusDoc - `observerStateStore.readCurrent('sweep:v1:<urlKey>')` result, or null
  * @param {boolean} [p.isFreeTier] - LIN-2623 beat 3: whether this page load's
@@ -400,7 +400,7 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
  * @param {Object} [deps.freeTierStore] - LIN-2432 §A.3: free-tier usage store
  *   (`tryUse`), mirroring Task Chat's own gate. Wired in server.js §A.12.
  * @param {Object} [deps.workspacePreferencesStore] - LIN-2432 §A.3/§A.4: model
- *   selection (`resolveWorkspaceModel`) AND threaded into `createChatToolCatalog`
+ *   selection (`resolveAiOperationModel`) AND threaded into `createChatToolCatalog`
  *   for the `send_follow_up` tool's dispatch-factory defaults (LIN-1139) — this
  *   is the one whose absence silently loses the LIN-1139 model/harness
  *   inheritance a §A.6 approval-time enqueue would otherwise get, so its
@@ -493,19 +493,18 @@ export function createFlightCompanionRoutes({
         ? await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
         : null;
 
-      // LIN-2621: resolve the model ONCE per page load, via the SAME
-      // `resolveWorkspaceModel` function (and the SAME free-tier `forceDefault`
-      // derivation, mirrored from the turn endpoint below) the turn core
-      // resolves with today — deliberately NOT `resolveAiOperationModel`,
-      // since LIN-2623 has not landed and the eventual one-site switch needs
-      // to move both call sites together. Tools-on/off derives from
+      // LIN-2623: resolve the model ONCE per page load, via the SAME
+      // `resolveAiOperationModel({ opKind: 'flight-companion' })` call (and
+      // the SAME free-tier `forceDefault` derivation) the turn core resolves
+      // with (lib/flight-companion-turn.js) — the one-site switch this
+      // ticket's own comment used to defer. Tools-on/off derives from
       // `isToolCapableModel` on this SAME resolved id (via
       // `buildFlightCompanionStripData`), never a second, independent guess.
       const sessionApiKey = req.session.openRouterApiKey;
       const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
       const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-      const model = await resolveWorkspaceModel({
-        urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier,
+      const model = await resolveAiOperationModel({
+        urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier, opKind: 'flight-companion',
       });
       // Read-only, same discipline as observerReportDoc above: readCurrent
       // ONLY, feeding the strip's last-check-in / sweep-liveness / no-census

@@ -264,6 +264,21 @@ function fakeWorkspacePreferencesStore(modelId, calls = []) {
   };
 }
 
+// LIN-2623 R1: same shape as fakeWorkspacePreferencesStore above, but also
+// carries `aiModelOverrides` — needed to distinguish resolveAiOperationModel
+// (reads byKind[opKind].model) from resolveWorkspaceModel (reads modelId
+// only) on the GET page, which fakeWorkspacePreferencesStore's bare
+// `{modelId}` shape can't do.
+function fakeWorkspacePreferencesStoreWithOverrides(modelId, aiModelOverrides, calls = []) {
+  return {
+    calls,
+    async getWorkspacePreferences(urlKey) {
+      calls.push({ method: 'getWorkspacePreferences', urlKey });
+      return { modelId, aiModelOverrides };
+    },
+  };
+}
+
 // A census doc whose stateHash differs from COMPANION_SEED_STATE's null
 // lastCensusStateHash, with empty attention — this is exactly the seed-turn
 // shape `shouldSpendTurn` always spends on (no prior snapshot to no-delta
@@ -2099,7 +2114,19 @@ describe('buildFlightCompanionStripData (LIN-2621) — pure derivation, no I/O',
 // ─── LIN-2621 beat 2: the GET page handler's server-side strip resolution ──
 
 describe('Flight Companion GET page (LIN-2621) — model resolution + status strip', () => {
-  test('resolves the model exactly once per page load, via resolveWorkspaceModel (never resolveAiOperationModel)', async () => {
+  // LIN-2623 R1 (review, PR #1442): this used to pin "via resolveWorkspaceModel
+  // (never resolveAiOperationModel)" — that was the deliberate LIN-2621 interim
+  // contract, and the comment above routes/flight-companion.js's GET handler
+  // said explicitly why. LIN-2623 IS the one-site switch that comment deferred:
+  // the page now resolves via the SAME resolveAiOperationModel({opKind:
+  // 'flight-companion'}) call the turn core uses (lib/flight-companion-turn.js),
+  // so the two can never diverge. This test still only proves the read count is
+  // exactly one per page load (resolveWorkspaceModel and resolveAiOperationModel
+  // both back onto the identical getWorkspacePreferences call, so this alone
+  // can't distinguish which resolver ran) — the test below this one is what
+  // proves it's actually resolveAiOperationModel, by asserting the per-kind
+  // override is honored end-to-end on the rendered strip.
+  test('resolves the model exactly once per page load, via resolveAiOperationModel', async () => {
     const prefCalls = [];
     const app = buildApp({
       observerStateStore: fakeObserverStateStore({ censusDoc: null }),
@@ -2108,7 +2135,36 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     const { status } = await get(app, '/workspace/acme/flight-companion');
     assert.strictEqual(status, 200);
-    assert.strictEqual(prefCalls.length, 1, 'exactly one resolveWorkspaceModel-backing read per page load');
+    assert.strictEqual(prefCalls.length, 1, 'exactly one resolveAiOperationModel-backing read per page load');
+  });
+
+  // LIN-2623 R1 (review, PR #1442) — the mandated red-first case: before the
+  // fix, the GET page resolved via resolveWorkspaceModel, which reads only
+  // `modelId` and has no idea `aiModelOverrides.byKind['flight-companion']`
+  // exists — so a workspace with an uncurated flight-companion override showed
+  // a curated/default model, `tools: on`, and no warning on the strip, while
+  // the turn itself (resolveAiOperationModel) would actually use the uncurated
+  // override with tools off. Red against the pre-fix resolveWorkspaceModel
+  // call, green once the GET handler resolves via resolveAiOperationModel({
+  // opKind: 'flight-companion'}) — the SAME call the turn core makes.
+  test('an uncurated PER-KIND override renders that model, tools off, and the tools-off warning (LIN-2623 R1)', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStoreWithOverrides('openai/gpt-5.4-mini', {
+        byKind: { 'flight-companion': { model: 'meta-llama/llama-3-70b-instruct' } },
+      }),
+      flightCompanionEnabled: true,
+    });
+    const { status, text } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 200);
+    // Scoped to the strip's own model span, not the page as a whole — the
+    // picker's <option> list always includes every curated id (including
+    // openai/gpt-5.4-mini) regardless of which one is currently resolved.
+    assert.match(text, /fc-strip-model">model: <code>meta-llama\/llama-3-70b-instruct<\/code><\/span>/);
+    assert.doesNotMatch(text, /fc-strip-model">model: <code>openai\/gpt-5\.4-mini<\/code><\/span>/);
+    assert.match(text, /fc-strip-tools">tools: off</);
+    assert.doesNotMatch(text, /fc-strip-tools">tools: on</);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
   });
 
   test('the rendered strip reports an uncurated model as tools off', async () => {

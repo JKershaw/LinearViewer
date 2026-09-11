@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveWorkspaceModel, resolveAiOperationModel, AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
+import { AI_OPERATION_LABELS } from '../../lib/render-settings.js';
 
 // A store stub whose getWorkspacePreferences both returns a stored preference AND
 // records that it was consulted — so we can assert the clamp short-circuits BEFORE
@@ -83,6 +84,15 @@ test('missing urlKey or store still returns DEFAULT_MODEL (unchanged guard)', as
 
 test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion and ship-biscuit (LIN-2623)', () => {
   assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'next-run', 'flight-companion', 'ship-biscuit']);
+});
+
+// R2 (LIN-2623 review, PR #1442): pins the settings label map to the class rather
+// than a single hard-coded label string, so a future AI_OPERATION_KINDS addition
+// with no matching AI_OPERATION_LABELS entry fails here instead of silently
+// rendering a raw kebab-case row (the `|| kind` fallback in
+// lib/render-settings.js's renderAiModelOverridesSection).
+test('every AI_OPERATION_KINDS entry has an AI_OPERATION_LABELS entry (LIN-2623 R2)', () => {
+  assert.ok(AI_OPERATION_KINDS.every(k => k in AI_OPERATION_LABELS));
 });
 
 test('resolveAiOperationModel: no overrides → falls back to modelId → DEFAULT_MODEL', async () => {
