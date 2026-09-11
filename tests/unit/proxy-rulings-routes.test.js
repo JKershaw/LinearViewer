@@ -69,6 +69,24 @@ function decisionItem(id, identifier, decisionId) {
   };
 }
 
+/**
+ * LIN-2790: the same shape as `decisionItem`, but the DECISION: block
+ * declares `options[]` — what `suggest-answer` needs to validate `optionId`
+ * against. A free-text decision (no `options` key) is `decisionItem` above.
+ */
+function decisionItemWithOptions(id, identifier, decisionId, options) {
+  const nowIso = new Date().toISOString();
+  return {
+    id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
+    promptName: 'implementation', prompt: 'p', dispatchedAt: nowIso, resolvedAt: nowIso,
+    status: 'taken',
+    feedback: [
+      { message: '[blocked] need a decision', timestamp: nowIso },
+      { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Which approach?', options }), timestamp: nowIso }
+    ]
+  };
+}
+
 let server, baseUrl, collection, suggestionsStore, tokenScope, historyItems, foreignHistoryItems, liveItems;
 
 before(async () => {
@@ -263,10 +281,12 @@ describe('POST /api/proxy/rulings/:decisionId/suggest-dismissal', () => {
     assert.equal(body.rulings[0].decision.decision_id, DECISION_ID);
   });
 
-  test('the suggestion row carries no outcome/answer field of any kind', async () => {
+  test('the suggestion row carries no outcome/answer/agreement field of any kind', async () => {
+    // LIN-2790: the proxy may never write agreed/agreedAt/acceptedAt on its
+    // own proposal row — that boundary is the point of the ticket.
     await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, { reason: 'r' });
     const doc = collection._docs[0];
-    for (const forbidden of ['outcome', 'outcomeAt', 'answered', 'answeredDecisionId']) {
+    for (const forbidden of ['outcome', 'outcomeAt', 'answered', 'answeredDecisionId', 'agreed', 'agreedAt', 'acceptedAt']) {
       assert.ok(!(forbidden in doc), `must never carry '${forbidden}'`);
     }
   });
@@ -299,20 +319,192 @@ describe('POST /api/proxy/rulings/:decisionId/suggest-dismissal', () => {
     const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, { reason: 'r' });
     assert.equal(status, 403);
   });
+
+  // LIN-2790 witness 7: existing dismissal-proposal behaviour is unchanged
+  // byte-for-byte — the widened store/route are additive only.
+  test('LIN-2790: the wire shape gains only the two new, correctly-defaulted fields', async () => {
+    const { body } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, {
+      reason: 'the task shipped'
+    });
+    assert.equal(body.suggestion.proposedOutcome, 'dismissed');
+    assert.equal(body.suggestion.optionId, null);
+    // Every field that existed before this ticket is present and unchanged.
+    assert.deepEqual(Object.keys(body.suggestion).sort(), [
+      'decisionId', 'decisionLoopId', 'optionId', 'proposedOutcome', 'reason',
+      'suggestedAt', 'suggestedBy', 'urlKey', 'withdrawn', 'withdrawnAt'
+    ]);
+  });
 });
 
-describe('LIN-1728 is not weakened: there is no proxy dismiss', () => {
-  test('the router exposes NO route that could discharge a ruling', async () => {
+// LIN-2790 — Track A: propose-side widening. `suggest-answer` follows the
+// SAME shape as `suggest-dismissal` above (this route is a sibling, not a
+// rewrite), so this suite only covers what's actually different: `optionId`
+// validation, the `proposedOutcome: 'answered'` stamp, and the discharge
+// boundary. It reuses `suggest-dismissal`'s own coverage for reason
+// validation, attribution, workspace isolation, and the 503 degrade path via
+// the SAME `resolveTargetRuling`/`attributionFromToken` helpers.
+describe('POST /api/proxy/rulings/:decisionId/suggest-answer (LIN-2790)', () => {
+  const OPTIONS = [{ id: 'a', label: 'Option A' }, { id: 'b', label: 'Option B' }];
+
+  test('a readWrite proxy token can propose a valid answer', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    const { status, body } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, {
+      optionId: 'a', reason: 'this is the right call'
+    });
+    assert.equal(status, 201);
+    assert.equal(body.success, true);
+    assert.equal(body.suggestion.proposedOutcome, 'answered');
+    assert.equal(body.suggestion.optionId, 'a');
+    assert.equal(body.suggestion.reason, 'this is the right call');
+    assert.match(body.note, /SUGGESTION only/);
+    assert.match(body.note, /still unanswered/);
+  });
+
+  test('THE RULING STAYS UNANSWERED — proposing an answer discharges nothing (positive readback)', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, { optionId: 'a', reason: 'r' });
+    const { body } = await req('GET', '/api/proxy/rulings');
+    assert.equal(body.count, 1, 'the ruling is still unanswered');
+    assert.equal(body.rulings[0].decision.decision_id, DECISION_ID);
+    assert.equal(body.rulings[0].suggestedDismissal.proposedOutcome, 'answered');
+    assert.equal(body.rulings[0].suggestedDismissal.optionId, 'a');
+  });
+
+  test('an unknown option id 422s, and writes nothing', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    const { status, body } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, {
+      optionId: 'no-such-option', reason: 'r'
+    });
+    assert.equal(status, 422);
+    assert.equal(body.code, 'OPTION_NOT_FOUND');
+    assert.equal(collection._docs.length, 0);
+  });
+
+  test('an unknown ruling 404s', async () => {
+    const { status, body } = await req('POST', '/api/proxy/rulings/no-such-decision/suggest-answer', {
+      optionId: 'a', reason: 'r'
+    });
+    assert.equal(status, 404);
+    assert.equal(body.code, 'RULING_NOT_FOUND');
+    assert.equal(collection._docs.length, 0);
+  });
+
+  test('a missing optionId 400s, and writes nothing', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    for (const optionId of [undefined, '', '   ', 42]) {
+      const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, { optionId, reason: 'r' });
+      assert.equal(status, 400);
+    }
+    assert.equal(collection._docs.length, 0);
+  });
+
+  test('a free-text decision with no options[] 422s rather than silently accepting the answer', async () => {
+    // decisionItem (no `options` key at all) is the plain free-text fixture
+    // the rest of this file already uses for suggest-dismissal.
+    historyItems = [decisionItem('loop-1', 'LIN-1', DECISION_ID)];
+    const { status, body } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, {
+      optionId: 'a', reason: 'r'
+    });
+    assert.equal(status, 422);
+    assert.equal(body.code, 'NO_OPTIONS_AVAILABLE');
+    assert.equal(collection._docs.length, 0);
+  });
+
+  test('a reason is REQUIRED — 400 without one', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    for (const reason of [undefined, '', '   ', 42]) {
+      const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, { optionId: 'a', reason });
+      assert.equal(status, 400);
+    }
+    assert.equal(collection._docs.length, 0, 'nothing is written on a refused proposal');
+  });
+
+  test('an over-long reason is refused rather than truncated', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, {
+      optionId: 'a', reason: 'x'.repeat(501)
+    });
+    assert.equal(status, 400);
+  });
+
+  test('attribution comes from the TOKEN, never from the request body', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    const { body } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, {
+      optionId: 'a', reason: 'r', suggestedBy: 'somebody-else'
+    });
+    assert.equal(body.suggestion.suggestedBy, 'account-123');
+  });
+
+  // LIN-2790 witness 2 (the suggest-answer half — the read-scoped/dispatch
+  // half is exercised structurally by the "no proxy dismiss or answer" and
+  // "forbidden field" suites elsewhere in this file).
+  test('a read-scoped token cannot reach suggest-answer', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    tokenScope = 'read';
+    const { status } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, { optionId: 'a', reason: 'r' });
+    assert.equal(status, 403);
+    assert.equal(collection._docs.length, 0);
+  });
+
+  test('an unconfigured suggestions store 503s rather than silently no-oping', async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(createRulingsRoutes({
+      proxyLimiter: (req, res, next) => next(),
+      authenticateProxyToken: (req, res, next) => { req.proxyUrlKey = URL_KEY; req.proxyTokenScope = 'readWrite'; next(); },
+      requireWriteScope: (req, res, next) => next(),
+      logEvent: () => {},
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      dismissalSuggestionsStore: null
+    }));
+    const s = http.createServer(app);
+    await new Promise(r => s.listen(0, '127.0.0.1', r));
+    const res = await fetch(`http://127.0.0.1:${s.address().port}/api/proxy/rulings/d-1/suggest-answer`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ optionId: 'a', reason: 'r' })
+    });
+    assert.equal(res.status, 503);
+    s.close();
+  });
+
+  test('the suggestion row carries no outcome/answer/agreement field of any kind — the discharge boundary applies to answer proposals too', async () => {
+    historyItems = [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, OPTIONS)];
+    await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-answer`, { optionId: 'a', reason: 'r' });
+    const doc = collection._docs[0];
+    for (const forbidden of ['outcome', 'outcomeAt', 'answered', 'answeredDecisionId', 'agreed', 'agreedAt', 'acceptedAt']) {
+      assert.ok(!(forbidden in doc), `must never carry '${forbidden}'`);
+    }
+  });
+});
+
+describe('LIN-1728 is not weakened: there is no proxy dismiss or answer', () => {
+  test('the router exposes NO route that could discharge a ruling — FORBIDDEN paths 404', async () => {
     // Pinned structurally rather than by reading the source: the original
     // LIN-2444 proposal included a proxy dismiss, John's ruling dropped it,
-    // and a later well-meaning edit must not quietly reinstate one.
+    // and a later well-meaning edit must not quietly reinstate one or a
+    // proxy answer (LIN-2790: `suggest-answer` proposes, it never answers).
     for (const path of [
       `/api/proxy/rulings/${DECISION_ID}/dismiss`,
       '/api/proxy/rulings/dismiss',
-      `/api/proxy/rulings/${DECISION_ID}/answer`
+      `/api/proxy/rulings/${DECISION_ID}/answer`,
+      '/api/proxy/rulings/answer'
     ]) {
       const { status } = await req('POST', path, { reason: 'r' });
       assert.equal(status, 404, `${path} must not exist`);
+    }
+  });
+
+  test('the two PROPOSE routes exist — must NOT 404', async () => {
+    // The positive control for the test above: a bare 404 sweep proves
+    // nothing if every path in it would 404 anyway (e.g. a typo in this
+    // router's own mount prefix). LIN-2790 adds suggest-answer alongside the
+    // pre-existing suggest-dismissal.
+    for (const path of [
+      `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`,
+      `/api/proxy/rulings/${DECISION_ID}/suggest-answer`
+    ]) {
+      const { status } = await req('POST', path, { reason: 'r', optionId: 'a' });
+      assert.notEqual(status, 404, `${path} must exist`);
     }
   });
 
