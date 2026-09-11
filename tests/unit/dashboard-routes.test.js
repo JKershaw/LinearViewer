@@ -19,6 +19,7 @@ import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
+import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -724,6 +725,164 @@ describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
     req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
     await handler(req, res);
     assert.equal(res.statusCode, 500);
+  });
+});
+
+describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
+  function makeAnswerRouter(taskDecisionsStore) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      taskDecisionsStore
+    });
+  }
+
+  const ANSWER_PATH = '/workspace/:urlKey/api/dashboard/rulings/answer';
+  const VALID_BODY = { taskDecisionId: 'scan_1', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555', optionId: 'opt-a' };
+
+  test('stamps markOutcome with outcome "answered" and the given optionId, on the ruling\'s own workspace; posts no comment', async () => {
+    const calls = [];
+    const router = makeAnswerRouter({
+      async markOutcome(args) {
+        calls.push(args);
+        return { outcomeAt: new Date(Date.now() + 60000).toISOString() };
+      }
+    });
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { success: true });
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], {
+      urlKey: 'ws-a', issueId: VALID_BODY.taskDecisionIssueId, id: VALID_BODY.taskDecisionId,
+      outcome: 'answered', optionId: 'opt-a'
+    });
+  });
+
+  test('400 when taskDecisionId, taskDecisionIssueId or optionId is missing or blank — markOutcome is never called', async () => {
+    let called = false;
+    const router = makeAnswerRouter({ async markOutcome() { called = true; return null; } });
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+
+    for (const omit of ['taskDecisionId', 'taskDecisionIssueId', 'optionId']) {
+      const { [omit]: _drop, ...rest } = VALID_BODY;
+      const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+      req.body = rest;
+      await handler(req, res);
+      assert.equal(res.statusCode, 400, `missing ${omit} should 400`);
+    }
+
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY, optionId: '   ' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 400, 'a blank optionId should 400');
+
+    assert.equal(called, false, 'markOutcome must never be called on a partial/blank payload');
+  });
+
+  test('404 when markOutcome finds no matching scan record', async () => {
+    const router = makeAnswerRouter({ async markOutcome() { return null; } });
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY };
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+  });
+
+  // Witness 14: a second Agree on an already-answered task-bound row (a
+  // double-click, or a duplicate bulk press) — markOutcome's first-stamp-wins
+  // returns the SAME shape a fresh success does (an 'answered' record), so the
+  // route must distinguish "my own write" from "an earlier, already-completed
+  // write" via the outcomeAt/requestStartedAt timestamp comparison, not the
+  // outcome string.
+  test('Witness 14: an outcomeAt predating the request (an earlier, already-completed answer) 409s ALREADY_TERMINAL and does not report success', async () => {
+    const router = makeAnswerRouter({
+      async markOutcome() {
+        // Simulates first-stamp-wins: markOutcome returns the PRE-EXISTING
+        // terminal record, stamped well before this call started.
+        return { outcomeAt: new Date(Date.now() - 60000).toISOString() };
+      }
+    });
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.jsonBody.code, 'ALREADY_TERMINAL');
+    assert.notEqual(res.statusCode, 200);
+    assert.notDeepEqual(res.jsonBody, { success: true });
+  });
+
+  test('503 when taskDecisionsStore is not configured', async () => {
+    const router = makeAnswerRouter(null);
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY };
+    await handler(req, res);
+    assert.equal(res.statusCode, 503);
+  });
+
+  test('500 when the store throws, never propagates the raw error', async () => {
+    const router = makeAnswerRouter({ async markOutcome() { throw new Error('store down'); } });
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY };
+    await handler(req, res);
+    assert.equal(res.statusCode, 500);
+  });
+
+  // Witness 6, task-bound half: option_id is recorded on the durable answered
+  // stamp via the task-bound stamp-only route and is readable back afterwards.
+  // End-to-end against the REAL TaskDecisionsStore (not a mock of markOutcome)
+  // so this exercises the actual write path, not just the route's own call shape.
+  test('Witness 6 (task-bound half): option_id is recorded via the route and readable back via taskDecisionsStore.getStatus', async () => {
+    const collection = (() => {
+      const docs = [];
+      function matches(doc, query) {
+        return Object.entries(query).every(([k, v]) => doc[k] === v);
+      }
+      return {
+        _docs: docs,
+        async findOne(query) { return docs.find(d => matches(d, query)) || null; },
+        async updateOne(query, update, opts = {}) {
+          const idx = docs.findIndex(d => matches(d, query));
+          if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
+          if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0, upsertedId: true }; }
+          return { matchedCount: 0 };
+        },
+        find(query = {}) { return { async toArray() { return docs.filter(d => matches(d, query)); } }; }
+      };
+    })();
+    const taskDecisionsStore = new TaskDecisionsStore({ collection });
+    const issueId = '11111111-2222-3333-4444-555555555555';
+    const scanned = await taskDecisionsStore.recordScan({
+      urlKey: 'ws-a', issueId, issueIdentifier: 'LIN-30', inputHash: 'a'.repeat(64),
+      decision: { decision_id: 'd-1', question: 'Proceed?', options: [{ id: 'opt-a', label: 'Yes' }] }
+    });
+
+    const router = makeAnswerRouter(taskDecisionsStore);
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { taskDecisionId: scanned.id, taskDecisionIssueId: issueId, optionId: 'opt-a' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { success: true });
+
+    const status = await taskDecisionsStore.getStatus('ws-a', issueId);
+    assert.equal(status.outcome, 'answered');
+    assert.equal(status.optionId, 'opt-a');
   });
 });
 
