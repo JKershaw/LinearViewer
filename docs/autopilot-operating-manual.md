@@ -448,7 +448,10 @@ obstacle, not a generic failure; **the decision**, stated as a decision, not a s
 options**, each with your recommendation and your reasoning for it; **the cost of each option**, and
 **the cost of doing nothing** — what continues, what halts, what it costs to wait. When you emit the
 `DECISION:` block, per-option cost belongs in the option's own wording (`options[].cost` only accepts
-a number and silently drops prose); the cost of doing nothing belongs in `if_unanswered`.
+a number and silently drops prose); the cost of doing nothing belongs in `if_unanswered`, while
+an optional sibling field, `on_answer: {"effect": "resume"|"dispatch"|"record"}`, declares what
+should happen once the decision IS answered — though live evidence at press time (an
+already-resumable session, or a run already in progress on the same task) can still override it.
 
 **Merge sibling blockers before you bubble up.** If more than one child you're holding is blocked on
 the same root cause, don't escalate once per child — raise ONE hand-back naming the shared cause, with

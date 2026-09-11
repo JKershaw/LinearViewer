@@ -69,7 +69,7 @@ function decisionItem(id, identifier, decisionId) {
   };
 }
 
-let server, baseUrl, collection, suggestionsStore, tokenScope, historyItems, foreignHistoryItems;
+let server, baseUrl, collection, suggestionsStore, tokenScope, historyItems, foreignHistoryItems, liveItems;
 
 before(async () => {
   process.env.NODE_ENV = 'test';
@@ -81,9 +81,11 @@ before(async () => {
   // workspace and the whole suite stayed green — the isolation property these
   // routes exist to hold had zero coverage.
   const dispatchQueueStore = {
-    // Always empty: this workspace has no LIVE queue items in these fixtures.
-    // `listHistory` below is what carries the isolation.
-    async listItems() { return []; },
+    // Empty by default (`beforeEach` below); a per-test `liveItems` override
+    // (LIN-2773) drives the `liveDispatchOnAnchor` witness — a live queue
+    // item sharing a ruling's own anchor issue. `listHistory` below is what
+    // carries the workspace isolation.
+    async listItems(urlKey) { return urlKey === URL_KEY ? (liveItems || []) : []; },
     async listHistory(urlKey) { return { items: urlKey === URL_KEY ? historyItems : foreignHistoryItems }; }
   };
   const agentStatusStore = { async listStatus() { return { items: [] }; } };
@@ -127,7 +129,34 @@ beforeEach(() => {
   tokenScope = 'readWrite';
   historyItems = [decisionItem('loop-1', 'LIN-1', DECISION_ID)];
   foreignHistoryItems = [decisionItem('loop-9', 'OTHER-9', 'foreign-decision')];
+  liveItems = [];
 });
+
+/**
+ * A `gone` loop — terminal (`[done]`), well past the 6h reap window — that
+ * ALSO declares `on_answer.effect`. Used only by the `liveDispatchOnAnchor`
+ * witness below: `gone` (unlike `resumable`) reaches resolveEffect's
+ * branch 4, where a declared effect is otherwise honoured, so it is the
+ * disposition on which an override is actually observable.
+ */
+function goneDecisionItem(id, identifier, decisionId, onAnswerEffect) {
+  const oldIso = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past REAP_INACTIVITY_MS (6h)
+  const payload = { decision_id: decisionId, question: 'Proceed?', on_answer: { effect: onAnswerEffect } };
+  return {
+    id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
+    promptName: 'implementation', prompt: 'p', dispatchedAt: oldIso, resolvedAt: oldIso,
+    status: 'taken',
+    feedback: [
+      { kind: 'decision', message: JSON.stringify(payload), timestamp: oldIso },
+      { message: '[done] shipped it', timestamp: oldIso }
+    ]
+  };
+}
+
+/** A live (queued, non-terminal) dispatch item anchored on `identifier`. */
+function liveQueueItem(id, identifier) {
+  return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'plan', prompt: 'p', dispatchedAt: new Date().toISOString() };
+}
 
 async function req(method, path, body) {
   const res = await fetch(`${baseUrl}${path}`, {
@@ -188,6 +217,28 @@ describe('GET /api/proxy/rulings', () => {
     assert.equal(status, 200);
     assert.equal(body.count, 0);
     assert.deepEqual(body.rulings, []);
+  });
+
+  // LIN-2773 Area 4: liveDispatchOnAnchor, threaded from this route's own
+  // `loops` read (zero new reads) into resolveEffect's branch 3.
+  test('liveDispatchOnAnchor forces effect: "record" on a gone row, even over a declared "dispatch"', async () => {
+    historyItems = [goneDecisionItem('loop-gone', 'LIN-50', 'd-gone-1', 'dispatch')];
+    liveItems = [liveQueueItem('loop-live', 'LIN-50')]; // same anchor, still queued (non-terminal)
+    const { status, body } = await req('GET', '/api/proxy/rulings');
+    assert.equal(status, 200);
+    const row = body.rulings.find(r => r.decision.decision_id === 'd-gone-1');
+    assert.ok(row, 'the gone row is still present');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.declaredEffect, 'dispatch');
+    assert.equal(row.effect, 'record', 'a live run on the same anchor forces record, overriding the declared dispatch');
+  });
+
+  test('without a live loop on the same anchor, a gone row honours its declared effect (control for the test above)', async () => {
+    historyItems = [goneDecisionItem('loop-gone', 'LIN-51', 'd-gone-2', 'dispatch')];
+    liveItems = [];
+    const { body } = await req('GET', '/api/proxy/rulings');
+    const row = body.rulings.find(r => r.decision.decision_id === 'd-gone-2');
+    assert.equal(row.effect, 'dispatch');
   });
 });
 

@@ -1150,6 +1150,96 @@ decide for itself whether a periodical is due.
   needs it rather than reshaping a field already in the wild.
 - **503** when dispatch is not configured on this deployment.
 
+#### Rulings
+
+```
+GET  /api/proxy/rulings
+POST /api/proxy/rulings/{decisionId}/suggest-dismissal
+```
+
+`GET` returns every **unanswered** operator decision in this workspace — the exact same set
+the Observation "Rulings" tab shows a human, scoped to this token's single workspace (never a
+merged cross-workspace view; a proxy token carries one workspace's credential, and widening
+this read would hand it a cross-workspace view). Read scope is sufficient.
+
+```json
+{
+  "count": 2,
+  "rulings": [
+    {
+      "decision": { "decision_id": "...", "question": "...", "options": [{ "id": "a", "label": "..." }] },
+      "anchor": { "issueId": "<raw uuid>", "issueIdentifier": "LIN-42", "workspaceUrlKey": "...", "loopId": "...", "taskDecisionId": "..." },
+      "disposition": "resumable|gone|mid-turn|indeterminate|task-bound",
+      "effect": "resume|dispatch|record" | null,
+      "declaredEffect": "resume|dispatch|record" | null,
+      "alternate": "resume|dispatch|record" | null,
+      "canReply": true,
+      "shelvedLapseCount": 0,
+      "suggestedDismissal": null
+    }
+  ],
+  "generatedAt": "..."
+}
+```
+
+- **`disposition`** governs whether/how a reply can be delivered: `resumable`/`gone` admit a
+  reply (a different action under the hood — resume the parked session vs. start a fresh run);
+  `mid-turn`/`indeterminate` are **read-only** (a loop is actively running, or in an ambiguous
+  mid-transition state); `task-bound` (a scan-produced decision with no dispatch item behind
+  it) always admits a reply, through the always-available issue-keyed comment endpoint.
+- **`effect`** is a **separate field from `disposition`** — never merged into one namespace.
+  It answers a different question: once a reply is delivered, what actually happens?
+  `resume` (continue the parked session), `dispatch` (start a fresh run), or `record` (log the
+  answer, no run). `effect` is `null` only when **no live run exists on the anchor issue**. A
+  read-only disposition (`mid-turn`/`indeterminate`) never surfaces a **declared** effect — but
+  live evidence on the anchor, including the read-only row's own loop (which is itself
+  non-terminal by definition of `mid-turn`/`indeterminate`), still resolves `effect` to
+  `record`. So a read-only row never surfaces its declared effect **in** `effect` —
+  `declaredEffect` is **not** guaranteed `null` on such a row; it still reports whatever the
+  block declared, if anything.
+- **`declaredEffect`** is what the runner's own `DECISION:` block requested, via an optional
+  `on_answer: { "effect": "..." }` field — `null` when nothing was declared. This is
+  disposition-independent: a read-only row can still carry a non-null `declaredEffect` if the
+  runner declared one, even though that declaration never surfaces in `effect` (per the
+  previous bullet).
+- **`effect`** can differ from **`declaredEffect`**: live evidence always overrides a
+  declaration — an already-`resumable` disposition always resolves to `resume` regardless of
+  what was declared, and, on any row that is not already `resumable`, a live run already in
+  progress on the same anchor issue forces `record`, even over a declared `dispatch`.
+- **`alternate`** names the untaken option ONLY when a genuine declared-vs-default choice
+  existed and no evidence forced the outcome; otherwise `null`.
+- **`suggestedDismissal`** is the standing proposal on that ruling, if any (see the `POST`
+  below) — a SUGGESTION a human has not yet acted on, never evidence the ruling is resolved.
+
+`POST /api/proxy/rulings/{decisionId}/suggest-dismissal` requires **readWrite**. It does
+**NOT** dismiss a ruling, and there is deliberately no endpoint that does — only a human
+discharges a ruling, by agreeing to the suggestion in the UI. This surface exists so an agent
+can say "I think this can go, and here is why" without ever being able to act on it
+unilaterally.
+
+Body:
+```json
+{ "reason": "why this ruling can go", "decisionLoopId": "..." }
+```
+- **`reason`** — required, non-empty, ≤ 500 chars. Mandatory because the operator's whole
+  interaction is a one-click Agree; an unjustified proposal would turn that click into a
+  rubber stamp.
+- **`decisionLoopId`** — optional but strongly preferred: a `decision_id` is not unique (one
+  session can emit the same `DECISION:` block from two loops), so omitting it applies the
+  proposal to every loop sharing that `decision_id` (a deliberately back-compatible legacy
+  shape). Send the target row's own `anchor.loopId ?? anchor.taskDecisionId` from the `GET`
+  above to address exactly one row.
+
+Returns 201:
+```json
+{
+  "success": true,
+  "suggestion": { "reason": "...", "suggestedBy": "...", "suggestedAt": "...", "withdrawn": false, "decisionLoopId": "..." | null },
+  "note": "Recorded as a SUGGESTION only. The ruling is still unanswered until a human agrees to it."
+}
+```
+Attribution comes from the token's own `createdBy`, never from the request body.
+
 ### Task Automation Endpoints
 
 These endpoints back the task-automation workflow: pick the next task, generate a prompt for it, and record agent progress. The **recap** and **brief** endpoints above are part of this group too. All are read-scope except `POST /api/proxy/agent/status` (deprecated alias: `POST /api/proxy/foreman/status`), which requires `readWrite`.

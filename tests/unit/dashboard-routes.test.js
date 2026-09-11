@@ -408,6 +408,166 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
     assert.equal(res.jsonBody.rulings[0].decision.decision_id, 'd-loop-1');
     assert.equal(res.jsonBody.rulings[0].disposition !== 'task-bound', true);
   });
+
+  // ─── liveDispatchOnAnchor (LIN-2773 Area 4) ─────────────────────────────
+
+  test('liveDispatchOnAnchor forces effect: "record" on a task-bound row, even over a declared "dispatch"', async () => {
+    const taskDecisionsStore = {
+      async listUnansweredForWorkspaces() {
+        return [{
+          id: 'scan_task2_bbbbbbbbbbbb', urlKey: 'ws-a', issueId: '22222222-3333-4444-5555-666666666666',
+          issueIdentifier: 'LIN-40',
+          decision: { decision_id: 'd-task-2', question: 'Proceed?', on_answer: { effect: 'dispatch' } },
+          scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
+        }];
+      }
+    };
+    // A live (queued, non-terminal) loop anchored on the SAME issue — this is
+    // what forces liveDispatchOnAnchor: true. Zero new reads: `merged` is
+    // already fetched for this exact workspace set.
+    const perWorkspace = { 'ws-a': { live: [activeItem('a-queued', 'LIN-40')], history: [], agentStatus: [] } };
+    // makeRouter doesn't thread taskDecisionsStore, so build the router by hand.
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    const directRouter = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      taskDecisionsStore
+    });
+    const handler = getHandler(directRouter, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-task-2');
+    assert.ok(row, 'the task-bound row is present');
+    assert.equal(row.disposition, 'task-bound');
+    assert.equal(row.declaredEffect, 'dispatch');
+    assert.equal(row.effect, 'record', 'a live queued run on the same anchor forces record, overriding the declared dispatch');
+  });
+
+  test('without a live loop on the same anchor, a task-bound row honours its declared effect (control for the test above)', async () => {
+    const taskDecisionsStore = {
+      async listUnansweredForWorkspaces() {
+        return [{
+          id: 'scan_task3_cccccccccccc', urlKey: 'ws-a', issueId: '33333333-4444-5555-6666-777777777777',
+          issueIdentifier: 'LIN-41',
+          decision: { decision_id: 'd-task-3', question: 'Proceed?', on_answer: { effect: 'dispatch' } },
+          scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
+        }];
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores({}); // no loops at all anywhere
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      taskDecisionsStore
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-task-3');
+    assert.equal(row.effect, 'dispatch');
+  });
+
+  // ─── Area 8: the ambient poll stays structurally provider-free ─────────
+  //
+  // This route backs the 5s ambient nav-badge poll (see the comment atop the
+  // handler above), so it must NEVER reach a provider-context read — not
+  // `anchorTerminal` (this beat doesn't even pass that opt into
+  // collectUnansweredDecisions here — see Area 4 above), and not any other
+  // provider call either. Every OTHER test in this describe block stubs
+  // `fetchIssueContext: async () => ({})` — a silent no-op that would never
+  // fail even if the route started calling it, so none of them could ever
+  // catch a regression here (this is the exact gap named in the ticket).
+  // This test is the one that actually can: `fetchIssueContext` THROWS if
+  // called at all, and a positive assertion on `historyReads` proves the
+  // route still did its real work (reached the store), so a passing test
+  // means real work happened AND no provider call rode along with it.
+  test('the ambient rulings poll never calls the provider-context dependency (fetchIssueContext)', async () => {
+    let historyReads = 0;
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { historyReads++; return { items: [decisionItem('a-dec', 'LIN-60', 'd-poll-1')] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => { throw new Error('fetchIssueContext must never be called by the ambient rulings poll'); },
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.count, 1);
+    assert.equal(historyReads, 1, 'the store read actually happened — this is not a vacuous pass');
+  });
+
+  // LIN-2773 beat 4 note (recorded for review, per the beat's own instruction —
+  // NOT a bug, and deliberately not "fixed" here; the approved branch order is
+  // the parent's design of record):
+  //
+  // liveDispatchOnAnchor scans the SAME loop set a row was derived from, so a
+  // non-terminal loop always matches ITSELF. For a `mid-turn` row (its own
+  // loop is non-terminal by definition — that is why the disposition is
+  // mid-turn), this means liveDispatchOnAnchor is self-satisfied on every
+  // mid-turn row that carries a decision, and resolveEffect's branch 3
+  // (liveDispatchOnAnchor === true → 'record') is checked BEFORE branch 4's
+  // mid-turn/indeterminate → null rule. So a mid-turn row's own `effect`
+  // reads "record", never null, in both feeds — this pins that this IS
+  // reachable, not merely theoretical.
+  //
+  // This does not violate any stated rule: the read-only-dispositions
+  // guarantee is "never surface a DECLARED effect" (declaredEffect stays
+  // whatever was actually declared, untouched), and branch 3's 'record' is
+  // an EVIDENCE override, not a declaration leaking through — exactly the
+  // same category as gone+anchorTerminal or a genuine second live run on the
+  // anchor. `canReply` (the field that actually gates the reply UI) stays
+  // `false` for mid-turn regardless, and no client reads `row.effect` yet
+  // (S3), so nothing rendered or actionable changes because of this.
+  test('DOCUMENTED INTERACTION: a mid-turn row self-matches liveDispatchOnAnchor (its own loop is non-terminal), so effect reads "record", not null', async () => {
+    const midTurnItem = {
+      id: 'a-running', issueIdentifier: 'LIN-70', issueTitle: 'Title LIN-70',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, status: 'taken',
+      // No [blocked]/[done]/[failed] marker and no matching agentStatus entry
+      // below: per lib/pipeline-loops.js's _deriveAgentState truth table,
+      // history + status:'taken' + no agent-status match => agentState
+      // 'running', which resolveDisposition maps to 'mid-turn'.
+      feedback: [
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-midturn-1', question: 'Proceed?' }), timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [midTurnItem], agentStatus: [] } };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-midturn-1');
+    assert.ok(row, 'the mid-turn row is present in the feed');
+    assert.equal(row.disposition, 'mid-turn');
+    assert.equal(row.canReply, false, 'mid-turn stays strictly read-only regardless of effect');
+    assert.equal(row.declaredEffect, null, 'nothing was declared on this decision');
+    assert.equal(row.effect, 'record', 'self-match reachability: branch 3 outranks the mid-turn null rule, by the approved precedence order');
+  });
 });
 
 describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {

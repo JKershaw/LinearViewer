@@ -111,3 +111,61 @@ describe('buildInstructions — proxy-token 401 fields + Class-B retry guidance 
     assert.match(text, /`stage: "proxy-token"`[\s\S]*?retrying it wastes the window/);
   });
 });
+
+// LIN-2773 Area 4: the published contract now carries "effect" beside
+// "disposition" on GET /api/proxy/rulings — every prior rulings-shape change
+// updated this same block in the same PR (937555cd, ad97bcf7, e4ec02f3,
+// 5feeefd0); this is that update for the on_answer/effect feature.
+describe('buildInstructions — GET /api/proxy/rulings publishes the effect enum (LIN-2773 Area 4)', () => {
+  test('the rulings example object carries "effect": "resume|dispatch|record" beside "disposition"', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /"disposition": "resumable\|gone\|mid-turn\|indeterminate\|task-bound",\s*\n\s*"effect": "resume\|dispatch\|record"/);
+  });
+
+  test('declaredEffect and alternate are documented alongside effect', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /"declaredEffect": "resume\|dispatch\|record" \| null/);
+    assert.match(text, /"alternate": "resume\|dispatch\|record" \| null/);
+  });
+
+  test('"effect" and "disposition" are documented as two distinct fields, never merged', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /"effect" is a SEPARATE field from "disposition"/);
+    assert.match(text, /never merge the two\s*\n\s*namespaces/);
+  });
+
+  test('present under both read and readWrite scope — GET /api/proxy/rulings is a read endpoint', () => {
+    for (const scope of ['read', 'readWrite']) {
+      const text = buildInstructions({ baseUrl: BASE_URL, scope });
+      assert.match(text, /"effect": "resume\|dispatch\|record"/, `missing under scope=${scope}`);
+    }
+  });
+
+  // LIN-2773 review finding 1: the prior wording claimed "effect" is null
+  // only for the two read-only dispositions — but liveDispatchOnAnchor scans
+  // the same loop set a row was derived from, so a mid-turn/indeterminate
+  // row's own (non-terminal, by definition) loop self-matches and forces
+  // branch 3's "record" before branch 4's read-only null rule is reached.
+  // Only "declaredEffect" is actually guaranteed null on a read-only row.
+  test('effect is documented as null only when no live run exists on the anchor — NOT simply "for the two read-only dispositions"', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /is null only when no live run exists on the anchor\s*\n\s*issue\./);
+    assert.doesNotMatch(text, /is null only for the two read-only dispositions/);
+  });
+
+  // LIN-2777: the corrective commit for finding 1 (a6effb29) introduced a
+  // NEW false guarantee of the same class — claiming "declaredEffect" is
+  // guaranteed null on a read-only row. It is not: declaredEffect is read
+  // straight off decision.on_answer.effect (lib/unanswered-decisions.js)
+  // and every one of resolveEffect's branches, including the read-only
+  // branch, returns it unchanged. Only "effect" is suppressed on a
+  // read-only row — declaredEffect still reports whatever was declared.
+  test('a read-only row never surfaces its declared effect IN "effect", but "declaredEffect" is documented as NOT guaranteed null there', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /read-only disposition \("mid-turn"\/"indeterminate"\) never\s*\n\s*surfaces a DECLARED effect/);
+    assert.match(text, /still resolves "effect" to "record"/);
+    assert.match(text, /read-only row never surfaces its declared effect IN\s*"effect"/);
+    assert.match(text, /"declaredEffect" is NOT guaranteed null on such a row; it still reports\s*\n\s*whatever the block declared, if anything\./);
+    assert.doesNotMatch(text, /"declaredEffect" is guaranteed null/);
+  });
+});

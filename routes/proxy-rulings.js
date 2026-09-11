@@ -34,7 +34,7 @@ import { badRequest, jsonError } from '../lib/errors.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
-import { enrichLoop } from './dashboard.js';
+import { enrichLoop, isTerminalLoop } from './dashboard.js';
 
 const MAX_REASON_LENGTH = 500;
 
@@ -121,7 +121,16 @@ export function createRulingsRoutes({
       taskDecisionsStore ? taskDecisionsStore.listUnansweredForWorkspaces([urlKey]) : Promise.resolve([]),
       shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
     ]);
-    return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings }, { now: new Date() });
+    // LIN-2773 Area 4: same `liveDispatchOnAnchor` predicate as the
+    // session-authed feed (routes/dashboard.js), reusing the SAME exported
+    // `isTerminalLoop` rather than a second hand-rolled terminal check —
+    // zero new reads, scanning only the `loops` array already fetched above.
+    // `anchorTerminal` stays unpassed here too (S3's press-time read).
+    return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings }, {
+      now: new Date(),
+      liveDispatchOnAnchor: (issueIdentifier) =>
+        loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
+    });
   }
 
   /**
