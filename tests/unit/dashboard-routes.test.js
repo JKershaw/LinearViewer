@@ -18,6 +18,7 @@ import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriv
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
+import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -518,6 +519,31 @@ describe('POST /api/dashboard/rulings/shelve (LIN-1727)', () => {
     assert.equal(res.jsonBody.shelf.decisionId, 'd-1');
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0], { urlKey: 'ws-a', decisionId: 'd-1', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 });
+  });
+
+  // LIN-2756: forwarded through to the store when the client sends it
+  // (public/observation.js's shelveRulingRow now always does), so the shelf's
+  // composite key can agree with the same row's client-side rulingKey.
+  test('LIN-2756: forwards decisionLoopId to the store when present', async () => {
+    const calls = [];
+    const router = makeShelveRouter({
+      async shelve(args) { calls.push(args); return { ...args, resurfaceAt: '2026-08-24T00:00:00.000Z', shelvedAt: '2026-08-23T00:00:00.000Z', lapseCount: 0 }; }
+    });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 };
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(calls[0].decisionLoopId, '07509b1e');
+  });
+
+  test('LIN-2756: an empty-string decisionLoopId is refused as a bad type, not silently omitted', async () => {
+    const router = makeShelveRouter({ async shelve() { return {}; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'd-1', decisionLoopId: '', reason: 'x', resurfaceInMs: 60 * 60 * 1000 };
+    await handler(req, res);
+    assert.equal(res.statusCode, 400);
   });
 
   test('400 when decisionId is missing', async () => {
@@ -3689,6 +3715,73 @@ describe('GET /api/dashboard/rulings — suggestedDismissal join (LIN-2444)', ()
   });
 });
 
+// LIN-2756 — the ticket's live repro through the ACTUAL browser-facing route
+// (routes/dashboard.js's GET, not the proxy one): session `74869c9c`'s review
+// loop `07509b1e` and close-out loop `0c912018` emit the SAME decision_id in
+// the SAME workspace. This is the join that used to be a SEPARATE, less
+// precise (bare `${urlKey}::${decisionId}`) copy of the proxy route's own —
+// now both share lib/dismissal-suggestions-store.js's `attachStandingSuggestions`.
+describe('GET /api/dashboard/rulings — per-loop suggestedDismissal join (LIN-2756)', () => {
+  const SHARED_DECISION_ID = 'lin2384-f6-gate';
+  const REVIEW_LOOP = '07509b1e';
+  const CLOSEOUT_LOOP = '0c912018';
+
+  function twoLoopRouter(suggestions) {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [
+          decisionItem(REVIEW_LOOP, 'LIN-1', SHARED_DECISION_ID),
+          decisionItem(CLOSEOUT_LOOP, 'LIN-1', SHARED_DECISION_ID)
+        ],
+        agentStatus: []
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] } } }),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      dismissalSuggestionsStore: { async listForWorkspaces() { return suggestions; } }
+    });
+  }
+
+  async function rulingsFrom(suggestions) {
+    const handler = getHandler(twoLoopRouter(suggestions), 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+    return res.jsonBody;
+  }
+
+  test('a loop-scoped suggestion attaches ONLY to its own loop’s row', async () => {
+    const body = await rulingsFrom([{
+      urlKey: 'ws-a', decisionId: SHARED_DECISION_ID, decisionLoopId: REVIEW_LOOP,
+      reason: 'review pass shipped', suggestedBy: 'lane-e', suggestedAt: NOW_ISO, withdrawn: false, withdrawnAt: null
+    }]);
+    assert.equal(body.rulings.length, 2, 'both loops still render as two distinct rulings');
+    const reviewRow = body.rulings.find(r => r.anchor.loopId === REVIEW_LOOP);
+    const closeoutRow = body.rulings.find(r => r.anchor.loopId === CLOSEOUT_LOOP);
+    assert.equal(reviewRow.suggestedDismissal.reason, 'review pass shipped');
+    assert.equal(closeoutRow.suggestedDismissal, null, "the close-out loop's row must not inherit the review loop's suggestion");
+  });
+
+  test('a legacy/workspace-wide suggestion (no decisionLoopId) still fans out to both loops — documented back-compat', async () => {
+    const body = await rulingsFrom([{
+      urlKey: 'ws-a', decisionId: SHARED_DECISION_ID, decisionLoopId: null,
+      reason: 'wide legacy proposal', suggestedBy: 'lane-e', suggestedAt: NOW_ISO, withdrawn: false, withdrawnAt: null
+    }]);
+    for (const r of body.rulings) assert.equal(r.suggestedDismissal.reason, 'wide legacy proposal');
+  });
+});
+
 // ─── Keep a ruling — withdraw a proposed dismissal (LIN-2444, Phase 1) ───────
 //
 // Keep is a suggestions-store write ONLY. It must never touch answer state:
@@ -3735,6 +3828,31 @@ describe('POST /api/dashboard/rulings/keep (LIN-2444)', () => {
     assert.equal(res.jsonBody.suggestion.withdrawn, true);
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0], { urlKey: 'ws-a', decisionId: 'shared-id' });
+  });
+
+  // LIN-2756: forwarded through to the store when the client sends it
+  // (public/observation.js's keepRulingRow now always does), so the Keep
+  // targets the SAME composite id a suggest() call would have addressed.
+  test('LIN-2756: forwards decisionLoopId to the store when present', async () => {
+    const calls = [];
+    const router = makeKeepRouter({
+      async withdraw(args) { calls.push(args); return { ...args, withdrawn: true }; }
+    });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'lin2384-f6-gate', decisionLoopId: '0c912018' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(calls[0].decisionLoopId, '0c912018');
+  });
+
+  test('LIN-2756: an empty-string decisionLoopId is refused as a bad type, not silently omitted', async () => {
+    const router = makeKeepRouter({ async withdraw() { return {}; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'd-1', decisionLoopId: '' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 400);
   });
 
   test('400 when decisionId is missing or not a non-empty string', async () => {
@@ -3807,6 +3925,81 @@ describe('POST /api/dashboard/rulings/keep (LIN-2444)', () => {
     await handler(req, res);
     assert.equal(res.statusCode, 200);
     assert.equal(markCalled, false, 'Keep must never stamp decision-answer');
+  });
+});
+
+// ─── Keep against a REAL store, end to end (LIN-2766) ────────────────────────
+//
+// Every other Keep-route test above stubs dismissalSuggestionsStore wholesale,
+// so none of them can exercise the real `_id` composition withdraw() does —
+// which is exactly how PR #1437's regression shipped with CI green: the
+// route's own validation/wiring was covered, and the store's withdraw() was
+// covered in isolation, but never crossed together through the actual route.
+describe('POST /api/dashboard/rulings/keep — real store, crossed with GET rulings (LIN-2766)', () => {
+  function makeMockCollection() {
+    const docs = [];
+    const matches = (doc, query) => (query._id === undefined || doc._id === query._id)
+      && (query.urlKey === undefined || (Array.isArray(query.urlKey?.$in) ? query.urlKey.$in.includes(doc.urlKey) : doc.urlKey === query.urlKey));
+    return {
+      async findOne(query) { return docs.find(d => matches(d, query)) || null; },
+      find(query = {}) { return { async toArray() { return docs.filter(d => matches(d, query)).slice(); } }; },
+      async updateOne(query, update, opts = {}) {
+        const idx = docs.findIndex(d => matches(d, query));
+        if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
+        if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0, upsertedId: update.$set?._id }; }
+        return { matchedCount: 0 };
+      }
+    };
+  }
+
+  const REVIEW_LOOP = '07509b1e';
+  const DECISION_ID = 'lin2384-f6-gate';
+
+  function realStoreRouter(dismissalSuggestionsStore) {
+    const perWorkspace = { 'ws-a': { live: [], history: [decisionItem(REVIEW_LOOP, 'LIN-1', DECISION_ID)], agentStatus: [] } };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] } } }),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      dismissalSuggestionsStore
+    });
+  }
+
+  test('a legacy suggestion that displays on a loop-backed row (GET) is actually withdrawn by pressing Keep on that row (POST) — no false "already withdrawn"', async () => {
+    const store = new DismissalSuggestionsStore({ collection: makeMockCollection() });
+    // A decisionId-only write, exactly like an un-upgraded agent integration
+    // (routes/proxy-rulings.js's decisionLoopId-optional back-compat) or any
+    // suggestion persisted before LIN-2756.
+    await store.suggest({ urlKey: 'ws-a', decisionId: DECISION_ID, reason: 'stale', suggestedBy: 'agent' });
+
+    const router = realStoreRouter(store);
+    const getHandlerFn = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const keepHandlerFn = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+
+    const before = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await getHandlerFn(before.req, before.res);
+    const row = before.res.jsonBody.rulings.find(r => r.decision.decision_id === DECISION_ID);
+    assert.ok(row?.suggestedDismissal, 'the legacy suggestion fans out to the loop-backed row — banner renders');
+
+    const keep = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    keep.req.body = { decisionId: DECISION_ID, decisionLoopId: REVIEW_LOOP };
+    await keepHandlerFn(keep.req, keep.res);
+    assert.equal(keep.res.statusCode, 200, 'Keep must not 404 on a legacy-shaped standing suggestion');
+    assert.equal(keep.res.jsonBody.suggestion.withdrawn, true);
+
+    const after = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await getHandlerFn(after.req, after.res);
+    const rowAfter = after.res.jsonBody.rulings.find(r => r.decision.decision_id === DECISION_ID);
+    assert.equal(rowAfter?.suggestedDismissal, null, 'the banner must actually be gone, not reappear on the next poll');
   });
 });
 

@@ -11,7 +11,7 @@
  */
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert';
-import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
+import { DismissalSuggestionsStore, attachStandingSuggestions } from '../../lib/dismissal-suggestions-store.js';
 
 // Mirrors tests/unit/shelved-rulings-store.test.js's mock.
 function createMockCollection() {
@@ -170,6 +170,31 @@ describe('DismissalSuggestionsStore.withdraw', () => {
     assert.equal(collection._docs.length, 0);
   });
 
+  test('LIN-2766: a decisionLoopId-scoped withdraw falls back to a legacy two-segment doc when no loop-scoped one exists', async () => {
+    // The read side (attachStandingSuggestions/shelfGate) has always fallen
+    // back to the legacy `${urlKey}::${decisionId}` doc for a loop-backed row.
+    // withdraw() composed the loop-scoped `_id` only and returned null on a
+    // miss — a Keep press on a legacy-suggested, loop-backed row 404s.
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', reason: 'stale', suggestedBy: 'agent', now: NOW });
+    const rec = await store.withdraw({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', now: LATER });
+    assert.notEqual(rec, null, 'withdraw must fall back to the legacy doc rather than reporting no match');
+    assert.equal(rec.withdrawn, true);
+    assert.equal(collection._docs.length, 1, 'the legacy row is retained (marked, not deleted), not duplicated');
+    assert.equal(collection._docs[0]._id, 'acme::lin2384-f6-gate', 'the legacy _id is what was actually updated');
+  });
+
+  test('LIN-2766: a loop-scoped withdraw prefers the exact loop-scoped doc over a coexisting legacy one', async () => {
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'legacy', suggestedBy: 'x', now: NOW });
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', reason: 'specific', suggestedBy: 'y', now: NOW });
+
+    await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: LATER });
+
+    const legacy = collection._docs.find(d => d._id === 'acme::d-1');
+    const scoped = collection._docs.find(d => d._id === 'acme::07509b1e::d-1');
+    assert.equal(scoped.withdrawn, true, 'the exact loop-scoped doc is the one withdrawn');
+    assert.equal(legacy.withdrawn, false, 'the legacy doc must not be touched when a loop-scoped doc exists');
+  });
+
   test('withdrawal does not touch any answer state — it only clears the offer', async () => {
     // The structural point of the whole ticket: neither suggest nor withdraw
     // may resemble an answer. This store writes exactly four fields beyond its
@@ -237,5 +262,169 @@ describe('DismissalSuggestionsStore.clear', () => {
     const { store } = makeStore();
     assert.equal(await store.clear(), 0);
     assert.equal(await new DismissalSuggestionsStore({}).clear('acme'), 0);
+  });
+});
+
+// LIN-2756 — the ticket's live repro at the store layer: session `74869c9c`'s
+// review loop `07509b1e` and close-out loop `0c912018` emit the SAME
+// `decision_id`. A suggestion proposed against one loop's row must not
+// silently apply to the other's.
+describe('DismissalSuggestionsStore — per-loop identity (LIN-2756)', () => {
+  let collection, store;
+  beforeEach(() => { ({ collection, store } = makeStore()); });
+
+  test('a decisionLoopId-scoped suggestion keys on the full triple, not just (urlKey, decisionId)', async () => {
+    const rec = await store.suggest({
+      urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'shipped', suggestedBy: 'lane-e', now: NOW
+    });
+    assert.equal(rec.decisionLoopId, '07509b1e');
+    assert.equal(collection._docs[0]._id, 'acme::07509b1e::lin2384-f6-gate');
+  });
+
+  test('two loops sharing (urlKey, decisionId) get independent suggestion rows', async () => {
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'review pass done', suggestedBy: 'x', now: NOW });
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '0c912018', reason: 'close-out pass done', suggestedBy: 'x', now: NOW });
+
+    assert.equal(collection._docs.length, 2, 'each loop must keep its own row, not collapse onto one shared (urlKey, decisionId) key');
+    assert.deepEqual(collection._docs.map(d => d._id).sort(), ['acme::07509b1e::lin2384-f6-gate', 'acme::0c912018::lin2384-f6-gate']);
+  });
+
+  test('withdrawing one loop’s suggestion leaves the other loop’s standing', async () => {
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'r', suggestedBy: 'x', now: NOW });
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '0c912018', reason: 'r', suggestedBy: 'x', now: NOW });
+
+    const withdrawn = await store.withdraw({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', now: LATER });
+    assert.equal(withdrawn.withdrawn, true);
+
+    const rows = await store.listForWorkspaces(['acme']);
+    const other = rows.find(r => r.decisionLoopId === '0c912018');
+    assert.equal(other.withdrawn, false, "the close-out loop's suggestion must not be withdrawn by a Keep on the review loop's row");
+  });
+
+  test('omitting decisionLoopId keeps the legacy, workspace-wide two-segment shape — back-compat, not a refusal', async () => {
+    const rec = await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'r', suggestedBy: 'x', now: NOW });
+    assert.equal(rec.decisionLoopId, null);
+    assert.equal(collection._docs[0]._id, 'acme::d-1');
+  });
+
+  test('LIN-2766: a legacy suggestion attached to a loop-backed row via the read-side fallback is ACTUALLY withdrawn by that row\'s Keep — crossed read/write', async () => {
+    // The ticket's own reproduction: attachStandingSuggestions (read side)
+    // has always fanned a legacy doc out to every loop's row. Before the fix,
+    // withdraw (write side) could not find that same doc via the loop-scoped
+    // id it was pressed with — Keep 404d and the banner returned on the next
+    // poll even though the client reported success.
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', reason: 'stale', suggestedBy: 'agent', now: NOW });
+    const row = { anchor: { workspaceUrlKey: 'acme', loopId: '07509b1e' }, decision: { decision_id: 'lin2384-f6-gate' } };
+
+    const before = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.ok(before[0].suggestedDismissal, 'the legacy suggestion attaches to the loop-backed row (banner renders)');
+
+    const withdrawn = await store.withdraw({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', now: LATER });
+    assert.notEqual(withdrawn, null, 'Keep must not 404 on a legacy-shaped standing suggestion');
+
+    const after = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.equal(after[0].suggestedDismissal, null, 'the banner must be gone — the withdrawal actually took effect, not a false "already withdrawn"');
+  });
+
+  test('LIN-2756 F3: a withdrawn loop-scoped doc must not shadow a standing legacy one — the SECOND Keep must still find and withdraw the doc the banner is actually showing', async () => {
+    // Re-review's repro: beat 6's fallback picks scoped-over-legacy by
+    // PRESENCE, not by which one is still standing. Once the scoped doc is
+    // itself withdrawn, a fresh (non-upgraded, decisionId-only) proposal
+    // creates a standing legacy doc that the read side (attachStandingSuggestions)
+    // correctly falls back to and displays — but a write-side lookup that
+    // still prefers "scoped, present-or-not" over "standing" finds the
+    // ALREADY-withdrawn scoped doc, takes the idempotent branch, and reports
+    // success while the legacy doc underneath the banner is never touched.
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', reason: 'scoped', suggestedBy: 'x', now: NOW });
+    await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: NOW }); // Keep #1: withdraws the scoped doc
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'a non-upgraded caller proposes again, workspace-wide', suggestedBy: 'y', now: LATER });
+
+    const row = { anchor: { workspaceUrlKey: 'acme', loopId: '07509b1e' }, decision: { decision_id: 'd-1' } };
+    const before = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.ok(before[0].suggestedDismissal, 'the read side falls back to the standing legacy doc — the banner renders');
+
+    await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: LATER }); // Keep #2
+
+    const legacy = collection._docs.find(d => d._id === 'acme::d-1');
+    assert.equal(legacy.withdrawn, true, 'the standing legacy doc — the one the banner actually displayed — must be the one withdrawn');
+
+    const after = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.equal(after[0].suggestedDismissal, null, 'the banner must actually clear, not silently persist behind a false "already withdrawn" success');
+  });
+});
+
+describe('attachStandingSuggestions — loop-aware join (LIN-2756)', () => {
+  function row(loopId, decisionId, urlKey = 'acme') {
+    return { anchor: { workspaceUrlKey: urlKey, loopId }, decision: { decision_id: decisionId } };
+  }
+  function suggestion(over) {
+    return { urlKey: 'acme', decisionId: 'lin2384-f6-gate', withdrawn: false, reason: 'r', suggestedBy: 'x', suggestedAt: NOW.toISOString(), decisionLoopId: null, ...over };
+  }
+
+  test('a loop-scoped suggestion attaches ONLY to its own loop’s row — the sibling stays null (LIN-2756 live repro)', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate'), row('0c912018', 'lin2384-f6-gate')];
+    const suggestions = [suggestion({ decisionLoopId: '07509b1e', reason: 'review pass done' })];
+
+    const [reviewRow, closeoutRow] = attachStandingSuggestions(rows, suggestions);
+    assert.equal(reviewRow.suggestedDismissal?.reason, 'review pass done');
+    assert.equal(closeoutRow.suggestedDismissal, null, "the close-out loop's row must not inherit the review loop's suggestion");
+  });
+
+  test('a legacy/workspace-wide suggestion (no decisionLoopId) still fans out to every loop sharing the id — documented back-compat', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate'), row('0c912018', 'lin2384-f6-gate')];
+    const suggestions = [suggestion({ decisionLoopId: null })];
+
+    const [reviewRow, closeoutRow] = attachStandingSuggestions(rows, suggestions);
+    assert.ok(reviewRow.suggestedDismissal, 'a legacy suggestion still applies to every loop carrying the id');
+    assert.ok(closeoutRow.suggestedDismissal, 'both loops see the same workspace-wide suggestion');
+  });
+
+  test('a loop-scoped suggestion for one loop does not fall back to the legacy row for a DIFFERENT loop that has its own', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate'), row('0c912018', 'lin2384-f6-gate')];
+    const suggestions = [
+      suggestion({ decisionLoopId: null, reason: 'legacy wide' }),
+      suggestion({ decisionLoopId: '0c912018', reason: 'close-out specific' })
+    ];
+
+    const [reviewRow, closeoutRow] = attachStandingSuggestions(rows, suggestions);
+    assert.equal(reviewRow.suggestedDismissal.reason, 'legacy wide', 'no loop-specific row for the review loop — falls back to legacy');
+    assert.equal(closeoutRow.suggestedDismissal.reason, 'close-out specific', 'a loop-specific row wins over the legacy fallback');
+  });
+
+  test('a withdrawn suggestion never attaches, loop-scoped or legacy', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate')];
+    const suggestions = [suggestion({ decisionLoopId: '07509b1e', withdrawn: true })];
+    assert.equal(attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal, null);
+  });
+
+  // LIN-2756 close-out (review N2): the read-side cell of the F3 rule. Beat 7
+  // put ONE precedence function (`pickStandingDoc`) behind both callers, but
+  // only `withdraw()` defended it — a presence-first mutation was caught by a
+  // write-side test alone. The read-side consequence is the visible one: a
+  // withdrawn loop-scoped document shadowing a STANDING legacy one means the
+  // banner renders nothing while a live suggestion exists.
+  test('a WITHDRAWN loop-scoped suggestion does not shadow a STANDING legacy one — the banner shows the legacy (review N2, F3 read side)', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate')];
+    const suggestions = [
+      suggestion({ decisionLoopId: '07509b1e', withdrawn: true, reason: 'scoped, kept' }),
+      suggestion({ decisionLoopId: null, reason: 'legacy, still standing' })
+    ];
+    assert.equal(
+      attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal?.reason,
+      'legacy, still standing',
+      'a withdrawn scoped document is not "standing" — the still-standing legacy one must surface'
+    );
+  });
+
+  test('a task-bound row (loopId null, taskDecisionId set) matches on taskDecisionId', () => {
+    const taskRow = { anchor: { workspaceUrlKey: 'acme', loopId: null, taskDecisionId: 'scan_abc' }, decision: { decision_id: 'd-task' } };
+    const suggestions = [{ urlKey: 'acme', decisionId: 'd-task', decisionLoopId: 'scan_abc', withdrawn: false, reason: 'r', suggestedBy: 'x', suggestedAt: NOW.toISOString() }];
+    assert.equal(attachStandingSuggestions([taskRow], suggestions)[0].suggestedDismissal.reason, 'r');
+  });
+
+  test('a different workspace sharing the same loopId+decisionId never attaches', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate', 'other-workspace')];
+    const suggestions = [suggestion({ decisionLoopId: '07509b1e' })]; // urlKey: 'acme'
+    assert.equal(attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal, null);
   });
 });

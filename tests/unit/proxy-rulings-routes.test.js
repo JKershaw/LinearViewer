@@ -480,3 +480,65 @@ describe('GET /api/proxy/rulings — task-bound rows via a real TaskDecisionsSto
     assert.equal(body.rulings[0].decision.decision_id, 'scan_11111111_aaaaaaaaaaaa');
   });
 });
+
+// LIN-2756 — the ticket's live repro, end to end through the real router +
+// real DismissalSuggestionsStore: session `74869c9c`'s review loop
+// `07509b1e` and close-out loop `0c912018` emit the SAME decision_id in the
+// SAME workspace.
+describe('two loops sharing a decision_id — per-loop suggest-dismissal (LIN-2756)', () => {
+  const SHARED_DECISION_ID = 'lin2384-f6-gate';
+  const REVIEW_LOOP = '07509b1e';
+  const CLOSEOUT_LOOP = '0c912018';
+
+  test('proposing a dismissal with decisionLoopId only attaches to that one loop’s row', async () => {
+    historyItems = [
+      decisionItem(REVIEW_LOOP, 'LIN-1', SHARED_DECISION_ID),
+      decisionItem(CLOSEOUT_LOOP, 'LIN-1', SHARED_DECISION_ID)
+    ];
+
+    const propose = await req('POST', `/api/proxy/rulings/${SHARED_DECISION_ID}/suggest-dismissal`, {
+      reason: 'review pass shipped', decisionLoopId: REVIEW_LOOP
+    });
+    assert.equal(propose.status, 201);
+
+    const { body } = await req('GET', '/api/proxy/rulings');
+    assert.equal(body.rulings.length, 2, 'both loops must still render as two distinct rulings');
+    const reviewRow = body.rulings.find(r => r.anchor.loopId === REVIEW_LOOP);
+    const closeoutRow = body.rulings.find(r => r.anchor.loopId === CLOSEOUT_LOOP);
+    assert.equal(reviewRow.suggestedDismissal.reason, 'review pass shipped');
+    assert.equal(closeoutRow.suggestedDismissal, null, "the close-out loop's row must not inherit the review loop's suggestion");
+  });
+
+  test('proposing a dismissal WITHOUT decisionLoopId (back-compat) fans out to every loop sharing the id', async () => {
+    historyItems = [
+      decisionItem(REVIEW_LOOP, 'LIN-1', SHARED_DECISION_ID),
+      decisionItem(CLOSEOUT_LOOP, 'LIN-1', SHARED_DECISION_ID)
+    ];
+
+    const propose = await req('POST', `/api/proxy/rulings/${SHARED_DECISION_ID}/suggest-dismissal`, { reason: 'wide, legacy-shaped proposal' });
+    assert.equal(propose.status, 201);
+
+    const { body } = await req('GET', '/api/proxy/rulings');
+    for (const r of body.rulings) {
+      assert.equal(r.suggestedDismissal.reason, 'wide, legacy-shaped proposal', 'documented back-compat: a decisionId-only proposal applies to every loop carrying it');
+    }
+  });
+
+  test('a decisionLoopId that names no real row 404s — the same orphan-row guard decisionId already has', async () => {
+    historyItems = [decisionItem(REVIEW_LOOP, 'LIN-1', SHARED_DECISION_ID)];
+    const { status, body } = await req('POST', `/api/proxy/rulings/${SHARED_DECISION_ID}/suggest-dismissal`, {
+      reason: 'r', decisionLoopId: 'no-such-loop'
+    });
+    assert.equal(status, 404);
+    assert.equal(body.code, 'RULING_NOT_FOUND');
+    assert.equal(collection._docs.length, 0, 'nothing is written for an unmatched decisionLoopId');
+  });
+
+  test('an empty-string decisionLoopId is refused as a bad type, not silently treated as omitted', async () => {
+    historyItems = [decisionItem(REVIEW_LOOP, 'LIN-1', SHARED_DECISION_ID)];
+    const { status } = await req('POST', `/api/proxy/rulings/${SHARED_DECISION_ID}/suggest-dismissal`, {
+      reason: 'r', decisionLoopId: ''
+    });
+    assert.equal(status, 400);
+  });
+});

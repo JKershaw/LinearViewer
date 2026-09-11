@@ -56,6 +56,7 @@ import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
+import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 import { hasPaidEnvKey } from '../lib/openrouter.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -1507,27 +1508,16 @@ export function createDashboardRoutes({
       const suggestions = dismissalSuggestionsStore
         ? await dismissalSuggestionsStore.listForWorkspaces(workspaces.map(w => w.urlKey))
         : [];
-      const standingSuggestions = new Map();
-      for (const s of suggestions) {
-        if (!s.withdrawn && s.urlKey && s.decisionId) standingSuggestions.set(`${s.urlKey}::${s.decisionId}`, s);
-      }
-
-      const rulings = collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings }, { now: new Date() })
-        .map(row => {
-          // Keyed on (workspace, decisionId), not decisionId alone: a
-          // decision_id is agent-invented free text and is not globally
-          // unique, so the same string in two workspaces must not share one
-          // proposal — the same composite-key reasoning
-          // lib/shelved-rulings-store.js already records.
-          const key = `${row.anchor?.workspaceUrlKey || ''}::${row.decision?.decision_id || ''}`;
-          const suggestion = standingSuggestions.get(key) || null;
-          return {
-            ...row,
-            suggestedDismissal: suggestion
-              ? { reason: suggestion.reason, suggestedBy: suggestion.suggestedBy, suggestedAt: suggestion.suggestedAt }
-              : null
-          };
-        });
+      // LIN-2756: loop-aware join, shared with routes/proxy-rulings.js's own
+      // GET — see attachStandingSuggestions' own doc for the two-tier match
+      // (a row's own loop segment first, falling back to a workspace-wide/
+      // legacy suggestion). Previously this route and the proxy route each
+      // hand-rolled their own (different, neither loop-aware) version of
+      // this join — now there is exactly one.
+      const rulings = attachStandingSuggestions(
+        collectUnansweredDecisions({ loops: merged, taskDecisions, shelvedRulings }, { now: new Date() }),
+        suggestions
+      );
 
       keepalive.stop();
       keepalive.send(200, {
@@ -1595,9 +1585,17 @@ export function createDashboardRoutes({
   const MAX_SHELVE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
   router.post('/workspace/:urlKey/api/dashboard/rulings/shelve', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
-    const { decisionId, reason, resurfaceInMs } = req.body || {};
+    const { decisionId, decisionLoopId, reason, resurfaceInMs } = req.body || {};
     if (typeof decisionId !== 'string' || !decisionId) {
       return jsonError(res, 400, 'decisionId is required');
+    }
+    // LIN-2756: OPTIONAL — see lib/shelved-rulings-store.js's back-compat
+    // note. `public/observation.js`'s shelveRulingRow always sends the
+    // row's own anchor.loopId/taskDecisionId, but this route stays
+    // tolerant of an omitted one (a stale cached tab mid-deploy, a future
+    // non-upgraded caller) rather than 400ing a previously-working shelve.
+    if (decisionLoopId !== undefined && (typeof decisionLoopId !== 'string' || !decisionLoopId)) {
+      return jsonError(res, 400, 'decisionLoopId, when given, must be a non-empty string');
     }
     if (typeof reason !== 'string' || !reason.trim()) {
       return jsonError(res, 400, 'A shelve reason is required — silent muting is not allowed');
@@ -1609,7 +1607,13 @@ export function createDashboardRoutes({
       return jsonError(res, 503, 'Shelved-rulings store not configured');
     }
     try {
-      const record = await shelvedRulingsStore.shelve({ urlKey: workspace.urlKey, decisionId, reason, resurfaceInMs });
+      const record = await shelvedRulingsStore.shelve({
+        urlKey: workspace.urlKey,
+        decisionId,
+        ...(decisionLoopId ? { decisionLoopId } : {}),
+        reason,
+        resurfaceInMs
+      });
       if (!record) {
         return jsonError(res, 500, 'Failed to shelve ruling');
       }
@@ -1631,15 +1635,25 @@ export function createDashboardRoutes({
   // withdrawn record unchanged), so no idempotence handling is needed here.
   router.post('/workspace/:urlKey/api/dashboard/rulings/keep', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
-    const { decisionId } = req.body || {};
+    const { decisionId, decisionLoopId } = req.body || {};
     if (typeof decisionId !== 'string' || !decisionId) {
       return jsonError(res, 400, 'decisionId is required');
+    }
+    // LIN-2756: OPTIONAL, same reasoning as the shelve route above — must
+    // match whatever the standing suggestion was proposed with, but an
+    // absent one is tolerated rather than refused.
+    if (decisionLoopId !== undefined && (typeof decisionLoopId !== 'string' || !decisionLoopId)) {
+      return jsonError(res, 400, 'decisionLoopId, when given, must be a non-empty string');
     }
     if (!dismissalSuggestionsStore) {
       return jsonError(res, 503, 'Dismissal-suggestions store not configured');
     }
     try {
-      const record = await dismissalSuggestionsStore.withdraw({ urlKey: workspace.urlKey, decisionId });
+      const record = await dismissalSuggestionsStore.withdraw({
+        urlKey: workspace.urlKey,
+        decisionId,
+        ...(decisionLoopId ? { decisionLoopId } : {})
+      });
       if (!record) {
         return jsonError(res, 404, 'No matching suggestion to keep');
       }
