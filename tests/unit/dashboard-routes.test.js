@@ -3635,6 +3635,13 @@ describe('GET /api/dashboard/rulings — suggestedDismissal join (LIN-2444)', ()
     for (const row of body.rulings) assert.equal(row.suggestedDismissal, null);
   });
 
+  test('count is unchanged by attaching a suggestion — the join adds a field, never filters a row (LIN-2444 Phase 7)', async () => {
+    const withoutSuggestion = await rulingsFrom([]);
+    const withSuggestion = await rulingsFrom([suggestion()]);
+    assert.equal(withSuggestion.count, withoutSuggestion.count, 'a standing suggestion must not change how many rulings are reported');
+    assert.equal(withSuggestion.rulings.length, withoutSuggestion.rulings.length);
+  });
+
   test('a WITHDRAWN proposal does not reach the surface — Keep means keep', async () => {
     const body = await rulingsFrom([suggestion({ withdrawn: true, withdrawnAt: NOW_ISO })]);
     const row = body.rulings.find(r => r.decision.decision_id === 'shared-id');
@@ -3679,6 +3686,127 @@ describe('GET /api/dashboard/rulings — suggestedDismissal join (LIN-2444)', ()
     assert.equal(res.statusCode, 200);
     assert.ok(keys.some(k => k.startsWith('rulings::')), `expected a 'rulings' namespace, saw ${JSON.stringify(keys)}`);
     assert.ok(!keys.some(k => k.startsWith('proxy-rulings::')), 'the human feed must not read the proxy entry');
+  });
+});
+
+// ─── Keep a ruling — withdraw a proposed dismissal (LIN-2444, Phase 1) ───────
+//
+// Keep is a suggestions-store write ONLY. It must never touch answer state:
+// markDecisionAnswered must never be called, and the boundary that keeps
+// `decision-answer` out of FEEDBACK_ENTRY_KINDS (LIN-1728) must stay intact.
+describe('POST /api/dashboard/rulings/keep (LIN-2444)', () => {
+  function makeKeepRouter(dismissalSuggestionsStoreOverrides, { markDecisionAnswered } = {}) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { return { items: [] }; },
+        async markDecisionAnswered(...args) {
+          if (markDecisionAnswered) return markDecisionAnswered(...args);
+          throw new Error('markDecisionAnswered must never be called by Keep');
+        }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      dismissalSuggestionsStore: dismissalSuggestionsStoreOverrides
+    });
+  }
+
+  test('withdraws the standing suggestion and returns the record — never touches answer state', async () => {
+    const calls = [];
+    const router = makeKeepRouter({
+      async withdraw({ urlKey, decisionId }) {
+        calls.push({ urlKey, decisionId });
+        return { urlKey, decisionId, reason: 'the task shipped', suggestedBy: 'lane-e', suggestedAt: NOW_ISO, withdrawn: true, withdrawnAt: NOW_ISO };
+      }
+    });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'shared-id' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.success, true);
+    assert.equal(res.jsonBody.suggestion.withdrawn, true);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], { urlKey: 'ws-a', decisionId: 'shared-id' });
+  });
+
+  test('400 when decisionId is missing or not a non-empty string', async () => {
+    let called = false;
+    const router = makeKeepRouter({ async withdraw() { called = true; return {}; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+
+    for (const bad of [undefined, '', 42]) {
+      const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+      req.body = bad === undefined ? {} : { decisionId: bad };
+      await handler(req, res);
+      assert.equal(res.statusCode, 400, `expected 400 for decisionId=${JSON.stringify(bad)}`);
+    }
+    assert.equal(called, false, 'withdraw() must never be called on invalid input');
+  });
+
+  test('503 when no dismissalSuggestionsStore is configured', async () => {
+    const router = makeKeepRouter(null);
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'shared-id' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 503);
+  });
+
+  test('404 when withdraw() finds no matching suggestion', async () => {
+    const router = makeKeepRouter({ async withdraw() { return null; } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'unknown-id' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+  });
+
+  test('500 when the store throws, never propagates the raw error', async () => {
+    const router = makeKeepRouter({ async withdraw() { throw new Error('store down'); } });
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'shared-id' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 500);
+  });
+
+  test('idempotent: a second Keep on an already-withdrawn suggestion is a no-op, not an error', async () => {
+    const record = { urlKey: 'ws-a', decisionId: 'shared-id', reason: 'the task shipped', suggestedBy: 'lane-e', suggestedAt: NOW_ISO, withdrawn: true, withdrawnAt: NOW_ISO };
+    const router = makeKeepRouter({ async withdraw() { return record; } }); // mirrors the real store's own idempotence
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+
+    const first = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    first.req.body = { decisionId: 'shared-id' };
+    await handler(first.req, first.res);
+    assert.equal(first.res.statusCode, 200);
+
+    const second = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    second.req.body = { decisionId: 'shared-id' };
+    await handler(second.req, second.res);
+    assert.equal(second.res.statusCode, 200, 'a repeat Keep must succeed, not error');
+    assert.deepEqual(second.res.jsonBody, first.res.jsonBody, 'a repeat Keep returns the same settled record');
+  });
+
+  test('Keep never calls markDecisionAnswered — the ruling stays unanswered', async () => {
+    let markCalled = false;
+    const router = makeKeepRouter(
+      { async withdraw() { return { urlKey: 'ws-a', decisionId: 'shared-id', withdrawn: true }; } },
+      { markDecisionAnswered: () => { markCalled = true; return { success: true }; } }
+    );
+    const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionId: 'shared-id' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(markCalled, false, 'Keep must never stamp decision-answer');
   });
 });
 

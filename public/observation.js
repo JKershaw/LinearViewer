@@ -102,6 +102,24 @@ function rulingKey(urlKey, decisionId) {
   return `${urlKey}::${decisionId}`;
 }
 const rulingsPending = new Set();          // rulingKey → currently mid-reply (disables its buttons)
+// A key moves here the instant its Agree succeeds (review F2 — the plan's own
+// Phase 5 wording: "on success the Agree path marks the key in a small
+// `rulingsSettled` Set"). Needed even for the single-row press, not only a
+// future bulk batch: a succeeded loop-backed row is served from the stale
+// feed cache for TTL + two reads, so it keeps appearing in the payload with
+// `suggestedDismissal` still set. Without this, the next 5s poll rebuilds the
+// row FULLY RE-ARMED (renderRulingRow renders fresh, enabled controls), and a
+// second press re-POSTs — `markDecisionAnswered`'s unconditional `$push` has
+// no idempotence guard on that branch, so this stamps TWO `decision-answer`
+// entries on one decision. `rulingsSettled` is OR-ed into `renderRulings`'
+// `mustReuse` below so such a row is REUSED with its controls still disabled
+// rather than rebuilt re-armed, and it is released once the key is absent
+// from a poll's actual payload (the row has finally left the feed for real).
+// Deliberately its OWN Set — not `preservedRulingRows` (purpose-built for
+// partial-failure retry state) and not a second dismiss/answer-state
+// mutation (Agree still runs the one existing dismiss path; nothing about
+// answer state changes here).
+const rulingsSettled = new Set();
 const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across a poll's repaint (partial-failure retry state)
 // rulingKey → the <li> currently attached to #obs-rulings for it (LIN-1728
 // review F3). Populated on every renderRulings pass and consulted whenever a
@@ -1559,12 +1577,24 @@ function renderRulings(rulings) {
     const decisionId = row?.decision?.decision_id;
     const urlKey = row?.anchor?.workspaceUrlKey;
     const key = (decisionId && urlKey) ? rulingKey(urlKey, decisionId) : null;
-    const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key));
+    const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key));
     const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
     nodes.push(li);
     if (key) { seen.add(key); renderedRulingRows.set(key, li); }
   }
+
+  // Release a settled key (review F2) the moment its row is absent from THIS
+  // poll's actual payload — checked against `seen` here, BEFORE the
+  // preserved/pending re-add loops below re-inject stale nodes for their own,
+  // unrelated reasons, so a settled row that has genuinely left the feed
+  // (task-bound: next poll; loop-backed: once the stale cache catches up)
+  // stops being force-reused. A later re-suggestion on the same key then
+  // starts fully re-armed rather than permanently disabled.
+  for (const key of Array.from(rulingsSettled)) {
+    if (!seen.has(key)) rulingsSettled.delete(key);
+  }
+
   // A preserved or still-pending row whose decision already dropped out of
   // this poll's payload (the stamp landed server-side, or the payload just
   // hasn't caught up yet) still shows once more — dropping it here would be
@@ -1726,6 +1756,37 @@ function renderRulingRow(row) {
     li.appendChild(cost);
   }
 
+  // Proposed-dismissal banner (LIN-2444 Phase 2). `null` covers both "never
+  // suggested" and "withdrawn" — the server's `!withdrawn` filter already
+  // collapses those (routes/dashboard.js), so no distinction is drawn here.
+  // Renders above the canReply branch entirely, so it appears on a mid-turn
+  // (non-canReply) row too — a suggestion can be made on a row nobody can
+  // yet answer. textContent throughout, matching the .obs-ruling-cost/
+  // .obs-ruling-question convention just above rather than a hand-rolled
+  // escape.
+  if (row.suggestedDismissal) {
+    const suggestion = row.suggestedDismissal;
+    const banner = document.createElement('div');
+    banner.className = 'obs-ruling-suggestion';
+
+    const label = document.createElement('p');
+    label.className = 'obs-ruling-suggestion-label';
+    label.textContent = 'proposed dismissal';
+    banner.appendChild(label);
+
+    const reason = document.createElement('p');
+    reason.className = 'obs-ruling-suggestion-reason';
+    reason.textContent = suggestion.reason;
+    banner.appendChild(reason);
+
+    const meta = document.createElement('p');
+    meta.className = 'obs-ruling-suggestion-meta';
+    meta.textContent = `— ${suggestion.suggestedBy}, ${relativeTime(suggestion.suggestedAt)}`;
+    banner.appendChild(meta);
+
+    li.appendChild(banner);
+  }
+
   window.ChatUI.appendOptions(li, {
     options: decision?.options,
     recommended: decision?.recommended,
@@ -1772,12 +1833,14 @@ function renderRulingRow(row) {
     actions.appendChild(sendBtn);
     actions.appendChild(makeDismissButton(row, li));
     actions.appendChild(makeShelveButton(row, li));
+    appendSuggestionActions(actions, row, li);
     composer.appendChild(actions);
   } else {
     const actions = document.createElement('div');
     actions.className = 'obs-ruling-answer-actions chat-composer__actions';
     actions.appendChild(makeDismissButton(row, li));
     actions.appendChild(makeShelveButton(row, li));
+    appendSuggestionActions(actions, row, li);
     composer.appendChild(actions);
   }
 
@@ -1935,31 +1998,56 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
   });
 }
 
-// The set of controls a pending reply/dismiss/shelve must disable — every
-// interactive element the row can carry, not just `.chat-option-btn`, so a
-// free-text send, a dismiss, or a shelve in flight can't be double-fired by
-// the OTHER control on the same row either.
+// The set of controls a pending reply/dismiss/shelve/agree/keep must disable
+// — every interactive element the row can carry, not just `.chat-option-btn`,
+// so any one of them in flight can't be double-fired by the OTHER control on
+// the same row either. Agree/Keep were added in LIN-2444 Phase 4 — omitting
+// them left a real double-fire hole (an in-flight Agree leaves both new
+// buttons live, and Agree drives the same unconditional-`$push` dismiss
+// stamp `markDecisionAnswered` writes, which has no idempotence guard of its
+// own on the loop-backed branch).
 function rulingRowControls(li) {
-  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve');
+  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep');
+}
+
+// The actual dismiss request (LIN-2444 Phase 3, extracted from the body
+// `dismissRulingRow` used to build inline). This is the ONLY dismiss path —
+// Agree below reuses it verbatim rather than forking a second one, per the
+// ticket's central constraint (no proxy-token dismiss, no new discharge
+// route). Branches on anchor shape exactly like `deliverRulingReply`'s own
+// disposition branches, but only two-way: a task-bound row reuses the
+// EXISTING scan dismiss route/outcome (LIN-2211/LIN-2197 Phase 4, projecting
+// `anchor.taskDecisionId`/`anchor.issueId` per LIN-2704) verbatim, while a
+// loop-backed row (every other disposition) hits the rulings dismiss route
+// (routes/dashboard.js), which tags the same decision-answer stamp
+// `outcome: 'dismissed'`. Neither path posts a comment. Returns the pending
+// request promise; the caller owns the pending-guard/restore/feedback wiring.
+function issueDismissRequest(anchor, decisionId) {
+  const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
+  return isTaskBound
+    ? window.api(`/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        on401: false,
+        body: JSON.stringify({ id: anchor.taskDecisionId })
+      })
+    : window.api(`/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/dashboard/rulings/dismiss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        on401: false,
+        body: JSON.stringify({ decisionLoopId: anchor.loopId, decisionId })
+      });
 }
 
 // Dismiss (LIN-2225): the row's other exit, independent of `canReply` — a
 // mid-turn/indeterminate ruling that cannot be replied to can still be
-// dismissed. Branches on anchor shape exactly like `deliverRulingReply`'s own
-// disposition branches, but only two-way: a task-bound row reuses the
-// EXISTING scan dismiss route/outcome (LIN-2211/LIN-2197 Phase 4) verbatim —
-// no dismiss logic is duplicated, per the ticket's own constraint — while a
-// loop-backed row (every other disposition) hits the new rulings dismiss
-// route (routes/dashboard.js), which tags the same decision-answer stamp
-// `outcome: 'dismissed'`. Neither path posts a comment; dismiss is
-// deliberately silent, unlike an answer.
+// dismissed. Dismiss is deliberately silent, unlike an answer.
 function dismissRulingRow(row, li) {
   const { decision, anchor } = row || {};
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
   const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
-  const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
   if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return;
 
   rulingsPending.add(key);
@@ -1978,21 +2066,7 @@ function dismissRulingRow(row, li) {
   };
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-  const req = isTaskBound
-    ? window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        on401: false,
-        body: JSON.stringify({ id: anchor.taskDecisionId })
-      })
-    : window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/dashboard/rulings/dismiss`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        on401: false,
-        body: JSON.stringify({ decisionLoopId: anchor.loopId, decisionId })
-      });
-
-  req.then(() => {
+  issueDismissRequest(anchor, decisionId).then(() => {
     restore();
     setFeedback('dismissed', false);
     pollRulings();
@@ -2002,6 +2076,136 @@ function dismissRulingRow(row, li) {
     restore();
     setFeedback('dismiss failed: ' + err.message, true);
   });
+}
+
+// Agree (LIN-2444 Phase 3) — one-click acceptance of a proposed dismissal.
+// This IS a dismiss (the human accepting the suggestion), so it runs the
+// SAME `issueDismissRequest` core as the Dismiss button above: same
+// loop-backed vs task-bound branch, same `anchor.workspaceUrlKey` target
+// (never the page's own — this feed is cross-workspace), same pending guard.
+// It adds NO new dismiss path; only the label/feedback text differs. Built
+// so a later sequential batch (Group B) can call this per selected row
+// without further surgery — it returns the settling promise so a caller can
+// await it, though this beat wires no such caller yet.
+//
+// Review F2: on SUCCESS this does NOT call a `restore()` that re-enables
+// every control — it marks the key `rulingsSettled` instead, exactly as the
+// plan's own Phase 5 wording requires of "the Agree path", so the row is
+// REUSED with its controls still disabled (via `mustReuse` above) rather
+// than rebuilt re-armed by the next poll. A FAILED attempt still restores
+// (re-enables) so the operator can retry.
+function agreeRulingRow(row, li) {
+  const { decision, anchor } = row || {};
+  const pageUrlKey = observationData?.urlKey;
+  const targetUrlKey = anchor?.workspaceUrlKey;
+  const decisionId = decision?.decision_id;
+  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
+  if (!targetUrlKey || !decisionId || rulingsPending.has(key) || rulingsSettled.has(key)) return Promise.resolve();
+
+  rulingsPending.add(key);
+  const controls = rulingRowControls(li);
+  controls.forEach(el => { el.disabled = true; });
+
+  const feedback = li.querySelector('.obs-ruling-feedback');
+  const setFeedback = (text, isError) => {
+    if (!feedback) return;
+    feedback.textContent = text;
+    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+  };
+  const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
+
+  return issueDismissRequest(anchor, decisionId).then(() => {
+    rulingsPending.delete(key);
+    setFeedback('agreed', false);
+    rulingsSettled.add(key);
+    pollRulings();
+    refreshBadge();
+  }).catch((err) => {
+    console.error('Ruling agree failed:', err);
+    rulingsPending.delete(key);
+    controls.forEach(el => { el.disabled = false; });
+    setFeedback('agree failed: ' + err.message, true);
+  });
+}
+
+// Keep (LIN-2444 Phase 3) — withdraws the standing suggestion via the
+// Phase-1 route. This is NOT a dismiss, shelve, or answer: the ruling stays
+// exactly as unanswered as it was, and only the suggestion stops being
+// offered. No client suppression state and no confirm() — the banner
+// disappears on its own via the server's `!withdrawn` filter on the next
+// poll, and re-suggestion after a Keep is intended (suggest() clears a prior
+// withdrawal), so a dialog here would be friction, not safety.
+function keepRulingRow(row, li) {
+  const { decision, anchor } = row || {};
+  const targetUrlKey = anchor?.workspaceUrlKey;
+  const decisionId = decision?.decision_id;
+  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
+  if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return;
+
+  rulingsPending.add(key);
+  const controls = rulingRowControls(li);
+  controls.forEach(el => { el.disabled = true; });
+
+  const feedback = li.querySelector('.obs-ruling-feedback');
+  const restore = () => {
+    rulingsPending.delete(key);
+    controls.forEach(el => { el.disabled = false; });
+  };
+  const setFeedback = (text, isError) => {
+    if (!feedback) return;
+    feedback.textContent = text;
+    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+  };
+
+  window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/dashboard/rulings/keep`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    on401: false,
+    body: JSON.stringify({ decisionId })
+  }).then(() => {
+    restore();
+    setFeedback('kept', false);
+    pollRulings();
+  }).catch((err) => {
+    restore();
+    // A 404 means no matching suggestion to withdraw — most often the benign
+    // already-withdrawn case (a second tab, or a repaint that raced a poll),
+    // not something the operator needs alarmed about.
+    if (err && err.status === 404) {
+      setFeedback('already withdrawn', false);
+      pollRulings();
+      return;
+    }
+    console.error('Ruling keep failed:', err);
+    setFeedback('keep failed: ' + err.message, true);
+  });
+}
+
+function makeAgreeButton(row, li) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'action-btn obs-ruling-agree';
+  btn.textContent = 'agree';
+  btn.addEventListener('click', () => agreeRulingRow(row, li));
+  return btn;
+}
+
+function makeKeepButton(row, li) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'action-btn obs-ruling-keep';
+  btn.textContent = 'keep';
+  btn.addEventListener('click', () => keepRulingRow(row, li));
+  return btn;
+}
+
+// Agree/Keep render only on a suggested row (LIN-2444 Phase 3), appended
+// into `.obs-ruling-answer-actions` in BOTH the canReply and non-canReply
+// branches, beside the existing dismiss/shelve buttons.
+function appendSuggestionActions(actions, row, li) {
+  if (!row?.suggestedDismissal) return;
+  actions.appendChild(makeAgreeButton(row, li));
+  actions.appendChild(makeKeepButton(row, li));
 }
 
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
@@ -3065,6 +3269,13 @@ if (typeof module !== 'undefined' && module.exports) {
     // test asserts against the SAME composite-key function these structures
     // use, not a hard-coded copy of its `::` separator.
     deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey,
+    // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
+    // Agree), the Agree/Keep handlers themselves, and the widened
+    // control-disable set — each unit-testable without simulating a DOM click.
+    issueDismissRequest, agreeRulingRow, keepRulingRow, rulingRowControls,
+    // Review F2: expose rulingsSettled so the settled-state regression pins
+    // the same seam the fix actually reads/writes.
+    rulingsSettled,
     // LIN-2293 review (F1): the collision has TWO halves — "disables both"
     // (deliverRulingReply/rulingsPending, covered above) and "re-renders
     // both", which lives entirely in renderRulings' reuse lookup against

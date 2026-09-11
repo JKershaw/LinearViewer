@@ -14,6 +14,7 @@
  *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/shelve       — shelve any ruling with a reason + re-surface timer (LIN-1727; view-only, works uniformly for loop-backed and task-bound)
+ *   POST     /workspace/:urlKey/api/dashboard/rulings/keep         — withdraw a proposed dismissal (LIN-2444; view-only — never touches answer state, arms no keepalive)
  *   GET      /workspace/:urlKey/escalation-kpis                    — operator-facing escalation KPI audit page (LIN-1736; rate, time-to-response, false-escalation, unanswered age); ?windowDays= (default 30), ?targetPerDay= (optional)
  *   GET      /workspace/:urlKey/api/escalation-kpis                — the same KPIs as JSON
  *   GET      /workspace/:urlKey/effort-readout                     — operator-facing per-kind effort x cost x duration x survived-the-next-gate read-out (LIN-2641); URL-only, unflagged and unlinked
@@ -1616,6 +1617,36 @@ export function createDashboardRoutes({
     } catch (error) {
       console.error('Ruling shelve error:', error);
       jsonError(res, 500, 'Failed to shelve ruling');
+    }
+  });
+
+  // ─── Keep a ruling — withdraw a proposed dismissal (LIN-2444) ───────────────
+  //
+  // A proxy token may PROPOSE a dismissal but never perform one; "Keep" is the
+  // human declining that proposal. Like shelve, this is a VIEW operation only
+  // — it never touches the underlying loop/task-decision row, so it needs no
+  // anchor/disposition branching and, unlike a dismiss/answer route, must NOT
+  // arm keepalive (verified: neither sibling write route above arms it either).
+  // `withdraw()` is already idempotent (a second Keep returns the existing
+  // withdrawn record unchanged), so no idempotence handling is needed here.
+  router.post('/workspace/:urlKey/api/dashboard/rulings/keep', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { decisionId } = req.body || {};
+    if (typeof decisionId !== 'string' || !decisionId) {
+      return jsonError(res, 400, 'decisionId is required');
+    }
+    if (!dismissalSuggestionsStore) {
+      return jsonError(res, 503, 'Dismissal-suggestions store not configured');
+    }
+    try {
+      const record = await dismissalSuggestionsStore.withdraw({ urlKey: workspace.urlKey, decisionId });
+      if (!record) {
+        return jsonError(res, 404, 'No matching suggestion to keep');
+      }
+      res.json({ success: true, suggestion: record });
+    } catch (error) {
+      console.error('Ruling keep error:', error);
+      jsonError(res, 500, 'Failed to keep ruling');
     }
   });
 

@@ -312,6 +312,44 @@
 .obs-ruling-feedback:empty { display: none; }
 .obs-ruling-feedback--error { color: var(--red); }
 
+/* Proposed-dismissal banner (LIN-2444 Phase 2) — a suggestion someone else
+   made, distinct from the ruling's own content, so it gets its own callout
+   rather than reusing .obs-ruling-cost's plain italic line. Base rules here
+   ARE the phone-width form (mobile-first, per this file's own convention —
+   the one width query below is a desktop enhancement, not a rewrite); the
+   reason wraps rather than clips, since it is the full argument being agreed
+   to, never a truncated excerpt like .obs-ruling-case above. Own names per
+   the plan (LIN-2711's ruleless bulk-scan classes are not reused here). */
+.obs-ruling-suggestion {
+  margin: 0.4rem 0;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brand) 6%, var(--card));
+}
+.obs-ruling-suggestion-label {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+  margin: 0 0 0.2rem;
+}
+.obs-ruling-suggestion-reason {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--text);
+  margin: 0 0 0.25rem;
+  overflow-wrap: break-word;
+}
+.obs-ruling-suggestion-meta {
+  font-family: var(--font-structural);
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin: 0;
+}
+
 /* Free-text answer + dismiss (LIN-2225). Mirrors .sess-inline-reply-input /
    .sess-inline-reply-actions (session.css) — same textarea + action-row shape,
    scoped to a ruling row instead of a run card. */
@@ -363,6 +401,37 @@
 }
 .obs-ruling-shelve:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
 .obs-ruling-shelve:disabled { opacity: 0.5; cursor: default; }
+
+/* Agree/Keep (LIN-2444 Phase 3/4) — same base/hover/disabled triplet as
+   dismiss/shelve above. Agree is green-toned like .obs-ruling-answer-send
+   (it IS a dismiss, just of the accepted-suggestion kind); Keep is neutral,
+   matching .obs-ruling-dismiss's weight rather than shelve's amber (Keep
+   discards a proposal, it does not raise or defer anything). Both append
+   into the existing .obs-ruling-answer-actions flex row, so no new layout
+   is needed at any width. */
+.obs-ruling-agree {
+  color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.obs-ruling-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
+.obs-ruling-agree:disabled { opacity: 0.5; cursor: default; }
+
+.obs-ruling-keep {
+  color: var(--fg-dim);
+  background: color-mix(in srgb, var(--fg-dim) 10%, transparent);
+}
+.obs-ruling-keep:hover { background: color-mix(in srgb, var(--fg-dim) 20%, transparent); }
+.obs-ruling-keep:disabled { opacity: 0.5; cursor: default; }
+
+/* Same 44px-ladder tap-target bump `.detail-toggle` gets at this breakpoint
+   (public/style.css:1315-1319) — scoped to just these two new buttons; the
+   pre-existing dismiss/shelve buttons are untouched, out of this phase. */
+@media (max-width: 640px) {
+  .obs-ruling-agree,
+  .obs-ruling-keep {
+    padding: 0.5rem 0.7rem;
+  }
+}
 
 .obs-ruling-shelve-panel {
   display: flex;
