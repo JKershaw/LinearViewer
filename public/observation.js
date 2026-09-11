@@ -85,21 +85,62 @@ let currentView = 'autopilot';
 // above — a ruling row has no stable per-poll identity worth diffing against
 // (unlike a session, which persists across polls), so the rulings feed is
 // simply repainted wholesale on every poll, keyed by rulingKey(urlKey,
-// decision_id) for the in-flight "reply pending" guard below.
+// anchor, decision_id) for the in-flight "reply pending" guard below.
 //
 // LIN-2293: `decision_id` is short free text an agent invents (simple-
 // dispatcher/hook.js), not a UUID, and this feed is cross-workspace by
 // design (routes/dashboard.js merges every req.session.workspaces) — so two
 // cards from DIFFERENT workspaces sharing a decision_id would otherwise
 // collide in every structure below (acting on one disables/re-renders both).
-// `rulingKey` composes the same `${urlKey}::${decisionId}` shape the server
-// side already uses (lib/unanswered-decisions.js's shelfGate,
-// lib/shelved-rulings-store.js's own `_id`) so client and server keys can't
-// drift apart. Each row's `anchor.workspaceUrlKey` (never the viewing page's
-// own urlKey — see the deliverRulingReply cross-workspace-targeting note
-// below) supplies the workspace half.
-function rulingKey(urlKey, decisionId) {
-  return `${urlKey}::${decisionId}`;
+// Each row's `anchor.workspaceUrlKey` (never the viewing page's own urlKey —
+// see the deliverRulingReply cross-workspace-targeting note below) supplies
+// the workspace segment.
+//
+// LIN-2756: `decision_id` is not unique within one workspace either — an
+// agent session that re-emits the same `DECISION:` block from two different
+// loops (a review pass and a close-out pass, say) produces two loops sharing
+// one `decision_id`. `rulingKey` therefore also threads the ANCHOR through
+// (never just a resolved loop-id string — the anchor is the one thing every
+// call site already has in scope, and passing it keeps the loopId-vs-
+// taskDecisionId resolution in exactly one place rather than re-deriving it
+// at each of the ~7 call sites) and folds in whichever of
+// `anchor.loopId`/`anchor.taskDecisionId` is live for that row — a loop-
+// backed row always carries the former, a task-bound row (LIN-2197 Phase 3,
+// no dispatch item behind it) always carries the latter, by construction in
+// `lib/unanswered-decisions.js`'s two row-producing branches (`collect
+// UnansweredDecisions`'s loop branch always sets `loopId`; `taskDecisionAnchor`
+// always sets `loopId: null` and a `taskDecisionId`). The two are never both
+// present and — the deliberate edge case — can both be ABSENT: a task-decision
+// row whose store `entry.id` is falsy has `taskDecisionId: null` too
+// (`taskDecisionAnchor`'s `entry.id || null`). Rather than let a null middle
+// segment recreate the exact same-key collision this ticket exists to fix
+// (in a narrower, pathological case), `rulingKey` refuses to compose a key at
+// all when that segment is missing — returning `null`, the same "no safe key"
+// signal every call site's pre-existing `urlKey`/`decisionId` guard already
+// uses, so an anchor-less row degrades to "always rebuilt, never
+// selectable/reusable" rather than silently colliding with anything.
+//
+// The server side (lib/unanswered-decisions.js's shelfGate,
+// lib/dismissal-suggestions-store.js's attachStandingSuggestions/withdraw,
+// lib/shelved-rulings-store.js's own `_id`) keys on the SAME triple, with a
+// deliberate two-tier fallback: a loop-scoped suggest/shelve/keep addresses
+// exactly this row's `${urlKey}::${loopKey}::${decisionId}` document, while a
+// `decisionLoopId`-omitted write keeps the legacy, workspace-wide
+// `${urlKey}::${decisionId}` shape — documented back-compat for suggestion/
+// shelf documents written before this ticket, or by a caller that hasn't
+// upgraded (e.g. routes/proxy-rulings.js's decisionLoopId-optional
+// suggest-dismissal route). A legacy document therefore still fans out to
+// every loop sharing that decisionId, and `withdraw()` shares the SAME
+// standing-first precedence rule as `attachStandingSuggestions`
+// (`pickStandingDoc`, LIN-2766 then re-review F3) so a Keep on any one of
+// those rows actually finds and withdraws whichever document the banner it
+// was pressed on actually displayed — never 404ing against a loop-scoped
+// `_id` no document was ever written under, and never silently targeting an
+// already-withdrawn scoped document while a standing legacy one persists.
+function rulingKey(urlKey, anchor, decisionId) {
+  const loopKey = anchor?.loopId ?? anchor?.taskDecisionId;
+  if (!urlKey || !loopKey || !decisionId) return null;
+  return `${urlKey}::${loopKey}::${decisionId}`;
 }
 const rulingsPending = new Set();          // rulingKey → currently mid-reply (disables its buttons)
 const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across a poll's repaint (partial-failure retry state)
@@ -114,7 +155,7 @@ const renderedRulingRows = new Map();
 
 // ─── Bulk-agree selection (LIN-2444 Phase 5) ────────────────────────────────
 //
-// `rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, decisionId)` —
+// `rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, anchor, decisionId)` —
 // mirrors the established `dueSelectedIds` discipline (below) for the SAME
 // reason: `renderRulings` rebuilds/reuses each <li> every 5s poll, so
 // checkbox DOM state can never be the source of truth, only a reflection of
@@ -1594,7 +1635,7 @@ function renderRulings(rulings) {
   for (const row of rulings) {
     const decisionId = row?.decision?.decision_id;
     const urlKey = row?.anchor?.workspaceUrlKey;
-    const key = (decisionId && urlKey) ? rulingKey(urlKey, decisionId) : null;
+    const key = rulingKey(urlKey, row?.anchor, decisionId);
     const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key));
     const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
@@ -1817,9 +1858,7 @@ function renderRulingRow(row) {
     // pass hasn't caught it.
     const suggestionHead = document.createElement('div');
     suggestionHead.className = 'obs-ruling-suggestion-head';
-    const selectionKey = (decision?.decision_id && anchor?.workspaceUrlKey)
-      ? rulingKey(anchor.workspaceUrlKey, decision.decision_id)
-      : null;
+    const selectionKey = rulingKey(anchor?.workspaceUrlKey, anchor, decision?.decision_id);
     if (selectionKey) {
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -2025,8 +2064,8 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
-  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
-  if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return;
+  const key = rulingKey(targetUrlKey, anchor, decisionId);
+  if (!key || rulingsPending.has(key)) return;
 
   rulingsPending.add(key);
   const controls = rulingRowControls(li);
@@ -2048,7 +2087,14 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     on401: false,
-    body: JSON.stringify({ decisionId, reason, resurfaceInMs })
+    // LIN-2756: same field/value the dismiss path already sends
+    // (`issueDismissRequest`'s `decisionLoopId: anchor.loopId`) — reused
+    // here, not forked, so the shelf store's composite key can agree with
+    // the client's own `rulingKey`. Optional server-side, so an anchor that
+    // somehow lost its loopId between render and click (should not happen —
+    // `key` above already refused a null-anchor row) still shelves under
+    // the wider, documented legacy shape rather than failing outright.
+    body: JSON.stringify({ decisionId, decisionLoopId: anchor?.loopId ?? anchor?.taskDecisionId, reason, resurfaceInMs })
   }).then(() => {
     restore();
     const panel = li.querySelector('.obs-ruling-shelve-panel');
@@ -2125,8 +2171,8 @@ function dismissRulingRow(row, li) {
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
-  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
-  if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return;
+  const key = rulingKey(targetUrlKey, anchor, decisionId);
+  if (!key || rulingsPending.has(key)) return;
 
   rulingsPending.add(key);
   const controls = rulingRowControls(li);
@@ -2182,8 +2228,8 @@ function agreeRulingRow(row, li) {
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
-  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
-  if (!targetUrlKey || !decisionId || rulingsPending.has(key) || rulingsSettled.has(key)) return Promise.resolve();
+  const key = rulingKey(targetUrlKey, anchor, decisionId);
+  if (!key || rulingsPending.has(key) || rulingsSettled.has(key)) return Promise.resolve();
 
   rulingsPending.add(key);
   const controls = rulingRowControls(li);
@@ -2229,8 +2275,8 @@ function keepRulingRow(row, li) {
   const { decision, anchor } = row || {};
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
-  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
-  if (!targetUrlKey || !decisionId || rulingsPending.has(key)) return;
+  const key = rulingKey(targetUrlKey, anchor, decisionId);
+  if (!key || rulingsPending.has(key)) return;
 
   rulingsPending.add(key);
   const controls = rulingRowControls(li);
@@ -2251,7 +2297,10 @@ function keepRulingRow(row, li) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     on401: false,
-    body: JSON.stringify({ decisionId })
+    // LIN-2756: must match whatever the standing suggestion was proposed
+    // with (present or omitted) — a Keep addresses the SAME composite id a
+    // suggest() call would have. See shelveRulingRow's own note just above.
+    body: JSON.stringify({ decisionId, decisionLoopId: anchor?.loopId ?? anchor?.taskDecisionId })
   }).then(() => {
     restore();
     setFeedback('kept', false);
@@ -2511,7 +2560,7 @@ function deliverRulingReply(row, prompt, li) {
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
-  const key = (targetUrlKey && decisionId) ? rulingKey(targetUrlKey, decisionId) : null;
+  const key = rulingKey(targetUrlKey, anchor, decisionId);
   const decisionLoopId = anchor?.loopId;
   const feedback = li.querySelector('.obs-ruling-feedback');
   // A task-bound row (LIN-2197 Phase 3) has no dispatch item behind it, so
@@ -2520,7 +2569,7 @@ function deliverRulingReply(row, prompt, li) {
   // option press on that row would hit this guard and return silently: no
   // comment, no dispatch, no feedback text, buttons left enabled (LIN-2215 F1,
   // a regression in kind on LIN-1728's G1, which at least said so out loud).
-  if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || rulingsPending.has(key)) return;
+  if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || !key || rulingsPending.has(key)) return;
 
   rulingsPending.add(key);
   const buttons = rulingRowControls(li);

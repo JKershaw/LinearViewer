@@ -33,6 +33,7 @@ import { Router } from 'express';
 import { badRequest, jsonError } from '../lib/errors.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
+import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
 import { enrichLoop } from './dashboard.js';
 
 const MAX_REASON_LENGTH = 500;
@@ -143,27 +144,12 @@ export function createRulingsRoutes({
         dismissalSuggestionsStore ? dismissalSuggestionsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
       ]);
 
-      // Attach any STANDING proposal to its ruling. A withdrawn row is not
-      // standing — the human already said Keep — so it is excluded here rather
-      // than in the store, which deliberately returns raw rows so exactly one
-      // place owns this predicate.
-      const standing = new Map();
-      for (const s of suggestions) {
-        if (!s.withdrawn && s.decisionId) standing.set(s.decisionId, s);
-      }
-
+      // LIN-2756: loop-aware join, shared with routes/dashboard.js's own GET
+      // — see attachStandingSuggestions' own doc for the two-tier match.
       logEvent(req, '/api/proxy/rulings', 200);
       res.json({
         count: rulings.length,
-        rulings: rulings.map(row => {
-          const suggestion = standing.get(row.decision?.decision_id) || null;
-          return {
-            ...row,
-            suggestedDismissal: suggestion
-              ? { reason: suggestion.reason, suggestedBy: suggestion.suggestedBy, suggestedAt: suggestion.suggestedAt }
-              : null
-          };
-        }),
+        rulings: attachStandingSuggestions(rulings, suggestions),
         generatedAt: new Date().toISOString()
       });
     } catch (error) {
@@ -191,11 +177,22 @@ export function createRulingsRoutes({
     requireWriteScope,
     async (req, res) => {
       const { decisionId } = req.params;
-      const { reason } = req.body || {};
+      const { reason, decisionLoopId } = req.body || {};
 
       if (!decisionId || typeof decisionId !== 'string') {
         logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
         return badRequest.json(res, 'decisionId is required');
+      }
+      // LIN-2756: OPTIONAL, unlike routes/dashboard.js's dismiss route
+      // (which requires it) — the ticket's back-compat clause is specifically
+      // "keep a decisionId-only write working as applies to every loop
+      // carrying that id", and this route is where that write actually
+      // happens (an agent proposing via the proxy API). Type-checked exactly
+      // like dashboard.js's dismiss validation when PRESENT; its ABSENCE is
+      // the documented wide/legacy shape, not an error.
+      if (decisionLoopId !== undefined && (typeof decisionLoopId !== 'string' || !decisionLoopId)) {
+        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
+        return badRequest.json(res, 'decisionLoopId, when given, must be a non-empty string');
       }
       if (typeof reason !== 'string' || !reason.trim()) {
         logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
@@ -218,12 +215,31 @@ export function createRulingsRoutes({
         // unbounded orphan rows from any readWrite token. It reuses the GET's
         // own cached loop read, so the check costs a collection pass, not a
         // second reconstruction.
+        //
+        // LIN-2756: when decisionLoopId is given, the SAME orphan-row concern
+        // applies to it — a caller passing a decisionLoopId that names no
+        // real row's anchor would write a suggestion that can never match
+        // anything (attachStandingSuggestions' loop-scoped lookup would never
+        // find it), silently. Matched against `anchor.loopId ??
+        // anchor.taskDecisionId`, exactly the segment the composite key uses.
         const rulings = await readRulings(req.proxyUrlKey);
         if (!rulings.some(row => row.decision?.decision_id === decisionId)) {
           logEvent(req, '/api/proxy/rulings/suggest-dismissal', 404);
           return jsonError(res, 404, 'No unanswered ruling with that decisionId in this workspace', {
             code: 'RULING_NOT_FOUND'
           });
+        }
+        if (decisionLoopId) {
+          const targetsThisLoop = rulings.some(row =>
+            row.decision?.decision_id === decisionId
+            && (row.anchor?.loopId ?? row.anchor?.taskDecisionId) === decisionLoopId
+          );
+          if (!targetsThisLoop) {
+            logEvent(req, '/api/proxy/rulings/suggest-dismissal', 404);
+            return jsonError(res, 404, 'No unanswered ruling with that decisionId AND decisionLoopId in this workspace', {
+              code: 'RULING_NOT_FOUND'
+            });
+          }
         }
 
         // Attribution comes from the TOKEN, never from the request body — a
@@ -234,6 +250,7 @@ export function createRulingsRoutes({
         const record = await dismissalSuggestionsStore.suggest({
           urlKey: req.proxyUrlKey,
           decisionId,
+          decisionLoopId: decisionLoopId || undefined,
           reason,
           suggestedBy
         });
