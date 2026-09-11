@@ -1143,3 +1143,121 @@ test.describe('Decisions as option buttons (LIN-2621 beat 4)', () => {
     await expect(card.locator('.chat-options-row')).toHaveCount(0);
   });
 });
+
+// LIN-2716: before this landed, a page reload threw the conversation away —
+// chatHistory lived only in a browser-memory array, never written to
+// sessionStorage. These are the ticket's own headline acceptance criteria,
+// written RED-FIRST against the unfixed client in beat 2 (verbatim red
+// output posted as a Linear comment on LIN-2716) and made to pass by beat
+// 3's production change (public/flight-companion.js's sessionStorageKey/
+// loadStoredSession/saveStoredSession/clearStoredSession + the finishTurn/
+// reorientClick/rehydrate-on-load wiring).
+test.describe('LIN-2716: reload persists and resumes the session', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockTurn(page);
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('send a turn, reload: the thread is visible AND the next turn\'s body.history includes the prior exchange', async ({ page }) => {
+    await mockTurn(page, { token: 'ack' });
+    await page.locator('#flight-companion-question').fill('are you there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Half 1 (the ticket's own wording): "the thread is visible" — both the
+    // prior user line and the prior companion reply, not just a truthy
+    // thread element.
+    await expect(page.locator('#flight-companion-thread')).toBeVisible();
+    await expect(page.locator('#flight-companion-chat-empty')).toBeHidden();
+    await expect(page.locator('.fc-msg-body').first()).toHaveText('are you there?');
+    await expect(page.locator('.fc-msg-body').nth(1)).toHaveText('ack');
+
+    // Half 2 (the ticket's own wording): "the next turn's body.history
+    // includes the prior exchange" — captured via a route intercept (needs
+    // the REQUEST body, which mockTurn's fulfil-only helper doesn't expose).
+    // Playwright runs the most-recently-registered handler for a matching
+    // pattern first, so this takes over from beforeEach's/the line above's
+    // mockTurn registrations without needing to unroute them.
+    let capturedBody = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      capturedBody = JSON.parse(route.request().postData());
+      const frames = renderSSEFrames([['token', { token: 'still here' }], ['done', {}]]);
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
+    });
+    await page.locator('#flight-companion-question').fill('still there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-body').nth(3)).toHaveText('still here');
+
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody.history).toEqual([
+      { role: 'user', content: 'are you there?' },
+      { role: 'assistant', content: 'ack' },
+    ]);
+  });
+
+  // LIN-2716's original acceptance bullet here was "reorient clears the
+  // stored session" — withdrawn by John's ruling on LIN-2770: reorient is
+  // NOT a fresh start (LIN-2622's boot turn already carries the prior
+  // exchange on the wire), so clearing storage on reorient was wrong on its
+  // own premise. The review that filed LIN-2770 found the clear "undid
+  // itself" one turn later anyway (the next ordinary turn re-saved the whole
+  // pre-reorient chatHistory), which is what made the withdrawn behaviour
+  // incoherent rather than merely conservative.
+  //
+  // This regression instead pins the CORRECTED behaviour end to end, and is
+  // written to be genuinely red against the withdrawn "clear on reorient"
+  // code: reloading immediately after reorient — before any further turn —
+  // is exactly the window where the old code had already cleared storage
+  // but the new code has not touched it. (Reloading only AFTER a further
+  // turn would pass either way, since that later turn's own save
+  // re-populates storage regardless of what reorient did — that ordering
+  // cannot distinguish the two behaviours, which is why the reload sits
+  // directly after reorient here, not after a follow-up turn.)
+  test('reorient does not clear the stored session: a reload right after reorient keeps the continuing conversation, and the next turn carries it forward', async ({ page }) => {
+    await mockTurn(page, { token: 'ack' });
+    await page.locator('#flight-companion-question').fill('are you there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+
+    await mockTurn(page, { endpoint: 'boot', token: 'orienting fresh' });
+    await page.locator('#flight-companion-reorient').click();
+    await expect(page.locator('.fc-msg-who').last()).toHaveClass(/status-pill--done/);
+
+    // Reload with NO further turn sent — under the withdrawn behaviour this
+    // is where storage was already cleared, so the thread would come back
+    // empty even though reorient was never meant to be a fresh start.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#flight-companion-thread')).toBeVisible();
+    await expect(page.locator('#flight-companion-chat-empty')).toBeHidden();
+    await expect(page.locator('.fc-msg-body').first()).toHaveText('are you there?');
+    await expect(page.locator('.fc-msg-body').nth(1)).toHaveText('ack');
+
+    // Continue with a later turn post-reload: the next turn's body.history
+    // must carry the pre-reorient exchange forward too, not just the
+    // visible thread — this is the "next-turn history" half of the ticket's
+    // corrected acceptance.
+    let capturedBody = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      capturedBody = JSON.parse(route.request().postData());
+      const frames = renderSSEFrames([['token', { token: 'still here' }], ['done', {}]]);
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
+    });
+    await page.locator('#flight-companion-question').fill('still there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-body').last()).toHaveText('still here');
+
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody.history).toEqual([
+      { role: 'user', content: 'are you there?' },
+      { role: 'assistant', content: 'ack' },
+    ]);
+  });
+});
