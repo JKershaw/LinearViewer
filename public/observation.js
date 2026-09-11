@@ -120,15 +120,20 @@ let currentView = 'autopilot';
 // uses, so an anchor-less row degrades to "always rebuilt, never
 // selectable/reusable" rather than silently colliding with anything.
 //
-// NOTE — this key is now WIDER than the server-side composite
-// (`${urlKey}::${decisionId}`, still lib/unanswered-decisions.js's shelfGate
-// and lib/shelved-rulings-store.js's own `_id` as of this commit): client and
-// server identity intentionally diverge for this one beat. The server-side
-// widening (keying suggestion/shelf documents by the same triple) is LIN-2756
-// beat 4 — until it lands, a suggest/shelve write still addresses a
-// `(urlKey, decisionId)` document, so it is still visible to every loop
-// sharing that decisionId even though the CLIENT now tracks each loop's row
-// independently.
+// The server side (lib/unanswered-decisions.js's shelfGate,
+// lib/dismissal-suggestions-store.js's attachStandingSuggestions/withdraw,
+// lib/shelved-rulings-store.js's own `_id`) keys on the SAME triple, with a
+// deliberate two-tier fallback: a loop-scoped suggest/shelve/keep addresses
+// exactly this row's `${urlKey}::${loopKey}::${decisionId}` document, while a
+// `decisionLoopId`-omitted write keeps the legacy, workspace-wide
+// `${urlKey}::${decisionId}` shape — documented back-compat for suggestion/
+// shelf documents written before this ticket, or by a caller that hasn't
+// upgraded (e.g. routes/proxy-rulings.js's decisionLoopId-optional
+// suggest-dismissal route). A legacy document therefore still fans out to
+// every loop sharing that decisionId, and `withdraw()` mirrors the same
+// two-tier lookup (LIN-2766) so a Keep on any one of those rows actually
+// finds and withdraws it, rather than 404ing against a loop-scoped `_id` no
+// document was ever written under.
 function rulingKey(urlKey, anchor, decisionId) {
   const loopKey = anchor?.loopId ?? anchor?.taskDecisionId;
   if (!urlKey || !loopKey || !decisionId) return null;

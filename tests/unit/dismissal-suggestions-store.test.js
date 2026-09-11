@@ -170,6 +170,31 @@ describe('DismissalSuggestionsStore.withdraw', () => {
     assert.equal(collection._docs.length, 0);
   });
 
+  test('LIN-2766: a decisionLoopId-scoped withdraw falls back to a legacy two-segment doc when no loop-scoped one exists', async () => {
+    // The read side (attachStandingSuggestions/shelfGate) has always fallen
+    // back to the legacy `${urlKey}::${decisionId}` doc for a loop-backed row.
+    // withdraw() composed the loop-scoped `_id` only and returned null on a
+    // miss — a Keep press on a legacy-suggested, loop-backed row 404s.
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', reason: 'stale', suggestedBy: 'agent', now: NOW });
+    const rec = await store.withdraw({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', now: LATER });
+    assert.notEqual(rec, null, 'withdraw must fall back to the legacy doc rather than reporting no match');
+    assert.equal(rec.withdrawn, true);
+    assert.equal(collection._docs.length, 1, 'the legacy row is retained (marked, not deleted), not duplicated');
+    assert.equal(collection._docs[0]._id, 'acme::lin2384-f6-gate', 'the legacy _id is what was actually updated');
+  });
+
+  test('LIN-2766: a loop-scoped withdraw prefers the exact loop-scoped doc over a coexisting legacy one', async () => {
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'legacy', suggestedBy: 'x', now: NOW });
+    await store.suggest({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', reason: 'specific', suggestedBy: 'y', now: NOW });
+
+    await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: LATER });
+
+    const legacy = collection._docs.find(d => d._id === 'acme::d-1');
+    const scoped = collection._docs.find(d => d._id === 'acme::07509b1e::d-1');
+    assert.equal(scoped.withdrawn, true, 'the exact loop-scoped doc is the one withdrawn');
+    assert.equal(legacy.withdrawn, false, 'the legacy doc must not be touched when a loop-scoped doc exists');
+  });
+
   test('withdrawal does not touch any answer state — it only clears the offer', async () => {
     // The structural point of the whole ticket: neither suggest nor withdraw
     // may resemble an answer. This store writes exactly four fields beyond its
@@ -280,6 +305,25 @@ describe('DismissalSuggestionsStore — per-loop identity (LIN-2756)', () => {
     const rec = await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'r', suggestedBy: 'x', now: NOW });
     assert.equal(rec.decisionLoopId, null);
     assert.equal(collection._docs[0]._id, 'acme::d-1');
+  });
+
+  test('LIN-2766: a legacy suggestion attached to a loop-backed row via the read-side fallback is ACTUALLY withdrawn by that row\'s Keep — crossed read/write', async () => {
+    // The ticket's own reproduction: attachStandingSuggestions (read side)
+    // has always fanned a legacy doc out to every loop's row. Before the fix,
+    // withdraw (write side) could not find that same doc via the loop-scoped
+    // id it was pressed with — Keep 404d and the banner returned on the next
+    // poll even though the client reported success.
+    await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', reason: 'stale', suggestedBy: 'agent', now: NOW });
+    const row = { anchor: { workspaceUrlKey: 'acme', loopId: '07509b1e' }, decision: { decision_id: 'lin2384-f6-gate' } };
+
+    const before = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.ok(before[0].suggestedDismissal, 'the legacy suggestion attaches to the loop-backed row (banner renders)');
+
+    const withdrawn = await store.withdraw({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', now: LATER });
+    assert.notEqual(withdrawn, null, 'Keep must not 404 on a legacy-shaped standing suggestion');
+
+    const after = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));
+    assert.equal(after[0].suggestedDismissal, null, 'the banner must be gone — the withdrawal actually took effect, not a false "already withdrawn"');
   });
 });
 

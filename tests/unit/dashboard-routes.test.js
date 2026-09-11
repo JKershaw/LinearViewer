@@ -18,6 +18,7 @@ import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriv
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
+import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -3924,6 +3925,81 @@ describe('POST /api/dashboard/rulings/keep (LIN-2444)', () => {
     await handler(req, res);
     assert.equal(res.statusCode, 200);
     assert.equal(markCalled, false, 'Keep must never stamp decision-answer');
+  });
+});
+
+// ─── Keep against a REAL store, end to end (LIN-2766) ────────────────────────
+//
+// Every other Keep-route test above stubs dismissalSuggestionsStore wholesale,
+// so none of them can exercise the real `_id` composition withdraw() does —
+// which is exactly how PR #1437's regression shipped with CI green: the
+// route's own validation/wiring was covered, and the store's withdraw() was
+// covered in isolation, but never crossed together through the actual route.
+describe('POST /api/dashboard/rulings/keep — real store, crossed with GET rulings (LIN-2766)', () => {
+  function makeMockCollection() {
+    const docs = [];
+    const matches = (doc, query) => (query._id === undefined || doc._id === query._id)
+      && (query.urlKey === undefined || (Array.isArray(query.urlKey?.$in) ? query.urlKey.$in.includes(doc.urlKey) : doc.urlKey === query.urlKey));
+    return {
+      async findOne(query) { return docs.find(d => matches(d, query)) || null; },
+      find(query = {}) { return { async toArray() { return docs.filter(d => matches(d, query)).slice(); } }; },
+      async updateOne(query, update, opts = {}) {
+        const idx = docs.findIndex(d => matches(d, query));
+        if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
+        if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0, upsertedId: update.$set?._id }; }
+        return { matchedCount: 0 };
+      }
+    };
+  }
+
+  const REVIEW_LOOP = '07509b1e';
+  const DECISION_ID = 'lin2384-f6-gate';
+
+  function realStoreRouter(dismissalSuggestionsStore) {
+    const perWorkspace = { 'ws-a': { live: [], history: [decisionItem(REVIEW_LOOP, 'LIN-1', DECISION_ID)], agentStatus: [] } };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] } } }),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      dismissalSuggestionsStore
+    });
+  }
+
+  test('a legacy suggestion that displays on a loop-backed row (GET) is actually withdrawn by pressing Keep on that row (POST) — no false "already withdrawn"', async () => {
+    const store = new DismissalSuggestionsStore({ collection: makeMockCollection() });
+    // A decisionId-only write, exactly like an un-upgraded agent integration
+    // (routes/proxy-rulings.js's decisionLoopId-optional back-compat) or any
+    // suggestion persisted before LIN-2756.
+    await store.suggest({ urlKey: 'ws-a', decisionId: DECISION_ID, reason: 'stale', suggestedBy: 'agent' });
+
+    const router = realStoreRouter(store);
+    const getHandlerFn = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const keepHandlerFn = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+
+    const before = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await getHandlerFn(before.req, before.res);
+    const row = before.res.jsonBody.rulings.find(r => r.decision.decision_id === DECISION_ID);
+    assert.ok(row?.suggestedDismissal, 'the legacy suggestion fans out to the loop-backed row — banner renders');
+
+    const keep = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    keep.req.body = { decisionId: DECISION_ID, decisionLoopId: REVIEW_LOOP };
+    await keepHandlerFn(keep.req, keep.res);
+    assert.equal(keep.res.statusCode, 200, 'Keep must not 404 on a legacy-shaped standing suggestion');
+    assert.equal(keep.res.jsonBody.suggestion.withdrawn, true);
+
+    const after = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await getHandlerFn(after.req, after.res);
+    const rowAfter = after.res.jsonBody.rulings.find(r => r.decision.decision_id === DECISION_ID);
+    assert.equal(rowAfter?.suggestedDismissal, null, 'the banner must actually be gone, not reappear on the next poll');
   });
 });
 
