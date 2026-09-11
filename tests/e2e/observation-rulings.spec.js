@@ -1231,3 +1231,67 @@ test.describe('.nav-actions width at ≤320px with both badges visible (LIN-2191
     expect(bothVisible.pageWidth, `the page grew from ${baseline.pageWidth}px to ${bothVisible.pageWidth}px at a 320px viewport with both badges visible`).toBeLessThanOrEqual(baseline.pageWidth);
   });
 });
+
+// ─── LIN-2754 close-out, ledger L3 — the E2E witness Plan Step 11 names ───
+// Every witness for the Agree-as-answer path shipped as a unit test against a
+// DOM shim. That proves the branch logic; it does not prove an operator can
+// press Agree in a real browser and have the ruling come back ANSWERED.
+// This is that press: a real proposal written through the real
+// `suggest-answer` proxy route (never a fabricated client-side field), a real
+// click, and a read-back of the durable stamp from storage — which is the
+// only place "answered, not dismissed" is actually distinguishable.
+async function suggestAnswer(page, decisionId, { optionId = 'a', urlKey = URL_KEY, reason = 'John ruled this in the relay' } = {}) {
+  const tokenResp = await page.request.get(`/test/create-proxy-token?scope=readWrite&label=suggest&urlKey=${urlKey}`);
+  const { token } = await tokenResp.json();
+  const resp = await page.request.post(`/api/proxy/rulings/${decisionId}/suggest-answer`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: { optionId, reason }
+  });
+  expect(resp.status(), `suggest-answer failed: ${await resp.text()}`).toBe(201);
+}
+
+test.describe('Agree on a PROPOSED ANSWER (LIN-2754 L3) — e2e', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearRuns(page);
+    await page.goto(`/test/clear-dismissal-suggestions?urlKey=${URL_KEY}`);
+  });
+
+  test('a real Agree press answers the ruling with the proposed option — the durable stamp carries option_id and is NOT a dismissal', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    const { workerId } = await seedDecisionWorker(page, {
+      issueIdentifier: 'LIN-2754-ANSWER', issueTitle: 'Relayed ruling', decisionId: 'd-2754-answer', blocked: true
+    });
+    await suggestAnswer(page, 'd-2754-answer', { optionId: 'a' });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2754-ANSWER' });
+    await expect(row).toBeVisible();
+    // The banner must name the PROPOSED ANSWER and its option's own label —
+    // the pre-LIN-2792 UI had no such branch and read "proposed dismissal"
+    // for this exact row.
+    await expect(row).toContainText('proposed answer: Approve');
+
+    await row.locator('.obs-ruling-agree').click();
+
+    // Delivered, not dismissed: the answer branch's own feedback text.
+    await expect(row.locator('.obs-ruling-feedback')).toHaveText('recorded ✓', { timeout: 15000 });
+
+    // The proof that matters, read back from storage rather than from the
+    // page: ONE `decision-answer` stamp, carrying the chosen `option_id`,
+    // with no `outcome: 'dismissed'` anywhere on it.
+    const itemResp = await page.request.get(`/test/dispatch-item?urlKey=${URL_KEY}&itemId=${workerId}`);
+    const { feedback } = await itemResp.json();
+    const stamps = feedback.filter((f) => f.kind === 'decision-answer').map((f) => JSON.parse(f.message));
+    expect(stamps.length, `expected exactly one decision-answer stamp, got ${JSON.stringify(stamps)}`).toBe(1);
+    expect(stamps[0].decision_id).toBe('d-2754-answer');
+    expect(stamps[0].option_id, 'the chosen option must reach the durable stamp — Shape B').toBe('a');
+    expect(stamps[0].outcome, 'an agreed ANSWER must never be stamped as a dismissal').toBeUndefined();
+
+    // And it genuinely clears the operator's inbox — the same SWR cache
+    // budget every other clearing assertion in this file uses.
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2754-ANSWER' })).toHaveCount(0, { timeout: 20000 });
+  });
+});

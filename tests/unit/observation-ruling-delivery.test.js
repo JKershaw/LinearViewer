@@ -3152,3 +3152,257 @@ describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', (
     assert.doesNotMatch(text, /skipped/);
   });
 });
+
+// ─── LIN-2754 close-out, ledger L1 (review finding F1) ────────────────────
+// Plan Step 11 witness 4, delivered as specified this time. The witness that
+// shipped with LIN-2792 used a TASK-BOUND answer row, which routes through
+// `deliverRulingStampOnly` — so no test anywhere drove `deliverRulingReply`
+// with `{bulkAgree: true}`, leaving both of its bulk arms unexercised:
+//
+//   * `onDelivered`'s bulk arm — settle WITHOUT `restore()` (controls stay
+//     disabled), no per-row `pollRulings()`/badge refresh, and
+//   * `makePartialFailureHandler`'s bulk arm — the one that prevents a
+//     DOUBLE-POST: a bulk partial failure must settle and offer a scoped
+//     retry, never fall back to bulk's ordinary "restore and stay selected"
+//     discipline, which would re-post the already-succeeded comment on the
+//     next Agree press.
+//
+// Both rows below are answer proposals on dispositions that actually reach
+// `deliverRulingReply` in bulk (`gone`+`record` and `resumable`); a
+// `gone`+`dispatch` row is skipped by bulk by design, so it cannot serve.
+describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754 L1 / review F1)', () => {
+  function makeBulkReplySandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const sandbox = makeSandbox({
+      api, postComment, dispatchPrompt, deliverReply, confirm,
+      elements: {
+        'obs-rulings': list, 'obs-rulings-empty': empty,
+        'obs-ruling-bulk-bar': new FakeElement('div'),
+        'obs-ruling-select-all': new FakeElement('input'),
+        'obs-ruling-selected-count': new FakeElement('span'),
+        'obs-ruling-agree-selected': new FakeElement('button')
+      }
+    });
+    return { module: sandbox.module, list };
+  }
+
+  // A `gone` row at `effect: 'record'` — branch 3/4's record delivery, which
+  // posts a comment and stops (no dispatch), so the whole batch is
+  // observable through `postComment` alone.
+  function goneRecordAnswerRow(decisionId, loopId) {
+    return answeredRow({
+      decision: { decision_id: decisionId, options: ANSWER_OPTIONS },
+      anchor: { loopId },
+      disposition: 'gone',
+      effect: 'record'
+    });
+  }
+
+  test('two gone+record answer rows settle SEQUENTIALLY — row 2 never starts before row 1 has finished', async () => {
+    const events = [];
+    const { module } = makeBulkReplySandbox({
+      postComment: async (urlKey, targetId, prompt, opts) => {
+        events.push(`start:${opts.decisionId}`);
+        // Yield several times so an interleaved second row would have every
+        // opportunity to start before this one resolves — the assertion
+        // below is a genuine witness against a concurrent (Promise.all)
+        // implementation, not an artefact of a single microtask hop.
+        for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r));
+        events.push(`end:${opts.decisionId}`);
+        return { ok: true, status: 201, data: {} };
+      }
+    });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected, rulingKey, rulingsSelected, rulingsSettled } = module.exports;
+
+    const rowA = goneRecordAnswerRow('d-seq-a', 'loop-seq-a');
+    const rowB = goneRecordAnswerRow('d-seq-b', 'loop-seq-b');
+    renderRulings([rowA, rowB]);
+    setAllRulingsSelected(true);
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(
+      events,
+      ['start:d-seq-a', 'end:d-seq-a', 'start:d-seq-b', 'end:d-seq-b'],
+      'each answer row must run and settle before the next one starts — interleaved starts mean the batch went concurrent'
+    );
+
+    // `onDelivered`'s BULK arm, the half no prior test reached: settled, not
+    // restored. Controls stay disabled, the checkbox is cleared, the key
+    // leaves the selection and enters rulingsSettled.
+    for (const [decisionId, loopId] of [['d-seq-a', 'loop-seq-a'], ['d-seq-b', 'loop-seq-b']]) {
+      const key = rulingKey('the-ruling-workspace', { ...ANCHOR, loopId }, decisionId);
+      const li = module.exports.renderedRulingRows.get(key);
+      assert.ok(li, `expected a rendered row for ${decisionId}`);
+      assert.equal(li.querySelector('.obs-ruling-feedback').textContent, 'recorded ✓', `${decisionId} must read as delivered`);
+      assert.equal(li.querySelector('.obs-ruling-agree')?.disabled, true, `${decisionId}'s controls must NOT be re-enabled by the bulk arm (no restore())`);
+      assert.equal(li.querySelector('.obs-ruling-select')?.checked, false, `${decisionId}'s checkbox must be cleared`);
+      assert.equal(rulingsSelected.has(key), false, `${decisionId} must leave the selection at the moment of success`);
+      assert.ok(rulingsSettled.has(key), `${decisionId} must be marked settled so the stale-cache repaint reuses this exact <li>`);
+    }
+  });
+
+  test('a bulk partial failure SETTLES the row and offers a scoped retry — the comment is never re-posted, by retry or by a second batch', async () => {
+    let commentCalls = 0;
+    let runCalls = 0;
+    let failRun = true;
+    const { module } = makeBulkReplySandbox({
+      // The `resumable` branch delegates to window.ReplyDelivery.deliverReply,
+      // whose real contract is: post the comment, then start the run, and on
+      // a comment-succeeded/run-failed split call onPartialFailure(err,
+      // retryRun) with a retry that re-fires ONLY the run. Modelled here
+      // exactly, so the bulk arm under test sees the real handler shape.
+      deliverReply: async (opts, prompt, handlers) => {
+        commentCalls += 1;
+        runCalls += 1;
+        if (failRun) {
+          handlers.onPartialFailure(new Error('session gone'), async () => {
+            runCalls += 1;
+            if (failRun) throw new Error('still gone');
+          });
+        } else {
+          handlers.onDispatchOk();
+        }
+      }
+    });
+    const {
+      renderRulings, setAllRulingsSelected, bulkAgreeSelected,
+      rulingKey, rulingsSelected, rulingsSettled, rulingsPending, preservedRulingRows
+    } = module.exports;
+
+    const row = answeredRow({
+      decision: { decision_id: 'd-partial', options: ANSWER_OPTIONS },
+      disposition: 'resumable'
+    });
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-partial');
+
+    renderRulings([row]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    assert.equal(commentCalls, 1, 'the comment (the durable half) is posted exactly once');
+
+    // The double-post guard: the durable half already succeeded, so the row
+    // is DONE from the batch's point of view — settled, deselected, pending
+    // released, controls NOT re-enabled. Bulk's ordinary failure discipline
+    // (restore + stay selected) would leave this row eligible for a second
+    // Agree press and re-post the comment.
+    assert.ok(rulingsSettled.has(key), 'a bulk partial failure must mark the row settled — its answer is already durable');
+    assert.equal(rulingsSelected.has(key), false, 'the row must leave the selection');
+    assert.equal(rulingsPending.has(key), false, 'the pending guard must be released');
+    assert.ok(preservedRulingRows.has(key), 'the row must be preserved across the next poll(s) while the retry is outstanding');
+
+    const li = module.exports.renderedRulingRows.get(key);
+    assert.equal(li.querySelector('.obs-ruling-agree')?.disabled, true, 'controls must stay disabled — the bulk arm never calls restore()');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /Recorded\. Could not resume the session/, 'must say the answer was RECORDED — only the run failed');
+
+    const retryBtn = feedback.children.find((c) => c.classList.contains('obs-ruling-retry-delivery'));
+    assert.ok(retryBtn, 'expected a scoped Retry delivery affordance');
+
+    // A second Agree press over the same (now empty) selection must not
+    // touch this row at all — and even if it were still selected,
+    // bulkAgreeRow's own rulingsSettled guard refuses it.
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+    assert.equal(commentCalls, 1, 'a second batch must NEVER re-post the already-succeeded comment');
+
+    // The retry re-fires only the run, never the comment.
+    failRun = false;
+    const runsBeforeRetry = runCalls;
+    retryBtn.click();
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1, 'the retry must re-fire the run only — never the comment');
+    assert.equal(runCalls, runsBeforeRetry + 1, 'the retry must re-fire the run exactly once');
+    assert.equal(preservedRulingRows.has(key), false, 'a succeeded retry releases the preserved row');
+    assert.match(feedback.textContent, /recorded ✓/);
+  });
+});
+
+// ─── LIN-2754 close-out, ledger L7 — witness 13's second half ─────────────
+// The `gone`+`record` Agree witness LIN-2792 landed covers the RESOLVABLE
+// happy path only (no `record_on` declared → the anchor). The `record_on`
+// FALLBACK paths — an unresolvable target, and an in-neighbourhood but
+// TERMINAL one — were covered only by inheritance from the pre-existing
+// `resolveRecordTarget` tests, which predate `optionId` and never observe
+// it. `deliverAsRecord`'s `postComment` literal is one of the four call
+// sites that silently dropped `optionId` before this ticket, so "the
+// fallback branch also carries the chosen option" is exactly the kind of
+// claim that must be asserted rather than inherited.
+describe('Agree-as-answer on a gone+record row — optionId survives the record_on FALLBACK too (LIN-2754 L7)', () => {
+  const fallbackCases = [
+    {
+      name: 'an UNRESOLVABLE record_on (matches nothing in the neighbourhood)',
+      recordOn: 'LIN-NOWHERE',
+      hydrate: async () => hydrateOk(neighborhoodOf({ siblings: [neighbor('LIN-9001')] })),
+      notePattern: /outside the checked neighbourhood/
+    },
+    {
+      name: 'a TERMINAL in-neighbourhood record_on',
+      recordOn: 'LIN-DONE',
+      hydrate: async () => hydrateOk(neighborhoodOf({ siblings: [neighbor('LIN-DONE', 'completed')] })),
+      notePattern: /closed|completed|terminal/i
+    },
+    {
+      name: 'a FAILED hydrate (the route is unavailable)',
+      recordOn: 'LIN-ELSEWHERE',
+      hydrate: async () => { throw new Error('hydrate unavailable'); },
+      notePattern: /outside the checked neighbourhood/
+    }
+  ];
+
+  for (const { name, recordOn, hydrate, notePattern } of fallbackCases) {
+    test(`${name} still records to the anchor WITH the chosen optionId, and says why`, async () => {
+      let captured = null;
+      let dispatchCalls = 0;
+      const { module } = makeSandbox({
+        postComment: async (urlKey, issueId, prompt, decision) => { captured = { urlKey, issueId, prompt, decision }; return { ok: true, status: 201, data: {} }; },
+        dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'x' }; },
+        api: hydrate
+      });
+      const { agreeRulingRow } = module.exports;
+      const li = makeLi();
+      const row = answeredRow({
+        decision: { decision_id: 'd-l7', options: ANSWER_OPTIONS, on_answer: { effect: 'record', record_on: recordOn } },
+        disposition: 'gone',
+        effect: 'record'
+      });
+
+      await agreeRulingRow(row, li);
+
+      assert.ok(captured, 'expected the record comment to be posted');
+      assert.equal(captured.decision.optionId, 'opt-yes', 'the chosen option must ride the fallback postComment too — this literal is one of the four that dropped it before LIN-2792');
+      assert.equal(captured.decision.decisionId, 'd-l7');
+      assert.equal(captured.issueId, ANCHOR.issueId, 'an unresolved record_on falls back to the ANCHOR, never the named target');
+      assert.equal(captured.prompt, 'Yes, proceed with the migration', 'the comment body is the option LABEL, not the raw id');
+      assert.equal(dispatchCalls, 0, 'a record-effect answer never starts a run');
+
+      const feedback = li.querySelector('.obs-ruling-feedback');
+      assert.match(feedback.textContent, /recorded ✓/);
+      assert.match(feedback.textContent, notePattern, 'the fallback must say why it did not use the declared record_on');
+    });
+  }
+
+  test('a RESOLVABLE record_on records to the resolved neighbour, also carrying the optionId', async () => {
+    let captured = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, prompt, decision) => { captured = { issueId, decision }; return { ok: true, status: 201, data: {} }; },
+      api: async () => hydrateOk(neighborhoodOf({ children: [neighbor('LIN-CHILD-7')] }))
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = answeredRow({
+      decision: { decision_id: 'd-l7-ok', options: ANSWER_OPTIONS, on_answer: { effect: 'record', record_on: 'LIN-CHILD-7' } },
+      disposition: 'gone',
+      effect: 'record'
+    });
+
+    await agreeRulingRow(row, li);
+
+    assert.equal(captured.issueId, 'id-LIN-CHILD-7', 'the resolved neighbour is the write target');
+    assert.equal(captured.decision.optionId, 'opt-yes');
+  });
+});
