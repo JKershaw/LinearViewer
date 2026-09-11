@@ -1281,6 +1281,36 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
 
     assert.deepEqual(posted.dismiss, ['d-other'], 'the shelved ruling must never be dismissed by a same-tab bulk press');
   });
+
+  // LIN-2756 close-out (review N1): the Keep sibling is pinned at :1017, the
+  // shelve half was not — a mutation that dropped `decisionLoopId` from this
+  // POST body survived the whole suite. The regression it hides is silent and
+  // is this ticket's own bug class: a shelve that loses its loop segment
+  // writes the legacy two-segment `_id`, which `shelfGate` then fans out
+  // across every loop sharing that `decision_id`, so one loop's deferral
+  // suppresses another loop's unshelved ruling with no error anywhere.
+  test('Shelve posts to the shelve route with the row\'s own decisionLoopId (review N1)', async () => {
+    let captured = null;
+    const { module } = makeSandbox({
+      api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
+    });
+    const { shelveRulingRow } = module.exports;
+    const li = makeLi();
+
+    shelveRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(captured, 'expected window.api to be called');
+    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/shelve');
+    assert.equal(captured.opts.method, 'POST');
+    assert.deepEqual(JSON.parse(captured.opts.body), {
+      decisionId: 'd-gone-1',
+      decisionLoopId: 'loop-gone-1',
+      reason: 'deferred pending upstream fix',
+      resurfaceInMs: 24 * 60 * 60 * 1000
+    });
+  });
 });
 
 // ─── Second review (LIN-2444) — fifth instance, found closing F6/F7 ────────

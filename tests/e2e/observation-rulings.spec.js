@@ -695,6 +695,55 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-4' })).toHaveCount(0, { timeout: 20000 });
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2444-BULK-5' })).toHaveCount(0, { timeout: 20000 });
   });
+
+  // LIN-2756 close-out (review ledger item 4): the ticket's own bug, at
+  // browser level. Every other LIN-2756 test is `node --test` against the
+  // module; this is the only one that renders two loops sharing ONE
+  // `decision_id` through the real feed and presses a real select-all. Before
+  // the fix both rows collapsed onto `${urlKey}::${decisionId}`, so the row
+  // map kept only the last <li>, select-all counted 1, and bulk agree stamped
+  // exactly one loop — the live repro in the ticket's Finding.
+  //
+  // The suggestion is deliberately seeded in the LEGACY, workspace-wide shape
+  // (no `decisionLoopId`), which is both what a pre-LIN-2756 agent wrote and
+  // what an un-updated one still writes: it must fan out to BOTH loop rows,
+  // so both are selectable and both agree.
+  test('two loops sharing one decision_id render two rows: select-all counts 2 and bulk agree dismisses both (LIN-2756)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    const SHARED = 'lin2384-f6-gate';
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2756-LOOP-A', issueTitle: 'Review loop', decisionId: SHARED, blocked: true });
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2756-LOOP-B', issueTitle: 'Close-out loop', decisionId: SHARED, blocked: true });
+    await suggestDismissal(page, SHARED);
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const rowA = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-A' });
+    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-B' });
+
+    // Acceptance limb 1: two rows, two keys — not one surviving <li>.
+    await expect(rowA).toHaveCount(1);
+    await expect(rowB).toHaveCount(1);
+    // The legacy workspace-wide suggestion reaches both, so both are selectable.
+    await expect(rowA.locator('.obs-ruling-select')).toBeVisible();
+    await expect(rowB.locator('.obs-ruling-select')).toBeVisible();
+
+    // Acceptance limb 2: select-all counts BOTH.
+    await page.locator('#obs-ruling-select-all').check();
+    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('2 selected');
+
+    // Acceptance limb 3: bulk agree dismisses BOTH, not just the last one.
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.locator('#obs-ruling-agree-selected').click();
+    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('agreed');
+    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('agreed');
+
+    // Genuinely dismissed server-side — the pre-fix failure was precisely a
+    // row that LOOKED handled and came back on the next poll still unanswered.
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-A' })).toHaveCount(0, { timeout: 20000 });
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2756-LOOP-B' })).toHaveCount(0, { timeout: 20000 });
+  });
 });
 
 // LIN-2215 — the task-bound row end to end: a scan-produced decision

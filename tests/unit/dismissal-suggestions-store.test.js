@@ -397,6 +397,25 @@ describe('attachStandingSuggestions — loop-aware join (LIN-2756)', () => {
     assert.equal(attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal, null);
   });
 
+  // LIN-2756 close-out (review N2): the read-side cell of the F3 rule. Beat 7
+  // put ONE precedence function (`pickStandingDoc`) behind both callers, but
+  // only `withdraw()` defended it — a presence-first mutation was caught by a
+  // write-side test alone. The read-side consequence is the visible one: a
+  // withdrawn loop-scoped document shadowing a STANDING legacy one means the
+  // banner renders nothing while a live suggestion exists.
+  test('a WITHDRAWN loop-scoped suggestion does not shadow a STANDING legacy one — the banner shows the legacy (review N2, F3 read side)', () => {
+    const rows = [row('07509b1e', 'lin2384-f6-gate')];
+    const suggestions = [
+      suggestion({ decisionLoopId: '07509b1e', withdrawn: true, reason: 'scoped, kept' }),
+      suggestion({ decisionLoopId: null, reason: 'legacy, still standing' })
+    ];
+    assert.equal(
+      attachStandingSuggestions(rows, suggestions)[0].suggestedDismissal?.reason,
+      'legacy, still standing',
+      'a withdrawn scoped document is not "standing" — the still-standing legacy one must surface'
+    );
+  });
+
   test('a task-bound row (loopId null, taskDecisionId set) matches on taskDecisionId', () => {
     const taskRow = { anchor: { workspaceUrlKey: 'acme', loopId: null, taskDecisionId: 'scan_abc' }, decision: { decision_id: 'd-task' } };
     const suggestions = [{ urlKey: 'acme', decisionId: 'd-task', decisionLoopId: 'scan_abc', withdrawn: false, reason: 'r', suggestedBy: 'x', suggestedAt: NOW.toISOString() }];
