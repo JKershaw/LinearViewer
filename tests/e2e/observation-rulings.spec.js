@@ -1274,18 +1274,30 @@ test.describe('Agree on a PROPOSED ANSWER (LIN-2754 L3) — e2e', () => {
     // for this exact row.
     await expect(row).toContainText('proposed answer: Approve');
 
+    // Held as an ElementHandle, deliberately, BEFORE the click: once the
+    // answer lands server-side the ruling leaves the /rulings payload and a
+    // background poll removes the row, so a locator-based assertion on the
+    // settle text races that removal (it did, in CI, while passing locally).
+    // A handle keeps reading the node `deliverRulingReply` actually wrote
+    // its feedback into, attached or not — the settle text is written
+    // synchronously on delivery, before any repaint can intervene.
+    const feedbackHandle = await row.locator('.obs-ruling-feedback').elementHandle();
+
     await row.locator('.obs-ruling-agree').click();
 
     // Delivered, not dismissed: the answer branch's own feedback text.
-    await expect(row.locator('.obs-ruling-feedback')).toHaveText('recorded ✓', { timeout: 15000 });
+    await expect.poll(async () => feedbackHandle.textContent(), { timeout: 15000 }).toBe('recorded ✓');
 
     // The proof that matters, read back from storage rather than from the
     // page: ONE `decision-answer` stamp, carrying the chosen `option_id`,
     // with no `outcome: 'dismissed'` anywhere on it.
-    const itemResp = await page.request.get(`/test/dispatch-item?urlKey=${URL_KEY}&itemId=${workerId}`);
-    const { feedback } = await itemResp.json();
-    const stamps = feedback.filter((f) => f.kind === 'decision-answer').map((f) => JSON.parse(f.message));
-    expect(stamps.length, `expected exactly one decision-answer stamp, got ${JSON.stringify(stamps)}`).toBe(1);
+    let stamps = [];
+    await expect.poll(async () => {
+      const itemResp = await page.request.get(`/test/dispatch-item?urlKey=${URL_KEY}&itemId=${workerId}`);
+      const { feedback } = await itemResp.json();
+      stamps = feedback.filter((f) => f.kind === 'decision-answer').map((f) => JSON.parse(f.message));
+      return stamps.length;
+    }, { message: 'expected exactly one decision-answer stamp in storage', timeout: 15000 }).toBe(1);
     expect(stamps[0].decision_id).toBe('d-2754-answer');
     expect(stamps[0].option_id, 'the chosen option must reach the durable stamp — Shape B').toBe('a');
     expect(stamps[0].outcome, 'an agreed ANSWER must never be stamped as a dismissal').toBeUndefined();
