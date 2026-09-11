@@ -239,3 +239,88 @@ describe('window.ChatUI.appendOptions (LIN-1728 Phase 4)', () => {
     assert.ok(wrap.classList.contains('chat-options--readonly'));
   });
 });
+
+// LIN-2775 Area 5 — effect-first captions, with the disposition table as
+// fallback, gated so a read-only row (no buttons) can never claim an effect.
+describe('window.ChatUI.appendOptions — effect captions (LIN-2775 Area 5)', () => {
+  test('a gone row with a declared effect captions effect-first, not the disposition caption', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    const wrap = window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }],
+      disposition: 'gone',
+      effect: 'dispatch',
+      onSelect: () => {}
+    });
+    assert.equal(wrap.children[0].textContent, 'Answer & start a run');
+  });
+
+  test('a resumable row with effect "resume" captions "Answer & resume" (effect overrides the disposition caption)', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    const wrap = window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }],
+      disposition: 'resumable',
+      effect: 'resume',
+      onSelect: () => {}
+    });
+    assert.equal(wrap.children[0].textContent, 'Answer & resume');
+  });
+
+  test('a task-bound row with effect "record" captions "Record answer" and stays reply-eligible', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    const wrap = window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }],
+      disposition: 'task-bound',
+      effect: 'record',
+      onSelect: () => {}
+    });
+    assert.equal(wrap.children[0].textContent, 'Record answer');
+    assert.ok(!wrap.classList.contains('chat-options--readonly'));
+    assert.equal(container.querySelectorAll('.chat-option-btn').length, 1);
+  });
+
+  test('no effect (null/undefined) falls back to the disposition caption exactly as before', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    const wrap = window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }],
+      disposition: 'gone',
+      effect: null,
+      onSelect: () => {}
+    });
+    assert.equal(wrap.children[0].textContent, 'Reply & start a run');
+  });
+
+  // The targeted regression this whole Area exists to prevent (S1 handover,
+  // LIN-2775): `resolveEffect` resolves a non-null `effect` — commonly
+  // `"record"` — even on a read-only mid-turn/indeterminate row (a live run
+  // on the row's own necessarily-non-terminal loop self-matches the anchor).
+  // A naive `EFFECT_CAPTIONS[effect] || DISPOSITION_CAPTIONS[disposition]`
+  // lookup would print "Record answer" on a row with NO buttons at all,
+  // silently claiming an action the row cannot take — regressing LIN-2215
+  // F2's honesty property. This is the acceptance witness for that property.
+  for (const disposition of ['mid-turn', 'indeterminate']) {
+    test(`a read-only ${disposition} row with effect "record" does NOT render an action-claiming caption`, () => {
+      const { document, window } = makeSandbox();
+      const container = document.createElement('div');
+      const wrap = window.ChatUI.appendOptions(container, {
+        options: [{ id: 'a', label: 'Approve' }],
+        disposition,
+        effect: 'record',
+        onSelect: () => {}
+      });
+      assert.notEqual(wrap.children[0].textContent, 'Record answer', 'a row with no buttons must never claim an effect');
+      assert.ok(wrap.classList.contains('chat-options--readonly'));
+      assert.equal(container.querySelectorAll('.chat-option-btn').length, 0);
+    });
+  }
+
+  test('window.ChatUI.resolveCaption applies the exact same read-only gate a caller can reuse directly', () => {
+    const { window } = makeSandbox();
+    assert.equal(window.ChatUI.resolveCaption('gone', 'dispatch'), 'Answer & start a run');
+    assert.equal(window.ChatUI.resolveCaption('mid-turn', 'record'), 'still running — reply disabled');
+    assert.notEqual(window.ChatUI.resolveCaption('mid-turn', 'record'), 'Record answer');
+  });
+});

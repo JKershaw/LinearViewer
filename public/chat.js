@@ -130,6 +130,48 @@
     'task-bound': 'A task raised a decision — reply to resolve it'
   };
 
+  // Effect → caption text (LIN-2775 Area 5). A SEPARATE namespace from
+  // DISPOSITION_CAPTIONS above, not three entries merged into it — `effect`
+  // (lib/unanswered-decisions.js's `resolveEffect`) answers "what happens
+  // once a reply is delivered", a different question from `disposition`'s
+  // "whether/how a reply can be delivered" (LIN-2215 F2 rewrote the
+  // neighbouring readOnly check to keep exactly these two namespaces apart;
+  // collapsing them back into one table here would reintroduce that shape).
+  // Provisional labels — final vocabulary lands via LIN-2757.
+  var EFFECT_CAPTIONS = {
+    resume: 'Answer & resume',
+    dispatch: 'Answer & start a run',
+    record: 'Record answer'
+  };
+
+  // The allow-list `canReplyFor` (lib/unanswered-decisions.js) mirrors:
+  // resumable/gone/task-bound are interactive, everything else — including a
+  // disposition not yet in this list — is read-only. Shared by the caption
+  // lookup and the options-render gate below so the two can never drift
+  // apart from each other.
+  function isReadOnlyDisposition(disposition) {
+    return !(disposition === 'resumable' || disposition === 'gone' || disposition === 'task-bound');
+  }
+
+  // Effect-first, disposition as fallback — but ONLY on a row that can
+  // actually act. `resolveEffect` still resolves a non-null `effect` on a
+  // read-only mid-turn/indeterminate row (a live run on the row's own,
+  // necessarily non-terminal, loop self-matches the anchor and forces
+  // `record` before that function's read-only-null branch ever fires — see
+  // the S1 handover on LIN-2775), so an ungated `EFFECT_CAPTIONS[effect] ||
+  // ...` lookup would print "Record answer" on a row with no buttons at all,
+  // regressing the honesty property LIN-2215 F2 established. Gating on
+  // `isReadOnlyDisposition` here — the SAME predicate the options-render gate
+  // uses — keeps that property: a row that cannot act never claims an
+  // effect. Exposed on window.ChatUI (below) so a caller updating a caption
+  // in place after the fact (e.g. observation.js's override flip control)
+  // reuses this exact logic rather than re-deriving it.
+  function resolveCaption(disposition, effect) {
+    return (!isReadOnlyDisposition(disposition) && EFFECT_CAPTIONS[effect])
+      || DISPOSITION_CAPTIONS[disposition]
+      || DISPOSITION_CAPTIONS.indeterminate;
+  }
+
   /**
    * Append an option-button row — the LIN-1728 chat primitive for answering a
    * decision. Every option LABEL is agent-authored text (it comes straight off
@@ -143,6 +185,7 @@
    * @param {Array<{id: string, label: string, cost?: number}>} [opts.options] - decision options.
    * @param {string} [opts.recommended] - the recommended option's `id`, if any.
    * @param {'resumable'|'gone'|'mid-turn'|'indeterminate'|'task-bound'} opts.disposition - press-time disposition (see `lib/unanswered-decisions.js`).
+   * @param {'resume'|'dispatch'|'record'|null} [opts.effect] - press-time resolved effect (`lib/unanswered-decisions.js`'s `resolveEffect`), used effect-first for the caption on a row that can act; ignored (never claimed) on a read-only disposition (LIN-2775 Area 5).
    * @param {function(string, string): void} [opts.onSelect] - called with `(optionId, optionLabel)` on a button press. Never called for a read-only disposition — an ALLOW-list of `resumable`/`gone`/`task-bound` is interactive; every other value, including one not yet in this list, is read-only (LIN-2215 F2) — or when `options` is empty.
    * @returns {Element} the appended `<div class="chat-options">` wrapper.
    */
@@ -158,7 +201,7 @@
 
     var caption = document.createElement('div');
     caption.className = 'chat-options-caption';
-    caption.textContent = DISPOSITION_CAPTIONS[disposition] || DISPOSITION_CAPTIONS.indeterminate;
+    caption.textContent = resolveCaption(disposition, opts.effect);
     wrap.appendChild(caption);
 
     // Read-only dispositions render the caption alone — no buttons, no dispatch
@@ -169,7 +212,7 @@
     // drifted once (task-bound rendered as "no action available yet" instead of
     // reply-eligible). An allow-list fails SAFE: an unrecognized future
     // disposition now defaults to read-only, not interactive.
-    var readOnly = !(disposition === 'resumable' || disposition === 'gone' || disposition === 'task-bound');
+    var readOnly = isReadOnlyDisposition(disposition);
     if (readOnly || !options.length) {
       wrap.classList.add('chat-options--readonly');
       container.appendChild(wrap);
@@ -309,6 +352,7 @@
     appendMessage: appendMessage,
     appendNote: appendNote,
     appendOptions: appendOptions,
+    resolveCaption: resolveCaption,
     renderMarkdownText: renderMarkdownText,
     toolBreadcrumbLabel: toolBreadcrumbLabel
   };

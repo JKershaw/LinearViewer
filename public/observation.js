@@ -153,6 +153,28 @@ const preservedRulingRows = new Map();     // rulingKey → <li> to reuse across
 // writing into the now-detached old one — see the renderRulings comment below.
 const renderedRulingRows = new Map();
 
+// rulingKey → operator-chosen effect override (LIN-2775 Area 5). Set/cleared
+// by the flip control renderRulingRow attaches whenever a row's `alternate`
+// is non-null (never against a hard override — resolveEffect's hard-override
+// branches 1-3 always carry `alternate: null`, so the control simply never
+// renders there). Restored at ROW-CREATION time inside renderRulingRow
+// itself, mirroring the `rulingsSelected` bulk-checkbox precedent above —
+// deliberately NOT threaded through `mustReuse` below, whose whole point is
+// to reuse the existing (already-correct) <li> without calling
+// renderRulingRow at all.
+//
+// Pruned two ways: instantly, the moment it goes STALE against the current
+// payload's `row.alternate` (the override-vs-repaint staleness rule — see
+// the check inside renderRulings' own per-row loop, which runs on every row
+// regardless of whether that row takes the mustReuse-reuse branch or the
+// fresh-render branch, precisely because mustReuse skips renderRulingRow —
+// and with it any staleness check written only inside it — entirely for
+// pending/preserved/settled rows; `8feb02c7`/LIN-2262 fixed this exact class
+// of bug once already in the shelf-gate keying); and, same as every other
+// per-key map here, in the `seen` sweep once a key's row has genuinely left
+// the feed.
+const rulingEffectOverride = new Map();
+
 // ─── Bulk-agree selection (LIN-2444 Phase 5) ────────────────────────────────
 //
 // `rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, anchor, decisionId)` —
@@ -1636,6 +1658,20 @@ function renderRulings(rulings) {
     const decisionId = row?.decision?.decision_id;
     const urlKey = row?.anchor?.workspaceUrlKey;
     const key = rulingKey(urlKey, row?.anchor, decisionId);
+    // Override-vs-repaint staleness rule (LIN-2775 Area 5): honour an
+    // override only when it exactly equals THIS payload's row.alternate;
+    // otherwise prune it outright, not merely ignore it, so a later evidence
+    // swing cannot resurrect a flip made under different circumstances. Runs
+    // HERE, on every row, before the mustReuse branch below decides whether
+    // renderRulingRow (and the restore inside it) even runs — a check
+    // written only inside renderRulingRow would never see the mustReuse
+    // reuse path at all (S12 mechanism correction; `8feb02c7`/LIN-2262 fixed
+    // the same class of bug once already in the shelf-gate keying). A
+    // hard-overridden row (row.alternate === null) can never carry a
+    // surviving stale override, by construction.
+    if (key && rulingEffectOverride.has(key) && rulingEffectOverride.get(key) !== row?.alternate) {
+      rulingEffectOverride.delete(key);
+    }
     const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key));
     const existing = key && renderedRulingRows.get(key);
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
@@ -1688,6 +1724,10 @@ function renderRulings(rulings) {
       renderedRulingRows.delete(key);
       rulingsRowByKey.delete(key);
       rulingsSelected.delete(key);
+      // A vanished row's key can never remain overridden either — otherwise
+      // a decision_id later reused (a fresh ruling landing on the exact same
+      // rulingKey) could inherit a stale flip it never earned.
+      rulingEffectOverride.delete(key);
     }
   }
 
@@ -1891,15 +1931,59 @@ function renderRulingRow(row) {
     li.appendChild(banner);
   }
 
+  // rulingKey — the SAME composite key `renderRulings` computes for this row
+  // (:decisionId/:urlKey re-derived identically from `row`) — restores any
+  // standing operator override at ROW-CREATION time, mirroring the
+  // `rulingsSelected` bulk-checkbox precedent above. Safe to read directly
+  // here (rather than re-checking staleness): renderRulings' own per-row
+  // loop already pruned a stale entry for this exact key, against this exact
+  // payload's `row.alternate`, before ever reaching this fresh-render branch.
+  const effectKey = rulingKey(anchor?.workspaceUrlKey, anchor, decision?.decision_id);
+  const effectiveEffect = (effectKey && rulingEffectOverride.has(effectKey))
+    ? rulingEffectOverride.get(effectKey)
+    : row?.effect;
+
   window.ChatUI.appendOptions(li, {
     options: decision?.options,
     recommended: decision?.recommended,
     disposition,
+    effect: effectiveEffect,
     onSelect: (optionId, optionLabel) => {
       if (!canReply) return;
       deliverRulingReply(row, optionLabel, li);
     }
   });
+
+  // Flip control (LIN-2775 Area 5): renders ONLY when `row.alternate` is
+  // non-null — never against a hard override, which by construction always
+  // carries `alternate: null` (resolveEffect's branches 1-3). Per-row
+  // default with an override, never a global toggle: pressing it sets/clears
+  // THIS row's own `rulingEffectOverride` entry, then re-renders this exact
+  // row via renderRulingRow itself (reusing the same restore-at-creation
+  // logic above rather than re-deriving the caption here a second time) and
+  // swaps the fresh <li> in for the old one in place.
+  if (row?.alternate) {
+    const flip = document.createElement('button');
+    flip.type = 'button';
+    flip.className = 'obs-ruling-effect-flip';
+    const overridden = !!(effectKey && rulingEffectOverride.has(effectKey));
+    flip.textContent = overridden
+      ? `Use "${row.effect}" instead`
+      : `Use "${row.alternate}" instead`;
+    flip.classList.toggle('obs-ruling-effect-flip--active', overridden);
+    flip.addEventListener('click', () => {
+      if (flip.disabled || !effectKey) return;
+      if (rulingEffectOverride.has(effectKey)) {
+        rulingEffectOverride.delete(effectKey);
+      } else {
+        rulingEffectOverride.set(effectKey, row.alternate);
+      }
+      const fresh = renderRulingRow(row);
+      if (li.parentNode) li.parentNode.replaceChild(fresh, li);
+      renderedRulingRows.set(effectKey, fresh);
+    });
+    li.appendChild(flip);
+  }
 
   // Free-text escape hatch + dismiss (LIN-2225): the declared options stay the
   // PRIMARY path (untouched above) — this is additive, not a replacement.
@@ -2130,8 +2214,14 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
 // held in `rulingsSettled`, which is exactly what stops the operator
 // re-selecting and re-agreeing a row that already succeeded but is still
 // showing (stale cache window).
+// `.obs-ruling-effect-flip` (LIN-2775 Area 5) joins the set so it is disabled
+// for the same window every other control here is: its click handler
+// replaces this row's <li> outright (renderRulingRow re-render, swapped in
+// via parentNode.replaceChild), which is exactly the "closure keeps writing
+// into a now-detached node" hazard this whole function exists to prevent if
+// pressed while a delivery on this same row is already in flight.
 function rulingRowControls(li) {
-  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep, .obs-ruling-select');
+  return li.querySelectorAll('.chat-option-btn, .obs-ruling-answer-send, .obs-ruling-dismiss, .obs-ruling-answer-input, .obs-ruling-shelve, .obs-ruling-agree, .obs-ruling-keep, .obs-ruling-select, .obs-ruling-effect-flip');
 }
 
 // The actual dismiss request (LIN-2444 Phase 3, extracted from the body
@@ -3613,6 +3703,12 @@ if (typeof module !== 'undefined' && module.exports) {
     // test asserts against the SAME composite-key function these structures
     // use, not a hard-coded copy of its `::` separator.
     deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey,
+    // LIN-2775 Area 5: expose the effect-override map and renderRulingRow
+    // itself — the override lifecycle (restore-at-creation, the
+    // override-vs-repaint staleness prune, the `seen`-sweep prune) spans
+    // both renderRulings and renderRulingRow, and the flip control's
+    // re-render-in-place behaviour is only reachable through the latter.
+    rulingEffectOverride, renderRulingRow,
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.

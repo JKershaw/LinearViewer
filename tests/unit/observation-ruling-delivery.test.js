@@ -87,6 +87,7 @@ class FakeElement {
     this.type = undefined;
     this.classList = new FakeClassList(this);
     this.attrs = {};
+    this.parentNode = null;
   }
   get className() { return this._className; }
   set className(v) {
@@ -97,7 +98,17 @@ class FakeElement {
   set textContent(v) { this._textContent = v; this.children = []; }
   setAttribute(name, value) { this.attrs[name] = String(value); }
   getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attrs, name) ? this.attrs[name] : null; }
-  appendChild(child) { this.children.push(child); return child; }
+  appendChild(child) { this.children.push(child); child.parentNode = this; return child; }
+  // LIN-2775 Area 5's flip control swaps its own <li> in place
+  // (li.parentNode.replaceChild(fresh, li)) — the one production caller of
+  // either method in this whole shim.
+  replaceChild(newChild, oldChild) {
+    const idx = this.children.indexOf(oldChild);
+    if (idx !== -1) this.children[idx] = newChild;
+    newChild.parentNode = this;
+    oldChild.parentNode = null;
+    return oldChild;
+  }
   addEventListener(type, handler) {
     (this.listeners[type] = this.listeners[type] || []).push(handler);
   }
@@ -2030,5 +2041,187 @@ describe('the rulings selection-clearing invariant (LIN-2444 review — closing 
       'the enumerated population of per-row rulings write handlers changed — update this list deliberately, or a new/renamed handler slipped past unexamined'
     );
     assert.deepEqual(guardedWithoutClear, [], `every rulingsPending.add(key)-guarded handler must also call rulingsSelected.delete(key) on success — missing in: ${guardedWithoutClear.join(', ')}`);
+  });
+});
+
+// ─── rulingEffectOverride lifecycle (LIN-2775 Area 5) ───────────────────────
+//
+// The override Map is consulted from TWO different places in renderRulings'
+// per-row loop depending on which branch a row takes: a fresh row goes
+// through renderRulingRow, which restores it at creation time; a row held by
+// `mustReuse` (pending/preserved/settled) skips renderRulingRow entirely and
+// simply reuses whatever <li> is already attached. The staleness prune must
+// therefore run in renderRulings itself, ahead of that branch, not only
+// inside renderRulingRow — S12's mechanism correction, and the exact bug
+// class `8feb02c7`/LIN-2262 already fixed once in the shelf-gate keying.
+describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  function flippableRow(overrides = {}) {
+    return makeRow({
+      decision: { decision_id: 'd-effect-1' },
+      effect: 'dispatch',
+      alternate: 'record',
+      ...overrides
+    });
+  }
+
+  test('pressing the flip control sets an override and swaps the row\'s caption/flip label in place', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    assert.equal(rulingEffectOverride.has(key), false, 'no override before any press');
+
+    const li = list.children[0];
+    const flip = li.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(flip, 'a row with a non-null alternate must render the flip control');
+    assert.equal(flip.textContent, 'Use "record" instead');
+
+    flip.click();
+
+    assert.equal(rulingEffectOverride.get(key), 'record', 'flipping stores the row\'s own alternate as the override value');
+    // The click swapped `li` for a freshly rendered node in the list.
+    const flippedLi = list.children[0];
+    assert.notEqual(flippedLi, li, 'the flip control re-renders its own row rather than mutating the old node');
+    const flippedFlip = flippedLi.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(flippedFlip.classList.contains('obs-ruling-effect-flip--active'));
+    assert.equal(flippedFlip.textContent, 'Use "dispatch" instead', 'label now offers to flip back to the row\'s own default effect');
+
+    flippedFlip.click();
+    assert.equal(rulingEffectOverride.has(key), false, 'a second press clears the override entirely rather than storing the default back into the map');
+  });
+
+  test('an override survives a repaint with the SAME payload (row.alternate unchanged) — fresh-render path', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    const row = flippableRow();
+    renderRulings([row]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // Next poll: a NEW row object, but the same alternate — this is what a
+    // real repaint looks like (renderRulings is always handed a fresh
+    // payload array). Nothing here marks the row as mustReuse, so this goes
+    // through the fresh renderRulingRow path, which must restore the
+    // override at creation time.
+    const repaintedRow = flippableRow();
+    renderRulings([repaintedRow]);
+
+    assert.equal(rulingEffectOverride.get(key), 'record', 'the override must still be present after a same-payload repaint');
+    const repaintedLi = list.children[0];
+    const repaintedFlip = repaintedLi.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(repaintedFlip.classList.contains('obs-ruling-effect-flip--active'), 'the restored row must render the flip control already in its overridden state');
+  });
+
+  test('a stale override (payload\'s alternate changed) is pruned — fresh-render path, row.effect wins', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // A later evidence swing: the SAME row now resolves a different
+    // alternate (e.g. a live dispatch appeared on the anchor between polls).
+    // The stored override ('record') no longer equals the new alternate
+    // ('resume'), so it must be pruned outright, not merely ignored.
+    const swungRow = flippableRow({ effect: 'dispatch', alternate: 'resume' });
+    renderRulings([swungRow]);
+
+    assert.equal(rulingEffectOverride.has(key), false, 'a stale override must be pruned, not just ignored');
+    const freshLi = list.children[0];
+    const freshFlip = freshLi.querySelectorAll('.obs-ruling-effect-flip')[0];
+    assert.ok(!freshFlip.classList.contains('obs-ruling-effect-flip--active'), 'row.effect must win — the row renders un-overridden');
+    assert.equal(freshFlip.textContent, 'Use "resume" instead', 'the flip control now offers the NEW alternate, not the stale one');
+  });
+
+  test('an override survives a repaint on the mustReuse (pending) reuse path — the same <li> is kept as-is', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = module.exports;
+
+    const row = flippableRow();
+    renderRulings([row]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    const flippedLi = (() => {
+      list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+      return list.children[0];
+    })();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // Mark the row mid-flight (mustReuse), matching a poll landing between a
+    // press and its network round trip completing — renderRulings must NOT
+    // rebuild the row (renderRulingRow is never called on this path), it
+    // must reuse the exact same <li> the operator is looking at.
+    rulingsPending.add(key);
+    renderRulings([flippableRow()]);
+
+    assert.equal(rulingEffectOverride.get(key), 'record', 'the override must still be present after a mustReuse repaint');
+    assert.equal(list.children[0], flippedLi, 'the mustReuse path must reuse the exact already-flipped <li>, never rebuild it');
+
+    rulingsPending.delete(key);
+  });
+
+  test('a stale override is pruned on the mustReuse (pending) reuse path too — the staleness check does not live only inside renderRulingRow', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride, rulingsPending } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // mustReuse this time (unlike the fresh-render staleness test above) —
+    // renderRulingRow is never invoked on this branch, so if the prune were
+    // written only inside it (the S12 trap this ticket calls out by name),
+    // this assertion is exactly what would catch it: the map would still
+    // hold the stale 'record' value here.
+    rulingsPending.add(key);
+    const swungRow = flippableRow({ effect: 'dispatch', alternate: 'resume' });
+    renderRulings([swungRow]);
+
+    assert.equal(rulingEffectOverride.has(key), false, 'the staleness prune must run on the mustReuse path too, not only inside renderRulingRow');
+
+    rulingsPending.delete(key);
+  });
+
+  test('a row with row.alternate === null never renders the flip control (a hard override can never surface here)', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+
+    renderRulings([makeRow({ decision: { decision_id: 'd-hard-1' }, effect: 'resume', alternate: null })]);
+
+    const li = list.children[0];
+    assert.equal(li.querySelectorAll('.obs-ruling-effect-flip').length, 0);
+  });
+
+  test('a vanished row\'s override is pruned in the seen sweep, so a later reused key never inherits a stale flip', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, rulingKey, rulingEffectOverride } = module.exports;
+
+    renderRulings([flippableRow()]);
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-effect-1');
+    list.children[0].querySelectorAll('.obs-ruling-effect-flip')[0].click();
+    assert.equal(rulingEffectOverride.get(key), 'record');
+
+    // The ruling leaves the feed entirely (answered, or otherwise gone) —
+    // not mustReuse, not present in the new payload at all.
+    renderRulings([]);
+
+    assert.equal(rulingEffectOverride.has(key), false, 'the override must not survive its row leaving the feed');
   });
 });

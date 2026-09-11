@@ -426,6 +426,22 @@
 .obs-ruling-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
 .obs-ruling-agree:disabled { opacity: 0.5; cursor: default; }
 
+/* Effect override flip (LIN-2775 Area 5) — neutral like .obs-ruling-dismiss:
+   it changes what the row WILL do, not a clearance/acceptance action, so it
+   borrows no green/amber weight from either. `--active` marks a standing
+   override with the same brand accent .obs-tab.is-active uses. */
+.obs-ruling-effect-flip {
+  margin-top: 0.35rem;
+  color: var(--fg-dim);
+  background: color-mix(in srgb, var(--fg-dim) 10%, transparent);
+}
+.obs-ruling-effect-flip:hover { background: color-mix(in srgb, var(--fg-dim) 20%, transparent); }
+.obs-ruling-effect-flip:disabled { opacity: 0.5; cursor: default; }
+.obs-ruling-effect-flip--active {
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+
 .obs-ruling-keep {
   color: var(--fg-dim);
   background: color-mix(in srgb, var(--fg-dim) 10%, transparent);
