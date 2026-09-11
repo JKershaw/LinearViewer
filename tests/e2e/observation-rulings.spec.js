@@ -134,7 +134,12 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-R' });
     await expect(row).toBeVisible();
     await expect(row).toContainText('Proceed with option A?');
-    await expect(row.locator('.chat-options-caption')).toHaveText('Reply & continue');
+    // LIN-2775 Area 5: captions are effect-first — a resumable row's
+    // resolved effect is unconditionally 'resume' (resolveEffect branch 1),
+    // so this now reads "Answer & resume", not the old disposition caption
+    // "Reply & continue". A real, intended behaviour change, not a loosened
+    // assertion.
+    await expect(row.locator('.chat-options-caption')).toHaveText('Answer & resume');
     const buttons = row.locator('.chat-option-btn');
     await expect(buttons).toHaveCount(2);
     await expect(buttons.filter({ hasText: 'Approve' })).toHaveClass(/chat-option--recommended/);
@@ -809,7 +814,12 @@ test.describe('Task-bound ruling (LIN-2215) — a scan-produced decision end to 
     // F2: the task-bound caption — proof this is NOT falling back to
     // "no action available yet" (the pre-fix indeterminate default a
     // task-bound row rendered under).
-    await expect(row.locator('.chat-options-caption')).toHaveText('A task raised a decision — reply to resolve it');
+    // LIN-2775 Area 5: captions are effect-first. buildMockScanText's fixture
+    // decision declares no `on_answer`, so task-bound's default effect
+    // applies (ON_ANSWER_EFFECT_DEFAULTS['task-bound'] = 'record',
+    // lib/unanswered-decisions.js) — "Record answer", not the old
+    // disposition caption. A real, intended behaviour change.
+    await expect(row.locator('.chat-options-caption')).toHaveText('Record answer');
     const buttons = row.locator('.chat-option-btn');
     await expect(buttons).toHaveCount(2);
 

@@ -435,7 +435,18 @@ main.flight-companion-page[data-url-key]  - page container
                                               SAME option-button row the rulings tab uses
                                               (`.chat-options-row`/`.chat-option-btn`,
                                               `window.ChatUI.appendOptions`; a star marks
-                                              the recommended option). A read-only
+                                              the recommended option). On the RULINGS TAB
+                                              specifically, that row's caption now names
+                                              the row's resolved `effect` when it can act
+                                              — "Answer & resume" / "Answer & start a run"
+                                              / "Record answer" (LIN-2775) — falling back
+                                              to the disposition caption otherwise. This
+                                              `.fc-decision` card does NOT: its own tool
+                                              result (`projectPendingDecision`, lib/chat-
+                                              tools.js) carries no `effect` field, so its
+                                              caption stays disposition-keyed exactly as
+                                              before, and its tap stays comment-only
+                                              regardless (see below). A read-only
                                               disposition renders `.chat-options--
                                               readonly` (a caption only, no buttons). A
                                               tap POSTs through `window.ReplyDelivery.
