@@ -153,6 +153,14 @@ function makeLi({ withFeedback = true } = {}) {
   return li;
 }
 
+// LIN-2775 Area 8: the press-time check's `window.api` hydrate mock, for
+// tests exercising the ORDINARY `gone`+dispatch path — a non-terminal
+// anchor state, so the check confirms and lets the dispatch proceed
+// unchanged. Tests exercising the downgrade itself stub their own `api`.
+function nonTerminalHydrateApi() {
+  return async () => ({ hydrated: true, identifier: ANCHOR.issueIdentifier, state: { name: 'In Progress', type: 'started' } });
+}
+
 // `elements` seeds document.getElementById (default: none, so it answers null
 // exactly as before — the delivery tests below never touch the document). The
 // ChatUI stub is likewise inert for those: only renderRulingRow calls
@@ -238,7 +246,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let capturedUrlKey = null;
     const { module } = makeSandbox({
       postComment: async (urlKey) => { capturedUrlKey = urlKey; return { ok: true, status: 201, data: {} }; },
-      dispatchPrompt: async () => ({ id: 'dispatched-1' })
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply } = module.exports;
     const li = makeLi();
@@ -255,12 +264,14 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let capturedOpts = null;
     const { module } = makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
-      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; }
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply } = module.exports;
     const li = makeLi();
 
     deliverRulingReply(makeRow(), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -285,9 +296,10 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let capturedOpts = null;
     const { module } = makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
-      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; }
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply } = module.exports;
+    const { deliverRulingReply, RULING_COMPOSED_RUN_MARKER } = module.exports;
     const li = makeLi();
 
     const row = makeRow({
@@ -296,6 +308,7 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     });
 
     deliverRulingReply(row, 'Preserve', li);
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -312,6 +325,10 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     assert.equal(capturedOpts.promptName, 'Ruling reply');
     assert.ok(DISPATCH_KINDS.includes(capturedOpts.kind), `capturedOpts.kind ("${capturedOpts.kind}") must be a member of DISPATCH_KINDS`);
     assert.equal(capturedOpts.kind, 'custom', 'nothing more specific than the neutral default is derivable from a ruling row today');
+    // LIN-2775 Area 8: the composed-run marker must ride along on every
+    // ordinary composed dispatch, activating the server-side terminal-anchor
+    // guard for this call specifically.
+    assert.equal(capturedOpts.composedRunMarker, RULING_COMPOSED_RUN_MARKER);
   });
 
   test('F2: comment succeeds, the fresh run fails to start — a durable partial-failure surfaces with a retry affordance, the comment is never reposted', async () => {
@@ -323,7 +340,8 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
         dispatchCalls += 1;
         if (dispatchCalls === 1) throw new Error('queue temporarily unavailable');
         return { id: 'dispatched-1' };
-      }
+      },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
@@ -333,7 +351,9 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     deliverRulingReply(row, 'Approve', li);
     assert.ok(rulingsPending.has(key), 'expected the decision to be marked pending immediately');
 
-    // Flush postComment -> dispatchPrompt (rejects) -> onPartialFailure.
+    // Flush the press-time hydrate check -> postComment -> dispatchPrompt
+    // (rejects) -> onPartialFailure.
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
@@ -370,13 +390,15 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let dispatchCalls = 0;
     const { module } = makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: false, status: 502, data: { error: 'upstream write rejected' } }; },
-      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; }
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
     const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-2');
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-gone-2' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -402,12 +424,14 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     let capturedDispatchOpts = null;
     const { module } = makeSandbox({
       postComment: async (urlKey, issueId) => { capturedCommentIssueId = issueId; return { ok: true, status: 201, data: {} }; },
-      dispatchPrompt: async (opts) => { capturedDispatchOpts = opts; return { id: 'dispatched-1' }; }
+      dispatchPrompt: async (opts) => { capturedDispatchOpts = opts; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply } = module.exports;
     const li = makeLi();
 
     deliverRulingReply(makeRow({ anchor: { issueId: null, issueIdentifier: 'LIN-1728-G' }, decision: { decision_id: 'd-gone-4' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 
@@ -661,6 +685,135 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
   });
 });
 
+// ─── Press-time check (LIN-2775 Area 8) ─────────────────────────────────────
+//
+// Before a `dispatch`-effect row actually composes and sends anything, the
+// anchor's OWN current `state.type` is read via the widened hydrate route.
+// Two outcomes, both specified: disagreement (the anchor is now terminal)
+// downgrades to record IN PLACE; a hydration failure — every failure mode
+// swallowed identically — fails CLOSED to record too. Never a silent
+// dispatch, never a silent no-op: both routes through the SAME record
+// delivery, so the row always ends up commented, stamped, and cleared.
+describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
+  for (const terminalType of ['completed', 'canceled', 'duplicate']) {
+    test(`disagreement: an anchor now ${terminalType} downgrades to record, dispatchPrompt is never called, and the note renders`, async () => {
+      let commentCalls = 0;
+      let dispatchCalls = 0;
+      const { module } = makeSandbox({
+        postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+        dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+        api: async () => hydrateOk({}, { name: 'Terminal', type: terminalType })
+      });
+      const { deliverRulingReply } = module.exports;
+      const li = makeLi();
+
+      deliverRulingReply(makeRow({ decision: { decision_id: `d-presstime-${terminalType}` } }), 'Approve', li);
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+
+      assert.equal(commentCalls, 1, 'the row must still be delivered — commented and stamped — never silently dropped');
+      assert.equal(dispatchCalls, 0, `a ${terminalType} anchor must never be dispatched to`);
+      const feedback = li.querySelector('.obs-ruling-feedback');
+      assert.match(feedback.textContent, /recorded ✓/);
+      assert.match(feedback.textContent, /now closed/, 'the note must say why — a downgrade, not an unexplained record');
+    });
+  }
+
+  for (const reason of ['no_token', 'not_found', 'unavailable']) {
+    test(`hydration failure (${reason}): fails CLOSED to record, dispatchPrompt is never called, and the note renders`, async () => {
+      let commentCalls = 0;
+      let dispatchCalls = 0;
+      const { module } = makeSandbox({
+        postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+        dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+        api: async () => ({ hydrated: false, reason })
+      });
+      const { deliverRulingReply } = module.exports;
+      const li = makeLi();
+
+      deliverRulingReply(makeRow({ decision: { decision_id: `d-presstime-fail-${reason}` } }), 'Approve', li);
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+      await new Promise((r) => setImmediate(r));
+
+      assert.equal(commentCalls, 1, `a ${reason} hydration failure must still deliver — never a silent no-op`);
+      assert.equal(dispatchCalls, 0, `a ${reason} hydration failure must fail CLOSED, never dispatch unverified`);
+      const feedback = li.querySelector('.obs-ruling-feedback');
+      assert.match(feedback.textContent, /recorded ✓/);
+      assert.match(feedback.textContent, /could not confirm/, 'the note must say why — swallowed identically regardless of the specific reason');
+    });
+  }
+
+  test('a network-level rejection from the hydrate call itself (not a well-formed {hydrated:false}) also fails CLOSED to record', async () => {
+    let commentCalls = 0;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => { throw new Error('network unreachable'); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-presstime-throw' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+    assert.match(feedback.textContent, /could not confirm/);
+  });
+
+  test('a non-terminal anchor confirmed at press time proceeds to the ordinary dispatch path, composedRunMarker included', async () => {
+    let commentCalls = 0;
+    let capturedOpts = null;
+    const { module } = makeSandbox({
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({}, { name: 'In Progress', type: 'started' })
+    });
+    const { deliverRulingReply, RULING_COMPOSED_RUN_MARKER } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-presstime-ok' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.ok(capturedOpts, 'a confirmed non-terminal anchor must still dispatch');
+    assert.equal(capturedOpts.composedRunMarker, RULING_COMPOSED_RUN_MARKER);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+    assert.doesNotMatch(feedback.textContent, /now closed|could not confirm/, 'a confirmed non-terminal anchor must not carry a downgrade note');
+  });
+
+  test('a row with no linked issue at all is refused before ever reaching the press-time hydrate call', async () => {
+    let apiCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: async () => { apiCalls += 1; return hydrateOk({}, { type: 'started' }); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ anchor: { ...ANCHOR, issueId: null, issueIdentifier: null }, decision: { decision_id: 'd-presstime-noissue' } }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(apiCalls, 0, 'nothing to hydrate — the refusal must precede the press-time call entirely');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /no linked issue/);
+  });
+});
+
 function makeResumableRow({ decision, anchor, ...rest } = {}) {
   return {
     decision: decision || { decision_id: 'd-resumable-1' },
@@ -869,7 +1022,8 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
       dispatchPrompt: async (opts) => {
         if (opts.urlKey === 'workspace-a') dispatchCallsA += 1; else dispatchCallsB += 1;
         return { id: 'dispatched-1' };
-      }
+      },
+      api: nonTerminalHydrateApi()
     });
     const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
 
@@ -890,6 +1044,7 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
     deliverRulingReply(rowB, 'Approve', liB);
     assert.ok(rulingsPending.has(keyB), 'workspace B row must be independently answerable while workspace A is still mid-flight');
 
+    await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
     await new Promise((r) => setImmediate(r));
 

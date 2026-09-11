@@ -598,12 +598,13 @@ window.api = async function api(url, opts = {}) {
  * @param {boolean} [opts.force]                    Whether to force-follow-up even into a terminal session
  * @param {string} [opts.presetId]                  Selected dispatch preset id (LIN-1391); blank/omitted sends no presetId, so the consumer's own default resolution applies unchanged (LIN-1094/1390)
  * @param {number} [opts.maxTasks]                  Task-budget scope bound (LIN-1737/LIN-1751); blank/omitted sends no maxTasks, so the run stays unbounded exactly as before this field existed
+ * @param {string} [opts.composedRunMarker]         LIN-2775 Area 8: the scoped structural marker for a composed-run dispatch (a real agent brief, not a raw pressed-option label) — activates routes/dispatch.js's terminal-anchor guard server-side. Blank/omitted sends nothing, so an ordinary dispatch is completely unaffected.
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, composedRunMarker } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -649,6 +650,10 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   if (force !== undefined) payload.force = force;
   if (presetId) payload.presetId = presetId;
   if (maxTasks !== undefined && maxTasks !== null) payload.maxTasks = maxTasks;
+  // LIN-2775 Area 8: truthy gate, like presetId/kind — only a composed-run
+  // dispatch (today: a ruling reply's real agent brief) sets this; every
+  // other dispatch surface sends nothing and is unaffected.
+  if (composedRunMarker) payload.composedRunMarker = composedRunMarker;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.

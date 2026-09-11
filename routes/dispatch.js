@@ -134,7 +134,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null }) {
   const router = Router();
 
   // =========================================================================
@@ -230,7 +230,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, composedRunMarker } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -463,6 +463,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         harness,
         terminal,
         effort,
+        // LIN-2775 Area 8: threaded straight through, unvalidated here — the
+        // marker's own validation and the terminal-anchor guard it gates
+        // both live inside createDispatchItem (the one reusable, testable
+        // chokepoint), not duplicated at this route layer the way model/
+        // harness/terminal are via validateDispatchPayload above.
+        composedRunMarker,
+        getWorkspaceAccessToken,
+        fetchIssueContext,
         ...(wantProxyContext
           ? {
               finalizePrompt: async (resolvedHarness) => {
