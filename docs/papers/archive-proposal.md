@@ -52,6 +52,24 @@ cites:
   - path: docs/roadmaps/README.md
     at: 5b9664c
     for: the regenerate-and-freeze supersession convention
+  - issue: LIN-2254
+    at: 2026-09-11
+    for: the north-star reading repair, read live over the workspace proxy
+  - issue: LIN-2385
+    at: 2026-09-11
+    for: the periodicals ledger repair, read live over the workspace proxy
+  - issue: LIN-2198
+    at: 2026-09-11
+    for: the filed need for long-term storage of trajectory data
+  - issue: LIN-2199
+    at: 2026-09-11
+    for: the filed spike on a training and evaluation corpus
+  - issue: LIN-1967
+    at: 2026-09-11
+    for: the ticket that placed the report convention in CLAUDE.md
+  - issue: LIN-1950
+    at: 2026-09-11
+    for: an unwritten document of the kind this archive would hold
 referee: null
 ---
 
@@ -102,8 +120,16 @@ What was read in full: the two `CLAUDE.md` files, the README of each repository,
 the charter, the folded-loop essay, the drift synthesis, the escalation philosophy, the
 2026-08-29 headwinds review, the 2026-08-29 documentation review, the 2026-09-11 model and
 effort routing proposal, the periodicals registry header, and the report gate. What was not
-read: the code beyond the files named, any ticket body, and the remaining 40 reviews beyond
-their front lines and the queries above.
+read: the code beyond the files named, and the remaining 40 reviews beyond their front lines
+and the queries above.
+
+The live workspace was also read, over Harbour's own proxy, on 2026-09-11: 20 read calls, no
+writes, every one audit-logged. What was read there: the served north star and its reading,
+the periodicals ledger, seven text searches of the tracker for a prior archive, catalogue,
+citation or corpus proposal, the cost of two 29 August periodical runs, and six tickets
+(LIN-2254, LIN-2385, LIN-2198, LIN-2199, LIN-1967, LIN-1950). Tracker search is text-only and
+relevance-capped at 50 results, so every "no ticket proposes" claim below is bounded by those
+seven queries.
 
 ## 2. The claim: the corpus exists
 
@@ -125,6 +151,13 @@ checkable reference exists (`lib/periodical-report-gate.js:6-14`). That gate is 
 founding principle already enforced in code: the artifact is the fact, the narration is not
 (`docs/north-star.md:7`).
 
+The need for long-term storage is already on the tracker, in a different shape. LIN-2198
+records that Harbour's event streams accumulate a high-quality corpus of agentic work that
+expires on 30-day TTLs, a week of trajectory history lost for every week that passes, and
+LIN-2199 proposes a spike on exporting it. Both are Backlog. They ask for the data half of
+long-term memory; this paper asks for the document half. No ticket found by the seven searches
+in section 1 proposes a papers archive, a citation model or a catalogue.
+
 So the question is not whether Harbour should have a scientific archive. It has one. The
 question is what it lacks.
 
@@ -144,8 +177,8 @@ cite "the current edition of the headwinds review" as opposed to a dated file.
 cannot produce an index either, by design: the registry is deliberately location-agnostic and
 the report convention is discovered by the executing agent at run time
 (`lib/periodical-report-gate.js:16-24`, `CLAUDE.md:243`). The convention is therefore a sentence
-in `CLAUDE.md`, which is exactly the kind of prose-only contract the gate was built because prose
-cannot hold.
+in `CLAUDE.md`, placed there by LIN-1967 so that agents could discover it, which is exactly the
+kind of prose-only contract the gate was built because prose cannot hold.
 
 **Supersession.** Three conventions for "which edition is current" coexist in the same docs
 tree. The north star bumps its version inside one file (`docs/north-star.md:1`, "v2"). The
@@ -201,6 +234,15 @@ shape: a stored record beside the artifact, drifting from it. An archive whose m
 a second record would fail the same way, and would be believed longer because it looks like a
 database.
 
+Both failures have since been repaired, and the repairs argue for the rule as much as the
+failures did. LIN-2254 merged on 2026-08-30 and, read live on 2026-09-11, the served reading is
+fresh at nine days old, carries v2, and now publishes a `docVersion` block that hashes the
+document at HEAD and reports drift against the stamped version. LIN-2385 merged the same day,
+and the ledger now registers the seven reviews that landed on 2026-08-29. The north-star fix is
+a small instance of section 4.2 already in production: the artifact at HEAD became the
+reference, and the stored record is checked against it rather than trusted. These are dated
+reads of a live system, not sha-pinned claims; a referee re-running them will see later values.
+
 ### 4.3 What counts as a paper
 
 Any document that keeps the contract, from any author. The periodicals are the first and most
@@ -208,6 +250,12 @@ regular author, and the report gate already makes their output checkable. Incide
 collective session records, essays, proposals like this one, and papers about existing
 documents all qualify. The distinction that matters is not who wrote it or what it is about but
 whether its claims cite evidence, its limits are stated, and its references are records.
+
+A concrete example of what the archive would hold is already on the tracker as a gap. LIN-1950,
+Todo, asks for an operating manual for the supervisory role, because that judgement today
+"exists only inside whichever session happens to be doing the supervising" and is gone when the
+session ends. That is the archive's purpose stated as a ticket: durable knowledge that outlives
+the session that learned it, with its perishable parts marked as such.
 
 ### 4.4 The verbs, named and deferred
 
@@ -288,6 +336,18 @@ This paper asks to be refereed before any tooling is built on it. The referee pa
 3. Endorse, correct in place, or retract, and set this paper's `referee` field and `status`
    accordingly.
 
+The referee run has a budget to be scored against. Read live on 2026-09-11, two 29 August
+periodical runs cost the following in API-equivalent dollars over their whole lineage
+(research, plan, implementation, review and close-out where present):
+
+| Run | Ticket | Total | Sessions |
+|---|---|---:|---:|
+| Recent Headwinds review | LIN-2364 | $34.40 | 6 |
+| Documentation review | LIN-2379 | $20.51 | 4 |
+
+A referee paper is a smaller shape than a periodical review, so it should land inside that band.
+One that costs materially more than the review it examines is itself a finding.
+
 A proposal that names its own reviewer is harder to accept quietly than one that does not.
 
 ## 9. Limitations
@@ -298,8 +358,11 @@ path is invisible to them. The corpus figures were measured by an author with no
 repository, in one sitting, reading a minority of the files it counted. The authors have a
 stake: the paper proposes its own genre and its own next step, and a referee should weigh that.
 No outside user, no cost figure, and no defect-escape record exists to score this proposal
-against, so its argument rests on the house's own documents, which the house wrote. Score it
-against something not written here.
+against, so its argument rests on the house's own documents, which the house wrote. The
+live-workspace observations in sections 2, 4.2 and 8 are dated reads of a moving system, not
+sha-pinned claims, and the tracker search behind "no prior proposal exists" is text-only and
+capped at 50 results per query, so a proposal filed under other words would be invisible to it.
+Score it against something not written here.
 
 ## References
 
@@ -314,3 +377,7 @@ against something not written here.
 - `lib/periodicals.js` at `5b9664c`. Header comment.
 - `lib/periodical-report-gate.js` at `5b9664c`. Lines 6 to 14 and 16 to 24.
 - `CLAUDE.md` at `5b9664c`. Line 243.
+- LIN-2254, LIN-2385, LIN-2198, LIN-2199, LIN-1967, LIN-1950. Read over the workspace proxy
+  on 2026-09-11.
+- `GET /api/proxy/north-star`, `GET /api/proxy/periodicals`, `GET /api/proxy/search`,
+  `GET /api/proxy/issues/{id}/cost`. Read on 2026-09-11.
