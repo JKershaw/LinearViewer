@@ -2195,7 +2195,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
       const { text } = await get(app, '/workspace/acme/flight-companion');
-      assert.match(text, /flight-companion-model-select" class="fc-model-select" disabled>/);
+      assert.match(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled>/);
       assert.match(text, /<span class="fc-strip-freetier" id="flight-companion-freetier-note">/);
     });
   });
@@ -2208,7 +2208,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: undefined }, async () => {
       const { text } = await get(app, '/workspace/acme/flight-companion');
-      assert.doesNotMatch(text, /flight-companion-model-select" class="fc-model-select" disabled/);
+      assert.doesNotMatch(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled/);
       assert.doesNotMatch(text, /fc-strip-freetier/);
     });
   });

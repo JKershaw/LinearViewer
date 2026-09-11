@@ -132,7 +132,7 @@ test('resolveAiOperationModel: missing urlKey or store returns DEFAULT_MODEL', a
   assert.equal(await resolveAiOperationModel({ urlKey: 'acme', workspacePreferencesStore: null, opKind: 'recommend' }), DEFAULT_MODEL);
 });
 
-test('resolveAiOperationModel: each of the 6 operation kinds resolves independently', async () => {
+test('resolveAiOperationModel: each operation kind resolves independently', async () => {
   const store = makeStore({
     modelId: 'openai/gpt-5.4-mini',
     aiModelOverrides: {

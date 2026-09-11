@@ -299,7 +299,7 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
       { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x', modelOptions: [] } },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select">\s*<option value="">current default \(openai\/gpt-5\.4-mini\)<\/option>/);
+    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override"><option value="">— current default —<\/option>/);
   });
 
   test('curated options render with their friendly name and a data-pricing attribute, straight off the supplied modelOptions', () => {
@@ -352,7 +352,7 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
       { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x', isFreeTier: true } },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" disabled>/);
+    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled>/);
     assert.match(html, /<span class="fc-strip-freetier" id="flight-companion-freetier-note">free tier: model selection is not honored — every request runs the clamped default<\/span>/);
   });
 
@@ -361,13 +361,13 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
       { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x', isFreeTier: false } },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select">/);
+    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override">/);
     assert.doesNotMatch(html, /fc-strip-freetier/);
   });
 
   test('a missing strip altogether still renders a (default-only) picker, never crashing', () => {
     const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select">/);
+    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override">/);
     assert.match(html, /<span class="fc-strip-price" id="flight-companion-model-price">—<\/span>/);
   });
 });

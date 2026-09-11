@@ -357,7 +357,7 @@ main.task-chat-page[data-url-key]      - page container
 
 The Flight Companion page (`/workspace/{urlKey}/flight-companion`) is a live, in-page chat for LIN-751 ("realtime chat with work in flight"): a companion that watches the workspace's dispatch feed and checks in with you on its own client-driven cadence (visible-tab only, 30s base, doubling to a 180s cap on nothing-to-report ticks; the server's own pre-call gate is always the real spend authority), or answers directly when you send it a message. It renders through the shared chat UI (`chat.css`/`window.ChatUI`) and streams turns over SSE, including tool-use breadcrumbs (LIN-2632) via the SAME shared `window.ChatUI.toolBreadcrumbLabel` Task Chat uses — never a page-local label fork. On an auto-wake turn, a proposed follow-up renders an inline Approve/Dismiss control and only an Approve click can enqueue it — the model can never dispatch one unapproved there. On a turn you start yourself, though, the model's `send_follow_up` executes directly (no proposal card, no approval needed) — the approval gate is auto-wake-only, not a blanket guarantee. Requires the per-user `flightCompanion` feature flag; reached only via a link in Settings.
 
-Chat is the FIRST section on the page (LIN-2443) — `How to use` and the kickoff prompt follow it, and the read-only observer report stays last. Above the thread sits a status strip (LIN-2621): model id, tools on/off (both resolved server-side ONCE per page load via `resolveWorkspaceModel`/`isToolCapableModel` — the SAME resolver the turn core uses), last check-in, next check-in due, sweep liveness/no-census, the running "this tab so far" cost total, and a mode line (`mode: read-only · proposes, never acts · rung 1 of 3`, byte-pinned; LIN-2626 turns it into a real control later). A silent auto-wake tick (one that completes with no text, the designed common outcome) paints NO chat bubble at all: instead the single, non-stacking status line (`#flight-companion-checkin`, `aria-live="polite"`, hidden until first use) reads `checking in…` for the duration of the tick, then settles to e.g. `checked in 22:03 · nothing new` on `done` — consecutive silent ticks overwrite that one node rather than appending rows, and a non-spend `gate-silent` tick refreshes the same line the same way (LIN-2632 beat 3). A turn YOU start instead gets the thinking state: an assistant row appears IMMEDIATELY, before any token or tool event, in the in-progress pill state with a quiet `thinking…` placeholder — the placeholder is display-only and never enters the client-held history, so an empty turn still ends with an honest `no reply — nothing to add` on that SAME row rather than a second one. Either way the speaker pill leaves the in-progress state on `done`/`error`.
+Chat is the FIRST section on the page (LIN-2443) — `How to use` and the kickoff prompt follow it, and the read-only observer report stays last. Above the thread sits a status strip (LIN-2621): model id, tools on/off (both resolved server-side ONCE per page load via `resolveWorkspaceModel`/`isToolCapableModel` — this page's own default-resolution call; since LIN-2623 beat 1 the turn core itself resolves via `resolveAiOperationModel({opKind:'flight-companion'})` instead, so the two are no longer literally the SAME call — migrating the page's own resolution to match is a tracked follow-up, not done here), last check-in, next check-in due, sweep liveness/no-census, the running "this tab so far" cost total, a mode line (`mode: read-only · proposes, never acts · rung 1 of 3`, byte-pinned; LIN-2626 turns it into a real control later), and — since LIN-2623 beat 3 — the per-turn model picker, its rate card, and (when the resolved default is not tool-capable) a visible tools-off warning. A silent auto-wake tick (one that completes with no text, the designed common outcome) paints NO chat bubble at all: instead the single, non-stacking status line (`#flight-companion-checkin`, `aria-live="polite"`, hidden until first use) reads `checking in…` for the duration of the tick, then settles to e.g. `checked in 22:03 · nothing new` on `done` — consecutive silent ticks overwrite that one node rather than appending rows, and a non-spend `gate-silent` tick refreshes the same line the same way (LIN-2632 beat 3). A turn YOU start instead gets the thinking state: an assistant row appears IMMEDIATELY, before any token or tool event, in the in-progress pill state with a quiet `thinking…` placeholder — the placeholder is display-only and never enters the client-held history, so an empty turn still ends with an honest `no reply — nothing to add` on that SAME row rather than a second one. Either way the speaker pill leaves the in-progress state on `done`/`error`.
 
 Every `done` frame carries the turn's own summed usage (LIN-2631 sums hop usage server-side onto the FINAL `done` only). A visible turn's own bubble grows a trailing meta line (`.fc-msg-meta`, "N tokens · $x") reading exactly what that frame carried, no caveat text; the strip's running total and check-in count (LIN-2621 beat 3) accumulate on EVERY `done` this tab observes — visible or silent, any turn kind — since a silent tick's cost otherwise has nowhere to appear. `lib/openrouter.js` does not yet attach per-hop usage to a tool-using turn's intermediate frames, so a multi-hop turn's displayed cost under-reports today until that lands as its own follow-up — a known, out-of-scope gap, not a defect of this page.
 
@@ -386,10 +386,22 @@ main.flight-companion-page[data-url-key]  - page container
                                               shape selectors keyed on that order are
                                               unaffected; the strip itself joins the
                                               fixed-height (flex: 0 0 auto) group
-      .fc-strip-model                         - "model: <code>…</code>" — resolved once
-                                              per page load, same resolver the turn uses
+      .fc-strip-model                         - "model: <code>…</code>" — this page's own
+                                              resolveWorkspaceModel read, once per page
+                                              load (see the note above on why this can
+                                              differ from what a no-override turn
+                                              actually resolves to since beat 1)
       .fc-strip-tools                         - "tools: on|off" — isToolCapableModel on
-                                              that SAME resolved model id
+                                              that SAME resolved model id. Byte-identical,
+                                              untouched by LIN-2623 beat 3's additions below
+      .fc-strip-tools-warning                 - (LIN-2623) "⚠ tools are off for this
+                                              model — …", rendered ONLY when
+                                              .fc-strip-tools reads "off" — visible on the
+                                              strip before you send anything. Exactly one
+                                              trigger: the resolved DEFAULT is not tool-
+                                              capable — never re-derived from the picker's
+                                              own selection below (every picker option is
+                                              curated, so always tool-capable)
       .fc-strip-checkin                       - "last check-in: <time>|never" — the
                                               companion doc's own lastTurnAt
       #flight-companion-strip-next            - "next check-in: —" server-rendered
@@ -408,6 +420,44 @@ main.flight-companion-page[data-url-key]  - page container
       .fc-strip-mode                          - "mode: read-only · proposes, never acts
                                               · rung 1 of 3" — byte-pinned text; LIN-2626
                                               turns this into a real control later
+      .fc-strip-model-picker                  - (LIN-2623) the per-turn model override,
+                                              beside the rate card. Options are EXACTLY
+                                              the curated AVAILABLE_MODELS allow-list the
+                                              turn endpoint's resolveTurnModelOverride
+                                              accepts — deliberately never widened by the
+                                              live OpenRouter catalog (LIN-1111), since a
+                                              wider selectable set would offer a choice
+                                              the endpoint then rejects with 400
+        #flight-companion-model-select           - the <select> itself, aria-label
+                                              "Per-turn model override" (a visible
+                                              "override:" label sits beside it too). The
+                                              leading option carries value="" ("— current
+                                              default —" — the id itself is NOT repeated
+                                              in the option text, deliberately: it's
+                                              already shown plainly in .fc-strip-model
+                                              above, and embedding it here once measurably
+                                              widened the <select> enough to overflow a
+                                              1024px viewport, LIN-2623 beat 4 finding):
+                                              an untouched picker sends NO `model` field
+                                              on the turn request at all,
+                                              so beat 1's resolveAiOperationModel decides
+                                              exactly as it did before this picker
+                                              existed — it can never silently swap a
+                                              possibly-uncurated workspace default for
+                                              some other curated id. Disabled outright on
+                                              a free-tier request (see .fc-strip-freetier)
+        #flight-companion-model-price            - the rate card, next to the picker —
+                                              the selected option's own data-pricing
+                                              attribute (getModelPricingHint), "—" for an
+                                              id with no known rate (never a fabricated
+                                              or zero price); updates live on `change`
+      .fc-strip-freetier                      - (LIN-2623) "free tier: model selection
+                                              is not honored — …", rendered only on a
+                                              free-tier page load, alongside a disabled
+                                              picker — the server-side `forceDefault`
+                                              clamp always wins there, so the control is
+                                              disabled rather than accepting a choice
+                                              that would be silently discarded
     #flight-companion-thread                - live chat thread (ul.chat-thread). Below
                                               600px this fills the section instead of
                                               chat.css's 40vh default (--chat-thread-
@@ -490,7 +540,7 @@ main.flight-companion-page[data-url-key]  - page container
 ```
 
 ### Flight Companion Endpoints
-- `POST /workspace/{urlKey}/api/flight-companion/turn` — SSE chat turn; body `{ message?, history[] }` (an absent/empty `message` is an auto-wake tick, never a client-asserted flag). Events: `token`, `tool` (`phase`: `call`/`result`/`error`/`cap`/`proposed`), `done` (an auto-wake `done` carries `surface`), `error`. A non-spend auto-wake tick returns plain JSON `{ turnKind, spent:false, reason }` instead of streaming.
+- `POST /workspace/{urlKey}/api/flight-companion/turn` — SSE chat turn; body `{ message?, history[], model? }` (an absent/empty `message` is an auto-wake tick, never a client-asserted flag). `model` (LIN-2623 beat 2) is the picker's own optional per-turn override — omitted or empty means "no override" (beat 1's `resolveAiOperationModel` decides); an explicitly supplied id must be one of the curated `AVAILABLE_MODELS` ids or the request is a clean `400` (never a silent tools-off degrade); a valid override is still clamped to the free-tier default when the request is free-tier. Events: `token`, `tool` (`phase`: `call`/`result`/`error`/`cap`/`proposed`), `done` (an auto-wake `done` carries `surface`), `error`. A non-spend auto-wake tick returns plain JSON `{ turnKind, spent:false, reason }` instead of streaming.
 - `POST /workspace/{urlKey}/api/flight-companion/boot` — SSE boot (orient) turn (LIN-2622), driven by `#flight-companion-start`/`#flight-companion-reorient`; body `{ history[] }` only — `message`/turn kind/`followUpMode`/budget are all endpoint-hardcoded server-side, never read from the body (the same "never client-asserted" rule as `/turn`). Propose-only (never executes a follow-up), its own budget (5 tool iterations / 2500 tokens) and lease, and it charges the free tier with the SAME 429 shape a typed turn gets — never auto-wake's silent refusal. Same SSE frame set as `/turn` (`token`/`tool`/`done`/`error`), consumed by the identical client stream reader — no boot-specific parsing exists.
 - `POST /workspace/{urlKey}/api/flight-companion/approve-follow-up` — body `{ sessionId, prompt }`; enqueues the follow-up the model proposed on a prior auto-wake turn.
 
