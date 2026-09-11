@@ -263,7 +263,7 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
     const row = makeRow();
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     deliverRulingReply(row, 'Approve', li);
     assert.ok(rulingsPending.has(key), 'expected the decision to be marked pending immediately');
@@ -309,7 +309,7 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     });
     const { deliverRulingReply, rulingsPending, preservedRulingRows, rulingKey } = module.exports;
     const li = makeLi();
-    const key = rulingKey('the-ruling-workspace', 'd-gone-2');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-2');
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-gone-2' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -494,7 +494,7 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
     });
     const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
-    const key = rulingKey('the-ruling-workspace', 'd-task-1');
+    const key = rulingKey('the-ruling-workspace', TASK_BOUND_ANCHOR, 'd-task-1');
 
     deliverRulingReply(makeTaskBoundRow(), 'Approve', li);
     assert.ok(rulingsPending.has(key), 'expected the decision to be marked pending immediately');
@@ -527,7 +527,7 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
     });
     const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
-    const key = rulingKey('the-ruling-workspace', 'd-task-2');
+    const key = rulingKey('the-ruling-workspace', TASK_BOUND_ANCHOR, 'd-task-2');
 
     deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-2' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -547,7 +547,7 @@ describe('deliverRulingReply — task-bound disposition (LIN-2215 F1)', () => {
     });
     const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
-    const key = rulingKey('the-ruling-workspace', 'd-task-3');
+    const key = rulingKey('the-ruling-workspace', TASK_BOUND_ANCHOR, 'd-task-3');
 
     deliverRulingReply(makeTaskBoundRow({ decision: { decision_id: 'd-task-3' } }), 'Approve', li);
     await new Promise((r) => setImmediate(r));
@@ -589,8 +589,8 @@ describe('deliverRulingReply — cross-workspace decision_id collision (LIN-2293
     const liB = makeLi();
     const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
     const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
-    const keyA = rulingKey('workspace-a', 'shared-decision');
-    const keyB = rulingKey('workspace-b', 'shared-decision');
+    const keyA = rulingKey('workspace-a', ANCHOR, 'shared-decision');
+    const keyB = rulingKey('workspace-b', ANCHOR, 'shared-decision');
 
     deliverRulingReply(rowA, 'Approve', liA);
     assert.ok(rulingsPending.has(keyA), 'workspace A row must be marked pending');
@@ -641,8 +641,8 @@ describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F
 
     const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
     const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
-    const keyA = rulingKey('workspace-a', 'shared-decision');
-    const keyB = rulingKey('workspace-b', 'shared-decision');
+    const keyA = rulingKey('workspace-a', ANCHOR, 'shared-decision');
+    const keyB = rulingKey('workspace-b', ANCHOR, 'shared-decision');
 
     renderRulings([rowA, rowB]);
 
@@ -665,8 +665,8 @@ describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F
 
     const rowA = makeRow({ anchor: { workspaceUrlKey: 'workspace-a' }, decision: { decision_id: 'shared-decision' } });
     const rowB = makeRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
-    const keyA = rulingKey('workspace-a', 'shared-decision');
-    const keyB = rulingKey('workspace-b', 'shared-decision');
+    const keyA = rulingKey('workspace-a', ANCHOR, 'shared-decision');
+    const keyB = rulingKey('workspace-b', ANCHOR, 'shared-decision');
 
     renderRulings([rowA, rowB]);
     const firstA = renderedRulingRows.get(keyA);
@@ -686,6 +686,54 @@ describe('renderRulings — cross-workspace decision_id reuse (LIN-2293 review F
     assert.notEqual(list.children[0], list.children[1]);
 
     rulingsPending.delete(keyA);
+  });
+});
+
+// LIN-2756 — the sibling of LIN-2293's fix above, one dimension over: THAT
+// bug was two rows sharing a decision_id across two different WORKSPACES;
+// THIS bug is two rows sharing a decision_id in the SAME workspace but two
+// different LOOPS (an agent re-emitting the same `DECISION:` block from two
+// separate loops within one session — the ticket's live repro: session
+// `74869c9c`'s review loop `07509b1e` and close-out loop `0c912018` both
+// emitted `lin2384-f6-gate`). Pre-fix, `rulingKey(urlKey, decisionId)` already
+// kept different workspaces apart (LIN-2293), but carried no loop dimension
+// at all, so two same-workspace loops collapsed onto ONE key exactly the way
+// LIN-2293's bare `decision_id` key used to collapse workspaces. Fixed by
+// widening `rulingKey` to `(urlKey, anchor, decisionId)`, folding in
+// `anchor.loopId ?? anchor.taskDecisionId` (LIN-2756 Proposal).
+describe('renderRulings — same-workspace, different-loop decision_id collision (LIN-2756)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  const REVIEW_LOOP = '07509b1e';
+  const CLOSEOUT_LOOP = '0c912018';
+
+  function loopRow(loopId) {
+    return makeRow({ anchor: { loopId }, decision: { decision_id: 'lin2384-f6-gate' } });
+  }
+
+  test('two loops in one workspace sharing decision_id get independent <li> nodes (LIN-2756 Acceptance #1)', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings, renderedRulingRows } = module.exports;
+
+    renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
+
+    // Both rows DO attach visually (renderRulings pushes a fresh <li> per
+    // row regardless of key collision) — the bug is entirely in the
+    // bookkeeping maps collapsing onto one shared key behind them, which is
+    // exactly what the size/distinctness assertions below pin.
+    assert.equal(list.children.length, 2, 'both loops’ rows must be attached');
+    assert.notEqual(list.children[0], list.children[1], 'the two attached nodes must be distinct');
+    assert.equal(renderedRulingRows.size, 2, 'each loop must keep its own renderedRulingRows entry, not collapse onto one shared (urlKey, decisionId) key — this is the ticket’s "kept only the last <li>" Finding');
   });
 });
 
@@ -879,7 +927,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.equal(feedback.textContent, 'agreed');
     assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), false);
-    assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', 'd-gone-1')), false);
+    assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1')), false);
   });
 
   test('a failed Agree surfaces an error and re-enables the row for retry', async () => {
@@ -893,7 +941,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /agree failed/);
     assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
-    assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', 'd-gone-1')), false, 'must not be stranded pending after a failure');
+    assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1')), false, 'must not be stranded pending after a failure');
   });
 
   // Review F2 — Phase 5's plan wording says verbatim "on success the Agree
@@ -906,7 +954,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     const { agreeRulingRow, rulingsSettled, rulingKey } = module.exports;
     const li = makeLi();
     const row = makeRow();
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     await agreeRulingRow(row, li);
 
@@ -966,7 +1014,12 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.equal(apiCalls, 1, 'a second Agree on an already-settled key must not re-POST a second decision-answer');
   });
 
-  test('Keep posts to the keep route with {decisionId}, never a dismiss endpoint', async () => {
+  // LIN-2756: widened from {decisionId} to {decisionId, decisionLoopId} —
+  // Keep must address the SAME composite id a suggest() call would have
+  // (lib/dismissal-suggestions-store.js's now-loop-aware `_id`), so it sends
+  // the row's own anchor.loopId (or anchor.taskDecisionId for a task-bound
+  // row), never a dismiss endpoint.
+  test('Keep posts to the keep route with {decisionId, decisionLoopId}, never a dismiss endpoint', async () => {
     let captured = null;
     const { module } = makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true, suggestion: { withdrawn: true } }; }
@@ -981,7 +1034,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.ok(captured, 'expected window.api to be called');
     assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/keep');
     assert.equal(captured.opts.method, 'POST');
-    assert.deepEqual(JSON.parse(captured.opts.body), { decisionId: 'd-gone-1' });
+    assert.deepEqual(JSON.parse(captured.opts.body), { decisionId: 'd-gone-1', decisionLoopId: 'loop-gone-1' });
 
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.equal(feedback.textContent, 'kept');
@@ -1053,7 +1106,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     const rowA = makeRow({ suggestedDismissal: SUGGESTION });
     const rowB = makeRow({ decision: { decision_id: 'd-b' }, suggestedDismissal: SUGGESTION });
     renderRulings([rowA, rowB]);
-    const keyA = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const keyA = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     toggleRulingSelection(keyA, true);
     const liA = list.children[0];
 
@@ -1094,8 +1147,8 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
     renderRulings([kept, other]);
     const li = list.children[0];
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-gone-1'), true);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-other'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-other'), true);
 
     keepRulingRow(kept, li);
     await new Promise((r) => setImmediate(r));
@@ -1114,7 +1167,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     });
     const { keepRulingRow, rulingsSelected, rulingKey } = module.exports;
     const li = makeLi();
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
     keepRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
@@ -1137,7 +1190,7 @@ describe('dismissRulingRow selection-clearing (LIN-2444 review — third open in
     const { module } = makeSandbox({ api: async () => ({ success: true }) });
     const { dismissRulingRow, rulingsSelected, rulingKey } = module.exports;
     const li = makeLi();
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
     dismissRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li);
@@ -1159,8 +1212,8 @@ describe('dismissRulingRow selection-clearing (LIN-2444 review — third open in
     const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
     renderRulings([dismissed, other]);
     const li = list.children[0];
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-gone-1'), true);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-other'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-other'), true);
 
     dismissRulingRow(dismissed, li);
     await new Promise((r) => setImmediate(r));
@@ -1187,7 +1240,7 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
     const { module } = makeSandbox({ api: async () => ({ success: true }) });
     const { shelveRulingRow, rulingsSelected, rulingKey } = module.exports;
     const li = makeLi();
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
     shelveRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
@@ -1214,8 +1267,8 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
     const other = makeRow({ decision: { decision_id: 'd-other' }, suggestedDismissal: SUGGESTION });
     renderRulings([shelved, other]);
     const li = list.children[0];
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-gone-1'), true);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-other'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-other'), true);
 
     shelveRulingRow(shelved, li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
     await new Promise((r) => setImmediate(r));
@@ -1227,6 +1280,36 @@ describe('shelveRulingRow selection-clearing (LIN-2444 review F8 — sixth open 
     await bulkAgreeSelected();
 
     assert.deepEqual(posted.dismiss, ['d-other'], 'the shelved ruling must never be dismissed by a same-tab bulk press');
+  });
+
+  // LIN-2756 close-out (review N1): the Keep sibling is pinned at :1017, the
+  // shelve half was not — a mutation that dropped `decisionLoopId` from this
+  // POST body survived the whole suite. The regression it hides is silent and
+  // is this ticket's own bug class: a shelve that loses its loop segment
+  // writes the legacy two-segment `_id`, which `shelfGate` then fans out
+  // across every loop sharing that `decision_id`, so one loop's deferral
+  // suppresses another loop's unshelved ruling with no error anywhere.
+  test('Shelve posts to the shelve route with the row\'s own decisionLoopId (review N1)', async () => {
+    let captured = null;
+    const { module } = makeSandbox({
+      api: async (url, opts) => { captured = { url, opts }; return { success: true }; }
+    });
+    const { shelveRulingRow } = module.exports;
+    const li = makeLi();
+
+    shelveRulingRow(makeRow({ suggestedDismissal: SUGGESTION }), li, 'deferred pending upstream fix', 24 * 60 * 60 * 1000);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(captured, 'expected window.api to be called');
+    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/shelve');
+    assert.equal(captured.opts.method, 'POST');
+    assert.deepEqual(JSON.parse(captured.opts.body), {
+      decisionId: 'd-gone-1',
+      decisionLoopId: 'loop-gone-1',
+      reason: 'deferred pending upstream fix',
+      resurfaceInMs: 24 * 60 * 60 * 1000
+    });
   });
 });
 
@@ -1250,7 +1333,7 @@ describe('deliverRulingReply also clears bulk selection (LIN-2444 review — fif
     const { deliverRulingReply, rulingsSelected, rulingKey } = module.exports;
     const li = makeLi();
     const row = makeRow({ suggestedDismissal: SUGGESTION });
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
     deliverRulingReply(row, 'Approve', li);
@@ -1268,7 +1351,7 @@ describe('deliverRulingReply also clears bulk selection (LIN-2444 review — fif
     const { deliverRulingReply, rulingsSelected, rulingKey } = module.exports;
     const li = makeLi();
     const row = makeRow({ suggestedDismissal: SUGGESTION });
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     rulingsSelected.add(key);
 
     deliverRulingReply(row, 'Approve', li);
@@ -1371,7 +1454,7 @@ describe('rulingRowControls widened for Agree/Keep (LIN-2444 Phase 4)', () => {
 
 // ─── Bulk-agree (LIN-2444 Phase 5) ───────────────────────────────────────────
 //
-// Selection is a module Set keyed rulingKey(urlKey, decisionId) — never a
+// Selection is a module Set keyed rulingKey(urlKey, anchor, decisionId) — never a
 // bare issueId or checkbox DOM state, since renderRulings can rebuild the
 // <li> on every poll (the comment atop public/observation.js). Bulk-agree
 // drives the SAME issueDismissRequest core Agree/Dismiss already share,
@@ -1426,7 +1509,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   test('selection survives a repaint — the checkbox reflects rulingsSelected, never its own prior DOM state', () => {
     const { module, list } = makeBulkSandbox();
     const { renderRulings, toggleRulingSelection, rulingKey } = module.exports;
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
     const firstLi = list.children[0];
@@ -1453,8 +1536,8 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
 
     setAllRulingsSelected(true);
 
-    assert.ok(rulingsSelected.has(rulingKey('the-ruling-workspace', 'd-suggested')));
-    assert.equal(rulingsSelected.has(rulingKey('the-ruling-workspace', 'd-plain')), false, 'a row with no suggestion must never be selectable');
+    assert.ok(rulingsSelected.has(rulingKey('the-ruling-workspace', ANCHOR, 'd-suggested')));
+    assert.equal(rulingsSelected.has(rulingKey('the-ruling-workspace', ANCHOR, 'd-plain')), false, 'a row with no suggestion must never be selectable');
     assert.equal(rulingsSelected.size, 1);
   });
 
@@ -1478,8 +1561,8 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const rowWsB = suggestedRow({ anchor: { workspaceUrlKey: 'workspace-b' }, decision: { decision_id: 'shared-decision' } });
     renderRulings([rowWsA, rowWsB]);
 
-    const keyA = rulingKey('workspace-a', 'shared-decision');
-    const keyB = rulingKey('workspace-b', 'shared-decision');
+    const keyA = rulingKey('workspace-a', ANCHOR, 'shared-decision');
+    const keyB = rulingKey('workspace-b', ANCHOR, 'shared-decision');
     assert.notEqual(keyA, keyB, 'the composite key must distinguish the two workspaces even though decision_id collides');
 
     // Select ONLY workspace A's row.
@@ -1503,7 +1586,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const rowA = suggestedRow({ decision: { decision_id: 'd-a' } });
     const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
     renderRulings([rowA, rowB]);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-a'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-a'), true);
 
     await bulkAgreeSelected();
 
@@ -1518,7 +1601,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
       confirm: (msg) => { confirmCalls.push(msg); return false; }
     });
     const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
     toggleRulingSelection(key, true);
@@ -1549,7 +1632,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   test('a succeeded key is deleted from the selection Set at the moment of success', async () => {
     const { module } = makeBulkSandbox({ api: async () => ({ success: true }) });
     const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingsSettled, rulingKey } = module.exports;
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
     toggleRulingSelection(key, true);
@@ -1576,9 +1659,9 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const rowB = suggestedRow({ decision: { decision_id: 'd-b' } });
     const rowC = suggestedRow({ decision: { decision_id: 'd-c' } });
     renderRulings([rowA, rowB, rowC]);
-    const keyA = rulingKey('the-ruling-workspace', 'd-a');
-    const keyB = rulingKey('the-ruling-workspace', 'd-b');
-    const keyC = rulingKey('the-ruling-workspace', 'd-c');
+    const keyA = rulingKey('the-ruling-workspace', ANCHOR, 'd-a');
+    const keyB = rulingKey('the-ruling-workspace', ANCHOR, 'd-b');
+    const keyC = rulingKey('the-ruling-workspace', ANCHOR, 'd-c');
     [keyA, keyB, keyC].forEach((k) => toggleRulingSelection(k, true));
 
     await bulkAgreeSelected();
@@ -1593,7 +1676,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     let apiCalls = 0;
     const { module } = makeBulkSandbox({ api: async () => { apiCalls++; return { success: true }; } });
     const { renderRulings, toggleRulingSelection, setAllRulingsSelected, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     const row = suggestedRow();
 
     renderRulings([row]);
@@ -1620,7 +1703,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   test('a settled row is REUSED (not rebuilt) with its controls still disabled, until it finally leaves the payload', async () => {
     const { module, list } = makeBulkSandbox({ api: async () => ({ success: true }) });
     const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
-    const key = rulingKey('the-ruling-workspace', 'd-gone-1');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
     const row = suggestedRow();
 
     renderRulings([row]);
@@ -1658,9 +1741,9 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const rowC = suggestedRow({ decision: { decision_id: 'd-c' } });
     renderRulings([rowA, rowB, rowC]);
     [
-      rulingKey('the-ruling-workspace', 'd-a'),
-      rulingKey('the-ruling-workspace', 'd-b'),
-      rulingKey('the-ruling-workspace', 'd-c')
+      rulingKey('the-ruling-workspace', ANCHOR, 'd-a'),
+      rulingKey('the-ruling-workspace', ANCHOR, 'd-b'),
+      rulingKey('the-ruling-workspace', ANCHOR, 'd-c')
     ].forEach((k) => toggleRulingSelection(k, true));
 
     await bulkAgreeSelected();
@@ -1681,12 +1764,12 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     assert.equal(agreeBtn.textContent, 'Agree selected (0)');
     assert.equal(agreeBtn.disabled, true);
 
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-a'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-a'), true);
     assert.equal(agreeBtn.textContent, 'Agree selected (1)');
     assert.equal(agreeBtn.disabled, false);
     assert.equal(selectAll.indeterminate, true);
 
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-b'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-b'), true);
     assert.equal(agreeBtn.textContent, 'Agree selected (2)');
     assert.equal(selectAll.checked, true);
     assert.equal(selectAll.indeterminate, false);
@@ -1710,7 +1793,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
   test('renderRulings drops a selected key from rulingsSelected once its suggestion is withdrawn (review F1)', () => {
     const { module, bar, countEl, selectAll } = makeBulkSandbox();
     const { renderRulings, toggleRulingSelection, rulingsSelected, rulingKey } = module.exports;
-    const key = rulingKey('the-ruling-workspace', 'd-w');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-w');
 
     renderRulings([suggestedRow({ decision: { decision_id: 'd-w' } })]);
     toggleRulingSelection(key, true);
@@ -1737,8 +1820,8 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const withdrawn = suggestedRow({ decision: { decision_id: 'd-w' } });
     const live = suggestedRow({ decision: { decision_id: 'd-live' } });
     renderRulings([withdrawn, live]);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-w'), true);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', 'd-live'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-w'), true);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-live'), true);
 
     // Suggestion withdrawn elsewhere; the poll repaints before Agree-selected fires.
     renderRulings([makeRow({ suggestedDismissal: null, decision: { decision_id: 'd-w' } }), live]);
@@ -1759,7 +1842,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     const calls = [];
     const { module } = makeBulkSandbox({ api: async (url, opts) => { calls.push(JSON.parse(opts.body).decisionId); return { success: true }; } });
     const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
-    const key = rulingKey('the-ruling-workspace', 'd-w');
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-w');
 
     renderRulings([suggestedRow({ decision: { decision_id: 'd-w' } })]);
     toggleRulingSelection(key, true);
@@ -1773,6 +1856,111 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     await bulkAgreeSelected();
 
     assert.deepEqual(calls, [], 'bulkAgreeRow must independently refuse a row with no live suggestedDismissal');
+  });
+});
+
+// LIN-2756 Acceptance #2/#3/#4 — same-workspace, different-loop decision_id
+// collision, exercised through the bulk-selection and single-row-Agree
+// seams. Mirrors the fixture shape of the renderRulings collision describe
+// above (REVIEW_LOOP/CLOSEOUT_LOOP, 'lin2384-f6-gate'), but drives the
+// selection-count/bulk-agree/single-agree seams that describe doesn't touch.
+// Both loop rows carry a live suggestedDismissal so they are selectable —
+// `issueDismissRequest` already threads `decisionLoopId: anchor.loopId` onto
+// the wire (the dismiss stamp is already per-loop, per the ticket's
+// Finding), so the mock API below can distinguish which loop's row actually
+// got dismissed.
+describe('bulk-agree / single-agree — same-workspace, different-loop decision_id collision (LIN-2756)', () => {
+  function makeLoopCollisionSandbox({ api } = {}) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const bar = new FakeElement('div');
+    const selectAll = new FakeElement('input');
+    const countEl = new FakeElement('span');
+    const agreeBtn = new FakeElement('button');
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      api,
+      confirm: () => true,
+      elements: {
+        'obs-rulings': list, 'obs-rulings-empty': empty, 'obs-ruling-bulk-bar': bar,
+        'obs-ruling-select-all': selectAll, 'obs-ruling-selected-count': countEl,
+        'obs-ruling-agree-selected': agreeBtn
+      }
+    });
+    return { module, list, bar, selectAll, countEl, agreeBtn };
+  }
+
+  const LOOP_SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+  const REVIEW_LOOP = '07509b1e';
+  const CLOSEOUT_LOOP = '0c912018';
+
+  function loopRow(loopId) {
+    return makeRow({ anchor: { loopId }, decision: { decision_id: 'lin2384-f6-gate' }, suggestedDismissal: LOOP_SUGGESTION });
+  }
+
+  test('select-all counts BOTH loop rows, not one (LIN-2756 Acceptance #2)', () => {
+    const { module } = makeLoopCollisionSandbox();
+    const { renderRulings, setAllRulingsSelected, rulingsSelected } = module.exports;
+
+    renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
+    setAllRulingsSelected(true);
+
+    assert.equal(rulingsSelected.size, 2, 'select-all must count both loops’ rows — pre-fix they collapse onto one shared key, so only one gets selected');
+  });
+
+  test('bulk agree dismisses BOTH loop rows, not just the one left standing in the shared-key map (LIN-2756 Acceptance #3)', async () => {
+    const calls = [];
+    const api = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push({ decisionLoopId: body.decisionLoopId, decisionId: body.decisionId });
+      return { success: true };
+    };
+    const { module } = makeLoopCollisionSandbox({ api });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = module.exports;
+
+    renderRulings([loopRow(REVIEW_LOOP), loopRow(CLOSEOUT_LOOP)]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    const loopIds = calls.map((c) => c.decisionLoopId).sort();
+    assert.deepEqual(
+      loopIds, [CLOSEOUT_LOOP, REVIEW_LOOP].sort(),
+      'bulk agree must dismiss both loops’ decisions — pre-fix, rulingsSelected only ever held one shared key, so only one POST fired and the other loop’s ruling was left exactly as the ticket found it: still carrying the suggestion'
+    );
+  });
+
+  test('agreeing one loop’s row must not silently block the other loop’s independent Agree (LIN-2756 Acceptance #4)', async () => {
+    const calls = [];
+    const api = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push({ decisionLoopId: body.decisionLoopId, decisionId: body.decisionId });
+      return { success: true };
+    };
+    const { module, list } = makeLoopCollisionSandbox({ api });
+    const { renderRulings, agreeRulingRow } = module.exports;
+
+    const rowReview = loopRow(REVIEW_LOOP);
+    const rowCloseout = loopRow(CLOSEOUT_LOOP);
+    renderRulings([rowReview, rowCloseout]);
+    const [liReview, liCloseout] = list.children;
+
+    await agreeRulingRow(rowReview, liReview);
+    assert.deepEqual(calls.map((c) => c.decisionLoopId), [REVIEW_LOOP], 'the review loop’s row must be agreed');
+
+    // Pre-fix, agreeing the review loop adds the SHARED (urlKey, decisionId)
+    // key to rulingsSettled — and agreeRulingRow's own guard
+    // (`rulingsSettled.has(key)`) then silently no-ops the close-out loop's
+    // press: no second API call, no error, no feedback. A suggestion/agree
+    // on one loop's row must never suppress the other's — this is the
+    // ticket's "a suggestion or shelve addresses one loop's row without
+    // touching the other" acceptance limb.
+    await agreeRulingRow(rowCloseout, liCloseout);
+    assert.deepEqual(
+      calls.map((c) => c.decisionLoopId).sort(),
+      [CLOSEOUT_LOOP, REVIEW_LOOP].sort(),
+      'the close-out loop’s row must be independently agreeable — it must not be silently swallowed by rulingsSettled just because it shares decision_id with the already-agreed review loop'
+    );
   });
 });
 
