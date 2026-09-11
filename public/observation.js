@@ -2619,6 +2619,50 @@ async function bulkAgreeSelected() {
   syncRulingsBulkBar();
 }
 
+// Mirrors lib/providers/models.js's TERMINAL_TYPES. Duplicated, not
+// imported — this is a plain browser script with no bundler/ESM import, the
+// same tradeoff `REAP_INACTIVITY_MS` (lib/unanswered-decisions.js) already
+// documents for this exact codebase: a small, stable, rarely-changed
+// constant, drift risk accepted rather than routed around here.
+const RECORD_TARGET_TERMINAL_TYPES = ['completed', 'canceled', 'duplicate'];
+
+// Client-side, advisory-only resolution of a declared `on_answer.record_on`
+// target (LIN-2775 Area 6). Pure — takes the widened hydrate route's already-
+// fetched response for the ANCHOR issue, never fetches anything itself, so it
+// is directly unit-testable. Fails safe in every unresolved case (no
+// `recordOn` declared, the target not found in the neighbourhood, found but
+// itself terminal, or the hydrate call failed/unavailable): all of those
+// return the ANCHOR as the target. Server-side guards are unchanged — this
+// only decides what the comment call below composes, never gates it.
+//
+// The note text deliberately does not say record_on was INVALID — a
+// legitimate sibling can simply sit beyond SIBLING_CAP/COUSIN_CAP
+// (lib/openrouter.js) and never appear in the neighbourhood at all, so
+// "outside the checked neighbourhood" is honest where "invalid target" would
+// not be.
+const RECORD_TARGET_OUTSIDE_NOTE = 'outside the checked neighbourhood';
+
+function resolveRecordTarget(anchor, recordOn, hydrateResult) {
+  const fallback = { issueId: anchor?.issueId || null, issueIdentifier: anchor?.issueIdentifier || null, note: null };
+  if (!recordOn) return fallback;
+
+  const neighborhood = hydrateResult && hydrateResult.hydrated ? hydrateResult.neighborhood : null;
+  const candidates = neighborhood
+    ? [neighborhood.parent, ...(neighborhood.siblings || []), ...(neighborhood.children || []), ...(neighborhood.cousins || [])].filter(Boolean)
+    : [];
+  const match = candidates.find(c => c.identifier === recordOn);
+
+  if (!match) return { ...fallback, note: RECORD_TARGET_OUTSIDE_NOTE };
+  if (match.state && RECORD_TARGET_TERMINAL_TYPES.includes(match.state.type)) {
+    return { ...fallback, note: RECORD_TARGET_OUTSIDE_NOTE };
+  }
+  // The rendered target identifier is a stated, un-eliminated residual's
+  // entire mitigation (S15): an in-neighbourhood-but-wrong sibling can still
+  // receive the human's words if the agent names it, so the caller MUST
+  // surface `issueIdentifier` back to the operator, not silently swallow it.
+  return { issueId: match.id || null, issueIdentifier: match.identifier, note: null };
+}
+
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
 // caller above already checks it — this is the second, structural guard);
 // branches on `disposition`, resolved server-side at poll time and never
@@ -2675,9 +2719,15 @@ function deliverRulingReply(row, prompt, li) {
     feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
   };
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
-  const onDelivered = () => {
+  // `note` (LIN-2775 Area 6) appends a parenthetical onto the standard
+  // "recorded ✓" text rather than replacing it — a record-branch delivery
+  // that fell back off a declared `record_on` still needs to say so, and the
+  // fallback note must survive all the way to the row's final feedback state,
+  // not get overwritten by it. Every other call site omits `note`, so its
+  // feedback text is byte-identical to before this Area existed.
+  const onDelivered = (note) => {
     restore();
-    setFeedback('recorded ✓', false);
+    setFeedback(note ? `recorded ✓ (${note})` : 'recorded ✓', false);
     // Fifth instance of the review's class, found while closing F6/F7: a
     // repliable row can ALSO carry a live suggestion (appendSuggestionActions
     // renders regardless of canReply), so it can be bulk-selected and then
@@ -2765,6 +2815,62 @@ function deliverRulingReply(row, prompt, li) {
   }
 
   if (disposition === 'gone') {
+    // LIN-2775 Area 6: `effect` (the operator's own flip override taking
+    // precedence over the row's server-resolved default, same lookup
+    // renderRulingRow uses to restore it) decides whether this press records
+    // or dispatches — a question the code below used to skip entirely,
+    // unconditionally dispatching every `gone` reply regardless of what
+    // `resolveEffect` (lib/unanswered-decisions.js) actually resolved.
+    const effectKey = rulingKey(targetUrlKey, anchor, decisionId);
+    const effectiveEffect = (effectKey && rulingEffectOverride.has(effectKey))
+      ? rulingEffectOverride.get(effectKey)
+      : row?.effect;
+
+    if (effectiveEffect === 'record') {
+      // A NEW sibling branch inside deliverRulingReply (branch inside, never
+      // fork — the LIN-2225 precedent), NOT routed through the task-bound
+      // branch below: that branch's stamp payload ({taskDecisionId,
+      // taskDecisionIssueId} → taskDecisionsStore.markOutcome) exists only
+      // for task-decision rows. A loop-backed row (this one) carries neither
+      // field, so routing it there would call stampDecisionAnswers down a
+      // branch that takes neither pair — the decision would never be marked
+      // answered and would reappear on the next 5s poll. Reuses the `gone`
+      // branch's own comment call verbatim (decisionLoopId/decisionId, the
+      // pair stampDecisionAnswers DOES key on) and stops after onDelivered()
+      // — never calls startRun/dispatchPrompt. The `!anchor.issueIdentifier`
+      // "cannot start a fresh run" refusal below is a precondition for the
+      // RUN half only; a record delivery only comments and stamps, so a
+      // missing run target is irrelevant to it and must not be inherited here.
+      const recordOn = decision?.on_answer?.record_on || null;
+      const targetContext = recordOn
+        ? window.api(
+            `/workspace/${encodeURIComponent(pageUrlKey)}/api/dashboard/hydrate/${encodeURIComponent(targetUrlKey)}/${encodeURIComponent(anchor.issueIdentifier)}`,
+            { on401: false }
+          ).catch(() => ({ hydrated: false }))
+        : Promise.resolve(null);
+
+      targetContext
+        .then((hydrateResult) => resolveRecordTarget(anchor, recordOn, hydrateResult))
+        .then((resolved) => {
+          const targetId = resolved.issueId || resolved.issueIdentifier;
+          return window.ReplyDelivery.postComment(targetUrlKey, targetId, prompt, { decisionLoopId, decisionId })
+            .then((commentResult) => {
+              if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
+              // The resolved target identifier is shown to the operator here
+              // — the rendered identifier IS the mitigation for the stated,
+              // un-eliminated residual (S15): an in-neighbourhood-but-wrong
+              // sibling can still receive the human's words if the agent
+              // named it.
+              const targetNote = resolved.note
+                ? `${resolved.note} — recorded to ${anchor.issueIdentifier}`
+                : (resolved.issueIdentifier && resolved.issueIdentifier !== anchor.issueIdentifier ? `to ${resolved.issueIdentifier}` : null);
+              onDelivered(targetNote);
+            });
+        })
+        .catch((err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+      return;
+    }
+
     // Identifier-backed targeting (LIN-1728 review G1) — same root cause as
     // F4 above, left in place on this sibling branch. `anchor.issueId` is
     // null for essentially every autopilot-dispatched loop (recommend-and-
@@ -3709,6 +3815,9 @@ if (typeof module !== 'undefined' && module.exports) {
     // both renderRulings and renderRulingRow, and the flip control's
     // re-render-in-place behaviour is only reachable through the latter.
     rulingEffectOverride, renderRulingRow,
+    // LIN-2775 Area 6: the pure record_on resolver, directly unit-testable
+    // against a hand-built hydrate-route response with no DOM/network.
+    resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE,
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.

@@ -4252,3 +4252,96 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
     assert.match(res.sentBody, /Failed to render the Observation page/);
   });
 });
+
+// ─── Widened hydrate route — neighborhood (LIN-2775 Area 6) ────────────────
+//
+// GET /workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier is the
+// only production caller-tested route this ticket touches directly (the
+// client's only caller, ensureHydration in public/observation.js, reads only
+// hydrated/state/labels/url — the new field is additive to it with zero
+// compatibility handling needed).
+describe('GET /api/dashboard/hydrate/:wsUrlKey/:identifier — widened neighborhood (LIN-2775 Area 6)', () => {
+  const NO_OP_STORES = {
+    dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+    agentStatusStore: { async listStatus() { return { items: [] }; } }
+  };
+
+  function makeHydrateRouter({ fetchIssueContext, getWorkspaceAccessToken } = {}) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      ...NO_OP_STORES,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: getWorkspaceAccessToken || (async () => 'token'),
+      fetchIssueContext: fetchIssueContext || (async () => ({})),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+  }
+
+  function callHydrate(router, { wsUrlKey = 'ws-a', identifier = 'LIN-1' } = {}) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier');
+    const { req, res } = makeReqRes({
+      session: { workspaces: [{ urlKey: wsUrlKey, name: 'Alpha' }] },
+      params: { wsUrlKey, identifier }
+    });
+    return handler(req, res).then(() => res);
+  }
+
+  test('the response gains neighborhood: {parent, siblings, children, cousins}, additive alongside the existing fields', async () => {
+    let contextCalls = 0;
+    const context = {
+      issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [{ name: 'bug' }] }, url: 'https://example.test/LIN-1' },
+      parent: { id: 'id-parent', identifier: 'LIN-PARENT', title: 'Parent', state: { name: 'Todo', type: 'unstarted' } },
+      siblings: [{ id: 'id-sib', identifier: 'LIN-SIB', title: 'Sib', state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] }, inverseRelations: { nodes: [] } }],
+      children: [{ id: 'id-child', identifier: 'LIN-CHILD', title: 'Child', state: { name: 'Done', type: 'completed' }, updatedAt: '2026-01-01', labels: { nodes: [] } }],
+      cousins: [{ id: 'id-cousin', identifier: 'LIN-COUSIN', title: 'Cousin', state: { name: 'Todo', type: 'unstarted' } }]
+    };
+    const router = makeHydrateRouter({ fetchIssueContext: async () => { contextCalls += 1; return context; } });
+
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    // Existing fields, byte-identical to before this Area.
+    assert.equal(res.jsonBody.hydrated, true);
+    assert.deepEqual(res.jsonBody.state, { name: 'In Progress', type: 'started' });
+    assert.deepEqual(res.jsonBody.labels, ['bug']);
+    assert.equal(res.jsonBody.url, 'https://example.test/LIN-1');
+    // New field.
+    assert.deepEqual(res.jsonBody.neighborhood.parent, { id: 'id-parent', identifier: 'LIN-PARENT', title: 'Parent', state: { name: 'Todo', type: 'unstarted' } });
+    assert.deepEqual(res.jsonBody.neighborhood.siblings, [{ id: 'id-sib', identifier: 'LIN-SIB', title: 'Sib', state: { name: 'In Progress', type: 'started' } }]);
+    assert.deepEqual(res.jsonBody.neighborhood.children, [{ id: 'id-child', identifier: 'LIN-CHILD', title: 'Child', state: { name: 'Done', type: 'completed' } }]);
+    assert.deepEqual(res.jsonBody.neighborhood.cousins, [{ id: 'id-cousin', identifier: 'LIN-COUSIN', title: 'Cousin', state: { name: 'Todo', type: 'unstarted' } }]);
+    // The projection drops fields a membership/terminality check has no use
+    // for (labels/inverseRelations/etc on the raw sibling/child GraphQL nodes) —
+    // pinned by the deepEqual above matching the small shape exactly, not a
+    // superset.
+    assert.equal(contextCalls, 1, 'no second provider read — one fetchIssueContext call resolves both neighbourhood membership and target terminality');
+  });
+
+  test('a parent-less issue (top-level) gets neighborhood.parent: null, siblings/children/cousins: []', async () => {
+    const router = makeHydrateRouter({ fetchIssueContext: async () => ({ issue: { state: { name: 'Todo', type: 'unstarted' } } }) });
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody.neighborhood, { parent: null, siblings: [], children: [], cousins: [] });
+  });
+
+  test('no token → hydrated: false, reason: no_token — unchanged, no neighborhood field at all', async () => {
+    const router = makeHydrateRouter({ getWorkspaceAccessToken: async () => null });
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { hydrated: false, reason: 'no_token' });
+  });
+
+  test('fetchIssueContext throwing "not found" degrades to hydrated: false, reason: not_found — never a 500', async () => {
+    const router = makeHydrateRouter({ fetchIssueContext: async () => { throw new Error('Issue not found: LIN-1'); } });
+    const res = await callHydrate(router);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { hydrated: false, reason: 'not_found' });
+  });
+});

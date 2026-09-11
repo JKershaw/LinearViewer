@@ -384,6 +384,225 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
   });
 });
 
+// ─── Record delivery (LIN-2775 Area 6) ──────────────────────────────────────
+//
+// A `gone`-disposition row whose resolved `effect` is `record` (server-
+// resolved, or an operator's own flip override — LIN-2775 Area 5) must
+// comment-and-stamp only, never dispatch. This is a NEW sibling branch, not a
+// reroute through the pre-existing `task-bound` branch (that branch's stamp
+// payload — {taskDecisionId, taskDecisionIssueId} — has no meaning for a
+// loop-backed row and would silently never mark the decision answered).
+function neighborhoodOf({ parent = null, siblings = [], children = [], cousins = [] } = {}) {
+  return { parent, siblings, children, cousins };
+}
+function hydrateOk(neighborhood, state = null) {
+  return { hydrated: true, identifier: ANCHOR.issueIdentifier, state, neighborhood: neighborhoodOf(neighborhood) };
+}
+function neighbor(identifier, type = 'started') {
+  return { id: `id-${identifier}`, identifier, title: identifier, state: { name: type, type } };
+}
+
+describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
+  test('a gone row with effect "record" and no declared record_on comments to the anchor and never dispatches', async () => {
+    let commentCalls = 0;
+    let capturedIssueId = null;
+    let capturedExtra = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => {
+        commentCalls += 1; capturedIssueId = issueId; capturedExtra = extra;
+        return { ok: true, status: 201, data: {} };
+      },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-record-1' }, effect: 'record', alternate: null }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'the fallback prefers the real issueId, mirroring the gone branch\'s own issueId || issueIdentifier convention');
+    // The stamp-triggering pair — proof this went through the NEW record
+    // branch, not the task-bound branch's {taskDecisionId, taskDecisionIssueId}.
+    // Field-by-field, not deepEqual — capturedExtra crosses the vm sandbox
+    // boundary, so it is structurally but not reference-equal to a same-realm
+    // object literal (same convention as the task-bound test above).
+    assert.equal(capturedExtra.decisionLoopId, ANCHOR.loopId);
+    assert.equal(capturedExtra.decisionId, 'd-record-1');
+    assert.equal(capturedExtra.taskDecisionId, undefined);
+    assert.equal(capturedExtra.taskDecisionIssueId, undefined);
+    assert.equal(dispatchCalls, 0, 'a record delivery must never dispatch');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+  });
+
+  test('record_on misrouting: an UNKNOWN record_on (matches nothing in the neighbourhood) targets the anchor, and the note renders', async () => {
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({ siblings: [neighbor('LIN-9001')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-2', on_answer: { effect: 'record', record_on: 'LIN-NOWHERE' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'the comment target must be the ANCHOR (issueId preferred), never the unresolved record_on value');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /outside the checked neighbourhood/, 'the note must render, and must not word this as "invalid"');
+  });
+
+  test('record_on misrouting: a TERMINAL in-neighbourhood record_on targets the anchor, and the note renders', async () => {
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      // In the neighbourhood, but itself Done — must not receive the comment.
+      api: async () => hydrateOk({ siblings: [neighbor('LIN-DONE', 'completed')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-3', on_answer: { effect: 'record', record_on: 'LIN-DONE' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'a terminal target — even one found in the neighbourhood — must not receive the comment');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /outside the checked neighbourhood/);
+  });
+
+  test('record_on misrouting: a CROSS-WORKSPACE record_on (absent from THIS workspace\'s neighbourhood) targets the anchor, and the note renders', async () => {
+    // The hydrate call is always scoped to the ANCHOR's own workspace token
+    // (targetUrlKey) — a record_on value that happens to name a real issue in
+    // a DIFFERENT workspace can never appear in this neighbourhood at all, so
+    // it is indistinguishable from "unknown" at this check, which is exactly
+    // the safety property under test: this workspace's neighbourhood can
+    // never accidentally validate an identifier that belongs to another one.
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({ siblings: [neighbor('LIN-9001')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-4', on_answer: { effect: 'record', record_on: 'OTHER-WS-42' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, ANCHOR.issueId, 'the fallback prefers the real issueId, mirroring the gone branch\'s own issueId || issueIdentifier convention');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /outside the checked neighbourhood/);
+  });
+
+  test('a valid, in-neighbourhood, non-terminal record_on targets ITS OWN identifier, not the anchor, and that identifier is shown', async () => {
+    let capturedIssueId = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId) => { capturedIssueId = issueId; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({ children: [neighbor('LIN-CHILD-1')] })
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-5', on_answer: { effect: 'record', record_on: 'LIN-CHILD-1' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(capturedIssueId, 'id-LIN-CHILD-1', 'the comment must target the resolved record_on identifier, not the anchor');
+    assert.equal(dispatchCalls, 0);
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+    assert.match(feedback.textContent, /LIN-CHILD-1/, 'the resolved target identifier must actually render — it is the entire mitigation for the stated S15 residual');
+    assert.doesNotMatch(feedback.textContent, /outside the checked neighbourhood/);
+  });
+
+  test('a record delivery stamps the decision answered (decisionLoopId/decisionId) and never calls startRun/dispatchPrompt', async () => {
+    let capturedExtra = null;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({})
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-6', on_answer: { effect: 'record' } }, effect: 'record', alternate: null }),
+      'Approve', li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    // Exactly the pair stampDecisionAnswers (routes/workspace-api.js) keys on
+    // — never the task-bound {taskDecisionId, taskDecisionIssueId} shape,
+    // which would leave this decision permanently unanswered. Field-by-field,
+    // not deepEqual — see the note on the sibling test above.
+    assert.equal(capturedExtra.decisionLoopId, ANCHOR.loopId);
+    assert.equal(capturedExtra.decisionId, 'd-record-6');
+    assert.equal(capturedExtra.taskDecisionId, undefined);
+    assert.equal(capturedExtra.taskDecisionIssueId, undefined);
+    assert.equal(dispatchCalls, 0, 'startRun/dispatchPrompt must never be called on a record delivery');
+  });
+
+  test('an operator\'s flip override (LIN-2775 Area 5) to "record" is honoured — a row whose server-resolved effect is "dispatch" still records, not dispatches', async () => {
+    let commentCalls = 0;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => hydrateOk({})
+    });
+    const { deliverRulingReply, rulingEffectOverride, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow({ decision: { decision_id: 'd-record-7' }, effect: 'dispatch', alternate: 'record' });
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-record-7');
+    rulingEffectOverride.set(key, 'record');
+
+    deliverRulingReply(row, 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1);
+    assert.equal(dispatchCalls, 0, 'the operator\'s override must be honoured over the row\'s own server-resolved default effect');
+  });
+});
+
 function makeResumableRow({ decision, anchor, ...rest } = {}) {
   return {
     decision: decision || { decision_id: 'd-resumable-1' },
@@ -2223,5 +2442,70 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
     renderRulings([]);
 
     assert.equal(rulingEffectOverride.has(key), false, 'the override must not survive its row leaving the feed');
+  });
+});
+
+// ─── resolveRecordTarget (LIN-2775 Area 6) — pure, no DOM/network ──────────
+describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
+  function sandboxExports() {
+    return makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) }).module.exports;
+  }
+
+  test('no record_on declared → the anchor, no note', () => {
+    const { resolveRecordTarget } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, null, { hydrated: true, neighborhood: { parent: null, siblings: [], children: [], cousins: [] } });
+    assert.equal(result.issueId, ANCHOR.issueId);
+    assert.equal(result.issueIdentifier, ANCHOR.issueIdentifier);
+    assert.equal(result.note, null);
+  });
+
+  test('record_on matches nothing in the neighbourhood → the anchor, the outside-neighbourhood note', () => {
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-NOWHERE', {
+      hydrated: true,
+      neighborhood: { parent: null, siblings: [{ id: 'id-1', identifier: 'LIN-1', state: { type: 'started' } }], children: [], cousins: [] }
+    });
+    assert.equal(result.issueId, ANCHOR.issueId);
+    assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
+  });
+
+  test('record_on matches a neighbour whose own state is terminal → the anchor, the note', () => {
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+    for (const type of ['completed', 'canceled', 'duplicate']) {
+      const result = resolveRecordTarget(ANCHOR, 'LIN-T', {
+        hydrated: true,
+        neighborhood: { parent: null, siblings: [], children: [{ id: 'id-t', identifier: 'LIN-T', state: { type } }], cousins: [] }
+      });
+      assert.equal(result.issueId, ANCHOR.issueId, `terminal type ${type} must fall back to the anchor`);
+      assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
+    }
+  });
+
+  test('record_on matches a non-terminal neighbour → that neighbour, no note', () => {
+    const { resolveRecordTarget } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-COUSIN', {
+      hydrated: true,
+      neighborhood: { parent: null, siblings: [], children: [], cousins: [{ id: 'id-cousin', identifier: 'LIN-COUSIN', state: { type: 'started' } }] }
+    });
+    assert.equal(result.issueId, 'id-cousin');
+    assert.equal(result.issueIdentifier, 'LIN-COUSIN');
+    assert.equal(result.note, null);
+  });
+
+  test('record_on matches the parent specifically (not only siblings/children/cousins)', () => {
+    const { resolveRecordTarget } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-PARENT', {
+      hydrated: true,
+      neighborhood: { parent: { id: 'id-parent', identifier: 'LIN-PARENT', state: { type: 'unstarted' } }, siblings: [], children: [], cousins: [] }
+    });
+    assert.equal(result.issueId, 'id-parent');
+    assert.equal(result.note, null);
+  });
+
+  test('a failed/unavailable hydrate result (hydrated: false) → the anchor, the note — fails safe, never throws', () => {
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+    const result = resolveRecordTarget(ANCHOR, 'LIN-SOMETHING', { hydrated: false, reason: 'unavailable' });
+    assert.equal(result.issueId, ANCHOR.issueId);
+    assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
   });
 });

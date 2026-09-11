@@ -2348,6 +2348,21 @@ export function createDashboardRoutes({
   // that workspace's own token. Failure (expired token, not found) degrades to a
   // null hydration — the run detail still renders from the Mongo Loop data.
 
+  // LIN-2775 Area 6: project a neighbourhood member (fetchIssueContext's raw
+  // parent/sibling/child/cousin node) down to the small, stable shape a
+  // membership/terminality check actually needs — never the full GraphQL node,
+  // which for siblings/children also carries labels/relations/grandchildren
+  // this consumer has no use for and no reason to expose over this route.
+  function projectNeighbor(node) {
+    if (!node) return null;
+    return {
+      id: node.id || null,
+      identifier: node.identifier || null,
+      title: node.title || null,
+      state: node.state ? { name: node.state.name, type: node.state.type } : null
+    };
+  }
+
   router.get('/workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier', workspaceFromUrl, async (req, res) => {
     const { wsUrlKey, identifier } = req.params;
     // Only hydrate workspaces the user is actually connected to (never trust the path).
@@ -2368,7 +2383,20 @@ export function createDashboardRoutes({
           ? issue.labels.nodes.map(l => l.name)
           : (Array.isArray(issue.labels) ? issue.labels : []),
         assignee: issue.assignee?.name || null,
-        url: issue.url || null
+        url: issue.url || null,
+        // LIN-2775 Area 6: additive, no second provider read — fetchIssueContext
+        // above already resolved parent/siblings/children/cousins, each
+        // carrying its own state. Widened so a caller resolving a declared
+        // `record_on` target gets BOTH neighbourhood-membership (does this
+        // identifier appear here at all) AND that member's own terminality
+        // (its embedded `state.type`) from this one call — no second round
+        // trip is needed to separately check the target's own state.
+        neighborhood: {
+          parent: projectNeighbor(context?.parent),
+          siblings: (context?.siblings || []).map(projectNeighbor),
+          children: (context?.children || []).map(projectNeighbor),
+          cousins: (context?.cousins || []).map(projectNeighbor)
+        }
       });
     } catch (error) {
       // Best-effort: never 500 the drill-down on a hydration miss.
