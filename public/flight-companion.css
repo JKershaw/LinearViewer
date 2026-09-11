@@ -426,7 +426,6 @@
        pushing Start/composer out of this section into the next one — unlike
        `min-height: auto` or `flex: 0 0 auto`, which stop the overlap by
        growing the column past its `100dvh` cap and leave Start unclickable. */
-    overflow-y: auto;
   }
   /* LIN-2621: the status strip is a new direct child, prepended above the
      thread — it takes its natural (wrapped) height like the section-header
