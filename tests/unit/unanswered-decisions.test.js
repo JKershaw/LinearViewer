@@ -432,4 +432,33 @@ describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
     assert.strictEqual(rows.length, 1);
     assert.strictEqual(rows[0].anchor.workspaceUrlKey, 'globex');
   });
+
+  // LIN-2756 — the ticket's live repro at the shelfGate layer: session
+  // `74869c9c`'s review loop `07509b1e` and close-out loop `0c912018` emit
+  // the SAME decision_id in the SAME workspace. A shelve on one loop's row
+  // must not suppress the other's — the same collision LIN-2293 already
+  // fixed across workspaces, one dimension over.
+  test('shelving one loop’s row does not suppress a DIFFERENT loop sharing the same decision_id in the same workspace', () => {
+    const reviewLoop = loop({ loopId: '07509b1e', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
+    const closeoutLoop = loop({ loopId: '0c912018', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
+    const rows = collectUnansweredDecisions(
+      {
+        loops: [reviewLoop, closeoutLoop],
+        shelvedRulings: [shelf('lin2384-f6-gate', { decisionLoopId: '07509b1e', resurfaceAt: '2026-08-23T00:00:00.000Z' })]
+      },
+      { now: NOW }
+    );
+    assert.strictEqual(rows.length, 1, 'only the review loop is shelved — the close-out loop must still surface');
+    assert.strictEqual(rows[0].anchor.loopId, '0c912018');
+  });
+
+  test('a legacy/workspace-wide shelf (no decisionLoopId) still suppresses every loop sharing the decision_id — documented back-compat', () => {
+    const reviewLoop = loop({ loopId: '07509b1e', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
+    const closeoutLoop = loop({ loopId: '0c912018', wakeMarker: 'blocked', decision: decision('lin2384-f6-gate') });
+    const rows = collectUnansweredDecisions(
+      { loops: [reviewLoop, closeoutLoop], shelvedRulings: [shelf('lin2384-f6-gate', { resurfaceAt: '2026-08-23T00:00:00.000Z' })] },
+      { now: NOW }
+    );
+    assert.deepStrictEqual(rows, [], 'a decisionLoopId-less shelf applies to every loop carrying the id, exactly as it did pre-LIN-2756');
+  });
 });

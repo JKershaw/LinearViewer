@@ -2079,7 +2079,14 @@ function shelveRulingRow(row, li, reason, resurfaceInMs) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     on401: false,
-    body: JSON.stringify({ decisionId, reason, resurfaceInMs })
+    // LIN-2756: same field/value the dismiss path already sends
+    // (`issueDismissRequest`'s `decisionLoopId: anchor.loopId`) — reused
+    // here, not forked, so the shelf store's composite key can agree with
+    // the client's own `rulingKey`. Optional server-side, so an anchor that
+    // somehow lost its loopId between render and click (should not happen —
+    // `key` above already refused a null-anchor row) still shelves under
+    // the wider, documented legacy shape rather than failing outright.
+    body: JSON.stringify({ decisionId, decisionLoopId: anchor?.loopId ?? anchor?.taskDecisionId, reason, resurfaceInMs })
   }).then(() => {
     restore();
     const panel = li.querySelector('.obs-ruling-shelve-panel');
@@ -2282,7 +2289,10 @@ function keepRulingRow(row, li) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     on401: false,
-    body: JSON.stringify({ decisionId })
+    // LIN-2756: must match whatever the standing suggestion was proposed
+    // with (present or omitted) — a Keep addresses the SAME composite id a
+    // suggest() call would have. See shelveRulingRow's own note just above.
+    body: JSON.stringify({ decisionId, decisionLoopId: anchor?.loopId ?? anchor?.taskDecisionId })
   }).then(() => {
     restore();
     setFeedback('kept', false);

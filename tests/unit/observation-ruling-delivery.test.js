@@ -1014,7 +1014,12 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.equal(apiCalls, 1, 'a second Agree on an already-settled key must not re-POST a second decision-answer');
   });
 
-  test('Keep posts to the keep route with {decisionId}, never a dismiss endpoint', async () => {
+  // LIN-2756: widened from {decisionId} to {decisionId, decisionLoopId} —
+  // Keep must address the SAME composite id a suggest() call would have
+  // (lib/dismissal-suggestions-store.js's now-loop-aware `_id`), so it sends
+  // the row's own anchor.loopId (or anchor.taskDecisionId for a task-bound
+  // row), never a dismiss endpoint.
+  test('Keep posts to the keep route with {decisionId, decisionLoopId}, never a dismiss endpoint', async () => {
     let captured = null;
     const { module } = makeSandbox({
       api: async (url, opts) => { captured = { url, opts }; return { success: true, suggestion: { withdrawn: true } }; }
@@ -1029,7 +1034,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.ok(captured, 'expected window.api to be called');
     assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/keep');
     assert.equal(captured.opts.method, 'POST');
-    assert.deepEqual(JSON.parse(captured.opts.body), { decisionId: 'd-gone-1' });
+    assert.deepEqual(JSON.parse(captured.opts.body), { decisionId: 'd-gone-1', decisionLoopId: 'loop-gone-1' });
 
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.equal(feedback.textContent, 'kept');

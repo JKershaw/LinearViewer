@@ -109,6 +109,44 @@ describe('ShelvedRulingsStore.shelve', () => {
   });
 });
 
+// LIN-2756 — same per-loop identity as DismissalSuggestionsStore (the two
+// stores are modelled on the same shape by design). Session `74869c9c`'s
+// review loop `07509b1e` and close-out loop `0c912018` share one
+// `decision_id`; a shelve on one loop's row must not silence the other's.
+describe('ShelvedRulingsStore — per-loop identity (LIN-2756)', () => {
+  let collection, store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new ShelvedRulingsStore({ collection });
+  });
+
+  test('a decisionLoopId-scoped shelve keys on the full triple', async () => {
+    const record = await store.shelve({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'waiting on review', resurfaceInMs: HOUR_MS, now: NOW });
+    assert.strictEqual(record.decisionLoopId, '07509b1e');
+    assert.strictEqual(collection._docs[0]._id, 'acme::07509b1e::lin2384-f6-gate');
+  });
+
+  test('two loops sharing (urlKey, decisionId) get independent shelf rows and independent lapse counts', async () => {
+    await store.shelve({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'a', resurfaceInMs: HOUR_MS, now: NOW });
+    await store.shelve({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '0c912018', reason: 'b', resurfaceInMs: HOUR_MS, now: NOW });
+    assert.strictEqual(collection._docs.length, 2, 'each loop must keep its own row, not collapse onto one shared key');
+
+    // Lapse the review loop's shelf only; the close-out loop's must be untouched.
+    const laterNow = new Date(NOW.getTime() + 2 * HOUR_MS);
+    const relapsed = await store.shelve({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'again', resurfaceInMs: HOUR_MS, now: laterNow });
+    assert.strictEqual(relapsed.lapseCount, 1);
+
+    const closeoutRow = collection._docs.find(d => d.decisionLoopId === '0c912018');
+    assert.strictEqual(closeoutRow.lapseCount, 0, "the close-out loop's shelf must not inherit the review loop's lapse count");
+  });
+
+  test('omitting decisionLoopId keeps the legacy, workspace-wide two-segment shape', async () => {
+    const record = await store.shelve({ urlKey: 'acme', decisionId: 'd-1', reason: 'x', resurfaceInMs: HOUR_MS, now: NOW });
+    assert.strictEqual(record.decisionLoopId, null);
+    assert.strictEqual(collection._docs[0]._id, 'acme::d-1');
+  });
+});
+
 describe('ShelvedRulingsStore.listForWorkspaces', () => {
   let collection, store;
   beforeEach(() => {
