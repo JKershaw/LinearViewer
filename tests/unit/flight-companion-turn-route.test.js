@@ -79,7 +79,7 @@ import {
 } from '../../lib/prompts/flight-companion-brief.js';
 import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
-import { DEFAULT_MODEL } from '../../lib/openrouter.js';
+import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js'), 'utf8');
@@ -2068,6 +2068,32 @@ describe('buildFlightCompanionStripData (LIN-2621) — pure derivation, no I/O',
     const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
     assert.strictEqual(strip.nextCheckInAt, null);
   });
+
+  // LIN-2623 beat 3
+  test('modelOptions is exactly the curated AVAILABLE_MODELS set — Trap 1: the same set resolveTurnModelOverride accepts, never widened', () => {
+    const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.deepEqual(strip.modelOptions.map((m) => m.id), AVAILABLE_MODELS.map((m) => m.id));
+    for (const m of strip.modelOptions) {
+      assert.strictEqual(typeof m.name, 'string');
+      assert.ok(m.name.length > 0);
+    }
+  });
+
+  test('currentPricing is the resolved default\'s own rate-card hint, and null for an uncurated default — never fabricated', () => {
+    const curated = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(typeof curated.currentPricing, 'string');
+
+    const uncurated = buildFlightCompanionStripData({ model: 'some-vendor/not-in-the-allowlist', companionDoc: null, censusDoc: null });
+    assert.strictEqual(uncurated.currentPricing, null);
+  });
+
+  test('isFreeTier passes through unchanged, defaulting to false', () => {
+    const defaulted = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
+    assert.strictEqual(defaulted.isFreeTier, false);
+
+    const freeTier = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null, isFreeTier: true });
+    assert.strictEqual(freeTier.isFreeTier, true);
+  });
 });
 
 // ─── LIN-2621 beat 2: the GET page handler's server-side strip resolution ──
@@ -2126,5 +2152,64 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     const { status, headers } = await get(app, '/workspace/acme/flight-companion');
     assert.strictEqual(status, 302);
     assert.match(headers.get('location'), /\/settings$/);
+  });
+
+  // LIN-2623 beat 3 — mandated red-first case, exercised on the real page.
+  test('an uncurated workspace default renders the tools-off warning on the real page', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('some-vendor/not-in-the-allowlist'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
+  });
+
+  test('a curated workspace default renders no tools-off warning', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.doesNotMatch(text, /fc-strip-tools-warning/);
+  });
+
+  test('the picker renders every curated model as a selectable option', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    for (const m of AVAILABLE_MODELS) {
+      assert.ok(text.includes(`value="${m.id}"`), `expected an <option> for ${m.id}`);
+    }
+  });
+
+  test('free tier renders the picker disabled with the legibility note, on the real page', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
+      const { text } = await get(app, '/workspace/acme/flight-companion');
+      assert.match(text, /flight-companion-model-select" class="fc-model-select" disabled>/);
+      assert.match(text, /<span class="fc-strip-freetier" id="flight-companion-freetier-note">/);
+    });
+  });
+
+  test('non-free-tier renders the picker enabled, with no free-tier note, on the real page', async () => {
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
+      flightCompanionEnabled: true,
+    });
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: undefined }, async () => {
+      const { text } = await get(app, '/workspace/acme/flight-companion');
+      assert.doesNotMatch(text, /flight-companion-model-select" class="fc-model-select" disabled/);
+      assert.doesNotMatch(text, /fc-strip-freetier/);
+    });
   });
 });

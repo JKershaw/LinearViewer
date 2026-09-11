@@ -405,6 +405,19 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   // spent nothing).
   const stripTabTotalEl = new FakeElement('span');
   stripTabTotalEl.textContent = '0 check-ins · $0.00 this tab';
+  // LIN-2623 beat 3: the model picker + its rate-card mount. `.value`
+  // mirrors a real <select>'s reported value — this fake does not model
+  // `<option>`/`selectedIndex` (unneeded here: every test in this file
+  // drives the picker by writing `.value` directly, the same way a real
+  // <select>'s value changes when an option is picked; `.options` stays
+  // undefined, so `updateModelPriceDisplay`'s real-DOM `data-pricing` read
+  // safely no-ops — that live-DOM behavior is covered by
+  // tests/unit/render-flight-companion.test.js's markup assertions and
+  // tests/e2e/flight-companion.spec.js's real-browser round trip instead).
+  const modelSelectEl = new FakeElement('select');
+  modelSelectEl.value = '';
+  const modelPriceEl = new FakeElement('span');
+  modelPriceEl.textContent = '—';
   doc._byId['flight-companion-thread'] = thread;
   doc._byId['flight-companion-chat-empty'] = emptyState;
   doc._byId['flight-companion-checkin'] = checkIn;
@@ -414,6 +427,8 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   doc._byId['flight-companion-reorient'] = reorientBtn;
   doc._byId['flight-companion-strip-next'] = stripNextEl;
   doc._byId['flight-companion-strip-tab-total'] = stripTabTotalEl;
+  doc._byId['flight-companion-model-select'] = modelSelectEl;
+  doc._byId['flight-companion-model-price'] = modelPriceEl;
   // LIN-2718: only the composer's own input is ever focused/blurred by this
   // module — wiring the owner document lets FakeElement#focus() and the
   // `disabled` setter's blur-on-disable simulate real activeElement changes.
@@ -2902,6 +2917,109 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
   });
 });
 
+// ─── Per-turn model picker (LIN-2623 beat 3) ───────────────────────────────
+//
+// The picker's OWN markup/rate-card/data-pricing behavior is pure server-
+// rendered HTML, already covered by tests/unit/render-flight-companion.test.js;
+// a live browser's real <select>/<option> reflection of that markup is
+// covered by tests/e2e/flight-companion.spec.js. This block covers the two
+// things that are genuinely CLIENT logic: what `sendTurn` puts in the turn
+// request body, and how the choice round-trips through LIN-2716's own
+// sessionStorage persistence — the same seam chatHistory/tabTotals already
+// use, extended (see the describe block below this one) rather than forked.
+describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends the choice', () => {
+  test('mandated red-first sibling: an untouched picker (empty value, "current default") sends NO model field', async () => {
+    const { exports: m, fetchCalls, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(fetchCalls[0].body, 'model'), false,
+      'a picker left on "current default" must not send a model field at all — beat 1\'s resolveAiOperationModel decides');
+  });
+
+  test('picking a curated model sends it as `model` on the turn request', async () => {
+    const { exports: m, fetchCalls, questionInput, doc } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    questionInput.value = 'status please';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(fetchCalls[0].body.model, 'anthropic/claude-opus-5');
+  });
+
+  test('the picker never rides an auto-wake tick — no human choice to carry on an unattended tick', async () => {
+    const { exports: m, fetchCalls, doc } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(fetchCalls[0].body, 'model'), false);
+  });
+
+  test('the picker never rides a boot turn — boot hardcodes its own turn content and reads no body field', async () => {
+    const { exports: m, fetchCalls, doc } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', {})]),
+    });
+    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    m.startBoot();
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(fetchCalls[0].url, '/workspace/acme/api/flight-companion/boot');
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(fetchCalls[0].body, 'model'), false);
+  });
+
+  test('a change on the picker updates the rate-card mount via the exported updateModelPriceDisplay', () => {
+    const { exports: m, doc } = loadClient();
+    const select = doc._byId['flight-companion-model-select'];
+    // This fake models `.value` only (see its own construction comment) —
+    // `.options`/`selectedIndex` are real-DOM-only, so the real data-pricing
+    // read safely falls through to the honest '—' fallback here; the REAL
+    // attribute read is covered by render-flight-companion.test.js (markup)
+    // and the e2e round trip (a real <select>).
+    select.value = 'anthropic/claude-opus-5';
+    select.dispatch('change');
+    assert.strictEqual(m.getModelPriceText(), '—');
+  });
+
+  test('a change on the picker persists the choice immediately — before any turn is sent', () => {
+    const storage = makeFakeStorage();
+    const { doc } = loadClient({ storageImpl: storage });
+    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    doc._byId['flight-companion-model-select'].dispatch('change');
+    const raw = storage.getItem('flight-companion-session:acme');
+    assert.ok(raw, 'expected a write to sessionStorage on change, not just at turn completion');
+    assert.strictEqual(JSON.parse(raw).selectedModel, 'anthropic/claude-opus-5');
+  });
+
+  test('the selection persists across a reload: a fresh loadClient() restores it from storage into the picker', async () => {
+    const storage = makeFakeStorage();
+    const first = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    first.doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    first.doc._byId['flight-companion-model-select'].dispatch('change');
+
+    // A fresh loadClient() call is a fresh page load (a new vm context, a
+    // new picker element defaulted back to '') — sharing only `storage`,
+    // exactly mirroring a real reload.
+    const second = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    assert.strictEqual(second.doc._byId['flight-companion-model-select'].value, 'anthropic/claude-opus-5',
+      'the reloaded page must restore the picker to the previously-chosen model, not the empty "current default"');
+
+    // And the restored choice is honored on the very next send, with no
+    // further interaction needed.
+    second.doc._byId['flight-companion-question'].value = 'still there?';
+    second.exports.submitQuestion();
+    await flush();
+    assert.strictEqual(second.fetchCalls[second.fetchCalls.length - 1].body.model, 'anthropic/claude-opus-5');
+  });
+});
+
 // ─── Session persistence helper (LIN-2716) ─────────────────────────────────
 //
 // Before this landed, a page reload lost `chatHistory` entirely — it lived
@@ -2909,10 +3027,12 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
 // ticket's Observed section). These tests PIN THE SHAPE of the persistence
 // helper, exposed on the module's own test seam:
 //   - `sessionStorageKey(urlKey)` -> the storage key for that workspace
-//   - `loadStoredSession(urlKey)` -> `{history, tabCheckInCount, tabTotalCost}`,
-//     always this shape, NEVER throws — a missing entry, malformed JSON, or
-//     well-formed JSON of the wrong shape all degrade to the same clean
-//     empty session `{history: [], tabCheckInCount: 0, tabTotalCost: 0}`
+//   - `loadStoredSession(urlKey)` -> `{history, tabCheckInCount, tabTotalCost,
+//     selectedModel}` (the last joined the shape in LIN-2623 beat 3 — the
+//     model picker's own choice, `null` meaning "no override"), always this
+//     shape, NEVER throws — a missing entry, malformed JSON, or well-formed
+//     JSON of the wrong shape all degrade to the same clean empty session
+//     `{history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null}`
 //   - `saveStoredSession(urlKey, session)` -> writes it back, capping
 //     `history` via the pre-existing `capHistory`/`HISTORY_CAP` so a
 //     hand-edited or pre-cap stored blob can never bypass the 40-turn bound
@@ -2939,7 +3059,10 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
 // production implementation these tests now exercise for real.
 describe('flight-companion.js — session persistence helper (LIN-2716)', () => {
   const STORAGE_KEY = 'flight-companion-session:acme';
-  const EMPTY_SESSION = { history: [], tabCheckInCount: 0, tabTotalCost: 0 };
+  // LIN-2623 beat 3: `selectedModel` joined the persisted shape (the model
+  // picker's own choice — null means "no override"), round-tripped through
+  // the SAME blob as history/totals.
+  const EMPTY_SESSION = { history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null };
 
   test('round-trip: a saved session reloads with the same thread and the same history the next turn would carry', () => {
     const { exports: m } = loadClient();
@@ -2950,6 +3073,7 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
       ],
       tabCheckInCount: 1,
       tabTotalCost: 0.0042,
+      selectedModel: 'anthropic/claude-opus-5',
     };
     m.saveStoredSession('acme', session);
     // looseDeepEqual (node:assert's non-strict deepEqual), not

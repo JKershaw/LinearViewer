@@ -81,7 +81,8 @@ import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kic
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey, AVAILABLE_MODELS } from '../lib/openrouter.js';
+import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
+import { buildModelOptions } from '../lib/openrouter-catalog.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
@@ -305,17 +306,46 @@ export function buildCensusSeedText(currentCensusDoc) {
  * checks the SAME null-ness the gate itself keys off and prints the SAME
  * established phrase, rather than re-deriving the no-census classification.
  *
+ * LIN-2623 beat 3 adds the per-turn model picker's own data: `modelOptions`
+ * (the exact curated set `resolveTurnModelOverride`, routes/flight-
+ * companion.js, accepts — never widened by the live OpenRouter catalog,
+ * which would offer a selection the turn endpoint could then 400. The set
+ * itself is built via the shared `buildModelOptions` merge (lib/openrouter-
+ * catalog.js), reused rather than forked, over `AVAILABLE_MODELS`' own ids;
+ * display name/pricing for each entry come straight from `AVAILABLE_MODELS`,
+ * which already carries both) and `currentPricing` (the resolved default's
+ * own rate-card hint, `null` when unpriced — never fabricated, matching
+ * `getModelPricingHint`'s own contract).
+ *
  * @param {Object} p
  * @param {string} p.model - the model id this page load resolved (`resolveWorkspaceModel`)
  * @param {Object|null} p.companionDoc - `observerStateStore.readCurrent('companion:v1:<urlKey>')` result, or null
  * @param {Object|null} p.censusDoc - `observerStateStore.readCurrent('sweep:v1:<urlKey>')` result, or null
+ * @param {boolean} [p.isFreeTier] - LIN-2623 beat 3: whether this page load's
+ *   requests will be free-tier clamped — surfaced so the page can make that
+ *   clamp legible rather than silently overriding a visible picker choice.
  * @param {number} [p.now] - injected clock (epoch ms), for deterministic tests
- * @returns {{model: string, toolsOn: boolean, lastCheckInAt: string|null, nextCheckInAt: null, sweepStatus: 'no-census'|'alive'|'stale', sweepLastSeenAt: string|null, mode: string}}
+ * @returns {{model: string, toolsOn: boolean, lastCheckInAt: string|null, nextCheckInAt: null, sweepStatus: 'no-census'|'alive'|'stale', sweepLastSeenAt: string|null, mode: string, isFreeTier: boolean, modelOptions: Array<{id: string, name: string, pricing: string|null}>, currentPricing: string|null}}
  */
-export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, now = Date.now() } = {}) {
+export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier = false, now = Date.now() } = {}) {
   const toolsOn = isToolCapableModel(model);
   const lastTurnAt = companionDoc?.state?.lastTurnAt || null;
   const lastCheckInAt = lastTurnAt ? new Date(lastTurnAt).toISOString() : null;
+
+  // LIN-2623 beat 3 — Trap 1/Trap 2: `buildModelOptions` is reused ONLY for
+  // its curated-id merge/dedup machinery, called with curatedIds alone (no
+  // live catalog). Passing the live catalog in as `catalog` here would widen
+  // the SELECTABLE set past AVAILABLE_MODELS (a picker option the turn
+  // endpoint's own curated allow-list would then 400) — the coherent reading
+  // this beat settled on. Display name/pricing intentionally come from
+  // AVAILABLE_MODELS directly (already rich: name + a resolved rate card),
+  // not from the descriptor's own `label`/`free` fields, which are shaped for
+  // the DIFFERENT dispatch-harness suggestion lists that have no such source.
+  const modelOptions = buildModelOptions({ curatedIds: AVAILABLE_MODELS.map((m) => m.id) }).map((d) => {
+    const curated = AVAILABLE_MODELS.find((m) => m.id === d.id);
+    return { id: d.id, name: curated ? curated.name : d.id, pricing: getModelPricingHint(d.id) };
+  });
+  const currentPricing = getModelPricingHint(model);
 
   let sweepStatus;
   let sweepLastSeenAt = null;
@@ -350,6 +380,9 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
     // LIN-2626 turns this into the control; rung 1 is correct while no toggle
     // exists.
     mode: 'read-only · proposes, never acts · rung 1 of 3',
+    isFreeTier,
+    modelOptions,
+    currentPricing,
   };
 }
 
@@ -483,7 +516,7 @@ export function createFlightCompanionRoutes({
       const censusDoc = observerStateStore
         ? await observerStateStore.readCurrent(`${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
         : null;
-      const strip = buildFlightCompanionStripData({ model, companionDoc, censusDoc });
+      const strip = buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier });
 
       const html = renderFlightCompanionPage(
         { prompt, observerReportDoc, strip },
