@@ -1833,6 +1833,18 @@ function requestBasisCheck(anchor, noteEl) {
   pumpBasisChecks();
 }
 
+// LIN-2792 Step 8: resolve a proposed answer's option id to its label off
+// the decision's own `options[]` — the same field the option buttons render
+// from. Falls back to the bare id (never blank) when the decision carries no
+// matching option, e.g. a stale proposal against a since-edited decision —
+// the banner should still say SOMETHING rather than silently rendering an
+// empty label.
+function resolveRulingOptionLabel(decision, optionId) {
+  const options = Array.isArray(decision?.options) ? decision.options : [];
+  const match = options.find((o) => o && o.id === optionId);
+  return match ? match.label : (optionId || '');
+}
+
 // Card content per Principle 5 (docs/escalation-philosophy.md): what (the
 // decision's own question) / why (decisionCase, the same bounded excerpt the
 // feed card uses) / the decision stated as a decision (rendered by the
@@ -1912,9 +1924,14 @@ function renderRulingRow(row) {
       suggestionHead.appendChild(checkbox);
     }
 
+    // LIN-2792 Step 8: kind-aware label — the one place this banner branches
+    // on `proposedOutcome`. Final wording is LIN-2757's hook; this is the
+    // named call site it changes, not the branch structure.
     const label = document.createElement('p');
     label.className = 'obs-ruling-suggestion-label';
-    label.textContent = 'proposed dismissal';
+    label.textContent = suggestion.proposedOutcome === 'answered'
+      ? `proposed answer: ${resolveRulingOptionLabel(decision, suggestion.optionId)}`
+      : 'proposed dismissal';
     suggestionHead.appendChild(label);
     banner.appendChild(suggestionHead);
 
@@ -2297,15 +2314,14 @@ function dismissRulingRow(row, li) {
   });
 }
 
-// Agree (LIN-2444 Phase 3) — one-click acceptance of a proposed dismissal.
-// This IS a dismiss (the human accepting the suggestion), so it runs the
-// SAME `issueDismissRequest` core as the Dismiss button above: same
-// loop-backed vs task-bound branch, same `anchor.workspaceUrlKey` target
-// (never the page's own — this feed is cross-workspace), same pending guard.
-// It adds NO new dismiss path; only the label/feedback text differs. Built
-// so a later sequential batch (Group B) can call this per selected row
-// without further surgery — it returns the settling promise so a caller can
-// await it, though this beat wires no such caller yet.
+// Agree (LIN-2444 Phase 3) — one-click acceptance of a proposed dismissal OR
+// (LIN-2792) a proposed answer. A dismissal proposal runs the SAME
+// `issueDismissRequest` core as the Dismiss button above: same loop-backed
+// vs task-bound branch, same `anchor.workspaceUrlKey` target (never the
+// page's own — this feed is cross-workspace), same pending guard. It adds NO
+// new dismiss path; only the label/feedback text differs. Built so a later
+// sequential batch (Group B) can call this per selected row without further
+// surgery — it returns the settling promise so a caller can await it.
 //
 // Review F2: on SUCCESS this does NOT call a `restore()` that re-enables
 // every control — it marks the key `rulingsSettled` instead, exactly as the
@@ -2313,7 +2329,112 @@ function dismissRulingRow(row, li) {
 // REUSED with its controls still disabled (via `mustReuse` above) rather
 // than rebuilt re-armed by the next poll. A FAILED attempt still restores
 // (re-enables) so the operator can retry.
+//
+// LIN-2792 Step 7 — an 'answered' proposal branches FOUR ways, on the row's
+// own press-time `canReply` FIRST, then disposition/`effectiveEffect` —
+// never `effect` alone, which cannot separate a safely-stampable `record`
+// row from a read-only one that also reads `record`. This function does NOT
+// call `rulingsPending.add(key)`/disable controls itself for branches 2-4:
+// each delegates to a callee (`deliverRulingStampOnly`/`deliverRulingReply`)
+// that owns its own guard/disable/settle cycle — the SAME discipline an
+// ordinary option press already uses — so this function can never
+// pre-trip that callee's own entry guard.
+//
+// Safety invariant: an Agree on a proposed answer may perform a write
+// (stamp or deliver) only when the row's press-time `canReply` is `true`; a
+// `canReply: false` row is refused — never stamped `answered` — regardless
+// of what `effect` it resolves to.
 function agreeRulingRow(row, li) {
+  const { decision, anchor, disposition, canReply } = row || {};
+  const pageUrlKey = observationData?.urlKey;
+  const targetUrlKey = anchor?.workspaceUrlKey;
+  const decisionId = decision?.decision_id;
+  const key = rulingKey(targetUrlKey, anchor, decisionId);
+  if (!key || rulingsPending.has(key) || rulingsSettled.has(key)) return Promise.resolve();
+
+  // Legacy rows (written before LIN-2790) and every pre-existing dismissal
+  // proposal carry no `proposedOutcome` at all — default to 'dismissed' so
+  // they keep agreeing exactly as they always have, byte-for-byte.
+  const proposedOutcome = row?.suggestedDismissal?.proposedOutcome ?? 'dismissed';
+
+  if (proposedOutcome !== 'answered') {
+    rulingsPending.add(key);
+    const controls = rulingRowControls(li);
+    controls.forEach(el => { el.disabled = true; });
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    const setFeedback = (text, isError) => {
+      if (!feedback) return;
+      feedback.textContent = text;
+      feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+    };
+    const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
+
+    return issueDismissRequest(anchor, decisionId).then(() => {
+      rulingsPending.delete(key);
+      setFeedback('agreed', false);
+      // Review F6: clear selection at the moment of success, exactly as
+      // `bulkAgreeRow` already does — otherwise a settled-but-still-selected
+      // row survives the stale poll window and desyncs the bulk bar's count
+      // against `rulingsSelectableKeys()` (which excludes settled rows).
+      rulingsSelected.delete(key);
+      rulingsSettled.add(key);
+      const checkbox = li.querySelector('.obs-ruling-select');
+      if (checkbox) checkbox.checked = false;
+      pollRulings();
+      refreshBadge();
+    }).catch((err) => {
+      console.error('Ruling agree failed:', err);
+      rulingsPending.delete(key);
+      controls.forEach(el => { el.disabled = false; });
+      setFeedback('agree failed: ' + err.message, true);
+    });
+  }
+
+  // Branch 1 — canReply === false (disposition mid-turn/indeterminate,
+  // regardless of what `effect` it resolves to): refuse, visibly, no write
+  // call reached. Reuses `window.ChatUI.resolveCaption`'s own read-only
+  // wording (the SAME text the row's option area already shows) as prose,
+  // rather than re-deriving it.
+  if (!canReply) {
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    if (feedback) {
+      feedback.textContent = `cannot answer — ${window.ChatUI.resolveCaption(disposition, row?.effect)}`;
+      feedback.classList.add('obs-ruling-feedback--error');
+    }
+    return Promise.resolve();
+  }
+
+  const optionId = row.suggestedDismissal?.optionId;
+
+  // Branch 2 — canReply === true AND disposition 'task-bound' (always
+  // effect: 'record' by construction): the stamp-only wrapper, never
+  // `deliverRulingReply` (which has no bare-stamp branch).
+  if (disposition === 'task-bound') {
+    return deliverRulingStampOnly(row, li, optionId);
+  }
+
+  // Branches 3/4 — canReply === true AND disposition 'resumable' or 'gone':
+  // reuse the SAME `deliverRulingReply` an ordinary option press on this row
+  // already uses, with the proposed option's own label as the "pressed"
+  // text and `optionId` threaded through to the durable stamp.
+  const optionLabel = resolveRulingOptionLabel(decision, optionId);
+  return deliverRulingReply(row, optionLabel, li, optionId);
+}
+
+// LIN-2792 Step 7 branch 2 — Agree on a task-bound proposed answer. A bare
+// stamp POST to the human-authenticated answered-without-comment route
+// (routes/dashboard.js, LIN-2754 Track B): no comment, no dispatch, no run.
+// Owns its own pending/disable/settle cycle exactly as `keepRulingRow` does
+// for its own write, mirroring `agreeRulingRow`'s dismiss-path discipline
+// above rather than delegating to `deliverRulingReply`.
+//
+// `bulkAgree` (LIN-2792 round 4): when true, a success does not itself call
+// `pollRulings()`/refresh the badge — `bulkAgreeRow`'s caller owns exactly
+// one of each per BATCH, mirroring `bulkAgreeRow`'s own dismiss-path
+// discipline. There is no partial-failure case here (a bare stamp POST has
+// no comment/dispatch duality to fail between).
+function deliverRulingStampOnly(row, li, optionId, { bulkAgree = false } = {}) {
   const { decision, anchor } = row || {};
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
@@ -2333,21 +2454,24 @@ function agreeRulingRow(row, li) {
   };
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-  return issueDismissRequest(anchor, decisionId).then(() => {
+  return window.api(`/workspace/${encodeURIComponent(targetUrlKey)}/api/dashboard/rulings/answer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    on401: false,
+    body: JSON.stringify({ taskDecisionId: anchor.taskDecisionId, taskDecisionIssueId: anchor.issueId, optionId })
+  }).then(() => {
     rulingsPending.delete(key);
     setFeedback('agreed', false);
-    // Review F6: clear selection at the moment of success, exactly as
-    // `bulkAgreeRow` already does — otherwise a settled-but-still-selected
-    // row survives the stale poll window and desyncs the bulk bar's count
-    // against `rulingsSelectableKeys()` (which excludes settled rows).
     rulingsSelected.delete(key);
     rulingsSettled.add(key);
     const checkbox = li.querySelector('.obs-ruling-select');
     if (checkbox) checkbox.checked = false;
-    pollRulings();
-    refreshBadge();
+    if (!bulkAgree) {
+      pollRulings();
+      refreshBadge();
+    }
   }).catch((err) => {
-    console.error('Ruling agree failed:', err);
+    console.error('Ruling stamp-only agree failed:', err);
     rulingsPending.delete(key);
     controls.forEach(el => { el.disabled = false; });
     setFeedback('agree failed: ' + err.message, true);
@@ -2520,13 +2644,52 @@ function syncRulingsBulkBar() {
   }
 }
 
+// LIN-2792 Step 7 — the bulk-agree breakdown for the CURRENT selection: how
+// many rows fall into each outcome `bulkAgreeRow`'s own four-way branch (plus
+// its bulk-only dispatch-skip) will actually take, so the confirm dialog and
+// the bulk bar can name real counts instead of a single undifferentiated "N
+// selected" / the old "each is a real dismissal" claim, which a mixed
+// selection makes false. Recomputed fresh from `rulingsRowByKey` (never
+// cached), mirroring `rulingsSelectableKeys`' own discipline.
+function computeBulkAgreeBreakdown() {
+  const breakdown = { dismiss: 0, answer: 0, refused: 0, dispatchSkipped: 0 };
+  for (const key of rulingsSelected) {
+    const row = rulingsRowByKey.get(key);
+    const suggestion = row?.suggestedDismissal;
+    if (!suggestion) continue;
+    const proposedOutcome = suggestion.proposedOutcome ?? 'dismissed';
+    if (proposedOutcome !== 'answered') { breakdown.dismiss += 1; continue; }
+    if (!row.canReply) { breakdown.refused += 1; continue; }
+    if (row.disposition === 'task-bound') { breakdown.answer += 1; continue; }
+    const effectKey = rulingKey(row.anchor?.workspaceUrlKey, row.anchor, row.decision?.decision_id);
+    const effectiveEffect = (effectKey && rulingEffectOverride.has(effectKey))
+      ? rulingEffectOverride.get(effectKey)
+      : row.effect;
+    if (row.disposition === 'gone' && effectiveEffect === 'dispatch') { breakdown.dispatchSkipped += 1; continue; }
+    breakdown.answer += 1;
+  }
+  return breakdown;
+}
+
 // Native confirm() (LIN-511's ratified destructive-action primitive, in the
 // form LIN-2650 landed — RETIRE_CONFIRM_TEXT, public/scan.js) behind a named
-// function beside its one call site, interpolating the count so the
-// operator sees exactly what they are about to discharge.
-function bulkAgreeConfirmText(count) {
-  return `Agree ${count} selected suggestion${count === 1 ? '' : 's'}? `
-    + 'Each is a real dismissal, exactly like pressing Agree on that row one at a time — this cannot be undone from here.';
+// function beside its one call site, naming every count from `breakdown`
+// (LIN-2792 — a mixed dismiss/answer selection makes the old single-count
+// "each is a real dismissal" text false) so the operator sees exactly what
+// they are about to discharge, and what will be skipped.
+function bulkAgreeConfirmText(breakdown) {
+  const total = breakdown.dismiss + breakdown.answer + breakdown.refused + breakdown.dispatchSkipped;
+  const parts = [];
+  if (breakdown.dismiss) parts.push(`${breakdown.dismiss} dismissal${breakdown.dismiss === 1 ? '' : 's'}`);
+  if (breakdown.answer) parts.push(`${breakdown.answer} answer${breakdown.answer === 1 ? '' : 's'}`);
+  const kinds = parts.length ? ` (${parts.join(', ')})` : '';
+  let text = `Agree ${total} selected suggestion${total === 1 ? '' : 's'}${kinds}? `
+    + 'Each row is discharged exactly as pressing Agree on that row alone would — this cannot be undone from here.';
+  const skips = [];
+  if (breakdown.refused) skips.push(`${breakdown.refused} cannot be answered yet and will be skipped`);
+  if (breakdown.dispatchSkipped) skips.push(`${breakdown.dispatchSkipped} would start a fresh run and will be skipped in bulk`);
+  if (skips.length) text += ` (${skips.join('; ')}.)`;
+  return text;
 }
 
 // Extracted to its own top-level function, unlike the inline `refreshBadge`
@@ -2539,21 +2702,27 @@ function refreshRulingsBadge(pageUrlKey) {
   if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey);
 }
 
-// Bulk-agree's per-row execution. Runs the SAME `issueDismissRequest` core
-// Agree/Dismiss already share — no new dismiss path — inside its own
-// pending guard/disable/feedback wiring, but UNLIKE `agreeRulingRow` it
-// does NOT call `pollRulings()`/refresh the badge itself (the caller owns
-// exactly one of each per BATCH, never one per row), and on SUCCESS it does
-// NOT re-enable the row's controls. That asymmetry is deliberate: a
-// succeeded key is deleted from `rulingsSelected` right here, at the moment
-// of success — never inferred from the row leaving a later poll's payload
-// (the plan-review finding) — and marked in `rulingsSettled` so
-// `renderRulings` reuses this exact <li>, controls still disabled, for as
+// Bulk-agree's per-row execution. A dismissal proposal runs the SAME
+// `issueDismissRequest` core Agree/Dismiss already share — no new dismiss
+// path — inside its own pending guard/disable/feedback wiring, but UNLIKE
+// `agreeRulingRow` it does NOT call `pollRulings()`/refresh the badge itself
+// (the caller owns exactly one of each per BATCH, never one per row), and on
+// SUCCESS it does NOT re-enable the row's controls. That asymmetry is
+// deliberate: a succeeded key is deleted from `rulingsSelected` right here,
+// at the moment of success — never inferred from the row leaving a later
+// poll's payload (the plan-review finding) — and marked in `rulingsSettled`
+// so `renderRulings` reuses this exact <li>, controls still disabled, for as
 // long as the row keeps showing up in the stale cache. A FAILED row is
 // restored (re-enabled) and left selected, so it stays visible, stays
 // recoverable, and a later "Agree selected" press retries only it.
+//
+// LIN-2792 Step 7 — an 'answered' proposal gets the SAME four-way branch as
+// `agreeRulingRow`, plus a bulk-only fifth outcome: a `gone`+`dispatch`-effect
+// row (a fresh agent run) is skipped — named and visible, never silently
+// dropped — rather than firing N fresh dispatches from one confirm() press.
+// `resume`/`record`-effect rows proceed through bulk unchanged.
 function bulkAgreeRow(key, row, li) {
-  const { decision, anchor } = row || {};
+  const { decision, anchor, disposition, canReply } = row || {};
   const decisionId = decision?.decision_id;
   // Belt and braces alongside the `renderRulings` prune above (review F1):
   // the row looked up here is whatever the most recent poll last wrote into
@@ -2564,30 +2733,81 @@ function bulkAgreeRow(key, row, li) {
     return Promise.resolve();
   }
 
-  rulingsPending.add(key);
-  const controls = rulingRowControls(li);
-  controls.forEach(el => { el.disabled = true; });
+  const proposedOutcome = row.suggestedDismissal.proposedOutcome ?? 'dismissed';
 
-  const feedback = li.querySelector('.obs-ruling-feedback');
-  const setFeedback = (text, isError) => {
-    if (!feedback) return;
-    feedback.textContent = text;
-    feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
-  };
+  if (proposedOutcome !== 'answered') {
+    rulingsPending.add(key);
+    const controls = rulingRowControls(li);
+    controls.forEach(el => { el.disabled = true; });
 
-  return issueDismissRequest(anchor, decisionId).then(() => {
-    rulingsPending.delete(key);
-    setFeedback('agreed', false);
-    rulingsSelected.delete(key);
-    rulingsSettled.add(key);
-    const checkbox = li.querySelector('.obs-ruling-select');
-    if (checkbox) checkbox.checked = false;
-  }).catch((err) => {
-    console.error('Bulk agree failed for a row:', err);
-    rulingsPending.delete(key);
-    controls.forEach(el => { el.disabled = false; });
-    setFeedback('agree failed: ' + err.message, true);
-  });
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    const setFeedback = (text, isError) => {
+      if (!feedback) return;
+      feedback.textContent = text;
+      feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
+    };
+
+    return issueDismissRequest(anchor, decisionId).then(() => {
+      rulingsPending.delete(key);
+      setFeedback('agreed', false);
+      rulingsSelected.delete(key);
+      rulingsSettled.add(key);
+      const checkbox = li.querySelector('.obs-ruling-select');
+      if (checkbox) checkbox.checked = false;
+    }).catch((err) => {
+      console.error('Bulk agree failed for a row:', err);
+      rulingsPending.delete(key);
+      controls.forEach(el => { el.disabled = false; });
+      setFeedback('agree failed: ' + err.message, true);
+    });
+  }
+
+  // Branch 1 (bulk) — canReply === false: skip, named, visible — never
+  // silently dropped. Left selected (not settled), so the row stays
+  // reachable after the batch rather than disappearing from the count.
+  if (!canReply) {
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    if (feedback) {
+      feedback.textContent = `skipped — cannot answer: ${window.ChatUI.resolveCaption(disposition, row?.effect)}`;
+      feedback.classList.add('obs-ruling-feedback--error');
+    }
+    return Promise.resolve();
+  }
+
+  const optionId = row.suggestedDismissal.optionId;
+
+  // Branch 2 (bulk) — task-bound: the stamp-only wrapper, bulk mode (no
+  // per-row poll/badge refresh — the batch owns exactly one of each).
+  if (disposition === 'task-bound') {
+    return deliverRulingStampOnly(row, li, optionId, { bulkAgree: true });
+  }
+
+  const effectKey = rulingKey(anchor?.workspaceUrlKey, anchor, decisionId);
+  const effectiveEffect = (effectKey && rulingEffectOverride.has(effectKey))
+    ? rulingEffectOverride.get(effectKey)
+    : row?.effect;
+
+  // Bulk-only fifth outcome — a `gone` row at a `dispatch` effect starts a
+  // materially bigger, costlier, less reversible action (a fresh agent run)
+  // than a stamp or a comment-only record. Single-row Agree still allows it
+  // (branch 4 is unrestricted there); bulk skips it, named and visible,
+  // deferred to a named LIN-2758-adjacent follow-up rather than fired blind
+  // from one confirm() press across N rows.
+  if (disposition === 'gone' && effectiveEffect === 'dispatch') {
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    if (feedback) {
+      feedback.textContent = 'skipped — starting a fresh run is not done in bulk';
+      feedback.classList.add('obs-ruling-feedback--error');
+    }
+    return Promise.resolve();
+  }
+
+  // Branches 3/4 (bulk) — resume-effect or record-effect: reuse
+  // `deliverRulingReply` in bulk mode, so it settles sequentially (the
+  // returned promise resolves once the row reaches a terminal per-press
+  // state) and defers poll/badge/restore discipline to the batch.
+  const optionLabel = resolveRulingOptionLabel(decision, optionId);
+  return deliverRulingReply(row, optionLabel, li, optionId, { bulkAgree: true });
 }
 
 // Bulk-agree entry point — the confirmed, SEQUENTIAL loop over
@@ -2598,11 +2818,14 @@ function bulkAgreeRow(key, row, li) {
 // guard, needing no `AbortController`, no teardown, no module-level run
 // pointer. Per-row failure cannot wedge this loop: `bulkAgreeRow` never
 // rejects (its own `.catch` swallows), so this `for…of` always reaches the
-// next key regardless of what happened to the last one.
+// next key regardless of what happened to the last one. Awaiting each row in
+// turn (LIN-2792) is what keeps this sequential rather than concurrent —
+// `deliverRulingReply`'s own return-promise contract is what makes that
+// await genuinely wait for an answer branch, not just a dismiss.
 async function bulkAgreeSelected() {
   const keys = Array.from(rulingsSelected);
   if (keys.length === 0) return;
-  if (!confirm(bulkAgreeConfirmText(keys.length))) return;
+  if (!confirm(bulkAgreeConfirmText(computeBulkAgreeBreakdown()))) return;
 
   for (const key of keys) {
     const row = rulingsRowByKey.get(key);
@@ -2753,7 +2976,27 @@ function composeDispatchPrompt(row, chosenAnswer) {
 // nav badge element, which is rendered once per page and keyed by the page's
 // own `data-url-key` (`lib/components/navbar.js`) — passing the ruling's
 // workspace there would just fail to find the badge.
-function deliverRulingReply(row, prompt, li) {
+// `optionId` (LIN-2792, 4th param, optional): the proposed answer's option
+// id, threaded onto every write below that can carry it. The pre-existing
+// `onSelect` option-press call site and the free-text send button both keep
+// calling this with THREE arguments — `optionId` stays `undefined` there,
+// byte-identical to before. `agreeRulingRow`'s new answer-branches are the
+// only 4-argument callers.
+//
+// `{bulkAgree}` (LIN-2792, 5th param, optional, default `false`): threaded
+// only from `bulkAgreeRow`. Changes `onDelivered`/the partial-failure
+// handler's settle discipline (see their own comments below); every other
+// caller is unaffected.
+//
+// Returns a promise that resolves — never rejects — once the row reaches any
+// terminal per-press state (delivered, comment-failed, dispatch-failed, or
+// partial-failure-with-retry-offered), restoring the sequential contract
+// `bulkAgreeRow`'s own `await` depends on. The `resumable` branch gets this
+// for free by returning `window.ReplyDelivery.deliverReply(...)`'s own
+// never-rejecting promise; the `gone`/`task-bound` branches return their own
+// hand-rolled `.then`/`.catch` chains, each of which already terminates in a
+// state mutation rather than a rethrow.
+function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {}) {
   const { decision, anchor, disposition } = row || {};
   const pageUrlKey = observationData?.urlKey;
   const targetUrlKey = anchor?.workspaceUrlKey;
@@ -2767,7 +3010,7 @@ function deliverRulingReply(row, prompt, li) {
   // option press on that row would hit this guard and return silently: no
   // comment, no dispatch, no feedback text, buttons left enabled (LIN-2215 F1,
   // a regression in kind on LIN-1728's G1, which at least said so out loud).
-  if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || !key || rulingsPending.has(key)) return;
+  if (!targetUrlKey || !decisionId || (!decisionLoopId && disposition !== 'task-bound') || !key || rulingsPending.has(key)) return Promise.resolve();
 
   rulingsPending.add(key);
   const buttons = rulingRowControls(li);
@@ -2789,8 +3032,14 @@ function deliverRulingReply(row, prompt, li) {
   // fallback note must survive all the way to the row's final feedback state,
   // not get overwritten by it. Every other call site omits `note`, so its
   // feedback text is byte-identical to before this Area existed.
+  //
+  // LIN-2792 round 4 settle discipline: `bulkAgree: false` (every pre-existing
+  // caller) stays byte-identical — `restore()`, `pollRulings()`,
+  // `refreshBadge()`. `bulkAgree: true` never calls any of those three
+  // itself; it mirrors `bulkAgreeRow`'s own dismiss-path discipline instead —
+  // release the pending guard without re-enabling controls, mark settled,
+  // uncheck the selection checkbox — deferring poll/badge to the batch.
   const onDelivered = (note) => {
-    restore();
     setFeedback(note ? `recorded ✓ (${note})` : 'recorded ✓', false);
     // Fifth instance of the review's class, found while closing F6/F7: a
     // repliable row can ALSO carry a live suggestion (appendSuggestionActions
@@ -2799,8 +3048,16 @@ function deliverRulingReply(row, prompt, li) {
     // decision just as terminally as Agree does, so the same
     // selection-clearing is owed here.
     rulingsSelected.delete(key);
-    pollRulings();
-    refreshBadge();
+    if (bulkAgree) {
+      rulingsPending.delete(key);
+      rulingsSettled.add(key);
+      const checkbox = li.querySelector('.obs-ruling-select');
+      if (checkbox) checkbox.checked = false;
+    } else {
+      restore();
+      pollRulings();
+      refreshBadge();
+    }
   };
   // Shared partial-failure UX (LIN-1728 review F2): the durable half (the
   // comment, already carrying the answer stamp) succeeded; only the run
@@ -2814,14 +3071,32 @@ function deliverRulingReply(row, prompt, li) {
   // the next poll(s) instead of the ruling silently vanishing (it is no
   // longer in the /rulings payload) or a stray fresh row confusingly
   // reappearing, until the retry succeeds and releases it below.
+  //
+  // LIN-2792 round 4: bulk mode still marks `rulingsSettled` here too — the
+  // durable half (the answer) already succeeded, so this row is DONE from
+  // the batch's point of view even though delivery needs a manual retry.
+  // Falling back to bulk's ordinary "restore, stay selected" discipline here
+  // would re-post the already-succeeded comment on a later retry — the exact
+  // double-post hazard the single-row partial-failure design exists to
+  // avoid. Only a genuine PRE-durability failure (the comment itself failed,
+  // nothing recorded yet — the plain `onCommentFailed`/`onDispatchFailed`/
+  // catch handlers below, all unaffected by `bulkAgree`) uses bulk's ordinary
+  // failure discipline, since nothing happened yet and a plain retry is safe.
   const makePartialFailureHandler = (label) => (err, retryRun) => {
-    restore();
     // The comment (the answer) already succeeded by the time this fires —
     // only the run failed to start/resume — so the answer is already
     // durable, same reasoning as `onDelivered` above.
     rulingsSelected.delete(key);
     preservedRulingRows.set(key, li);
     setFeedback(`Recorded. Could not ${label}: ${err.message}. `, true);
+    if (bulkAgree) {
+      rulingsPending.delete(key);
+      rulingsSettled.add(key);
+      const checkbox = li.querySelector('.obs-ruling-select');
+      if (checkbox) checkbox.checked = false;
+    } else {
+      restore();
+    }
     if (feedback) {
       const retryBtn = document.createElement('button');
       retryBtn.type = 'button';
@@ -2842,7 +3117,7 @@ function deliverRulingReply(row, prompt, li) {
       });
       feedback.appendChild(retryBtn);
     }
-    pollRulings();
+    if (!bulkAgree) pollRulings();
   };
 
   if (disposition === 'resumable') {
@@ -2856,7 +3131,13 @@ function deliverRulingReply(row, prompt, li) {
     // (the true issueless case) routes `deliverReply` straight to its
     // existing dispatch-only path instead of attempting an invalid
     // `/api/comments/null` write.
-    window.ReplyDelivery.deliverReply(
+    // `optionId` (LIN-2792 round 4 correction): this `opts` literal is the
+    // ONLY producer of the object `common.js`'s `deliverReply` forwards to
+    // `postComment` — widening `postComment`'s own allowlist alone never
+    // reaches this call site, since `deliverReply` builds its own
+    // `{decisionLoopId, decisionId}` (now also `optionId`) literal from
+    // `opts` rather than forwarding `opts` wholesale.
+    return window.ReplyDelivery.deliverReply(
       {
         urlKey: targetUrlKey,
         issueId: anchor.issueId || anchor.issueIdentifier,
@@ -2865,7 +3146,8 @@ function deliverRulingReply(row, prompt, li) {
         force: false,
         target: anchor.target || 'cli',
         decisionLoopId,
-        decisionId
+        decisionId,
+        optionId
       },
       prompt,
       {
@@ -2875,7 +3157,6 @@ function deliverRulingReply(row, prompt, li) {
         onDispatchOk: onDelivered
       }
     );
-    return;
   }
 
   if (disposition === 'gone') {
@@ -2916,11 +3197,15 @@ function deliverRulingReply(row, prompt, li) {
             .catch(() => ({ hydrated: false }))
         : Promise.resolve(null);
 
-      targetContext
+      return targetContext
         .then((hydrateResult) => resolveRecordTarget(anchor, recordOn, hydrateResult))
         .then((resolved) => {
           const targetId = resolved.issueId || resolved.issueIdentifier;
-          return window.ReplyDelivery.postComment(targetUrlKey, targetId, prompt, { decisionLoopId, decisionId })
+          // `optionId` (LIN-2792 round 3, F2): this literal is one of the
+          // three silently-dropped call sites the delivery-pipeline thread
+          // found — a fresh `{decisionLoopId, decisionId}` object built
+          // locally rather than reusing a wider one.
+          return window.ReplyDelivery.postComment(targetUrlKey, targetId, prompt, { decisionLoopId, decisionId, optionId })
             .then((commentResult) => {
               if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
               // The resolved target identifier is shown to the operator here
@@ -2938,8 +3223,7 @@ function deliverRulingReply(row, prompt, li) {
     };
 
     if (effectiveEffect === 'record') {
-      deliverAsRecord(null);
-      return;
+      return deliverAsRecord(null);
     }
 
     // Identifier-backed targeting (LIN-1728 review G1) — same root cause as
@@ -2958,7 +3242,7 @@ function deliverRulingReply(row, prompt, li) {
       console.error('Ruling reply: no issue to start a fresh run against, cannot reply for a gone session');
       restore();
       setFeedback('cannot start a fresh run: no linked issue', true);
-      return;
+      return Promise.resolve();
     }
 
     // LIN-2775 Area 8 — press-time check. Before this dispatch-effect row
@@ -2971,17 +3255,15 @@ function deliverRulingReply(row, prompt, li) {
     // visible-note pattern. Never silently dispatch, never silently do
     // nothing: both outcomes route through `deliverAsRecord` above, so a
     // downgraded press still comments, stamps, and clears the row.
-    window.api(hydrateUrl(pageUrlKey, targetUrlKey, anchor.issueIdentifier), { on401: false })
+    return window.api(hydrateUrl(pageUrlKey, targetUrlKey, anchor.issueIdentifier), { on401: false })
       .catch(() => ({ hydrated: false, reason: 'unavailable' }))
       .then((hydrateResult) => {
         if (!hydrateResult || !hydrateResult.hydrated) {
-          deliverAsRecord(PRESS_TIME_HYDRATION_FAILURE_NOTE);
-          return;
+          return deliverAsRecord(PRESS_TIME_HYDRATION_FAILURE_NOTE);
         }
         const isTerminal = !!(hydrateResult.state && RECORD_TARGET_TERMINAL_TYPES.includes(hydrateResult.state.type));
         if (isTerminal) {
-          deliverAsRecord(PRESS_TIME_DOWNGRADE_NOTE);
-          return;
+          return deliverAsRecord(PRESS_TIME_DOWNGRADE_NOTE);
         }
 
         // Anchor confirmed non-terminal at press time — proceed to the
@@ -2989,7 +3271,10 @@ function deliverRulingReply(row, prompt, li) {
         // `composedRunMarker` (Area 8): the scoped signal that activates
         // routes/dispatch.js's server-side terminal-anchor guard for THIS
         // call specifically, never inferred from `kind`.
-        window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, { decisionLoopId, decisionId })
+        //
+        // `optionId` (LIN-2792 round 3, F2): the second of the three
+        // silently-dropped call sites.
+        return window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, { decisionLoopId, decisionId, optionId })
           .then((commentResult) => {
             if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
             // Deliberately NOT window.ReplyDelivery.deliverReply — that call's
@@ -3019,7 +3304,6 @@ function deliverRulingReply(row, prompt, li) {
           })
           .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
       });
-    return;
   }
 
   if (disposition === 'task-bound') {
@@ -3040,7 +3324,11 @@ function deliverRulingReply(row, prompt, li) {
     // TARGET itself (the route's own `:issueId` param, permissive of either
     // shape) still prefers the real id with an identifier fallback, mirroring
     // the `gone` branch and `public/scan.js`'s own answer-form call.
-    window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, {
+    // Deliberately NOT widened with `optionId` — Agree on a task-bound
+    // proposed answer routes through `deliverRulingStampOnly` instead (Step 7
+    // branch 2), never this branch; no caller of this branch (the ordinary
+    // option press / free-text reply) ever carries a proposed option.
+    return window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, {
       taskDecisionId: anchor.taskDecisionId,
       taskDecisionIssueId: anchor.issueId
     })
@@ -3961,6 +4249,11 @@ if (typeof module !== 'undefined' && module.exports) {
     toggleRulingSelection, setAllRulingsSelected, rulingsSelectableKeys,
     syncRulingsBulkBar, repaintRulingsSelection,
     bulkAgreeConfirmText, refreshRulingsBadge, bulkAgreeRow, bulkAgreeSelected,
+    // LIN-2792 (Track C — UI convergence): the four-way Agree-as-answer
+    // branch's own seams — the task-bound stamp-only wrapper, the option-id
+    // -> label resolver the banner and the Agree branches both use, and the
+    // bulk confirm-text breakdown — each directly unit-testable without a DOM.
+    deliverRulingStampOnly, resolveRulingOptionLabel, computeBulkAgreeBreakdown,
     // LIN-2293 review (F1): the collision has TWO halves — "disables both"
     // (deliverRulingReply/rulingsPending, covered above) and "re-renders
     // both", which lives entirely in renderRulings' reuse lookup against

@@ -187,7 +187,18 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements 
     window: {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
-      ChatUI: { appendOptions() {} },
+      // LIN-2792: `resolveCaption` mirrors public/chat.js's own read-only
+      // DISPOSITION_CAPTIONS wording closely enough for tests that assert
+      // the refusal text NAMES the reason (mid-turn vs indeterminate) rather
+      // than asserting an exact string this file doesn't own.
+      ChatUI: {
+        appendOptions() {},
+        resolveCaption(disposition) {
+          if (disposition === 'mid-turn') return 'still running — reply disabled';
+          if (disposition === 'indeterminate') return 'no action available yet';
+          return 'no action available yet';
+        }
+      },
       ReplyDelivery: {
         postComment,
         deliverReply,
@@ -2469,7 +2480,12 @@ describe('the rulings selection-clearing invariant (LIN-2444 review — closing 
     // "passing".
     assert.deepEqual(
       guardedFns.sort(),
-      ['agreeRulingRow', 'bulkAgreeRow', 'deliverRulingReply', 'dismissRulingRow', 'keepRulingRow', 'shelveRulingRow'].sort(),
+      // LIN-2792 Step 7 adds `deliverRulingStampOnly` — the task-bound
+      // Agree-as-answer wrapper — to this population, deliberately: it
+      // follows the same guard-in-flight idiom every other verb here does,
+      // and clears `rulingsSelected.delete(key)` on success exactly like
+      // its siblings.
+      ['agreeRulingRow', 'bulkAgreeRow', 'deliverRulingReply', 'deliverRulingStampOnly', 'dismissRulingRow', 'keepRulingRow', 'shelveRulingRow'].sort(),
       'the enumerated population of per-row rulings write handlers changed — update this list deliberately, or a new/renamed handler slipped past unexamined'
     );
     assert.deepEqual(guardedWithoutClear, [], `every rulingsPending.add(key)-guarded handler must also call rulingsSelected.delete(key) on success — missing in: ${guardedWithoutClear.join(', ')}`);
@@ -2762,5 +2778,631 @@ describe('composeDispatchPrompt (LIN-2775 Area 7)', () => {
     const row = { decision: { question: 'Why was I asked this?' }, decisionCase: [] };
     const prompt = composeDispatchPrompt(row, 'Because the migration touches this table too.');
     assert.match(prompt, /Because the migration touches this table too\./);
+  });
+});
+
+// ─── LIN-2792 (LIN-2754 Track C) — UI convergence: the four-way Agree ──────
+// branch, the optionId thread, and the banner/bulk-confirm wording. Every
+// test below is a genuine witness against the pre-fix code, which had NO
+// branch on `suggestedDismissal.proposedOutcome` at all — `agreeRulingRow`/
+// `bulkAgreeRow` called `issueDismissRequest` (a DISMISS) unconditionally,
+// so an Agree on a proposed ANSWER would have silently dismissed it instead.
+
+const ANSWER_OPTIONS = [
+  { id: 'opt-yes', label: 'Yes, proceed with the migration' },
+  { id: 'opt-no', label: 'No, hold off' }
+];
+
+function answerSuggestion(overrides = {}) {
+  return {
+    proposedOutcome: 'answered',
+    optionId: 'opt-yes',
+    reason: 'John ruled yes in the relay',
+    suggestedBy: 'runner-relay',
+    suggestedAt: '2026-09-05T00:00:00.000Z',
+    ...overrides
+  };
+}
+
+function answeredRow(overrides = {}) {
+  return makeRow({
+    decision: { decision_id: 'd-answered-1', options: ANSWER_OPTIONS },
+    suggestedDismissal: answerSuggestion(),
+    canReply: true,
+    ...overrides
+  });
+}
+
+describe('resolveRulingOptionLabel / the answered-proposal banner (LIN-2792 Step 8)', () => {
+  test('resolveRulingOptionLabel finds the matching option label', () => {
+    const { resolveRulingOptionLabel } = makeSandbox().module.exports;
+    const label = resolveRulingOptionLabel({ options: ANSWER_OPTIONS }, 'opt-no');
+    assert.equal(label, 'No, hold off');
+  });
+
+  test('resolveRulingOptionLabel falls back to the bare id when no option matches', () => {
+    const { resolveRulingOptionLabel } = makeSandbox().module.exports;
+    assert.equal(resolveRulingOptionLabel({ options: ANSWER_OPTIONS }, 'opt-stale'), 'opt-stale');
+    assert.equal(resolveRulingOptionLabel({}, 'opt-stale'), 'opt-stale');
+  });
+
+  test('the banner reads "proposed answer: <label>" for an answered proposal, never "proposed dismissal"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(answeredRow());
+    const label = li.querySelector('.obs-ruling-suggestion-label');
+    assert.ok(label, 'expected a suggestion banner');
+    assert.equal(label.textContent, 'proposed answer: Yes, proceed with the migration');
+  });
+
+  test('the banner still reads "proposed dismissal" for a dismissal proposal (unchanged)', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'stale', suggestedBy: 'x', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
+    const label = li.querySelector('.obs-ruling-suggestion-label');
+    assert.equal(label.textContent, 'proposed dismissal');
+  });
+
+  test('a legacy suggestion with no proposedOutcome at all still reads "proposed dismissal"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    // No `proposedOutcome` key — exactly a pre-LIN-2790 stored row.
+    const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'legacy', suggestedBy: 'x', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
+    assert.equal(li.querySelector('.obs-ruling-suggestion-label').textContent, 'proposed dismissal');
+  });
+});
+
+describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step 7)', () => {
+  test('BRANCH 1 — canReply: false refuses visibly, no write call reached, regardless of what effect reads', async () => {
+    let apiCalls = 0;
+    const { module } = makeSandbox({
+      api: async () => { apiCalls += 1; return { success: true }; },
+      postComment: async () => { apiCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { apiCalls += 1; return { id: 'x' }; }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    // Built exactly like tests/unit/dashboard-routes.test.js's own mid-turn
+    // self-match fixture: disposition mid-turn, canReply false, but effect
+    // STILL reads 'record' (branch 3's self-match) — proving the refusal
+    // fires on canReply, never on effect.
+    const row = answeredRow({ disposition: 'mid-turn', canReply: false, effect: 'record' });
+
+    await agreeRulingRow(row, li);
+
+    assert.equal(apiCalls, 0, 'no write of any kind may be attempted for a canReply:false row');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /cannot answer/);
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
+  });
+
+  test('BRANCH 1 — the same refusal fires for indeterminate, both effect sub-cases (self-matching record, and null)', async () => {
+    const { module } = makeSandbox({ api: async () => ({ success: true }) });
+    const { agreeRulingRow } = module.exports;
+
+    for (const effect of ['record', null]) {
+      const li = makeLi();
+      await agreeRulingRow(answeredRow({ disposition: 'indeterminate', canReply: false, effect }), li);
+      const feedback = li.querySelector('.obs-ruling-feedback');
+      assert.match(feedback.textContent, /cannot answer/, `effect=${effect}`);
+    }
+  });
+
+  test('BRANCH 2 — task-bound stamps via the answered-without-comment route, with optionId, no comment posted', async () => {
+    let captured = null;
+    let commentCalls = 0;
+    const { module } = makeSandbox({
+      api: async (url, opts) => { captured = { url, opts }; return { success: true }; },
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = answeredRow({
+      disposition: 'task-bound',
+      anchor: { loopId: null, taskDecisionId: 'td-answer-1' },
+      effect: 'record'
+    });
+
+    await agreeRulingRow(row, li);
+
+    assert.ok(captured, 'expected the stamp-only route to be called');
+    assert.equal(captured.url, '/workspace/the-ruling-workspace/api/dashboard/rulings/answer');
+    assert.deepEqual(JSON.parse(captured.opts.body), { taskDecisionId: 'td-answer-1', taskDecisionIssueId: 'issue-1', optionId: 'opt-yes' });
+    assert.equal(commentCalls, 0, 'the ruling already lives on the ticket — Agree-as-answer posts no comment');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'agreed');
+  });
+
+  test('BRANCH 3/4 — resumable Agree resumes the session and threads optionId onto the comment payload', async () => {
+    let capturedOpts = null;
+    let capturedPrompt = null;
+    const { module } = makeSandbox({
+      deliverReply: async (opts, prompt, handlers) => { capturedOpts = opts; capturedPrompt = prompt; handlers.onDispatchOk(); }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = answeredRow({ disposition: 'resumable', effect: 'resume' });
+
+    await agreeRulingRow(row, li);
+
+    assert.ok(capturedOpts, 'expected window.ReplyDelivery.deliverReply to be called');
+    assert.equal(capturedOpts.optionId, 'opt-yes', 'optionId must reach the opts literal deliverReply forwards to postComment');
+    assert.equal(capturedOpts.decisionLoopId, 'loop-gone-1');
+    assert.equal(capturedPrompt, 'Yes, proceed with the migration', 'the proposed option\'s own label is the "pressed" text');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'recorded ✓');
+  });
+
+  test('BRANCH 3/4 — gone+record Agree delivers via deliverAsRecord and threads optionId onto the postComment call', async () => {
+    let capturedDecision = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, prompt, decision) => { capturedDecision = decision; return { ok: true, status: 201, data: {} }; }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = answeredRow({ disposition: 'gone', effect: 'record' });
+
+    await agreeRulingRow(row, li);
+
+    assert.ok(capturedDecision, 'expected postComment to be called');
+    assert.equal(capturedDecision.optionId, 'opt-yes');
+    assert.equal(capturedDecision.decisionLoopId, 'loop-gone-1');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /recorded ✓/);
+  });
+
+  test('BRANCH 3/4 — gone+dispatch (default) Agree posts a comment carrying optionId, then dispatches a composed run', async () => {
+    let capturedDecision = null;
+    let capturedDispatch = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, prompt, decision) => { capturedDecision = decision; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async (opts) => { capturedDispatch = opts; return { id: 'dispatched-answer-1' }; },
+      api: nonTerminalHydrateApi()
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = answeredRow({ disposition: 'gone', effect: 'dispatch' });
+
+    await agreeRulingRow(row, li);
+
+    assert.ok(capturedDecision, 'expected the comment to be posted');
+    assert.equal(capturedDecision.optionId, 'opt-yes');
+    assert.ok(capturedDispatch, 'expected a fresh run to be dispatched');
+    assert.match(capturedDispatch.prompt, /Yes, proceed with the migration/, 'the composed brief carries the chosen option\'s label');
+  });
+
+  test('deliverRulingReply never rejects: a hard failure still resolves the promise agreeRulingRow returns', async () => {
+    const { module } = makeSandbox({
+      postComment: async () => { throw new Error('network down'); }
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = answeredRow({ disposition: 'gone', effect: 'record' });
+
+    await assert.doesNotReject(agreeRulingRow(row, li));
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /reply failed/);
+  });
+});
+
+describe('bulkAgreeRow / bulkAgreeSelected — mixed dismiss/answer batch (LIN-2792 Step 7)', () => {
+  function makeAnswerBulkSandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const bar = new FakeElement('div');
+    const selectAll = new FakeElement('input');
+    const countEl = new FakeElement('span');
+    const agreeBtn = new FakeElement('button');
+    const sandbox = makeSandbox({
+      api, postComment, dispatchPrompt, deliverReply, confirm,
+      elements: {
+        'obs-rulings': list, 'obs-rulings-empty': empty, 'obs-ruling-bulk-bar': bar,
+        'obs-ruling-select-all': selectAll, 'obs-ruling-selected-count': countEl,
+        'obs-ruling-agree-selected': agreeBtn
+      }
+    });
+    return { module: sandbox.module, list, bar, selectAll, countEl, agreeBtn };
+  }
+
+  test('a mixed selection (one dismissal, one answer) discharges each row per its own proposal, sequentially', async () => {
+    const dismissCalls = [];
+    const stampCalls = [];
+    const { module, list } = makeAnswerBulkSandbox({
+      api: async (url, opts) => {
+        const body = JSON.parse(opts.body);
+        if (url.includes('/rulings/dismiss')) dismissCalls.push(body);
+        if (url.includes('/rulings/answer')) stampCalls.push(body);
+        return { success: true };
+      }
+    });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = module.exports;
+
+    const dismissRow = makeRow({
+      decision: { decision_id: 'd-mix-dismiss' },
+      anchor: { loopId: 'loop-mix-dismiss' },
+      suggestedDismissal: { reason: 'stale', suggestedBy: 'x', suggestedAt: '2026-09-05T00:00:00.000Z' }
+    });
+    const answerRow = answeredRow({
+      decision: { decision_id: 'd-mix-answer', options: ANSWER_OPTIONS },
+      disposition: 'task-bound',
+      anchor: { loopId: null, taskDecisionId: 'td-mix-answer' },
+      effect: 'record'
+    });
+
+    renderRulings([dismissRow, answerRow]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    assert.equal(dismissCalls.length, 1, 'the dismissal row must be dismissed');
+    assert.deepEqual(dismissCalls[0], { decisionLoopId: 'loop-mix-dismiss', decisionId: 'd-mix-dismiss' });
+    assert.equal(stampCalls.length, 1, 'the answer row must be stamped answered, never dismissed');
+    assert.deepEqual(stampCalls[0], { taskDecisionId: 'td-mix-answer', taskDecisionIssueId: 'issue-1', optionId: 'opt-yes' });
+
+    // Both rows must end up settled (controls disabled, still reused) —
+    // the bulk batch's own single poll/badge-refresh discipline, unchanged.
+    const [liDismiss, liAnswer] = list.children;
+    assert.equal(liDismiss.querySelector('.obs-ruling-agree')?.disabled, true);
+    assert.equal(liAnswer.querySelector('.obs-ruling-agree')?.disabled, true);
+  });
+
+  test('a canReply:false row in the selection is skipped with a visible, named reason, and the batch completes', async () => {
+    const stampCalls = [];
+    const { module } = makeAnswerBulkSandbox({
+      api: async (url, opts) => { stampCalls.push(JSON.parse(opts.body)); return { success: true }; }
+    });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = module.exports;
+
+    const refusedRow = answeredRow({
+      decision: { decision_id: 'd-refused', options: ANSWER_OPTIONS },
+      disposition: 'mid-turn', canReply: false, effect: 'record'
+    });
+    const okRow = answeredRow({
+      decision: { decision_id: 'd-ok', options: ANSWER_OPTIONS },
+      disposition: 'task-bound',
+      anchor: { loopId: null, taskDecisionId: 'td-ok' },
+      effect: 'record'
+    });
+
+    renderRulings([refusedRow, okRow]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    assert.equal(stampCalls.length, 1, 'only the answerable row is actually stamped');
+    assert.deepEqual(stampCalls[0], { taskDecisionId: 'td-ok', taskDecisionIssueId: 'issue-1', optionId: 'opt-yes' });
+
+    const refusedLi = module.exports.renderedRulingRows.get(
+      module.exports.rulingKey('the-ruling-workspace', ANCHOR, 'd-refused')
+    );
+    assert.match(refusedLi.querySelector('.obs-ruling-feedback').textContent, /skipped — cannot answer/);
+  });
+
+  test('a dispatch-effect answer row is skipped in bulk (never fired blind), but Agree alone (single-row) still allows it', async () => {
+    let dispatchCalls = 0;
+    const { module: bulkModule } = makeAnswerBulkSandbox({
+      api: async () => ({ success: true }),
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'x' }; }
+    });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected } = bulkModule.exports;
+
+    const dispatchRow = answeredRow({ disposition: 'gone', effect: 'dispatch' });
+    renderRulings([dispatchRow]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    assert.equal(dispatchCalls, 0, 'bulk must never fire a fresh dispatch blind across N rows');
+    const li = bulkModule.exports.renderedRulingRows.get(bulkModule.exports.rulingKey('the-ruling-workspace', ANCHOR, 'd-answered-1'));
+    assert.match(li.querySelector('.obs-ruling-feedback').textContent, /skipped — starting a fresh run/);
+
+    // Single-row Agree on the SAME kind of row is unrestricted (branch 4).
+    const { module: singleModule } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'x' }; },
+      api: nonTerminalHydrateApi()
+    });
+    const { agreeRulingRow } = singleModule.exports;
+    await agreeRulingRow(answeredRow({ disposition: 'gone', effect: 'dispatch' }), makeLi());
+    assert.equal(dispatchCalls, 1, 'single-row Agree must still allow a dispatch-effect answer');
+  });
+});
+
+describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', () => {
+  test('breakdown counts dismiss/answer/refused/dispatchSkipped independently', () => {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const { module } = makeSandbox({ elements: { 'obs-rulings': list, 'obs-rulings-empty': empty } });
+    const { renderRulings, setAllRulingsSelected, computeBulkAgreeBreakdown } = module.exports;
+
+    const dismissRow = makeRow({
+      decision: { decision_id: 'd-breakdown-dismiss' },
+      suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' }
+    });
+    const answerRow = answeredRow({ decision: { decision_id: 'd-breakdown-answer', options: ANSWER_OPTIONS }, disposition: 'task-bound', anchor: { loopId: null, taskDecisionId: 'td-b' }, effect: 'record' });
+    const refusedRow = answeredRow({ decision: { decision_id: 'd-breakdown-refused', options: ANSWER_OPTIONS }, disposition: 'mid-turn', canReply: false, effect: 'record' });
+    const dispatchRow = answeredRow({ decision: { decision_id: 'd-breakdown-dispatch', options: ANSWER_OPTIONS }, disposition: 'gone', effect: 'dispatch' });
+
+    renderRulings([dismissRow, answerRow, refusedRow, dispatchRow]);
+    setAllRulingsSelected(true);
+
+    // Compared field-by-field, not via a whole-object deepEqual: the
+    // breakdown object is constructed inside the vm sandbox, a different
+    // realm than this literal, so a cross-realm deepStrictEqual would fail
+    // on prototype identity alone despite matching structurally.
+    const breakdown = computeBulkAgreeBreakdown();
+    assert.equal(breakdown.dismiss, 1);
+    assert.equal(breakdown.answer, 1);
+    assert.equal(breakdown.refused, 1);
+    assert.equal(breakdown.dispatchSkipped, 1);
+  });
+
+  test('bulkAgreeConfirmText names both dismiss and answer counts, and both skip categories, when present', () => {
+    const { bulkAgreeConfirmText } = makeSandbox().module.exports;
+    const text = bulkAgreeConfirmText({ dismiss: 2, answer: 1, refused: 1, dispatchSkipped: 1 });
+    assert.match(text, /Agree 5 selected suggestions/);
+    assert.match(text, /2 dismissals/);
+    assert.match(text, /1 answer\b/);
+    assert.match(text, /1 cannot be answered yet and will be skipped/);
+    assert.match(text, /1 would start a fresh run and will be skipped in bulk/);
+  });
+
+  test('bulkAgreeConfirmText with only dismissals reads singular/plural correctly and carries no skip parenthetical', () => {
+    const { bulkAgreeConfirmText } = makeSandbox().module.exports;
+    const text = bulkAgreeConfirmText({ dismiss: 1, answer: 0, refused: 0, dispatchSkipped: 0 });
+    assert.match(text, /Agree 1 selected suggestion \(1 dismissal\)/);
+    assert.doesNotMatch(text, /skipped/);
+  });
+});
+
+// ─── LIN-2754 close-out, ledger L1 (review finding F1) ────────────────────
+// Plan Step 11 witness 4, delivered as specified this time. The witness that
+// shipped with LIN-2792 used a TASK-BOUND answer row, which routes through
+// `deliverRulingStampOnly` — so no test anywhere drove `deliverRulingReply`
+// with `{bulkAgree: true}`, leaving both of its bulk arms unexercised:
+//
+//   * `onDelivered`'s bulk arm — settle WITHOUT `restore()` (controls stay
+//     disabled), no per-row `pollRulings()`/badge refresh, and
+//   * `makePartialFailureHandler`'s bulk arm — the one that prevents a
+//     DOUBLE-POST: a bulk partial failure must settle and offer a scoped
+//     retry, never fall back to bulk's ordinary "restore and stay selected"
+//     discipline, which would re-post the already-succeeded comment on the
+//     next Agree press.
+//
+// Both rows below are answer proposals on dispositions that actually reach
+// `deliverRulingReply` in bulk (`gone`+`record` and `resumable`); a
+// `gone`+`dispatch` row is skipped by bulk by design, so it cannot serve.
+describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754 L1 / review F1)', () => {
+  function makeBulkReplySandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const sandbox = makeSandbox({
+      api, postComment, dispatchPrompt, deliverReply, confirm,
+      elements: {
+        'obs-rulings': list, 'obs-rulings-empty': empty,
+        'obs-ruling-bulk-bar': new FakeElement('div'),
+        'obs-ruling-select-all': new FakeElement('input'),
+        'obs-ruling-selected-count': new FakeElement('span'),
+        'obs-ruling-agree-selected': new FakeElement('button')
+      }
+    });
+    return { module: sandbox.module, list };
+  }
+
+  // A `gone` row at `effect: 'record'` — branch 3/4's record delivery, which
+  // posts a comment and stops (no dispatch), so the whole batch is
+  // observable through `postComment` alone.
+  function goneRecordAnswerRow(decisionId, loopId) {
+    return answeredRow({
+      decision: { decision_id: decisionId, options: ANSWER_OPTIONS },
+      anchor: { loopId },
+      disposition: 'gone',
+      effect: 'record'
+    });
+  }
+
+  test('two gone+record answer rows settle SEQUENTIALLY — row 2 never starts before row 1 has finished', async () => {
+    const events = [];
+    const { module } = makeBulkReplySandbox({
+      postComment: async (urlKey, targetId, prompt, opts) => {
+        events.push(`start:${opts.decisionId}`);
+        // Yield several times so an interleaved second row would have every
+        // opportunity to start before this one resolves — the assertion
+        // below is a genuine witness against a concurrent (Promise.all)
+        // implementation, not an artefact of a single microtask hop.
+        for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r));
+        events.push(`end:${opts.decisionId}`);
+        return { ok: true, status: 201, data: {} };
+      }
+    });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected, rulingKey, rulingsSelected, rulingsSettled } = module.exports;
+
+    const rowA = goneRecordAnswerRow('d-seq-a', 'loop-seq-a');
+    const rowB = goneRecordAnswerRow('d-seq-b', 'loop-seq-b');
+    renderRulings([rowA, rowB]);
+    setAllRulingsSelected(true);
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(
+      events,
+      ['start:d-seq-a', 'end:d-seq-a', 'start:d-seq-b', 'end:d-seq-b'],
+      'each answer row must run and settle before the next one starts — interleaved starts mean the batch went concurrent'
+    );
+
+    // `onDelivered`'s BULK arm, the half no prior test reached: settled, not
+    // restored. Controls stay disabled, the checkbox is cleared, the key
+    // leaves the selection and enters rulingsSettled.
+    for (const [decisionId, loopId] of [['d-seq-a', 'loop-seq-a'], ['d-seq-b', 'loop-seq-b']]) {
+      const key = rulingKey('the-ruling-workspace', { ...ANCHOR, loopId }, decisionId);
+      const li = module.exports.renderedRulingRows.get(key);
+      assert.ok(li, `expected a rendered row for ${decisionId}`);
+      assert.equal(li.querySelector('.obs-ruling-feedback').textContent, 'recorded ✓', `${decisionId} must read as delivered`);
+      assert.equal(li.querySelector('.obs-ruling-agree')?.disabled, true, `${decisionId}'s controls must NOT be re-enabled by the bulk arm (no restore())`);
+      assert.equal(li.querySelector('.obs-ruling-select')?.checked, false, `${decisionId}'s checkbox must be cleared`);
+      assert.equal(rulingsSelected.has(key), false, `${decisionId} must leave the selection at the moment of success`);
+      assert.ok(rulingsSettled.has(key), `${decisionId} must be marked settled so the stale-cache repaint reuses this exact <li>`);
+    }
+  });
+
+  test('a bulk partial failure SETTLES the row and offers a scoped retry — the comment is never re-posted, by retry or by a second batch', async () => {
+    let commentCalls = 0;
+    let runCalls = 0;
+    let failRun = true;
+    const { module } = makeBulkReplySandbox({
+      // The `resumable` branch delegates to window.ReplyDelivery.deliverReply,
+      // whose real contract is: post the comment, then start the run, and on
+      // a comment-succeeded/run-failed split call onPartialFailure(err,
+      // retryRun) with a retry that re-fires ONLY the run. Modelled here
+      // exactly, so the bulk arm under test sees the real handler shape.
+      deliverReply: async (opts, prompt, handlers) => {
+        commentCalls += 1;
+        runCalls += 1;
+        if (failRun) {
+          handlers.onPartialFailure(new Error('session gone'), async () => {
+            runCalls += 1;
+            if (failRun) throw new Error('still gone');
+          });
+        } else {
+          handlers.onDispatchOk();
+        }
+      }
+    });
+    const {
+      renderRulings, setAllRulingsSelected, bulkAgreeSelected,
+      rulingKey, rulingsSelected, rulingsSettled, rulingsPending, preservedRulingRows
+    } = module.exports;
+
+    const row = answeredRow({
+      decision: { decision_id: 'd-partial', options: ANSWER_OPTIONS },
+      disposition: 'resumable'
+    });
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-partial');
+
+    renderRulings([row]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    assert.equal(commentCalls, 1, 'the comment (the durable half) is posted exactly once');
+
+    // The double-post guard: the durable half already succeeded, so the row
+    // is DONE from the batch's point of view — settled, deselected, pending
+    // released, controls NOT re-enabled. Bulk's ordinary failure discipline
+    // (restore + stay selected) would leave this row eligible for a second
+    // Agree press and re-post the comment.
+    assert.ok(rulingsSettled.has(key), 'a bulk partial failure must mark the row settled — its answer is already durable');
+    assert.equal(rulingsSelected.has(key), false, 'the row must leave the selection');
+    assert.equal(rulingsPending.has(key), false, 'the pending guard must be released');
+    assert.ok(preservedRulingRows.has(key), 'the row must be preserved across the next poll(s) while the retry is outstanding');
+
+    const li = module.exports.renderedRulingRows.get(key);
+    assert.equal(li.querySelector('.obs-ruling-agree')?.disabled, true, 'controls must stay disabled — the bulk arm never calls restore()');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /Recorded\. Could not resume the session/, 'must say the answer was RECORDED — only the run failed');
+
+    const retryBtn = feedback.children.find((c) => c.classList.contains('obs-ruling-retry-delivery'));
+    assert.ok(retryBtn, 'expected a scoped Retry delivery affordance');
+
+    // A second Agree press over the same (now empty) selection must not
+    // touch this row at all — and even if it were still selected,
+    // bulkAgreeRow's own rulingsSettled guard refuses it.
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+    assert.equal(commentCalls, 1, 'a second batch must NEVER re-post the already-succeeded comment');
+
+    // The retry re-fires only the run, never the comment.
+    failRun = false;
+    const runsBeforeRetry = runCalls;
+    retryBtn.click();
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 1, 'the retry must re-fire the run only — never the comment');
+    assert.equal(runCalls, runsBeforeRetry + 1, 'the retry must re-fire the run exactly once');
+    assert.equal(preservedRulingRows.has(key), false, 'a succeeded retry releases the preserved row');
+    assert.match(feedback.textContent, /recorded ✓/);
+  });
+});
+
+// ─── LIN-2754 close-out, ledger L7 — witness 13's second half ─────────────
+// The `gone`+`record` Agree witness LIN-2792 landed covers the RESOLVABLE
+// happy path only (no `record_on` declared → the anchor). The `record_on`
+// FALLBACK paths — an unresolvable target, and an in-neighbourhood but
+// TERMINAL one — were covered only by inheritance from the pre-existing
+// `resolveRecordTarget` tests, which predate `optionId` and never observe
+// it. `deliverAsRecord`'s `postComment` literal is one of the four call
+// sites that silently dropped `optionId` before this ticket, so "the
+// fallback branch also carries the chosen option" is exactly the kind of
+// claim that must be asserted rather than inherited.
+describe('Agree-as-answer on a gone+record row — optionId survives the record_on FALLBACK too (LIN-2754 L7)', () => {
+  const fallbackCases = [
+    {
+      name: 'an UNRESOLVABLE record_on (matches nothing in the neighbourhood)',
+      recordOn: 'LIN-NOWHERE',
+      hydrate: async () => hydrateOk(neighborhoodOf({ siblings: [neighbor('LIN-9001')] })),
+      notePattern: /outside the checked neighbourhood/
+    },
+    {
+      name: 'a TERMINAL in-neighbourhood record_on',
+      recordOn: 'LIN-DONE',
+      hydrate: async () => hydrateOk(neighborhoodOf({ siblings: [neighbor('LIN-DONE', 'completed')] })),
+      notePattern: /closed|completed|terminal/i
+    },
+    {
+      name: 'a FAILED hydrate (the route is unavailable)',
+      recordOn: 'LIN-ELSEWHERE',
+      hydrate: async () => { throw new Error('hydrate unavailable'); },
+      notePattern: /outside the checked neighbourhood/
+    }
+  ];
+
+  for (const { name, recordOn, hydrate, notePattern } of fallbackCases) {
+    test(`${name} still records to the anchor WITH the chosen optionId, and says why`, async () => {
+      let captured = null;
+      let dispatchCalls = 0;
+      const { module } = makeSandbox({
+        postComment: async (urlKey, issueId, prompt, decision) => { captured = { urlKey, issueId, prompt, decision }; return { ok: true, status: 201, data: {} }; },
+        dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'x' }; },
+        api: hydrate
+      });
+      const { agreeRulingRow } = module.exports;
+      const li = makeLi();
+      const row = answeredRow({
+        decision: { decision_id: 'd-l7', options: ANSWER_OPTIONS, on_answer: { effect: 'record', record_on: recordOn } },
+        disposition: 'gone',
+        effect: 'record'
+      });
+
+      await agreeRulingRow(row, li);
+
+      assert.ok(captured, 'expected the record comment to be posted');
+      assert.equal(captured.decision.optionId, 'opt-yes', 'the chosen option must ride the fallback postComment too — this literal is one of the four that dropped it before LIN-2792');
+      assert.equal(captured.decision.decisionId, 'd-l7');
+      assert.equal(captured.issueId, ANCHOR.issueId, 'an unresolved record_on falls back to the ANCHOR, never the named target');
+      assert.equal(captured.prompt, 'Yes, proceed with the migration', 'the comment body is the option LABEL, not the raw id');
+      assert.equal(dispatchCalls, 0, 'a record-effect answer never starts a run');
+
+      const feedback = li.querySelector('.obs-ruling-feedback');
+      assert.match(feedback.textContent, /recorded ✓/);
+      assert.match(feedback.textContent, notePattern, 'the fallback must say why it did not use the declared record_on');
+    });
+  }
+
+  test('a RESOLVABLE record_on records to the resolved neighbour, also carrying the optionId', async () => {
+    let captured = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, prompt, decision) => { captured = { issueId, decision }; return { ok: true, status: 201, data: {} }; },
+      api: async () => hydrateOk(neighborhoodOf({ children: [neighbor('LIN-CHILD-7')] }))
+    });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+    const row = answeredRow({
+      decision: { decision_id: 'd-l7-ok', options: ANSWER_OPTIONS, on_answer: { effect: 'record', record_on: 'LIN-CHILD-7' } },
+      disposition: 'gone',
+      effect: 'record'
+    });
+
+    await agreeRulingRow(row, li);
+
+    assert.equal(captured.issueId, 'id-LIN-CHILD-7', 'the resolved neighbour is the write target');
+    assert.equal(captured.decision.optionId, 'opt-yes');
   });
 });
