@@ -3420,7 +3420,7 @@ app.post('/workspace/:urlKey/settings/dispatch-defaults', workspaceFromUrl, asyn
 
 /**
  * Save per-operation AI model overrides (LIN-1145).
- * Each of the 7 AI_OPERATION_KINDS gets an optional model override stored
+ * Each kind in AI_OPERATION_KINDS gets an optional model override stored
  * under prefs.aiModelOverrides.byKind[op].model. Blank rows signal "inherit
  * the global default" and are NOT stored as empty-string overrides — they
  * are simply omitted from the byKind map. Uses the same session-auth +
