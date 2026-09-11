@@ -1190,10 +1190,15 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
 - **`effect`** is a **separate field from `disposition`** — never merged into one namespace.
   It answers a different question: once a reply is delivered, what actually happens?
   `resume` (continue the parked session), `dispatch` (start a fresh run), or `record` (log the
-  answer, no run). `null` only for the two read-only dispositions above — a row that cannot
-  act never claims an effect.
+  answer, no run). `effect` is `null` only when **no live run exists on the anchor issue**. A
+  read-only disposition (`mid-turn`/`indeterminate`) never surfaces a **declared** effect — but
+  live evidence on the anchor, including the read-only row's own loop (which is itself
+  non-terminal by definition of `mid-turn`/`indeterminate`), still resolves `effect` to
+  `record`. So a read-only row is **not** guaranteed a `null` `effect`; only its
+  `declaredEffect` is guaranteed `null`.
 - **`declaredEffect`** is what the runner's own `DECISION:` block requested, via an optional
-  `on_answer: { "effect": "..." }` field — `null` when nothing was declared.
+  `on_answer: { "effect": "..." }` field — `null` when nothing was declared (always `null` on a
+  read-only row, per the previous bullet).
 - **`effect`** can differ from **`declaredEffect`**: live evidence always overrides a
   declaration — an already-`resumable` disposition always resolves to `resume` regardless of
   what was declared, and a live run already in progress on the same anchor issue always forces

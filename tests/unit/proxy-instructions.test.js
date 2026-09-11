@@ -141,8 +141,22 @@ describe('buildInstructions — GET /api/proxy/rulings publishes the effect enum
     }
   });
 
-  test('effect is null only for the two read-only dispositions, documented explicitly', () => {
+  // LIN-2773 review finding 1: the prior wording claimed "effect" is null
+  // only for the two read-only dispositions — but liveDispatchOnAnchor scans
+  // the same loop set a row was derived from, so a mid-turn/indeterminate
+  // row's own (non-terminal, by definition) loop self-matches and forces
+  // branch 3's "record" before branch 4's read-only null rule is reached.
+  // Only "declaredEffect" is actually guaranteed null on a read-only row.
+  test('effect is documented as null only when no live run exists on the anchor — NOT simply "for the two read-only dispositions"', () => {
     const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
-    assert.match(text, /is null only for the two read-only dispositions\s*\n\s*\("mid-turn"\/"indeterminate"\)/);
+    assert.match(text, /is null only when no live run exists on the anchor\s*\n\s*issue\./);
+    assert.doesNotMatch(text, /is null only for the two read-only dispositions/);
+  });
+
+  test('declaredEffect, not effect, is documented as guaranteed null on a read-only row', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /read-only disposition \("mid-turn"\/"indeterminate"\) never\s*\n\s*surfaces a DECLARED effect/);
+    assert.match(text, /still resolves "effect" to "record"/);
+    assert.match(text, /"declaredEffect" is guaranteed null/);
   });
 });
