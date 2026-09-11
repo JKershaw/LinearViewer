@@ -250,12 +250,16 @@ const decisionStampDedupe = createDedupeCache();
  *   try again.
  */
 async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore }) {
-  const { decisionLoopId, decisionId, taskDecisionId, taskDecisionIssueId } = decision || {};
+  const { decisionLoopId, decisionId, taskDecisionId, taskDecisionIssueId, optionId } = decision || {};
   let ok = true;
 
   if (typeof decisionLoopId === 'string' && decisionLoopId && typeof decisionId === 'string' && decisionId) {
     try {
-      const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId);
+      // LIN-2792: `optionId` rides this same stamp, undefined `outcome`
+      // (this helper is never reached for a dismissal, so there is no risk
+      // of it leaking onto one) — `markDecisionAnswered`'s 5th argument,
+      // added by LIN-2754 Track B.
+      const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId, undefined, optionId);
       if (!stamped) {
         console.error(`Decision-answer stamp not applied: no matching item ${decisionLoopId} in workspace ${workspace.urlKey}`);
         ok = false;

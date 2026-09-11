@@ -718,6 +718,10 @@ window.ReplyDelivery = (function () {
   // object — `{taskDecisionId, taskDecisionIssueId}`, also both-or-neither —
   // so `public/scan.js`'s answer flow can best-effort stamp a scanned row
   // 'answered' via the same route, without a second postComment variant.
+  // LIN-2792: `optionId` is a THIRD, independent conditional key on the same
+  // object — forwarded alone whenever it's a non-blank string, regardless of
+  // which (or neither) of the two pairs above is also present, so a
+  // proposed-answer's durable option id can ride the ordinary comment write.
   function postComment(urlKey, issueId, prompt, decision) {
     var body = { body: prompt };
     if (decision && decision.decisionLoopId && decision.decisionId) {
@@ -727,6 +731,9 @@ window.ReplyDelivery = (function () {
     if (decision && decision.taskDecisionId && decision.taskDecisionIssueId) {
       body.taskDecisionId = decision.taskDecisionId;
       body.taskDecisionIssueId = decision.taskDecisionIssueId;
+    }
+    if (decision && typeof decision.optionId === 'string' && decision.optionId) {
+      body.optionId = decision.optionId;
     }
     return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId), {
       method: 'POST',
@@ -836,7 +843,11 @@ window.ReplyDelivery = (function () {
     // fulfilled-branch's own callbacks (onDispatchOk/onPartialFailure) can
     // never be misclassified as a comment failure — those two are already on
     // separate arms of doDispatch's own .then below.
-    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId }).then(function (commentResult) {
+    // LIN-2792: `optionId` forwarded alongside the existing pair — a fresh
+    // literal built here rather than the rest of `opts`, so this stays the
+    // one place a caller's `opts.optionId` (when set) actually reaches
+    // `postComment`'s own allowlist.
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;
