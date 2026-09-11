@@ -1143,3 +1143,114 @@ test.describe('Decisions as option buttons (LIN-2621 beat 4)', () => {
     await expect(card.locator('.chat-options-row')).toHaveCount(0);
   });
 });
+
+// LIN-2716: before this landed, a page reload threw the conversation away —
+// chatHistory lived only in a browser-memory array, never written to
+// sessionStorage. These are the ticket's own headline acceptance criteria,
+// written RED-FIRST against the unfixed client in beat 2 (verbatim red
+// output posted as a Linear comment on LIN-2716) and made to pass by beat
+// 3's production change (public/flight-companion.js's sessionStorageKey/
+// loadStoredSession/saveStoredSession/clearStoredSession + the finishTurn/
+// reorientClick/rehydrate-on-load wiring).
+test.describe('LIN-2716: reload persists and resumes the session', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockTurn(page);
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('send a turn, reload: the thread is visible AND the next turn\'s body.history includes the prior exchange', async ({ page }) => {
+    await mockTurn(page, { token: 'ack' });
+    await page.locator('#flight-companion-question').fill('are you there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Half 1 (the ticket's own wording): "the thread is visible" — both the
+    // prior user line and the prior companion reply, not just a truthy
+    // thread element.
+    await expect(page.locator('#flight-companion-thread')).toBeVisible();
+    await expect(page.locator('#flight-companion-chat-empty')).toBeHidden();
+    await expect(page.locator('.fc-msg-body').first()).toHaveText('are you there?');
+    await expect(page.locator('.fc-msg-body').nth(1)).toHaveText('ack');
+
+    // Half 2 (the ticket's own wording): "the next turn's body.history
+    // includes the prior exchange" — captured via a route intercept (needs
+    // the REQUEST body, which mockTurn's fulfil-only helper doesn't expose).
+    // Playwright runs the most-recently-registered handler for a matching
+    // pattern first, so this takes over from beforeEach's/the line above's
+    // mockTurn registrations without needing to unroute them.
+    let capturedBody = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      capturedBody = JSON.parse(route.request().postData());
+      const frames = renderSSEFrames([['token', { token: 'still here' }], ['done', {}]]);
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
+    });
+    await page.locator('#flight-companion-question').fill('still there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-body').nth(3)).toHaveText('still here');
+
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody.history).toEqual([
+      { role: 'user', content: 'are you there?' },
+      { role: 'assistant', content: 'ack' },
+    ]);
+  });
+
+  // LIN-2716 item 3. A genuine red-first run here needs something to have
+  // been persisted to fail to clear — nothing is persisted at all yet, so a
+  // bare "reorient then check storage is empty" would pass vacuously against
+  // TODAY's code (there was never anything stored to begin with) and would
+  // not be guarding the reorient behaviour specifically. Seeding
+  // sessionStorage directly with the shape the beat-2 unit tests pin
+  // (`loadStoredSession`'s contract) sidesteps that: it also gives a genuine,
+  // independent red for the rehydrate-on-load half (nothing reads storage on
+  // load today, so the seeded thread never appears) before reorient is even
+  // clicked.
+  test('reorient clears the stored session: rehydrate-from-storage then clear-on-reorient, both observed live', async ({ page }) => {
+    const seeded = {
+      history: [
+        { role: 'user', content: 'seeded question' },
+        { role: 'assistant', content: 'seeded answer' },
+      ],
+      tabCheckInCount: 1,
+      tabTotalCost: 0.01,
+    };
+    await page.evaluate(({ urlKey, session }) => {
+      sessionStorage.setItem(`flight-companion-session:${urlKey}`, JSON.stringify(session));
+    }, { urlKey: URL_KEY, session: seeded });
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // The rehydrate-on-load half: the seeded thread should appear without
+    // any turn being sent.
+    await expect(page.locator('#flight-companion-thread')).toBeVisible();
+    await expect(page.locator('.fc-msg-body').first()).toHaveText('seeded question');
+    await expect(page.locator('.fc-msg-body').nth(1)).toHaveText('seeded answer');
+    await expect(page.locator('#flight-companion-reorient')).toBeVisible();
+
+    // The clear-on-reorient half.
+    await mockTurn(page, { endpoint: 'boot', token: 'orienting fresh' });
+    await page.locator('#flight-companion-reorient').click();
+    await expect(page.locator('.fc-msg-who').last()).toHaveClass(/status-pill--done/);
+
+    const storedAfterReorient = await page.evaluate(
+      (urlKey) => sessionStorage.getItem(`flight-companion-session:${urlKey}`),
+      URL_KEY
+    );
+    expect(storedAfterReorient).toBeNull();
+
+    // A subsequent reload shows the start state, not the old seeded thread —
+    // the ticket's own wording for this acceptance bullet.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#flight-companion-start')).toBeVisible();
+    await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
+    await expect(page.locator('.fc-msg-body')).toHaveCount(0);
+  });
+});

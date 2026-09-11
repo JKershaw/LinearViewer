@@ -299,6 +299,21 @@ function makeReplyDeliverySpy(impl) {
   return postComment;
 }
 
+// LIN-2716: a minimal Web Storage fake (sessionStorage's real interface is
+// getItem/setItem/removeItem over string keys/values — no iteration/length
+// this module's helper needs). `initial` seeds raw string entries, exactly
+// as a real browser would already hold them across a reload — the shape a
+// corrupt-storage test needs to construct directly, bypassing setItem.
+function makeFakeStorage(initial = {}) {
+  const data = Object.assign({}, initial);
+  return {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) { data[key] = String(value); },
+    removeItem(key) { delete data[key]; },
+    _data: data,
+  };
+}
+
 function makeFetchSpy(responder) {
   const calls = [];
   const fn = (url, opts) => {
@@ -355,7 +370,7 @@ function sseResponse(frames) {
   };
 }
 
-function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl } = {}) {
+function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl, storageImpl } = {}) {
   const doc = makeDocument({ hiddenInitial });
   const page = new FakeElement('main');
   page.dataset.urlKey = 'acme';
@@ -413,6 +428,11 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   const fetchSpy = makeFetchSpy(fetchImpl || (() => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' })));
   const apiSpy = makeApiSpy(apiImpl || (async () => { throw Object.assign(new Error('unexpected api call'), { status: 500 }); }));
   const postCommentSpy = makeReplyDeliverySpy(postCommentImpl || (() => ({ ok: true, status: 200, data: {} })));
+  // LIN-2716: sessionStorage is a vm-global here (bare `sessionStorage.*`
+  // references in the client script resolve against the sandbox object
+  // itself, same as `document`/`window`/`fetch` above), never routed through
+  // `window.sessionStorage` — mirrors how a real browser exposes it.
+  const storage = storageImpl || makeFakeStorage();
 
   const windowShim = {
     ChatUI: chatUI,
@@ -446,6 +466,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
     fetch: fetchSpy,
     TextDecoder,
     navigator: { clipboard: { writeText: async () => {} } },
+    sessionStorage: storage,
   };
   vm.createContext(sandbox);
   vm.runInContext(CLIENT_SRC, sandbox, { filename: 'flight-companion.js' });
@@ -458,6 +479,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
     apiCalls: apiSpy.calls,
     replyDeliveryCalls: postCommentSpy.calls,
     windowShim,
+    storage,
   };
 }
 
@@ -2877,5 +2899,128 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
     assert.strictEqual(questionInput._heightWrites.length, 0, 'no auto-wake path assigns .value or fires input');
     assert.strictEqual(questionInput.style.overflowY, '');
     assert.strictEqual(questionInput._disabledWriteCount, 0);
+  });
+});
+
+// ─── Session persistence helper (LIN-2716) ─────────────────────────────────
+//
+// Before this landed, a page reload lost `chatHistory` entirely — it lived
+// only in the module-level array, never written to sessionStorage (see the
+// ticket's Observed section). These tests PIN THE SHAPE of the persistence
+// helper, exposed on the module's own test seam:
+//   - `sessionStorageKey(urlKey)` -> the storage key for that workspace
+//   - `loadStoredSession(urlKey)` -> `{history, tabCheckInCount, tabTotalCost}`,
+//     always this shape, NEVER throws — a missing entry, malformed JSON, or
+//     well-formed JSON of the wrong shape all degrade to the same clean
+//     empty session `{history: [], tabCheckInCount: 0, tabTotalCost: 0}`
+//   - `saveStoredSession(urlKey, session)` -> writes it back, capping
+//     `history` via the pre-existing `capHistory`/`HISTORY_CAP` so a
+//     hand-edited or pre-cap stored blob can never bypass the 40-turn bound
+//     on the way out OR the way back in
+//   - `clearStoredSession(urlKey)` -> removes the entry (reorient's job)
+//
+// Keyed by `urlKey` — never a single global key, unlike public/app.js's
+// collapse-state `STORAGE_KEY` — since one browser visiting two workspaces
+// must not cross-contaminate their companion threads. Storage is
+// `sessionStorage`, not `localStorage`: it survives the reload/tab-eviction
+// scenario the ticket names (LIN-751's mobile-reload complaint) without
+// accumulating stale threads indefinitely across days/devices the way a
+// `localStorage` key would. This is a beat-2 design call, not settled by the
+// ticket text — flagged in the beat-2 evidence comment on LIN-2716 for
+// review, not silently assumed.
+//
+// These four names did not exist on the module when this block was written
+// (beat 2) — every test here failed with "m.<name> is not a function"
+// against the unfixed code; that red-first evidence is posted as a comment
+// on LIN-2716 (title: "Beat 2/5 — red-first evidence"). Beat 3 added the
+// production implementation these tests now exercise for real.
+describe('flight-companion.js — session persistence helper (LIN-2716)', () => {
+  const STORAGE_KEY = 'flight-companion-session:acme';
+  const EMPTY_SESSION = { history: [], tabCheckInCount: 0, tabTotalCost: 0 };
+
+  test('round-trip: a saved session reloads with the same thread and the same history the next turn would carry', () => {
+    const { exports: m } = loadClient();
+    const session = {
+      history: [
+        { role: 'user', content: 'are you there?' },
+        { role: 'assistant', content: 'yes' },
+      ],
+      tabCheckInCount: 1,
+      tabTotalCost: 0.0042,
+    };
+    m.saveStoredSession('acme', session);
+    // looseDeepEqual (node:assert's non-strict deepEqual), not
+    // assert.deepStrictEqual, throughout this describe block — the vm
+    // sandbox is a separate realm, so an object literal built inside it
+    // carries that realm's own Object.prototype and fails a strict deep
+    // comparison against a plain object built in this file, on prototype
+    // identity alone, even with byte-identical own properties. The rest of
+    // this file's own pure-helper tests hit the exact same seam (see
+    // `looseDeepEqual` in the imports at the top and its use throughout).
+    looseDeepEqual(m.loadStoredSession('acme'), session);
+  });
+
+  test('cap: the existing 40-turn bound still holds across a save/restore', () => {
+    const { exports: m } = loadClient();
+    const history = [];
+    for (let i = 0; i < 45; i++) history.push({ role: i % 2 === 0 ? 'user' : 'assistant', content: String(i) });
+    m.saveStoredSession('acme', { history, tabCheckInCount: 0, tabTotalCost: 0 });
+    const loaded = m.loadStoredSession('acme');
+    assert.strictEqual(loaded.history.length, m.HISTORY_CAP, 'must not exceed HISTORY_CAP');
+    assert.strictEqual(loaded.history[0].content, '5', 'oldest entries are dropped, not newest');
+    assert.strictEqual(loaded.history[loaded.history.length - 1].content, '44');
+  });
+
+  test('corrupt storage -> empty: malformed JSON yields a clean empty session and never throws into the page', () => {
+    const storage = makeFakeStorage({ [STORAGE_KEY]: '{not json' });
+    const { exports: m } = loadClient({ storageImpl: storage });
+    let loaded;
+    assert.doesNotThrow(() => { loaded = m.loadStoredSession('acme'); });
+    looseDeepEqual(loaded, EMPTY_SESSION);
+  });
+
+  test('corrupt storage -> empty: well-formed JSON of the wrong shape also yields a clean empty session', () => {
+    const storage = makeFakeStorage({ [STORAGE_KEY]: JSON.stringify([1, 2, 3]) });
+    const { exports: m } = loadClient({ storageImpl: storage });
+    looseDeepEqual(m.loadStoredSession('acme'), EMPTY_SESSION);
+  });
+
+  test('no stored entry yields the same clean empty session, never throws', () => {
+    const { exports: m } = loadClient();
+    let loaded;
+    assert.doesNotThrow(() => { loaded = m.loadStoredSession('acme'); });
+    looseDeepEqual(loaded, EMPTY_SESSION);
+  });
+
+  test('keyed by urlKey: two workspaces in the same browser do not cross-contaminate', () => {
+    const { exports: m } = loadClient();
+    m.saveStoredSession('acme', { history: [{ role: 'user', content: 'acme q' }], tabCheckInCount: 0, tabTotalCost: 0 });
+    m.saveStoredSession('other', { history: [{ role: 'user', content: 'other q' }], tabCheckInCount: 0, tabTotalCost: 0 });
+    assert.strictEqual(m.loadStoredSession('acme').history[0].content, 'acme q');
+    assert.strictEqual(m.loadStoredSession('other').history[0].content, 'other q');
+  });
+
+  test('clearStoredSession removes the entry — a subsequent load returns the clean empty session (reorient\'s job)', () => {
+    const storage = makeFakeStorage();
+    const { exports: m } = loadClient({ storageImpl: storage });
+    m.saveStoredSession('acme', { history: [{ role: 'user', content: 'hi' }], tabCheckInCount: 1, tabTotalCost: 0.01 });
+    assert.notStrictEqual(storage.getItem(STORAGE_KEY), null, 'sanity: something was actually written');
+    m.clearStoredSession('acme');
+    assert.strictEqual(storage.getItem(STORAGE_KEY), null);
+    looseDeepEqual(m.loadStoredSession('acme'), EMPTY_SESSION);
+  });
+
+  test('saveStoredSession never throws when the underlying storage.setItem throws (quota/private-browsing)', () => {
+    const storage = makeFakeStorage();
+    storage.setItem = () => { throw new Error('QuotaExceededError'); };
+    const { exports: m } = loadClient({ storageImpl: storage });
+    assert.doesNotThrow(() => m.saveStoredSession('acme', { history: [], tabCheckInCount: 0, tabTotalCost: 0 }));
+  });
+
+  test('clearStoredSession never throws when the underlying storage.removeItem throws', () => {
+    const storage = makeFakeStorage();
+    storage.removeItem = () => { throw new Error('boom'); };
+    const { exports: m } = loadClient({ storageImpl: storage });
+    assert.doesNotThrow(() => m.clearStoredSession('acme'));
   });
 });

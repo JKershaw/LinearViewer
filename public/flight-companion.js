@@ -44,6 +44,16 @@
   var CADENCE_BASE_MS = 30000;
   var CADENCE_CAP_MS = 180000;
   var HISTORY_CAP = 40;
+  // LIN-2716: sessionStorage (never localStorage) keyed by urlKey — survives
+  // the reload/tab-eviction scenario the ticket names (mobile OS tab
+  // eviction, a link tap and back) without indefinitely accumulating stale
+  // threads across days/devices the way a localStorage key would. Mirrors
+  // public/app.js's collapse-state persistence pattern (try/catch around
+  // JSON parse/stringify, corrupt data or quota errors fall back to a clean
+  // default rather than throwing into the page) but keyed per-workspace,
+  // unlike that file's single global STORAGE_KEY — one browser visiting two
+  // workspaces must not cross-contaminate their companion threads.
+  var SESSION_STORAGE_PREFIX = 'flight-companion-session:';
 
   var page = document.querySelector('.flight-companion-page');
   var urlKey = (page && page.dataset.urlKey) || '';
@@ -129,8 +139,11 @@
   var inFlight = false;
   var cadence = { delayMs: CADENCE_BASE_MS, stopped: false };
   var timerId = null;
-  // LIN-2621 beat 3: per-tab, in-memory only — deliberately not persisted
-  // across a reload (the ticket's own "does not need to persist" note).
+  // LIN-2621 beat 3 called this "per-tab, in-memory only — deliberately not
+  // persisted across a reload" — LIN-2716 reverses that: these two now
+  // round-trip through saveStoredSession/loadStoredSession (see finishTurn
+  // and the rehydrate-on-load block below) alongside chatHistory, since a
+  // resumed tab needs its running total to stay honest, not reset to zero.
   var tabCheckInCount = 0;
   var tabTotalCost = 0;
   // LIN-2632: an auto-wake tick's "checking in…" placeholder (set at
@@ -169,6 +182,69 @@
     cap = cap || HISTORY_CAP;
     if (history.length > cap) history.splice(0, history.length - cap);
     return history;
+  }
+
+  // LIN-2716: the session-persistence helper. Keyed by urlKey (never a bare
+  // constant — see SESSION_STORAGE_PREFIX's own comment above).
+  function sessionStorageKey(urlKeyArg) {
+    return SESSION_STORAGE_PREFIX + urlKeyArg;
+  }
+
+  function emptyStoredSession() {
+    return { history: [], tabCheckInCount: 0, tabTotalCost: 0 };
+  }
+
+  // Never throws into the page: a missing entry, a JSON.parse failure, and
+  // well-formed JSON of the wrong shape all degrade to the SAME clean empty
+  // session — corrupt/malformed storage is exactly as safe as no storage at
+  // all, never a half-restored or crashing page. `history` is re-capped on
+  // the way IN too (not just on the way out in saveStoredSession below), so
+  // a hand-edited or pre-cap stored blob can never bypass HISTORY_CAP either
+  // direction. Deliberately does NOT persist/restore a token or the +proxy
+  // block — the stored shape has no field for either, by construction.
+  function loadStoredSession(urlKeyArg) {
+    try {
+      var raw = sessionStorage.getItem(sessionStorageKey(urlKeyArg));
+      if (!raw) return emptyStoredSession();
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.history)) return emptyStoredSession();
+      var history = parsed.history.filter(function (turn) {
+        return turn && typeof turn.role === 'string' && typeof turn.content === 'string';
+      });
+      capHistory(history);
+      var tabCheckInCount = typeof parsed.tabCheckInCount === 'number' && isFinite(parsed.tabCheckInCount) ? parsed.tabCheckInCount : 0;
+      var tabTotalCost = typeof parsed.tabTotalCost === 'number' && isFinite(parsed.tabTotalCost) ? parsed.tabTotalCost : 0;
+      return { history: history, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost };
+    } catch (e) {
+      return emptyStoredSession();
+    }
+  }
+
+  // Swallows a throwing storage.setItem (quota exceeded, private-browsing
+  // lockdown) — a failed save just means the NEXT reload starts fresh; it
+  // must never throw into the turn-completion path that calls this.
+  function saveStoredSession(urlKeyArg, session) {
+    try {
+      var history = capHistory((session.history || []).slice());
+      sessionStorage.setItem(sessionStorageKey(urlKeyArg), JSON.stringify({
+        history: history,
+        tabCheckInCount: session.tabCheckInCount || 0,
+        tabTotalCost: session.tabTotalCost || 0,
+      }));
+    } catch (e) {
+      // Nothing to do — the in-memory state stays authoritative for this tab.
+    }
+  }
+
+  // Reorient's job (and only reorient's — see reorientClick below). Swallows
+  // a throwing storage.removeItem for the same reason saveStoredSession
+  // swallows setItem.
+  function clearStoredSession(urlKeyArg) {
+    try {
+      sessionStorage.removeItem(sessionStorageKey(urlKeyArg));
+    } catch (e) {
+      // ignore
+    }
   }
 
   function nextCadenceDelay(currentDelayMs) {
@@ -900,6 +976,23 @@
 
   function finishTurn(turnKind) {
     inFlight = false;
+    // LIN-2716: persist AFTER every non-boot turn settles — by the time
+    // finishTurn runs, chatHistory/tabCheckInCount/tabTotalCost already
+    // reflect the turn's final outcome on every exit path (the 'done'
+    // handler's push-and-cap, an error/non-stream/network-failure branch's
+    // chatHistory.pop(), or an auto-wake silent tick's counter-only bump),
+    // so this ONE call site covers all of them — no need to save separately
+    // at each mutation site. `turnKind !== 'boot'` is deliberate, not an
+    // oversight: a boot's own orientation exchange (whether from the empty-
+    // state Start button or from reorient) is never persisted, which is what
+    // keeps "reorient clears the stored session, and a reload afterwards
+    // shows the start state" true without a special case — reorient clears
+    // storage in reorientClick below, and if boot turns persisted too, the
+    // very act of re-orienting would immediately re-populate storage with
+    // its own reply the moment that boot's `done` frame arrived.
+    if (urlKey && turnKind !== 'boot') {
+      saveStoredSession(urlKey, { history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost });
+    }
     // LIN-2718: release the lock only for the turn kinds that took it —
     // an auto-wake tick never called setComposerBusy(true), so it must never
     // call it with `false` either (that would still be touching the
@@ -1379,10 +1472,53 @@
     if (!window.matchMedia('(max-width: 600px)').matches) return;
     questionInput.scrollIntoView({ block: 'end', inline: 'nearest' });
   });
+  // LIN-2716: reorient is the ONE deliberate-fresh-start affordance, so it
+  // alone clears the stored session — the empty-state Start button has
+  // nothing to clear (there is no prior thread yet) and stays wired straight
+  // to startBoot. Clearing BEFORE startBoot runs (rather than after) means a
+  // page that dies mid-boot still lands on a cleared session next load,
+  // never a half-cleared one.
+  function reorientClick() {
+    if (urlKey) clearStoredSession(urlKey);
+    startBoot();
+  }
   if (startBtn) startBtn.addEventListener('click', startBoot);
-  if (reorientBtn) reorientBtn.addEventListener('click', startBoot);
+  if (reorientBtn) reorientBtn.addEventListener('click', reorientClick);
   // Size a browser-restored form value (e.g. bfcache) on first paint.
   resizeComposer();
+
+  // LIN-2716: rehydrate a persisted session before wiring beforeunload/the
+  // cadence timer below — restores chatHistory (so the very next turn's
+  // body.history is correct even if the human never touches the composer
+  // before it), the visible thread (through the SAME render path A1 landed:
+  // appendUserBubble / appendAssistantBubble -> window.ChatUI.
+  // renderMarkdownText -> setBubbleState(..., 'done') — no second rendering
+  // path for restored turns), and the tab cost/counter total. Proposals are
+  // NOT part of chatHistory (they arrive as ephemeral tool-call SSE events,
+  // never persisted) and so are never reconstructed on reload — the
+  // ticket's "read-only unless the approve path can still reach a live
+  // proposal id" default resolves to "absent" here, which is trivially safe
+  // (nothing stale to approve). A restored assistant turn also renders no
+  // per-message cost meta line (LIN-2621 beat 3's `.fc-msg-meta`) — only the
+  // running tab total is persisted, not each turn's own usage payload.
+  if (urlKey) {
+    var restoredSession = loadStoredSession(urlKey);
+    if (restoredSession.history.length) {
+      chatHistory = restoredSession.history;
+      restoredSession.history.forEach(function (turn) {
+        if (turn.role === 'user') {
+          appendUserBubble(turn.content);
+        } else if (turn.role === 'assistant') {
+          var restoredBody = appendAssistantBubble();
+          window.ChatUI.renderMarkdownText(restoredBody, turn.content);
+          setBubbleState(restoredBody.closest('li'), 'done');
+        }
+      });
+    }
+    tabCheckInCount = restoredSession.tabCheckInCount;
+    tabTotalCost = restoredSession.tabTotalCost;
+    updateTabTotalDisplay();
+  }
 
   window.addEventListener('beforeunload', function () {
     if (timerId) { clearTimeout(timerId); timerId = null; }
@@ -1406,6 +1542,7 @@
       formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal, parseDecisionsResult,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
       resizeComposer,
+      sessionStorageKey, loadStoredSession, saveStoredSession, clearStoredSession,
       getCadenceState: function () { return cadence; },
       getChatHistory: function () { return chatHistory; },
       getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
