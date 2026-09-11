@@ -2917,7 +2917,10 @@ describe('flight-companion.js — LIN-2717: composer auto-grow (S4 unit witnesse
 //     `history` via the pre-existing `capHistory`/`HISTORY_CAP` so a
 //     hand-edited or pre-cap stored blob can never bypass the 40-turn bound
 //     on the way out OR the way back in
-//   - `clearStoredSession(urlKey)` -> removes the entry (reorient's job)
+//   - `clearStoredSession(urlKey)` -> removes the entry. NOT wired to
+//     reorient any more (LIN-2770/John's ruling withdrew that job — reorient
+//     is not a fresh start) — kept as the primitive a later "start a fresh
+//     session" affordance would use; still exercised directly below
 //
 // Keyed by `urlKey` — never a single global key, unlike public/app.js's
 // collapse-state `STORAGE_KEY` — since one browser visiting two workspaces
@@ -3000,7 +3003,7 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     assert.strictEqual(m.loadStoredSession('other').history[0].content, 'other q');
   });
 
-  test('clearStoredSession removes the entry — a subsequent load returns the clean empty session (reorient\'s job)', () => {
+  test('clearStoredSession removes the entry — a subsequent load returns the clean empty session', () => {
     const storage = makeFakeStorage();
     const { exports: m } = loadClient({ storageImpl: storage });
     m.saveStoredSession('acme', { history: [{ role: 'user', content: 'hi' }], tabCheckInCount: 1, tabTotalCost: 0.01 });
@@ -3022,5 +3025,29 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     storage.removeItem = () => { throw new Error('boom'); };
     const { exports: m } = loadClient({ storageImpl: storage });
     assert.doesNotThrow(() => m.clearStoredSession('acme'));
+  });
+
+  // LIN-2770 / John's ruling: reorient is NOT a fresh start, so it must no
+  // longer clear the stored session — the withdrawn behaviour this
+  // regression guards against. Checked synchronously, right after the click
+  // and before the async boot turn resolves, so this is a direct test of
+  // reorientClick's own wiring, not of anything a later turn re-saves.
+  test('reorientClick preserves the stored session — reorient is not a fresh start (LIN-2770)', () => {
+    const storage = makeFakeStorage();
+    const { reorientBtn } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => new Promise(() => {}), // never resolves — pre-response state only
+    });
+    storage.setItem('flight-companion-session:acme', JSON.stringify({
+      history: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'hello' }],
+      tabCheckInCount: 1,
+      tabTotalCost: 0.01,
+    }));
+    reorientBtn.dispatch('click');
+    assert.notStrictEqual(
+      storage.getItem('flight-companion-session:acme'),
+      null,
+      'reorient must not clear the stored session'
+    );
   });
 });

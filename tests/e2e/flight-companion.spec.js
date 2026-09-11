@@ -1201,56 +1201,63 @@ test.describe('LIN-2716: reload persists and resumes the session', () => {
     ]);
   });
 
-  // LIN-2716 item 3. A genuine red-first run here needs something to have
-  // been persisted to fail to clear — nothing is persisted at all yet, so a
-  // bare "reorient then check storage is empty" would pass vacuously against
-  // TODAY's code (there was never anything stored to begin with) and would
-  // not be guarding the reorient behaviour specifically. Seeding
-  // sessionStorage directly with the shape the beat-2 unit tests pin
-  // (`loadStoredSession`'s contract) sidesteps that: it also gives a genuine,
-  // independent red for the rehydrate-on-load half (nothing reads storage on
-  // load today, so the seeded thread never appears) before reorient is even
-  // clicked.
-  test('reorient clears the stored session: rehydrate-from-storage then clear-on-reorient, both observed live', async ({ page }) => {
-    const seeded = {
-      history: [
-        { role: 'user', content: 'seeded question' },
-        { role: 'assistant', content: 'seeded answer' },
-      ],
-      tabCheckInCount: 1,
-      tabTotalCost: 0.01,
-    };
-    await page.evaluate(({ urlKey, session }) => {
-      sessionStorage.setItem(`flight-companion-session:${urlKey}`, JSON.stringify(session));
-    }, { urlKey: URL_KEY, session: seeded });
+  // LIN-2716's original acceptance bullet here was "reorient clears the
+  // stored session" — withdrawn by John's ruling on LIN-2770: reorient is
+  // NOT a fresh start (LIN-2622's boot turn already carries the prior
+  // exchange on the wire), so clearing storage on reorient was wrong on its
+  // own premise. The review that filed LIN-2770 found the clear "undid
+  // itself" one turn later anyway (the next ordinary turn re-saved the whole
+  // pre-reorient chatHistory), which is what made the withdrawn behaviour
+  // incoherent rather than merely conservative.
+  //
+  // This regression instead pins the CORRECTED behaviour end to end, and is
+  // written to be genuinely red against the withdrawn "clear on reorient"
+  // code: reloading immediately after reorient — before any further turn —
+  // is exactly the window where the old code had already cleared storage
+  // but the new code has not touched it. (Reloading only AFTER a further
+  // turn would pass either way, since that later turn's own save
+  // re-populates storage regardless of what reorient did — that ordering
+  // cannot distinguish the two behaviours, which is why the reload sits
+  // directly after reorient here, not after a follow-up turn.)
+  test('reorient does not clear the stored session: a reload right after reorient keeps the continuing conversation, and the next turn carries it forward', async ({ page }) => {
+    await mockTurn(page, { token: 'ack' });
+    await page.locator('#flight-companion-question').fill('are you there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
 
-    await page.reload();
-    await page.waitForLoadState('networkidle');
-
-    // The rehydrate-on-load half: the seeded thread should appear without
-    // any turn being sent.
-    await expect(page.locator('#flight-companion-thread')).toBeVisible();
-    await expect(page.locator('.fc-msg-body').first()).toHaveText('seeded question');
-    await expect(page.locator('.fc-msg-body').nth(1)).toHaveText('seeded answer');
-    await expect(page.locator('#flight-companion-reorient')).toBeVisible();
-
-    // The clear-on-reorient half.
     await mockTurn(page, { endpoint: 'boot', token: 'orienting fresh' });
     await page.locator('#flight-companion-reorient').click();
     await expect(page.locator('.fc-msg-who').last()).toHaveClass(/status-pill--done/);
 
-    const storedAfterReorient = await page.evaluate(
-      (urlKey) => sessionStorage.getItem(`flight-companion-session:${urlKey}`),
-      URL_KEY
-    );
-    expect(storedAfterReorient).toBeNull();
-
-    // A subsequent reload shows the start state, not the old seeded thread —
-    // the ticket's own wording for this acceptance bullet.
+    // Reload with NO further turn sent — under the withdrawn behaviour this
+    // is where storage was already cleared, so the thread would come back
+    // empty even though reorient was never meant to be a fresh start.
     await page.reload();
     await page.waitForLoadState('networkidle');
-    await expect(page.locator('#flight-companion-start')).toBeVisible();
-    await expect(page.locator('#flight-companion-chat-empty')).toBeVisible();
-    await expect(page.locator('.fc-msg-body')).toHaveCount(0);
+    await expect(page.locator('#flight-companion-thread')).toBeVisible();
+    await expect(page.locator('#flight-companion-chat-empty')).toBeHidden();
+    await expect(page.locator('.fc-msg-body').first()).toHaveText('are you there?');
+    await expect(page.locator('.fc-msg-body').nth(1)).toHaveText('ack');
+
+    // Continue with a later turn post-reload: the next turn's body.history
+    // must carry the pre-reorient exchange forward too, not just the
+    // visible thread — this is the "next-turn history" half of the ticket's
+    // corrected acceptance.
+    let capturedBody = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      capturedBody = JSON.parse(route.request().postData());
+      const frames = renderSSEFrames([['token', { token: 'still here' }], ['done', {}]]);
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: frames });
+    });
+    await page.locator('#flight-companion-question').fill('still there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-body').last()).toHaveText('still here');
+
+    expect(capturedBody).not.toBeNull();
+    expect(capturedBody.history).toEqual([
+      { role: 'user', content: 'are you there?' },
+      { role: 'assistant', content: 'ack' },
+    ]);
   });
 });

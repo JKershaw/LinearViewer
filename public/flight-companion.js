@@ -236,9 +236,14 @@
     }
   }
 
-  // Reorient's job (and only reorient's — see reorientClick below). Swallows
-  // a throwing storage.removeItem for the same reason saveStoredSession
-  // swallows setItem.
+  // General-purpose helper: removes the stored session outright. LIN-2716
+  // originally wired this into reorientClick to give reorient a "clear
+  // storage" job on a fresh-start premise; John's ruling (LIN-2770) withdrew
+  // that — reorient is not a fresh start, so nothing calls this today (see
+  // reorientClick below). Left in place, and still covered by its own unit
+  // tests, as the primitive a later deliberate "start a fresh session"
+  // affordance would reach for. Swallows a throwing storage.removeItem for
+  // the same reason saveStoredSession swallows setItem.
   function clearStoredSession(urlKeyArg) {
     try {
       sessionStorage.removeItem(sessionStorageKey(urlKeyArg));
@@ -984,12 +989,15 @@
     // so this ONE call site covers all of them — no need to save separately
     // at each mutation site. `turnKind !== 'boot'` is deliberate, not an
     // oversight: a boot's own orientation exchange (whether from the empty-
-    // state Start button or from reorient) is never persisted, which is what
-    // keeps "reorient clears the stored session, and a reload afterwards
-    // shows the start state" true without a special case — reorient clears
-    // storage in reorientClick below, and if boot turns persisted too, the
-    // very act of re-orienting would immediately re-populate storage with
-    // its own reply the moment that boot's `done` frame arrived.
+    // state Start button or from reorient) is never itself written to
+    // storage — a human who clicks Start/reorient and reloads before any
+    // further turn sees storage as of the last ordinary turn, not the boot
+    // narration. This is independent of reorient's own storage handling
+    // (see reorientClick below, and LIN-2770/John's ruling that reorient is
+    // not a fresh start): the very next ordinary turn still serialises the
+    // WHOLE chatHistory, boot exchange included, so the continuing
+    // conversation is never lost — only the boot turn's own bubble is
+    // absent from storage until a later turn carries it along.
     if (urlKey && turnKind !== 'boot') {
       saveStoredSession(urlKey, { history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost });
     }
@@ -1472,14 +1480,19 @@
     if (!window.matchMedia('(max-width: 600px)').matches) return;
     questionInput.scrollIntoView({ block: 'end', inline: 'nearest' });
   });
-  // LIN-2716: reorient is the ONE deliberate-fresh-start affordance, so it
-  // alone clears the stored session — the empty-state Start button has
-  // nothing to clear (there is no prior thread yet) and stays wired straight
-  // to startBoot. Clearing BEFORE startBoot runs (rather than after) means a
-  // page that dies mid-boot still lands on a cleared session next load,
-  // never a half-cleared one.
+  // LIN-2770 / John's ruling (relayed 2026-09-11): reorient is NOT a fresh
+  // start — LIN-2622's boot turn already carries the prior conversation on
+  // the wire, and LIN-2716's original "reorient clears the stored session"
+  // job fought that premise: the review found the next ordinary turn simply
+  // re-saved the whole pre-reorient chatHistory anyway (LIN-2770 — the clear
+  // "un-did itself" one turn later, storage and memory briefly disagreeing
+  // and memory always winning). That acceptance bullet is withdrawn by the
+  // ruling; persistence now mirrors the existing in-memory session across
+  // reorient exactly like it does across any other turn kind, so storage
+  // and memory can no longer disagree. A deliberate "start a fresh session"
+  // affordance — distinct from this reorientation — is a later ticket, not
+  // this one.
   function reorientClick() {
-    if (urlKey) clearStoredSession(urlKey);
     startBoot();
   }
   if (startBtn) startBtn.addEventListener('click', startBoot);
