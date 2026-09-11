@@ -52,6 +52,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
@@ -219,6 +220,15 @@ function makeRow({ decision, anchor, ...rest } = {}) {
     decision: decision || { decision_id: 'd-gone-1' },
     anchor: { ...ANCHOR, ...(anchor || {}) },
     disposition: 'gone',
+    // LIN-2775 Area 7: a `gone` row's resolveEffect default IS 'dispatch'
+    // (ON_ANSWER_EFFECT_DEFAULTS.gone, lib/unanswered-decisions.js) — every
+    // caller below that doesn't override `effect`/`alternate` via `rest` is
+    // now explicitly re-anchored on the row shape the real feed actually
+    // sends for an ordinary gone ruling, rather than relying on `effect`
+    // being silently `undefined` (which happened to take the same branch,
+    // by accident of `!== 'record'`, not by declared intent).
+    effect: 'dispatch',
+    alternate: null,
     ...rest
   };
 }
@@ -258,6 +268,50 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     assert.equal(capturedOpts.urlKey, 'the-ruling-workspace');
     assert.equal(capturedOpts.issue.id, 'issue-1');
     assert.equal(capturedOpts.issue.identifier, 'LIN-1728-G');
+  });
+
+  // ── LIN-2775 Area 7 — THE HEADLINE WITNESS ──────────────────────────────
+  //
+  // This is the ticket's own reason to exist: tapping "preserve" on a
+  // ruling today launches an agent whose ENTIRE brief is the word
+  // "preserve" — `dispatchPrompt` receives the raw pressed-option text (or
+  // free text) as `prompt`, verbatim, and nothing else. No test anywhere in
+  // this suite previously asserted on `.prompt` — every existing
+  // dispatchPrompt-opts assertion above (F1, G1 below) checks only
+  // urlKey/issue.id/issue.identifier — which is exactly why this defect
+  // shipped and stayed unnoticed. This test MUST fail against that
+  // raw-reply-text behaviour; confirmed red-first (see beat 3's own report).
+  test('HEADLINE: the composed dispatch prompt carries the question, the chosen answer, and the decisionCase recap — never just the raw pressed text', async () => {
+    let capturedOpts = null;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    const row = makeRow({
+      decision: { decision_id: 'd-headline-1', question: 'Preserve the legacy adapter, or retire it?' },
+      decisionCase: ['The adapter has zero callers in prod.', 'Staging still references it via a feature flag.']
+    });
+
+    deliverRulingReply(row, 'Preserve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedOpts, 'expected dispatchPrompt to be called');
+    // The regression this witness exists to catch: pre-fix, capturedOpts.prompt
+    // was LITERALLY just 'Preserve' — the pressed option's bare label, nothing
+    // else. Asserting `.prompt === 'Preserve'` would PASS against that bug, so
+    // this checks for the presence of everything the bug's prompt lacked.
+    assert.notEqual(capturedOpts.prompt, 'Preserve', 'the raw pressed text alone is exactly the pre-fix regression this witness exists to catch');
+    assert.match(capturedOpts.prompt, /Preserve the legacy adapter, or retire it\?/, 'must carry the decision\'s own question');
+    assert.match(capturedOpts.prompt, /Preserve/, 'must carry the chosen option\'s label (or free text)');
+    assert.match(capturedOpts.prompt, /The adapter has zero callers in prod\./, 'must carry the decisionCase recap');
+    assert.match(capturedOpts.prompt, /Staging still references it via a feature flag\./);
+    assert.equal(capturedOpts.promptName, 'Ruling reply');
+    assert.ok(DISPATCH_KINDS.includes(capturedOpts.kind), `capturedOpts.kind ("${capturedOpts.kind}") must be a member of DISPATCH_KINDS`);
+    assert.equal(capturedOpts.kind, 'custom', 'nothing more specific than the neutral default is derivable from a ruling row today');
   });
 
   test('F2: comment succeeds, the fresh run fails to start — a durable partial-failure surfaces with a retry affordance, the comment is never reposted', async () => {
@@ -488,7 +542,11 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     assert.equal(capturedIssueId, ANCHOR.issueId, 'a terminal target — even one found in the neighbourhood — must not receive the comment');
     assert.equal(dispatchCalls, 0);
     const feedback = li.querySelector('.obs-ruling-feedback');
-    assert.match(feedback.textContent, /outside the checked neighbourhood/);
+    // Beat 3 correction: this case is NOT "outside the checked neighbourhood"
+    // — LIN-DONE WAS found there. Reusing that note here would itself be a
+    // false claim, so the terminal case gets its own honest wording.
+    assert.match(feedback.textContent, /already closed/);
+    assert.doesNotMatch(feedback.textContent, /outside the checked neighbourhood/, 'the terminal case must not borrow the not-found note — the target WAS in the checked neighbourhood');
   });
 
   test('record_on misrouting: a CROSS-WORKSPACE record_on (absent from THIS workspace\'s neighbourhood) targets the anchor, and the note renders', async () => {
@@ -2469,15 +2527,19 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
     assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
   });
 
-  test('record_on matches a neighbour whose own state is terminal → the anchor, the note', () => {
-    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE } = sandboxExports();
+  test('record_on matches a neighbour whose own state is terminal → the anchor, its OWN honest note (beat 3 correction)', () => {
+    // NOT the not-found note — LIN-T WAS found in the neighbourhood, so
+    // claiming "outside the checked neighbourhood" here would itself be a
+    // false claim, which is exactly what this ticket exists to eliminate.
+    const { resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE, RECORD_TARGET_TERMINAL_NOTE } = sandboxExports();
     for (const type of ['completed', 'canceled', 'duplicate']) {
       const result = resolveRecordTarget(ANCHOR, 'LIN-T', {
         hydrated: true,
         neighborhood: { parent: null, siblings: [], children: [{ id: 'id-t', identifier: 'LIN-T', state: { type } }], cousins: [] }
       });
       assert.equal(result.issueId, ANCHOR.issueId, `terminal type ${type} must fall back to the anchor`);
-      assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
+      assert.equal(result.note, RECORD_TARGET_TERMINAL_NOTE, `terminal type ${type} must carry its own note, not the not-found one`);
+      assert.notEqual(result.note, RECORD_TARGET_OUTSIDE_NOTE);
     }
   });
 
@@ -2507,5 +2569,43 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
     const result = resolveRecordTarget(ANCHOR, 'LIN-SOMETHING', { hydrated: false, reason: 'unavailable' });
     assert.equal(result.issueId, ANCHOR.issueId);
     assert.equal(result.note, RECORD_TARGET_OUTSIDE_NOTE);
+  });
+});
+
+// ─── composeDispatchPrompt (LIN-2775 Area 7) — pure, no DOM/network ────────
+describe('composeDispatchPrompt (LIN-2775 Area 7)', () => {
+  function sandboxExports() {
+    return makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) }).module.exports;
+  }
+
+  test('carries the question, the chosen answer, and the full decisionCase recap', () => {
+    const { composeDispatchPrompt } = sandboxExports();
+    const row = { decision: { question: 'Ship or hold?' }, decisionCase: ['Tests are green.', 'The release window closes Friday.'] };
+    const prompt = composeDispatchPrompt(row, 'Ship');
+    assert.match(prompt, /Ship or hold\?/);
+    assert.match(prompt, /Ship/);
+    assert.match(prompt, /Tests are green\./);
+    assert.match(prompt, /The release window closes Friday\./);
+  });
+
+  test('the FULL decisionCase is used, never the UI\'s DECISION_EXCERPT_CHARS-truncated preview', () => {
+    const { composeDispatchPrompt, DECISION_EXCERPT_CHARS } = sandboxExports();
+    const longChunk = 'x'.repeat(DECISION_EXCERPT_CHARS + 50);
+    const row = { decision: { question: 'Q' }, decisionCase: [longChunk] };
+    const prompt = composeDispatchPrompt(row, 'A');
+    assert.match(prompt, new RegExp(longChunk), 'a real agent brief must not be truncated to the UI\'s screen-space budget');
+  });
+
+  test('no question and no decisionCase → still carries the chosen answer, never throws', () => {
+    const { composeDispatchPrompt } = sandboxExports();
+    const prompt = composeDispatchPrompt({}, 'Approve');
+    assert.match(prompt, /Approve/);
+  });
+
+  test('free text (not a declared option label) is carried exactly as pressed', () => {
+    const { composeDispatchPrompt } = sandboxExports();
+    const row = { decision: { question: 'Why was I asked this?' }, decisionCase: [] };
+    const prompt = composeDispatchPrompt(row, 'Because the migration touches this table too.');
+    assert.match(prompt, /Because the migration touches this table too\./);
   });
 });

@@ -2641,6 +2641,12 @@ const RECORD_TARGET_TERMINAL_TYPES = ['completed', 'canceled', 'duplicate'];
 // "outside the checked neighbourhood" is honest where "invalid target" would
 // not be.
 const RECORD_TARGET_OUTSIDE_NOTE = 'outside the checked neighbourhood';
+// A SEPARATE note for the found-but-terminal case (beat 3 correction): the
+// declared target WAS in the checked neighbourhood, so reusing the
+// not-found note here would itself be the exact kind of false claim this
+// ticket exists to eliminate. Same non-invalidity-implying register as the
+// note above — the target isn't wrong, it's just already closed.
+const RECORD_TARGET_TERMINAL_NOTE = 'the declared target is already closed';
 
 function resolveRecordTarget(anchor, recordOn, hydrateResult) {
   const fallback = { issueId: anchor?.issueId || null, issueIdentifier: anchor?.issueIdentifier || null, note: null };
@@ -2654,13 +2660,45 @@ function resolveRecordTarget(anchor, recordOn, hydrateResult) {
 
   if (!match) return { ...fallback, note: RECORD_TARGET_OUTSIDE_NOTE };
   if (match.state && RECORD_TARGET_TERMINAL_TYPES.includes(match.state.type)) {
-    return { ...fallback, note: RECORD_TARGET_OUTSIDE_NOTE };
+    return { ...fallback, note: RECORD_TARGET_TERMINAL_NOTE };
   }
   // The rendered target identifier is a stated, un-eliminated residual's
   // entire mitigation (S15): an in-neighbourhood-but-wrong sibling can still
   // receive the human's words if the agent names it, so the caller MUST
   // surface `issueIdentifier` back to the operator, not silently swallow it.
   return { issueId: match.id || null, issueIdentifier: match.identifier, note: null };
+}
+
+// LIN-2775 Area 7 — this ticket's headline defect. `kind` is
+// DISPATCH_KIND_DEFAULT (lib/prompt-templates.js) — 'custom' — since nothing
+// more specific is derivable from a ruling row today: `anchor`
+// (lib/unanswered-decisions.js) carries no promptName/kind from the loop
+// that raised the decision, only loopId/issueId/issueIdentifier/
+// workspaceUrlKey/target/followUpTo.
+const RULING_DISPATCH_PROMPT_NAME = 'Ruling reply';
+const RULING_DISPATCH_KIND = 'custom';
+
+// Compose a REAL agent brief for a `dispatch`-effect ruling reply, copying
+// public/next-run.js's explicit-promptName/kind `dispatchPrompt` pattern.
+// Pure — no DOM/network — so directly unit-testable. Before this, the `gone`
+// branch dispatched the RAW reply text as the agent's entire prompt: tapping
+// "preserve" launched an agent whose whole brief was the word "preserve".
+//
+// `chosenAnswer` is the pressed option's LABEL or the operator's free text —
+// exactly what `deliverRulingReply`'s own `prompt` parameter already
+// carries, so it is passed straight through, never re-derived. `row`
+// supplies the decision's `question` and the `decisionCase` recap the row
+// already renders (`.obs-ruling-case`) — the FULL case here, not that
+// UI's DECISION_EXCERPT_CHARS-bounded preview: a screen-space excerpt is
+// the wrong budget for what an agent actually needs to act correctly.
+function composeDispatchPrompt(row, chosenAnswer) {
+  const question = row?.decision?.question;
+  const caseText = Array.isArray(row?.decisionCase) ? row.decisionCase.join(' ').trim() : '';
+  const parts = [];
+  if (question) parts.push(`Decision: ${question}`);
+  parts.push(`Chosen answer: ${chosenAnswer}`);
+  if (caseText) parts.push(`Context:\n${caseText}`);
+  return parts.join('\n\n');
 }
 
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
@@ -2895,9 +2933,18 @@ function deliverRulingReply(row, prompt, li) {
         // dispatch chain here, using the SAME shared partial-failure handler
         // as the `resumable` branch above (review F2) rather than the bare
         // "reply failed" catch this branch had before.
+        //
+        // LIN-2775 Area 7: the DISPATCHED prompt is the composed brief
+        // (question + chosen answer + decisionCase recap), never the raw
+        // `prompt` the comment above just posted — the comment is for a
+        // human reading the issue thread, the dispatch prompt is the
+        // agent's brief, and conflating the two was the ticket's headline
+        // defect (a bare option label as an agent's entire brief).
         const startRun = () => window.dispatchPrompt({
           urlKey: targetUrlKey,
-          prompt,
+          prompt: composeDispatchPrompt(row, prompt),
+          promptName: RULING_DISPATCH_PROMPT_NAME,
+          kind: RULING_DISPATCH_KIND,
           issue: { id: anchor.issueId || anchor.issueIdentifier, identifier: anchor.issueIdentifier },
           target: anchor.target || 'cli'
         });
@@ -3817,7 +3864,11 @@ if (typeof module !== 'undefined' && module.exports) {
     rulingEffectOverride, renderRulingRow,
     // LIN-2775 Area 6: the pure record_on resolver, directly unit-testable
     // against a hand-built hydrate-route response with no DOM/network.
-    resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE,
+    resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE, RECORD_TARGET_TERMINAL_NOTE,
+    // LIN-2775 Area 7: the composed-dispatch-prompt seam, directly
+    // unit-testable against the headline "raw reply text as entire brief"
+    // regression.
+    composeDispatchPrompt, RULING_DISPATCH_PROMPT_NAME, RULING_DISPATCH_KIND,
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.
