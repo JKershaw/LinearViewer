@@ -7,7 +7,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectUnansweredDecisions, resolveDisposition } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, resolveDisposition, resolveEffect } from '../../lib/unanswered-decisions.js';
 
 const NOW = new Date('2026-08-22T12:00:00.000Z');
 const REAP_INACTIVITY_MS = 21600000; // 6h, mirrors simple-dispatcher's config.js
@@ -96,6 +96,116 @@ describe('resolveDisposition (LIN-1728 Revision 3, F8: total mapping)', () => {
   });
 });
 
+describe('resolveEffect (LIN-2773 Area 3)', () => {
+  test('RED-FIRST PRIMARY: a blocked-parked loop always resumes, overriding a declared record', () => {
+    // resolveDisposition('resumable') must win unconditionally over a
+    // present, valid declared effect — evidence overrides declaration.
+    // `resolveEffect` does not exist at all on unmodified (pre-Area-3) code,
+    // so this assertion cannot pass there.
+    const result = resolveEffect(decision('d-1', { on_answer: { effect: 'record' } }), 'resumable');
+    assert.deepStrictEqual(result, { effect: 'resume', declaredEffect: 'record', alternate: null });
+  });
+
+  test('resumable ignores anchorTerminal/liveDispatchOnAnchor too — branch 1 is checked first, unconditionally', () => {
+    const result = resolveEffect(decision('d-1'), 'resumable', { anchorTerminal: true, liveDispatchOnAnchor: true });
+    assert.deepStrictEqual(result, { effect: 'resume', declaredEffect: null, alternate: null });
+  });
+
+  test('gone + anchorTerminal: true forces record, overriding a declared dispatch', () => {
+    const result = resolveEffect(decision('d-1', { on_answer: { effect: 'dispatch' } }), 'gone', { anchorTerminal: true });
+    assert.deepStrictEqual(result, { effect: 'record', declaredEffect: 'dispatch', alternate: null });
+  });
+
+  test('gone + anchorTerminal: false (or undefined) does NOT force record — falls through to branch 4', () => {
+    const falseResult = resolveEffect(decision('d-1'), 'gone', { anchorTerminal: false });
+    assert.strictEqual(falseResult.effect, 'dispatch'); // today's gone default
+    const undefinedResult = resolveEffect(decision('d-1'), 'gone', {});
+    assert.strictEqual(undefinedResult.effect, 'dispatch');
+  });
+
+  test('liveDispatchOnAnchor: true forces record regardless of disposition (gone or task-bound), overriding a declared dispatch', () => {
+    const gone = resolveEffect(decision('d-1', { on_answer: { effect: 'dispatch' } }), 'gone', { liveDispatchOnAnchor: true });
+    assert.deepStrictEqual(gone, { effect: 'record', declaredEffect: 'dispatch', alternate: null });
+    const taskBound = resolveEffect(decision('d-1', { on_answer: { effect: 'dispatch' } }), 'task-bound', { liveDispatchOnAnchor: true });
+    assert.deepStrictEqual(taskBound, { effect: 'record', declaredEffect: 'dispatch', alternate: null });
+  });
+
+  test('READ-ONLY: mid-turn never surfaces a declared effect, even when one is present in the fixture', () => {
+    const result = resolveEffect(decision('d-1', { on_answer: { effect: 'dispatch' } }), 'mid-turn');
+    assert.strictEqual(result.effect, null);
+    assert.strictEqual(result.declaredEffect, 'dispatch', 'declaredEffect still reports what was declared, only effect is suppressed');
+    assert.strictEqual(result.alternate, null);
+  });
+
+  test('READ-ONLY: indeterminate never surfaces a declared effect, even when one is present in the fixture', () => {
+    const result = resolveEffect(decision('d-1', { on_answer: { effect: 'resume' } }), 'indeterminate');
+    assert.strictEqual(result.effect, null);
+    assert.strictEqual(result.declaredEffect, 'resume');
+  });
+
+  test('gone with no declared effect falls back to the default (dispatch), alternate stays null', () => {
+    const result = resolveEffect(decision('d-1'), 'gone');
+    assert.deepStrictEqual(result, { effect: 'dispatch', declaredEffect: null, alternate: null });
+  });
+
+  test('task-bound with no declared effect falls back to the default (record), alternate stays null', () => {
+    const result = resolveEffect(decision('d-1'), 'task-bound');
+    assert.deepStrictEqual(result, { effect: 'record', declaredEffect: null, alternate: null });
+  });
+
+  test('gone with a declared effect matching the default: effect is the default, alternate stays null (no real divergence)', () => {
+    const result = resolveEffect(decision('d-1', { on_answer: { effect: 'dispatch' } }), 'gone');
+    assert.deepStrictEqual(result, { effect: 'dispatch', declaredEffect: 'dispatch', alternate: null });
+  });
+
+  test('gone with a declared effect diverging from the default: declared wins, default surfaces as alternate', () => {
+    const result = resolveEffect(decision('d-1', { on_answer: { effect: 'record' } }), 'gone');
+    assert.deepStrictEqual(result, { effect: 'record', declaredEffect: 'record', alternate: 'dispatch' });
+  });
+
+  test('task-bound with a declared effect diverging from the default: declared wins, default surfaces as alternate', () => {
+    const result = resolveEffect(decision('d-1', { on_answer: { effect: 'dispatch' } }), 'task-bound');
+    assert.deepStrictEqual(result, { effect: 'dispatch', declaredEffect: 'dispatch', alternate: 'record' });
+  });
+
+  test('PARTIAL INPUTS: every combination of missing anchorTerminal/liveDispatchOnAnchor still returns a defined effect, never throws', () => {
+    const combos = [
+      {},
+      { anchorTerminal: undefined },
+      { liveDispatchOnAnchor: undefined },
+      { anchorTerminal: undefined, liveDispatchOnAnchor: undefined },
+      { anchorTerminal: false },
+      { liveDispatchOnAnchor: false },
+      { anchorTerminal: false, liveDispatchOnAnchor: false }
+    ];
+    for (const disposition of ['resumable', 'gone', 'task-bound']) {
+      for (const opts of combos) {
+        assert.doesNotThrow(() => resolveEffect(decision('d-1'), disposition, opts));
+        const result = resolveEffect(decision('d-1'), disposition, opts);
+        assert.notStrictEqual(result.effect, undefined, `${disposition} with ${JSON.stringify(opts)} must not return an undefined effect`);
+      }
+    }
+    // mid-turn/indeterminate deliberately return effect: null (not undefined) — still "defined" in the sense of never throwing/never omitted.
+    for (const disposition of ['mid-turn', 'indeterminate']) {
+      for (const opts of combos) {
+        assert.doesNotThrow(() => resolveEffect(decision('d-1'), disposition, opts));
+      }
+    }
+  });
+
+  test('a decision with no on_answer at all (or no decision) yields declaredEffect: null, never throws', () => {
+    assert.strictEqual(resolveEffect(decision('d-1'), 'gone').declaredEffect, null);
+    assert.doesNotThrow(() => resolveEffect(null, 'gone'));
+    assert.strictEqual(resolveEffect(null, 'gone').declaredEffect, null);
+    assert.doesNotThrow(() => resolveEffect(undefined, 'task-bound'));
+  });
+
+  test('resolveEffect is pure — calling it twice with the same input yields the same output, and it takes no now/clock input', () => {
+    const d = decision('d-1', { on_answer: { effect: 'record' } });
+    assert.deepStrictEqual(resolveEffect(d, 'gone'), resolveEffect(d, 'gone'));
+  });
+});
+
 describe('collectUnansweredDecisions (LIN-1728)', () => {
   test('a loop with no decision contributes no row', () => {
     const rows = collectUnansweredDecisions({ loops: [loop({ decision: null })] }, { now: NOW });
@@ -148,7 +258,10 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
     assert.strictEqual(rows[0].decision.decision_id, 'd-2');
   });
 
-  test('row shape carries decision, decisionCase, an anchor, disposition, and canReply', () => {
+  // LIN-2773 Area 3: the full-row deepStrictEqual is rewritten, not loosened
+  // to a subset match, so it keeps failing on any unreviewed field —
+  // `effect`/`declaredEffect`/`alternate` are now part of the asserted shape.
+  test('row shape carries decision, decisionCase, an anchor, disposition, canReply, and the derived effect fields', () => {
     const l = loop({
       loopId: 'loop-a',
       issueId: 'uuid-a',
@@ -175,7 +288,10 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
       },
       disposition: 'resumable',
       canReply: true,
-      shelvedLapseCount: 0
+      shelvedLapseCount: 0,
+      effect: 'resume',
+      declaredEffect: null,
+      alternate: null
     });
   });
 
