@@ -1282,6 +1282,64 @@ describe('TaskDecisionsStore outcomeReason/outcomeBasisHash (LIN-2650 WS0 §5)',
   });
 });
 
+// LIN-2754 Track B: optionId is an answered-conditional durable side field,
+// projected `?? null` by toRecord, written using the same present-only-when-
+// supplied pattern as outcomeReason/outcomeBasisHash above — but gated on
+// 'answered' rather than 'self-resolved', and never touching the write-once
+// guard (a second markOutcome on an already-terminal row still returns the
+// original unchanged).
+describe('TaskDecisionsStore optionId (LIN-2754 Track B)', () => {
+  let collection, store;
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('optionId is written on an answered stamp and readable back via toRecord', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const record = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered', optionId: 'a' });
+    assert.equal(record.optionId, 'a');
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.optionId, 'a');
+  });
+
+  test('optionId is absent (null, not undefined) on a dismissed stamp even when supplied', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const record = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed', optionId: 'a' });
+    assert.strictEqual(record.optionId, null);
+  });
+
+  test('optionId is absent (null) on a self-resolved stamp', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const record = await store.markOutcome({
+      urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+    assert.strictEqual(record.optionId, null);
+  });
+
+  test('optionId is null, not undefined, when never supplied on an answered stamp', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const record = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered' });
+    assert.strictEqual(record.optionId, null);
+  });
+
+  test('the write-once guard is unchanged: a second markOutcome on an already-answered row with a different optionId returns the original unchanged', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    const first = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered', optionId: 'a' });
+    const second = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered', optionId: 'b' });
+    assert.equal(first.optionId, 'a');
+    assert.equal(second.optionId, 'a');
+    assert.equal(second.outcomeAt, first.outcomeAt);
+  });
+});
+
 describe('TaskDecisionsStore.listCandidatesForWorkspace (LIN-2649 WS2)', () => {
   let collection, store;
   const ID_A = '11111111-1111-1111-1111-111111111111';

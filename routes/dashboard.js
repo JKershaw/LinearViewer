@@ -13,6 +13,7 @@
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
  *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
+ *   POST     /workspace/:urlKey/api/dashboard/rulings/answer       — stamp a TASK-BOUND ruling answered with no comment, durable optionId (LIN-2754 Track B; the answer already lives on the ticket, this is bookkeeping only)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/shelve       — shelve any ruling with a reason + re-surface timer (LIN-1727; view-only, works uniformly for loop-backed and task-bound)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/keep         — withdraw a proposed dismissal (LIN-2444; view-only — never touches answer state, arms no keepalive)
  *   GET      /workspace/:urlKey/escalation-kpis                    — operator-facing escalation KPI audit page (LIN-1736; rate, time-to-response, false-escalation, unanswered age); ?windowDays= (default 30), ?targetPerDay= (optional)
@@ -1591,6 +1592,70 @@ export function createDashboardRoutes({
     } catch (error) {
       console.error('Ruling dismiss error:', error);
       jsonError(res, 500, 'Failed to dismiss ruling');
+    }
+  });
+
+  // ─── Answer a task-bound ruling — human-authenticated, no comment (LIN-2754 Track B) ──
+  //
+  // Task-bound only — sibling to `.../rulings/dismiss` above, not a loop-backed
+  // route: the proposed answer already lives on the ticket (LIN-2754's whole
+  // point), so this is stamp-only bookkeeping. It posts no comment, starts no
+  // run, and resumes nothing.
+  //
+  // No canonical-id re-resolution: every `taskDecisionsStore` row's `issueId`
+  // is canonical by construction (`routes/workspace-api.js`'s scan/dismiss
+  // routes only ever write a UUID there), and `taskDecisionAnchor`
+  // (`lib/unanswered-decisions.js`) hands this route's caller that same
+  // already-canonical id unchanged — `markOutcome`'s own canonical-UUID guard
+  // is belt-and-braces behind it.
+  //
+  // `optionId` is NOT re-validated against `decision.options[].id` here — it
+  // was already validated once at propose time (Track A's suggest-answer
+  // route); re-deriving it needs a read this route does not otherwise take,
+  // for a value sourced from an already-validated standing suggestion.
+  //
+  // The 409 detection compares `record.outcomeAt` (always a string —
+  // `toRecord` stringifies it) against `requestStartedAt`, both converted via
+  // `new Date(...).getTime()`. A bare `<` between a string and a `Date`
+  // coerces the `Date` to `NaN` and is unconditionally `false`, silently
+  // disabling this guard for every input — do not simplify it back to that.
+  // `markOutcome`'s write branch always sets `outcomeAt` strictly after this
+  // call's own `requestStartedAt` (its `findOne` observed no existing outcome
+  // first), so this call's own successful write always falls through to 200;
+  // any genuinely pre-existing outcome — including an earlier, already-
+  // completed `answered` stamp — predates it and 409s instead. The `outcome`
+  // string alone cannot distinguish those two cases, since both are
+  // `'answered'` (unlike the retire route's `'self-resolved'` lookalike,
+  // which nothing else ever writes).
+  router.post('/workspace/:urlKey/api/dashboard/rulings/answer', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { taskDecisionId, taskDecisionIssueId, optionId } = req.body || {};
+    if (
+      typeof taskDecisionId !== 'string' || !taskDecisionId.trim() ||
+      typeof taskDecisionIssueId !== 'string' || !taskDecisionIssueId.trim() ||
+      typeof optionId !== 'string' || !optionId.trim()
+    ) {
+      return jsonError(res, 400, 'taskDecisionId, taskDecisionIssueId and optionId are all required');
+    }
+    if (!taskDecisionsStore) {
+      return jsonError(res, 503, 'Scan store not configured');
+    }
+    try {
+      const requestStartedAt = new Date();
+      const record = await taskDecisionsStore.markOutcome({
+        urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId,
+        outcome: 'answered', optionId
+      });
+      if (!record) {
+        return jsonError(res, 404, 'No matching ruling to answer');
+      }
+      if (new Date(record.outcomeAt).getTime() < requestStartedAt.getTime()) {
+        return jsonError(res, 409, 'This ruling was already answered', { code: 'ALREADY_TERMINAL' });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Ruling answer error:', error);
+      jsonError(res, 500, 'Failed to answer ruling');
     }
   });
 
