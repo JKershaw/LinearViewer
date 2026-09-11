@@ -134,6 +134,28 @@ describe('markDecisionAnswered (LIN-1728)', () => {
     const doc = store.historyCollection._docs.find(d => d._id === item._id);
     assert.deepEqual(JSON.parse(doc.feedback[0].message), { decision_id: 'd-1' });
   });
+
+  // LIN-2754 Track B: option_id is a second, independent conditional key —
+  // present whenever supplied, regardless of what `outcome` resolves to — so
+  // it rides the bare {decision_id} shape too (outcome left undefined, the
+  // shape Track C's stampDecisionAnswers actually calls this with).
+  test('option_id rides the bare {decision_id} shape when supplied with outcome: undefined', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1', undefined, 'opt-1');
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.deepEqual(JSON.parse(doc.feedback[0].message), { decision_id: 'd-1', option_id: 'opt-1' });
+  });
+
+  test('option_id is absent from the message when not supplied', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1', 'dismissed');
+    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.deepEqual(JSON.parse(doc.feedback[0].message), { decision_id: 'd-1', outcome: 'dismissed' });
+  });
 });
 
 // ── Regression: the runner-facing feedback route must never accept this kind ──
