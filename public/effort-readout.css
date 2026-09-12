@@ -63,6 +63,39 @@
   padding-top: 0.3rem;
 }
 
+/* LIN-2830: per-(harness, model, effort) breakdown rows inside each kind
+   card. Semantic-token-only (dark-safe); machine facts in the structural
+   mono face, per the page's typographic split. */
+.effort-group-rows {
+  margin-top: 0.4rem;
+  display: grid;
+  gap: 0.15rem;
+}
+.effort-group-rows-head {
+  display: grid;
+  grid-template-columns: 8.5rem 16rem 5rem 6rem 6rem 5rem auto;
+  gap: 0 0.5rem;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--fg-dim);
+}
+.effort-group-row {
+  display: grid;
+  grid-template-columns: 8.5rem 16rem 5rem 6rem 6rem 5rem auto;
+  gap: 0 0.5rem;
+  align-items: baseline;
+}
+.effort-group-cell {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.effort-group-coverage {
+  color: var(--fg-dim);
+  font-size: 0.7rem;
+}
+
 .effort-notes {
   margin-top: 1.25rem;
 }
