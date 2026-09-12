@@ -706,6 +706,67 @@ describe('F. clock-freedom, loudness and __internal', () => {
   });
 });
 
+// ─── G. LIN-2628: the :494 forwarding bag — no field may silently re-default ──
+//
+// computeFollowOnRatio rebuilds an options bag at its single countFollowOns
+// call site (lib/follow-on-ratio.js:494):
+//
+//   countFollowOns(issue, peerIndex, { relationTypes, maturityDays })
+//
+// and countFollowOns re-applies its OWN defaults on the far side (:338-339):
+//
+//   options.relationTypes || COUNTED_RELATION_TYPES
+//   Number.isFinite(options.maturityDays) ? … : MATURITY_DAYS
+//
+// So a field dropped from the forwarded bag does not fail loudly — it
+// silently reverts the caller's override back to the pinned default. That is
+// the same weakest-discriminable-field failure class LIN-2592 removed in
+// lib/plan-review-round-trips.js, and at that PR's head BOTH one-field drop
+// mutations survived this file's 40 tests (mutation evidence recorded on
+// LIN-2628). The two tests below make each field independently discriminating
+// at the boundary: a non-degenerate fixture whose computed output CHANGES
+// when the field is missing, so each mutation goes red on its own. A test
+// that still passes under the defaulted fallback would pin nothing.
+describe('G. LIN-2628: relationTypes and maturityDays are both forwarded, not re-defaulted', () => {
+  const DONE = '2026-06-10T00:00:00.000Z';
+
+  test('a custom relationTypes reaches countFollowOns — a `related` edge outside the bag is not counted', () => {
+    // Both peers pass the causal rule, so the only thing that can hold the
+    // `related` edge out of the numerator is the bag forwarded at :494. Under
+    // the default ['related','blocks'] both edges qualify; under the caller's
+    // ['blocks'] only one does — so the counts move iff the field is dropped.
+    const r = run([
+      source('s', DONE, { relations: [outgoing('blocks', 'b'), outgoing('related', 'r')] }),
+      peer('b', '2026-06-12T00:00:00.000Z'),
+      peer('r', '2026-06-12T00:00:00.000Z'),
+    ], { relationTypes: ['blocks'] });
+    assert.equal(r.numerator, 1, 'only the blocks peer counts under relationTypes: ["blocks"]');
+    assert.equal(r.distinctPeers, 1);
+    assert.equal(r.diagnostics.meanRelationsPerCompleted, 1, 'the related edge is filtered before it is even relationsSeen');
+    assert.deepEqual(r.definition.relationTypesCounted, ['blocks'], 'the recorded ruler is the override (unaffected control — it reads the option directly)');
+  });
+
+  test('a custom maturityDays reaches countFollowOns — the peer horizon is the caller\'s, not the 7-day default', () => {
+    // The forwarded maturityDays is what sets each peer's withinMaturity
+    // (maturityCutoff, :351/:388) — the `matured` source flag and
+    // definition.maturityDays read the option directly and survive the
+    // mutation, so the assertion must land on the matured reading, the one
+    // output only the FORWARDED value produces. The +10d peer is inside a
+    // 14-day horizon and outside the 7-day default, so the instrument moves
+    // iff the field is dropped; the +16d peer pins the horizon's upper edge.
+    const r = run([
+      source('s', DONE, { relations: [outgoing('related', 'in'), outgoing('related', 'out')] }),
+      peer('in', '2026-06-20T00:00:00.000Z'),  // +10d — inside 14d, outside the 7d default
+      peer('out', '2026-06-26T00:00:00.000Z'),  // +16d — outside both, so the horizon is genuinely 14
+    ], { maturityDays: 14 });
+    assert.equal(r.numerator, 2, 'the causal headline has no maturity horizon — unaffected control');
+    assert.equal(r.matured7d.denominator, 1, 'completedAt + 14d ≤ windowEnd — the outer option matured the source, unaffected control');
+    assert.equal(r.matured7d.numerator, 1, 'the +10d peer is inside the FORWARDED 14-day horizon');
+    assert.equal(r.matured7d.ratio, 1, 'the instrument ratio moves 1 → 0 iff maturityDays re-defaults to 7');
+    assert.equal(r.definition.maturityDays, 14, 'the recorded ruler is the override (unaffected control)');
+  });
+});
+
 // ─── LIN-1770: close-out's archive+prune stub must not blind PLAN_MARKER ──────
 //
 // The close-out template now prunes stage artifacts from the description on
