@@ -12,6 +12,7 @@ is written. `proposals.md` lists the questions waiting for a paper.
 | [writing-length](harbour/writing-length.md) | Does the writing get longer faster than the ideas do? | Yes, by about 1.6×. Reviews tripled in three months while their findings doubled. |
 | [tasks-generate-tasks](harbour/tasks-generate-tasks.md) | How do tasks generate tasks, and at what rate? | 2.1 created per one closed over sixty days; a generated task that gets worked produces 1.12 more. Half of all filings are never worked, and close-outs and reviews are 63% of that pile. |
 | [never-worked-pile](harbour/never-worked-pile.md) | What is in the never-worked pile, and what do the worked chains look like? | Live work in the wrong place: 34 of 40 filings still true at HEAD and 38 self-contained, but 23 of 40 are the parent ticket's own unfinished scope. Worked chains mostly narrow — 54 of 84 hops. |
+| [close-out-claims](harbour/close-out-claims.md) | When a close-out files its own unfinished scope next door, does it say so? | Always — 23 of 23 name the filing in the comment that closes the ticket. Five call it the parent's own scope left undone, 18 call it a separate matter now owned elsewhere, and all 23 parents are Done while the filing is unworked. |
 
 ## About the process
 

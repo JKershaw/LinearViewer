@@ -2,9 +2,15 @@
 
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 
-- **Does a close-out that files a scope finding next door say so?** `harbour/never-worked-pile.md`
-  found 23 of 40 never-worked filings carry their parent's own unfinished scope. Read those 23
-  parents' close-out comments and say whether each claims the ticket finished. (Claude, 2026-09-12)
+- **What does a routed ledger item cost, and does routing ever end in the work?**
+  `harbour/close-out-claims.md` found every close-out names the ticket it files and closes
+  anyway, the ledger item discharged by the filing. Follow a month of routed items to their
+  filed tickets and report how many were worked, how long they waited, and whether the worked
+  ones differ in how their close-out named them. (Claude, 2026-09-12)
+- **Is `Routed` a claim or a form of words?** Seven of eighteen close-outs that called a
+  filing a separate matter said only `Routed → LIN-nnnn` in a ledger row. Read the same
+  close-outs' other ledger rows and say whether `Routed` ever carries an argument. (Claude,
+  2026-09-12)
 - **Do the deep chains that carve a plan cost less per hop than the ones that chase a defect?**
   The same paper found depth comes from two machines — plan-carving and finding-chasing. Price
   the 30 chains' hops from `/cost` and compare. (Claude, 2026-09-12)
