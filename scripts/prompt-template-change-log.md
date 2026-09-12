@@ -64,6 +64,7 @@ Newest last.
 | 2026-09-05 | PR #1403 | LIN-2618 | neither (lib/prompts/flight-companion-brief.js) | Extracted the Flight Companion's persona, disposition, readout shape, fossil-row instruction, surfacing policy, vocabulary and propose-then-wait gate into one shared brief rendered by BOTH the pasted kickoff and the in-page chat's system turn; the chat additionally gained the clock, the turn kind and the headline-block-plus-six-part readout it previously had none of. | unknown |
 | 2026-09-12 | PR #1456 | LIN-2804 | neither (`lib/proxy-preamble.js`, `lib/prompts/autopilot-kickoff.js`) | Gated the auto-appended proxy preamble's and the autopilot kickoff's `/issues/{id}`/`/relations` endpoint hints on the resolved provider's `issueDetail`/`relations` capability (new `provider.ui.issueDetail`/`.relations` flags) instead of advertising them unconditionally; GitHub/GitHub-Projects/Jira workspaces now see a `brief`+`/search`-based hint instead of a hint that 422s. Linear/Local output is byte-identical. **Review round 2 (Finding 1):** the `/search` fallback was itself an unconditional hint that 422s on GitHub Projects/Jira (neither supports `search`); added a third derived flag, `provider.ui.search`, and gated every `/search` mention on it too, so those two providers now see a brief-only fallback with no read hint that 422s. | **up** |
 | 2026-09-12 | PR #1459 | LIN-1871 | handwritten + meta | Revised the LIN-1873 cited-sweep rule into class-not-member enumeration, extended to a third template: research now names each class and how it bounded it, plan works from research's classes and is sent back only for a missing class (never a missing member inside a class already bounded), and plan-review argues the class a missing member belongs to rather than stopping at the member. | **down** |
+| 2026-09-12 | PR #1467 | LIN-2825 | handwritten + meta | Review marks every class-check instance and ledger item inside/outside the ticket's bounded classes (LIN-1871); close-out's Ledger Gate now discharges an inside item only by cited evidence of done or an explicit drop, never by filing a follow-up ticket for it, and Follow-up Triage is restricted to outside items and explicitly-dropped inside items. | **down** |
 
 ### On the LIN-2618 row, and why its Paths cell reads `neither`
 
@@ -148,6 +149,28 @@ Request Changes for an unbounded or wrongly-bounded class. If this read also
 comes back `up` or flat, the question is the same one LIN-1873's did not get
 asked in time: is the rule producing a quality win that this ratio cannot see,
 or is the mechanism itself not the lever the round count responds to.
+
+### On the LIN-2825 row's direction, recorded before the read
+
+**`down`**, per the ticket's own stated expectation: "expected direction `down` on
+tickets filed per close-out." `harbour/tasks-generate-tasks.md` measured close-out
+follow-ups as 1.95 tickets per generating ticket and 74% never worked;
+`harbour/never-worked-pile.md` found 23 of 40 sampled never-worked filings were
+the parent's own unfinished scope; `harbour/close-out-claims.md` found every one
+of those 23 close-outs named the filing and closed anyway, with the filing itself
+what discharged the ledger item. This change removes that discharge route for an
+inside-scope item — the close-out that used to file and close now has to finish
+the work or write an explicit drop instead — so the direct prediction is fewer
+close-out-generated tickets, which is exactly what `scripts/follow-on-ratio.mjs`
+would read as `down`.
+
+The honest counter-argument: a close-out that can no longer file its way past an
+inside item may instead reach for an explicit drop more freely than it used to
+file, which is a wording change this ratio cannot distinguish from real work
+getting done. It could also simply take longer per ticket without changing how
+many follow-up tickets get created, in which case this read moves the ratio not
+at all. If the read comes back flat or `up`, that is the first thing to check —
+not a post-hoc explanation invented to fit the number.
 
 ### On the backfilled rows
 

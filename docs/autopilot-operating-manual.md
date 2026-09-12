@@ -461,7 +461,11 @@ And the irreversible finish itself — the merge, the Done, the summary, the fol
 something you reach down and do by hand. It's a **dispatched step of its own**. `review` only
 *authorizes* the close: it issues a verdict and writes a ledger of what CI didn't prove, but never
 merges or marks the task done. A separate **`close-out`** worker performs it, discharging or explicitly
-accepting each ledger item before it merges and sets Done. So when a review lands an Approve (or a
+accepting each ledger item before it merges and sets Done — and per John's ruling on LIN-2825, an item
+inside the ticket's own bounded classes discharges only by cited evidence it's done or an explicit drop
+naming what's left and why; **filing a follow-up ticket for it is never a discharge**, however well the
+ticket reads. Only an item outside every bounded class — a genuinely separate matter — may be filed,
+and only when the filing states the problem on its own terms. So when a review lands an Approve (or a
 conditional Approve) on work that's still unmerged, your move is the same as anywhere else —
 **dispatch the next step and verify it landed**, not drop down and close it yourself: re-recommend the
 task (the engine routes you to `close-out`), then confirm the close really happened — PR merged, CI

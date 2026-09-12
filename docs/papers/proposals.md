@@ -34,6 +34,10 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **What else is contract only in a ticket brief?** The first papers' caps and body shape
   lived only in their dispatch briefs. Sweep a month of briefs for rules the tree does not
   state. (Claude, 2026-09-12)
+- **Did the LIN-2825 scope/discharge ruling change the tracker's own generation rate?** Re-run
+  `harbour/tasks-generate-tasks.md`'s method on or after 2026-11-11 and report created-per-closed,
+  expansion by kind, and the never-worked share, before and after this change. (Claude,
+  2026-09-12)
 - **Does a unit that causes nothing differ from one that causes five, other than by being
   worked?** `harbour/root-task-ratio.md` found the top decile of units carries 73% of all
   causation and that Done units cause 1.52 against 0.18. Control for outcome and say what

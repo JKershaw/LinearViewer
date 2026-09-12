@@ -2525,11 +2525,67 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/Not-Proven-by-CI Ledger Gate/i.test(prompt), 'has the ledger gate');
     assert.ok(/Do NOT merge or set the task Done while any ledger item is undischarged/i.test(prompt),
       'blocks merge/Done while any item is undischarged');
-    assert.ok(/\*\*\(a\) discharged\*\*/i.test(prompt) && /\*\*\(b\) explicitly accepted\*\*/i.test(prompt),
-      'each item is discharged-with-evidence or explicitly accepted');
+    assert.ok(/\*\*An item marked inside scope\*\*/i.test(prompt) && /\*\*An item marked outside every bounded class\*\*/i.test(prompt),
+      'the discharge route is keyed on review\'s inside/outside mark');
+    assert.ok(/\*\*explicitly accepted\*\*/i.test(prompt) && /names the exact precondition they exercised/i.test(prompt),
+      'either kind of item may also be explicitly accepted by a human naming the precondition');
     // Only after all-clear does it perform the irreversible set.
     assert.ok(/Perform the Irreversible Set/i.test(prompt) && /Merge the approved PR/i.test(prompt) && /Set the task to Done/i.test(prompt),
       'merge/Done/summary/follow-ups happen only on all-clear');
+  });
+
+  // Ruling on LIN-2825: scope discharges by done or an explicit drop, never by
+  // filing. Extends the LIN-550 ledger gate and the LIN-1871 class-bound
+  // enumeration with an inside/outside mark, on both paths, failing
+  // independently of the plain LIN-550 pins above.
+  describe('scope discharges by done, not by filing (LIN-2825, extending LIN-550 + LIN-1871)', () => {
+    test('review marks class-check instances and ledger items inside/outside the ticket\'s bounded classes', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      assert.ok(/Inside or Outside the Ticket's Scope/i.test(prompt), 'review has the inside/outside scope section');
+      assert.ok(/A finding inside a bounded class is scope/i.test(prompt), 'states rule 1 of the ruling');
+      assert.ok(/scope discharges by done or an explicit drop, never by filing/i.test(prompt), 'states rule 2 of the ruling');
+      assert.ok(/mark it \*\*inside\*\* or \*\*outside\*\* the ticket's bounded classes/i.test(prompt),
+        'the ledger instruction requires marking each item inside/outside');
+      assert.ok(/filing a ticket for it is never a discharge, since it belongs to this ticket/i.test(prompt),
+        'the ledger instruction states filing never discharges an inside item');
+    });
+
+    test('close-out\'s ledger gate discharges an inside item only by done or an explicit drop, never by filing', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/An item marked inside scope.*discharges only by \(a\) cited evidence that it is \*\*done\*\*/is.test(prompt),
+        'an inside item discharges by cited evidence of done');
+      assert.ok(/\(b\) an \*\*explicit drop\*\*: a line in your summary naming exactly what is being left undone and why/i.test(prompt),
+        'an inside item may also discharge by an explicit drop naming what remains and why');
+      assert.ok(/Filing a follow-up ticket for an inside item is NOT a discharge/i.test(prompt),
+        'filing a ticket for an inside item is explicitly not a discharge');
+      assert.ok(/A close-out that still has an undischarged inside item must not set Done/i.test(prompt),
+        'close-out must not set Done over an undischarged inside item');
+    });
+
+    test('close-out\'s ledger gate lets an outside item discharge by a self-contained filed ticket', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/An item marked outside every bounded class.*may be discharged by filing it as a follow-up ticket/is.test(prompt),
+        'an outside item may be discharged by filing');
+      assert.ok(/provided the filing states the problem on its own terms: a reader with no access to this task can act on it/i.test(prompt),
+        'the filing must stand alone as a ticketable problem');
+    });
+
+    test('close-out\'s follow-up triage restricts filing to outside items and explicitly-dropped inside items', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/Only outside-scope items, and inside-scope items you have explicitly dropped in the summary above, are eligible to be filed here/i.test(prompt),
+        'follow-up triage gates eligibility on the scope mark');
+      assert.ok(/an inside-scope ledger item that is neither done nor dropped is not eligible for filing/i.test(prompt),
+        'an undischarged inside item is not eligible for filing');
+    });
+
+    test('the LIN-1579 named-monitor/named-rollback lanes remain untouched — a different axis from scope', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      const closeout = generatePrompt('close-out', issue, context).prompt;
+      assert.ok(/name the monitor/i.test(review) && /name the rollback/i.test(review), 'review still carries both named lanes');
+      assert.ok(/named monitor/i.test(closeout) && /named rollback/i.test(closeout), 'close-out still honours both named lanes');
+      assert.ok(/which are about verification depth, not about whether the work itself is done/i.test(review),
+        'review states the scope mark is orthogonal to the proportional risk lanes');
+    });
   });
 
   test('(b) review writes a structured ledger; close-out reads the verdict/gaps without keying on the heading (LIN-810 decoupling)', () => {

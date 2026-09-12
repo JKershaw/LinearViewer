@@ -1060,6 +1060,78 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'the rule must prohibit holding open, re-routing, or reopening');
   });
 
+  // Ruling on LIN-2825: scope discharges by done or an explicit drop, never by
+  // filing. Extends the LIN-1871 class-bound enumeration and the LIN-550 ledger
+  // gate onto the meta-prompt's Review-prompts and Close-out-prompts quality
+  // rules, mirroring the handwritten-template pins in prompt-templates.test.js
+  // so each path fails independently.
+  describe('scope discharges by done, not by filing (LIN-2825, extending LIN-550 + LIN-1871)', () => {
+    function reviewRule() {
+      return build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Review prompts**'));
+    }
+    function closeoutRule() {
+      return build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
+    }
+
+    test('the Review-prompts rule requires marking class-check instances and ledger items inside/outside the ticket\'s bounded classes', () => {
+      const rule = reviewRule();
+      assert.ok(rule, 'the meta-prompt must carry a Review-prompts quality rule');
+      assert.ok(/inside or outside the ticket's own bounded classes/i.test(rule),
+        'the rule requires an inside/outside mark on class-check instances and ledger items');
+      assert.ok(/LIN-1871/.test(rule), 'the rule cites LIN-1871 as the bounding mechanism');
+      assert.ok(/a finding inside a bounded class is scope, and scope discharges by done or an explicit drop, never by filing/i.test(rule),
+        'the rule states the ruling\'s scope/discharge rule');
+      assert.ok(/close-out must not be able to discharge it merely by filing a ticket for it/i.test(rule),
+        'the rule states an inside instance cannot be discharged by filing');
+      assert.ok(/this marking is orthogonal to the proportional risk lanes/i.test(rule),
+        'the rule states the scope mark is a different axis from the named-monitor/named-rollback lanes');
+    });
+
+    test('the Review-prompts rule\'s ledger item (6) is marked inside/outside and routes discharge accordingly', () => {
+      const rule = reviewRule();
+      assert.ok(/each marked inside or outside per \(5a\) and stated with how it can be discharged/i.test(rule),
+        'ledger items are marked per (5a) before stating a discharge route');
+      assert.ok(/an inside item by a real-world check or a manual repro naming its exact distinguishing precondition \(filing a ticket for it is never a discharge, since it is this ticket's own scope\)/i.test(rule),
+        'an inside ledger item never discharges by filing');
+      assert.ok(/an outside item by a routed follow-up ticket that states the problem on its own terms/i.test(rule),
+        'an outside ledger item discharges by a self-contained filed ticket');
+    });
+
+    test('the Close-out-prompts rule discharges an inside item only by done or an explicit drop, never by filing', () => {
+      const rule = closeoutRule();
+      assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
+      assert.ok(/each gap's inside\/outside mark \(LIN-1871\)/i.test(rule),
+        'the rule reads the inside/outside mark from the review comment');
+      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop naming exactly what is being left undone and why/is.test(rule),
+        'an inside item discharges only by done or an explicit drop');
+      assert.ok(/filing a follow-up ticket for an inside item is NOT a discharge, however well written/i.test(rule),
+        'filing is explicitly not a discharge for an inside item');
+      assert.ok(/a close-out that still has an undischarged inside item must not set Done/i.test(rule),
+        'close-out must not set Done over an undischarged inside item');
+    });
+
+    test('the Close-out-prompts rule lets an outside item discharge by a self-contained filed ticket, and gates follow-up eligibility', () => {
+      const rule = closeoutRule();
+      assert.ok(/an item marked \*\*outside\*\* every bounded class.*may be discharged by filing it as a follow-up ticket that states the problem on its own terms/is.test(rule),
+        'an outside item may discharge by a self-contained filed ticket');
+      assert.ok(/only outside-scope items, and inside-scope items explicitly dropped in the summary, are eligible to be filed/i.test(rule),
+        'follow-up filing eligibility is gated on the scope mark');
+      assert.ok(/an inside-scope ledger item that is neither done nor dropped must be discharged first, never filed as a substitute/i.test(rule),
+        'an undischarged inside item must not be filed as a substitute for finishing it');
+    });
+
+    test('the LIN-1579 named-monitor/named-rollback lanes remain untouched on the meta path — a different axis from scope', () => {
+      const review = reviewRule();
+      const closeout = closeoutRule();
+      assert.ok(/name the monitor/i.test(review) && /name the rollback/i.test(review),
+        'the Review-prompts rule still carries both named lanes');
+      assert.ok(/named monitor/i.test(closeout) && /named rollback/i.test(closeout),
+        'the Close-out-prompts rule still honours both named lanes');
+      assert.ok(/regardless of the item's inside\/outside mark — the named monitor stands as the cited evidence/i.test(closeout),
+        'the named-monitor discharge is explicitly independent of the scope mark');
+    });
+  });
+
   test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {
     // The routing branch is only real if what the recommender emits survives the
     // wire: parseRecommendedAction reads the `→ **name**` line, and the dispatch
