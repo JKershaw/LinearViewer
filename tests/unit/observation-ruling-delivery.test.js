@@ -185,7 +185,17 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements 
     // to accepting, since most tests here aren't exercising the gate itself.
     confirm: confirmImpl || (() => true),
     window: {
-      addEventListener() {},
+      // LIN-2758: recorded (not just a no-op) so a test can retrieve and
+      // directly invoke the ONE real registration observation.js makes at
+      // top-level script execution (`window.addEventListener('beforeunload',
+      // ...)`, :4242) — the beforeunload-guard-armed-only-while-running
+      // acceptance point has no other seam reachable from this DOM-free
+      // harness (there's no real `window` to dispatch an actual unload
+      // event against).
+      _listeners: {},
+      addEventListener(type, handler) {
+        (this._listeners[type] = this._listeners[type] || []).push(handler);
+      },
       matchMedia: () => ({ matches: false }),
       // LIN-2792: `resolveCaption` mirrors public/chat.js's own read-only
       // DISPOSITION_CAPTIONS wording closely enough for tests that assert
@@ -2400,6 +2410,257 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     await bulkAgreeSelected();
 
     assert.deepEqual(calls, [], 'bulkAgreeRow must independently refuse a row with no live suggestedDismissal');
+  });
+});
+
+// ─── Bulk-agree progress / Stop / completion summary (LIN-2758) ────────────
+//
+// RED-FIRST witnesses, beat 1 of a stepped implementation run: none of this
+// mechanism exists yet at this HEAD (82e8b36b) — `rulingsBulkRunning`,
+// `rulingsBulkStopRequested`, `updateRulingsBulkProgress`,
+// `renderRulingsBulkSummary`, the `#obs-ruling-bulk-progress` node, and the
+// `#obs-ruling-bulk-stop` button are all beat 2's own additions. Every test
+// below is expected to fail against current HEAD; beat 2 implements the
+// mechanism these pin. `#obs-ruling-bulk-progress`/`#obs-ruling-bulk-stop`
+// are provided here as FakeElement stubs (this harness never reads real
+// markup) mirroring the sibling `<p>`/`<button>` the plan's render change
+// adds to lib/render-observation.js.
+describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)', () => {
+  function makeProgressSandbox({ api, confirm } = {}) {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p'); empty.hidden = false;
+    const bar = new FakeElement('div');
+    const selectAll = new FakeElement('input');
+    const countEl = new FakeElement('span');
+    const agreeBtn = new FakeElement('button');
+    const progressEl = new FakeElement('p');
+    const stopBtn = new FakeElement('button');
+    const sandbox = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      api,
+      confirm,
+      elements: {
+        'obs-rulings': list,
+        'obs-rulings-empty': empty,
+        'obs-ruling-bulk-bar': bar,
+        'obs-ruling-select-all': selectAll,
+        'obs-ruling-selected-count': countEl,
+        'obs-ruling-agree-selected': agreeBtn,
+        'obs-ruling-bulk-progress': progressEl,
+        'obs-ruling-bulk-stop': stopBtn
+      }
+    });
+    // initControls() is only ever called from init(), which this harness
+    // never invokes (see the file-header note on public/observation.js's own
+    // two addEventListener calls) — calling it standalone here is safe,
+    // since every binding inside is `if (el) ...`-guarded against elements
+    // this fixture doesn't provide, and it is what wires the Stop button's
+    // real click listener so a test can press Stop exactly the way an
+    // operator would, rather than reaching into module internals that don't
+    // exist yet.
+    sandbox.initControls();
+    return { sandbox, module: sandbox.module, list, bar, selectAll, countEl, agreeBtn, progressEl, stopBtn };
+  }
+
+  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+  function suggestedRow(overrides = {}) {
+    return makeRow({ suggestedDismissal: SUGGESTION, ...overrides });
+  }
+
+  test('progress text updates per row, literally 1-based: "Applying 1 of N…" through "Applying N of N…"', async () => {
+    const seenAtCallTime = [];
+    const { module, progressEl } = makeProgressSandbox({
+      api: async () => { seenAtCallTime.push(progressEl.textContent); return { success: true }; }
+    });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const rows = ['d-p1', 'd-p2', 'd-p3'].map((id) => suggestedRow({ decision: { decision_id: id } }));
+    renderRulings(rows);
+    rows.forEach((r) => toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id), true));
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(
+      seenAtCallTime,
+      ['Applying 1 of 3…', 'Applying 2 of 3…', 'Applying 3 of 3…'],
+      'the progress node must read the 1-based count BEFORE each row is attempted — the first read "Applying 1 of 3…", the last "Applying 3 of 3…" (an off-by-one would fail this immediately, not just "look wrong")'
+    );
+  });
+
+  test('Stop halts the loop before the next row — every unattempted row is still in rulingsSelected, and the summary reads the stopped-early shape', async () => {
+    const calls = [];
+    const { module, stopBtn, progressEl } = makeProgressSandbox({
+      api: async (url, opts) => {
+        calls.push(JSON.parse(opts.body).decisionId);
+        // Press Stop from INSIDE the first row's own settle: a row already
+        // in flight is never aborted (no AbortController) — the flag is
+        // only checked at the TOP of the next iteration, so Stop must land
+        // after row 1 resolves but before row 2 is attempted.
+        if (calls.length === 1) stopBtn.click();
+        return { success: true };
+      }
+    });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+
+    const rows = ['d-s1', 'd-s2', 'd-s3'].map((id) => suggestedRow({ decision: { decision_id: id } }));
+    renderRulings(rows);
+    const keys = rows.map((r) => rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id));
+    keys.forEach((k) => toggleRulingSelection(k, true));
+
+    await bulkAgreeSelected();
+
+    assert.deepEqual(calls, ['d-s1'], 'only the row already underway when Stop was pressed may run — Stop must not let a second row start');
+    assert.equal(rulingsSelected.has(keys[0]), false, 'the row that completed before Stop was pressed settles normally');
+    assert.ok(rulingsSelected.has(keys[1]), 'every row Stop pre-empted must remain selected, not silently dropped');
+    assert.ok(rulingsSelected.has(keys[2]), 'every row Stop pre-empted must remain selected, not silently dropped');
+    assert.equal(
+      progressEl.textContent,
+      'Stopped after 1 of 3 — 2 remain selected.',
+      'the stopped-early summary must use the last row actually reached (1), never the total (3)'
+    );
+  });
+
+  test('select-all and the bulk apply button are disabled for the duration of the run and re-enabled once it ends', async () => {
+    let resolveFirst;
+    const { module, selectAll, agreeBtn } = makeProgressSandbox({
+      api: async () => new Promise((resolve) => { resolveFirst = resolve; })
+    });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    renderRulings([suggestedRow()]);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
+    assert.equal(selectAll.disabled, false, 'before the confirmed press, nothing is running yet');
+    assert.equal(agreeBtn.disabled, false);
+
+    const runPromise = bulkAgreeSelected();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(selectAll.disabled, true, 'select-all must be disabled while the batch is running');
+    assert.equal(agreeBtn.disabled, true, 'the apply button must be disabled while the batch is running');
+
+    resolveFirst({ success: true });
+    await runPromise;
+
+    assert.equal(selectAll.disabled, false, 'select-all must be re-enabled once the batch ends');
+    assert.equal(agreeBtn.disabled, false, 'the apply button must be re-enabled once the batch ends');
+  });
+
+  test('completion summary: all rows applied', async () => {
+    const { module, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const rows = ['d-ok1', 'd-ok2'].map((id) => suggestedRow({ decision: { decision_id: id } }));
+    renderRulings(rows);
+    rows.forEach((r) => toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id), true));
+
+    await bulkAgreeSelected();
+
+    assert.equal(progressEl.textContent, '2 applied.');
+  });
+
+  test('completion summary: a mixed batch names applied · skipped · failed (still selected), each tallied by its own bulkAgreeRow outcome', async () => {
+    const { module, progressEl } = makeProgressSandbox({
+      api: async (url, opts) => {
+        const { decisionId } = JSON.parse(opts.body);
+        if (decisionId === 'd-fail') throw new Error('boom');
+        return { success: true };
+      }
+    });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    const applied = suggestedRow({ decision: { decision_id: 'd-ok' } });
+    const failed = suggestedRow({ decision: { decision_id: 'd-fail' } });
+    // 'answered' + canReply:false takes bulkAgreeRow's existing bulk-only
+    // skip branch (:2832-2839-ish, "cannot answer") — pre-existing logic,
+    // never counted before this ticket.
+    const skipped = suggestedRow({
+      decision: { decision_id: 'd-skip' },
+      suggestedDismissal: { ...SUGGESTION, proposedOutcome: 'answered', optionId: 'a' },
+      canReply: false
+    });
+    renderRulings([applied, failed, skipped]);
+    [applied, failed, skipped].forEach((r) => toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id), true));
+
+    await bulkAgreeSelected();
+
+    assert.equal(progressEl.textContent, '1 applied · 1 skipped · 1 failed (still selected).');
+  });
+
+  // Mutation check (the plan's own instruction): this is the ONE test in
+  // this block a correct `finally` block is actually load-bearing for —
+  // every other test here would still pass with no `finally` at all, since
+  // nothing else here throws. Once beat 2 lands, comment out the `finally`
+  // wrapper and confirm THIS test alone goes red before trusting it.
+  test('a thrown row still tears down: the run flag resets, controls re-enable, a summary renders, and the error propagates (not swallowed)', async () => {
+    const { sandbox, module, selectAll, agreeBtn, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
+    // A test-only stub of a function bulkAgreeSelected's loop calls directly
+    // — mirrors the existing `sandbox.pollRulings = () => {...}` /
+    // `sandbox.refreshRulingsBadge = () => {...}` override idiom already
+    // used above in this same file — simulating a genuine, unanticipated
+    // regression inside the per-row core, which the plan's own Cleanup
+    // section names as exactly the scenario a `finally` must survive.
+    sandbox.bulkAgreeRow = () => { throw new Error('unexpected row failure'); };
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+
+    renderRulings([suggestedRow()]);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
+
+    await assert.rejects(
+      () => bulkAgreeSelected(),
+      /unexpected row failure/,
+      'the finally block must not swallow the error — it must still propagate after teardown runs'
+    );
+
+    assert.equal(selectAll.disabled, false, 'teardown must re-enable select-all even on a thrown row');
+    assert.equal(agreeBtn.disabled, false, 'teardown must re-enable the apply button even on a thrown row');
+    assert.notEqual(progressEl.textContent, '', 'a thrown row must not leave the progress node frozen mid-batch — the finally block must still repaint a terminal summary');
+    // The plan states a throw renders the SAME "stopped early" shape a Stop
+    // press does (its "Mixed outcomes" section) — asserted here as a SHAPE
+    // match only. The plan does not fully pin what row-count a throw
+    // in-flight (as opposed to Stop, checked only between completed rows)
+    // should report; see this beat's report for that discrepancy.
+    assert.match(
+      progressEl.textContent,
+      /^Stopped after \d+ of 1 — \d+ remain selected\.$/,
+      'an unexpected throw must render the same stopped-early shape a Stop press does'
+    );
+  });
+
+  test('the beforeunload guard is armed only while a batch is actually running', async () => {
+    let resolveFirst;
+    const { sandbox, module } = makeProgressSandbox({
+      api: async () => new Promise((resolve) => { resolveFirst = resolve; })
+    });
+    const beforeunloadHandlers = sandbox.window._listeners.beforeunload || [];
+    assert.ok(beforeunloadHandlers.length >= 1, 'observation.js must register its beforeunload listener at load time, as it already does today');
+    const handler = beforeunloadHandlers[beforeunloadHandlers.length - 1];
+    const makeEvent = () => {
+      const event = { returnValue: undefined, prevented: false };
+      event.preventDefault = () => { event.prevented = true; };
+      return event;
+    };
+
+    const idleEvent = makeEvent();
+    handler(idleEvent);
+    assert.equal(idleEvent.prevented, false, 'idle (no batch running) must not arm the guard');
+
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    renderRulings([suggestedRow()]);
+    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
+    const runPromise = bulkAgreeSelected();
+    await new Promise((r) => setImmediate(r));
+
+    const runningEvent = makeEvent();
+    handler(runningEvent);
+    assert.equal(runningEvent.prevented, true, 'a batch in flight must arm the guard (preventDefault)');
+    assert.equal(runningEvent.returnValue, '', 'a batch in flight must set event.returnValue for the legacy unload-confirmation path');
+
+    resolveFirst({ success: true });
+    await runPromise;
+
+    const doneEvent = makeEvent();
+    handler(doneEvent);
+    assert.equal(doneEvent.prevented, false, 'the guard must disarm once the batch ends — teardown is what makes this free (same flag)');
   });
 });
 

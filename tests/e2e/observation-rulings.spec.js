@@ -793,6 +793,104 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
   });
 });
 
+// LIN-2758 — the batch-progress/Stop/completion-summary mechanism end to
+// end, over 3 seeded suggested rows (per Acceptance). RED-FIRST: neither
+// `#obs-ruling-bulk-progress` nor `#obs-ruling-bulk-stop` exists in
+// lib/render-observation.js at this HEAD, so every assertion on them below
+// must fail until beat 2 lands. Per the plan's D4, `page.route` + an
+// artificial delay on the per-row dismiss endpoint is what makes the batch
+// slow enough to deterministically assert mid-batch progress without racing
+// a fast (real, in-memory, single-machine) batch.
+test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2e, red-first', () => {
+  test.beforeEach(async ({ page }) => {
+    await clearRuns(page);
+    await page.goto(`/test/clear-dismissal-suggestions?urlKey=${URL_KEY}`);
+  });
+
+  async function seedThreeSuggestedRows(page) {
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2758-1', issueTitle: 'Progress row A', decisionId: 'd-2758-a', blocked: true });
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2758-2', issueTitle: 'Progress row B', decisionId: 'd-2758-b', blocked: true });
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-2758-3', issueTitle: 'Progress row C', decisionId: 'd-2758-c', blocked: true });
+    await suggestDismissal(page, 'd-2758-a');
+    await suggestDismissal(page, 'd-2758-b');
+    await suggestDismissal(page, 'd-2758-c');
+  }
+
+  test('a full 3-row run shows mid-batch progress and ends with the all-applied summary; the bar re-enables', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await seedThreeSuggestedRows(page);
+
+    // D4: an artificial 300ms delay on the write each row makes, so the
+    // batch takes ~900ms total — long enough to deterministically observe
+    // each mid-batch progress state rather than racing a near-instant loop.
+    await page.route('**/api/dashboard/rulings/dismiss', async (route) => {
+      await new Promise((r) => setTimeout(r, 300));
+      await route.continue();
+    });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    await page.locator('#obs-ruling-select-all').check();
+    await expect(page.locator('#obs-ruling-selected-count')).toHaveText('3 selected');
+
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.locator('#obs-ruling-agree-selected').click();
+
+    const progress = page.locator('#obs-ruling-bulk-progress');
+    await expect(progress).toHaveText('Applying 1 of 3…', { timeout: 5000 });
+    await expect(progress).toHaveText('Applying 2 of 3…', { timeout: 5000 });
+    await expect(progress).toHaveText('Applying 3 of 3…', { timeout: 5000 });
+
+    await expect(progress).toHaveText('3 applied.', { timeout: 5000 });
+    await expect(page.locator('#obs-ruling-bulk-bar')).toBeHidden();
+    await expect(page.locator('#obs-ruling-select-all')).toBeEnabled();
+    await expect(page.locator('#obs-ruling-agree-selected')).toBeEnabled();
+  });
+
+  test('pressing Stop mid-batch halts the run: the remaining rows stay checked/selected, and the summary reads stopped-early', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await seedThreeSuggestedRows(page);
+
+    await page.route('**/api/dashboard/rulings/dismiss', async (route) => {
+      await new Promise((r) => setTimeout(r, 300));
+      await route.continue();
+    });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    await page.locator('#obs-ruling-select-all').check();
+
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.locator('#obs-ruling-agree-selected').click();
+
+    const progress = page.locator('#obs-ruling-bulk-progress');
+    await expect(progress).toHaveText('Applying 1 of 3…', { timeout: 5000 });
+
+    const stopBtn = page.locator('#obs-ruling-bulk-stop');
+    await expect(stopBtn).toBeVisible();
+    await stopBtn.click();
+
+    await expect(progress).toHaveText('Stopped after 1 of 3 — 2 remain selected.', { timeout: 5000 });
+
+    // The two rows Stop pre-empted are still visible, still checked, still
+    // selected — never silently dropped.
+    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2758-2' });
+    const rowC = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2758-3' });
+    await expect(rowB).toBeVisible();
+    await expect(rowC).toBeVisible();
+    await expect(rowB.locator('.obs-ruling-select')).toBeChecked();
+    await expect(rowC.locator('.obs-ruling-select')).toBeChecked();
+
+    await expect(page.locator('#obs-ruling-select-all')).toBeEnabled();
+    await expect(page.locator('#obs-ruling-agree-selected')).toBeEnabled();
+    await expect(stopBtn).toBeHidden();
+  });
+});
+
 // LIN-2215 — the task-bound row end to end: a scan-produced decision
 // (LIN-2197's third producer) reaching the rulings surface and its reply
 // path actually delivering. Seeded through a GENUINE local-provider
