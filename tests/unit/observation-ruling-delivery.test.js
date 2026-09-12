@@ -2852,6 +2852,36 @@ describe('resolveRulingOptionLabel / the answered-proposal banner (LIN-2792 Step
   });
 });
 
+// ─── Row control labels — positive pins (LIN-2757 review F1/F1b) ────────────
+//
+// The review found these three headline labels unwitnessed at every layer:
+// inverting the row button's kind branch, or reverting "keep open" to "keep",
+// both pass the full 10,720-test unit suite and every e2e assertion, because
+// every existing test selects `.obs-ruling-agree`/`.obs-ruling-keep` by class
+// and never reads their text. These assertions pin the actual rendered copy.
+describe('row control labels are pinned by text, not just by class (LIN-2757 review F1/F1b)', () => {
+  test('a dismissal-kind row renders "dismiss as proposed"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
+    assert.equal(li.querySelector('.obs-ruling-agree').textContent, 'dismiss as proposed');
+  });
+
+  test('an answer-kind row renders "answer as proposed"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(answeredRow());
+    assert.equal(li.querySelector('.obs-ruling-agree').textContent, 'answer as proposed');
+  });
+
+  test('the keep control renders "keep open"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
+    assert.equal(li.querySelector('.obs-ruling-keep').textContent, 'keep open');
+  });
+});
+
 describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step 7)', () => {
   test('BRANCH 1 — canReply: false refuses visibly, no write call reached, regardless of what effect reads', async () => {
     let apiCalls = 0;
