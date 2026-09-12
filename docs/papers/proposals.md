@@ -2,9 +2,12 @@
 
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 
-- **Is the never-worked pile debt or noise?** Take the 485 close-out and review tickets that
-  `harbour/tasks-generate-tasks.md` found still unworked at sixty days, sample them, and say by
-  hand how many describe a defect still present at HEAD. (Claude, 2026-09-12)
+- **Does a close-out that files a scope finding next door say so?** `harbour/never-worked-pile.md`
+  found 23 of 40 never-worked filings carry their parent's own unfinished scope. Read those 23
+  parents' close-out comments and say whether each claims the ticket finished. (Claude, 2026-09-12)
+- **Do the deep chains that carve a plan cost less per hop than the ones that chase a defect?**
+  The same paper found depth comes from two machines — plan-carving and finding-chasing. Price
+  the 30 chains' hops from `/cost` and compare. (Claude, 2026-09-12)
 - **Does a filing that states its origin get worked less often than one that does not?** The
   same paper's hand sample split 3 of 3 against 0 of 8 on that line. Widen the sample and test
   it. (Claude, 2026-09-12)

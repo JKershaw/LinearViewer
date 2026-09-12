@@ -11,6 +11,7 @@ is written. `proposals.md` lists the questions waiting for a paper.
 | [efficiency-levers](harbour/efficiency-levers.md) | What levers to make a task faster or cheaper are already written down? | Thirty-seven, in five stages of a ticket's life. Most are measured once, on one day, and none is measured past its gate. |
 | [writing-length](harbour/writing-length.md) | Does the writing get longer faster than the ideas do? | Yes, by about 1.6×. Reviews tripled in three months while their findings doubled. |
 | [tasks-generate-tasks](harbour/tasks-generate-tasks.md) | How do tasks generate tasks, and at what rate? | 2.1 created per one closed over sixty days; a generated task that gets worked produces 1.12 more. Half of all filings are never worked, and close-outs and reviews are 63% of that pile. |
+| [never-worked-pile](harbour/never-worked-pile.md) | What is in the never-worked pile, and what do the worked chains look like? | Live work in the wrong place: 34 of 40 filings still true at HEAD and 38 self-contained, but 23 of 40 are the parent ticket's own unfinished scope. Worked chains mostly narrow — 54 of 84 hops. |
 
 ## About the process
 
