@@ -185,6 +185,15 @@ const rulingEffectOverride = new Map();
 // cross-workspace collision `rulingKey` exists to prevent (LIN-2293, see the
 // comment above `rulingKey` itself).
 const rulingsSelected = new Set();
+// LIN-2758: the bulk-agree batch's own run state — a plain flag, checked at
+// the TOP of each loop iteration (bulkAgreeSelected below), never an
+// AbortController: the loop stays sequential, and a row already in flight
+// when Stop is pressed is never aborted, only left to settle naturally.
+// `rulingsBulkRunning` also drives select-all/apply-button disablement
+// (syncRulingsBulkBar) and the `beforeunload` guard below — one flag, three
+// derived reads, so none of them can desync from each other.
+let rulingsBulkRunning = false;
+let rulingsBulkStopRequested = false;
 // A key moves here the instant its Agree succeeds — a single-click press
 // (review F2) or a row's turn inside a bulk batch (never a plain
 // Dismiss/Shelve/Keep — the plan's scope note keeps those untouched). This is
@@ -2686,6 +2695,7 @@ function syncRulingsBulkBar() {
   const selectAll = document.getElementById('obs-ruling-select-all');
   const countEl = document.getElementById('obs-ruling-selected-count');
   const agreeBtn = document.getElementById('obs-ruling-agree-selected');
+  const stopBtn = document.getElementById('obs-ruling-bulk-stop');
 
   const selectable = rulingsSelectableKeys();
   const total = selectable.length;
@@ -2695,16 +2705,55 @@ function syncRulingsBulkBar() {
   if (selectAll) {
     selectAll.checked = total > 0 && selectedCount === total;
     selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+    // LIN-2758: disabled for the run's duration — a selection change mid-batch
+    // would desync the Set a sequential in-flight loop is iterating over.
+    selectAll.disabled = rulingsBulkRunning;
   }
   if (countEl) countEl.textContent = `${selectedCount} selected`;
   if (agreeBtn) {
-    agreeBtn.disabled = selectedCount === 0;
+    // LIN-2758: a run already in progress must not admit a second, concurrent
+    // batch — folded into the SAME disabled expression as the pre-existing
+    // empty-selection guard, not a separate check.
+    agreeBtn.disabled = rulingsBulkRunning || selectedCount === 0;
     // LIN-2757: kind-neutral — this button fires whatever mix of dismissals
     // and answers is selected, so it cannot name a single outcome verb (see
     // bulkAgreeConfirmText below, which names the real per-kind counts).
     // Must stay byte-identical to lib/render-observation.js's SSR button
     // label template (`Apply 0 as proposed`) so the two can never drift.
     agreeBtn.textContent = `Apply ${selectedCount} as proposed`;
+  }
+  // LIN-2758: visible only while a batch is actually running — mirrors
+  // #obs-due-stop's own hidden-toggle discipline.
+  if (stopBtn) stopBtn.hidden = !rulingsBulkRunning;
+}
+
+// LIN-2758: per-row progress, written into the aria-live="polite" node above
+// the bulk bar (lib/render-observation.js) BEFORE each row is attempted —
+// 1-based, so the first read is "Applying 1 of N…" (the row CURRENTLY being
+// applied, matching how a human counts "I'm on the 1st one"), never a
+// 0-based "rows completed so far" reading.
+function updateRulingsBulkProgress(i, total) {
+  const el = document.getElementById('obs-ruling-bulk-progress');
+  if (el) el.textContent = `Applying ${i} of ${total}…`;
+}
+
+// LIN-2758: the four terminal shapes, replacing the progress text once the
+// batch ends (all still on the SAME aria-live node, so a screen reader has
+// exactly one thing to hear at a time: the progress line during the run,
+// then this summary once). `stoppedAt` covers BOTH a Stop press and an
+// unexpected throw — the plan's own "Mixed outcomes" section: a thrown row
+// is functionally indistinguishable from Stop to the operator, so both
+// render the identical "stopped early" shape, keyed off how far the loop
+// actually got (`i`/`total`), not off which of the two happened.
+function renderRulingsBulkSummary({ ok, skipped, failed, stoppedAt, total, i }) {
+  const el = document.getElementById('obs-ruling-bulk-progress');
+  if (!el) return;
+  if (stoppedAt) {
+    el.textContent = `Stopped after ${i} of ${total} — ${total - i} remain selected.`;
+  } else if (skipped || failed) {
+    el.textContent = `${ok} applied · ${skipped} skipped · ${failed} failed (still selected).`;
+  } else {
+    el.textContent = `${total} applied.`;
   }
 }
 
@@ -2818,11 +2867,13 @@ function bulkAgreeRow(key, row, li) {
       rulingsSettled.add(key);
       const checkbox = li.querySelector('.obs-ruling-select');
       if (checkbox) checkbox.checked = false;
+      return 'applied';
     }).catch((err) => {
       console.error('Bulk agree failed for a row:', err);
       rulingsPending.delete(key);
       controls.forEach(el => { el.disabled = false; });
       setFeedback('dismiss failed: ' + err.message, true);
+      return 'failed';
     });
   }
 
@@ -2835,15 +2886,20 @@ function bulkAgreeRow(key, row, li) {
       feedback.textContent = `skipped — cannot answer: ${window.ChatUI.resolveCaption(disposition, row?.effect)}`;
       feedback.classList.add('obs-ruling-feedback--error');
     }
-    return Promise.resolve();
+    return Promise.resolve('skipped');
   }
 
   const optionId = row.suggestedDismissal.optionId;
 
   // Branch 2 (bulk) — task-bound: the stamp-only wrapper, bulk mode (no
   // per-row poll/badge refresh — the batch owns exactly one of each).
+  // LIN-2758: `deliverRulingStampOnly` itself is untouched (still resolves
+  // undefined either way, success or failure, its own internals handling
+  // both) — the outcome is read off the SAME `rulingsSettled` membership
+  // check its own success branch already performs, never a second write.
   if (disposition === 'task-bound') {
-    return deliverRulingStampOnly(row, li, optionId, { bulkAgree: true });
+    return deliverRulingStampOnly(row, li, optionId, { bulkAgree: true })
+      .then(() => (rulingsSettled.has(key) ? 'applied' : 'failed'));
   }
 
   const effectKey = rulingKey(anchor?.workspaceUrlKey, anchor, decisionId);
@@ -2863,15 +2919,27 @@ function bulkAgreeRow(key, row, li) {
       feedback.textContent = 'skipped — starting a fresh run is not done in bulk';
       feedback.classList.add('obs-ruling-feedback--error');
     }
-    return Promise.resolve();
+    return Promise.resolve('skipped');
   }
 
   // Branches 3/4 (bulk) — resume-effect or record-effect: reuse
   // `deliverRulingReply` in bulk mode, so it settles sequentially (the
   // returned promise resolves once the row reaches a terminal per-press
   // state) and defers poll/badge/restore discipline to the batch.
+  //
+  // LIN-2758: `deliverRulingReply` itself is untouched — every genuine
+  // failure path inside it (onCommentFailed/onDispatchFailed/the "no linked
+  // issue" refusal/deliverAsRecord's own catch) calls `restore()` and never
+  // touches `rulingsSettled`, so this membership check after the fact
+  // reliably distinguishes a real failure from a success — INCLUDING the
+  // partial-failure handler's bulk-mode branch (comment/answer already
+  // durably recorded, only the fresh run failed to start): that branch also
+  // marks `rulingsSettled`, so it tallies as 'applied' here, not 'failed' —
+  // its own "Retry delivery" affordance (independent of this batch) is what
+  // recovers the un-started run, not a later bulk-agree press.
   const optionLabel = resolveRulingOptionLabel(decision, optionId);
-  return deliverRulingReply(row, optionLabel, li, optionId, { bulkAgree: true });
+  return deliverRulingReply(row, optionLabel, li, optionId, { bulkAgree: true })
+    .then(() => (rulingsSettled.has(key) ? 'applied' : 'failed'));
 }
 
 // Bulk-agree entry point — the confirmed, SEQUENTIAL loop over
@@ -2886,24 +2954,64 @@ function bulkAgreeRow(key, row, li) {
 // turn (LIN-2792) is what keeps this sequential rather than concurrent —
 // `deliverRulingReply`'s own return-promise contract is what makes that
 // await genuinely wait for an answer branch, not just a dismiss.
+//
+// LIN-2758: wraps the loop in `try`/`finally` — resting cleanup on "nothing
+// in bulkAgreeRow throws today" would leave the page PERMANENTLY with
+// select-all/apply disabled and the unload guard armed the day a future
+// regression (here or in a function it calls) throws for real. The
+// `finally` runs on every exit — all-done, Stop, or a re-thrown error — and
+// does NOT swallow that error: it still propagates once teardown finishes,
+// so a real bug stays visible in the console.
+//
+// `completed` is set ONLY as the very last statement inside the `try`, right
+// after the `for…of` exhausts every key — reached on a full natural finish,
+// but skipped entirely if a throw interrupts the loop first (default
+// `false`) and reached-but-false if Stop broke it early (`i < total`). That
+// single derivation is what makes an unexpected throw render the exact same
+// "stopped early" summary shape a Stop press does (this ticket's own Mixed-
+// outcomes section: to the operator the two are indistinguishable), without
+// needing a separate flag to track which of the two actually happened.
 async function bulkAgreeSelected() {
   const keys = Array.from(rulingsSelected);
   if (keys.length === 0) return;
   if (!confirm(bulkAgreeConfirmText(computeBulkAgreeBreakdown()))) return;
 
-  for (const key of keys) {
-    const row = rulingsRowByKey.get(key);
-    const li = renderedRulingRows.get(key);
-    if (!row || !li) continue; // vanished since the press — nothing left to act on
-    await bulkAgreeRow(key, row, li);
-  }
-
-  // Exactly one pollRulings() and one badge refresh for the WHOLE batch —
-  // N per-row calls would be N redundant reads of the same cached value and
-  // could not show progress either way.
-  pollRulings();
-  refreshRulingsBadge(observationData?.urlKey);
+  const total = keys.length;
+  let ok = 0, skipped = 0, failed = 0, i = 0, completed = false;
+  rulingsBulkRunning = true;
+  rulingsBulkStopRequested = false;
   syncRulingsBulkBar();
+
+  try {
+    for (const key of keys) {
+      // Checked at the TOP of each iteration, before incrementing `i` or
+      // calling `bulkAgreeRow` — a row already in flight when Stop is
+      // pressed is never aborted (no AbortController); it already settled
+      // by the time this check runs again. `break` here leaves the row
+      // that triggered the check, and everything after it, untouched and
+      // still selected.
+      if (rulingsBulkStopRequested) break;
+      i += 1;
+      const row = rulingsRowByKey.get(key);
+      const li = renderedRulingRows.get(key);
+      if (!row || !li) continue; // vanished since the press — nothing left to act on
+      updateRulingsBulkProgress(i, total);
+      const outcome = await bulkAgreeRow(key, row, li);
+      if (outcome === 'applied') ok += 1;
+      else if (outcome === 'skipped') skipped += 1;
+      else if (outcome === 'failed') failed += 1;
+    }
+    completed = i === total;
+  } finally {
+    rulingsBulkRunning = false;
+    // Exactly one pollRulings() and one badge refresh for the WHOLE batch —
+    // moved into `finally` so they still fire on an early exit (Stop or a
+    // throw), not just on a full natural finish.
+    pollRulings();
+    refreshRulingsBadge(observationData?.urlKey);
+    renderRulingsBulkSummary({ ok, skipped, failed, stoppedAt: !completed, total, i });
+    syncRulingsBulkBar();
+  }
 }
 
 // Mirrors lib/providers/models.js's TERMINAL_TYPES. Duplicated, not
@@ -4196,6 +4304,12 @@ function initControls() {
   const rulingAgreeSelected = document.getElementById('obs-ruling-agree-selected');
   if (rulingAgreeSelected) rulingAgreeSelected.addEventListener('click', bulkAgreeSelected);
 
+  // LIN-2758: sets the SAME flag bulkAgreeSelected's loop checks at the top
+  // of each iteration — no separate stop function, mirroring the inline-
+  // arrow idiom the select-all listeners just above already use.
+  const rulingBulkStop = document.getElementById('obs-ruling-bulk-stop');
+  if (rulingBulkStop) rulingBulkStop.addEventListener('click', () => { rulingsBulkStopRequested = true; });
+
   const chips = document.getElementById('obs-chips');
   if (chips) {
     chips.addEventListener('click', (e) => {
@@ -4239,7 +4353,11 @@ function init() {
   startPolling();
 }
 
-window.addEventListener('beforeunload', () => {
+window.addEventListener('beforeunload', (e) => {
+  // LIN-2758: armed only while a bulk-agree batch is running — the SAME flag
+  // `bulkAgreeSelected`'s `finally` already resets, so disarming is free (no
+  // separate arm/disarm calls, no second listener).
+  if (rulingsBulkRunning) { e.preventDefault(); e.returnValue = ''; }
   if (pollId) { clearTimeout(pollId); pollId = null; }
   if (visibilityHandler) { document.removeEventListener('visibilitychange', visibilityHandler); visibilityHandler = null; }
 });
@@ -4317,6 +4435,10 @@ if (typeof module !== 'undefined' && module.exports) {
     toggleRulingSelection, setAllRulingsSelected, rulingsSelectableKeys,
     syncRulingsBulkBar, repaintRulingsSelection,
     bulkAgreeConfirmText, refreshRulingsBadge, bulkAgreeRow, bulkAgreeSelected,
+    // LIN-2758: the batch-progress/Stop/summary seam — the two run-state
+    // flags plus the two paint functions, each directly unit-testable
+    // without simulating a DOM click.
+    rulingsBulkRunning, rulingsBulkStopRequested, updateRulingsBulkProgress, renderRulingsBulkSummary,
     // LIN-2792 (Track C — UI convergence): the four-way Agree-as-answer
     // branch's own seams — the task-bound stamp-only wrapper, the option-id
     // -> label resolver the banner and the Agree branches both use, and the

@@ -2522,14 +2522,20 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
   });
 
   test('select-all and the bulk apply button are disabled for the duration of the run and re-enabled once it ends', async () => {
-    let resolveFirst;
+    let rejectFirst;
     const { module, selectAll, agreeBtn } = makeProgressSandbox({
-      api: async () => new Promise((resolve) => { resolveFirst = resolve; })
+      // The row FAILS (stays selected) so the assertions below isolate the
+      // run-state portion of agreeBtn's disabled expression — a row that
+      // SUCCEEDS empties the selection, which would re-disable the button
+      // for the unrelated, pre-existing "nothing selected" reason instead
+      // and make this test pass for the wrong one.
+      api: async () => new Promise((_resolve, reject) => { rejectFirst = reject; })
     });
-    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey } = module.exports;
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingsSelected, rulingKey } = module.exports;
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
 
     renderRulings([suggestedRow()]);
-    toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1'), true);
+    toggleRulingSelection(key, true);
     assert.equal(selectAll.disabled, false, 'before the confirmed press, nothing is running yet');
     assert.equal(agreeBtn.disabled, false);
 
@@ -2538,9 +2544,10 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     assert.equal(selectAll.disabled, true, 'select-all must be disabled while the batch is running');
     assert.equal(agreeBtn.disabled, true, 'the apply button must be disabled while the batch is running');
 
-    resolveFirst({ success: true });
+    rejectFirst(new Error('network blip'));
     await runPromise;
 
+    assert.ok(rulingsSelected.has(key), 'sanity: the failed row must still be selected after the batch');
     assert.equal(selectAll.disabled, false, 'select-all must be re-enabled once the batch ends');
     assert.equal(agreeBtn.disabled, false, 'the apply button must be re-enabled once the batch ends');
   });
