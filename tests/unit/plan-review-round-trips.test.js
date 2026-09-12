@@ -1129,3 +1129,130 @@ describe('__internal', () => {
     assert.deepEqual(sorted.map((r) => r.id), ['a', 'b']);
   });
 });
+
+// =============================================================================
+// LIN-1871 — a third round is counted, not just the first
+// =============================================================================
+//
+// The module header used to claim the observable shape was "0-vs-1, not
+// 0-vs-2" (censored at one revision cycle by the templates' own "one
+// revision cycle is the bound" language). `docs/papers/review-loops.md`
+// (LIN-2800) measured the real record and refuted it: 33 of 94 tickets went
+// round plan-review TWO OR MORE times. `countRoundTrips` and `walkR0`'s
+// sub-window walk were never actually capped at one — only the header's
+// PROSE was wrong — but this suite pins the counting behavior explicitly so
+// a future change cannot silently reintroduce a real cap without a test
+// noticing.
+//
+// Acceptance-witness note (this ticket's own implementation guideline 6):
+// genuine failure is not reachable by running this test against "unfixed"
+// code, because the counting was never broken — this is a characterization
+// pin of pre-existing correct behavior. The mutation equivalent was
+// performed instead: `countRoundTrips` was temporarily changed to
+// `if (row.kind === rePassKind && seenGate && count === 0) count++;` (capping
+// at one), the test below was run and observed to FAIL — actual output
+// `roundTrips: 1` where `2` was asserted — and the mutation was then
+// reverted. That failing run is the evidence this test is a real witness,
+// not just a green assertion with nothing behind it.
+describe('LIN-1871 — third-round counting (mutation-checked)', () => {
+  test('a ticket that goes round plan-review three times counts 2 round trips, not 1', () => {
+    const iss = issue('three-rounds', {
+      description: 'plan-review due: yes',
+      rows: [
+        row('plan-1', 'plan', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
+        row('rev-1', 'plan-review', 'done', '2026-08-01T01:00:00.000Z', '2026-08-01T01:05:00.000Z',
+          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T01:05:00.000Z')),
+        row('plan-2', 'plan', 'done', '2026-08-01T02:00:00.000Z', '2026-08-01T02:05:00.000Z'),
+        row('rev-2', 'plan-review', 'done', '2026-08-01T03:00:00.000Z', '2026-08-01T03:05:00.000Z',
+          feedbackDone('DONE: Verdict: Request Changes.', '2026-08-01T03:05:00.000Z')),
+        row('plan-3', 'plan', 'done', '2026-08-01T04:00:00.000Z', '2026-08-01T04:05:00.000Z'),
+        row('rev-3', 'plan-review', 'done', '2026-08-01T05:00:00.000Z', '2026-08-01T05:05:00.000Z',
+          feedbackDone('DONE: Verdict: Approve.', '2026-08-01T05:05:00.000Z')),
+      ],
+    });
+    const result = computeIssueRoundTrips(iss, { asOf: ASOF });
+    assert.equal(result.roundTrips, 2,
+      'plan-2 and plan-3 each follow an earlier plan-review row — a third round must not be dropped or clamped to 1');
+
+    const agg = computePlanReviewRoundTrips([iss], { asOf: ASOF });
+    assert.equal(agg.roundTrips.mean, 2);
+    assert.deepEqual(agg.roundTrips.distribution, { 2: 1 },
+      'the aggregate distribution must key on the real count (2), not collapse it into a 0-vs-1 bucket');
+  });
+});
+
+// =============================================================================
+// LIN-1871 — options.windowDays: a calendar window, not a row-count cap
+// =============================================================================
+//
+// Deliberately unlike `routes/dashboard.js`'s `EFFORT_READOUT_HISTORY_LIMIT`
+// (a flat 200-row slice of an unrelated read) — a row-count cap gives no
+// comparable boundary across two reads taken at different points in a
+// workspace's activity. `windowDays` restricts to issues with qualifying
+// pipeline activity in the last N days of `asOf`, matching
+// `docs/papers/review-loops.md`'s own 30-day split.
+describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)', () => {
+  const inWindow = issue('in-window', {
+    description: 'plan-review due: yes',
+    rows: [
+      row('p1', 'plan', 'done', '2026-08-05T00:00:00.000Z', '2026-08-05T00:05:00.000Z'),
+      row('r1', 'plan-review', 'done', '2026-08-05T01:00:00.000Z', '2026-08-05T01:05:00.000Z',
+        feedbackDone('DONE: Verdict: Approve.', '2026-08-05T01:05:00.000Z')),
+    ],
+  });
+  const outOfWindow = issue('out-of-window', {
+    description: 'plan-review due: yes',
+    rows: [
+      row('p1', 'plan', 'done', '2026-06-01T00:00:00.000Z', '2026-06-01T00:05:00.000Z'),
+      row('r1', 'plan-review', 'done', '2026-06-01T01:00:00.000Z', '2026-06-01T01:05:00.000Z',
+        feedbackDone('DONE: Verdict: Approve.', '2026-06-01T01:05:00.000Z')),
+    ],
+  });
+
+  test('omitted (default): every issue is read, unchanged from before the option existed', () => {
+    const agg = computePlanReviewRoundTrips([inWindow, outOfWindow], { asOf: ASOF });
+    assert.equal(agg.scale.issuesRead, 2);
+    assert.equal(agg.scale.issuesExcludedByWindow, 0);
+    assert.equal(agg.window.windowDays, null);
+  });
+
+  test('set: an issue with no qualifying pipeline row in the last N days is excluded', () => {
+    // ASOF is 2026-08-09T12:00:00.000Z. outOfWindow's rows are from
+    // 2026-06-01, well outside even a 30-day window; inWindow's are from
+    // 2026-08-05, four days before ASOF.
+    const agg = computePlanReviewRoundTrips([inWindow, outOfWindow], { asOf: ASOF, windowDays: 30 });
+    assert.equal(agg.scale.issuesRead, 1);
+    assert.equal(agg.scale.issuesExcludedByWindow, 1);
+    assert.equal(agg.window.windowDays, 30);
+    assert.deepEqual(agg.perIssue.map((r) => r.identifier), ['LIN-in-window']);
+  });
+
+  test('the excluded issue contributes to NO series, not just roundTrips', () => {
+    const agg = computePlanReviewRoundTrips([inWindow, outOfWindow], { asOf: ASOF, windowDays: 30 });
+    assert.equal(agg.primary.denominator, 1, 'outOfWindow\'s approve must not inflate the primary denominator');
+    assert.equal(agg.roundTrips.n, 1);
+    assert.equal(agg.gate.due, 1);
+  });
+
+  test('a boundary row exactly windowDays old is included (>=, not >)', () => {
+    const boundary = issue('boundary', {
+      description: 'plan-review due: yes',
+      rows: [
+        row('r1', 'plan-review', 'done', '2026-07-10T12:00:00.000Z', '2026-07-10T12:05:00.000Z',
+          feedbackDone('DONE: Verdict: Approve.', '2026-07-10T12:05:00.000Z')),
+      ],
+    });
+    // ASOF - 30 days = 2026-07-10T12:00:00.000Z exactly.
+    const agg = computePlanReviewRoundTrips([boundary], { asOf: ASOF, windowDays: 30 });
+    assert.equal(agg.scale.issuesRead, 1, 'a row exactly on the window boundary must be included, not excluded');
+  });
+
+  test('rejects a non-positive or non-numeric windowDays rather than silently reading everything', () => {
+    assert.throws(() => computePlanReviewRoundTrips([inWindow], { asOf: ASOF, windowDays: 0 }),
+      /windowDays must be a positive finite number/);
+    assert.throws(() => computePlanReviewRoundTrips([inWindow], { asOf: ASOF, windowDays: -5 }),
+      /windowDays must be a positive finite number/);
+    assert.throws(() => computePlanReviewRoundTrips([inWindow], { asOf: ASOF, windowDays: 'thirty' }),
+      /windowDays must be a positive finite number/);
+  });
+});

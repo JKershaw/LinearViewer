@@ -21,6 +21,18 @@
  *                                 supplied, the result's diagnostics.rulerContamination
  *                                 flags R0 rows whose window straddles it
  *   ... --limit <n>          issues per list page (default 250, the proxy's max)
+ *   ... --window-days <n>    restrict the read to issues with plan-review pipeline
+ *                            activity in the last N days of the read instant
+ *                            (LIN-1871) — a CALENDAR window, unlike
+ *                            `routes/dashboard.js`'s `EFFORT_READOUT_HISTORY_LIMIT`
+ *                            (a flat 200-row cap on an unrelated read, which gives
+ *                            no comparable boundary across two reads taken at
+ *                            different points in a workspace's activity). Omitted
+ *                            (the default) reads every issue, unchanged from
+ *                            before this flag existed — LIN-1964's baseline read
+ *                            an un-windowed full crawl and a later comparison
+ *                            read should match that unless deliberately choosing
+ *                            otherwise.
  *   ... --help
  *
  * NOT registered in package.json and not run by CI — deliberately, matching the
@@ -58,7 +70,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TERMINAL_STATES = ['completed', 'canceled', 'duplicate'];
 
 const USAGE = `usage: PROXY_TOKEN=xxx node scripts/plan-review-round-trips.mjs \\
-         [--json] [--no-cache] [--ruler-change-at <ISO>]
+         [--json] [--no-cache] [--ruler-change-at <ISO>] [--window-days <n>]
        [--base <url>] [--token <tok>] [--cache <dir>] [--limit <n>]`;
 
 function parseArgs(argv) {
@@ -69,6 +81,7 @@ function parseArgs(argv) {
     cache: join(tmpdir(), 'harbour-plan-review-round-trips-cache'),
     limit: 250,
     rulerChangeAt: null,
+    windowDays: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i];
@@ -80,6 +93,7 @@ function parseArgs(argv) {
     else if (v === '--cache') a.cache = argv[++i];
     else if (v === '--limit') a.limit = parseInt(argv[++i], 10) || 250;
     else if (v === '--ruler-change-at') a.rulerChangeAt = argv[++i];
+    else if (v === '--window-days') a.windowDays = parseInt(argv[++i], 10) || null;
   }
   return a;
 }
@@ -300,6 +314,7 @@ function render(result, meta) {
   L.push('══ plan-review round trips — LIN-1883 baseline ════════════════════════════════');
   L.push(`  asOf         ${result.window.asOf}`);
   if (result.window.rulerChangeAt) L.push(`  rulerChangeAt ${result.window.rulerChangeAt}  (LIN-1859, b6c5e046)`);
+  L.push(`  windowDays   ${result.window.windowDays == null ? 'unset (all issues read)' : `${result.window.windowDays} (${num(result.scale.issuesExcludedByWindow)} issues excluded)`}`);
   L.push(`  code         ${JSON.stringify(result.codeVersion?.files || null)}${result.codeVersion?.dirty ? '  ⚠ DIRTY TREE' : ''}`);
   L.push(`  scale        ${result.scale.issuesRead} issues read`);
   L.push('');
@@ -395,6 +410,7 @@ async function main() {
   const result = computePlanReviewRoundTrips(issues, {
     asOf,
     rulerChangeAt: args.rulerChangeAt || undefined,
+    windowDays: args.windowDays || undefined,
     codeVersion: readCodeVersion(),
     skipped,
   });
