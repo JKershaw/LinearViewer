@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Harbour from the Bridge · Harbour Archive #6</title>
+<meta name="description" content="A project manager's briefing filed to the Harbour Archive on 12 September 2026: what Harbour is, how its work is organised, where the portfolio stands, what its own studies say, and what to decide next.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚓</text></svg>">
+</head>
+<body>
+<style>
+  @font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("/fonts/inter-400.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("/fonts/inter-500.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("/fonts/inter-600.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("/fonts/inter-700.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("/fonts/jetbrains-mono-400.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("/fonts/jetbrains-mono-500.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 600; font-display: swap; src: url("/fonts/jetbrains-mono-600.woff2") format("woff2"); }
+  :root {
+    color-scheme: light;
+    --bg: #ffffff;
+    --card: #f6f8f8;
+    --card-h: #eef2f2;
+    --text: #1a1f22;
+    --muted: #5b6770;
+    --line: #dfe5e7;
+    --line-soft: #ecf0f1;
+    --brand: #0d9488;
+    --brand-dim: #0f766e;
+    --brand-tint: #e6f5f3;
+    --amber: #FFB224;
+    --amber-dim: #8a5a00;
+    --green: #16a34a;
+    --green-dim: #15803d;
+    --red-dim: #b91c1c;
+    --red-tint: #fdecec;
+    --slate: #64748b;
+    --slate-dim: #475569;
+    --series: #2a78d6;      /* ordinal step 450 (scheduled) */
+    --series-lo: #86b6ef;   /* ordinal step 250 (parked) */
+    --font-content: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-structural: 'JetBrains Mono', 'SF Mono', 'Fira Code', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #16181d;
+      --card: #1f222a;
+      --card-h: #262a33;
+      --text: #e6e9ec;
+      --muted: #9aa5ae;
+      --line: #2e333c;
+      --line-soft: #262a31;
+      --brand: #14b8a6;
+      --brand-dim: #2dd4bf;
+      --brand-tint: #14312f;
+      --amber: #FFB224;
+      --amber-dim: #f2c14e;
+      --green: #2ee65f;
+      --green-dim: #4ade80;
+      --red-dim: #f87171;
+      --red-tint: #3a1f1f;
+      --slate: #64748b;
+      --slate-dim: #94a3b8;
+      --series: #3987e5;    /* ordinal step 400 */
+      --series-lo: #184f95; /* ordinal step 600 */
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #16181d;
+    --card: #1f222a;
+    --card-h: #262a33;
+    --text: #e6e9ec;
+    --muted: #9aa5ae;
+    --line: #2e333c;
+    --line-soft: #262a31;
+    --brand: #14b8a6;
+    --brand-dim: #2dd4bf;
+    --brand-tint: #14312f;
+    --amber: #FFB224;
+    --amber-dim: #f2c14e;
+    --green: #2ee65f;
+    --green-dim: #4ade80;
+    --red-dim: #f87171;
+    --red-tint: #3a1f1f;
+    --slate: #64748b;
+    --slate-dim: #94a3b8;
+    --series: #3987e5;
+    --series-lo: #184f95;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-content);
+    font-size: 16px;
+    line-height: 1.55;
+    padding-block: 0 4rem;
+    padding-inline: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--brand-dim); text-decoration: none; border-bottom: 1px solid var(--line); }
+  a:hover, a:focus-visible { border-bottom-color: var(--brand-dim); }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  code, .mono { font-family: var(--font-structural); font-size: 0.86em; }
+  code { background: var(--card); padding: 0.05em 0.35em; border-radius: 3px; }
+  .num { font-family: var(--font-structural); font-variant-numeric: tabular-nums; }
+
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .measure { max-width: 68ch; }
+
+  /* masthead */
+  .mast { padding-block: 2.5rem 1.5rem; border-bottom: 1px solid var(--line); }
+  .mast .eyebrow { font-family: var(--font-structural); font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.6rem; }
+  .mast h1 { font-size: clamp(1.9rem, 4.2vw, 2.7rem); line-height: 1.12; margin: 0 0 0.75rem; letter-spacing: -0.015em; font-weight: 700; text-wrap: balance; }
+  .mast .standfirst { font-size: 1.12rem; color: var(--text); margin: 0 0 1.2rem; max-width: 62ch; }
+  .grounding { font-family: var(--font-structural); font-size: 0.78rem; color: var(--muted); line-height: 1.6; margin: 0; }
+  .grounding b { color: var(--text); font-weight: 500; }
+
+  /* contents as a tree, Harbour's own idiom */
+  .toc { margin: 1.5rem 0 0; padding: 0; list-style: none; font-family: var(--font-structural); font-size: 0.86rem; line-height: 1.75; }
+  .toc li::before { content: '├─ '; color: var(--slate); }
+  .toc li:last-child::before { content: '└─ '; }
+  .toc a { border-bottom: none; color: var(--text); }
+  .toc a:hover { color: var(--brand-dim); }
+  .toc .sub { color: var(--muted); font-family: var(--font-content); }
+
+  /* sections */
+  section { padding-block: 2.4rem 0.6rem; border-bottom: 1px solid var(--line-soft); }
+  section:last-of-type { border-bottom: none; }
+  h2 { font-size: 1.45rem; margin: 0 0 1rem; letter-spacing: -0.01em; text-wrap: balance; display: flex; align-items: baseline; gap: 0.5rem; }
+  h2 .glyph { font-family: var(--font-structural); color: var(--brand); font-weight: 500; font-size: 1rem; }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.5rem; font-weight: 600; }
+  p { margin: 0 0 0.9rem; }
+  ul, ol { padding-left: 1.3rem; margin: 0 0 0.9rem; }
+  li { margin-bottom: 0.35rem; }
+  li > p { margin-bottom: 0.4rem; }
+  .lede { font-size: 1.06rem; }
+  .note { color: var(--muted); font-size: 0.9rem; }
+  .callout { background: var(--card); border-left: 3px solid var(--brand); padding: 0.9rem 1.1rem; margin: 1.2rem 0; border-radius: 0 4px 4px 0; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.risk { border-left-color: var(--red-dim); }
+  .callout.quote { font-style: italic; }
+  blockquote { margin: 1rem 0; padding: 0 0 0 1rem; border-left: 2px solid var(--line); color: var(--muted); }
+
+  /* status glyphs */
+  .st { font-family: var(--font-structural); font-weight: 600; margin-right: 0.35em; }
+  .st-done { color: var(--green-dim); }
+  .st-prog { color: var(--amber-dim); }
+  .st-todo { color: var(--slate-dim); }
+
+  /* KPI tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 1.2rem 0 1.4rem; }
+  .tile { background: var(--card); border-radius: 6px; padding: 0.85rem 1rem 0.8rem; min-width: 0; }
+  .tile .v { font-family: var(--font-structural); font-size: 1.7rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .tile .l { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.35; }
+  .tile.warn .v { color: var(--amber-dim); }
+  .tile.bad .v { color: var(--red-dim); }
+  .tile.good .v { color: var(--green-dim); }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin: 0.8rem 0 1.2rem; -webkit-overflow-scrolling: touch; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); }
+  td.n, th.n { text-align: right; font-family: var(--font-structural); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td .id { font-family: var(--font-structural); font-size: 0.84em; white-space: nowrap; }
+  tr:hover td { background: var(--card-h); }
+  .tight td, .tight th { padding: 0.35rem 0.6rem; }
+  caption { caption-side: top; text-align: left; font-size: 0.85rem; color: var(--muted); padding: 0 0 0.5rem; }
+
+  /* bar charts (HTML) */
+  .chart { margin: 1rem 0 0.5rem; }
+  .chart-title { font-weight: 600; margin: 0 0 0.15rem; }
+  .chart-sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.8rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.9rem; font-size: 0.8rem; color: var(--muted); margin: 0 0 0.7rem; }
+  .legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.4em; vertical-align: -1px; background: var(--series); }
+  .legend .lo::before { background: var(--series-lo); }
+  .row { display: grid; grid-template-columns: minmax(120px, 220px) 1fr 56px; gap: 10px; align-items: center; margin-bottom: 7px; }
+  .row .lab { font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .tot { font-family: var(--font-structural); font-size: 0.82rem; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  .track { display: flex; gap: 2px; height: 16px; }
+  .seg { height: 100%; background: var(--series); border-radius: 0 3px 3px 0; min-width: 0; cursor: default; }
+  .seg.lo { background: var(--series-lo); }
+  .seg:first-child { border-radius: 3px 0 0 3px; }
+  .seg:last-child { border-radius: 0 3px 3px 0; }
+  .seg:only-child { border-radius: 3px; }
+  .seg:hover, .seg:focus-visible { filter: brightness(0.88); }
+  .tip { position: fixed; z-index: 10; pointer-events: none; background: var(--text); color: var(--bg); font-family: var(--font-structural); font-size: 0.76rem; padding: 0.35rem 0.55rem; border-radius: 4px; white-space: nowrap; display: none; }
+  details { margin: 0.4rem 0 1rem; }
+  summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); font-family: var(--font-structural); }
+  summary:hover { color: var(--brand-dim); }
+
+  /* definition grid */
+  .defs { display: grid; grid-template-columns: minmax(130px, 170px) 1fr; gap: 0.55rem 1.2rem; margin: 1rem 0 1.2rem; }
+  .defs dt { font-family: var(--font-structural); font-size: 0.86rem; font-weight: 600; color: var(--brand-dim); padding-top: 0.1rem; }
+  .defs dd { margin: 0; }
+  @media (max-width: 560px) { .defs { grid-template-columns: 1fr; gap: 0.15rem 0; } .defs dd { margin-bottom: 0.7rem; } }
+
+  /* loop diagram */
+  .loop { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 1.2rem 0; }
+  .loop .step { background: var(--card); border-radius: 6px; padding: 0.75rem 0.85rem; }
+  .loop .k { font-family: var(--font-structural); font-size: 0.72rem; color: var(--brand-dim); letter-spacing: 0.05em; text-transform: uppercase; }
+  .loop .t { font-weight: 600; margin: 0.15rem 0 0.25rem; }
+  .loop .d { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
+  @media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+
+  .tag { display: inline-block; font-family: var(--font-structural); font-size: 0.72rem; padding: 0.1em 0.45em; border-radius: 3px; background: var(--card); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+  .tag.hi { color: var(--red-dim); border-color: var(--red-dim); background: var(--red-tint); }
+  .tag.md { color: var(--amber-dim); border-color: var(--amber-dim); }
+  .tag.ok { color: var(--green-dim); border-color: var(--green-dim); }
+
+  .foot { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); font-family: var(--font-structural); font-size: 0.76rem; color: var(--muted); line-height: 1.6; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <p class="eyebrow">Harbour Archive · Document 6 · A briefing</p>
+    <h1>Harbour from the Bridge</h1>
+    <p class="standfirst">What Harbour is, how its work is organised, where the portfolio stands today, what the project's own instruments say about its health, and what a project manager would watch next.</p>
+    <p class="grounding"><b>Written</b> 12 September 2026 by an outside Claude session handed a single-use read token, for a project manager meeting Harbour for the first time. Documents 1, 2 and 4 are museum editions; 3 is a project brief; 5 is an essay.<br><b>Grounded on:</b> the live workspace API proxy at harbour.cat (read scope, 16:35–16:40 UTC, every issue paged), the public <b>/kpis</b> page (16:38 UTC), and the checked-out docs of both repositories (<b>LinearViewer</b> and <b>simple-dispatcher</b>). Figures marked <b>instance-wide</b> cover all 8 workspaces on the host, not only this one.</p>
+    <ul class="toc">
+      <li><a href="#what">What Harbour is</a> <span class="sub">— one loop, two repos, five backends</span></li>
+      <li><a href="#who">Who holds what</a> <span class="sub">— one operator, a fleet of agents, seven reserved acts</span></li>
+      <li><a href="#vocab">How work is organised</a> <span class="sub">— tickets, fronts, passages, periodicals, rulings</span></li>
+      <li><a href="#state">Where the portfolio stands</a> <span class="sub">— the numbers as of today</span></li>
+      <li><a href="#flow">Throughput, cost and capacity</a></li>
+      <li><a href="#health">What the project's own studies say</a></li>
+      <li><a href="#direction">Direction and the tensions inside it</a></li>
+      <li><a href="#risks">Risks and headwinds on the record</a></li>
+      <li><a href="#next">What a PM would put on this week's list</a></li>
+      <li><a href="#where">Where to look, and how this was read</a></li>
+    </ul>
+  </header>
+
+  <section id="what">
+    <h2><span class="glyph">├─</span>What Harbour is</h2>
+    <div class="measure">
+      <p class="lede">Harbour is a control plane for software delivery done by AI agents, run by one person. It reads a backlog from a task tracker, turns a ticket into a grounded prompt, dispatches that prompt to an agent session, and then checks the result against evidence rather than against the agent's own report. The landing page's phrase is <em>"keep human intent in command of AI execution, one turn of the loop at a time."</em></p>
+      <p>It began in early 2026 as a read-only tree viewer for Linear. What compounded since then is not the model but the doctrine: staleness checks, a review-then-close-out split with a ledger of "what CI did not prove", a credential broker so no agent ever sees a live token, an operator decision queue, a north star the human alone may edit. The repository's CLAUDE.md alone is now roughly nineteen thousand words of that residue.</p>
+    </div>
+    <div class="loop">
+      <div class="step"><div class="k">1 · read</div><div class="t">Rank the backlog</div><div class="d">A sorted stack with blocking graph and critical path, from Linear, GitHub Issues, GitHub Projects, Jira or a local store.</div></div>
+      <div class="step"><div class="k">2 · ground</div><div class="t">Generate a prompt</div><div class="d">Seventeen handwritten templates plus an AI recommender; both paths carry the same grounding rules.</div></div>
+      <div class="step"><div class="k">3 · dispatch</div><div class="t">Queue it for an agent</div><div class="d">A runner (Simple Dispatcher) claims it and launches a Claude Code or OpenCode session in a terminal.</div></div>
+      <div class="step"><div class="k">4 · verify</div><div class="t">Check on evidence</div><div class="d">CI green, PR merged, review ledger discharged. "Done" is a claim; the artifact is the fact.</div></div>
+    </div>
+    <div class="measure">
+      <p><strong>Two repositories make the product.</strong> <em>LinearViewer</em> is Harbour itself: the web app, the API agents call, the prompt engine, the observation and KPI surfaces. <em>simple-dispatcher</em> is the runner on the operator's Mac that polls Harbour's queue and drives each agent session through its phases. A third piece, <em>Harbour OS</em>, is the operator's in-browser workstation and is out of scope here.</p>
+      <p><strong>It is dogfooded on itself.</strong> The tracker you are reading about is Harbour's own backlog, worked almost entirely by agents Harbour dispatched. One outward run on a foreign repository (28 August) proved the machinery ports but exposed that the non-Linear agent lane had never been exercised end to end.</p>
+    </div>
+  </section>
+
+  <section id="who">
+    <h2><span class="glyph">├─</span>Who holds what</h2>
+    <div class="measure">
+      <p>The instance reports <span class="num">12</span> users across <span class="num">8</span> workspaces, but this workspace has one human: John Kershaw, the maintainer and operator. Everyone else on the board is an agent. The charter (a draft, dated 19 July, deliberately not yet adopted) says so plainly: "one maintainer and roughly one other user".</p>
+      <p>The division of labour is the design, not an accident of headcount.</p>
+    </div>
+    <div class="two">
+      <div>
+        <h3>The agents may</h3>
+        <ul>
+          <li>Rank the backlog, ground and draft prompts, dispatch work to other agents.</li>
+          <li>Run the autopilot loop: pick the next step, hand it down, verify it landed.</li>
+          <li>Research, plan, review plans, implement, review code, and close out (merge, set Done, file follow-ups) inside the gates.</li>
+          <li>Propose decisions and draft reports, including the weekly reviews and the papers.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Only the human may</h3>
+        <ul>
+          <li>Decide what is worth doing and what counts as done. Every ruling in the decision queue is discharged by a human press; agents can only propose an answer.</li>
+          <li>Ratify a passage (the planned run), set or revise the north star, amend the charter.</li>
+          <li>Anything irreversible: spend money, change prices or the licence, cut a release, approve the maintainer's own pay.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="measure">
+      <p>Three agent roles sit above the workers. The <strong>Autopilot</strong> orchestrator chooses and accepts, never writes code. The <strong>Flight Companion</strong> is the observer: a chat surface that watches the fleet, narrates, and proposes follow-ups a human taps to approve; it is on rung one of a three-rung trust ladder (read-only, then supervised writes, then unattended). The <strong>Passage Runner</strong> flies a ratified passage leg by leg. All three answer to the same rule the handbook states: describe how things are going, but never redraw what "done" or "worth it" means.</p>
+    </div>
+  </section>
+
+  <section id="vocab">
+    <h2><span class="glyph">├─</span>How work is organised</h2>
+    <div class="measure">
+      <p>Harbour's planning vocabulary is nautical and its scheduling unit is not a sprint. The terms a PM needs, in the order they nest:</p>
+    </div>
+    <dl class="defs">
+      <dt>Ticket</dt>
+      <dd>A Linear issue, <code>LIN-nnnn</code>, on one team. Six workflow states: Backlog, Todo, In Progress, Done, Canceled, Duplicate. No ticket carries a due date; the board measures flow, never schedule.</dd>
+      <dt>Project</dt>
+      <dd>Eleven Linear projects act as workstreams (Product, Dispatch &amp; Execution Runtime, Autopilot &amp; Prompt Engine, Providers &amp; API Unification, Quality &amp; Periodicals, Simple Dispatcher, Platform Security, UX &amp; Theme, DevOps, The Ship's Biscuit, and a completed test-infrastructure migration). A quarter of open work carries no project at all.</dd>
+      <dt>front: / kind:</dt>
+      <dd>Two label families, applied by the ticket-minting prompts since 25 August. <code>front:</code> names the front the work is on (twelve, from <code>dispatcher-substrate</code> to <code>public-path</code>); <code>kind:</code> names its origin: <code>epic</code>, <code>research</code>, <code>decision</code>, <code>follow-up</code>, or <code>review-residue</code>, the findings a review filed rather than fixed.</dd>
+      <dt>Pipeline</dt>
+      <dd>A ticket walks research → plan → plan-review → implementation → review → close-out. Each leg is one fresh agent session with its own template. Review is write-only and ends in a ledger of claims CI cannot prove; close-out consumes that ledger and owns merge, Done, and the follow-ups. Since 12 September a ledger item marked <em>inside</em> the ticket's own scope can no longer be discharged by filing a ticket for it.</dd>
+      <dt>Passage</dt>
+      <dd>The planning unit: a voyage of 12–19 tasks, planned in a live session with John and <em>ratified</em> by one "yes". It is written as legs, each with anchors, intent, a task-count budget, a <em>making port</em> condition and a <em>wind down if</em> trigger. Budgets are task counts, never hours or dollars. This is the closest thing to a sprint, and it is scoped by evidence rather than by calendar.</dd>
+      <dt>Periodical</dt>
+      <dd>Fifteen weekly reviews an agent runs against the repo or the tracker (documentation, code quality, security, drift, headwinds, onboarding, and so on). Corrective ones file tickets; advisory ones only report. A report counts only once it lands on <code>main</code> under <code>docs/reviews/</code>.</dd>
+      <dt>Ruling</dt>
+      <dd>A well-formed decision an agent could not take, parked in the operator decision queue with a one-paragraph case and options. Born from a 30 July incident where three sessions waited overnight on rulings nobody saw.</dd>
+      <dt>North star</dt>
+      <dd>A versioned, human-only document (currently v2, "the self-funding loop"). A roadmap report scores the portfolio's direction against it every couple of weeks and publishes an alignment reading, including which work it counts as drift.</dd>
+      <dt>Paper</dt>
+      <dd>A short study answering one question with evidence, written by an agent, indexed under <code>docs/papers/</code>. Seven exist; thirteen questions are queued. They are the project's process-health instrument.</dd>
+      <dt>Budget window</dt>
+      <dd>The whole fleet runs on one Claude subscription whose weekly window resets Thursday 06:00 UTC. The gauge on <code>/kpis</code> estimates consumption from telemetry; the cap, not the backlog, is what binds.</dd>
+    </dl>
+    <h3>Recent passages, oldest first</h3>
+    <div class="tablewrap">
+      <table class="tight">
+        <thead><tr><th>Ticket</th><th>Passage</th><th>Ratified / proposed</th><th class="n">Tasks</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td><span class="id">LIN-1876</span></td><td>Close the loop, quiet the failures</td><td>ratified 3 Aug</td><td class="n">12</td><td><span class="st st-todo">○</span>Todo, never flown as written</td></tr>
+          <tr><td><span class="id">LIN-2156</span></td><td>Fix the lighthouse, then light it</td><td>ratified 20 Aug</td><td class="n">13</td><td><span class="st st-todo">○</span>Backlog (doubled as the runner's first acceptance flight)</td></tr>
+          <tr><td><span class="id">LIN-2461</span></td><td>Big Run, debt first then the deep night</td><td>ratified 2 Sep</td><td class="n">19</td><td><span class="st st-done">✓</span>Done</td></tr>
+          <tr><td><span class="id">LIN-2636</span></td><td>Flight Companion V1, parity then trust</td><td>proposed 5 Sep</td><td class="n">14</td><td><span class="st st-done">✓</span>Done, 12 of 14 made port</td></tr>
+          <tr><td><span class="id">LIN-2730</span></td><td>Flight Companion polish + OpenCode plumbing</td><td>proposed 10 Sep</td><td class="n">13</td><td><span class="st st-todo">○</span>Todo, <strong>awaiting John's yes</strong>; trim-safe minimum is legs A2 + B1</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="state">
+    <h2><span class="glyph">├─</span>Where the portfolio stands</h2>
+    <div class="measure"><p>Every issue on the team, read this afternoon. Harbour's convention: <span class="st st-done">✓</span>done, <span class="st st-prog">◐</span>in progress, <span class="st st-todo">○</span>not started.</p></div>
+    <div class="tiles">
+      <div class="tile"><div class="v">2,769</div><div class="l">tickets on the board, all time</div></div>
+      <div class="tile good"><div class="v">1,590</div><div class="l">done · 57% of everything ever filed</div></div>
+      <div class="tile"><div class="v">1,004</div><div class="l">open · 239 Todo, 13 In Progress, 752 Backlog</div></div>
+      <div class="tile"><div class="v">175</div><div class="l">canceled or duplicate</div></div>
+      <div class="tile warn"><div class="v">23</div><div class="l">open epics · 13 tickets In Progress</div></div>
+      <div class="tile good"><div class="v">0</div><div class="l">rulings waiting on a human right now</div></div>
+    </div>
+
+    <div class="chart" id="chart-projects">
+      <p class="chart-title">Open work by project</p>
+      <p class="chart-sub">1,004 open tickets. Scheduled means Todo or In Progress; parked means Backlog. Hover a bar for the split.</p>
+      <div class="legend"><span>scheduled (Todo + In Progress)</span><span class="lo">parked (Backlog)</span></div>
+      <div class="rows">
+        <div class="row"><div class="lab">No project</div><div class="track"><div class="seg" data-tip="No project · scheduled 17" style="width:7.3%"></div><div class="seg lo" data-tip="No project · parked 217" style="width:92.7%"></div></div><div class="tot">234</div></div>
+        <div class="row"><div class="lab">Product</div><div class="track" style="width:61.5%"><div class="seg" data-tip="Product · scheduled 60" style="width:41.7%"></div><div class="seg lo" data-tip="Product · parked 84" style="width:58.3%"></div></div><div class="tot">144</div></div>
+        <div class="row"><div class="lab">Autopilot &amp; Prompt Engine</div><div class="track" style="width:59.8%"><div class="seg" data-tip="Autopilot & Prompt Engine · scheduled 43" style="width:30.7%"></div><div class="seg lo" data-tip="Autopilot & Prompt Engine · parked 97" style="width:69.3%"></div></div><div class="tot">140</div></div>
+        <div class="row"><div class="lab">Simple Dispatcher</div><div class="track" style="width:50.9%"><div class="seg" data-tip="Simple Dispatcher · scheduled 26" style="width:21.8%"></div><div class="seg lo" data-tip="Simple Dispatcher · parked 93" style="width:78.2%"></div></div><div class="tot">119</div></div>
+        <div class="row"><div class="lab">Dispatch &amp; Execution Runtime</div><div class="track" style="width:37.6%"><div class="seg" data-tip="Dispatch & Execution Runtime · scheduled 33" style="width:37.5%"></div><div class="seg lo" data-tip="Dispatch & Execution Runtime · parked 55" style="width:62.5%"></div></div><div class="tot">88</div></div>
+        <div class="row"><div class="lab">Quality &amp; Periodicals</div><div class="track" style="width:33.3%"><div class="seg" data-tip="Quality & Periodicals · scheduled 26" style="width:33.3%"></div><div class="seg lo" data-tip="Quality & Periodicals · parked 52" style="width:66.7%"></div></div><div class="tot">78</div></div>
+        <div class="row"><div class="lab">Providers &amp; API Unification</div><div class="track" style="width:32.1%"><div class="seg" data-tip="Providers & API Unification · scheduled 13" style="width:17.3%"></div><div class="seg lo" data-tip="Providers & API Unification · parked 62" style="width:82.7%"></div></div><div class="tot">75</div></div>
+        <div class="row"><div class="lab">Platform Security &amp; Observability</div><div class="track" style="width:27.4%"><div class="seg" data-tip="Platform Security & Observability · scheduled 20" style="width:31.3%"></div><div class="seg lo" data-tip="Platform Security & Observability · parked 44" style="width:68.7%"></div></div><div class="tot">64</div></div>
+        <div class="row"><div class="lab">UX, Theme</div><div class="track" style="width:17.1%"><div class="seg" data-tip="UX, Theme · scheduled 8" style="width:20%"></div><div class="seg lo" data-tip="UX, Theme · parked 32" style="width:80%"></div></div><div class="tot">40</div></div>
+        <div class="row"><div class="lab">DevOps &amp; Tooling</div><div class="track" style="width:6%"><div class="seg" data-tip="DevOps & Tooling · scheduled 4" style="width:28.6%"></div><div class="seg lo" data-tip="DevOps & Tooling · parked 10" style="width:71.4%"></div></div><div class="tot">14</div></div>
+        <div class="row"><div class="lab">The Ship's Biscuit</div><div class="track" style="width:3.4%"><div class="seg" data-tip="The Ship's Biscuit · scheduled 2" style="width:25%"></div><div class="seg lo" data-tip="The Ship's Biscuit · parked 6" style="width:75%"></div></div><div class="tot">8</div></div>
+      </div>
+      <details>
+        <summary>table view · open and done by project</summary>
+        <div class="tablewrap">
+          <table class="tight">
+            <thead><tr><th>Project</th><th class="n">Todo</th><th class="n">In Progress</th><th class="n">Backlog</th><th class="n">Done</th><th class="n">Canceled + Dup</th></tr></thead>
+            <tbody>
+              <tr><td>No project</td><td class="n">15</td><td class="n">2</td><td class="n">217</td><td class="n">376</td><td class="n">27</td></tr>
+              <tr><td>Product</td><td class="n">58</td><td class="n">2</td><td class="n">84</td><td class="n">450</td><td class="n">57</td></tr>
+              <tr><td>Autopilot, Recommendation &amp; Prompt Engine</td><td class="n">41</td><td class="n">2</td><td class="n">97</td><td class="n">194</td><td class="n">19</td></tr>
+              <tr><td>Simple Dispatcher</td><td class="n">26</td><td class="n">0</td><td class="n">93</td><td class="n">152</td><td class="n">14</td></tr>
+              <tr><td>Dispatch &amp; Execution Runtime</td><td class="n">30</td><td class="n">3</td><td class="n">55</td><td class="n">84</td><td class="n">12</td></tr>
+              <tr><td>Quality, Periodicals &amp; Measurement</td><td class="n">25</td><td class="n">1</td><td class="n">52</td><td class="n">55</td><td class="n">21</td></tr>
+              <tr><td>Providers &amp; API Unification</td><td class="n">12</td><td class="n">1</td><td class="n">62</td><td class="n">104</td><td class="n">12</td></tr>
+              <tr><td>Platform Security, Robustness, Observability</td><td class="n">20</td><td class="n">0</td><td class="n">44</td><td class="n">27</td><td class="n">3</td></tr>
+              <tr><td>UX, Theme</td><td class="n">6</td><td class="n">2</td><td class="n">32</td><td class="n">58</td><td class="n">3</td></tr>
+              <tr><td>DevOps &amp; Tooling</td><td class="n">4</td><td class="n">0</td><td class="n">10</td><td class="n">57</td><td class="n">6</td></tr>
+              <tr><td>The Ship's Biscuit</td><td class="n">2</td><td class="n">0</td><td class="n">6</td><td class="n">5</td><td class="n">1</td></tr>
+              <tr><td>Test Infrastructure: Local-Provider Migration</td><td class="n">0</td><td class="n">0</td><td class="n">0</td><td class="n">28</td><td class="n">0</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+
+    <div class="chart" id="chart-fronts">
+      <p class="chart-title">Open work by front</p>
+      <p class="chart-sub">Open tickets carrying each <code>front:</code> label. A ticket can carry more than one front, so the bars overlap and do not sum to 1,004.</p>
+      <div class="rows">
+        <div class="row"><div class="lab">dispatcher-substrate</div><div class="track"><div class="seg" data-tip="dispatcher-substrate · 249 open" style="width:100%"></div></div><div class="tot">249</div></div>
+        <div class="row"><div class="lab">providers</div><div class="track"><div class="seg" data-tip="providers · 144 open" style="width:57.8%"></div></div><div class="tot">144</div></div>
+        <div class="row"><div class="lab">surfaces</div><div class="track"><div class="seg" data-tip="surfaces · 143 open" style="width:57.4%"></div></div><div class="tot">143</div></div>
+        <div class="row"><div class="lab">prompt-engine</div><div class="track"><div class="seg" data-tip="prompt-engine · 117 open" style="width:47%"></div></div><div class="tot">117</div></div>
+        <div class="row"><div class="lab">cost-economy</div><div class="track"><div class="seg" data-tip="cost-economy · 76 open" style="width:30.5%"></div></div><div class="tot">76</div></div>
+        <div class="row"><div class="lab">proxy-api</div><div class="track"><div class="seg" data-tip="proxy-api · 69 open" style="width:27.7%"></div></div><div class="tot">69</div></div>
+        <div class="row"><div class="lab">flight-companion</div><div class="track"><div class="seg" data-tip="flight-companion · 43 open" style="width:17.3%"></div></div><div class="tot">43</div></div>
+        <div class="row"><div class="lab">rulings</div><div class="track"><div class="seg" data-tip="rulings · 42 open" style="width:16.9%"></div></div><div class="tot">42</div></div>
+        <div class="row"><div class="lab">operating-model</div><div class="track"><div class="seg" data-tip="operating-model · 39 open" style="width:15.7%"></div></div><div class="tot">39</div></div>
+        <div class="row"><div class="lab">maintenance</div><div class="track"><div class="seg" data-tip="maintenance · 35 open" style="width:14.1%"></div></div><div class="tot">35</div></div>
+        <div class="row"><div class="lab">periodicals</div><div class="track"><div class="seg" data-tip="periodicals · 31 open" style="width:12.4%"></div></div><div class="tot">31</div></div>
+        <div class="row"><div class="lab">public-path</div><div class="track"><div class="seg" data-tip="public-path · 17 open" style="width:6.8%"></div></div><div class="tot">17</div></div>
+      </div>
+    </div>
+
+    <div class="measure">
+      <h3>Three things the shape of the backlog says</h3>
+      <ul>
+        <li><strong>Half the open work is residue.</strong> 324 open tickets are <code>kind:review-residue</code> and 195 are <code>kind:follow-up</code>: 519 of 1,004. Reviews and close-outs file more than they fix, and what they file mostly waits (see the studies below).</li>
+        <li><strong>The runner is the heaviest front.</strong> <code>dispatcher-substrate</code> leads with 249 open tickets, and the operating-model hub ranks finishing the Linux dispatcher host above every other phase because "the September incident set is almost entirely the Mac host".</li>
+        <li><strong>Priority is not steering intake.</strong> The three Urgent tickets are all in Backlog, none scheduled; 104 top-level High tickets sit in Todo. Passages, not priorities, decide what gets flown.</li>
+      </ul>
+    </div>
+
+    <h3>In progress right now</h3>
+    <div class="tablewrap">
+      <table class="tight">
+        <thead><tr><th>Ticket</th><th>Project</th><th>Priority</th><th>Title</th></tr></thead>
+        <tbody>
+          <tr><td><span class="id">LIN-751</span></td><td>Autopilot &amp; Prompt Engine</td><td><span class="tag hi">High</span></td><td>Realtime chat interface for work in flight (the Flight Companion epic; 20 open children; open 67+ days)</td></tr>
+          <tr><td><span class="id">LIN-2114</span></td><td>Dispatch &amp; Execution Runtime</td><td><span class="tag hi">High</span></td><td>Move observation-type sessions out of Claude Code into a simpler cloud harness (epic)</td></tr>
+          <tr><td><span class="id">LIN-2246</span></td><td>Providers &amp; API Unification</td><td><span class="tag hi">High</span></td><td>Decompose the 4,388-line workspace-api route file by URL group</td></tr>
+          <tr><td><span class="id">LIN-1933</span></td><td>Quality &amp; Periodicals</td><td><span class="tag hi">High</span></td><td>Periodicals: target-repo selection at dispatch (active 25+ days)</td></tr>
+          <tr><td><span class="id">LIN-2634</span></td><td>Autopilot &amp; Prompt Engine</td><td><span class="tag md">Medium</span></td><td>Rung-two evidence: five paired mornings, agent-graded, with minutes-to-first-decision</td></tr>
+          <tr><td><span class="id">LIN-2459</span></td><td>No project</td><td><span class="tag md">Medium</span></td><td>Workspace prep copies the source checkout's untracked settings into every clone</td></tr>
+          <tr><td><span class="id">LIN-2811</span></td><td>UX, Theme</td><td><span class="tag md">Medium</span></td><td>Gate the chat reveal on a shared pinned-to-bottom predicate</td></tr>
+          <tr><td><span class="id">LIN-2808</span></td><td>UX, Theme</td><td><span class="tag md">Medium</span></td><td>Preserve scroll position and indicate new conversation updates</td></tr>
+          <tr><td><span class="id">LIN-2089</span></td><td>Product</td><td><span class="tag md">Medium</span></td><td>Ship Journey: waypoint dot is six times the step length</td></tr>
+          <tr><td><span class="id">LIN-1675</span></td><td>Product</td><td><span class="tag">Low</span></td><td>Animated ship journey map from roadmap data (epic; the north-star reading names it as drift)</td></tr>
+          <tr><td><span class="id">LIN-2422</span></td><td>Dispatch &amp; Execution Runtime</td><td><span class="tag">None · Blocked</span></td><td>Phase 1 guest provisioning script for the Linux dispatcher box</td></tr>
+          <tr><td><span class="id">LIN-1785</span></td><td>Dispatch &amp; Execution Runtime</td><td><span class="tag">None</span></td><td>Provisioning script for the Linux dispatcher box</td></tr>
+          <tr><td><span class="id">LIN-2397</span></td><td>No project</td><td><span class="tag">None</span></td><td>Factor the shared GitHub App auth flow out of two route files</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note measure">"In Progress" is a loose signal here. The team's own practice, recorded on LIN-1981, is to move a ticket nobody is actively working back to Todo, so a long-lived In Progress row usually means an epic or a stalled item rather than a live session.</p>
+  </section>
+
+  <section id="flow">
+    <h2><span class="glyph">├─</span>Throughput, cost and capacity</h2>
+    <div class="measure"><p>Harbour publishes its own operating figures on a public, unlinked <code>/kpis</code> page. These are instance-wide, thirty-day windows unless stated.</p></div>
+    <div class="tiles">
+      <div class="tile"><div class="v">74%</div><div class="l">of dispatched work landed · 2,152 done, 712 failed, 45 aborted</div></div>
+      <div class="tile"><div class="v">$33.97</div><div class="l">API-equivalent cost per terminal-marked task (cash cost: not configured)</div></div>
+      <div class="tile warn"><div class="v">60%</div><div class="l">of this week's subscription window used by Saturday afternoon; exhausts Monday at the current burn</div></div>
+      <div class="tile"><div class="v">267</div><div class="l">autopilot runs · 7,714 prompts dispatched</div></div>
+      <div class="tile"><div class="v">3.8</div><div class="l">agent sessions per delivered ticket (29 Aug headwinds cohort)</div></div>
+    </div>
+    <div class="measure">
+      <h3>Velocity, read honestly</h3>
+      <p>The Recent Headwinds review counts mainline commit units per active day on the Harbour repo. It refuses to give a single number, and so should you: one 52-unit lane-run day on 23 August lifts the latest window's average from below the prior baseline to well above it.</p>
+    </div>
+    <div class="tablewrap">
+      <table class="tight">
+        <caption>Harbour repo, mainline units per active day (Recent Headwinds, 29 Aug)</caption>
+        <thead><tr><th>Window</th><th>Span</th><th class="n">Units</th><th class="n">Per active day</th></tr></thead>
+        <tbody>
+          <tr><td>A · 8 Jun – 6 Jul</td><td>28 d</td><td class="n">459</td><td class="n">16.4</td></tr>
+          <tr><td>B · 6 Jul – 3 Aug</td><td>28 d</td><td class="n">230</td><td class="n">8.5</td></tr>
+          <tr><td>C · 3 – 23 Aug</td><td>20 d</td><td class="n">117</td><td class="n">8.4</td></tr>
+          <tr><td>D · 23 – 29 Aug</td><td>7 d</td><td class="n">97</td><td class="n">13.9 (7.5 without the lane day)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="measure">
+      <p>The 23 August lane run itself is the best single day on record: fifteen long-lived sessions, 52 tickets to Done, 43 PRs merged, zero faked closes, wound down deliberately at 71% of the weekly budget. The method it codified (one session carries an ordered ticket list with a file carve, without pausing) is now one of three ways work is flown, alongside per-step autopilot and per-leg passage runs.</p>
+      <h3>Where the money goes</h3>
+      <p>A routing proposal dated 11 September priced 1,068 worker sessions across 155 issues over nineteen days at $6,687 API-equivalent. The orchestrator tier is the single largest line; implementation is where the cheaper model already runs.</p>
+    </div>
+    <div class="tablewrap">
+      <table class="tight">
+        <thead><tr><th>Kind (model)</th><th class="n">Sessions</th><th class="n">Share of spend</th><th class="n">Median cost</th><th class="n">Median minutes</th></tr></thead>
+        <tbody>
+          <tr><td>autopilot orchestrator (Opus)</td><td class="n">113</td><td class="n">23.8%</td><td class="n">$9.27</td><td class="n">140</td></tr>
+          <tr><td>implementation (Sonnet)</td><td class="n">172</td><td class="n">19.1%</td><td class="n">$4.54</td><td class="n">19</td></tr>
+          <tr><td>review (Opus)</td><td class="n">188</td><td class="n">14.0%</td><td class="n">$4.67</td><td class="n">11</td></tr>
+          <tr><td>close-out (Opus)</td><td class="n">156</td><td class="n">11.2%</td><td class="n">$4.17</td><td class="n">10</td></tr>
+          <tr><td>research (Opus)</td><td class="n">78</td><td class="n">8.8%</td><td class="n">$6.37</td><td class="n">14</td></tr>
+          <tr><td>plan-review (Opus)</td><td class="n">118</td><td class="n">8.1%</td><td class="n">$4.45</td><td class="n">10</td></tr>
+          <tr><td>plan (Sonnet)</td><td class="n">127</td><td class="n">3.8%</td><td class="n">$1.74</td><td class="n">7</td></tr>
+          <tr><td>implementation (Opus)</td><td class="n">12</td><td class="n">4.1%</td><td class="n">$18.72</td><td class="n">57</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="measure">
+      <p>The evidence behind the routing: Sonnet implementations passed review first time in 84% of 115 cases at a quarter of Opus's median cost, and terminal failures are rare on every kind. The proposal's whole saving is effort, not model: three effort reductions (research, review, close-out) touch a third of worker spend and would save roughly 10–15% if published curves hold. Nothing has been changed yet.</p>
+      <div class="callout">
+        <p><strong>The capacity model in one sentence.</strong> The fleet runs on one prepaid subscription that buys thirty to sixty-five times its price in list-rate compute when the week has headroom; two of four measured weeks hit the cap, and the essay "The Cheap Ships" (5 September) sets out five levers, in compounding order, for running at full capacity and eventually stepping off the subscription: an observer that does not think, a generated wiki instead of a research phase, a cheaper implementer (Dash), routing that keeps judgement expensive on purpose, and context discipline.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="health">
+    <h2><span class="glyph">├─</span>What the project's own studies say</h2>
+    <div class="measure">
+      <p>Harbour measures itself. Seven papers landed between 5 and 12 September, each answering one question about the process from the tracker's own data. Read together they describe a system whose gates work but whose exhaust is piling up.</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Question</th><th>Finding</th><th>What it means for a PM</th></tr></thead>
+        <tbody>
+          <tr><td>Why does a plan go round plan-review more than once?</td><td>83 of 94 plans were sent back; 33 went round twice or more. Every send-back asked for one more member of a list the plan had already built, never a different design. The loops cost a third of all session time.</td><td>The plan gate is a list-completeness gate, not a design gate. The rule changed on 12 September to "argue the class, not the member"; the re-measurement is queued for 26 September.</td></tr>
+          <tr><td>How do tasks generate tasks?</td><td>2.1 tickets created per one closed over sixty days, above 1.3 every week. A generated ticket that is worked produces 1.12 more. Half of all filings are never worked; close-out follow-ups and review findings are 63% of that pile.</td><td>Intake outruns closure by design of the pipeline itself. Backlog growth is a process property, not a demand signal.</td></tr>
+          <tr><td>Does the system run out of tasks?</td><td>Collapsing breakdown trees to one unit, each unit causes 0.74 further units. Three in four cause none; a unit that reaches Done causes 1.52. A tenth of units carry 73% of all causation.</td><td>Worked work is above replacement. The population number sits under one only because most filings are never touched.</td></tr>
+          <tr><td>What is in the never-worked pile?</td><td>Of 40 filings read by hand, 34 are still true at HEAD and 38 are actionable on their own. 23 of 40 are the parent ticket's own unfinished scope, filed next door.</td><td>The pile is real work in the wrong place, not stale noise. It cannot be closed by age.</td></tr>
+          <tr><td>Does a close-out say so when it files its own scope?</td><td>Always: 23 of 23 name the filing. But filing was the mechanism by which the ledger item discharged and the parent closed.</td><td>Led to John's 12 September ruling: an inside-scope item can no longer be discharged by filing a ticket.</td></tr>
+          <tr><td>Does the writing get longer faster than the ideas?</td><td>Yes, by about 1.6×. Reviews tripled in length in three months while findings doubled. CLAUDE.md grew 11.5× while its section count fell.</td><td>Reading cost is a real tax on the one human. The comprehension-debt review that should have caught it never fired.</td></tr>
+          <tr><td>What cost levers are already written down?</td><td>Thirty-seven, across five stages of a ticket's life. Most measured once, on one day; none measured past the gate that judges its output.</td><td>A map for choosing the next experiment, not a ranking. Cost work is rich in hypotheses and thin on controlled reads.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="direction">
+    <h2><span class="glyph">├─</span>Direction and the tensions inside it</h2>
+    <div class="measure">
+      <p>The north star, v2, is titled "the self-funding loop" and makes one economic claim with seven clauses behind it:</p>
+      <div class="callout quote"><p>Harbour completes verified backlog work at a cost and cadence a solo operator can sustain, funds itself doing it, and proves every word.</p></div>
+      <ul>
+        <li>Verified beats claimed: CI green, merged, ledger discharged.</li>
+        <li>Cost per verified task, visible and falling, in the money actually spent.</li>
+        <li>Operator minutes and sessions are the scarce resources; silent failures outrank feature work.</li>
+        <li>Gates buy evidence, never delay.</li>
+        <li>Finish transitions before starting capabilities; the longest blocked chain and oldest compat lane are standing priorities.</li>
+        <li>A stranger can trust it in one sitting; the free tier is a published line item.</li>
+        <li>Every claim reachable from its evidence; every contract legible in one screen.</li>
+      </ul>
+      <h3>The alignment reading, nine days old</h3>
+      <p>The roadmap report of 2 September scores the portfolio against that text. Its verdict, condensed: the operational core (evidence integrity, bounded runs, spend attribution, silent-failure work) is aligned. The drift it names is elective interface work: UX &amp; Theme, The Ship's Biscuit, the Ship Journey map, and Flight Companion expansion whose effect on operator minutes has not been demonstrated. Two unscorables sit underneath: "verified task" is still a proxy (the KPI counts terminal markers, not discharged ledgers, tracked as LIN-1878), and the first published forecast (LIN-1626) is unstarted while blocking six tasks.</p>
+      <p>The report ends with the question it wants the human to answer: <em>should supervised conversational control count as a north-star outcome in itself, or only when it demonstrably reduces operator minutes and sessions per verified task?</em> Nine days on, that question is still open, and the Flight Companion has had two passages since.</p>
+      <h3>The programmes on the board</h3>
+    </div>
+    <div class="tablewrap">
+      <table class="tight">
+        <thead><tr><th>Programme</th><th>Anchor</th><th>Shape</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Operating model path</td><td><span class="id">LIN-2569</span></td><td>19 tickets in five phases: an adaptation memo, secret scans and deploy witnesses, a declared invariants registry with a deterministic Measure job, an opt-in estate report, then sensors. Ranks the Linux dispatcher host above all of Phase 3.</td><td><span class="st st-todo">○</span>Phases 0–2 Todo, 3–4 Backlog; filed 9 Sep</td></tr>
+          <tr><td>Path P0–P4 (self-funding)</td><td><span class="id">LIN-1625</span>…<span class="id">LIN-1652</span></td><td>30 tickets from cost-per-verified-task through forecasting, threat model, public projection, hosted tenancy with a ring-fenced free tier, to governance and an AGPL release.</td><td><span class="st st-done">✓</span>P0.1 done; <span class="st st-todo">○</span>29 Todo</td></tr>
+          <tr><td>The Cheap Ships</td><td><span class="id">LIN-2686</span></td><td>Fold the five cost levers into the run. 8 open children.</td><td><span class="st st-todo">○</span>Todo, High</td></tr>
+          <tr><td>Linux dispatcher host</td><td><span class="id">LIN-1781</span> / <span class="id">LIN-1785</span> / <span class="id">LIN-2422</span></td><td>Run the runner headless under tmux, off the Mac. The tmux driver exists; provisioning is the blocked piece.</td><td><span class="st st-prog">◐</span>In Progress, one child Blocked</td></tr>
+          <tr><td>Flight Companion</td><td><span class="id">LIN-751</span></td><td>The observer chat, rung one of three. V1 shipped 5–10 Sep; polish passage awaits a yes; rungs two and three gated on John.</td><td><span class="st st-prog">◐</span>In Progress since July, 20 open children</td></tr>
+          <tr><td>Operator decision queue</td><td><span class="id">LIN-1721</span></td><td>The rulings inbox and its escalation lifecycle. 41 children, the largest single generator of new work on the board.</td><td><span class="st st-todo">○</span>Todo, 10 open children</td></tr>
+          <tr><td>Trivial onboarding</td><td><span class="id">LIN-614</span></td><td>Account → Connection → Workspace; add any number of sources from one connection. The path to "a stranger can trust it in one sitting".</td><td><span class="st st-todo">○</span>Todo, 2 children</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="risks">
+    <h2><span class="glyph">├─</span>Risks and headwinds on the record</h2>
+    <div class="measure"><p>Drawn from the last Recent Headwinds review (29 August), the Drift &amp; Coherence review (29 August), the incident file, and today's live reads. Severity is the reviews' own.</p></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Risk</th><th>Evidence</th><th>State today</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag hi">critical</span> The review layer's own cadence instrument is unreliable</td><td>10 of 15 periodicals read "never" on 29 August, including four whose reports had landed; the ledger keyed on a dispatch being taken, not on a report landing.</td><td>Partly fixed (LIN-2385). Live today: 7 of 15 due at 13–14 days, 8 still "never" in the 30-day window. The four never-run corrective reviews include security and dependency supply chain.</td></tr>
+          <tr><td><span class="tag hi">critical → fixed</span> The direction layer served the wrong north star</td><td>The proxy served v1 while the doc was v2; the alignment reading went stale, then empty.</td><td>Fixed. Today the reading is v2 and fresh at 9 days, with a doc-hash drift check (LIN-2254).</td></tr>
+          <tr><td><span class="tag hi">high</span> Single host, single operator</td><td>The runner lives on one Mac; the watcher deliberately does not relaunch a dead dispatcher (a merge to main is the only remote lever). The September incident set is "almost entirely the Mac host".</td><td>Open. The Linux host is In Progress with its provisioning child Blocked.</td></tr>
+          <tr><td><span class="tag hi">high</span> Fix-induced chain in the runner's wake/resume path</td><td>LIN-2297's root-cause fix did not bound its class; LIN-2331's own title says so. Seventeen stall/refire tickets in one week.</td><td>LIN-2331 still Backlog. The OpenCode "hold survives the runner dying" leg (B1 of the pending passage) is the next move on this surface.</td></tr>
+          <tr><td><span class="tag hi">high</span> Gate deferrals expiring unwatched</td><td>LIN-1661 and LIN-1873 carried "not before 25 August" in their titles and passed the date with no action and no fresh ruling.</td><td>LIN-1661 Todo, LIN-1873 Backlog. Nothing on the board watches a title-encoded date.</td></tr>
+          <tr><td><span class="tag hi">high</span> Cost figures on a hand-edited price table</td><td>Sonnet 5 introductory pricing ended 31 August; 36% of the window's spend rode on it; the pricing table has no expiry field.</td><td>Unverified whether the table was updated. Every cost figure in this brief inherits that uncertainty.</td></tr>
+          <tr><td><span class="tag md">medium</span> Latent import cycles</td><td>Three cycles among the KPI and budget modules, five more at the provider seam; all latent, none live. The provider-auth inversion has worsened four reviews running; its fix (LIN-675) sits in Backlog.</td><td>Open.</td></tr>
+          <tr><td><span class="tag md">medium</span> The agent lane on non-Linear backends was never exercised</td><td>The outward run on 28 August found five of thirteen natural agent reads return 500 on GitHub, and every generated prompt told the worker to update "Linear".</td><td>Two of eight findings Done, rest in Backlog.</td></tr>
+          <tr><td><span class="tag md">medium</span> No schedule signal at all</td><td>0 of 2,769 issues carry a due date. Every timeliness reading is flow health, never schedule health.</td><td>By design. Passages are the only dated commitments, and they are dated by ratification, not by landing.</td></tr>
+          <tr><td><span class="tag md">medium</span> Reading load on the one human</td><td>Reviews tripled in length; comment words per issue grew 3.6×; CLAUDE.md is 19,000 words.</td><td>Named in a paper; no corrective ticket found.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="measure">
+      <div class="callout risk">
+        <p><strong>The one incident file worth reading first.</strong> On 8–9 August every Linear call from the proxy returned 401 for twelve hours. No data was lost; three sessions detected it and parked cleanly. The root cause was never found, an amplifier was, and the fix was held unmerged pending evidence. It is a model of how this project writes incidents: times with their clock provenance, a corrections section, and a monitor named for what it could not prove. Whether that monitor ever fired is itself a Todo ticket (LIN-2577).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="next">
+    <h2><span class="glyph">├─</span>What a PM would put on this week's list</h2>
+    <div class="measure">
+      <p>These follow from the evidence above and respect the line the project draws: a PM here decides what is worth doing and what counts as done, and leaves the how to the loop. Each is one decision, most of them John's.</p>
+      <ol>
+        <li><strong>Answer the ratification waiting on LIN-2730.</strong> One "yes" as a comment. If the week's budget is the constraint (60% used, exhausting Monday at current burn, reset Thursday 06:00 UTC), ratify the trim-safe minimum only: legs A2 and B1.</li>
+        <li><strong>Answer the roadmap report's open question.</strong> Whether supervised conversational control is a north-star outcome in itself decides whether the next three Flight Companion passages are core work or drift. Deciding it once is cheaper than re-deciding it per passage.</li>
+        <li><strong>Drain or retire the periodicals.</strong> Seven are due. Eight have no run in thirty days, four of them corrective (test-coverage gap, security, API quality, dependency supply chain). A weekly cadence nobody meets is a false instrument; either run the reserved maintenance leg the passage template already provides, or cut the registry to the cadence the budget can carry.</li>
+        <li><strong>Start LIN-1626, the first published forecast.</strong> The alignment reading calls it the unstarted bottleneck blocking six tasks, and "every cycle forecasts the next and scores the last" is a north-star clause with no evidence behind it yet.</li>
+        <li><strong>Adopt or reject the effort-routing proposal.</strong> Three effort reductions, a claimed 10–15% of worker spend, no data of its own because every stamped run so far was at the same effort. The proposal asks for a five-minute check first: confirm what effort the host actually defaults to.</li>
+        <li><strong>Rule on the two expired deferrals.</strong> LIN-1661 and LIN-1873: run the follow-on-ratio read now, or extend the date with a stated reason. Either closes a ledger row that has been silently wrong for three weeks.</li>
+        <li><strong>Sweep the residue pile once, by policy.</strong> 519 open tickets are review residue or follow-ups, most of them the parent's own scope filed next door. The 12 September ruling stops new ones forming; it does nothing for the pile. A single triage rule (reattach to the parent, schedule, or cancel with a reason) applied by an agent in one lane would be cheaper than letting each one age.</li>
+        <li><strong>Move the three Urgent tickets out of Backlog</strong>, either into a passage or down a priority. An Urgent ticket that is not scheduled is a label, not a priority.</li>
+        <li><strong>Get the Linux host over the line.</strong> The operating-model hub already ranks it above everything in its own Phase 3; the blocked child (LIN-2422) needs a human to unblock, not another session.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="where">
+    <h2><span class="glyph">└─</span>Where to look, and how this was read</h2>
+    <div class="two">
+      <div>
+        <h3>Surfaces for a PM</h3>
+        <ul>
+          <li><strong>Observation</strong> (<code>/workspace/:key/observation</code>): every agent session, live, with a Rulings tab for decisions waiting on you.</li>
+          <li><strong>/kpis</strong>: the public instance dashboard; the budget gauge and cost-per-task card live here.</li>
+          <li><strong>Roadmap</strong>: the narrative report and north-star alignment reading, regenerated on demand.</li>
+          <li><strong>Flight Companion</strong>: the observer chat, behind a per-user flag.</li>
+          <li><strong>docs/reviews/</strong>: 42 review reports; start with the latest Recent Headwinds, which carries a mechanical trend ledger.</li>
+          <li><strong>docs/papers/</strong>: the seven studies and the queue of thirteen proposed questions.</li>
+          <li><strong>docs/north-star.md</strong>, <strong>docs/charter/charter.md</strong>, <strong>docs/escalation-philosophy.md</strong>: the normative layer.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>API reads an agent can make for you</h3>
+        <ul>
+          <li><code>/stack?view=digest</code>: the ranked frontier with why each item ranks where it does.</li>
+          <li><code>/north-star</code>: the live intent plus the freshness-gated alignment reading.</li>
+          <li><code>/periodicals</code>: which weekly reviews are due, recent, or never ran.</li>
+          <li><code>/rulings</code>: every unanswered decision, with the option to propose an answer (never take it).</li>
+          <li><code>/issues/{id}/cost</code>: dollar cost of one ticket, refusing to total partial data.</li>
+          <li><code>/issues/{id}/brief</code>: a present-tense distillation of a ticket that supersedes stale wording.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="measure">
+      <h3>Method and limits</h3>
+      <p>Counts by state, project, priority and label were computed from all 2,769 issues paged over the proxy today. Passage and epic detail came from the same API. Throughput, cost breakdowns and risk severities are quoted from the project's own reviews and papers at the checked-out HEAD, and each is dated in the text so you can judge its age.</p>
+      <p>What this brief could not see: the issue list carries no creation dates, so ticket ages here are the reviews' numbers, not mine; the repository checkout was shallow, so commit velocity is quoted rather than recomputed; the KPI page aggregates all eight workspaces on the host; and cost figures are API-equivalent list rates on a subscription, so the cash cost is lower and the "verified" in cost per verified task is still, by the project's own admission, a proxy.</p>
+    </div>
+    <p class="foot">Harbour Archive · document 6 · filed 2026-09-12 · read scope, every call audit-logged · served verbatim from docs/archive/6.html</p>
+  </section>
+</div>
+
+<div class="tip" id="tip" role="tooltip"></div>
+<script>
+  (function () {
+    var tip = document.getElementById('tip');
+    var segs = document.querySelectorAll('.seg[data-tip]');
+    function show(e) {
+      tip.textContent = e.currentTarget.getAttribute('data-tip');
+      tip.style.display = 'block';
+      move(e);
+    }
+    function move(e) {
+      var x = (e.clientX || 0) + 12, y = (e.clientY || 0) + 14;
+      var w = tip.offsetWidth, h = tip.offsetHeight;
+      if (x + w > window.innerWidth - 8) x = e.clientX - w - 12;
+      if (y + h > window.innerHeight - 8) y = e.clientY - h - 12;
+      tip.style.left = x + 'px';
+      tip.style.top = y + 'px';
+    }
+    function hide() { tip.style.display = 'none'; }
+    Array.prototype.forEach.call(segs, function (s) {
+      s.setAttribute('tabindex', '0');
+      s.setAttribute('aria-label', s.getAttribute('data-tip'));
+      s.addEventListener('mouseenter', show);
+      s.addEventListener('mousemove', move);
+      s.addEventListener('mouseleave', hide);
+      s.addEventListener('focus', function (e) {
+        var r = s.getBoundingClientRect();
+        show({ currentTarget: s, clientX: r.left + r.width / 2, clientY: r.top });
+      });
+      s.addEventListener('blur', hide);
+    });
+  })();
+</script>
+
+</body>
+</html>
