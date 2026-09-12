@@ -495,6 +495,33 @@
 .obs-ruling-bulk-agree:hover { background: color-mix(in srgb, var(--green) 22%, transparent); }
 .obs-ruling-bulk-agree:disabled { opacity: 0.5; cursor: default; }
 
+/* LIN-2758: batch progress, above the bar (mirrors .obs-due-progress,
+   :1294 below — same machine-fact typographic convention: a per-row count
+   is a machine fact, not prose). Plain text node, no animation, so no
+   prefers-reduced-motion carve-out is needed. */
+.obs-ruling-bulk-progress {
+  font-family: var(--font-structural);
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+}
+/* Stop mirrors .obs-ruling-shelve's amber caution treatment (:409 above) --
+   both halt/pause an otherwise-destructive-reaching action mid-flight,
+   distinct from the green "commit" affordance .obs-ruling-bulk-agree
+   carries. */
+.obs-ruling-bulk-stop {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.6rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.obs-ruling-bulk-stop:hover { background: color-mix(in srgb, var(--amber) 22%, transparent); }
+.obs-ruling-bulk-stop[hidden] { display: none; }
+
 /* Same 44px-ladder tap-target bump Agree/Keep get above (`.detail-toggle`'s
    convention, public/style.css) — it is a real tappable action button, same
    as they are. The select-all affordance needs no bump of its own: it is a
@@ -503,6 +530,9 @@
    shape `.obs-bulk-scan-select-all` (Scan-due) relies on. */
 @media (max-width: 640px) {
   .obs-ruling-bulk-agree {
+    padding: 0.5rem 0.7rem;
+  }
+  .obs-ruling-bulk-stop {
     padding: 0.5rem 0.7rem;
   }
 }
