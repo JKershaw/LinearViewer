@@ -306,6 +306,13 @@ export function createRulingsRoutes({
           logEvent(req, '/api/proxy/rulings/suggest-dismissal', 500);
           return jsonError(res, 500, 'Failed to record the suggestion');
         }
+        // LIN-2755: uniform invalidation on every ruling write — suggest-
+        // dismissal only ever writes to dismissalSuggestionsStore, which is
+        // read live (not cached), so this is defensive/uniform rather than
+        // fixing an observable staleness bug. Guarded like the GET read
+        // above: a null sessionsFeedCache means this deployment runs
+        // uncached, so there is nothing to invalidate.
+        if (sessionsFeedCache) sessionsFeedCache.clear(req.proxyUrlKey);
         logEvent(req, '/api/proxy/rulings/suggest-dismissal', 201);
         res.status(201).json({
           success: true,
@@ -414,6 +421,8 @@ export function createRulingsRoutes({
           logEvent(req, routeLabel, 500);
           return jsonError(res, 500, 'Failed to record the suggestion');
         }
+        // LIN-2755: uniform invalidation, same reasoning as suggest-dismissal above.
+        if (sessionsFeedCache) sessionsFeedCache.clear(req.proxyUrlKey);
         logEvent(req, routeLabel, 201);
         res.status(201).json({
           success: true,
