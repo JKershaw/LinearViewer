@@ -279,10 +279,11 @@ const dueSelectedIds = new Set();
 // `dueLoadedItems` mirrors exactly what is currently painted in
 // `#obs-due-list` (loaded-rows-only, §B.2) — replaced wholesale on a full
 // repaint (loadInitialDueCheckPage's `paintDuePage(..., {append:false})`
-// call), concatenated on load-more. It exists so "select all loaded" and the
-// tri-state sync can iterate the loaded population without a DOM query
-// (rows are string-rendered, not held as real elements) and so pruning a
-// vanished row is a simple Set-membership check rather than a DOM diff.
+// call), concatenated on load-more. It exists so select-all (LIN-2760:
+// due + unknown rows only) and the tri-state sync can iterate the loaded
+// population without a DOM query (rows are string-rendered, not held as
+// real elements) and so pruning a vanished row is a simple Set-membership
+// check rather than a DOM diff.
 let dueLoadedItems = [];
 
 // Live data + view state preserved across polls.
@@ -3710,8 +3711,20 @@ function syncDueBulkBar() {
   const selectedCount = dueSelectedIds.size;
   if (bar) bar.hidden = total === 0;
   if (selectAll) {
-    selectAll.checked = total > 0 && selectedCount === total;
-    selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+    // LIN-2760: the select-all tri-state is keyed on the select-all-coverable
+    // population (due + unknown), mirroring syncRulingsBulkBar's own
+    // selectable-keyed tri-state — the control's named outcome is "select all
+    // due + unknown", so checked means exactly "every due+unknown loaded row
+    // is selected": a not-due/errored row beside them neither satisfies nor
+    // defeats it. Without this the checkbox would snap back unchecked the
+    // moment a skipped row exists on screen, even though the click did
+    // exactly what its label says. (The bar's own visibility above stays
+    // keyed on ALL loaded rows — a not-due/errored row is still hand-pickable
+    // and the Scan-selected run control must stay reachable for it.)
+    const coverable = dueSelectableItems();
+    const coverableSelected = coverable.filter((item) => dueSelectedIds.has(String(item.issueId))).length;
+    selectAll.checked = coverable.length > 0 && coverableSelected === coverable.length;
+    selectAll.indeterminate = coverableSelected > 0 && coverableSelected < coverable.length;
   }
   if (countEl) countEl.textContent = dueSelectedCountText();
   if (estimateEl) estimateEl.textContent = formatDueScanCostEstimate(observationData?.scanCostEstimate, selectedCount);
@@ -3774,15 +3787,38 @@ function toggleDueSelection(id, checked) {
   syncDueBulkBar();
 }
 
+// LIN-2760 (John's ruling on LIN-2241 F3, decision `lin2241-f3-selectall`):
+// the select-all-coverable population — loaded rows whose due status is due
+// or unknown. Not-due rows (`dueStatus === false`) are unchanged by
+// definition and errored rows (`error: true`) must not be re-billed blindly
+// — each selected row costs one billable LLM scan — so select-all skips
+// both. Unknown rows stay covered so day one is preserved: on day one every
+// previously-scanned task reads unknown until rescanned once, so a strict
+// due-only rule would select nothing on first use. Same classification
+// discipline as dueStatusCopy (`error` first, only an exact `false` is
+// not-due, any non-boolean dueStatus is unknown). Recomputed fresh on every
+// call — the `rulingsSelectableKeys` discipline, same file — rather than
+// cached, so it can never desync from `dueLoadedItems`. This bounds only
+// the select-all CONTROL; the per-row checkbox stays free, so an operator
+// can still hand-pick a not-due or errored row via toggleDueSelection.
+function dueSelectableItems() {
+  return dueLoadedItems.filter((item) => !item?.error && item?.dueStatus !== false);
+}
+
 // LIN-2706 §B.3: select-all-loaded, same extraction rationale as
 // toggleDueSelection above. "Select all loaded" iterates ONLY the rows
 // currently painted — never an implicit all-pages semantic (§B.2);
-// dueLoadedItems is exactly that population.
+// dueLoadedItems is exactly that population. LIN-2760 scopes CHECKING to
+// dueSelectableItems() (due + unknown only); UNCHECKING still clears every
+// loaded row, hand-picked ones included — the pre-LIN-2760 uncheck
+// semantics, unchanged by the ruling, because "off" means none of the
+// loaded rows.
 function setAllDueSelected(checked) {
-  dueLoadedItems.forEach((item) => {
-    if (checked) dueSelectedIds.add(String(item.issueId));
-    else dueSelectedIds.delete(String(item.issueId));
-  });
+  if (checked) {
+    for (const item of dueSelectableItems()) dueSelectedIds.add(String(item.issueId));
+  } else {
+    dueLoadedItems.forEach((item) => dueSelectedIds.delete(String(item.issueId)));
+  }
   repaintDueRows();
   syncDueBulkBar();
 }
@@ -4477,6 +4513,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // startBulkScan/stopBulkScan below, so the delegated-listener bodies are
     // directly callable without simulating a DOM click event.
     dueSelectedIds, toggleDueSelection, setAllDueSelected, syncDueBulkBar, repaintDueRows,
+    // LIN-2760: the select-all-coverable population (due + unknown) — exposed
+    // so the ruling's four-status boundary is directly unit-testable, the
+    // same seam `rulingsSelectableKeys` already opens for the rulings tab.
+    dueSelectableItems,
     // LIN-2701 §B.7: the run control's own entry point, extracted like
     // toggleDueSelection/setAllDueSelected above, so a test can drive a run
     // directly without simulating a DOM click.

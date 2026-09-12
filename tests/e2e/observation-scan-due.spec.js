@@ -93,7 +93,9 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     await page.locator('#obs-due-select-all').check();
     await expect(bar).toBeVisible();
     await expect(bar).toHaveCSS('display', 'flex');
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('3 selected (exact)');
+    // LIN-2760: the not-due row (issue-2, dueStatus: false) is skipped by
+    // select-all, so the count reflects the two due rows only.
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
 
     // Review finding 3 / N2 (LIN-2706 PR #1424) — the STYLING witness. The
     // fix for finding 3 (the count/estimate/refusal/quota-note rendering as
@@ -224,6 +226,47 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // LIN-2701 §B.7: the control now exists on both tiers — it is not
     // itself free-tier-gated; only the quota disclosure above is.
     await expect(page.locator('#obs-due-scan-selected')).toBeVisible();
+  });
+
+  // LIN-2760 (John's ruling on LIN-2241 F3): select-all covers due + unknown
+  // and skips not-due and errored rows — each selected row costs one
+  // billable LLM scan, not-due rows are unchanged by definition, and errored
+  // rows must not be re-billed blindly. Day one is preserved (unknown rows
+  // are still selected). The per-row checkbox stays free: a hand-picked
+  // not-due row remains selectable.
+  test('select-all on a mixed four-status list leaves not-due and errored unchecked, and a hand-pick still works', async ({ page }) => {
+    await page.route(SCAN_DUE_ROUTE, (route) => route.fulfill({
+      json: {
+        items: [
+          { issueId: 'issue-due', issueIdentifier: 'LIN-1', dueStatus: true },
+          { issueId: 'issue-unknown', issueIdentifier: 'LIN-2', dueStatus: null },
+          { issueId: 'issue-not-due', issueIdentifier: 'LIN-3', dueStatus: false },
+          { issueId: 'issue-errored', issueIdentifier: 'LIN-4', dueStatus: null, error: true },
+        ],
+        nextCursor: null,
+        pageCandidateCount: 4,
+        totalCandidateCount: 4,
+      },
+    }));
+    await openDueTab(page);
+    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(4);
+
+    // LIN-2757: the control names its outcome — the label (and so the
+    // checkbox's accessible name) says what it selects.
+    await expect(page.getByRole('checkbox', { name: 'select all due + unknown' })).toBeVisible();
+
+    await page.locator('#obs-due-select-all').check();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
+    await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-2' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-3' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-4' })).not.toBeChecked();
+
+    // A hand-pick still works: the per-row checkbox stays free, so an
+    // operator can still select a not-due row by hand.
+    await page.getByRole('checkbox', { name: 'select LIN-3' }).check();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('3 selected (exact)');
+    await expect(page.getByRole('checkbox', { name: 'select LIN-3' })).toBeChecked();
   });
 
   // Review N3 (LIN-2706 PR #1424): the per-row checkbox's accessible name,
