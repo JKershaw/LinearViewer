@@ -9,22 +9,22 @@ cites: [docs/papers/archive-proposal.md, lib/plan-review-round-trips.js, lib/eff
 # Why does a plan go round plan-review more than once?
 
 Because the gate is not judging the design. Over 30 days it approved a plan on first
-pass **11.7% of the time** (11 of 94), and every send-back below asks for one more
+pass **11.7%** of the time (11 of 94), and every send-back below asks for one more
 member in an enumeration the plan already built. Loops cost **31.2% of session time and
 38.3% of dollars**; resuming the original session recovers about **1%**.
 
 ## Findings
 
 **The split.** Over 329 window-closing tickets with dispatch lineage (1,994 sessions):
-first pass 452.5 h / $5,863.83, gate legs 132.4 h / $2,822.91, re-pass legs 72.2 h /
-$818.36 — **68.9 / 20.2 / 11.0** by time, **61.7 / 29.7 / 8.6** by cost. Session time
-totals 657.2 h against 2,455.3 h wall-clock (3.74×), and orchestration kinds add a
-further 950.6 h / $3,202.82 that is neither pass nor gate.
+first pass 452.5 h / $5,863.83, gate 132.4 h / $2,822.91, re-pass 72.2 h / $818.36 —
+**68.9 / 20.2 / 11.0** by time, **61.7 / 29.7 / 8.6** by cost. Session time totals 657.2
+h against 2,455.3 h wall-clock (3.74×), and orchestration kinds add 950.6 h / $3,202.82
+that is neither pass nor gate.
 
 **The plan gate loops; review mostly does not.** Of 94 tickets reaching plan-review, 83
 (88%) were sent back at least once and **33 (35%) went round twice or more**; one went
-five. Of 247 reaching review, 51 (21%) went round once and 9 (4%) more. Send-backs per
-ticket: 1.34 vs 0.26.
+five. Of 247 reaching review, 53 (21%) were sent back, only 9 (4%) twice or more.
+Send-backs per ticket, 1.34 vs 0.26.
 
 **What the send-backs ask for.** Vocabulary, fixed before reading: `sweep-short` (its
 enumeration misses a member), `sibling-unreconciled` (it ignores work landed under the
@@ -45,20 +45,20 @@ send-back on the proposal's three named tickets.
 | 2754 · plan · 4 | "still **one call site short** on the `resumable` branch" | sweep-short | in research |
 
 Four of eight are `sweep-short`. **None asked for a different design** — two verdicts
-say so ("nothing here asks for a redesign"; "Neither touches the architecture"). **None
-was unknowable before code.** The window's two worst loops corroborate: LIN-2641 took
-five rounds, the last conceding "**J1 is a fourth same-class finding**"; LIN-2437 took
-three, the third "not a repeat of RC#1/RC#2's class". All three closed by human ruling,
-not approval; LIN-2754 never reached implementation.
+volunteer as much (LIN-2437: "nothing here asks for a redesign"; LIN-2641: "Neither
+touches the architecture"). **None was unknowable before code.** The window's two worst
+loops agree: LIN-2641 took five rounds, the last conceding "**J1 is a fourth same-class
+finding**"; LIN-2437 took three, the third "not a repeat of RC#1/RC#2's class". All
+three ended by ruling, not approval; LIN-2754 never reached implementation.
 
 **What a resume would save.** The 108 implementation re-pass legs cost 49.2 h / $497.11.
-Timing each from dispatch to its first mutating tool call — a ceiling: part of that
-prefix is real diagnosis — gives **6.1–10.9 h and $69–$134**, a median 12.7% of a leg;
-16 legs also paid an `[onboarding]` bootstrap step averaging 6.6 min (1.76 h) that a
-resume removes outright. It could land: the median gap to the predecessor's end is 19
-min — **88% inside the 1 h in-session hold** (`FOLLOWUP_HOLD_MS`), 96% inside the 6 h
-record retention (`REAP_INACTIVITY_MS`). Retention does not bind; the brief's "about an
-hour" is that hold, not the reap. The loop, not the re-grounding, is the expense.
+Timing each from dispatch to its first mutating tool call (103 of 108) — a ceiling: part
+of that prefix is real diagnosis — gives **6.1–10.9 h and $69–$134**, a median 12.7% of
+a leg; 16 legs also paid an `[onboarding]` bootstrap step averaging 6.6 min (1.76 h)
+that a resume removes outright. It could land: the median gap to the predecessor's end
+is 19 min — **88% inside the 1 h in-session hold** (`FOLLOWUP_HOLD_MS`), 96% inside the
+6 h record retention (`REAP_INACTIVITY_MS`). Retention does not bind; the brief's "about
+an hour" is that hold, not the reap. The loop, not the re-grounding, is the expense.
 
 **One instrument is refuted.** `lib/plan-review-round-trips.js` pins "the endpoint is
 censored at one revision cycle by the templates themselves", so "the observable shape is
@@ -72,11 +72,11 @@ reads a verdict past its token, so neither can say *what* was asked.
 
 The verdict reader is a heading-anchored regex, hand-checked against 137 comments on
 five tickets read end-to-end: 26 verdicts, no disagreements. But the module's own limit
-1 warns that about a third of `/verdict/i` comments restate an earlier verdict, and a
-looser anchor inflated plan-review send-backs from 126 to 160 — treat counts as ±10%.
+1 warns that a third of `/verdict/i` comments restate an earlier verdict, and a looser
+anchor inflated plan-review send-backs from 126 to 160; treat counts as ±10%.
 
 The research axis is weakest: three of the eight are internal defects in the plan's own
-text, where "was it in the research" is not well formed. Coding them `absent` flatters
+text, where "was it in the research" is not well formed; coding them `absent` flatters
 the research pass, not the plan.
 
 The population is a census of identifiers ≥ LIN-1700 plus a 1-in-5 sample below. 81 of
@@ -85,9 +85,8 @@ The population is a census of identifiers ≥ LIN-1700 plus a 1-in-5 sample belo
 `completedAt`, were dated by their last comment; 49 legs report no duration.
 
 Nothing measures whether the loops are worth it: a gate that sends back 88% of plans and
-finds a real missing member each time may be the cheapest part of this pipeline, and
-these queries cannot tell that from ceremony.
-
+finds a real missing member each time may be the cheapest part of this pipeline; these
+queries cannot tell that from ceremony.
 
 ```sh
 B="$HARBOUR_LOCAL_BASE/api/proxy"   # sleep 1.05 between calls; proxy caps at 60/min
