@@ -2130,6 +2130,80 @@ a.wordmark:hover {
   border-color: var(--border-strong);
 }
 
+/* Repo picker (LIN-2820) — a radio-row list inside the shared .login-container
+   shell. Deliberately its OWN classes: .github-repo-form/.github-repo-select
+   are shared, unstyled hooks reused by five other renderers (GitHub Projects
+   board picker, Jira PAT, Jira site picker, merge-confirm, OpenRouter consent)
+   — styling those here would leak into all five. Left-aligned locally
+   (overriding .login-container's centered text) without touching the shared
+   rule itself, since other login-styled pages still rely on it being centered.
+   Semantic tokens only, so it is dark-safe under .theme-dark with no new
+   custom properties. */
+.repo-picker-list {
+  text-align: left;
+  margin: var(--space-3) 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+}
+
+.repo-picker-group + .repo-picker-group {
+  margin-top: var(--space-3);
+}
+
+.repo-picker-group-heading {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+}
+
+.repo-picker-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6ch;
+  padding: 0.35rem 0;
+  cursor: pointer;
+}
+
+.repo-picker-slug {
+  font-family: var(--font-structural);  /* machine fact — mono, per the LIN-785 split */
+  color: var(--fg);
+}
+
+.repo-picker-add-link {
+  display: block;
+  margin: 0.5rem 0;
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  color: var(--brand);
+}
+
+.repo-picker-add-link:hover {
+  text-decoration: underline;
+}
+
+.repo-picker-filter {
+  display: block;
+  width: 100%;
+  max-width: 40ch;
+  margin: var(--space-2) 0;
+  padding: 0.4rem 0.6rem;
+  font-family: var(--font-content);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.repo-picker-truncated-note {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85em;
+  color: var(--amber-dim);
+}
+
 /* Local-workspace CTA — secondary action below the Linear login button.
    No Linear account required; backed by the local provider (LIN-377). */
 .local-workspace-cta {

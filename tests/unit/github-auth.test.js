@@ -518,6 +518,20 @@ describe('GitHub auth routes', () => {
     assert.match(res.body, /github-repo-form/);
   });
 
+  // LIN-2820: the fresh-install path's rows (provider.listRepos) carry no
+  // installationId of their own — the id only reaches the renderer if the
+  // route wires it through from `pending.installationId` (already in scope
+  // from the query's `installation_id`). Closes the gap the LIN-2820 research
+  // flagged: this path was otherwise unproven end-to-end.
+  test('GET callback (install path) threads installationId into the rendered picker (LIN-2820)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+    await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
+    assert.match(res.body, /https:\/\/github\.com\/settings\/installations\/99/);
+  });
+
   test('GET callback (add-source) carries the viewed-workspace urlKey from intent into pending', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');

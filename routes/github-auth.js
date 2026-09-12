@@ -53,6 +53,10 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
     // signed-in "+ GitHub Issues" click must mint a fresh container per
     // invocation rather than reusing the per-account `github:<userId>` one.
     supportsFreshContainer: true,
+    // LIN-2820: the repo picker's subtitle now names the signed-in identity on
+    // the re-bind path too (previously install-only) — opt in here, not on the
+    // shared descriptor, since the Projects picker must stay byte-identical.
+    passLoginOnRebind: true,
 
     bodyField: 'repo',
     slugRegex: REPO_SLUG_REGEX,

@@ -66,7 +66,7 @@ describe('renderGitHubProjectSelectPage (LIN-560 Session 2)', () => {
   });
 });
 
-describe('renderGitHubRepoSelectPage (LIN-541)', () => {
+describe('renderGitHubRepoSelectPage (LIN-541, radio-list layout LIN-2820)', () => {
   const repos = [
     { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false },
     { slug: 'octocat/secret', name: 'octocat/secret', private: true },
@@ -76,7 +76,8 @@ describe('renderGitHubRepoSelectPage (LIN-541)', () => {
     const html = renderGitHubRepoSelectPage(repos, { mode: 'new', login: 'octocat' });
     assert.match(html, /action="\/auth\/github\/link"/);
     assert.match(html, /data-testid="github-repo-select"/);
-    assert.match(html, /<option value="octocat\/hello-world">/);
+    // Radio-list row (LIN-2820) replaces the old <select>/<option> markup.
+    assert.match(html, /<input type="radio" name="repo" value="octocat\/hello-world" required>/);
     // private repos are annotated
     assert.match(html, /octocat\/secret \(private\)/);
     // signed-in identity surfaced
@@ -88,40 +89,68 @@ describe('renderGitHubRepoSelectPage (LIN-541)', () => {
     assert.match(html, /Add a GitHub repository/);
   });
 
-  test('shows a no-repositories fallback (no form) for an empty account', () => {
+  test('shows a no-repositories fallback (no form) for an empty account, with the add-more link', () => {
     const html = renderGitHubRepoSelectPage([], { mode: 'new', login: 'octocat' });
     assert.match(html, /No repositories were found/);
     assert.doesNotMatch(html, /github-repo-form/);
+    assert.match(html, /class="repo-picker-add-link" href="\/auth\/github"/);
   });
 
-  test('escapes option values to prevent injection', () => {
+  test('empty state links straight to the installation settings page when an installationId is known', () => {
+    const html = renderGitHubRepoSelectPage([], { mode: 'new', installationId: '55' });
+    assert.match(html, /class="repo-picker-add-link" href="https:\/\/github\.com\/settings\/installations\/55"/);
+  });
+
+  test('escapes slug/name values to prevent injection', () => {
     const html = renderGitHubRepoSelectPage([{ slug: 'a/<b>', name: 'a/<b>' }], {});
     assert.doesNotMatch(html, /<b>/);
     assert.match(html, /&lt;b&gt;/);
   });
 
+  test('the posted field is still `repo`', () => {
+    const html = renderGitHubRepoSelectPage(repos, { mode: 'new' });
+    assert.match(html, /name="repo"/);
+    assert.doesNotMatch(html, /name="board"/);
+  });
+
   // Already-installed re-bind path (LIN-728): repos may carry an installationId.
-  test('keeps a flat option list (no optgroups) for a single installation', () => {
+  test('keeps a flat row list (no group headings) for a single installation, with its settings link', () => {
     const single = [
       { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' },
       { slug: 'octocat/secret', name: 'octocat/secret', private: true, installationId: '77' },
     ];
     const html = renderGitHubRepoSelectPage(single, { mode: 'new' });
-    assert.doesNotMatch(html, /<optgroup/);
-    assert.match(html, /<option value="octocat\/hello-world">/);
+    assert.doesNotMatch(html, /repo-picker-group-heading/);
+    assert.match(html, /<input type="radio" name="repo" value="octocat\/hello-world" required>/);
+    assert.match(html, /class="repo-picker-add-link" href="https:\/\/github\.com\/settings\/installations\/77"/);
   });
 
-  test('groups options by account when repos span more than one installation (LIN-728)', () => {
+  test('groups rows by installationId when repos span more than one installation (LIN-728/LIN-2820)', () => {
     const multi = [
       { slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' },
       { slug: 'acme/widgets', name: 'acme/widgets', private: false, installationId: '88' },
     ];
     const html = renderGitHubRepoSelectPage(multi, { mode: 'new' });
-    assert.match(html, /<optgroup label="octocat">/);
-    assert.match(html, /<optgroup label="acme">/);
+    assert.match(html, /<h3 class="repo-picker-group-heading">octocat<\/h3>/);
+    assert.match(html, /<h3 class="repo-picker-group-heading">acme<\/h3>/);
     // Still submits only the repo slug — server maps repo -> installation.
-    assert.match(html, /<option value="octocat\/hello-world">/);
-    assert.match(html, /<option value="acme\/widgets">/);
+    assert.match(html, /<input type="radio" name="repo" value="octocat\/hello-world" required>/);
+    assert.match(html, /<input type="radio" name="repo" value="acme\/widgets" required>/);
+    // One settings link per installation section.
+    assert.match(html, /href="https:\/\/github\.com\/settings\/installations\/77"/);
+    assert.match(html, /href="https:\/\/github\.com\/settings\/installations\/88"/);
+  });
+
+  test('filter input appears only once the list is longer than the pinned 8-row threshold', () => {
+    const eight = Array.from({ length: 8 }, (_, i) => ({ slug: `octocat/repo-${i}`, name: `octocat/repo-${i}` }));
+    const nine = Array.from({ length: 9 }, (_, i) => ({ slug: `octocat/repo-${i}`, name: `octocat/repo-${i}` }));
+    assert.doesNotMatch(renderGitHubRepoSelectPage(eight, {}), /data-testid="github-repo-filter"/);
+    assert.match(renderGitHubRepoSelectPage(nine, {}), /data-testid="github-repo-filter"/);
+  });
+
+  test('the truncation note renders only when the caller marks the list truncated', () => {
+    assert.doesNotMatch(renderGitHubRepoSelectPage(repos, { truncated: false }), /repo-picker-truncated-note/);
+    assert.match(renderGitHubRepoSelectPage(repos, { truncated: true }), /repo-picker-truncated-note/);
   });
 });
 
