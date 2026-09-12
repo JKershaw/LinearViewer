@@ -1136,7 +1136,7 @@ describe('__internal', () => {
 //
 // The module header used to claim the observable shape was "0-vs-1, not
 // 0-vs-2" (censored at one revision cycle by the templates' own "one
-// revision cycle is the bound" language). `docs/papers/review-loops.md`
+// revision cycle is the bound" language). `docs/papers/harbour/review-loops.md`
 // (LIN-2800) measured the real record and refuted it: 33 of 94 tickets went
 // round plan-review TWO OR MORE times. `countRoundTrips` and `walkR0`'s
 // sub-window walk were never actually capped at one — only the header's
@@ -1190,7 +1190,7 @@ describe('LIN-1871 — third-round counting (mutation-checked)', () => {
 // comparable boundary across two reads taken at different points in a
 // workspace's activity. `windowDays` restricts to issues with qualifying
 // pipeline activity in the last N days of `asOf`, matching
-// `docs/papers/review-loops.md`'s own 30-day split.
+// `docs/papers/harbour/review-loops.md`'s own 30-day split.
 describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)', () => {
   const inWindow = issue('in-window', {
     description: 'plan-review due: yes',

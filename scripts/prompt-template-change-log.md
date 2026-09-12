@@ -130,7 +130,7 @@ post-hoc explanation invented to fit the number.
 
 **`down`**, per John's own ruling on the ticket: "expected direction `down` on
 plan-review rounds per ticket." The reasoning, restated here so it can be
-judged: `docs/papers/review-loops.md` (LIN-2800) measured that the LIN-1873
+judged: `docs/papers/harbour/review-loops.md` (LIN-2800) measured that the LIN-1873
 row above did NOT deliver the loop-shortening effect its own recorded `down`
 predicted — 33 of 94 tickets still went round plan-review two or more times,
 and the send-back rule that change left in place still let a reviewer stop at
