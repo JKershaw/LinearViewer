@@ -14,6 +14,18 @@
 
 .effort-grid {
   margin-top: 0.75rem;
+  /* LIN-2830: the kind cards carry the (harness, model, effort) bake-off rows,
+     whose fixed tracks below sum to ~792px of content — they cannot fit the
+     220px-min cells `.kpi-grid`'s auto-fit hands out (a card measures ~263px
+     at a 1440px viewport with four kind cards), and fixed grid tracks do not
+     shrink. This override (later in the cascade than escalation-kpis.css, by
+     the page's own stylesheet order) raises the card floor to 52rem — the
+     792px of tracks + the card's own 2rem of padding, plus a sliver for the
+     coverage column — so at desktop widths the rows table is fully laid out
+     inside the card with every column visible at rest. `min(100%, 52rem)`
+     keeps the card from overflowing the grid on narrow viewports, where the
+     per-rows scroll container below takes over instead. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 52rem), 1fr));
 }
 
 .effort-card-row {
@@ -70,6 +82,18 @@
   margin-top: 0.4rem;
   display: grid;
   gap: 0.15rem;
+  /* The narrow-viewport fallback for the 52rem `.effort-grid` card floor
+     above: when the card cannot be 52rem wide (phones; the grid's
+     min(100%, …) leg), the fixed tracks in .effort-group-rows-head/row
+     below overflow this box — and because html/body carry a deliberate
+     site-wide `overflow-x: clip` (public/style.css, LIN-1068; `clip`, not
+     `auto`, so the ROOT never grows a scrollbar either), that overflow was
+     simply unreachable: the cost/duration columns painted out of reach.
+     Becoming its own scroll container makes the rows reachable at every
+     width WITHOUT touching the root clip (an inner scroll box is unaffected
+     by an ancestor's `clip`). Wide cards never scroll — when content fits,
+     scrollWidth == clientWidth and no scrollbar renders. */
+  overflow-x: auto;
 }
 .effort-group-rows-head {
   display: grid;
