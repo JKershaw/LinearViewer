@@ -2565,6 +2565,65 @@ describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)'
     assert.equal(progressEl.textContent, '2 applied.');
   });
 
+  // Review finding A (PR #1453, commit 91286e16): the all-succeeded branch
+  // printed `${total} applied.` — total, not ok — and two paths advanced the
+  // counter without ever producing a bucket, so a batch of 2 where only 1 was
+  // genuinely applied printed "2 applied." on the wrong-output tree. Both
+  // tests below pin `ok` against `total` directly, reproducing the review's
+  // own throwaway-probe finding before the fix, and must go red on that tree.
+  test('completion summary: a selected row that vanished before its turn tallies as skipped, not counted toward applied (review finding A)', async () => {
+    const { module, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
+    const {
+      renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey,
+      rulingsRowByKey, renderedRulingRows
+    } = module.exports;
+
+    const rows = ['d-ok1', 'd-vanish'].map((id) => suggestedRow({ decision: { decision_id: id } }));
+    renderRulings(rows);
+    const keys = rows.map((r) => rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id));
+    keys.forEach((k) => toggleRulingSelection(k, true));
+
+    // The 5s poll deletes a vanished row's entries mid-batch while `keys` is
+    // bulkAgreeSelected's own press-time snapshot — the key stays selected,
+    // but nothing is left to act on for it.
+    rulingsRowByKey.delete(keys[1]);
+    renderedRulingRows.delete(keys[1]);
+
+    await bulkAgreeSelected();
+
+    assert.equal(
+      progressEl.textContent,
+      '1 applied · 1 skipped · 0 failed (still selected).',
+      'only the row that actually ran may count toward "applied" — the wrong-output tree prints "2 applied." (total, not ok) here'
+    );
+  });
+
+  test('completion summary: a row that fails bulkAgreeRow\'s own top guard (already pending) tallies as skipped, not applied (review finding A)', async () => {
+    const { module, progressEl } = makeProgressSandbox({ api: async () => ({ success: true }) });
+    const { renderRulings, toggleRulingSelection, bulkAgreeSelected, rulingKey, rulingsPending } = module.exports;
+
+    const rows = ['d-ok2', 'd-pending'].map((id) => suggestedRow({ decision: { decision_id: id } }));
+    renderRulings(rows);
+    const keys = rows.map((r) => rulingKey('the-ruling-workspace', ANCHOR, r.decision.decision_id));
+    keys.forEach((k) => toggleRulingSelection(k, true));
+
+    // A human presses single-row Keep/Agree on the second row in another
+    // tab, already mid-flight when this batch reaches its turn — that drops
+    // row.suggestedDismissal or, as simulated here directly, leaves the key
+    // in rulingsPending — either way bulkAgreeRow's own top guard returns
+    // early, resolving `undefined` on the wrong-output tree instead of a
+    // real bucket.
+    rulingsPending.add(keys[1]);
+
+    await bulkAgreeSelected();
+
+    assert.equal(
+      progressEl.textContent,
+      '1 applied · 1 skipped · 0 failed (still selected).',
+      'bulkAgreeRow\'s top guard must resolve a real bucket ("skipped"), not undefined — the wrong-output tree prints "2 applied." for this exact 2-row batch where only 1 was genuinely applied'
+    );
+  });
+
   test('completion summary: a mixed batch names applied · skipped · failed (still selected), each tallied by its own bulkAgreeRow outcome', async () => {
     const { module, progressEl } = makeProgressSandbox({
       api: async (url, opts) => {

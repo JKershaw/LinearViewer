@@ -2753,7 +2753,7 @@ function renderRulingsBulkSummary({ ok, skipped, failed, stoppedAt, total, i }) 
   } else if (skipped || failed) {
     el.textContent = `${ok} applied · ${skipped} skipped · ${failed} failed (still selected).`;
   } else {
-    el.textContent = `${total} applied.`;
+    el.textContent = `${ok} applied.`;
   }
 }
 
@@ -2843,7 +2843,7 @@ function bulkAgreeRow(key, row, li) {
   // and this key's own turn in the sequential loop — re-check the suggestion
   // is still live rather than trusting the snapshot taken at confirm time.
   if (!key || !anchor?.workspaceUrlKey || !decisionId || !row?.suggestedDismissal || rulingsPending.has(key) || rulingsSettled.has(key)) {
-    return Promise.resolve();
+    return Promise.resolve('skipped');
   }
 
   const proposedOutcome = row.suggestedDismissal.proposedOutcome ?? 'dismissed';
@@ -2992,10 +2992,10 @@ async function bulkAgreeSelected() {
       // still selected.
       if (rulingsBulkStopRequested) break;
       i += 1;
+      updateRulingsBulkProgress(i, total);
       const row = rulingsRowByKey.get(key);
       const li = renderedRulingRows.get(key);
-      if (!row || !li) continue; // vanished since the press — nothing left to act on
-      updateRulingsBulkProgress(i, total);
+      if (!row || !li) { skipped += 1; continue; } // vanished since the press — nothing left to act on
       const outcome = await bulkAgreeRow(key, row, li);
       if (outcome === 'applied') ok += 1;
       else if (outcome === 'skipped') skipped += 1;
