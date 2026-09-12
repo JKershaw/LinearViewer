@@ -2415,16 +2415,16 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
 
 // ─── Bulk-agree progress / Stop / completion summary (LIN-2758) ────────────
 //
-// RED-FIRST witnesses, beat 1 of a stepped implementation run: none of this
-// mechanism exists yet at this HEAD (82e8b36b) — `rulingsBulkRunning`,
+// Written red-first, beat 1 of a stepped implementation run: none of this
+// mechanism existed yet at HEAD 82e8b36b — `rulingsBulkRunning`,
 // `rulingsBulkStopRequested`, `updateRulingsBulkProgress`,
 // `renderRulingsBulkSummary`, the `#obs-ruling-bulk-progress` node, and the
-// `#obs-ruling-bulk-stop` button are all beat 2's own additions. Every test
-// below is expected to fail against current HEAD; beat 2 implements the
-// mechanism these pin. `#obs-ruling-bulk-progress`/`#obs-ruling-bulk-stop`
+// `#obs-ruling-bulk-stop` button were all beat 2's own additions. Every test
+// below was confirmed failing against that HEAD before beat 2 implemented
+// the mechanism these pin. `#obs-ruling-bulk-progress`/`#obs-ruling-bulk-stop`
 // are provided here as FakeElement stubs (this harness never reads real
-// markup) mirroring the sibling `<p>`/`<button>` the plan's render change
-// adds to lib/render-observation.js.
+// markup) mirroring the sibling `<p>`/`<button>` lib/render-observation.js
+// now renders.
 describe('bulk-agree progress / Stop / completion summary (LIN-2758, red-first)', () => {
   function makeProgressSandbox({ api, confirm } = {}) {
     const list = new FakeElement('ul');
