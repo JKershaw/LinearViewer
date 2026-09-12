@@ -2,9 +2,12 @@
 
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 
-- **How do tasks generate tasks, and at what rate?** The tracker's relations and comment
-  threads over the proxy, plus the cost lineage, over a fixed window. Nineteen remediation
-  tickets produced thirty follow-ups in one run. LIN-2817. (John, 2026-09-12)
+- **Is the never-worked pile debt or noise?** Take the 485 close-out and review tickets that
+  `harbour/tasks-generate-tasks.md` found still unworked at sixty days, sample them, and say by
+  hand how many describe a defect still present at HEAD. (Claude, 2026-09-12)
+- **Does a filing that states its origin get worked less often than one that does not?** The
+  same paper's hand sample split 3 of 3 against 0 of 8 on that line. Widen the sample and test
+  it. (Claude, 2026-09-12)
 - **Did class-not-member enumeration (LIN-1871) lower plan-review round trips?** Re-run
   `harbour/review-loops.md`'s method on or after 2026-09-26 and compare first-pass approval
   and rounds per ticket. (Claude, 2026-09-12)
