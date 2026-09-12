@@ -527,6 +527,21 @@ describe('GitHub auth routes', () => {
     assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' });
   });
 
+  // LIN-2802 close-out F1: the callback carry from `intent.fresh` to
+  // `pending.fresh` (lib/github-install-flow.js:429, the install branch) was
+  // the feature's only load-bearing wire with zero test coverage — deleting it
+  // left the entire suite green. Mirrors the workspaceUrlKey carry test above,
+  // driving the callback directly with a signed-in-fresh intent rather than
+  // injecting `fresh` onto a link-handler fixture.
+  test('GET callback carries `intent.fresh` into pending as `pending.fresh` (LIN-2802)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', fresh: true } });
+    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    assert.strictEqual(session.githubPending.fresh, true);
+  });
+
   test('GET callback surfaces a clean 400 when the installation-token mint fails', async () => {
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
@@ -567,6 +582,18 @@ describe('GitHub auth routes', () => {
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
     await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
     assert.deepEqual(session.githubPending, { rebind: true, mode: 'add-source', repoInstallations: { 'octocat/hello-world': '77' }, workspaceUrlKey: 'acme' });
+  });
+
+  // LIN-2802 close-out F1: the same undischarged callback carry, re-bind
+  // branch (lib/github-install-flow.js:370). Mirrors the workspaceUrlKey
+  // carry test above for this branch.
+  test('GET callback (re-bind) carries `intent.fresh` into the rebind pending as `pending.fresh` (LIN-2802)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', fresh: true } });
+    await handler({ query: { code: 'oauth-code', state: 'real' }, session }, res);
+    assert.strictEqual(session.githubPending.fresh, true);
   });
 
   test('GET callback (re-bind) keeps the CSRF state guard (mismatched state rejected before code exchange)', async () => {

@@ -49,6 +49,10 @@ export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, a
     providerOkKey: 'github',
     pendingKey: 'githubPending',
     notConfiguredLead: 'GitHub login is not available.',
+    // LIN-2802: this descriptor has a switcher entry point (entryCta), so a
+    // signed-in "+ GitHub Issues" click must mint a fresh container per
+    // invocation rather than reusing the per-account `github:<userId>` one.
+    supportsFreshContainer: true,
 
     bodyField: 'repo',
     slugRegex: REPO_SLUG_REGEX,
