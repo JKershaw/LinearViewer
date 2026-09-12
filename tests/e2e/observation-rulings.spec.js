@@ -794,14 +794,40 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 });
 
 // LIN-2758 — the batch-progress/Stop/completion-summary mechanism end to
-// end, over 3 seeded suggested rows (per Acceptance). RED-FIRST: neither
-// `#obs-ruling-bulk-progress` nor `#obs-ruling-bulk-stop` exists in
-// lib/render-observation.js at this HEAD, so every assertion on them below
-// must fail until beat 2 lands. Per the plan's D4, `page.route` + an
-// artificial delay on the per-row dismiss endpoint is what makes the batch
-// slow enough to deterministically assert mid-batch progress without racing
-// a fast (real, in-memory, single-machine) batch.
-test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2e, red-first', () => {
+// end, over 3 seeded suggested rows (per Acceptance).
+//
+// Beat 3 correction: the plan's own D4 suggestion (a fixed artificial delay
+// via page.route, e.g. 300ms) turned out to be a genuine flakiness trap, not
+// just a slow-batch nicety — it races real wall-clock overhead (locator
+// resolution, IPC round-trips between test and browser) against a FIXED
+// per-row delay. At 300ms the intermediate "Applying 2 of 3…" state was
+// observed to be skipped entirely by Playwright's own polling; at 1200ms the
+// Stop test still occasionally let every row complete before the click
+// landed, because there is no guarantee about WHICH row is in flight when a
+// human-speed `stopBtn.click()` actually fires. Tuning the delay upward is
+// not a fix, only a smaller chance of the same race.
+//
+// Fixed by GATING each row's write behind an explicitly-released promise
+// instead of a fixed timer: `installGatedDismissRoute` intercepts the
+// per-row dismiss endpoint and holds each request open until the test calls
+// `release()` — turning "assert progress, then let this specific row
+// finish" into a fully deterministic step with no wall-clock race at all.
+function installGatedDismissRoute(page) {
+  let releaseCurrent;
+  let currentGate = new Promise((resolve) => { releaseCurrent = resolve; });
+  page.route('**/api/dashboard/rulings/dismiss', async (route) => {
+    await currentGate;
+    await route.continue();
+  });
+  return {
+    release() {
+      releaseCurrent();
+      currentGate = new Promise((resolve) => { releaseCurrent = resolve; });
+    }
+  };
+}
+
+test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2e', () => {
   test.beforeEach(async ({ page }) => {
     await clearRuns(page);
     await page.goto(`/test/clear-dismissal-suggestions?urlKey=${URL_KEY}`);
@@ -819,14 +845,7 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
   test('a full 3-row run shows mid-batch progress and ends with the all-applied summary; the bar re-enables', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await seedThreeSuggestedRows(page);
-
-    // D4: an artificial 300ms delay on the write each row makes, so the
-    // batch takes ~900ms total — long enough to deterministically observe
-    // each mid-batch progress state rather than racing a near-instant loop.
-    await page.route('**/api/dashboard/rulings/dismiss', async (route) => {
-      await new Promise((r) => setTimeout(r, 300));
-      await route.continue();
-    });
+    const { release } = installGatedDismissRoute(page);
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
@@ -839,24 +858,28 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
     await page.locator('#obs-ruling-agree-selected').click();
 
     const progress = page.locator('#obs-ruling-bulk-progress');
-    await expect(progress).toHaveText('Applying 1 of 3…', { timeout: 5000 });
-    await expect(progress).toHaveText('Applying 2 of 3…', { timeout: 5000 });
-    await expect(progress).toHaveText('Applying 3 of 3…', { timeout: 5000 });
+    await expect(progress).toHaveText('Applying 1 of 3…');
+    release();
+    await expect(progress).toHaveText('Applying 2 of 3…');
+    release();
+    await expect(progress).toHaveText('Applying 3 of 3…');
+    release();
 
-    await expect(progress).toHaveText('3 applied.', { timeout: 5000 });
+    await expect(progress).toHaveText('3 applied.');
     await expect(page.locator('#obs-ruling-bulk-bar')).toBeHidden();
     await expect(page.locator('#obs-ruling-select-all')).toBeEnabled();
-    await expect(page.locator('#obs-ruling-agree-selected')).toBeEnabled();
+    // agreeBtn is deliberately NOT asserted enabled here: a full successful
+    // run empties rulingsSelected (every row succeeded), and the button's
+    // own pre-existing, unrelated rule (`disabled: selectedCount === 0`)
+    // correctly keeps it disabled — nothing to do with the run-state flag.
+    // That rule is exercised by the Stop test below instead, where a
+    // genuinely non-empty selection survives the run.
   });
 
   test('pressing Stop mid-batch halts the run: the remaining rows stay checked/selected, and the summary reads stopped-early', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await seedThreeSuggestedRows(page);
-
-    await page.route('**/api/dashboard/rulings/dismiss', async (route) => {
-      await new Promise((r) => setTimeout(r, 300));
-      await route.continue();
-    });
+    const { release } = installGatedDismissRoute(page);
 
     await page.goto(OBSERVATION_URL);
     await page.waitForLoadState('networkidle');
@@ -867,23 +890,33 @@ test.describe('Bulk-agree progress / Stop / completion summary (LIN-2758) — e2
     page.on('dialog', (dialog) => dialog.accept());
     await page.locator('#obs-ruling-agree-selected').click();
 
+    // Row 1's own write is held open by the gate — deterministically "in
+    // flight" for as long as the test needs to press Stop, no race.
     const progress = page.locator('#obs-ruling-bulk-progress');
-    await expect(progress).toHaveText('Applying 1 of 3…', { timeout: 5000 });
+    await expect(progress).toHaveText('Applying 1 of 3…');
 
     const stopBtn = page.locator('#obs-ruling-bulk-stop');
     await expect(stopBtn).toBeVisible();
     await stopBtn.click();
+    // Row 1 is already in flight (no AbortController) — it is never
+    // aborted, only let to finish; releasing it now lets the loop reach its
+    // next-iteration check, which sees Stop and breaks before row 2.
+    release();
 
-    await expect(progress).toHaveText('Stopped after 1 of 3 — 2 remain selected.', { timeout: 5000 });
+    await expect(progress).toHaveText('Stopped after 1 of 3 — 2 remain selected.');
 
     // The two rows Stop pre-empted are still visible, still checked, still
-    // selected — never silently dropped.
-    const rowB = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2758-2' });
-    const rowC = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-2758-3' });
-    await expect(rowB).toBeVisible();
-    await expect(rowC).toBeVisible();
-    await expect(rowB.locator('.obs-ruling-select')).toBeChecked();
-    await expect(rowC.locator('.obs-ruling-select')).toBeChecked();
+    // selected — never silently dropped. Deliberately COUNT-based, not
+    // identity-based (e.g. "row B and row C"): `rulingsSelected` is a Set
+    // iterated via `Array.from`, and its iteration order is insertion order
+    // into that Set — driven by `setAllRulingsSelected`'s own walk of
+    // `rulingsSelectableKeys()`/the feed's render order, NOT this test's
+    // seed order. Measured directly: with these three rows, the row that
+    // actually processes first is LIN-2758-3 (seeded LAST), not -1 — so an
+    // assertion naming specific surviving rows would be pinning an
+    // accidental ordering detail, not the behavior under test.
+    await expect(page.locator('#obs-rulings .obs-ruling-select:checked')).toHaveCount(2);
+    await expect(page.locator('#obs-rulings .obs-ruling-select:disabled')).toHaveCount(1);
 
     await expect(page.locator('#obs-ruling-select-all')).toBeEnabled();
     await expect(page.locator('#obs-ruling-agree-selected')).toBeEnabled();

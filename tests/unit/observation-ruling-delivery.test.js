@@ -3562,6 +3562,7 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
   function makeBulkReplySandbox({ api, postComment, dispatchPrompt, deliverReply, confirm } = {}) {
     const list = new FakeElement('ul');
     const empty = new FakeElement('p'); empty.hidden = false;
+    const progressEl = new FakeElement('p');
     const sandbox = makeSandbox({
       api, postComment, dispatchPrompt, deliverReply, confirm,
       elements: {
@@ -3569,10 +3570,11 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
         'obs-ruling-bulk-bar': new FakeElement('div'),
         'obs-ruling-select-all': new FakeElement('input'),
         'obs-ruling-selected-count': new FakeElement('span'),
-        'obs-ruling-agree-selected': new FakeElement('button')
+        'obs-ruling-agree-selected': new FakeElement('button'),
+        'obs-ruling-bulk-progress': progressEl
       }
     });
-    return { module: sandbox.module, list };
+    return { module: sandbox.module, list, progressEl };
   }
 
   // A `gone` row at `effect: 'record'` — branch 3/4's record delivery, which
@@ -3707,6 +3709,50 @@ describe('bulkAgreeSelected — answer rows through deliverRulingReply (LIN-2754
     assert.equal(runCalls, runsBeforeRetry + 1, 'the retry must re-fire the run exactly once');
     assert.equal(preservedRulingRows.has(key), false, 'a succeeded retry releases the preserved row');
     assert.match(feedback.textContent, /recorded ✓/);
+  });
+
+  // LIN-2758 beat 2's own documented deviation, pinned (beat 3): the plan's
+  // Mixed-outcomes section names exactly three buckets — applied / skipped /
+  // failed (still selected) — and says a 'failed' row stays selected. This
+  // bulk-mode partial failure does NOT stay selected: makePartialFailureHandler
+  // (above) deletes it from rulingsSelected unconditionally and, in bulk
+  // mode, also marks it rulingsSettled — the SAME end state a success
+  // leaves, with its own independent "Retry delivery" affordance for the
+  // un-started run, never a further bulk press. beat 2 tallied this
+  // sub-case as 'applied' (off the same rulingsSettled membership check
+  // every other branch uses) rather than 'failed', since 'still selected'
+  // would be a false claim about this row. Nothing before this test
+  // asserted on the SUMMARY text for this exact scenario — the sibling test
+  // above only checks the row's own state, not the batch-level tally — so a
+  // future change could flip this silently. Both halves in one place:
+  test('a bulk-mode partial failure (comment/answer durably recorded, fresh run failed to start) tallies as APPLIED, never "still selected" (LIN-2758 beat 2 deviation, pinned)', async () => {
+    const { module, progressEl } = makeBulkReplySandbox({
+      deliverReply: async (opts, prompt, handlers) => {
+        handlers.onPartialFailure(new Error('session gone'), async () => {});
+      }
+    });
+    const { renderRulings, setAllRulingsSelected, bulkAgreeSelected, rulingsSelected, rulingsSettled, rulingKey } = module.exports;
+
+    const row = answeredRow({
+      decision: { decision_id: 'd-partial-tally', options: ANSWER_OPTIONS },
+      disposition: 'resumable'
+    });
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-partial-tally');
+
+    renderRulings([row]);
+    setAllRulingsSelected(true);
+    await bulkAgreeSelected();
+
+    // Half 1 — the premise: settled and deselected, not "still selected".
+    assert.ok(rulingsSettled.has(key), 'a durably-recorded partial failure must settle the row');
+    assert.equal(rulingsSelected.has(key), false, 'a durably-recorded partial failure must deselect the row — the plan\'s "still selected" claim does not hold here');
+
+    // Half 2 — the deviation itself: the completion summary must count this
+    // row as applied, not failed, matching its real settled+deselected
+    // state. A regression here would render '0 applied · 0 skipped · 1
+    // failed (still selected).' instead — a doubly false claim, since the
+    // row is neither still selected nor unrecorded.
+    assert.equal(progressEl.textContent, '1 applied.', 'a bulk partial failure must tally as applied, matching beat 2\'s documented call');
   });
 });
 
