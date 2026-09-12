@@ -1588,6 +1588,13 @@ export function createDashboardRoutes({
       if (!stamped) {
         return jsonError(res, 404, 'No matching ruling to dismiss');
       }
+      // LIN-2755: invalidate the sessions-feed cache so the next poll of
+      // either namespace (rulings::… / proxy-rulings::…) reconstructs
+      // instead of serving the just-discharged row for up to the 5s TTL.
+      // `clear(urlKey)` matches any entry whose workspace set includes this
+      // key, which is why one call covers both namespaces + the merged
+      // dashboard keys — see lib/sessions-feed-cache.js.
+      sessionsFeedCache.clear(workspace.urlKey);
       res.json({ success: true });
     } catch (error) {
       console.error('Ruling dismiss error:', error);
@@ -1652,6 +1659,10 @@ export function createDashboardRoutes({
       if (new Date(record.outcomeAt).getTime() < requestStartedAt.getTime()) {
         return jsonError(res, 409, 'This ruling was already answered', { code: 'ALREADY_TERMINAL' });
       }
+      // LIN-2755: see the dismiss route's identical comment above — one
+      // clear() after a genuinely successful write (never on the 409
+      // first-stamp-wins path, which changed nothing this call can claim).
+      sessionsFeedCache.clear(workspace.urlKey);
       res.json({ success: true });
     } catch (error) {
       console.error('Ruling answer error:', error);
@@ -1704,6 +1715,11 @@ export function createDashboardRoutes({
       if (!record) {
         return jsonError(res, 500, 'Failed to shelve ruling');
       }
+      // LIN-2755: uniform invalidation on every ruling write, per the
+      // ticket's Proposal — shelve never touches loop/task-decision data
+      // itself (shelvedRulingsStore is read live, not cached), so this is
+      // defensive/uniform rather than fixing an observable staleness bug.
+      sessionsFeedCache.clear(workspace.urlKey);
       res.json({ success: true, shelf: record });
     } catch (error) {
       console.error('Ruling shelve error:', error);
@@ -1744,6 +1760,9 @@ export function createDashboardRoutes({
       if (!record) {
         return jsonError(res, 404, 'No matching suggestion to keep');
       }
+      // LIN-2755: uniform invalidation, same reasoning as shelve above —
+      // dismissalSuggestionsStore is read live, not cached.
+      sessionsFeedCache.clear(workspace.urlKey);
       res.json({ success: true, suggestion: record });
     } catch (error) {
       console.error('Ruling keep error:', error);

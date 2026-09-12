@@ -22,8 +22,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
+import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 
 const PROVIDER_NAME = 'comment-write-fake';
 const ISSUE_ID = 'LIN-901';
@@ -91,7 +94,7 @@ function makeFlakyHarbourCommentsStore() {
   };
 }
 
-function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore } = {}) {
+function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache } = {}) {
   registerProvider(provider);
   const app = express();
   app.use(express.json());
@@ -108,6 +111,11 @@ function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, h
     reportHistoryStore: {}, dispatchQueueStore: dispatchQueueStore || {}, agentStatusStore: {}, promptTraceStore: {},
     taskDecisionsStore,
     harbourCommentsStore,
+    // LIN-2755 beat 2: NOT YET a real parameter of createWorkspaceApiRoutes
+    // (beat 1's sweep found this) — passed here so the RED tests below are
+    // ready for beat 3 to wire it in; today it is silently ignored by the
+    // destructure, which is exactly why those tests are red.
+    sessionsFeedCache,
   });
   app.use(workspaceRouter);
 
@@ -567,5 +575,191 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — harbour-comments led
       first.body.comment.id,
       'the repair attempt targets the SAME comment id the original create minted'
     );
+  });
+});
+
+// =============================================================================
+// LIN-2755 beat 2: ruling-write cache invalidation (RED until beat 3).
+// =============================================================================
+//
+// This route's stamp block (`stampDecisionAnswers`, routes/workspace-api.js)
+// is TWO of the ticket's 11 write sites in one request:
+//   - the loop half (`markDecisionAnswered`, workspace-api.js:262) — writes
+//     into data the sessions-feed cache actually holds (mergeLoops
+//     reconstructs from dispatchQueueStore), so it gets BOTH the
+//     invalidation+bound witness AND the stronger stale-row witness (2),
+//     same as dashboard.js's dismiss route.
+//   - the task-decision half (`markOutcome`, workspace-api.js:275) — writes
+//     to taskDecisionsStore, read LIVE on every rulings poll (per beat 1's
+//     sweep), so invalidation+bound only.
+//
+// Beat 1's sweep also found that `createWorkspaceApiRoutes` does not yet
+// accept `sessionsFeedCache` at all — mounting THIS route's app and
+// `createDashboardRoutes`'s rulings GET side by side, sharing one real cache
+// instance and one real dispatchQueueStore, is what makes that gap
+// observable: today the shared cache is warmed by the GET side and never
+// invalidated by a write through this route, because nothing here even
+// receives it yet.
+describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache invalidation (LIN-2755)', () => {
+  const CACHE_URL_KEY = 'acme';
+  const CACHE_DECISION_ID = 'd-cache-1';
+
+  // A single loop, `listHistory`-backed, that starts decision-bearing and
+  // flips to answered once `markDecisionAnswered` is called — same technique
+  // as the equivalent WITNESS 2 test in tests/unit/dashboard-routes.test.js.
+  function makeSharedLoopStore() {
+    let discharged = false;
+    let historyReads = 0;
+    return {
+      historyReads: () => historyReads,
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() {
+          historyReads++;
+          const nowIso = new Date().toISOString();
+          const feedback = [
+            { message: '[blocked] need a decision', timestamp: nowIso },
+            { kind: 'decision', message: JSON.stringify({ decision_id: CACHE_DECISION_ID, question: 'Proceed?' }), timestamp: nowIso },
+          ];
+          if (discharged) feedback.push({ kind: 'decision-answer', message: JSON.stringify({ decision_id: CACHE_DECISION_ID }), timestamp: nowIso });
+          return {
+            items: [{
+              id: 'loop-1', issueIdentifier: 'LIN-99', issueTitle: 'Title LIN-99', promptName: 'implementation',
+              prompt: 'p', dispatchedAt: nowIso, resolvedAt: nowIso, status: 'taken', feedback,
+            }],
+          };
+        },
+        async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 3 }; },
+      },
+    };
+  }
+
+  function makeSharedTaskDecisionsStore() {
+    const calls = [];
+    return {
+      calls,
+      async listUnansweredForWorkspaces() { return []; }, // this half's write is exercised in isolation below
+      async markOutcome(args) { calls.push(args); return { ...args, outcomeAt: new Date().toISOString() }; },
+    };
+  }
+
+  // Mounts the SAME workspace-api app `buildApp` builds, plus a
+  // dashboard.js router sharing the same dispatchQueueStore/taskDecisionsStore
+  // and ONE real sessionsFeedCache instance — mirroring how server.js wires a
+  // single process-wide cache into both route factories.
+  function buildCrossRouterApp({ dispatchQueueStore, taskDecisionsStore, sessionsFeedCache }) {
+    const { provider } = makeFakeProvider();
+    const app = buildApp({ provider, dispatchQueueStore, taskDecisionsStore, sessionsFeedCache });
+
+    const dashboardRouter = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: dispatchQueueStore || {},
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache,
+      taskDecisionsStore,
+    });
+    // A tiny dedicated mount that seeds req.session.workspaces the way real
+    // session auth would — dashboard.js's rulings route reads it directly.
+    app.use((req, res, next) => {
+      req.session = req.session || {};
+      req.session.workspaces = [{ urlKey: CACHE_URL_KEY, name: 'Acme' }];
+      next();
+    }, dashboardRouter);
+
+    return app;
+  }
+
+  async function getRulings(app) {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    const { port } = server.address();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/workspace/${CACHE_URL_KEY}/api/dashboard/rulings`);
+      return await res.json();
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }
+
+  test('the loop half (markDecisionAnswered, workspace-api.js:262) invalidates the rulings cache — witness 1+3', async () => {
+    const { dispatchQueueStore, historyReads } = makeSharedLoopStore();
+    const app = buildCrossRouterApp({ dispatchQueueStore, sessionsFeedCache: createSessionsFeedCache() });
+
+    const warm = await getRulings(app);
+    assert.equal(warm.count, 1, 'sanity: the ruling is visible before any write');
+    assert.equal(historyReads(), 1, 'sanity: the first poll always reconstructs');
+
+    const stillWarm = await getRulings(app);
+    assert.equal(stillWarm.count, 1);
+    assert.equal(historyReads(), 1, 'sanity: a second poll within the 5s TTL is still served from cache');
+
+    const write = await postComment(app, ISSUE_ID, {
+      body: 'ship it — cache invalidation loop half', decisionLoopId: 'loop-1', decisionId: CACHE_DECISION_ID,
+    }, CACHE_URL_KEY);
+    assert.strictEqual(write.status, 201);
+
+    const afterWrite = await getRulings(app);
+    assert.equal(historyReads(), 2,
+      'THE RED: the next poll after a successful stamp must reconstruct — only true if the write invalidated the cache');
+
+    const afterWriteAgain = await getRulings(app);
+    assert.equal(historyReads(), 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
+  });
+
+  test('WITNESS 2 (stale-row, loop-backed): the loop half actually excludes the discharged row on the next poll', async () => {
+    const { dispatchQueueStore, historyReads } = makeSharedLoopStore();
+    const app = buildCrossRouterApp({ dispatchQueueStore, sessionsFeedCache: createSessionsFeedCache() });
+
+    const before = await getRulings(app);
+    assert.equal(before.count, 1, 'the ruling is present before the stamp');
+
+    const write = await postComment(app, ISSUE_ID, {
+      body: 'ship it — cache invalidation stale row', decisionLoopId: 'loop-1', decisionId: CACHE_DECISION_ID,
+    }, CACHE_URL_KEY);
+    assert.strictEqual(write.status, 201);
+
+    const after = await getRulings(app);
+    assert.equal(after.count, 0,
+      'THE RED: the discharged row must actually be gone on the next poll, without waiting out the 5s TTL');
+    assert.equal(historyReads(), 2, 'the row only disappeared because the cache was invalidated and re-read');
+  });
+
+  test('the task-decision half (markOutcome, workspace-api.js:275) invalidates the rulings cache — witness 1+3', async () => {
+    // No loop-backed rows at all — isolates this half from the loop half above.
+    let historyReads = 0;
+    const dispatchQueueStore = {
+      async listItems() { return []; },
+      async listHistory() { historyReads++; return { items: [] }; },
+    };
+    const taskDecisionsStore = makeSharedTaskDecisionsStore();
+    const app = buildCrossRouterApp({ dispatchQueueStore, taskDecisionsStore, sessionsFeedCache: createSessionsFeedCache() });
+
+    const warm = await getRulings(app);
+    assert.equal(warm.count, 0);
+    assert.equal(historyReads, 1, 'sanity: the first poll always reconstructs');
+
+    const stillWarm = await getRulings(app);
+    assert.equal(historyReads, 1, 'sanity: a second poll within the 5s TTL is still served from cache');
+
+    const write = await postComment(app, ISSUE_ID, {
+      body: 'ship it — cache invalidation task-decision half',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    }, CACHE_URL_KEY);
+    assert.strictEqual(write.status, 201);
+    assert.strictEqual(taskDecisionsStore.calls.length, 1, 'sanity: the write actually reached markOutcome');
+
+    const afterWrite = await getRulings(app);
+    assert.equal(historyReads, 2,
+      'THE RED: the next poll after a successful stamp must reconstruct — only true if the write invalidated the cache');
+
+    const afterWriteAgain = await getRulings(app);
+    assert.equal(historyReads, 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
   });
 });

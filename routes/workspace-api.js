@@ -249,7 +249,7 @@ const decisionStampDedupe = createDedupeCache();
  *   bypass uses to decide whether a later identical-text retry still needs to
  *   try again.
  */
-async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore }) {
+async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache = null }) {
   const { decisionLoopId, decisionId, taskDecisionId, taskDecisionIssueId, optionId } = decision || {};
   let ok = true;
 
@@ -263,6 +263,11 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
       if (!stamped) {
         console.error(`Decision-answer stamp not applied: no matching item ${decisionLoopId} in workspace ${workspace.urlKey}`);
         ok = false;
+      } else if (sessionsFeedCache) {
+        // LIN-2755: this stamp writes into dispatchQueueStore feedback, which
+        // is exactly what the cached loop reconstruction (mergeLoops/
+        // loadLoops) reads — invalidate only on a genuine success.
+        sessionsFeedCache.clear(workspace.urlKey);
       }
     } catch (stampErr) {
       console.error('Decision-answer stamp failed:', stampErr.message);
@@ -278,6 +283,11 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
       if (!stamped) {
         console.error(`Task-decision answer stamp not applied: no matching row ${taskDecisionId} for issue ${taskDecisionIssueId} in workspace ${workspace.urlKey}`);
         ok = false;
+      } else if (sessionsFeedCache) {
+        // LIN-2755: uniform invalidation, per the ticket's Proposal — this
+        // store is read live/uncached, so it's defensive rather than fixing
+        // an observable staleness bug (see the loop-half comment above).
+        sessionsFeedCache.clear(workspace.urlKey);
       }
     } catch (stampErr) {
       console.error('Task-decision answer stamp failed:', stampErr.message);
@@ -295,9 +305,10 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
  * @param {Object} options.freeTierStore - Free tier usage store
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @param {Object} [options.taskDecisionsStore] - Task-keyed scan-decision store (LIN-2197)
+ * @param {Object} [options.sessionsFeedCache] - Shared SWR cache for the rulings/sessions feed (LIN-2755); null → uncached deployment, invalidation is a no-op
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -1559,7 +1570,7 @@ ${goal}`
         // stamp attempt once one has already landed (the pre-existing "a
         // deduped resubmission does not re-stamp" success-path coverage).
         if (!decisionStampDedupe.get(key)) {
-          const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore })
+          const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache })
           if (stampOk) decisionStampDedupe.set(key, true)
         }
 
@@ -1623,7 +1634,7 @@ ${goal}`
       // secondary annotation the rulings predicate tolerates missing (the
       // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
       // above is what makes an identical-text retry one such later attempt).
-      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore })
+      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache })
       if (stampOk) decisionStampDedupe.set(key, true)
 
       return res.status(201).json(commentCreate)
@@ -2702,6 +2713,10 @@ ${goal}`
       if (!record) {
         return notFound.json(res, 'Scan record not found');
       }
+      // LIN-2755: uniform invalidation on every ruling write — taskDecisionsStore
+      // is read live (not cached), so this is defensive/uniform rather than
+      // fixing an observable staleness bug.
+      if (sessionsFeedCache) sessionsFeedCache.clear(workspace.urlKey);
 
       return res.json({
         status: 'fresh',
@@ -2896,6 +2911,11 @@ ${goal}`
           code: 'ALREADY_TERMINAL'
         });
       }
+      // LIN-2755: uniform invalidation on every ruling write, only past the
+      // ALREADY_TERMINAL race check above (this call's own write must have
+      // actually landed) — taskDecisionsStore is read live (not cached), so
+      // this is defensive/uniform rather than fixing an observable staleness bug.
+      if (sessionsFeedCache) sessionsFeedCache.clear(workspace.urlKey);
 
       return keepalive.send(200, {
         retired: true,
@@ -2984,6 +3004,12 @@ ${goal}`
       }
 
       const record = await taskDecisionsStore.reverseOutcome({ urlKey: workspace.urlKey, issueId: canonicalId, id: recordId });
+      // LIN-2755: uniform invalidation on every ruling write — reverseOutcome's
+      // fail-loud contract means reaching here is already a genuine success
+      // (a failure throws, caught below, never invalidating). taskDecisionsStore
+      // is read live (not cached), so this is defensive/uniform rather than
+      // fixing an observable staleness bug.
+      if (sessionsFeedCache) sessionsFeedCache.clear(workspace.urlKey);
 
       return res.json({
         status: 'fresh',

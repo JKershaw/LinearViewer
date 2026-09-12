@@ -21,6 +21,7 @@ import express from 'express';
 import { createRulingsRoutes } from '../../routes/proxy-rulings.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
+import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 
 const URL_KEY = 'test-workspace';
 const DECISION_ID = 'd-1';
@@ -783,5 +784,99 @@ describe('two loops sharing a decision_id — per-loop suggest-dismissal (LIN-27
       reason: 'r', decisionLoopId: ''
     });
     assert.equal(status, 400);
+  });
+});
+
+// ─── LIN-2755 beat 2: ruling-write cache invalidation (RED until beat 3) ────
+//
+// Sibling of the equivalent block in tests/unit/dashboard-routes.test.js —
+// same witness shape, applied to the `proxy-rulings` cache namespace this
+// router owns. Both `suggest-dismissal` and `suggest-answer` write only to
+// `dismissalSuggestionsStore`, which — per beat 1's sweep — is read LIVE on
+// every request (this route's own `readRulings` comment says so: "Only the
+// LOOP READ is cached"), so neither site has a constructible stale-ROW
+// witness; both get the invalidation+bound witness only, proving the
+// ticket's uniform "clear after every write" Proposal.
+//
+// This block stands up its OWN app/server with a REAL sessionsFeedCache —
+// the shared top-level `before()` above deliberately runs with
+// `sessionsFeedCache: null` (uncached) for every other test in this file, so
+// it cannot exercise invalidation at all.
+describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
+  function buildCachedApp({ suggestionsStore }) {
+    let reads = 0;
+    const app = express();
+    app.use(express.json());
+    app.use(createRulingsRoutes({
+      proxyLimiter: (req, res, next) => next(),
+      authenticateProxyToken: (req, res, next) => {
+        req.proxyUrlKey = URL_KEY;
+        req.proxyTokenScope = 'readWrite';
+        req.proxyCreatedBy = 'account-123';
+        next();
+      },
+      requireWriteScope: (req, res, next) => next(),
+      logEvent: () => {},
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { reads++; return { items: [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, [{ id: 'a', label: 'Yes' }])] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      dismissalSuggestionsStore: suggestionsStore,
+      sessionsFeedCache: createSessionsFeedCache()
+    }));
+    return { app, reads: () => reads };
+  }
+
+  async function withServer(app, fn) {
+    const s = http.createServer(app);
+    await new Promise(r => s.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${s.address().port}`;
+    const localReq = async (method, path, body) => {
+      const res = await fetch(`${base}${path}`, {
+        method, headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : undefined
+      });
+      let parsed = null;
+      try { parsed = await res.json(); } catch { /* no body */ }
+      return { status: res.status, body: parsed };
+    };
+    try {
+      await fn(localReq);
+    } finally {
+      s.close();
+    }
+  }
+
+  async function assertInvalidatesAndBounded(writePath, writeBody) {
+    const store = new DismissalSuggestionsStore({ collection: createMockCollection() });
+    const { app, reads } = buildCachedApp({ suggestionsStore: store });
+    await withServer(app, async (localReq) => {
+      const warm = await localReq('GET', '/api/proxy/rulings');
+      assert.equal(warm.status, 200);
+      assert.equal(reads(), 1, 'sanity: the first poll always reconstructs');
+
+      const stillWarm = await localReq('GET', '/api/proxy/rulings');
+      assert.equal(stillWarm.status, 200);
+      assert.equal(reads(), 1, 'sanity: a second poll within the 5s TTL is still served from cache');
+
+      const write = await localReq('POST', writePath, writeBody);
+      assert.equal(write.status, 201, 'the write itself must succeed');
+
+      const afterWrite = await localReq('GET', '/api/proxy/rulings');
+      assert.equal(reads(), 2,
+        'THE RED: the next poll after a successful write must reconstruct — only true if the write invalidated the cache');
+
+      const afterWriteAgain = await localReq('GET', '/api/proxy/rulings');
+      assert.equal(reads(), 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
+    });
+  }
+
+  test('suggest-dismissal (proxy-rulings.js:298) invalidates the proxy-rulings cache — witness 1+3', async () => {
+    await assertInvalidatesAndBounded(`/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, { reason: 'the task shipped' });
+  });
+
+  test('suggest-answer (proxy-rulings.js:404) invalidates the proxy-rulings cache — witness 1+3', async () => {
+    await assertInvalidatesAndBounded(`/api/proxy/rulings/${DECISION_ID}/suggest-answer`, { optionId: 'a', reason: 'the task shipped' });
   });
 });

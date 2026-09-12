@@ -197,12 +197,38 @@ const rulingsSelected = new Set();
 // idempotence guard on that branch). `rulingsSettled` is OR-ed into
 // `renderRulings`' `mustReuse` below so such a row is REUSED with its
 // controls still disabled rather than rebuilt re-armed, and it is released
-// once the key is absent from a poll's actual payload (the row has finally
-// left the feed for real). Deliberately its OWN Set — not
-// `preservedRulingRows` (purpose-built for partial-failure retry state) and
-// not a second dismiss/answer-state mutation (Agree still runs the one
-// existing dismiss path; nothing about answer state changes here).
+// once the key has been absent from a poll's actual payload for one full
+// render pass beyond the pass that first noticed the absence (LIN-2797 —
+// see `rulingsSettledGhosted` below for why one pass isn't enough). Once
+// released, the row has finally left the feed for real. Deliberately its
+// OWN Set — not `preservedRulingRows` (purpose-built for partial-failure
+// retry state) and not a second dismiss/answer-state mutation (Agree still
+// runs the one existing dismiss path; nothing about answer state changes
+// here).
 const rulingsSettled = new Set();
+// LIN-2797: companion to `rulingsSettled`, tracking which settled keys have
+// already been re-injected once while absent from a poll's payload.
+// `preservedRulingRows` and `rulingsPending` both get an explicit
+// "show it once more" re-injection in `renderRulings` when their row drops
+// out of the payload (their OWN membership is cleared by other application
+// code, not by renderRulings); `rulingsSettled` used to have no equivalent —
+// it was pruned the INSTANT its row left the payload, with no re-injection
+// at all. That gap was invisible before LIN-2755: the sessions-feed cache's
+// old 5s staleness meant a just-discharged row stayed in every payload for
+// up to 5s, so `rulingsSettled`'s "reuse this exact <li>" contract always
+// had a wide implicit grace window before the row could ever go missing.
+// LIN-2755 correctly collapsed that staleness — a row can now leave the
+// payload on the very next poll — which shrank that window to near-zero and
+// exposed the gap: an ambient poll landing in that tiny window could rebuild
+// a fresh, textless `<li>` for a row whose feedback text
+// (`bulkAgreeRow`/`agreeRulingRow`'s success handler) was set on the node it
+// just replaced, discarding it invisibly. Fix: a settled key survives
+// exactly one extra render pass after first going missing — long enough for
+// the in-flight success handler's own DOM mutation (before or after that
+// pass) to always land on the SAME, still-attached node — then releases on
+// the next pass if still missing, preserving the original "eventually goes
+// away for real" contract above.
+const rulingsSettledGhosted = new Set();
 // rulingKey → the row payload from the poll that currently renders it.
 // Populated/pruned in lockstep with `renderedRulingRows` (same `seen`
 // bookkeeping in renderRulings), so a key can never outlive the <li> it
@@ -1691,15 +1717,40 @@ function renderRulings(rulings) {
     }
   }
 
-  // Release a settled key (review F2 / LIN-2444 Phase 5) the moment its row
-  // is absent from THIS poll's actual payload — checked against `seen` here,
-  // BEFORE the preserved/pending re-add loops below re-inject stale nodes for
-  // their own, unrelated reasons, so a settled row that has genuinely left
-  // the feed (task-bound: next poll; loop-backed: once the stale cache
-  // catches up) stops being force-reused. A later re-suggestion on the same
-  // key then starts fully re-armed rather than permanently disabled.
+  // Release a settled key (review F2 / LIN-2444 Phase 5) once its row has
+  // been absent from TWO consecutive polls' actual payloads — checked
+  // against `seen` here, BEFORE the preserved/pending re-add loops below
+  // re-inject stale nodes for their own, unrelated reasons — so a settled
+  // row that has genuinely left the feed (task-bound: next poll; loop-backed:
+  // once the stale cache catches up) still stops being force-reused, and a
+  // later re-suggestion on the same key still starts fully re-armed rather
+  // than permanently disabled. The one change from the original review-F2
+  // design (LIN-2797): the FIRST poll that finds the row missing re-injects
+  // it once more (mirroring the preserved/pending loops right below) instead
+  // of releasing immediately, via the `rulingsSettledGhosted` companion Set
+  // declared next to `rulingsSettled` above — see that declaration for why a
+  // single missing poll is not by itself proof the row is really gone.
   for (const key of Array.from(rulingsSettled)) {
-    if (!seen.has(key)) rulingsSettled.delete(key);
+    if (seen.has(key)) {
+      // Reappeared (the stale cache still serves it) — a future disappearance
+      // gets its own fresh one-more-look, not a leftover ghost flag from this cycle.
+      rulingsSettledGhosted.delete(key);
+      continue;
+    }
+    if (rulingsSettledGhosted.has(key)) {
+      // Missing for a second consecutive poll — genuinely gone, release it.
+      rulingsSettled.delete(key);
+      rulingsSettledGhosted.delete(key);
+      continue;
+    }
+    // Missing for the first time — show it once more so an in-flight
+    // success handler's DOM mutation (bulkAgreeRow/agreeRulingRow), whichever
+    // side of this render it lands on, always finds the SAME attached node.
+    rulingsSettledGhosted.add(key);
+    if (renderedRulingRows.has(key)) {
+      nodes.push(renderedRulingRows.get(key));
+      seen.add(key);
+    }
   }
 
   // A preserved or still-pending row whose decision already dropped out of
@@ -4258,7 +4309,11 @@ if (typeof module !== 'undefined' && module.exports) {
     // row-data map renderRulings/bulk-agree share, and the confirm-gated
     // batch runner + its per-row core, each directly unit-testable without
     // simulating a DOM click/change event.
-    rulingsSelected, rulingsSettled, rulingsRowByKey,
+    // LIN-2797: rulingsSettledGhosted is exposed alongside rulingsSettled so
+    // the one-more-look regression (a settled row surviving exactly one
+    // render pass after its row first drops out of the payload) is directly
+    // unit-testable against renderRulings, not only inferable from timing.
+    rulingsSelected, rulingsSettled, rulingsSettledGhosted, rulingsRowByKey,
     toggleRulingSelection, setAllRulingsSelected, rulingsSelectableKeys,
     syncRulingsBulkBar, repaintRulingsSelection,
     bulkAgreeConfirmText, refreshRulingsBadge, bulkAgreeRow, bulkAgreeSelected,

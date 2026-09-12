@@ -167,13 +167,14 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     expect(commentPayload.body).toBe('Approve');
     expect((await commentReq.response()).status()).toBe(201);
 
-    // The comment write stamps `markDecisionAnswered` best-effort — a later
-    // poll's /rulings read no longer carries this decision. Budget generously:
-    // the server-side sessionsFeedCache is a 5s-TTL stale-while-revalidate
-    // cache (lib/sessions-feed-cache.js) — the poll that crosses the TTL still
-    // serves the STALE (pre-answer) value while kicking a background refresh,
-    // so it takes a SECOND post-TTL read to observe the fresh count. Measured
-    // at ~8s server-side in practice; 20s leaves real headroom above that.
+    // The comment write stamps `markDecisionAnswered` and (LIN-2755)
+    // invalidates the sessionsFeedCache before responding, so the very next
+    // poll already reconstructs — the row should disappear quickly. The
+    // generous timeout stays as headroom for the poll interval + a render
+    // pass, not because staleness is expected: this same-tab disappearance
+    // is also covered by `rulingsSettled`'s client-side masking regardless
+    // (LIN-2444), so this assertion alone does not prove server-side
+    // invalidation — see the LIN-2755 round-trip test below for that.
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-P' })).toHaveCount(0, { timeout: 20000 });
   });
 
@@ -182,8 +183,28 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
   // link (attribute emitted, threaded into the POST body, route calls the
   // store, store persists, answeredDecisionId derives, predicate excludes) is
   // covered individually elsewhere. This is the composition witness, driven
-  // directly against the API (no UI) so it isolates the round trip itself.
-  test('LIN-2209: the answer-a-ruling round trip is witnessed end to end — GET /rulings count 1 -> save -> count 0, accounting for the sessionsFeedCache SWR TTL', async ({ page }) => {
+  // directly against the API (no UI, so `rulingsSettled`'s client-side
+  // same-tab masking — public/observation.js — is structurally out of the
+  // loop; nothing here ever renders the page) so it isolates the round trip
+  // itself.
+  //
+  // LIN-2755 (beat 4): before that fix, the comment route's best-effort stamp
+  // never invalidated sessionsFeedCache, so a read landing inside the 5s TTL
+  // window served the stale pre-answer value, and even the FIRST read past
+  // the TTL still served it once more (SWR: a stale read returns the last
+  // good value immediately and only KICKS a background refresh) — a second
+  // post-TTL read was required to observe the change. That two-read,
+  // TTL-gated shape is what this test used to assert (see git history) —
+  // it was pinning the bug's own symptom as expected behavior. Now that the
+  // stamp calls `sessionsFeedCache.clear(urlKey)` on success
+  // (routes/workspace-api.js's `stampDecisionAnswers`), the very NEXT read —
+  // taken immediately, well inside the old 5s TTL window, with no wait at
+  // all — already reconstructs and excludes the answered row. Asserting that
+  // with zero wait is what makes this a genuine witness of server-side cache
+  // invalidation rather than of the TTL eventually expiring on its own: an
+  // unfixed build would still read `count: 1` here, because nothing would
+  // have dropped the cache entry and under 5s has not elapsed.
+  test('LIN-2755/LIN-2209: the answer-a-ruling round trip invalidates the cache immediately — GET /rulings count 1 -> save -> count 0 on the very next read, no TTL wait', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     const { workerId } = await seedDecisionWorker(page, { issueIdentifier: 'LIN-2209-RT', issueTitle: 'Round-trip ruling', decisionId: 'd-rulings-roundtrip', blocked: true });
@@ -199,21 +220,42 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     });
     expect(commentResp.status()).toBe(201);
 
-    // sessionsFeedCache is stale-while-revalidate with a 5s TTL
-    // (lib/sessions-feed-cache.js): the FIRST read after the TTL expires
-    // still serves the STALE (pre-answer) value — it only KICKS a background
-    // refresh — and it takes a SECOND read to observe the refreshed value.
-    // "Wait out the TTL, then re-read once" is necessary but not sufficient;
-    // pinning both reads here means a regression to that weaker assumption
-    // fails loudly instead of passing on lucky timing.
-    await page.waitForTimeout(5200);
-    const staleRead = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
-    const staleBody = await staleRead.json();
-    expect(staleBody.count, 'first post-TTL read still serves the stale pre-answer value').toBe(1);
+    // No `waitForTimeout` at all — the write is expected to have already
+    // invalidated the cache by the time this response is in hand, so the
+    // very next poll must reconstruct, well before the 5s TTL would have
+    // expired it on its own.
+    const afterRead = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+    const afterBody = await afterRead.json();
+    expect(afterBody.count, 'THE WITNESS: the very next poll — no TTL wait — already excludes the answered row').toBe(0);
+  });
 
-    const freshRead = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
-    const freshBody = await freshRead.json();
-    expect(freshBody.count, 'second post-TTL read observes the refreshed, answered value').toBe(0);
+  // LIN-2755 (beat 4): the sibling witness for the OTHER loop-backed write
+  // site — `POST .../rulings/dismiss` (routes/dashboard.js), the ticket's
+  // own named Agree/dismiss flow. Same shape and same reasoning as the
+  // round-trip test above: driven directly against the API (no UI, so
+  // `rulingsSettled` never enters into it) and asserts the very next poll —
+  // no TTL wait — already excludes the dismissed row.
+  test('LIN-2755: the dismiss round trip invalidates the cache immediately — GET /rulings count 1 -> dismiss -> count 0 on the very next read, no TTL wait', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { workerId } = await seedDecisionWorker(page, { issueIdentifier: 'LIN-2755-DT', issueTitle: 'Dismiss round-trip ruling', decisionId: 'd-rulings-dismiss-rt', blocked: true });
+
+    const before = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+    expect(before.status()).toBe(200);
+    const beforeBody = await before.json();
+    expect(beforeBody.count).toBe(1);
+    expect(beforeBody.rulings[0].decision.decision_id).toBe('d-rulings-dismiss-rt');
+
+    const dismissResp = await page.request.post(`/workspace/${URL_KEY}/api/dashboard/rulings/dismiss`, {
+      data: { decisionLoopId: workerId, decisionId: 'd-rulings-dismiss-rt' }
+    });
+    expect(dismissResp.status()).toBe(200);
+
+    // No wait — see the round-trip test above for why zero wait is what
+    // makes this a witness of invalidation rather than of the TTL elapsing.
+    const afterRead = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/rulings`);
+    const afterBody = await afterRead.json();
+    expect(afterBody.count, 'THE WITNESS: the very next poll — no TTL wait — already excludes the dismissed row').toBe(0);
   });
 
   test('partial failure (comment recorded, resume delivery fails) surfaces a Retry delivery affordance, which re-fires only the dispatch call', async ({ page }) => {
