@@ -1,9 +1,10 @@
 ---
-version: 2
-date: 2026-09-11
+version: 3
+date: 2026-09-12
 authors: [Claude, John Kershaw]
-grounded_at: 5b9664c
-cites: [docs/reviews/, lib/periodical-report-gate.js, docs/north-star.md]
+model: claude-opus-5, effort high, harness null in lineage (dispatcher default claude-code)
+grounded_at: 46c155cf
+cites: [docs/reviews/@46c155cf, lib/periodical-report-gate.js@46c155cf:6-14, docs/north-star.md@46c155cf:1-19, docs/papers/archive-check.md]
 ---
 
 # A papers archive for Harbour
@@ -16,10 +17,18 @@ nothing says which edition of a document is current.
 ## Proposal
 
 Start a `docs/papers/` folder. A paper is a markdown file with a short header like the one
-above: version, date, authors, the commit it was grounded at, and what it cites. That is the
-whole contract for now.
+above: version, date, authors, the model that wrote it, the commit it was grounded at, and
+what it cites. That is the whole contract for now.
 
-Two rules.
+`model` is the model, harness and effort the run's dispatch lineage reports
+(`GET /api/proxy/issues/{id}/cost`); where it reports null, name the dispatcher default. A
+paper written by hand says so. `authors` is who is responsible, a different question.
+
+Every `cites` entry carries a locator: `path@sha:line`; `LIN-nnn` or a PR number with the
+date of the comment meant; the bare path for a file added in the same change. A citation a
+reader cannot land on is not one.
+
+Three rules.
 
 1. The files are the record. Any index, graph or number about the archive is derived from the
    files at HEAD, never stored beside them. Harbour has already been bitten twice by a stored
@@ -27,6 +36,9 @@ Two rules.
    HEAD.
 2. A paper is checked by a second paper, not by its author. The next paper in this folder
    should re-read this one and say what it got wrong.
+3. Every paper ends with a Next section, and that section adds at least one line to
+   `proposals.md` in the same PR. A paper that proposes nothing ends the loop instead of
+   feeding it.
 
 ## How it grows
 
@@ -39,7 +51,12 @@ before.
 Version 1 of this paper is in git history and carries the full evidence, queries and
 limitations. It was too much for the idea. Cutting it is the first revision the archive has.
 
+Version 3 adds the model field, the locators and rule 3, nothing else. Each is here because
+`archive-check.md` found four papers doing without it: the `authors` line was queried at the
+second paper and unfixed at the fourth, PR #1454's checker wrote out the locators the paper
+omitted, and three papers landed proposing nothing. Remove any of the
+three if that evidence later looks thin.
+
 ## Next
 
-A second paper that checks this one, and moves one existing review into this folder to see
-what the header cannot hold.
+A paper that checks this version.
