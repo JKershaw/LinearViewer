@@ -14,7 +14,3 @@ PR, remove the line. Nothing here is a commitment.
   verdict on the looped tickets and trace it to the research: answered there, absent from it, or
   unknowable before code. LIN-2650, LIN-2720, LIN-2754 are the first cases. (John Kershaw, Claude,
   2026-09-12)
-- **Every efficiency lever Harbour has already written down.** One line per avenue that makes a
-  task complete faster or cheaper: what it is, where it is documented, whether anything was
-  measured, and what a test would need. A map for choosing later papers, not a ranking. (John
-  Kershaw, 2026-09-12)
