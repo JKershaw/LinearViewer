@@ -622,7 +622,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     await expect(count).toHaveText('1 selected');
     await expect(agreeSelected).toBeEnabled();
-    await expect(agreeSelected).toHaveText('Agree selected (1)');
+    await expect(agreeSelected).toHaveText('Apply 1 as proposed');
     // A real DOM tri-state: one of two selectable rows selected.
     expect(await selectAll.evaluate((el) => el.indeterminate)).toBe(true);
     expect(await selectAll.evaluate((el) => el.checked)).toBe(false);
@@ -659,7 +659,7 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     await page.locator('#obs-ruling-agree-selected').click();
     await page.waitForTimeout(200);
 
-    expect(dialogText).toContain('Agree 1 selected suggestion');
+    expect(dialogText).toContain('Apply 1 selected proposal');
     expect(dialogText).toContain('cannot be undone');
     expect(dismissRequested, 'declining the confirm() dialog must send no dismiss request').toBe(false);
     // Still there, still selected, still checked — nothing was silently discarded.
@@ -689,8 +689,8 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
 
     // Both rows settle at the moment of success — no wait for a poll: controls
     // disabled, feedback recorded, selection emptied, bar hidden.
-    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('agreed');
-    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('agreed');
+    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
+    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
     await expect(rowA.locator('.obs-ruling-select')).toBeDisabled();
     await expect(page.locator('#obs-ruling-bulk-bar')).toBeHidden();
     await expect(page.locator('#obs-ruling-selected-count')).toHaveText('0 selected');
@@ -741,8 +741,8 @@ test.describe('Bulk-agree suggested rulings (LIN-2444 Phase 5) — e2e', () => {
     // Acceptance limb 3: bulk agree dismisses BOTH, not just the last one.
     page.on('dialog', (dialog) => dialog.accept());
     await page.locator('#obs-ruling-agree-selected').click();
-    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('agreed');
-    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('agreed');
+    await expect(rowA.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
+    await expect(rowB.locator('.obs-ruling-feedback')).toHaveText('dismissed as proposed');
 
     // Genuinely dismissed server-side — the pre-fix failure was precisely a
     // row that LOOKED handled and came back on the next poll still unanswered.

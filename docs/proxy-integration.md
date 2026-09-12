@@ -1272,17 +1272,17 @@ this read would hand it a cross-workspace view). Read scope is sufficient.
 
 `POST /api/proxy/rulings/{decisionId}/suggest-dismissal` requires **readWrite**. It does
 **NOT** dismiss a ruling, and there is deliberately no endpoint that does — only a human
-discharges a ruling, by agreeing to the suggestion in the UI. This surface exists so an agent
-can say "I think this can go, and here is why" without ever being able to act on it
-unilaterally.
+discharges a ruling, by pressing "dismiss as proposed" on the suggestion in the UI. This
+surface exists so an agent can say "I think this can go, and here is why" without ever being
+able to act on it unilaterally.
 
 Body:
 ```json
 { "reason": "why this ruling can go", "decisionLoopId": "..." }
 ```
 - **`reason`** — required, non-empty, ≤ 500 chars. Mandatory because the operator's whole
-  interaction is a one-click Agree; an unjustified proposal would turn that click into a
-  rubber stamp.
+  interaction is pressing "dismiss as proposed"; an unjustified proposal would turn that press
+  into a rubber stamp.
 - **`decisionLoopId`** — optional but strongly preferred: a `decision_id` is not unique (one
   session can emit the same `DECISION:` block from two loops), so omitting it applies the
   proposal to every loop sharing that `decision_id` (a deliberately back-compatible legacy
@@ -1294,15 +1294,15 @@ Returns 201:
 {
   "success": true,
   "suggestion": { "reason": "...", "suggestedBy": "...", "suggestedAt": "...", "withdrawn": false, "decisionLoopId": "..." | null },
-  "note": "Recorded as a SUGGESTION only. The ruling is still unanswered until a human agrees to it."
+  "note": "Recorded as a SUGGESTION only. The ruling is still unanswered until a human dismisses or answers it."
 }
 ```
 Attribution comes from the token's own `createdBy`, never from the request body.
 
 `POST /api/proxy/rulings/{decisionId}/suggest-answer` requires **readWrite**. It does **NOT**
 answer a ruling, and there is deliberately no endpoint that does — only a human discharges a
-ruling, by agreeing to the suggestion in the UI. This is the sibling of `suggest-dismissal`
-above: an agent proposes an ANSWER instead of a dismissal.
+ruling, by pressing "answer as proposed" on the suggestion in the UI. This is the sibling of
+`suggest-dismissal` above: an agent proposes an ANSWER instead of a dismissal.
 
 Body:
 ```json
@@ -1321,7 +1321,7 @@ Returns 201:
   "success": true,
   "suggestion": { "reason": "...", "suggestedBy": "...", "suggestedAt": "...", "withdrawn": false,
                    "decisionLoopId": "..." | null, "proposedOutcome": "answered", "optionId": "a" },
-  "note": "Recorded as a SUGGESTION only. The ruling is still unanswered until a human agrees to it."
+  "note": "Recorded as a SUGGESTION only. The ruling is still unanswered until a human dismisses or answers it."
 }
 ```
 Attribution comes from the token's own `createdBy`, never from the request body.
@@ -1339,8 +1339,8 @@ Error shapes:
 This route stays disposition-agnostic: it never checks the ruling's current
 disposition/canReply/effect, because those are resolved fresh at press time, not at propose
 time (see `disposition`/`effect` above). Nothing here — or on `suggest-dismissal` — ever writes
-`agreed`, `agreedAt`, or `acceptedAt`; those are the human's own Agree stamp, written only by
-the session-authed discharge path.
+`agreed`, `agreedAt`, or `acceptedAt`; those are stamps written only by the human's own
+dismiss/answer press, via the session-authed discharge path.
 
 ### Task Automation Endpoints
 
