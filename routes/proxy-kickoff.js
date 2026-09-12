@@ -16,7 +16,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { isValidIssueId } from '../lib/workspace.js';
-import { declaredProviderDisplayName } from '../lib/proxy-graphql-errors.js';
+import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 
 /**
  * @param {Object} deps
@@ -278,7 +278,35 @@ export function createKickoffRoutes({
         goal: typeof goal === 'string' ? goal : '',
         mode: resolvedMode,
         variant: resolvedVariant,
-        maxTasks: maxTasks ?? null
+        maxTasks: maxTasks ?? null,
+        // LIN-2804: only resolved when this was a SCOPED kickoff (see the
+        // identical note on the attachProxyContext call below) — a goal-only
+        // kickoff resolves no provider and correctly stays neutral.
+        //
+        // LIN-2804 review Finding 2 (DELIBERATE, NAMED DEFERRAL, not a silent
+        // gap): a goal-only kickoff has never called resolveProviderAccess —
+        // there is no issue to look up — so `resolvedProviderUi(req)` is `null`
+        // here and the rendered hints fall back to full-capability, same as
+        // every provider the `!== false` convention treats as fully-capable by
+        // default. On a GitHub-Projects/Jira workspace this general (unscoped)
+        // stack-walk kickoff therefore still advertises `/issues/{id}` and
+        // `/search` hints that 422 — the defect class this ticket exists to
+        // remove is NOT closed on this one lane. Deliberately not fixed here:
+        // doing so would mean calling resolveProviderAccess unconditionally on
+        // every general kickoff — a real credential round-trip (Mongo/cache
+        // read, possibly a token-refresh HTTP call, a new possible 503) that
+        // this request pays for NO OTHER reason today, the same cost/behavior
+        // tradeoff the plan weighed and declined for the standalone GET preview
+        // route (see the sibling note in this same route file). Impact is
+        // bounded: a capable model (or the worker's own retry-on-422 discipline)
+        // routes around the stale hint after one failed call, exactly as it did
+        // before this ticket for every endpoint this ticket doesn't touch.
+        // Tracked explicitly (not silently inherited) — see
+        // tests/unit/lin-2804-provider-ui-endpoint-hints.test.js's
+        // 'unscoped/goal-only kickoff' describe block, which pins today's
+        // full-capability fallback on this lane so a future accidental change
+        // (in either direction) is visible.
+        providerUi: resolvedProviderUi(req)
       });
 
       // Create the dispatch item through the shared factory (LIN-1139): it
@@ -320,7 +348,14 @@ export function createKickoffRoutes({
               // stamping req.resolvedProvider); a goal-only kickoff resolves no
               // provider and correctly stays neutral rather than triggering a
               // fresh resolve just to fill this sentence.
-              providerDisplayName: declaredProviderDisplayName(req)
+              providerDisplayName: declaredProviderDisplayName(req),
+              // LIN-2804: same stamped req.resolvedProvider, capability half.
+              // Review Finding 2: same deliberate, named deferral as the
+              // `buildAutopilotKickoff` call above — a goal-only kickoff never
+              // resolves a provider, so this is `null` (full-capability) on
+              // every unscoped run regardless of the workspace's real
+              // capability. See the note there for the full rationale.
+              providerUi: resolvedProviderUi(req)
             });
           }
           return { prompt: kickoff, bootstrapToken: null };

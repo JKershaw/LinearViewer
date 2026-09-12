@@ -487,6 +487,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
                   // capability shaping) never guesses Linear for an undeclared
                   // workspace.
                   providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
+                  // LIN-2804: capability summary, same source as the displayName above.
+                  providerUi: getProvider(workspace.provider)?.ui ?? null,
                   // LIN-1376: stamp the launching account so the dispatched
                   // session's token resolves under LIN-1366 owner-scoping.
                   createdBy: req.session?.accountId || null

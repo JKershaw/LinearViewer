@@ -659,7 +659,11 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         issue: { identifier: issue.identifier, title: issue.title },
         mode,
         variant,
-        standalone: true
+        standalone: true,
+        // LIN-2804: mirrors the identical generatePrompt pattern already at
+        // lines 948/1299/1388 in this file — issueProvider is the actually
+        // resolved (possibly cross-source) provider for this issue.
+        providerUi: issueProvider.ui || null
       })
       sendPromptResult(req, res, {
         identifier: issue.identifier,
@@ -725,7 +729,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
 
     try {
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks })
+      // LIN-2804: mirrors the identical generatePrompt pattern at lines 439/3415.
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks, providerUi: getProviderForWorkspace(req.workspace)?.ui || null })
       sendPromptResult(req, res, {
         identifier: '',
         downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
@@ -3457,6 +3462,8 @@ ${goal}`
           // LIN-2354: declared provider identity, fallback-free (unlike the
           // getProviderForWorkspace capability-shaping read above this function).
           providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
+          // LIN-2804: capability summary, same source.
+          providerUi: getProvider(workspace.provider)?.ui ?? null,
           // LIN-1376: stamp the launching account so the dispatched session's
           // token resolves under LIN-1366 owner-scoping.
           createdBy: session?.accountId || null
@@ -3496,7 +3503,10 @@ ${goal}`
       const kickoff = buildAutopilotKickoff({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
-        originNote: FEEDBACK_AUTOPILOT_ORIGIN_NOTE
+        originNote: FEEDBACK_AUTOPILOT_ORIGIN_NOTE,
+        // LIN-2804: capability summary, same source as the attachProxyContext
+        // call below.
+        providerUi: getProvider(workspace.provider)?.ui ?? null
       });
 
       // Create the dispatch item through the shared factory (LIN-1139): it
@@ -3534,6 +3544,8 @@ ${goal}`
           // LIN-2354: declared provider identity, fallback-free (unlike the
           // getProviderForWorkspace capability-shaping reads elsewhere here).
           providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
+          // LIN-2804: capability summary, same source.
+          providerUi: getProvider(workspace.provider)?.ui ?? null,
           // LIN-1376: stamp the launching account so the dispatched session's
           // token resolves under LIN-1366 owner-scoping.
           createdBy: session?.accountId || null

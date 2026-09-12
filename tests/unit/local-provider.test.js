@@ -32,6 +32,9 @@ describe('LocalProvider capability profile (LIN-356 step D)', () => {
       comments: true,     // fetchIssueComments implemented
       inlineCreate: true, // supports('createIssue') (LIN-1552)
       inlineEdit: true,   // supports('updateIssue') (LIN-1552)
+      issueDetail: true,  // supports('issueDetail') — Local implements it (LIN-2804)
+      relations: true,    // supports('relations') — Local implements it (LIN-2804)
+      search: true,       // supports('search') — Local implements it (LIN-2804 review Finding 1)
       estimates: false,
       subtasks: true,
       attachments: true,  // markdown bodies can embed upload links (LIN-771)

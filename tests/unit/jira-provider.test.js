@@ -359,6 +359,13 @@ describe('JiraProvider capability profile', () => {
     assert.equal(p.ui.priority, false, 'priority is unmapped (D3) — the edit form must hide the control')
   })
 
+  test('ui.issueDetail / .relations / .search are all false (LIN-2804 review Finding 1) — no dispatch-prompt read hint should assume Jira has any of the three', () => {
+    const p = new JiraProvider({ site: SITE })
+    assert.equal(p.ui.issueDetail, false, 'issueDetail() is not implemented')
+    assert.equal(p.ui.relations, false, 'relations() is not implemented')
+    assert.equal(p.ui.search, false, 'search() is not implemented — the brief+search fallback must not be offered to Jira')
+  })
+
   test('ui.displayName is "Jira", not the lowercase machine name (LIN-1885 research trap)', () => {
     const p = new JiraProvider()
     assert.equal(p.ui.displayName, 'Jira')
