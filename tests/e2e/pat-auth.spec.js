@@ -19,8 +19,11 @@ test.describe('PAT Authentication Mode', () => {
     const workspaceToggle = page.locator('#workspace-toggle')
     await workspaceToggle.click()
 
-    // The Linear +add link should not be present (OAuth may not be configured)
-    await expect(page.locator('.nav-option-add')).toHaveCount(0)
+    // The Linear +add link should not be present (OAuth may not be configured).
+    // Scoped to Linear's own testid: Jira's add row is not PAT-gated and still
+    // renders here (the shared Playwright webServer configures Jira for the
+    // whole run, LIN-2802), so a bare `.nav-option-add` count is no longer 0.
+    await expect(page.locator('[data-testid="nav-workspace-add-linear"]')).toHaveCount(0)
 
     // But local-workspace onboarding is auth-independent (LIN-377): it stays
     // available even in PAT mode.

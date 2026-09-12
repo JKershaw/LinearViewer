@@ -153,11 +153,18 @@ describe('LIN-1890 E4 — the landing nav bar', () => {
     assert.equal(renderNavBar({ isLanding: true, minimalNav: true }), '');
   });
 
-  test('CHARACTERIZATION: authenticated pages are untouched', () => {
+  test('CHARACTERIZATION: the isLanding-only login CTAs never leak onto authenticated pages', () => {
+    // The `nav-login-*` CTAs are specific to the unauthenticated `isLanding`
+    // bar. LIN-2802 deliberately adds a SEPARATE, authenticated surface (the
+    // workspace switcher's registry-driven add rows, `nav-workspace-add-*`)
+    // that DOES render an `entryCta.href` — see
+    // tests/unit/lin-2802-workspace-add-rows.test.js for that surface's own
+    // coverage. This test narrows to what it can still honestly claim: the
+    // isLanding CTAs themselves stay isLanding-only.
     configureJira();
     const html = renderNavBar({ isLanding: false, urlKey: 'acme', workspaces: [{ urlKey: 'acme', name: 'Acme' }] });
-    assert.ok(!html.includes('/auth/jira'), 'the Jira CTA belongs to the unauthenticated bar only');
-    assert.ok(!html.includes('nav-login-linear'));
+    assert.ok(!html.includes('nav-login-jira'), 'the isLanding Jira CTA testid belongs to the unauthenticated bar only');
+    assert.ok(!html.includes('nav-login-linear'), 'the isLanding Linear CTA testid belongs to the unauthenticated bar only');
   });
 });
 

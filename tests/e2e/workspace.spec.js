@@ -34,11 +34,25 @@ test.describe('Workspace Selector', () => {
     const workspaceOptions = page.locator('#workspace-options');
     await expect(workspaceOptions).toBeVisible();
 
-    // Should show workspace rows (1 workspace + Linear +add + local +add row).
+    // Should show workspace rows (1 workspace + Linear +add + Jira +add + local
+    // +add row). Jira renders here because the shared Playwright webServer sets
+    // JIRA_CLIENT_ID/SECRET/REDIRECT_URI for the whole run (LIN-2802).
     // The local-create row is always present (LIN-377), independent of OAuth/PAT.
-    await expect(workspaceOptions.locator('.nav-options-row')).toHaveCount(3);
-    await expect(workspaceOptions.locator('.nav-option-add')).toContainText('+add');
+    await expect(workspaceOptions.locator('.nav-options-row')).toHaveCount(4);
+    await expect(workspaceOptions.locator('[data-testid="nav-workspace-add-linear"]')).toContainText('+ Linear');
+    await expect(workspaceOptions.locator('[data-testid="nav-workspace-add-jira"]')).toContainText('+ Jira');
     await expect(workspaceOptions.locator('.nav-option-add-local')).toContainText('+local workspace');
+
+    // Row order (LIN-2802 acceptance bullet 3): the workspace row, then the
+    // registry-driven provider add rows in registry order (linear before
+    // jira; github would sort between them if configured here), with Local
+    // always the true last row.
+    const rows = workspaceOptions.locator('.nav-options-row');
+    await expect(rows.nth(0)).toContainText('Local Workspace');
+    await expect(rows.nth(1)).toContainText('+ Linear');
+    await expect(rows.nth(2)).toContainText('+ Jira');
+    await expect(rows.nth(3)).toContainText('+local workspace');
+    await expect(rows.last().locator('.option-prefix')).toHaveText('└─');
   });
 
   test('multiple workspaces show in selector', async ({ page, workerUrlKey }) => {
@@ -51,9 +65,9 @@ test.describe('Workspace Selector', () => {
     const workspaceOptions = page.locator('#workspace-options');
     await expect(workspaceOptions).toBeVisible();
 
-    // Should show 2 workspaces + Linear +add + local +add option
+    // Should show 2 workspaces + Linear +add + Jira +add + local +add option
     const options = workspaceOptions.locator('.nav-options-row');
-    await expect(options).toHaveCount(4); // 2 workspaces + Linear +add + local +add
+    await expect(options).toHaveCount(5); // 2 workspaces + Linear +add + Jira +add + local +add
 
     // First workspace should be selected (has ● marker)
     await expect(workspaceOptions.locator('.nav-option.selected')).toContainText('Test Workspace');
@@ -186,8 +200,8 @@ test.describe('Workspace Limit', () => {
     const workspaceOptions = page.locator('#workspace-options');
     await expect(workspaceOptions).toBeVisible();
 
-    // Should show 10 workspaces + Linear +add + local +add = 12 rows
+    // Should show 10 workspaces + Linear +add + Jira +add + local +add = 13 rows
     const options = workspaceOptions.locator('.nav-options-row');
-    await expect(options).toHaveCount(12);
+    await expect(options).toHaveCount(13);
   });
 });
