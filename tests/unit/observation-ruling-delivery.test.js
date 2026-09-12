@@ -1370,7 +1370,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.ok(!capturedUrl.includes('/api/proxy'), `expected no proxy-prefixed request, got ${capturedUrl}`);
   });
 
-  test('a successful Agree writes "agreed" feedback and clears its pending state (no dangling pending state)', async () => {
+  test('a successful Agree writes "dismissed as proposed" feedback and clears its pending state (no dangling pending state)', async () => {
     const { module } = makeSandbox({ api: async () => ({ success: true }) });
     const { agreeRulingRow, rulingsPending, rulingKey } = module.exports;
     const li = makeLi();
@@ -1379,7 +1379,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     await agreeRulingRow(row, li);
 
     const feedback = li.querySelector('.obs-ruling-feedback');
-    assert.equal(feedback.textContent, 'agreed');
+    assert.equal(feedback.textContent, 'dismissed as proposed');
     assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), false);
     assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1')), false);
   });
@@ -1393,7 +1393,7 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     await agreeRulingRow(row, li);
 
     const feedback = li.querySelector('.obs-ruling-feedback');
-    assert.match(feedback.textContent, /agree failed/);
+    assert.match(feedback.textContent, /dismiss failed/);
     assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
     assert.equal(rulingsPending.has(rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1')), false, 'must not be stranded pending after a failure');
   });
@@ -1571,8 +1571,8 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     // exactly the window PROBE-D exercised.
     renderRulings([rowA, rowB]);
     assert.equal(countEl.textContent, '0 selected', 'the bulk bar must not over-report a settled row as still selected');
-    assert.equal(agreeBtn.textContent, 'Agree selected (0)');
-    assert.equal(agreeBtn.disabled, true, '"Agree selected" must not render enabled over an empty real selection');
+    assert.equal(agreeBtn.textContent, 'Apply 0 as proposed');
+    assert.equal(agreeBtn.disabled, true, '"Apply … as proposed" must not render enabled over an empty real selection');
     assert.equal(selectAll.checked, false);
     assert.equal(selectAll.indeterminate, false);
 
@@ -2064,7 +2064,7 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
 
     assert.equal(apiCalled, false, 'declining the confirm() dialog must send no request');
     assert.equal(confirmCalls.length, 1);
-    assert.match(confirmCalls[0], /1 selected suggestion/);
+    assert.match(confirmCalls[0], /1 selected proposal/);
     assert.ok(rulingsSelected.has(key), 'the selection must survive a decline');
   });
 
@@ -2215,16 +2215,16 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     renderRulings([rowA, rowB]);
 
     assert.equal(bar.hidden, false, 'the bar must show once a suggested row is on screen');
-    assert.equal(agreeBtn.textContent, 'Agree selected (0)');
+    assert.equal(agreeBtn.textContent, 'Apply 0 as proposed');
     assert.equal(agreeBtn.disabled, true);
 
     toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-a'), true);
-    assert.equal(agreeBtn.textContent, 'Agree selected (1)');
+    assert.equal(agreeBtn.textContent, 'Apply 1 as proposed');
     assert.equal(agreeBtn.disabled, false);
     assert.equal(selectAll.indeterminate, true);
 
     toggleRulingSelection(rulingKey('the-ruling-workspace', ANCHOR, 'd-b'), true);
-    assert.equal(agreeBtn.textContent, 'Agree selected (2)');
+    assert.equal(agreeBtn.textContent, 'Apply 2 as proposed');
     assert.equal(selectAll.checked, true);
     assert.equal(selectAll.indeterminate, false);
   });
@@ -2852,6 +2852,36 @@ describe('resolveRulingOptionLabel / the answered-proposal banner (LIN-2792 Step
   });
 });
 
+// ─── Row control labels — positive pins (LIN-2757 review F1/F1b) ────────────
+//
+// The review found these three headline labels unwitnessed at every layer:
+// inverting the row button's kind branch, or reverting "keep open" to "keep",
+// both pass the full 10,720-test unit suite and every e2e assertion, because
+// every existing test selects `.obs-ruling-agree`/`.obs-ruling-keep` by class
+// and never reads their text. These assertions pin the actual rendered copy.
+describe('row control labels are pinned by text, not just by class (LIN-2757 review F1/F1b)', () => {
+  test('a dismissal-kind row renders "dismiss as proposed"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
+    assert.equal(li.querySelector('.obs-ruling-agree').textContent, 'dismiss as proposed');
+  });
+
+  test('an answer-kind row renders "answer as proposed"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(answeredRow());
+    assert.equal(li.querySelector('.obs-ruling-agree').textContent, 'answer as proposed');
+  });
+
+  test('the keep control renders "keep open"', () => {
+    const { module } = makeSandbox();
+    const { renderRulingRow } = module.exports;
+    const li = renderRulingRow(makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } }));
+    assert.equal(li.querySelector('.obs-ruling-keep').textContent, 'keep open');
+  });
+});
+
 describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step 7)', () => {
   test('BRANCH 1 — canReply: false refuses visibly, no write call reached, regardless of what effect reads', async () => {
     let apiCalls = 0;
@@ -2910,7 +2940,7 @@ describe('agreeRulingRow — proposed answer, the four-way branch (LIN-2792 Step
     assert.deepEqual(JSON.parse(captured.opts.body), { taskDecisionId: 'td-answer-1', taskDecisionIssueId: 'issue-1', optionId: 'opt-yes' });
     assert.equal(commentCalls, 0, 'the ruling already lives on the ticket — Agree-as-answer posts no comment');
     const feedback = li.querySelector('.obs-ruling-feedback');
-    assert.equal(feedback.textContent, 'agreed');
+    assert.equal(feedback.textContent, 'answered as proposed');
   });
 
   test('BRANCH 3/4 — resumable Agree resumes the session and threads optionId onto the comment payload', async () => {
@@ -3138,7 +3168,7 @@ describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', (
   test('bulkAgreeConfirmText names both dismiss and answer counts, and both skip categories, when present', () => {
     const { bulkAgreeConfirmText } = makeSandbox().module.exports;
     const text = bulkAgreeConfirmText({ dismiss: 2, answer: 1, refused: 1, dispatchSkipped: 1 });
-    assert.match(text, /Agree 5 selected suggestions/);
+    assert.match(text, /Apply 5 selected proposals/);
     assert.match(text, /2 dismissals/);
     assert.match(text, /1 answer\b/);
     assert.match(text, /1 cannot be answered yet and will be skipped/);
@@ -3148,7 +3178,7 @@ describe('computeBulkAgreeBreakdown / bulkAgreeConfirmText (LIN-2792 Step 7)', (
   test('bulkAgreeConfirmText with only dismissals reads singular/plural correctly and carries no skip parenthetical', () => {
     const { bulkAgreeConfirmText } = makeSandbox().module.exports;
     const text = bulkAgreeConfirmText({ dismiss: 1, answer: 0, refused: 0, dispatchSkipped: 0 });
-    assert.match(text, /Agree 1 selected suggestion \(1 dismissal\)/);
+    assert.match(text, /Apply 1 selected proposal \(1 dismissal\)/);
     assert.doesNotMatch(text, /skipped/);
   });
 });
@@ -3404,5 +3434,74 @@ describe('Agree-as-answer on a gone+record row — optionId survives the record_
 
     assert.equal(captured.issueId, 'id-LIN-CHILD-7', 'the resolved neighbour is the write target');
     assert.equal(captured.decision.optionId, 'opt-yes');
+  });
+});
+
+// LIN-2757 — the absence witness for acceptance criterion 1 ("no control on
+// the Rulings tab uses 'agree' without naming the outcome it agrees to").
+// Every other test in this file (and in render-observation.test.js) only
+// pins what a specific string SHOULD say; nothing before this asserted the
+// ABSENCE of a bare "agree" across a rendered row's own controls. CSS/JS
+// class names (e.g. `.obs-ruling-agree`) are wire/structural, not display
+// text — deliberately excluded, only textContent and aria-label are checked.
+describe('no rendered .obs-ruling-* control reads a bare "agree" (LIN-2757 acceptance criterion 1)', () => {
+  function makeRenderSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    empty.hidden = false;
+    const { module } = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      api: async () => ({ success: true }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { module, list, empty };
+  }
+
+  function collectRulingControls(li) {
+    const found = [];
+    const walk = (node) => {
+      for (const child of node.children) {
+        const classes = String(child.className || '').split(/\s+/);
+        if (classes.some((c) => c.startsWith('obs-ruling-'))) {
+          found.push({
+            className: child.className,
+            text: child.textContent,
+            ariaLabel: typeof child.getAttribute === 'function' ? child.getAttribute('aria-label') : null
+          });
+        }
+        walk(child);
+      }
+    };
+    walk(li);
+    return found;
+  }
+
+  function assertNoBareAgree(controls) {
+    assert.ok(controls.length > 0, 'expected at least one .obs-ruling-* control to check');
+    for (const { className, text, ariaLabel } of controls) {
+      assert.doesNotMatch(text || '', /\bagree\b/i, `${className}'s textContent ("${text}") must not read a bare "agree"`);
+      if (ariaLabel) {
+        assert.doesNotMatch(ariaLabel, /\bagree\b/i, `${className}'s aria-label ("${ariaLabel}") must not read a bare "agree"`);
+      }
+    }
+  }
+
+  test('a proposed-DISMISSAL row: no control text or aria-label reads a bare "agree"', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+    renderRulings([makeRow({ suggestedDismissal: { reason: 'x', suggestedBy: 'y', suggestedAt: '2026-09-05T00:00:00.000Z' } })]);
+    assertNoBareAgree(collectRulingControls(list.children[0]));
+  });
+
+  test('a proposed-ANSWER (task-bound) row: no control text or aria-label reads a bare "agree"', () => {
+    const { module, list } = makeRenderSandbox();
+    const { renderRulings } = module.exports;
+    renderRulings([answeredRow({
+      disposition: 'task-bound',
+      anchor: { loopId: null, taskDecisionId: 'td-invariant' },
+      effect: 'record'
+    })]);
+    assertNoBareAgree(collectRulingControls(list.children[0]));
   });
 });

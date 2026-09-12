@@ -324,3 +324,48 @@ describe('window.ChatUI.appendOptions — effect captions (LIN-2775 Area 5)', ()
     assert.notEqual(window.ChatUI.resolveCaption('mid-turn', 'record'), 'Record answer');
   });
 });
+
+// LIN-2757 Step 1 — opt-in `opts.recommendedLabel` marker text on the
+// recommended option. Flight Companion's `.fc-decision` cards (public/
+// flight-companion.js's renderOneDecision) call appendOptions with no
+// `recommendedLabel` key at all, so the "absent by default" case below is
+// that call site's own guarantee expressed as an assertion, not a
+// hypothetical.
+describe('window.ChatUI.appendOptions — recommendedLabel marker (LIN-2757 Step 1)', () => {
+  test('renders the marker text on the recommended option when recommendedLabel is set', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }, { id: 'b', label: 'Reject' }],
+      recommended: 'a',
+      recommendedLabel: 'agent recommends',
+      disposition: 'resumable',
+      onSelect: () => {}
+    });
+
+    const buttons = container.querySelectorAll('.chat-option-btn');
+    const marker = buttons[0].children.find(c => c.classList.contains('chat-option-recommended-label'));
+    assert.ok(marker, 'expected a marker span on the recommended option');
+    assert.equal(marker.textContent, 'agent recommends');
+    assert.equal(buttons[0].children.length, 1, 'only the marker span, no other new children');
+
+    const nonRecommendedMarker = buttons[1].children.find(c => c.classList.contains('chat-option-recommended-label'));
+    assert.equal(nonRecommendedMarker, undefined, 'a non-recommended option never gets the marker');
+  });
+
+  test('omitting recommendedLabel (the default) renders byte-identically to today — the Flight Companion guarantee', () => {
+    const { document, window } = makeSandbox();
+    const container = document.createElement('div');
+    window.ChatUI.appendOptions(container, {
+      options: [{ id: 'a', label: 'Approve' }],
+      recommended: 'a',
+      disposition: 'resumable',
+      onSelect: () => {}
+    });
+
+    const btn = container.querySelectorAll('.chat-option-btn')[0];
+    assert.ok(btn.classList.contains('chat-option--recommended'), 'the existing CSS-star class is unaffected');
+    assert.equal(btn.children.length, 0, 'no marker span is added when recommendedLabel is omitted');
+    assert.equal(btn.textContent, 'Approve', 'the button label is exactly what it renders today');
+  });
+});

@@ -343,8 +343,39 @@ describe('render-observation: bulk select-all checkbox accessible name (LIN-2444
     );
     assert.match(
       html,
-      /<input type="checkbox" id="obs-ruling-select-all" aria-label="select all suggested">/,
+      /<input type="checkbox" id="obs-ruling-select-all" aria-label="select all proposed">/,
       'the select-all checkbox must carry an aria-label so it has a name even when the sibling text span is display:none at ≤400px'
+    );
+  });
+});
+
+// LIN-2757: half the bulk bar's markup carried no pinned assertion at all —
+// only the aria-label above. These pin the visible select-all span text and
+// the SSR button label, and require the button label to match the client
+// runtime's template exactly (public/observation.js's syncRulingsBulkBar),
+// since the two had zero shared witness before this.
+describe('render-observation: bulk bar markup — visible select-all text + SSR button label (LIN-2757)', () => {
+  test('the visible select-all span reads the same kind-neutral text as its aria-label', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a' }
+    );
+    assert.match(
+      html,
+      /<span class="obs-ruling-bulk-select-all-text">select all proposed<\/span>/,
+      'the visible span must carry the same text as the aria-label'
+    );
+  });
+
+  test('the SSR "0 selected" button label matches the client-rendered template exactly', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a' }
+    );
+    assert.match(
+      html,
+      /id="obs-ruling-agree-selected" disabled>Apply 0 as proposed<\/button>/,
+      'SSR markup and public/observation.js\'s syncRulingsBulkBar must never drift apart on this label'
     );
   });
 });

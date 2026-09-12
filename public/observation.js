@@ -1918,7 +1918,7 @@ function renderRulingRow(row) {
       // LIN-2706 §B.3's convention: the identifier lives in the sibling
       // `idLabel` span above, so an unlabeled checkbox announces nothing
       // useful to a screen reader.
-      checkbox.setAttribute('aria-label', `select ${idLabel} for bulk agree`);
+      checkbox.setAttribute('aria-label', `select ${idLabel} for bulk dismissal or answer`);
       checkbox.checked = rulingsSelected.has(selectionKey);
       checkbox.addEventListener('change', () => toggleRulingSelection(selectionKey, checkbox.checked));
       suggestionHead.appendChild(checkbox);
@@ -1963,6 +1963,7 @@ function renderRulingRow(row) {
   window.ChatUI.appendOptions(li, {
     options: decision?.options,
     recommended: decision?.recommended,
+    recommendedLabel: 'agent recommends',
     disposition,
     effect: effectiveEffect,
     onSelect: (optionId, optionLabel) => {
@@ -2372,7 +2373,7 @@ function agreeRulingRow(row, li) {
 
     return issueDismissRequest(anchor, decisionId).then(() => {
       rulingsPending.delete(key);
-      setFeedback('agreed', false);
+      setFeedback('dismissed as proposed', false);
       // Review F6: clear selection at the moment of success, exactly as
       // `bulkAgreeRow` already does — otherwise a settled-but-still-selected
       // row survives the stale poll window and desyncs the bulk bar's count
@@ -2387,7 +2388,7 @@ function agreeRulingRow(row, li) {
       console.error('Ruling agree failed:', err);
       rulingsPending.delete(key);
       controls.forEach(el => { el.disabled = false; });
-      setFeedback('agree failed: ' + err.message, true);
+      setFeedback('dismiss failed: ' + err.message, true);
     });
   }
 
@@ -2461,7 +2462,7 @@ function deliverRulingStampOnly(row, li, optionId, { bulkAgree = false } = {}) {
     body: JSON.stringify({ taskDecisionId: anchor.taskDecisionId, taskDecisionIssueId: anchor.issueId, optionId })
   }).then(() => {
     rulingsPending.delete(key);
-    setFeedback('agreed', false);
+    setFeedback('answered as proposed', false);
     rulingsSelected.delete(key);
     rulingsSettled.add(key);
     const checkbox = li.querySelector('.obs-ruling-select');
@@ -2474,7 +2475,7 @@ function deliverRulingStampOnly(row, li, optionId, { bulkAgree = false } = {}) {
     console.error('Ruling stamp-only agree failed:', err);
     rulingsPending.delete(key);
     controls.forEach(el => { el.disabled = false; });
-    setFeedback('agree failed: ' + err.message, true);
+    setFeedback('answer failed: ' + err.message, true);
   });
 }
 
@@ -2540,11 +2541,18 @@ function keepRulingRow(row, li) {
   });
 }
 
+// LIN-2757: the button names the outcome it agrees to, rather than the bare
+// verb "agree" (which read as agreeing with the recommended option, not with
+// the proposed disposition). Read `proposedOutcome` once here, the same
+// `?? 'dismissed'` legacy-default arm `agreeRulingRow`/`bulkAgreeRow` already
+// use — a legacy row with no `proposedOutcome` at all still reads as a
+// dismissal, matching the banner above it.
 function makeAgreeButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-agree';
-  btn.textContent = 'agree';
+  const proposedOutcome = row?.suggestedDismissal?.proposedOutcome ?? 'dismissed';
+  btn.textContent = proposedOutcome === 'answered' ? 'answer as proposed' : 'dismiss as proposed';
   btn.addEventListener('click', () => agreeRulingRow(row, li));
   return btn;
 }
@@ -2553,7 +2561,7 @@ function makeKeepButton(row, li) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'action-btn obs-ruling-keep';
-  btn.textContent = 'keep';
+  btn.textContent = 'keep open';
   btn.addEventListener('click', () => keepRulingRow(row, li));
   return btn;
 }
@@ -2640,7 +2648,12 @@ function syncRulingsBulkBar() {
   if (countEl) countEl.textContent = `${selectedCount} selected`;
   if (agreeBtn) {
     agreeBtn.disabled = selectedCount === 0;
-    agreeBtn.textContent = `Agree selected (${selectedCount})`;
+    // LIN-2757: kind-neutral — this button fires whatever mix of dismissals
+    // and answers is selected, so it cannot name a single outcome verb (see
+    // bulkAgreeConfirmText below, which names the real per-kind counts).
+    // Must stay byte-identical to lib/render-observation.js's SSR button
+    // label template (`Apply 0 as proposed`) so the two can never drift.
+    agreeBtn.textContent = `Apply ${selectedCount} as proposed`;
   }
 }
 
@@ -2683,8 +2696,8 @@ function bulkAgreeConfirmText(breakdown) {
   if (breakdown.dismiss) parts.push(`${breakdown.dismiss} dismissal${breakdown.dismiss === 1 ? '' : 's'}`);
   if (breakdown.answer) parts.push(`${breakdown.answer} answer${breakdown.answer === 1 ? '' : 's'}`);
   const kinds = parts.length ? ` (${parts.join(', ')})` : '';
-  let text = `Agree ${total} selected suggestion${total === 1 ? '' : 's'}${kinds}? `
-    + 'Each row is discharged exactly as pressing Agree on that row alone would — this cannot be undone from here.';
+  let text = `Apply ${total} selected proposal${total === 1 ? '' : 's'}${kinds}? `
+    + "Each row is discharged exactly as pressing that row's own dismiss/answer control alone would — this cannot be undone from here.";
   const skips = [];
   if (breakdown.refused) skips.push(`${breakdown.refused} cannot be answered yet and will be skipped`);
   if (breakdown.dispatchSkipped) skips.push(`${breakdown.dispatchSkipped} would start a fresh run and will be skipped in bulk`);
@@ -2749,7 +2762,7 @@ function bulkAgreeRow(key, row, li) {
 
     return issueDismissRequest(anchor, decisionId).then(() => {
       rulingsPending.delete(key);
-      setFeedback('agreed', false);
+      setFeedback('dismissed as proposed', false);
       rulingsSelected.delete(key);
       rulingsSettled.add(key);
       const checkbox = li.querySelector('.obs-ruling-select');
@@ -2758,7 +2771,7 @@ function bulkAgreeRow(key, row, li) {
       console.error('Bulk agree failed for a row:', err);
       rulingsPending.delete(key);
       controls.forEach(el => { el.disabled = false; });
-      setFeedback('agree failed: ' + err.message, true);
+      setFeedback('dismiss failed: ' + err.message, true);
     });
   }
 

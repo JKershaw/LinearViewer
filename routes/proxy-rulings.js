@@ -312,7 +312,7 @@ export function createRulingsRoutes({
           suggestion: record,
           // Said plainly on the wire, because the whole risk of this endpoint
           // is a caller believing it discharged the ruling.
-          note: 'Recorded as a SUGGESTION only. The ruling is still unanswered until a human agrees to it.'
+          note: 'Recorded as a SUGGESTION only. The ruling is still unanswered until a human dismisses or answers it.'
         });
       } catch (error) {
         console.error('Proxy ruling suggest-dismissal error:', error);
@@ -420,7 +420,7 @@ export function createRulingsRoutes({
           suggestion: record,
           // Said plainly on the wire, because the whole risk of this endpoint
           // is a caller believing it discharged the ruling.
-          note: 'Recorded as a SUGGESTION only. The ruling is still unanswered until a human agrees to it.'
+          note: 'Recorded as a SUGGESTION only. The ruling is still unanswered until a human dismisses or answers it.'
         });
       } catch (error) {
         console.error('Proxy ruling suggest-answer error:', error);
