@@ -109,6 +109,7 @@ describe('GitHubProjectsProvider capability profile (LIN-560)', () => {
       inlineEdit: false,   // supports('updateIssue') false — read-only V1 (LIN-1552)
       issueDetail: false, // supports('issueDetail') false — no issueDetail() method (LIN-2804)
       relations: false,   // supports('relations') false — no relations() method (LIN-2804)
+      search: false,      // supports('search') false — no search() method (LIN-2804 review Finding 1)
       estimates: false,   // no estimate mapping in V1
       subtasks: false,    // no item hierarchy
       attachments: true,  // item body (issue/PR) carries user-content uploads (LIN-771)

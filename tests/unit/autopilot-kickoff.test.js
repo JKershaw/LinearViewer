@@ -440,6 +440,57 @@ describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: true } });
     assert.ok(text.includes('GET /issues/LIN-42'));
   });
+
+  describe('providerUi.search (LIN-2804 review Finding 1)', () => {
+    // `/search` is itself capability-gated (routes/proxy-reads.js's
+    // `denyIfUnsupported(provider, 'search', ...)`) — GitHub Projects and Jira
+    // support neither `issueDetail` nor `search`, so the Setup guide's
+    // unconditional `GET /search` mention was the same defect class this
+    // ticket exists to remove.
+
+    test('search: false — Setup guide bullet drops the `GET /search` mention too, both scoped and general', () => {
+      const scopedText = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: false, search: false } });
+      const generalText = buildAutopilotKickoff({ baseUrl: BASE_URL, providerUi: { issueDetail: false, search: false } });
+      for (const text of [scopedText, generalText]) {
+        assert.ok(!text.includes('`GET /search`'), 'no /search mention — it 422s too on this provider');
+        assert.ok(text.includes('verify via `GET /brief/{id}`, plus the artifact URLs in `[evidence]`'), 'clause closes straight from the brief verb to the artifact-URL clause');
+      }
+    });
+
+    test('search: true, issueDetail: false (e.g. GitHub) — GET /search mention still present', () => {
+      const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: false, search: true } });
+      assert.ok(text.includes('verify via `GET /brief/{id}`, `GET /search`,'), '/search retained when actually supported');
+    });
+
+    test('omitted/null search reproduces byte-identical output (defaults to full capability)', () => {
+      const omitted = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
+      const explicitTrue = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { search: true } });
+      assert.equal(explicitTrue, omitted);
+    });
+
+    test('mutation check: comment out the search gate to see these assertions fail', () => {
+      const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { search: true } });
+      assert.ok(text.includes('`GET /search`'));
+    });
+
+    test('real registered provider parity: the Setup guide never names an endpoint the resolved provider does not support', async () => {
+      const { linearProvider } = await import('../../lib/providers/linear/index.js');
+      const { localProvider } = await import('../../lib/providers/local/index.js');
+      const { githubProvider } = await import('../../lib/providers/github/index.js');
+      const { githubProjectsProvider } = await import('../../lib/providers/github-projects/index.js');
+      const { jiraProvider } = await import('../../lib/providers/jira/index.js');
+
+      for (const provider of [linearProvider, localProvider, githubProvider, githubProjectsProvider, jiraProvider]) {
+        const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: provider.ui });
+        if (text.includes(`GET /issues/${issue.identifier}`)) {
+          assert.equal(provider.supports('issueDetail'), true, `${provider.name}: rendered /issues/{id} but does not support issueDetail`);
+        }
+        if (text.includes('`GET /search`')) {
+          assert.equal(provider.supports('search'), true, `${provider.name}: rendered /search but does not support search`);
+        }
+      }
+    });
+  });
 });
 
 // LIN-1829, plan step 5f. The golden fixture (tests/fixtures/autopilot-kickoff/

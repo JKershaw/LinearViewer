@@ -415,6 +415,7 @@ describe('provider.ui surface (LIN-332)', () => {
       inlineEdit: false,   // derived from supports('updateIssue') — off on base (LIN-1552)
       issueDetail: false, // derived from supports('issueDetail') — off on base (LIN-2804)
       relations: false,   // derived from supports('relations') — off on base (LIN-2804)
+      search: false,      // derived from supports('search') — off on base (LIN-2804 review Finding 1)
       estimates: false,
       subtasks: false,
       attachments: false, // read-attachments opt-in, off by default (LIN-649)
@@ -433,6 +434,7 @@ describe('provider.ui surface (LIN-332)', () => {
       inlineEdit: true,   // supports('updateIssue') (LIN-1552)
       issueDetail: true, // supports('issueDetail') — Linear implements it (LIN-2804)
       relations: true,   // supports('relations') — Linear implements it (LIN-2804)
+      search: true,      // supports('search') — Linear implements it (LIN-2804 review Finding 1)
       estimates: true,  // estimate is in ISSUE_FIELDS_FRAGMENT
       subtasks: true,   // children/parent are fetched
       attachments: true, // API read selects attachments + extracts md images (LIN-649)
@@ -526,7 +528,7 @@ describe('provider.ui surface (LIN-332)', () => {
     makeStubProvider({ write: true, displayName: 'Other' });
     // linearProvider.ui is unaffected by stub construction.
     assert.deepStrictEqual(linearProvider.ui, {
-      write: true, comments: true, inlineCreate: true, inlineEdit: true, issueDetail: true, relations: true, estimates: true, subtasks: true, attachments: true, priority: true, displayName: 'Linear', fixedStates: null,
+      write: true, comments: true, inlineCreate: true, inlineEdit: true, issueDetail: true, relations: true, search: true, estimates: true, subtasks: true, attachments: true, priority: true, displayName: 'Linear', fixedStates: null,
     });
   });
 });

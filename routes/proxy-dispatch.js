@@ -422,6 +422,28 @@ export function createDispatchRoutes({
               // and correctly stays neutral rather than triggering a fresh resolve.
               providerDisplayName: declaredProviderDisplayName(req),
               // LIN-2804: same stamped req.resolvedProvider, capability half.
+              //
+              // LIN-2804 review Finding 2 (DELIBERATE, NAMED DEFERRAL, not a
+              // silent gap): when `issueIdentifier` is absent (a goal-only /
+              // unscoped human-supplied-prompt dispatch), the dangling-referent
+              // guard above never runs and no provider is resolved, so this is
+              // `null` here and the rendered hints fall back to full-capability
+              // regardless of the workspace's real provider. A GitHub-Projects/
+              // Jira workspace's unscoped `POST /api/proxy/dispatch` therefore
+              // still gets `/issues/{id}`/`/search` hints that 422. Deliberately
+              // not fixed here: this route resolves no provider today for any
+              // reason OTHER than the dangling-referent check (see the comment
+              // on that guard above), and calling resolveProviderAccess
+              // unconditionally just to fill this field would add a real
+              // credential round-trip (Mongo/cache read, possibly a
+              // token-refresh HTTP call, a new possible 503) to every plain
+              // dispatch that doesn't otherwise need one — the identical
+              // cost/behavior tradeoff the plan weighed and declined for the
+              // standalone GET kickoff-preview route. Impact is bounded (a
+              // worker routes around one stale hint after a single failed
+              // call), and the boundary is pinned, not silently inherited — see
+              // tests/unit/lin-2804-provider-ui-endpoint-hints.test.js's
+              // 'unscoped/goal-only dispatch' describe block.
               providerUi: resolvedProviderUi(req)
             });
           }

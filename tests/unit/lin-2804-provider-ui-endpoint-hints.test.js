@@ -246,3 +246,45 @@ describe('LIN-2804 — workspace-scoped idiom (getProvider(workspace.provider)?.
     assert.ok(explicitTrue.includes('/api/proxy/issues/'), 'raw issue detail stays available for a full-capability provider');
   });
 });
+
+// --- Review Finding 2: unscoped/goal-only bearer-token dispatch (NAMED, ------
+// --- DELIBERATE deferral — not a silent gap; see the code comments on -------
+// --- routes/proxy-kickoff.js and routes/proxy-dispatch.js for the full ------
+// --- rationale) -------------------------------------------------------------
+//
+// Neither `POST /api/proxy/autopilot/kickoff` (no `issueIdentifier`, a
+// general/goal-only stack-walk run) nor `POST /api/proxy/dispatch` (no
+// `issueIdentifier`, a plain human-supplied-prompt dispatch) ever calls
+// `resolveProviderAccess` on this lane — there is no issue to look up, so
+// `req.resolvedProvider` is never stamped and `resolvedProviderUi(req)` reads
+// `null`. Per the `!== false` convention that is FULL CAPABILITY, so a
+// GitHub-Projects/Jira-backed workspace's general/goal-only dispatch still
+// renders the unconditional `/issues/{id}`/`/search` hints — the defect class
+// this ticket exists to remove is NOT closed on this one lane. These tests pin
+// TODAY'S documented boundary (not the fix) so a future change to either
+// direction is visible rather than silently inherited.
+describe('LIN-2804 review Finding 2 — unscoped/goal-only dispatch renders full-capability hints regardless of the workspace provider (documented, deliberate boundary)', () => {
+  test('a goal-only POST /api/proxy/autopilot/kickoff on a GitHub-shaped workspace still renders the /issues/{id} verify hint (no capability resolved)', async () => {
+    const dispatch = capturingDispatchStore();
+    const app = buildKickoffApp({ provider: githubShapedProvider('lin2804-gh-goal-kickoff'), dispatchQueueStore: dispatch });
+
+    const { status } = await postKickoff(app, { goal: 'walk the stack' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(dispatch.items.length, 1);
+    const { prompt } = dispatch.items[0].item;
+    assert.ok(/verify `GET \/issues\/\{id\}`/.test(prompt), 'documented gap: unscoped kickoff still advertises /issues/{id} on a GitHub-shaped workspace');
+    assert.ok(prompt.includes('e.g. GET') && prompt.includes('/issues/{id})'), 'documented gap: preamble generic discovery still names /issues/{id} too');
+  });
+
+  test('a scoped kickoff on the same GitHub-shaped workspace DOES gate the hint — contrast case proving the gap is specific to the unscoped lane', async () => {
+    const dispatch = capturingDispatchStore();
+    const app = buildKickoffApp({ provider: githubShapedProvider('lin2804-gh-contrast-kickoff'), dispatchQueueStore: dispatch });
+
+    const { status } = await postKickoff(app, { issueIdentifier: 'GH-42' });
+
+    assert.strictEqual(status, 201);
+    const { prompt } = dispatch.items[0].item;
+    assert.ok(!/verify `GET \/issues\/\{id\}`/.test(prompt), 'a SCOPED kickoff on the identical provider correctly gates the hint');
+  });
+});

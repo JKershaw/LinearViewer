@@ -262,6 +262,80 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
         assert.ok(out.includes(MCP_GATE_LINE), 'authn≠authz gate sentence present, byte-identical');
       }
     });
+
+    describe('providerUi.search (LIN-2804 review Finding 1)', () => {
+      // `/search` is itself capability-gated (routes/proxy-reads.js's
+      // `denyIfUnsupported(provider, 'search', ...)`), so the issueDetail-false
+      // fallback must not assume `/search` is a safe landing — real GitHub
+      // Projects/Jira `ui` objects report `search: false` too.
+
+      test('issueDetail: false, search: false — with-identifier drops /search too, brief-only fallback', () => {
+        const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: false, relations: false, search: false } });
+        assert.ok(!out.includes('/api/proxy/issues/LIN-42'), 'no /issues/{id} hint');
+        assert.ok(!out.includes('/relations/LIN-42'), 'no /relations hint');
+        assert.ok(!out.includes('/api/proxy/search'), 'no /search hint — it 422s too on this provider');
+        assert.ok(out.includes('Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42'), 'brief hint unchanged');
+        assert.ok(out.includes('update the workspace as you work (status, comments, labels)'), 'the update-workspace close survives with no read-hint clause attached');
+      });
+
+      test('issueDetail: false, search: true (e.g. GitHub) — /search fallback still offered', () => {
+        const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: false, relations: false, search: true } });
+        assert.ok(out.includes('/api/proxy/search?q=… to find related tasks by text'), 'search alternative present when the provider actually supports it');
+      });
+
+      test('issueDetail: false, search: false — generic (no identifier) drops /search, leaving stack-only', () => {
+        const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', providerUi: { issueDetail: false, search: false } });
+        assert.ok(!out.includes('/issues/{id}'), 'no /issues/{id} hint');
+        assert.ok(!out.includes('/search'), 'no /search hint');
+        assert.ok(out.includes(`GET https://host/api/proxy/stack) and to update`), 'stack-only fallback retained');
+      });
+
+      test('issueDetail: true, search: false (robustness case, no real provider hits it today) — generic drops only /search', () => {
+        const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', providerUi: { search: false } });
+        assert.ok(out.includes('/issues/{id})'), 'keeps the /issues/{id} example');
+        assert.ok(!out.includes('/search'), 'drops /search only');
+      });
+
+      test('omitted/null search reproduces byte-identical output (defaults to full capability)', () => {
+        const withId = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42' });
+        const withIdExplicit = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { search: true } });
+        assert.equal(withIdExplicit, withId);
+        const generic = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123' });
+        const genericExplicit = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', providerUi: { search: true } });
+        assert.equal(genericExplicit, generic);
+      });
+
+      test('real registered provider parity: every endpoint the rendered hint names is supports()-true for that provider (discharges review "What CI Did Not Prove" item 1)', async () => {
+        // The review's own blocking finding: every prior test built a fake
+        // provider with a hand-written `ui` literal, so none of them could have
+        // caught a rendered hint the RECEIVING provider doesn't actually
+        // support. This drives buildProxyContextPreamble with the five real,
+        // registered provider singletons' own `.ui` (imported directly, no
+        // hand-typed literal) and asserts every endpoint the rendered text
+        // names is `supports()`-true on that same provider.
+        const { linearProvider } = await import('../../lib/providers/linear/index.js');
+        const { localProvider } = await import('../../lib/providers/local/index.js');
+        const { githubProvider } = await import('../../lib/providers/github/index.js');
+        const { githubProjectsProvider } = await import('../../lib/providers/github-projects/index.js');
+        const { jiraProvider } = await import('../../lib/providers/jira/index.js');
+
+        for (const provider of [linearProvider, localProvider, githubProvider, githubProjectsProvider, jiraProvider]) {
+          const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'X-42', providerUi: provider.ui });
+          if (out.includes('/api/proxy/issues/X-42')) {
+            assert.equal(provider.supports('issueDetail'), true, `${provider.name}: rendered /issues/{id} but does not support issueDetail`);
+          }
+          if (out.includes('/relations/X-42')) {
+            assert.equal(provider.supports('relations'), true, `${provider.name}: rendered /relations but does not support relations`);
+          }
+          if (out.includes('/api/proxy/search')) {
+            assert.equal(provider.supports('search'), true, `${provider.name}: rendered /search but does not support search`);
+          }
+          // The converse must also hold: an unsupported-capability provider is
+          // never left with NO landing at all — the brief is always offered.
+          assert.ok(out.includes('/api/proxy/brief/X-42'), `${provider.name}: the brief hint must always be present`);
+        }
+      });
+    });
   });
 
   test('mcp mode embeds no token and no curl, but keeps context + evidence', () => {
