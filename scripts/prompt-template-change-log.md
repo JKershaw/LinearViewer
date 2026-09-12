@@ -63,6 +63,7 @@ Newest last.
 | 2026-09-04 | `d8152ee8` | LIN-1873 | handwritten + meta | Generalised the cited-sweep rule into plan and plan-review: a claim of covering a class must cite the reproducible query whose output IS the enumeration (with output and sha), the reviewer re-runs that query rather than searching independently, and a class with no possible sweep is declared as such with its reason. | **down** |
 | 2026-09-05 | PR #1403 | LIN-2618 | neither (lib/prompts/flight-companion-brief.js) | Extracted the Flight Companion's persona, disposition, readout shape, fossil-row instruction, surfacing policy, vocabulary and propose-then-wait gate into one shared brief rendered by BOTH the pasted kickoff and the in-page chat's system turn; the chat additionally gained the clock, the turn kind and the headline-block-plus-six-part readout it previously had none of. | unknown |
 | 2026-09-12 | PR #1456 | LIN-2804 | neither (`lib/proxy-preamble.js`, `lib/prompts/autopilot-kickoff.js`) | Gated the auto-appended proxy preamble's and the autopilot kickoff's `/issues/{id}`/`/relations` endpoint hints on the resolved provider's `issueDetail`/`relations` capability (new `provider.ui.issueDetail`/`.relations` flags) instead of advertising them unconditionally; GitHub/GitHub-Projects/Jira workspaces now see a `brief`+`/search`-based hint instead of a hint that 422s. Linear/Local output is byte-identical. **Review round 2 (Finding 1):** the `/search` fallback was itself an unconditional hint that 422s on GitHub Projects/Jira (neither supports `search`); added a third derived flag, `provider.ui.search`, and gated every `/search` mention on it too, so those two providers now see a brief-only fallback with no read hint that 422s. | **up** |
+| 2026-09-12 | PR #1459 | LIN-1871 | handwritten + meta | Revised the LIN-1873 cited-sweep rule into class-not-member enumeration, extended to a third template: research now names each class and how it bounded it, plan works from research's classes and is sent back only for a missing class (never a missing member inside a class already bounded), and plan-review argues the class a missing member belongs to rather than stopping at the member. | **down** |
 
 ### On the LIN-2618 row, and why its Paths cell reads `neither`
 
@@ -124,6 +125,29 @@ I am recording `down` because the loop-shortening effect is the one the four
 measured cases actually exhibit, and the rejection effect is speculative. If the
 read comes back up, that counter-argument is the first thing to check — not a
 post-hoc explanation invented to fit the number.
+
+### On the LIN-1871 row's direction, recorded before the read
+
+**`down`**, per John's own ruling on the ticket: "expected direction `down` on
+plan-review rounds per ticket." The reasoning, restated here so it can be
+judged: `docs/papers/review-loops.md` (LIN-2800) measured that the LIN-1873
+row above did NOT deliver the loop-shortening effect its own recorded `down`
+predicted — 33 of 94 tickets still went round plan-review two or more times,
+and the send-back rule that change left in place still let a reviewer stop at
+one missing member rather than the whole class, so the plan → plan-review →
+plan loop could still cycle one member at a time. This change targets that
+specific gap: a plan is now sent back only for a missing or wrongly-bounded
+class, never for a missing member inside a class already correctly bounded,
+which should shorten exactly the cycle LIN-1873 did not.
+
+The same honest counter-argument as the LIN-1873 row applies again, and is not
+weaker for having been wrong once already: naming the class-not-member rule
+gives a reviewer a new, sharper thing to send a plan back for, and some plans
+that would have passed on a narrower member-level finding may now come back
+Request Changes for an unbounded or wrongly-bounded class. If this read also
+comes back `up` or flat, the question is the same one LIN-1873's did not get
+asked in time: is the rule producing a quality win that this ratio cannot see,
+or is the mechanism itself not the lever the round count responds to.
 
 ### On the backfilled rows
 

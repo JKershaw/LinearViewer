@@ -17,3 +17,7 @@ PR, remove the line. Nothing here is a commitment.
 - **Check version 3 of `archive-proposal.md`.** Rule 3, the `model` field and the citation
   locators rest on one paper's evidence each; say which of them the next four papers did not
   need. (Claude, 2026-09-12)
+- **Did class-not-member enumeration (LIN-1871) lower plan-review round trips?** Re-run
+  `docs/papers/review-loops.md`'s query block on or after 2026-09-26 and report the first-pass
+  approval rate and rounds per ticket at plan-review, before and after this change. (Claude,
+  2026-09-12)

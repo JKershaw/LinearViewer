@@ -1445,14 +1445,16 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
 // CLAUDE.md's both-paths rule (review template's Test Quality Check bullet +
 // checklist item). Nothing pinned this on the meta path either (LIN-2303).
 
-// LIN-1873 — the cited-sweep rule on the META path.
+// LIN-1871 (revising LIN-1873) — argue the class, not the member, on the META
+// path, across all three templates (research/plan/plan-review) the ruling
+// names.
 //
 // The both-paths rule (CLAUDE.md, docs/prompt-change-validation.md) is why this
 // file mirrors tests/unit/prompt-templates.test.js: a rule that lands only in
 // the handwritten templates silently does not apply to any AI-generated prompt,
 // and the two drift without anything noticing. LIN-2303 is the precedent —
 // LIN-2274's directive was unpinned on both paths until it added these.
-describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
+describe('buildMetaPromptTemplate class-not-member enumeration rule (LIN-1871, revising LIN-1873)', () => {
   function build() {
     return buildMetaPromptTemplate({
       issueContext: 'Test context',
@@ -1468,11 +1470,39 @@ describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
     });
   }
 
-  test('Plan-prompts rule requires the query whose output IS the enumeration', () => {
+  test('Research-prompts rule requires naming each class, its bound, and every member found', () => {
     const result = build();
     assert.ok(
-      result.includes('cites the reproducible query whose output IS the enumeration'),
-      'the plan rule must require a cited sweep for any class-coverage claim'
+      result.includes('Research prompts must also require naming the classes the task touches'),
+      'the research rule must require class-naming, not just layer-auditing'
+    );
+    assert.ok(
+      result.includes('a reproducible query is one way to bound a class, not the only way'),
+      'a query must not be the only accepted form of bounding at research stage'
+    );
+    assert.ok(
+      result.includes('the plan step works from this list and adds a class of its own only if it can say why research missed it'),
+      'must hand the class list to the plan step with a justification bar for extending it'
+    );
+  });
+
+  test('Plan-prompts rule works from research\'s classes and requires the query as one way to bound', () => {
+    const result = build();
+    assert.ok(
+      result.includes('naming the class and how it was bounded, working from research\'s classes'),
+      'the plan rule must require class-not-member framing, keyed to research'
+    );
+    assert.ok(
+      result.includes('add a class of its own only if it can say why research missed it'),
+      'a plan-added class must be justified against what research found'
+    );
+    assert.ok(
+      result.includes('reproducible query whose output IS the enumeration'),
+      'the plan rule must still require a cited query where one applies'
+    );
+    assert.ok(
+      result.includes('which is one way to bound a class and the strongest one where it applies'),
+      'a query must not be presented as the only accepted bound'
     );
     assert.ok(
       result.includes('the commit sha it was run at'),
@@ -1528,11 +1558,11 @@ describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
     );
   });
 
-  test('Plan-prompts rule says where the sweep and its sha are recorded', () => {
+  test('Plan-prompts rule says where the class, its bound and its sha are recorded', () => {
     const result = build();
     assert.ok(
       result.includes('recorded in the issue description alongside the plan'),
-      'the query, its output and its sha need a stated destination'
+      'the class, its bound and its sha need a stated destination'
     );
     assert.ok(
       result.includes('where plan-review looks for them'),
@@ -1540,39 +1570,68 @@ describe('buildMetaPromptTemplate cited-sweep rule (LIN-1873)', () => {
     );
   });
 
-  test('Plan-prompts rule warns against a query that only looks authoritative', () => {
+  test('Plan-prompts rule warns against a query, a script, or a checklist that only looks authoritative', () => {
     const result = build();
+    assert.ok(
+      result.includes('manufacturing a query, a script, or a checklist to fill the slot'),
+      'the anti-incentive must now exclude scripted forms too, not just a fabricated query'
+    );
+    assert.ok(
+      result.includes('the rule asks for reasoning shown, not a form filled'),
+      'must state the rule is about reasoning, not a fixed vocabulary'
+    );
     assert.ok(
       result.includes('looks authoritative and is quietly incomplete'),
       'the anti-incentive is what keeps the rule from becoming a box to tick'
     );
   });
 
-  test('Plan-review-prompts rule re-runs the plan\'s cited sweep as check (1)', () => {
+  test('Plan-review-prompts rule (1) argues the class, not the member', () => {
     const result = build();
     assert.ok(
-      result.includes('re-run THAT query at the sha it names'),
-      'the verifier must re-run the cited query, not an equivalent of their own'
+      result.includes('completeness check — argue the class, not the member'),
+      'check (1) must be retitled to name the class-not-member rule'
     );
     assert.ok(
-      result.includes('only where the plan cites no sweep does the verifier fall back'),
-      'the independent search is the fallback, not the primary path'
+      result.includes('re-derive that bound (re-run the query it cites at the sha it names, or redo the reasoning)'),
+      'the verifier must re-derive the plan\'s own bound, by query or by reasoning'
+    );
+    assert.ok(
+      result.includes('the verdict does not stop at the member'),
+      'a found member must not end the finding by itself'
+    );
+    assert.ok(
+      result.includes('how the verifier bounded that class, and every other member that bounding found'),
+      'the finding must widen to the whole class, not just the one member'
+    );
+    assert.ok(
+      result.includes('only where the plan cites no bound for a class it claims to cover does the verifier fall back'),
+      'the independent search is the fallback, not the primary path, and now keys on "bound" not "sweep"'
+    );
+    assert.ok(
+      result.includes('a plan is never sent back for a missing member inside a class already correctly bounded, only for a missing or wrongly-bounded class'),
+      'the class-not-member send-back rule must be stated explicitly on the meta path too'
     );
   });
 
-  test('Plan-review-prompts rule directs disagreement at the sweep', () => {
+  test('Plan-review-prompts rule directs disagreement at the bound', () => {
     const result = build();
     assert.ok(
-      result.includes('argues about the SWEEP'),
-      'a disputed enumeration must be argued as a query'
+      result.includes('argues about the BOUND'),
+      'a disputed enumeration must be argued as a bound, not just "the sweep"'
+    );
+    assert.ok(
+      result.includes('proposing the class, the query or reasoning they would use instead'),
+      'proposing a counter-class with its own bound is the concrete action'
     );
     // NOT a bare `includes('converge')`. `origin/main`'s Plan-prompts rule
     // already says "migration / convergence / pre-launch parent epics", so that
-    // assertion passes with the entire LIN-1873 meta text deleted — a witness
-    // that witnesses nothing, in the test file for a rule about exactly that.
+    // assertion passes with the entire LIN-1871/1873 meta text deleted — a
+    // witness that witnesses nothing, in the test file for a rule about
+    // exactly that.
     assert.ok(
       result.includes('converge once one of them runs it'),
-      'must say why — a query converges where member-by-member discovery does not'
+      'must say why — a bound converges where member-by-member discovery does not'
     );
   });
 

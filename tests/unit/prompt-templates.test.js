@@ -997,24 +997,85 @@ describe('mutation-check directive — pin the review institutionalization (LIN-
 
 
 // =============================================================================
-// LIN-1873 — the cited-sweep rule, pinned on BOTH prompt paths
+// LIN-1871 (revising LIN-1873) — argue the class, not the member, pinned on
+// BOTH prompt paths, across all three templates the ruling names
 // =============================================================================
 //
-// Evidence base is LIN-1871, which applied this by hand to the four tickets
-// parked at plan-review with 4+ agent sessions each and ZERO commits between
-// them. In every case the convergent query was cheap (one `rg`, or a ~40-line
-// script) and reproduced the reviewer's blocking finding mechanically — and on
-// LIN-1717 the reviewer had already written the query down; the plan simply
-// never cited it.
+// Evidence base is LIN-1871, which applied the original cited-sweep rule by
+// hand to four tickets parked at plan-review with 4+ agent sessions each and
+// ZERO commits between them. In every case the convergent query was cheap
+// (one `rg`, or a ~40-line script) and reproduced the reviewer's blocking
+// finding mechanically — and on LIN-1717 the reviewer had already written the
+// query down; the plan simply never cited it. John's 2026-09-12 ruling
+// generalises that fix into three rules: research names the classes a ticket
+// touches (with a bound, not necessarily a query); plan works from research's
+// classes and is sent back only for a missing CLASS, never a missing member
+// inside a class already correctly bounded; plan-review argues the class a
+// missed member belongs to, not just the member.
 //
-// The rule has two halves and BOTH are pinned, because the second is what
-// stops the first becoming a box to tick: a plan may declare a class
-// un-sweepable, and a reviewer must check the REASON rather than the absence.
-// Without that, the rule would push plans toward inventing an authoritative-
-// looking query for a class that has none — which ends the conversation with
-// the wrong answer instead of not ending it.
+// The un-sweepable escape hatch is UNCHANGED by this revision and stays
+// pinned as before: a class may have no sweep, and a reviewer must check the
+// REASON rather than the absence — otherwise the rule pushes plans toward
+// inventing an authoritative-looking bound for a class that has none, which
+// ends the conversation with the wrong answer instead of not ending it.
 
-describe('cited-sweep rule — plan template (LIN-1873)', () => {
+describe('class-not-member enumeration rule — research template (LIN-1871)', () => {
+  const researchIssue = {
+    id: 'issue-classes-research', identifier: 'TEST-CL0', title: 'Cover every call site',
+    description: 'Handle the whole class', url: 'https://linear.app/test/issue/TEST-CL0',
+    state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-01-01T00:00:00.000Z',
+    labels: []
+  };
+  const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+
+  test('requires naming each class, how it was bounded, and every member found', () => {
+    const result = generatePrompt('research', researchIssue, ctx);
+    assert.ok(/### Name the Classes/.test(result.prompt),
+      'research prompt must carry the Name the Classes section');
+    assert.ok(/name it, say how you bounded it, and list every member you found/i.test(result.prompt),
+      'must pin the three-part obligation: name, bound, enumerate');
+    assert.ok(/a query is one way to bound a class, not the only way/i.test(result.prompt),
+      'a query must not be the only accepted form of bounding at research stage');
+  });
+
+  test('treats an unbound class as a first-class answer, naming the two recurring shapes', () => {
+    const result = generatePrompt('research', researchIssue, ctx);
+    assert.ok(/A class you could not bound is a first-class answer/i.test(result.prompt),
+      'declaring a class unbound must not read as an omission');
+    assert.ok(/destination that does not exist yet in the current source tree/i.test(result.prompt),
+      'must name the moved-code-destinations shape (LIN-1717)');
+    assert.ok(/production data rather than source/i.test(result.prompt),
+      'must name the population-is-data shape (LIN-1731)');
+  });
+
+  test('hands the class list to the plan step, which extends it only with reason', () => {
+    const result = generatePrompt('research', researchIssue, ctx);
+    assert.ok(/Record each class, its bound, and its members in the description/i.test(result.prompt),
+      'the class list needs a stated destination for the plan step to find');
+    assert.ok(/plan step works from this list/i.test(result.prompt),
+      'must state that plan is not free to re-derive classes from scratch');
+    assert.ok(/only adds a class of its own if it can say why you missed it/i.test(result.prompt),
+      'a new class at plan stage must be justified against research, not just added');
+  });
+
+  test('sits after Audit the Layers, before Surface Assessment', () => {
+    const result = generatePrompt('research', researchIssue, ctx);
+    const audit = result.prompt.indexOf('### Audit the Layers');
+    const classes = result.prompt.indexOf('### Name the Classes');
+    const surface = result.prompt.indexOf('### Surface Assessment');
+    assert.ok(audit > -1 && classes > -1 && surface > -1, 'all three anchors present');
+    assert.ok(audit < classes, 'class-naming follows the broader layer audit');
+    assert.ok(classes < surface, 'and precedes the Surface Assessment verdict');
+  });
+
+  test('lists the class list among the research comment output', () => {
+    const result = generatePrompt('research', researchIssue, ctx);
+    assert.ok(/the class list \(each class named, bounded, and its members\)/i.test(result.prompt),
+      'the Output section must name the class list as a deliverable, not just imply it');
+  });
+});
+
+describe('class-not-member enumeration rule — plan template (LIN-1871, revising LIN-1873)', () => {
   const planIssue = {
     id: 'issue-sweep-plan', identifier: 'TEST-SW1', title: 'Cover every call site',
     description: 'Handle the whole class', url: 'https://linear.app/test/issue/TEST-SW1',
@@ -1023,18 +1084,30 @@ describe('cited-sweep rule — plan template (LIN-1873)', () => {
   };
   const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
-  test('requires a reproducible query whose output IS the enumeration', () => {
+  test('works from research\'s classes and adds a class only with reason', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/Cite the sweep, not the conclusion/.test(result.prompt),
-      'plan prompt must carry the cited-sweep directive');
-    assert.ok(/reproducible query whose output IS that enumeration/i.test(result.prompt),
-      'must pin the substantive clause — the query IS the enumeration, not a supporting note');
+    assert.ok(/Name the class, and how you bounded it — work from research.s classes/i.test(result.prompt),
+      'plan prompt must carry the class-not-member directive, keyed to research');
+    assert.ok(/add a class of your own only if you can say why research missed it/i.test(result.prompt),
+      'a plan-added class must be justified against what research found');
   });
 
-  test('requires the output and the sha it was run at, not just the query', () => {
+  test('requires a reproducible query as one way to bound a class, not the only way', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/Paste the output and record the commit sha it was run at/i.test(result.prompt),
+    assert.ok(/reproducible query whose output IS the enumeration/i.test(result.prompt),
+      'must pin the substantive clause — the query IS the enumeration, not a supporting note');
+    assert.ok(/is one way to bound a class, and the strongest one where it applies/i.test(result.prompt),
+      'a query must not be presented as the only accepted bound');
+    assert.ok(/paste its output and record the commit sha it ran at/i.test(result.prompt),
       'a query with no output and no sha is not reproducible by the reviewer');
+  });
+
+  test('is sent back only for a missing class, never a missing member inside a bounded class', () => {
+    const result = generatePrompt('plan', planIssue, ctx);
+    assert.ok(/not sent back later for a missing member inside a class it correctly bounded/i.test(result.prompt),
+      'the class-not-member bound must be stated as the plan\'s own send-back rule');
+    assert.ok(/only for a class it should have named/i.test(result.prompt),
+      'the only valid send-back reason is a missing class');
   });
 
   test('names the two un-sweepable shapes and makes declaring one a first-class answer', () => {
@@ -1067,38 +1140,40 @@ describe('cited-sweep rule — plan template (LIN-1873)', () => {
       'must say WHY it is excluded, or the exclusion reads as arbitrary');
   });
 
-  test('names where the sweep, its output and its sha are recorded', () => {
-    // A cited sweep the reviewer cannot find is a hand-list with extra steps,
-    // and check (1) of plan-review is written to go looking for it.
+  test('names where the class, its bound and its members are recorded', () => {
+    // A class the reviewer cannot find recorded is a hand-list with extra
+    // steps, and check (1) of plan-review is written to go looking for it.
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/Record all three in the issue description/i.test(result.prompt),
-      'the query, its output and its sha need a stated destination');
+    assert.ok(/Record the class, its bound, and its members in the issue description/i.test(result.prompt),
+      'the class, its bound and its members need a stated destination');
     assert.ok(/where plan-review will look for them/i.test(result.prompt),
       'the destination must be tied to the reader who consumes it');
   });
 
-  test('warns against manufacturing a query to fill the slot', () => {
+  test('warns against manufacturing a query, a script, or a checklist to fill the slot', () => {
     const result = generatePrompt('plan', planIssue, ctx);
-    assert.ok(/Do not manufacture a query to fill the slot/i.test(result.prompt),
-      'the anti-incentive is the half that keeps the rule honest');
+    assert.ok(/Do not manufacture a query, a script, or a checklist to fill the slot/i.test(result.prompt),
+      'the anti-incentive is the half that keeps the rule honest, and now excludes scripted forms too');
+    assert.ok(/the rule asks for reasoning shown, not a form filled/i.test(result.prompt),
+      'must state the rule is about reasoning, not a fixed vocabulary');
     assert.ok(/looks authoritative and is quietly incomplete/i.test(result.prompt),
-      'must name WHY a fabricated sweep is worse than none');
-    assert.ok(/rather than trimming the query until it agrees/i.test(result.prompt),
-      'a disagreeing sweep is a result to report, not a query to tune');
+      'must name WHY a fabricated bound is worse than none');
+    assert.ok(/rather than trimming it until it agrees/i.test(result.prompt),
+      'a disagreeing bound is a result to report, not something to tune');
   });
 
   test('sits inside the completeness check, before the per-surface notes', () => {
     const result = generatePrompt('plan', planIssue, ctx);
     const completeness = result.prompt.indexOf('**Completeness check.**');
-    const sweep = result.prompt.indexOf('Cite the sweep, not the conclusion');
+    const classRule = result.prompt.indexOf('Name the class, and how you bounded it');
     const perSurface = result.prompt.indexOf('For each surface, note:');
-    assert.ok(completeness > -1 && sweep > -1 && perSurface > -1, 'all three anchors present');
-    assert.ok(completeness < sweep, 'the sweep directive extends the completeness check');
-    assert.ok(sweep < perSurface, 'and stays ahead of the per-surface notes');
+    assert.ok(completeness > -1 && classRule > -1 && perSurface > -1, 'all three anchors present');
+    assert.ok(completeness < classRule, 'the class rule extends the completeness check');
+    assert.ok(classRule < perSurface, 'and stays ahead of the per-surface notes');
   });
 });
 
-describe('cited-sweep rule — plan-review template (LIN-1873)', () => {
+describe('class-not-member enumeration rule — plan-review template (LIN-1871, revising LIN-1873)', () => {
   const reviewIssue = {
     id: 'issue-sweep-rev', identifier: 'TEST-SW2', title: 'Verify the plan',
     description: 'Plan is documented', url: 'https://linear.app/test/issue/TEST-SW2',
@@ -1107,30 +1182,44 @@ describe('cited-sweep rule — plan-review template (LIN-1873)', () => {
   };
   const ctx = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
-  test('re-runs the plan\'s own sweep before searching independently', () => {
+  test('argues the class, not the member, when a missing member turns up', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    // One alternative only. An earlier version wrote `/…plan\\'s own…|…plan.s own…/`,
-    // where `\\` is a literal backslash in a regex literal — so the first
-    // alternative could never match and only the second was carrying the test.
-    assert.ok(/re-run the plan.s own sweep first/i.test(result.prompt),
-      'the cheap mechanical check must come first');
-    assert.ok(/run THAT query, at the sha it names/i.test(result.prompt),
-      'must pin re-running the cited query at its own sha, not an equivalent search');
-    // Review found check (1) announcing "the cheap, mechanical half" without
-    // ever naming the other half, so the reword below states both. This
-    // assertion caught that reword, which is the pin doing its job.
-    assert.ok(/expensive half is the fallback/i.test(result.prompt),
-      'both halves must be named, not one plus an unlabelled else-branch');
-    assert.ok(/reached only where the plan cites no sweep/i.test(result.prompt),
-      'the independent search is the fallback, not the primary');
+    assert.ok(/Completeness check — argue the class, not the member/i.test(result.prompt),
+      'the check must be retitled to name the class-not-member rule');
+    assert.ok(/If you find a member the plan lacks, do not stop there/i.test(result.prompt),
+      'a found member must not end the finding by itself');
+    assert.ok(/how you bounded that class, and every other member your bounding found/i.test(result.prompt),
+      'the finding must widen to the whole class, not just the one member');
+    assert.ok(/One round, whole class/i.test(result.prompt),
+      'must pin the one-round-whole-class outcome');
+    assert.ok(/a verdict that names a member and stops is incomplete/i.test(result.prompt),
+      'a member-only verdict must be named as incomplete, however correct the member');
   });
 
-  test('directs disagreement at the sweep, because that is what converges', () => {
+  test('re-derives the plan\'s own bound before searching independently', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
-    assert.ok(/argue about the SWEEP/i.test(result.prompt),
-      'must redirect a disputed enumeration to the query');
-    assert.ok(/Propose the query you would run instead and show its output/i.test(result.prompt),
-      'proposing a counter-query is the concrete action');
+    assert.ok(/re-derive that bound yourself/i.test(result.prompt),
+      'the cheap mechanical check must come first');
+    assert.ok(/re-run the query it cites at the sha it names, or redo the reasoning/i.test(result.prompt),
+      'must accept a re-run OR a redone reasoning as ways to re-derive the bound');
+    assert.ok(/Where the plan cites no bound for a class it claims to cover/i.test(result.prompt),
+      'the independent search is the fallback, not the primary, and now keys on "bound" not "sweep"');
+  });
+
+  test('is sent back only for a missing or wrongly-bounded class', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/not sent back for a missing member inside a class already correctly bounded/i.test(result.prompt),
+      'the class-not-member bound must be stated as plan-review\'s own send-back rule');
+    assert.ok(/only for a missing or wrongly-bounded class/i.test(result.prompt),
+      'the only valid Request Changes reason is a missing or wrongly-bounded class');
+  });
+
+  test('directs disagreement at the bound, because that is what converges', () => {
+    const result = generatePrompt('plan-review', reviewIssue, ctx);
+    assert.ok(/argue about the BOUND/i.test(result.prompt),
+      'must redirect a disputed enumeration to the bound, not just "the sweep"');
+    assert.ok(/Propose the class, the query or reasoning you would use instead, and show what it finds/i.test(result.prompt),
+      'proposing a counter-class with its own bound is the concrete action');
     // One alternative only. The old second branch `one at a time do not` was a
     // SUBSTRING of the first, so the first could never be the deciding branch
     // and the effective assertion was silently the weaker one -- the same dead
@@ -1154,7 +1243,7 @@ describe('cited-sweep rule — plan-review template (LIN-1873)', () => {
     const one = result.prompt.indexOf('1. **Completeness check');
     const two = result.prompt.indexOf('2. **Strategy Framing');
     assert.ok(one > -1 && two > -1, 'both numbered checks present');
-    assert.ok(one < two, 'the sweep re-run belongs to check (1), not a new check');
+    assert.ok(one < two, 'the class-argument check belongs to check (1), not a new check');
   });
 });
 
