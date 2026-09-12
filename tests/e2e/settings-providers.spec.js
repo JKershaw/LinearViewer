@@ -1,4 +1,33 @@
 import { test, expect } from '../fixtures/test-base.js'
+import { localSeedId } from '../fixtures/local-harness.js'
+
+// LIN-2803: a second, distinct local-store partition's seed, used only by the
+// notice->activate->drill-down scenario below. Local declares no `addProvider`/
+// `entryCta` (no UI add row, no post-bind redirect), so this scenario cannot be
+// driven by a live add-source POST like the GitHub/Jira/Linear arms — it
+// composes seedLocal's `extraBindings` (a second same-provider binding on one
+// session workspace) with the test-only `providerAdded` seam (a direct
+// req.session.providerAdded write) to prove the SAME notice/activate/drill-down
+// chain those live arms would produce. Content is deliberately distinct from
+// `defaultLocalSeed`'s titles so a drill-down assertion can tell the two
+// partitions apart — both partitions render an identical `local` source badge
+// (LIN-1903 caveat: badges alone never distinguish same-provider bindings).
+function partitionSeed(urlKey) {
+  const id = (rawId) => localSeedId(urlKey, rawId)
+  return {
+    projects: [{ id: id('proj'), name: 'Second Local Partition', content: 'A second local-store partition', sortOrder: 1 }],
+    issues: [{
+      id: id('issue'),
+      identifier: 'LOCB-1',
+      title: 'Second partition task',
+      description: 'Lives only in the second local-store partition',
+      projectId: id('proj'),
+      sortOrder: 1,
+      state: { name: 'Todo', type: 'unstarted' },
+      url: `/workspace/${urlKey}/issue/${id('issue')}`,
+    }],
+  }
+}
 
 // Provider-management section on the settings page (LIN-634). Rides the local
 // provider harness (`seedLocal`) so the workspace has a REAL `local` binding to
@@ -173,6 +202,77 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     await page.waitForLoadState('networkidle')
     await expect(githubBinding.locator('.provider-active')).toBeVisible()
     await expect(localBinding.locator('.provider-active')).toHaveCount(0)
+  })
+
+  // LIN-2803 acceptance: the same-provider second-binding dead end (LIN-1903/
+  // 1904 narrowed the general cross-provider case; this is the case they left
+  // open) is now reachable from a one-shot post-bind notice. Local has no add
+  // row, so the flash is set directly via the harness seam rather than a live
+  // add-source POST — the wired live arms (GitHub/Jira/Linear) are proven by
+  // the golden/literal-redirect suite staying byte-identical (the flash write
+  // never perturbs the response) plus the render-settings unit coverage of
+  // `notice.activate`'s exact shape.
+  test('notice -> activate -> drill-down reads the newly-bound, non-active same-provider binding (LIN-2803)', async ({ page, seedLocal }) => {
+    const partitionUrlKey = 'local-workspace-partition-b'
+    // Seed the SECOND partition's own store content first (a distinct
+    // workspace entry this call also creates in the session is immaterial —
+    // the very next call below replaces session.workspaces wholesale).
+    await seedLocal(partitionSeed(partitionUrlKey), { urlKey: partitionUrlKey, append: true })
+
+    // Seed the primary workspace with the second partition riding along as a
+    // non-active EXTRA binding of the SAME provider, and set the post-bind
+    // flash directly (the harness seam LIN-2803 added, since Local has no
+    // live add-source POST to produce a real one from).
+    ;({ urlKey } = await seedLocal(null, {
+      extraBindings: [
+        { provider: 'local', scope: partitionUrlKey, credentials: { token: partitionUrlKey, tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+      ],
+      providerAdded: { provider: 'local', scope: partitionUrlKey },
+    }))
+
+    // The flash alone does not produce a notice — it only ever ADDS an
+    // `activate` affordance to an existing `provider_ok` notice (defends a
+    // stale/cross-tab flash), exactly as a real add-source redirect would land.
+    await page.goto(`/workspace/${urlKey}/settings?provider_ok=local`)
+    await page.waitForLoadState('networkidle')
+
+    const notice = page.locator('[data-testid="settings-provider-notice"]')
+    await expect(notice).toBeVisible()
+    await expect(notice).toContainText('local credentials are valid')
+    const noticeActivate = notice.locator('[data-testid="settings-provider-notice-activate"]')
+    await expect(noticeActivate).toBeVisible()
+
+    // Reloading the SAME page a second time must not still offer it — the
+    // flash is one-shot, read-and-cleared on the load above.
+    await page.goto(`/workspace/${urlKey}/settings?provider_ok=local`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('[data-testid="settings-provider-notice-activate"]')).toHaveCount(0)
+
+    // Re-establish the flash (cleared by the reload above) and actually
+    // activate through it this time.
+    await seedLocal(null, {
+      extraBindings: [
+        { provider: 'local', scope: partitionUrlKey, credentials: { token: partitionUrlKey, tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
+      ],
+      providerAdded: { provider: 'local', scope: partitionUrlKey },
+    })
+    await page.goto(`/workspace/${urlKey}/settings?provider_ok=local`)
+    await page.waitForLoadState('networkidle')
+    await page.locator('[data-testid="settings-provider-notice-activate"]').click()
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('[data-testid="settings-provider-notice"]')).toContainText('Switched active provider to local')
+
+    // Drill-down: the merged dashboard fans out both bindings regardless of
+    // active status (LIN-544), so the second partition's row is reachable
+    // even before activation — but activation is what makes ITS OWN detail
+    // resolve correctly (LIN-1903's residual same-provider case). Assert on
+    // partition content, never the source badge (both read "local").
+    await page.goto(`/workspace/${urlKey}/`)
+    await page.waitForLoadState('networkidle')
+    const partitionRow = page.locator('.line[data-section="project"][data-identifier="LOCB-1"]')
+    await expect(partitionRow).toBeVisible()
+    await partitionRow.click()
+    await expect(page.locator('body')).toContainText('Lives only in the second local-store partition')
   })
 
   test('remove unlinks the binding and persists across reload', async ({ page }) => {

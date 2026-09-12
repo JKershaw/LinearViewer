@@ -291,6 +291,11 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       tokenExpiresAt: Number.MAX_SAFE_INTEGER,
     })
 
+    // One-shot session flash (LIN-2803): Basic add binds onto the viewed
+    // workspace exactly like every other add-source arm — it just isn't an
+    // "install flow" with a golden pin — so it earns the same "make active"
+    // notice support.
+    req.session.providerAdded = { provider: 'jira', scope: normalizedSite }
     await saveSession(req.session)
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=jira`)
   })
@@ -605,6 +610,8 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       tokenExpiresAt: calculateExpiresAt(pending.expiresIn),
     })
 
+    // One-shot session flash (LIN-2803) — see the Basic add-source arm above.
+    req.session.providerAdded = { provider: 'jira', scope: site.url }
     delete req.session.jiraPending
     delete req.session.oauthState
     delete req.session.oauthIntent

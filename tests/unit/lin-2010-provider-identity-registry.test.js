@@ -65,4 +65,15 @@ describe('LIN-2010 provider identity registry — step 8 (beat 4)', () => {
     assert.deepEqual(rows, ['linear', 'github', 'github-projects', 'jira']);
     assert.ok(!rows.includes('local'), 'local must never appear in the add-row set');
   });
+
+  // LIN-2803: the new-workspace-verb testid is `settings-provider-new-workspace-*`
+  // — a different prefix from `settings-provider-add-*` on purpose, made explicit
+  // here rather than accidentally true, so a future rename can't silently start
+  // scraping it into the row-sequence pin above.
+  test('the new-workspace-verb testid is not captured by the add-row scrape regex (LIN-2803)', () => {
+    const html = renderSettingsPage('Acme', { urlKey: 'acme', workspaces: [], currentModel: 'x', availableModels: [], githubEnabled: true });
+    assert.match(html, /data-testid="settings-provider-new-workspace-github"/, 'sanity: the verb must actually render for this fixture');
+    const rows = [...html.matchAll(/data-testid="settings-provider-add-([a-z-]+)"/g)].map((m) => m[1]);
+    assert.ok(!rows.some((name) => name.includes('new-workspace')), 'the new-workspace testid must never match the -add- scrape prefix');
+  });
 });

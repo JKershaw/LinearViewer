@@ -3012,10 +3012,24 @@ app.get('/workspace/:urlKey/audit', workspaceFromUrl, (req, res) => {
  * for the Providers section (LIN-634). The provider-action POST handlers redirect
  * back with one of these flags; the renderer escapes the text, so the derived
  * messages (not raw query echoes) keep it injection-safe.
+ *
+ * `flash` (LIN-2803) is the one-shot `req.session.providerAdded` value written
+ * beside each add-source `linkProvider` call and read-and-cleared once by the
+ * settings GET handler below. It never changes `text` (every `provider_ok`
+ * arm's existing copy is unchanged, so the byte-pinned redirect/golden tests
+ * stay untouched) — it only ever ADDS an `activate` affordance, and only when
+ * both hold: the flash's own provider matches THIS notice's `provider_ok`
+ * (defends a stale/cross-tab flash from attaching to an unrelated notice —
+ * `providerOkKey` resolves to exactly `provider.name` on every wired arm), and
+ * that provider's add genuinely binds onto this workspace rather than
+ * creating a separate one (`createsWorkspace !== true` — Linear's add-source
+ * flash still gets written, but never earns `activate`, since there is
+ * nothing on THIS workspace to make active).
  * @param {Object} query - req.query
- * @returns {{type: 'ok'|'fail'|'blocked', text: string}|null}
+ * @param {{provider: string, scope: string}|null} [flash] - the just-read-and-cleared session flash
+ * @returns {{type: 'ok'|'fail'|'blocked', text: string, activate?: {provider: string, scope: string}}|null}
  */
-function providerNoticeFromQuery(query = {}) {
+function providerNoticeFromQuery(query = {}, flash = null) {
   if (query.provider_blocked) {
     return { type: 'blocked', text: `Adding ${query.provider_blocked} is not available yet.` };
   }
@@ -3026,7 +3040,11 @@ function providerNoticeFromQuery(query = {}) {
     return { type: 'ok', text: `Switched active provider to ${query.provider_switched}.` };
   }
   if (query.provider_ok) {
-    return { type: 'ok', text: `${query.provider_ok} credentials are valid.` };
+    const notice = { type: 'ok', text: `${query.provider_ok} credentials are valid.` };
+    if (flash && flash.provider === query.provider_ok && getProvider(flash.provider)?.addProvider?.createsWorkspace !== true) {
+      notice.activate = { provider: flash.provider, scope: flash.scope };
+    }
+    return notice;
   }
   if (query.provider_fail) {
     return { type: 'fail', text: `${query.provider_fail} credentials failed validation.` };
@@ -3089,7 +3107,14 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     token: b.credentials?.token,
     active: b.provider === workspace.provider && b.credentials?.token === workspace.accessToken,
   }));
-  const providerNotice = providerNoticeFromQuery(req.query);
+  // One-shot session flash (LIN-2803): read and delete unconditionally, even
+  // when this load carries no matching `provider_ok` (or none at all) — a
+  // stale flash must never survive a second, unrelated settings load. Its
+  // deletion is an ordinary session mutation; `resave: false` (this file's
+  // session config) still persists it at response end.
+  const providerAddedFlash = req.session.providerAdded || null;
+  delete req.session.providerAdded;
+  const providerNotice = providerNoticeFromQuery(req.query, providerAddedFlash);
 
   // Dispatch model/harness defaults (LIN-1095): the model/harness dispatched
   // agents execute WITH, distinct from currentModel above (which writes

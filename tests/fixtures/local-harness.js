@@ -389,17 +389,19 @@ export function createLocalProvider() {
  * @param {import('@playwright/test').Page} page
  * @param {{projects?: Array, issues?: Array}} [seed] - defaults to the urlKey-aware
  *   defaultLocalSeed for the resolved `urlKey`
- * @param {{features?: Object, openRouterConnected?: boolean, freeTierEnabled?: boolean, extraBindings?: Array, urlKey?: string}} [options] -
+ * @param {{features?: Object, openRouterConnected?: boolean, freeTierEnabled?: boolean, extraBindings?: Array, urlKey?: string, providerAdded?: {provider: string, scope: string}}} [options] -
  *   session feature flags (whitelist-validated server-side); `openRouterConnected`
  *   to provision a mock OpenRouter key on the local session (so e.g. roadmap specs
  *   reach the AI mock instead of resolveRoadmapLLM's 503); `freeTierEnabled` to
  *   simulate free-tier mode (no key, session flag) for the recommend free-tier
- *   block (LIN-405); and `urlKey` to seed a per-worker workspace partition
+ *   block (LIN-405); `urlKey` to seed a per-worker workspace partition
  *   (LIN-625 S1 — defaults to `LOCAL_WORKSPACE_URL_KEY`, supplied by the
- *   `localWorkerUrlKey` worker fixture once specs are swept).
+ *   `localWorkerUrlKey` worker fixture once specs are swept); and
+ *   `providerAdded` (LIN-2803) to set `req.session.providerAdded` directly —
+ *   Local has no live add-source POST to produce a real one from.
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY, append } = {}) {
+export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY, append, providerAdded } = {}) {
   const data = { ...(seed ?? defaultLocalSeed(urlKey)), urlKey };
   if (features) data.features = features;
   if (openRouterConnected) data.openRouterConnected = openRouterConnected;
@@ -412,6 +414,7 @@ export async function seedLocalWorkspace(page, seed = null, { features, openRout
   // task-bound coverage) — call this a second time with a different `urlKey`
   // and `append: true` to add it alongside the first rather than replacing it.
   if (append) data.append = true;
+  if (providerAdded) data.providerAdded = providerAdded;
   const resp = await page.request.post('/test/set-local-session', { data });
   if (!resp.ok()) {
     throw new Error(`seedLocalWorkspace failed: ${resp.status()} ${await resp.text()}`);
