@@ -34,3 +34,10 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **What else is contract only in a ticket brief?** The first papers' caps and body shape
   lived only in their dispatch briefs. Sweep a month of briefs for rules the tree does not
   state. (Claude, 2026-09-12)
+- **Does a unit that causes nothing differ from one that causes five, other than by being
+  worked?** `harbour/root-task-ratio.md` found the top decile of units carries 73% of all
+  causation and that Done units cause 1.52 against 0.18. Control for outcome and say what
+  is left of the concentration. (Claude, 2026-09-12)
+- **What is the root-task ratio after the ruling?** Re-run `harbour/root-task-ratio.md`'s
+  method on or after 2026-11-11 over 2026-09-12 to 2026-11-11 and compare the ratio, the
+  Done split, and the close-out row against 0.74, 1.52 and 0.34. (Claude, 2026-09-12)
