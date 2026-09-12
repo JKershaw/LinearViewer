@@ -1468,6 +1468,87 @@ describe('agreeRulingRow / keepRulingRow (LIN-2444 Phase 3)', () => {
     assert.equal(apiCalls, 1, 'a second Agree on an already-settled key must not re-POST a second decision-answer');
   });
 
+  // LIN-2797 — the review-F2 repaint test above covers the row STAYING in
+  // the payload (the pre-LIN-2755 stale-cache case: the same suggested row
+  // keeps being served). This covers the OTHER case LIN-2755 made routine:
+  // the row disappearing from the very next payload because the cache now
+  // invalidates immediately. Before this fix, a settled key was released the
+  // INSTANT it went missing (no re-injection), so the very next repaint
+  // dropped the row's `<li>` from `nodes` entirely with no chance for a
+  // late-arriving `agreeRulingRow`/`bulkAgreeRow` success handler to ever
+  // find it again — a real risk once "missing" can happen on poll #1 instead
+  // of only after the old 5s TTL. The fix: a settled row survives its FIRST
+  // missing poll (same `<li>`, not rebuilt) and is released only on a SECOND
+  // consecutive missing poll.
+  test('a settled row survives one missing poll unrebuilt, then releases on the next (LIN-2797)', async () => {
+    const { module, list } = (() => {
+      const l = new FakeElement('ul');
+      const e = new FakeElement('p'); e.hidden = false;
+      const { module: m } = makeSandbox({
+        api: async () => ({ success: true }),
+        elements: { 'obs-rulings': l, 'obs-rulings-empty': e }
+      });
+      return { module: m, list: l };
+    })();
+    const { renderRulings, agreeRulingRow, rulingsSettled, rulingsSettledGhosted, rulingKey } = module.exports;
+    const row = makeRow();
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
+
+    renderRulings([row]);
+    const li = list.children[0];
+    await agreeRulingRow(row, li);
+    assert.ok(rulingsSettled.has(key), 'sanity: Agree marked the key settled');
+
+    // Poll #1 after discharge: the row is ALREADY gone from the payload
+    // (the fixed, fast-invalidating cache) — the row must still be there,
+    // as the SAME node, not rebuilt fresh and textless.
+    renderRulings([]);
+    assert.equal(list.children.length, 1, 'the settled row must survive its first missing poll');
+    assert.equal(list.children[0], li, 'it must be the SAME <li> agreeRulingRow already wrote feedback text onto, not a rebuilt one');
+    assert.equal(li.querySelector('.obs-ruling-feedback').textContent, 'dismissed as proposed', 'the feedback text must still be visible on the surviving node');
+    assert.ok(rulingsSettledGhosted.has(key), 'the ghost flag records that this key has now been shown once while missing');
+
+    // Poll #2, still missing: NOW it releases for real.
+    renderRulings([]);
+    assert.equal(list.children.length, 0, 'a row missing for a SECOND consecutive poll must finally be released');
+    assert.equal(rulingsSettled.has(key), false, 'released — a later re-suggestion on this key starts fully re-armed');
+    assert.equal(rulingsSettledGhosted.has(key), false, 'the ghost flag is cleared alongside release, not leaked');
+  });
+
+  // The reappearance side of the same fix: if the row comes BACK before the
+  // second miss (the stale cache still serving it once), the ghost flag must
+  // reset rather than carrying a stale "already shown once" count into a
+  // LATER, unrelated disappearance.
+  test('a settled row that reappears before release resets the ghost flag (LIN-2797)', async () => {
+    const { module, list } = (() => {
+      const l = new FakeElement('ul');
+      const e = new FakeElement('p'); e.hidden = false;
+      const { module: m } = makeSandbox({
+        api: async () => ({ success: true }),
+        elements: { 'obs-rulings': l, 'obs-rulings-empty': e }
+      });
+      return { module: m, list: l };
+    })();
+    const { renderRulings, agreeRulingRow, rulingsSettled, rulingsSettledGhosted, rulingKey } = module.exports;
+    const row = makeRow();
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-1');
+
+    renderRulings([row]);
+    const li = list.children[0];
+    await agreeRulingRow(row, li);
+
+    renderRulings([]); // miss #1 — ghosted
+    assert.ok(rulingsSettledGhosted.has(key));
+
+    renderRulings([row]); // reappears — the stale cache still serves it once
+    assert.equal(rulingsSettledGhosted.has(key), false, 'reappearing clears the ghost flag');
+    assert.ok(rulingsSettled.has(key), 'still settled — not released just because it reappeared');
+
+    renderRulings([]); // a FRESH miss must get its own full one-more-look, not an immediate release
+    assert.equal(list.children.length, 1, 'a fresh disappearance after a reappearance must survive one more poll, not release immediately');
+    assert.ok(rulingsSettled.has(key));
+  });
+
   // LIN-2756: widened from {decisionId} to {decisionId, decisionLoopId} —
   // Keep must address the SAME composite id a suggest() call would have
   // (lib/dismissal-suggestions-store.js's now-loop-aware `_id`), so it sends
@@ -2173,12 +2254,21 @@ describe('bulk-agree selection + execution (LIN-2444 Phase 5)', () => {
     assert.equal(list.children[0], settledLi, 'a settled row must be REUSED, not rebuilt re-armed');
     assert.equal(list.children[0].querySelector('.obs-ruling-select').disabled, true);
 
-    // The row finally leaves the payload for real.
+    // LIN-2797: the row going missing for exactly ONE poll is not yet proof
+    // it is really gone (see rulingsSettledGhosted's own declaration) — it
+    // must still survive, as the SAME node, one more pass.
     renderRulings([]);
+    assert.equal(list.children.length, 1, 'a settled row survives its first missing poll');
+    assert.equal(list.children[0], settledLi, 'still the SAME node on that first missing poll, not rebuilt');
+
+    // Only a SECOND consecutive missing poll is the row finally leaving the
+    // payload for real.
+    renderRulings([]);
+    assert.equal(list.children.length, 0, 'released after a second consecutive missing poll');
     // A later re-suggestion (or the same one, re-raised) starts fully re-armed.
     renderRulings([row]);
     const rebuiltLi = list.children[0];
-    assert.notEqual(rebuiltLi, settledLi, 'once truly absent, the settled mark releases and a later row is rebuilt fresh');
+    assert.notEqual(rebuiltLi, settledLi, 'once truly absent for two consecutive polls, the settled mark releases and a later row is rebuilt fresh');
     assert.equal(rebuiltLi.querySelector('.obs-ruling-select').disabled, false);
   });
 
