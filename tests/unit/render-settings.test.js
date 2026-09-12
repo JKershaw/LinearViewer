@@ -359,6 +359,56 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-provider-add-hint-linear"/);
   });
 
+  // LIN-2803: every unblocked provider that declares an addProvider row gets
+  // an honest hint — a SWEEP over the class, not a per-provider pin alone, so
+  // a future provider that forgets to declare (or default) one fails this.
+  test('every unblocked add-source row renders a non-empty add-hint (LIN-2803 sweep)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: true });
+    for (const name of ['linear', 'github', 'github-projects', 'jira']) {
+      const re = new RegExp(`data-testid="settings-provider-add-hint-${name}">([^<]+)<`);
+      const match = html.match(re);
+      assert.ok(match, `expected a non-empty add-hint for ${name}`);
+      assert.ok(match[1].trim().length > 0, `expected non-empty hint text for ${name}`);
+    }
+  });
+
+  test('GitHub/GitHub Projects/Jira default to the shared bind-onto-this-workspace hint (LIN-2803)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: true });
+    const defaultHintCount = (html.match(/adds a source onto this workspace/g) || []).length;
+    // github, github-projects, jira — three rows sharing the one default; Linear
+    // keeps its own override text and must not pick up the default too.
+    assert.strictEqual(defaultHintCount, 3);
+    assert.match(html, /data-testid="settings-provider-add-hint-github">adds a source onto this workspace</);
+    assert.match(html, /data-testid="settings-provider-add-hint-github-projects">adds a source onto this workspace</);
+    assert.match(html, /data-testid="settings-provider-add-hint-jira">adds a source onto this workspace</);
+  });
+
+  test('a blocked GitHub row still renders no hint at all (early return, unaffected by the new default)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: false });
+    // configBlocked rows return before addHintHtml is computed — no hint span,
+    // default or otherwise, ever reaches a blocked row.
+    assert.doesNotMatch(html, /data-testid="settings-provider-add-hint-github"/);
+  });
+
+  test('the GitHub row offers the "as a new workspace" verb as a plain link, gated honest (LIN-2803)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: true });
+    assert.match(html, /data-testid="settings-provider-new-workspace-github"/);
+    // A link, never a button/form — must not perturb the pinned button counts.
+    const anchorMatch = html.match(/<a href="\/auth\/github"[^>]*data-testid="settings-provider-new-workspace-github"[^>]*>as a new workspace<\/a>/);
+    assert.ok(anchorMatch, 'expected an <a href="/auth/github"> anchor for the new-workspace verb');
+  });
+
+  test('Jira and Linear never render a new-workspace verb (LIN-2803 — Jira withheld pending LIN-2819, Linear already creates one)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: true });
+    assert.doesNotMatch(html, /settings-provider-new-workspace-jira/);
+    assert.doesNotMatch(html, /settings-provider-new-workspace-linear/);
+  });
+
+  test('github-projects (no entryCta) never renders a new-workspace verb', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: true });
+    assert.doesNotMatch(html, /settings-provider-new-workspace-github-projects/);
+  });
+
   test('shows an empty state when there are no bindings', () => {
     const html = renderSettingsPage('Acme', { ...BASE, providerBindings: [] });
     assert.match(html, /no provider bindings/);
@@ -372,6 +422,37 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     assert.match(html, /data-testid="settings-provider-notice"/);
     assert.match(html, /provider-notice-fail/);
     assert.match(html, /linear credentials failed validation\./);
+  });
+
+  // LIN-2803: the post-bind notice's "make active" affordance reuses the
+  // EXACT switchAction POST form every per-binding row already renders — a
+  // second, distinct testid so both can coexist without ambiguity when the
+  // just-added binding is also the page's one inactive row.
+  test('a notice with `activate` renders the reused switch form (LIN-2803)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerNotice: {
+        type: 'ok',
+        text: 'github credentials are valid.',
+        activate: { provider: 'github', scope: 'octo/repo' },
+      },
+    });
+    assert.match(html, /data-testid="settings-provider-notice-activate"/);
+    const noticeBlock = html.slice(html.indexOf('data-testid="settings-provider-notice"'));
+    const formEnd = noticeBlock.indexOf('</form>');
+    const form = noticeBlock.slice(0, formEnd);
+    assert.match(form, /action="\/workspace\/acme\/settings\/providers\/switch" method="POST"/);
+    assert.match(form, /<input type="hidden" name="provider" value="github">/);
+    assert.match(form, /<input type="hidden" name="scope" value="octo\/repo">/);
+  });
+
+  test('a notice with no `activate` renders no activate form at all (LIN-2803 — e.g. a Linear-sourced flash)', () => {
+    const html = renderSettingsPage('Acme', {
+      ...BASE,
+      providerNotice: { type: 'ok', text: 'linear credentials are valid.' },
+    });
+    assert.match(html, /data-testid="settings-provider-notice"/);
+    assert.doesNotMatch(html, /settings-provider-notice-activate/);
   });
 
   test('provider action forms are not feature-toggle forms (no XHR interception)', () => {

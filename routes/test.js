@@ -1096,6 +1096,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
           ...body.extraBindings,
         ];
       }
+      // Optional session flash seam (LIN-2803): Local has no live add-source
+      // POST (no `addProvider`/`entryCta`), so the notice->activate->drill-down
+      // e2e chain has no real bind flow to produce `req.session.providerAdded`
+      // from — this lets a spec set it directly, exactly as every real
+      // add-source arm would (`{provider, scope}`).
+      if (body.providerAdded && typeof body.providerAdded === 'object') {
+        req.session.providerAdded = { provider: body.providerAdded.provider, scope: body.providerAdded.scope }
+      }
+
       if (append && Array.isArray(req.session.workspaces) && req.session.workspaces.length) {
         // Additive: keep the first (already-established) workspace active —
         // this call only needs the new one to exist in the session so the

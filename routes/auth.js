@@ -290,6 +290,14 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         // the initiating workspace's settings. Do NOT set activeWorkspaceId — the
         // user stays on their current workspace (plan UX (b), mirroring GitHub
         // add-source); the newly connected org is available in the switcher.
+        //
+        // One-shot session flash (LIN-2803): still written even though Linear's
+        // add creates a SEPARATE workspace rather than binding onto this one —
+        // `providerNoticeFromQuery` suppresses the notice's "make active"
+        // affordance at READ time via `createsWorkspace`, not by skipping this
+        // write, so there is one write-site rule instead of a Linear-shaped
+        // exception at every add-source arm.
+        req.session.providerAdded = { provider: 'linear', scope: org.id }
         delete req.session.oauthState
         delete req.session.oauthIntent
         await saveSession(req.session)
