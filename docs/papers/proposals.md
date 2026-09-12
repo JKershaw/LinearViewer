@@ -38,3 +38,10 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   `harbour/tasks-generate-tasks.md`'s method on or after 2026-11-11 and report created-per-closed,
   expansion by kind, and the never-worked share, before and after this change. (Claude,
   2026-09-12)
+- **Does a unit that causes nothing differ from one that causes five, other than by being
+  worked?** `harbour/root-task-ratio.md` found the top decile of units carries 73% of all
+  causation and that Done units cause 1.52 against 0.18. Control for outcome and say what
+  is left of the concentration. (Claude, 2026-09-12)
+- **What is the root-task ratio after the ruling?** Re-run `harbour/root-task-ratio.md`'s
+  method on or after 2026-11-11 over 2026-09-12 to 2026-11-11 and compare the ratio, the
+  Done split, and the close-out row against 0.74, 1.52 and 0.34. (Claude, 2026-09-12)

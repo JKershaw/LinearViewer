@@ -13,6 +13,7 @@ is written. `proposals.md` lists the questions waiting for a paper.
 | [tasks-generate-tasks](harbour/tasks-generate-tasks.md) | How do tasks generate tasks, and at what rate? | 2.1 created per one closed over sixty days; a generated task that gets worked produces 1.12 more. Half of all filings are never worked, and close-outs and reviews are 63% of that pile. |
 | [never-worked-pile](harbour/never-worked-pile.md) | What is in the never-worked pile, and what do the worked chains look like? | Live work in the wrong place: 34 of 40 filings still true at HEAD and 38 self-contained, but 23 of 40 are the parent ticket's own unfinished scope. Worked chains mostly narrow — 54 of 84 hops. |
 | [close-out-claims](harbour/close-out-claims.md) | When a close-out files its own unfinished scope next door, does it say so? | Always — 23 of 23 name the filing in the comment that closes the ticket. Five call it the parent's own scope left undone, 18 call it a separate matter now owned elsewhere, and all 23 parents are Done while the filing is unworked. |
+| [root-task-ratio](harbour/root-task-ratio.md) | Does the system run out of tasks, or generate them forever? | Neither: collapsing breakdown trees to one unit, 1,484 tickets are 1,340 units and each causes 0.74 further ones. Three in four cause none, but a unit that reaches Done causes 1.52 — the population number is under one only because most filings are never worked. |
 
 ## About the process
 
