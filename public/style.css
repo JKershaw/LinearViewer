@@ -2168,6 +2168,10 @@ a.wordmark:hover {
   cursor: pointer;
 }
 
+.repo-picker-row[hidden] {
+  display: none;
+}
+
 .repo-picker-slug {
   font-family: var(--font-structural);  /* machine fact — mono, per the LIN-785 split */
   color: var(--fg);

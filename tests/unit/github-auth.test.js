@@ -167,6 +167,51 @@ describe('GitHubProvider auth primitives', () => {
     ]);
   });
 
+  // LIN-2820 review: the mutation check found `.map()` dropping the client's
+  // `.truncated` own property, and the cross-installation aggregate losing a
+  // per-installation truncation, were BOTH unpinned by any test — index.js
+  // re-attaches `.truncated` explicitly in each method for exactly this reason
+  // (see the comments at listRepos/listReboundableRepos), but nothing proved it.
+  test('listRepos re-attaches .truncated across the .map() (LIN-2820)', async () => {
+    const provider = new GitHubProvider();
+    const cappedRepos = [
+      { full_name: 'octocat/hello-world', private: false },
+    ];
+    cappedRepos.truncated = true;
+    provider._clientForToken = () => ({ listRepos: async () => cappedRepos });
+
+    const repos = await provider.listRepos('gho_abc');
+    assert.equal(repos.truncated, true, '.map() must not silently drop the client-side truncation flag');
+  });
+
+  test('listRepos stays a plain array (no .truncated) when the client read was complete', async () => {
+    const provider = new GitHubProvider();
+    provider._clientForToken = () => ({
+      listRepos: async () => ([{ full_name: 'octocat/hello-world', private: false }]),
+    });
+
+    const repos = await provider.listRepos('gho_abc');
+    assert.ok(!repos.truncated, 'a complete read must not be flagged truncated');
+  });
+
+  test('listReboundableRepos marks the aggregate .truncated when ONE of several installations truncates (LIN-2820)', async () => {
+    const provider = new GitHubProvider();
+    const completeRepos = [{ full_name: 'octocat/hello-world', private: false }];
+    const cappedRepos = [{ full_name: 'acme/widgets', private: false }];
+    cappedRepos.truncated = true;
+    provider._clientForToken = () => ({
+      listUserInstallations: async () => ([
+        { id: 77, account: { login: 'octocat' } },
+        { id: 88, account: { login: 'acme' } },
+      ]),
+      listUserInstallationRepos: async (installationId) =>
+        installationId === 88 ? cappedRepos : completeRepos,
+    });
+
+    const repos = await provider.listReboundableRepos('gho_user');
+    assert.equal(repos.truncated, true, 'one truncated installation must truncate the whole flattened aggregate');
+  });
+
   test('completeInstallation mints an installation token and resolves account identity (LIN-709)', async () => {
     process.env.GITHUB_APP_PRIVATE_KEY = RSA_PEM; // real key so mintAppJwt signs
     const realFetch = global.fetch;
@@ -530,6 +575,23 @@ describe('GitHub auth routes', () => {
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
     await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
     assert.match(res.body, /https:\/\/github\.com\/settings\/installations\/99/);
+  });
+
+  // LIN-2820 review F2/gap 4: truncation must survive client -> provider ->
+  // route -> renderer end to end. A truncated provider read was previously
+  // unreachable in the rendered body on every production (default-cap) call
+  // (F2) and, separately, nothing proved the route's `truncated: choices.truncated`
+  // wiring (lib/github-install-flow.js) actually reaches the picker's note.
+  test('GET callback (install path) surfaces the truncation note when the provider read was capped (LIN-2820)', async () => {
+    const truncatedRepos = [{ slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false }];
+    truncatedRepos.truncated = true;
+    const provider = { ...fakeProvider(), listRepos: async () => truncatedRepos };
+    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/github/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
+    await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
+    assert.match(res.body, /repo-picker-truncated-note/);
   });
 
   test('GET callback (add-source) carries the viewed-workspace urlKey from intent into pending', async () => {

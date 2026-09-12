@@ -800,6 +800,31 @@ describe('createGitHubClient listRepos/listUserInstallationRepos pagination (LIN
     assert.equal(repos.truncated, true);
   });
 
+  // LIN-2820 review F2: DEFAULT_REPO_CAP (500) is an exact multiple of PER_PAGE
+  // (100), so the walk lands EXACTLY on the cap on every production call (no
+  // caller passes a custom `cap`) — unlike the `cap: 250` case above, which only
+  // reaches the slice/truncate branch because 250 is not a page boundary. A
+  // `> cap` comparison would never fire here; this pins the production path.
+  test('listRepos marks .truncated at the PRODUCTION default cap (no custom cap passed)', async () => {
+    let page = 0;
+    const fetchImpl = async () => {
+      page += 1;
+      return {
+        ok: true, status: 200, statusText: 'OK',
+        text: async () => JSON.stringify({
+          total_count: 10000,
+          repositories: Array.from({ length: 100 }, (_, i) => ({ full_name: `o/r${page}-${i}`, private: false })),
+        }),
+      };
+    };
+    const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
+
+    const repos = await client.listRepos(); // no cap option — the real production call shape
+
+    assert.equal(repos.length, 500, 'stops at DEFAULT_REPO_CAP');
+    assert.equal(repos.truncated, true, 'a 10000-repo installation capped at the default must be flagged truncated');
+  });
+
   test('listUserInstallationRepos walks multiple pages for one installation, keeping page 1 unparameterized', async () => {
     const calls = [];
     const pages = [
