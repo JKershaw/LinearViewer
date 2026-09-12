@@ -397,6 +397,51 @@ describe('buildAutopilotKickoff (scoped to an issue)', () => {
   });
 });
 
+// LIN-2804: gate the two `/issues/{id}` read hints (Setup's verb catalog and the
+// scoped run's first act) on the resolved provider's `issueDetail` capability.
+// This file never mentions `/relations` anywhere (grep confirms zero hits), so
+// only `issueDetail` gates anything here.
+describe('buildAutopilotKickoff (providerUi capability gate, LIN-2804)', () => {
+  const issue = { identifier: 'LIN-42', title: 'Fix login bug' };
+
+  test('omitted/null providerUi keeps the existing line-387 assertion green, untouched', () => {
+    const omitted = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
+    const nulled = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: null });
+    const fullCap = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: true } });
+    assert.equal(nulled, omitted);
+    assert.equal(fullCap, omitted);
+    assert.ok(omitted.includes('GET /issues/LIN-42'), 'raw issue detail stays available');
+  });
+
+  test('issueDetail: false — scoped first act swaps the /issues/{id} read for a brief-only note', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: false } });
+    assert.ok(!text.includes('GET /issues/LIN-42'), 'no /issues/{id} read hint');
+    assert.ok(
+      text.includes('this provider does not support raw issue-detail reads, so the brief is the fullest detail available'),
+      'replacement wording present'
+    );
+    assert.ok(text.includes('GET /brief/LIN-42'), 'brief read hint unchanged');
+  });
+
+  test('issueDetail: false — Setup guide bullet swaps verify GET /issues/{id} for verify via GET /brief/{id}, both scoped and general', () => {
+    const scopedText = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: false } });
+    const generalText = buildAutopilotKickoff({ baseUrl: BASE_URL, providerUi: { issueDetail: false } });
+    for (const text of [scopedText, generalText]) {
+      assert.ok(!text.includes('verify `GET /issues/{id}`'), 'no unconditional /issues/{id} verify hint');
+      assert.ok(text.includes('verify via `GET /brief/{id}`, `GET /search`,'), 'replacement wording present');
+      // The rest of the sentence — the artifact-URL clause — stays untouched.
+      assert.ok(text.includes('plus the artifact URLs in `[evidence]`'));
+    }
+  });
+
+  test('mutation check: comment out the gate to see these assertions fail', () => {
+    // With the real gate (`providerUi?.issueDetail !== false`) restored, this is
+    // the positive control: full capability keeps the unconditional hint.
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, providerUi: { issueDetail: true } });
+    assert.ok(text.includes('GET /issues/LIN-42'));
+  });
+});
+
 // LIN-1829, plan step 5f. The golden fixture (tests/fixtures/autopilot-kickoff/
 // scoped-snapshot-golden.txt) was captured from the PRE-CHANGE
 // lib/prompts/autopilot-kickoff.js (commit 8891b0b8, before the periodicals

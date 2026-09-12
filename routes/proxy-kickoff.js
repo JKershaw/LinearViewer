@@ -16,7 +16,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { isValidIssueId } from '../lib/workspace.js';
-import { declaredProviderDisplayName } from '../lib/proxy-graphql-errors.js';
+import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 
 /**
  * @param {Object} deps
@@ -278,7 +278,11 @@ export function createKickoffRoutes({
         goal: typeof goal === 'string' ? goal : '',
         mode: resolvedMode,
         variant: resolvedVariant,
-        maxTasks: maxTasks ?? null
+        maxTasks: maxTasks ?? null,
+        // LIN-2804: only resolved when this was a SCOPED kickoff (see the
+        // identical note on the attachProxyContext call below) — a goal-only
+        // kickoff resolves no provider and correctly stays neutral.
+        providerUi: resolvedProviderUi(req)
       });
 
       // Create the dispatch item through the shared factory (LIN-1139): it
@@ -320,7 +324,9 @@ export function createKickoffRoutes({
               // stamping req.resolvedProvider); a goal-only kickoff resolves no
               // provider and correctly stays neutral rather than triggering a
               // fresh resolve just to fill this sentence.
-              providerDisplayName: declaredProviderDisplayName(req)
+              providerDisplayName: declaredProviderDisplayName(req),
+              // LIN-2804: same stamped req.resolvedProvider, capability half.
+              providerUi: resolvedProviderUi(req)
             });
           }
           return { prompt: kickoff, bootstrapToken: null };

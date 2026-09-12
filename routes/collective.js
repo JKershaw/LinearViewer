@@ -271,6 +271,11 @@ export function createCollectiveRoutes({
       // `getProviderForWorkspace`) carries no legacy-Linear fallback, so an
       // undeclared provider correctly yields `null` here rather than "Linear".
       const providerDisplayName = getProvider(ws.provider)?.ui?.displayName ?? null;
+      // LIN-2804: capability summary, same source/derivation as providerDisplayName
+      // above — threaded to attachProxyContext below (the only consumer today;
+      // buildCollectiveParticipantPrompt/buildCollectiveFacilitatorPrompt don't
+      // gate any endpoint hint on it, out of scope per this ticket's class sweep).
+      const providerUi = getProvider(ws.provider)?.ui ?? null;
 
       // Build the participant/facilitator prompt for a given proxy token pair.
       // Hoisted so finalizePrompt can build it either WITHOUT a token (claude-code,
@@ -343,6 +348,7 @@ export function createCollectiveRoutes({
                 prompt: buildPrompt({ proxyBaseUrl: null, proxyToken: null }),
                 label: 'collective',
                 providerDisplayName,
+                providerUi,
                 harness: resolvedHarness,
                 // LIN-1376: stamp the initiating account so the exchanged token
                 // resolves under LIN-1366 owner-scoping (token ownership keys on

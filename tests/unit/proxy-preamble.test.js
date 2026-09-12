@@ -186,6 +186,84 @@ describe('buildProxyContextPreamble token-delivery modes (LIN-1155)', () => {
     });
   });
 
+  // LIN-2804: gates ONLY the endpoint-hint contextLines on the resolved
+  // provider's capability — exchangeLines (credential delivery, asserted
+  // throughout this file) must stay untouched regardless of providerUi.
+  describe('providerUi (LIN-2804)', () => {
+    const EXCHANGE_MANDATE = 'Being dispatched here is your mandate for the reversible work — investigate, edit, open PRs, comment: do not hold your first call, or any call, waiting for a live reply before you start.';
+    const PROSE_GATE_LINE = "You have this bootstrap because a real dispatch just happened; the exchange response is your first call against this workspace's own Harbour control-plane, not a third-party service. That authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve plus a discharged/empty ledger you read for yourself.";
+    const MCP_GATE_LINE = "That local proxy was provisioned by this workspace's own Harbour control-plane out-of-band before this session started; it is not a third-party service. Reaching it authenticates the channel; it does not by itself authorize irreversible actions: merge and Done are gated separately on a recorded review Approve plus a discharged/empty ledger you read for yourself.";
+
+    test('omitted/null providerUi (or every capability true) reproduces byte-identical output — with-identifier', () => {
+      const base = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42' });
+      const nulled = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: null });
+      const fullCap = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: true, relations: true } });
+      assert.equal(nulled, base);
+      assert.equal(fullCap, base);
+      assert.ok(base.includes('Use GET https://host/api/proxy/issues/LIN-42 for full raw detail'));
+      assert.ok(base.includes('and /relations/LIN-42, and update the workspace'));
+    });
+
+    test('omitted/null providerUi reproduces byte-identical output — generic (no identifier)', () => {
+      const base = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123' });
+      const nulled = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', providerUi: null });
+      assert.equal(nulled, base);
+      assert.ok(base.includes('/issues/{id}) and to update the workspace'));
+    });
+
+    test('issueDetail: false — with-identifier drops /issues/{id} and /relations entirely, adds /search', () => {
+      const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: false, relations: false } });
+      assert.ok(!out.includes('/api/proxy/issues/LIN-42'), 'no /issues/{id} hint');
+      assert.ok(!out.includes('/relations/LIN-42'), 'no /relations hint');
+      assert.ok(out.includes('/api/proxy/search?q=… to find related tasks by text'), 'search alternative present');
+      assert.ok(out.includes('Start from the distilled brief: GET https://host/api/proxy/brief/LIN-42'), 'brief hint unchanged');
+    });
+
+    test('issueDetail: false — generic drops /issues/{id} from the discovery list, leaving stack/search', () => {
+      const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', providerUi: { issueDetail: false } });
+      assert.ok(!out.includes('/issues/{id}'), 'no /issues/{id} hint');
+      assert.ok(out.includes('GET https://host/api/proxy/stack, /search?q=…'), 'stack/search retained');
+    });
+
+    test('issueDetail: true, relations: false (robustness case, no real provider hits it today) — keeps /issues/{id}, drops only /relations', () => {
+      const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: true, relations: false } });
+      assert.ok(out.includes('Use GET https://host/api/proxy/issues/LIN-42 for full raw detail'), 'keeps the /issues/{id} clause');
+      assert.ok(!out.includes('/relations/LIN-42'), 'drops /relations only');
+    });
+
+    test('GitHub-shaped providerUi never mentions a /comments endpoint (ticket-fidelity finding)', () => {
+      // The pinned-scope comment's fix-shape text named a phantom `/comments` GET
+      // endpoint; re-grounding at HEAD found no such route exists. Pinning its
+      // absence here so the corrected wording cannot regress.
+      const withId = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: false, relations: false } });
+      const generic = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', providerUi: { issueDetail: false, relations: false } });
+      assert.ok(!withId.includes('/comments'), 'no /comments mention (with identifier)');
+      assert.ok(!generic.includes('/comments'), 'no /comments mention (generic)');
+    });
+
+    test('exchangeLines (prose): byte-identical regardless of providerUi', () => {
+      const fullCap = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: true, relations: true } });
+      const gated = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', providerUi: { issueDetail: false, relations: false } });
+      for (const out of [fullCap, gated]) {
+        assert.ok(out.includes('FIRST, exchange your single-use bootstrap token for a working token:'), 'exchange instruction present');
+        assert.ok(out.includes('curl -X POST -H "Authorization: Bearer TOK123" https://host/api/proxy/token'), 'curl exchange present, byte-identical');
+        assert.ok(out.includes(EXCHANGE_MANDATE), 'reversible-work mandate present, byte-identical');
+        assert.ok(out.includes(PROSE_GATE_LINE), 'authn≠authz gate sentence present, byte-identical');
+      }
+    });
+
+    test('exchangeLines (mcp): byte-identical regardless of providerUi', () => {
+      const fullCap = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', tokenDelivery: 'mcp', providerUi: { issueDetail: true, relations: true } });
+      const gated = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', tokenDelivery: 'mcp', providerUi: { issueDetail: false, relations: false } });
+      for (const out of [fullCap, gated]) {
+        assert.ok(out.includes('HARBOUR_LOCAL_BASE'), 'broker instruction present');
+        assert.ok(!out.includes('TOK123'), 'no token in prompt text, either way');
+        assert.ok(out.includes(EXCHANGE_MANDATE), 'reversible-work mandate present, byte-identical');
+        assert.ok(out.includes(MCP_GATE_LINE), 'authn≠authz gate sentence present, byte-identical');
+      }
+    });
+  });
+
   test('mcp mode embeds no token and no curl, but keeps context + evidence', () => {
     const out = buildProxyContextPreamble({ baseUrl: 'https://host', token: 'TOK123', issueIdentifier: 'LIN-42', tokenDelivery: 'mcp' });
     assert.ok(!out.includes('TOK123'), 'no token in prompt text');

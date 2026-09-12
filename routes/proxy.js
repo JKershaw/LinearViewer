@@ -661,7 +661,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         // provider name from a prior request.
         // LIN-2354: `declared` mirrors the general branch below — this branch is
         // always resolved (a real local-provider identity, never a fallback).
-        req.resolvedProvider = { name: localProvider.name, displayName: localProvider.ui.displayName, declared: localProvider.name };
+        req.resolvedProvider = { name: localProvider.name, displayName: localProvider.ui.displayName, declared: localProvider.name, ui: localProvider.ui };
       }
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
@@ -705,10 +705,17 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // needs to distinguish "really Linear" from "unresolved, defaulted to
       // Linear". Additive only: the sole existing reader (`graphqlErrorDetail`,
       // below) reads `.displayName` and is unaffected.
+      // LIN-2804: `ui` is the same optionally-chained read `displayName` above
+      // already uses — falls back to `null` for the same bare-object test
+      // fixtures (no `.ui` getter) rather than throwing. Deliberately NOT
+      // gated on `declared` (see resolvedProviderUi's own doc in
+      // lib/proxy-graphql-errors.js) — a legacy-fallback-to-Linear resolution
+      // genuinely has Linear's real capabilities.
       req.resolvedProvider = {
         name: activeProvider.name,
         displayName: activeProvider.ui?.displayName ?? activeProvider.name,
-        declared: providerName ?? null
+        declared: providerName ?? null,
+        ui: activeProvider.ui ?? null
       };
     }
     // Record WHICH credential this resolution handed out, so a later 401 from the

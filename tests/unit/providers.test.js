@@ -413,6 +413,8 @@ describe('provider.ui surface (LIN-332)', () => {
       comments: false,
       inlineCreate: false, // derived from supports('createIssue') — off on base (LIN-1552)
       inlineEdit: false,   // derived from supports('updateIssue') — off on base (LIN-1552)
+      issueDetail: false, // derived from supports('issueDetail') — off on base (LIN-2804)
+      relations: false,   // derived from supports('relations') — off on base (LIN-2804)
       estimates: false,
       subtasks: false,
       attachments: false, // read-attachments opt-in, off by default (LIN-649)
@@ -429,12 +431,41 @@ describe('provider.ui surface (LIN-332)', () => {
       comments: true,   // fetchIssueComments is implemented
       inlineCreate: true, // supports('createIssue') (LIN-1552)
       inlineEdit: true,   // supports('updateIssue') (LIN-1552)
+      issueDetail: true, // supports('issueDetail') — Linear implements it (LIN-2804)
+      relations: true,   // supports('relations') — Linear implements it (LIN-2804)
       estimates: true,  // estimate is in ISSUE_FIELDS_FRAGMENT
       subtasks: true,   // children/parent are fetched
       attachments: true, // API read selects attachments + extracts md images (LIN-649)
       priority: true,   // abstract default, not overridden (LIN-1886)
       displayName: 'Linear',
       fixedStates: null, // LIN-2361: states() is async/per-team — no synchronous vocabulary exists
+    });
+  });
+
+  describe('provider.ui.issueDetail / .relations (LIN-2804)', () => {
+    test('Linear and Local implement both real reads — ui reports true', () => {
+      assert.strictEqual(linearProvider.ui.issueDetail, true);
+      assert.strictEqual(linearProvider.ui.relations, true);
+      assert.strictEqual(localProvider.ui.issueDetail, true);
+      assert.strictEqual(localProvider.ui.relations, true);
+    });
+
+    test('GitHub, GitHub Projects, and Jira implement neither — ui reports false', () => {
+      for (const p of [githubProvider, githubProjectsProvider, jiraProvider]) {
+        assert.strictEqual(p.ui.issueDetail, false, `${p.name}.ui.issueDetail`);
+        assert.strictEqual(p.ui.relations, false, `${p.name}.ui.relations`);
+      }
+    });
+
+    test('mutation check: flags derive from real supports(), not a hardcoded true', () => {
+      // Comment out `issueDetail: this.supports('issueDetail')` in interface.js
+      // (replacing it with a literal `false`) to see this assertion fail —
+      // recorded per LIN-2274/LIN-2219 mutation-check discipline rather than
+      // trusting the green run alone.
+      assert.strictEqual(new ProviderInterface().supports('issueDetail'), false);
+      assert.strictEqual(new ProviderInterface().supports('relations'), false);
+      assert.strictEqual(linearProvider.supports('issueDetail'), true);
+      assert.strictEqual(linearProvider.supports('relations'), true);
     });
   });
 
@@ -495,7 +526,7 @@ describe('provider.ui surface (LIN-332)', () => {
     makeStubProvider({ write: true, displayName: 'Other' });
     // linearProvider.ui is unaffected by stub construction.
     assert.deepStrictEqual(linearProvider.ui, {
-      write: true, comments: true, inlineCreate: true, inlineEdit: true, estimates: true, subtasks: true, attachments: true, priority: true, displayName: 'Linear', fixedStates: null,
+      write: true, comments: true, inlineCreate: true, inlineEdit: true, issueDetail: true, relations: true, estimates: true, subtasks: true, attachments: true, priority: true, displayName: 'Linear', fixedStates: null,
     });
   });
 });

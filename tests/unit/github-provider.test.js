@@ -105,6 +105,8 @@ describe('GitHubProvider capability profile (LIN-178)', () => {
       comments: true,     // fetchIssueComments implemented
       inlineCreate: true, // supports('createIssue') (LIN-1552)
       inlineEdit: true,   // supports('updateIssue') (LIN-1552)
+      issueDetail: false, // supports('issueDetail') false — no issueDetail() method (LIN-2804)
+      relations: false,   // supports('relations') false — no relations() method (LIN-2804)
       estimates: false,   // no estimate field
       subtasks: false,    // no hierarchy
       attachments: true,  // issue/comment bodies carry user-content uploads (LIN-771)

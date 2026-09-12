@@ -13,7 +13,7 @@ import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
-import { declaredProviderDisplayName, graphqlErrorDetail, graphqlErrorExtra } from '../lib/proxy-graphql-errors.js';
+import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, graphqlErrorExtra } from '../lib/proxy-graphql-errors.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
@@ -420,7 +420,9 @@ export function createDispatchRoutes({
               // resolveProviderAccess (`!isAbort && issueIdentifier`), stamping
               // req.resolvedProvider — an unscoped dispatch resolves no provider
               // and correctly stays neutral rather than triggering a fresh resolve.
-              providerDisplayName: declaredProviderDisplayName(req)
+              providerDisplayName: declaredProviderDisplayName(req),
+              // LIN-2804: same stamped req.resolvedProvider, capability half.
+              providerUi: resolvedProviderUi(req)
             });
           }
           // LIN-1429: the prose block may be suppressed for a warm follow-up
@@ -735,7 +737,9 @@ export function createDispatchRoutes({
                   // LIN-2354: resolveProviderAccess runs unconditionally near the
                   // top of this route, so req.resolvedProvider is always stamped
                   // here.
-                  providerDisplayName: declaredProviderDisplayName(req)
+                  providerDisplayName: declaredProviderDisplayName(req),
+                  // LIN-2804: same stamped req.resolvedProvider, capability half.
+                  providerUi: resolvedProviderUi(req)
                 });
               }
               return { prompt: generated.prompt, bootstrapToken: null };
@@ -928,7 +932,9 @@ export function createDispatchRoutes({
                 // LIN-2354: resolveProviderAccess runs unconditionally near the
                 // top of this route, so req.resolvedProvider is always stamped
                 // here.
-                providerDisplayName: declaredProviderDisplayName(req)
+                providerDisplayName: declaredProviderDisplayName(req),
+                // LIN-2804: same stamped req.resolvedProvider, capability half.
+                providerUi: resolvedProviderUi(req)
               });
             }
             return { prompt: rec.prompt, bootstrapToken: null };
