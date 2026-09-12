@@ -379,3 +379,35 @@ describe('render-observation: bulk bar markup — visible select-all text + SSR 
     );
   });
 });
+
+// Review finding B (PR #1453, commit 91286e16): this markup had zero pinned
+// render coverage — an M9 mutation stripping aria-live="polite" from the
+// progress node left every unit test (and both new e2e tests) green. These
+// two assertions pin the accessibility half of LIN-2758's bulk-agree feature
+// directly against the rendered markup, so a future regression here fails a
+// unit test rather than only a live screen reader.
+describe('render-observation: bulk-agree progress node + Stop button markup (LIN-2758)', () => {
+  test('the progress node carries aria-live="polite" — a screen reader must hear per-row progress and the completion summary', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a' }
+    );
+    assert.match(
+      html,
+      /<p class="obs-ruling-bulk-progress" id="obs-ruling-bulk-progress" aria-live="polite"><\/p>/,
+      'stripping aria-live="polite" here would silence the batch progress/summary announcement entirely, with no visible symptom'
+    );
+  });
+
+  test('the Stop button is hidden until a batch is running', () => {
+    const html = renderObservationPage(
+      { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      { urlKey: 'ws-a' }
+    );
+    assert.match(
+      html,
+      /<button type="button" class="obs-ruling-bulk-stop" id="obs-ruling-bulk-stop" hidden>Stop<\/button>/,
+      'Stop must render hidden on first paint — syncRulingsBulkBar toggles it visible only while rulingsBulkRunning'
+    );
+  });
+});
