@@ -15,6 +15,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
 import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriveSessionStatus } from '../../routes/dashboard.js';
+import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
@@ -4584,5 +4585,294 @@ describe('GET /api/dashboard/hydrate/:wsUrlKey/:identifier — widened neighborh
 
     assert.equal(res.statusCode, 200);
     assert.deepEqual(res.jsonBody, { hydrated: false, reason: 'not_found' });
+  });
+});
+
+// ─── LIN-2755 beat 2: ruling-write cache invalidation (RED until beat 3) ────
+//
+// Beat 1's cited sweep enumerated the write surface and the cache contract;
+// this beat pins the acceptance witness BEFORE the fix lands (the cited-sweep
+// discipline: a witness that only starts passing once the fix exists is
+// worth something, one that already passes proves nothing).
+//
+// Witness shape, applied per site:
+//   1. invalidation — after a write, the NEXT poll of the cached `rulings`
+//      view re-invokes the producer (a cache hit would not).
+//   3. bound        — one write costs AT MOST one reconstruction: a second
+//      poll right after the first post-write poll is served from the
+//      freshly-warmed cache again, not re-triggering a third read.
+// These two are asserted together below (`assertInvalidatesAndBounded`):
+// reads go 1 (cold) -> still 1 (within TTL) -> write -> 2 (invalidated) ->
+// still 2 (re-warmed, bounded).
+//
+// Only `dashboard.js:1587` (dismiss) writes into data this cache actually
+// HOLDS: `mergeLoops` reconstructs loop/decision state from
+// `dispatchQueueStore`, which `markDecisionAnswered` mutates. `answer`
+// (task-bound), `shelve` and `keep` write to `taskDecisionsStore` /
+// `shelvedRulingsStore` / `dismissalSuggestionsStore`, all three read LIVE on
+// every request — dashboard.js's own comment on the additive reads says so
+// plainly ("no second caching layer is introduced here"), and beat 1's sweep
+// independently confirmed it against the ticket's own measured incident
+// (task-bound rows were never stale — only the loop-backed rows were). So
+// dismiss alone gets the stronger STALE-ROW witness (2) below — a seeded row
+// actually disappearing from the response, not just a re-read; the other
+// three get invalidation+bound only, which is what proves the ticket's
+// uniform "clear after every write" Proposal without asserting a staleness
+// bug that cannot exist for them.
+describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
+  // Counts `listHistory` calls, which is exactly once per `mergeLoops`
+  // reconstruction (the existing "rides the sessionsFeedCache" test above,
+  // line ~351, relies on the same correlation) — a faithful stand-in for
+  // "the cache producer ran", observable from outside for every site
+  // regardless of which store that site actually writes to.
+  function countingHistoryStore(itemsFn) {
+    let reads = 0;
+    return {
+      reads: () => reads,
+      store: {
+        async listItems() { return []; },
+        async listHistory() { reads++; return { items: itemsFn() }; }
+      }
+    };
+  }
+
+  async function assertInvalidatesAndBounded({ router, historyReads, doWrite }) {
+    const getRulings = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+    const warm = makeReqRes({ session });
+    await getRulings(warm.req, warm.res);
+    assert.equal(historyReads(), 1, 'sanity: the first poll always reconstructs');
+
+    const stillWarm = makeReqRes({ session });
+    await getRulings(stillWarm.req, stillWarm.res);
+    assert.equal(historyReads(), 1, 'sanity: a second poll within the 5s TTL is still served from cache');
+
+    await doWrite();
+
+    const afterWrite = makeReqRes({ session });
+    await getRulings(afterWrite.req, afterWrite.res);
+    assert.equal(historyReads(), 2,
+      'THE RED: the next poll after a successful write must reconstruct — only true if the write invalidated the cache');
+
+    const afterWriteAgain = makeReqRes({ session });
+    await getRulings(afterWriteAgain.req, afterWriteAgain.res);
+    assert.equal(historyReads(), 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
+  }
+
+  test('dismiss (dashboard.js:1587) invalidates the rulings cache — witness 1+3', async () => {
+    const { store, reads } = countingHistoryStore(() => [decisionItem('loop-1', 'LIN-99', 'd-99')]);
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: { ...store, async markDecisionAnswered() { return { success: true, feedbackCount: 1 }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache: createSessionsFeedCache()
+    });
+    await assertInvalidatesAndBounded({
+      router, historyReads: reads,
+      doWrite: async () => {
+        const dismiss = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+        const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+        req.body = { decisionLoopId: 'loop-1', decisionId: 'd-99' };
+        await dismiss(req, res);
+        assert.equal(res.statusCode, 200);
+      }
+    });
+  });
+
+  test('WITNESS 2 (stale-row, loop-backed only): dismiss actually excludes the discharged row on the next poll — not merely a re-read', async () => {
+    let discharged = false;
+    let reads = 0;
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() {
+          reads++;
+          const item = decisionItem('loop-1', 'LIN-99', 'd-99',
+            discharged ? [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-99', outcome: 'dismissed' }), timestamp: new Date().toISOString() }] : []);
+          return { items: [item] };
+        },
+        async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 2 }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache: createSessionsFeedCache()
+    });
+    const getRulings = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const dismiss = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/dismiss');
+    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+    const before = makeReqRes({ session });
+    await getRulings(before.req, before.res);
+    assert.equal(before.res.jsonBody.count, 1, 'the ruling is present before dismiss');
+
+    const dismissReqRes = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    dismissReqRes.req.body = { decisionLoopId: 'loop-1', decisionId: 'd-99' };
+    await dismiss(dismissReqRes.req, dismissReqRes.res);
+    assert.equal(dismissReqRes.res.statusCode, 200);
+
+    const after = makeReqRes({ session });
+    await getRulings(after.req, after.res);
+    assert.equal(after.res.jsonBody.count, 0,
+      'THE RED: the discharged row must actually be gone on the next poll, without waiting out the 5s TTL');
+    assert.equal(reads, 2, 'the row only disappeared because the cache was invalidated and re-read');
+  });
+
+  test('answer (dashboard.js:1645, task-bound) invalidates the rulings cache — witness 1+3', async () => {
+    const { store, reads } = countingHistoryStore(() => []); // no loop-backed rows — this write never touches them
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: store,
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache: createSessionsFeedCache(),
+      taskDecisionsStore: {
+        async listUnansweredForWorkspaces() { return []; },
+        async markOutcome() { return { outcomeAt: new Date(Date.now() + 60000).toISOString() }; }
+      }
+    });
+    await assertInvalidatesAndBounded({
+      router, historyReads: reads,
+      doWrite: async () => {
+        const answer = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/answer');
+        const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+        req.body = { taskDecisionId: 'scan_1', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555', optionId: 'opt-a' };
+        await answer(req, res);
+        assert.equal(res.statusCode, 200);
+      }
+    });
+  });
+
+  test('shelve (dashboard.js:1697) invalidates the rulings cache — witness 1+3', async () => {
+    const { store, reads } = countingHistoryStore(() => []);
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: store,
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache: createSessionsFeedCache(),
+      shelvedRulingsStore: {
+        async listForWorkspaces() { return []; },
+        async shelve({ urlKey, decisionId, reason, resurfaceInMs }) {
+          return { urlKey, decisionId, reason, resurfaceAt: new Date(Date.now() + resurfaceInMs).toISOString(), shelvedAt: new Date().toISOString(), lapseCount: 0 };
+        }
+      }
+    });
+    await assertInvalidatesAndBounded({
+      router, historyReads: reads,
+      doWrite: async () => {
+        const shelve = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/shelve');
+        const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+        req.body = { decisionId: 'd-1', reason: 'waiting on legal', resurfaceInMs: 24 * 60 * 60 * 1000 };
+        await shelve(req, res);
+        assert.equal(res.statusCode, 200);
+      }
+    });
+  });
+
+  test('keep (dashboard.js:1739) invalidates the rulings cache — witness 1+3', async () => {
+    const { store, reads } = countingHistoryStore(() => []);
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: store,
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache: createSessionsFeedCache(),
+      dismissalSuggestionsStore: {
+        async listForWorkspaces() { return []; },
+        async withdraw({ urlKey, decisionId }) {
+          return { urlKey, decisionId, reason: 'the task shipped', suggestedBy: 'lane-e', suggestedAt: NOW_ISO, withdrawn: true, withdrawnAt: NOW_ISO };
+        }
+      }
+    });
+    await assertInvalidatesAndBounded({
+      router, historyReads: reads,
+      doWrite: async () => {
+        const keep = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/keep');
+        const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+        req.body = { decisionId: 'shared-id' };
+        await keep(req, res);
+        assert.equal(res.statusCode, 200);
+      }
+    });
+  });
+
+  // WITNESS 4 (regression guard, NOT red — this must stay green through beat
+  // 3): the SWR read path and the 5s TTL are untouched by adding
+  // invalidation. A warm-and-stale poll still serves the cached value
+  // immediately and kicks exactly one background refresh, at the ROUTE
+  // level (the low-level mechanics are already exhaustively pinned in
+  // tests/unit/sessions-feed-cache.test.js — this is the integration-level
+  // companion so a route-level regression cannot slip past that file alone).
+  test('WITNESS 4: the rulings view keeps its SWR + 5s TTL semantics unchanged', async () => {
+    let clock = 1000;
+    const cache = createSessionsFeedCache({ ttlMs: 5000, now: () => clock });
+    let reads = 0;
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { reads++; return { items: [decisionItem(`loop-${reads}`, 'LIN-99', `d-${reads}`)] }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache: cache
+    });
+    const getRulings = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+    const first = makeReqRes({ session });
+    await getRulings(first.req, first.res);
+    assert.equal(reads, 1);
+    assert.equal(first.res.jsonBody.rulings[0].decision.decision_id, 'd-1');
+
+    // Past the 5s TTL: the next poll must serve the STALE value immediately
+    // (no blocking on a fresh reconstruction) while kicking exactly one
+    // background refresh — untouched SWR behaviour per beat 1's cache-
+    // contract findings.
+    clock += 6000;
+    const stale = makeReqRes({ session });
+    await getRulings(stale.req, stale.res);
+    assert.equal(stale.res.jsonBody.rulings[0].decision.decision_id, 'd-1', 'stale value served immediately, not blocked on a fresh read');
+
+    await new Promise(resolve => setImmediate(resolve)); // let the background refresh's microtask settle
+    assert.equal(reads, 2, 'exactly one background refresh ran');
+
+    const refreshed = makeReqRes({ session });
+    await getRulings(refreshed.req, refreshed.res);
+    assert.equal(refreshed.res.jsonBody.rulings[0].decision.decision_id, 'd-2', 'the refreshed value is now served');
+    assert.equal(reads, 2, 'no extra production for the fresh read');
   });
 });

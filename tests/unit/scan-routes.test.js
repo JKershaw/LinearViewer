@@ -18,7 +18,10 @@ import assert from 'node:assert/strict';
 import http from 'http';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
+import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
+import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -773,5 +776,167 @@ describe('POST /workspace/:urlKey/api/scan/:issueId/unretire (LIN-2650 WS4)', ()
   test('un-retiring without an id 400s', async () => {
     const result = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}/unretire`, {});
     assert.equal(result.status, 400);
+  });
+});
+
+// ─── LIN-2755 beat 2: ruling-write cache invalidation (RED until beat 3) ────
+//
+// Scan dismiss/retire/unretire all write only to `taskDecisionsStore`, read
+// LIVE on every rulings poll (per beat 1's sweep and dashboard.js's own
+// comment on the additive taskDecisions/shelved/suggestions reads: "no
+// second caching layer is introduced here") — so, like the answer/shelve/
+// keep sites in tests/unit/dashboard-routes.test.js, these three get the
+// invalidation+bound witness only; there is no constructible stale-ROW
+// witness for a write that never touches cached data.
+//
+// retire/unretire are NOT among the ticket's six named verbs
+// (markDecisionAnswered/markOutcome/suggest/withdraw/shelve/keep) — beat 1's
+// sweep found them by broadening past that list ("attack your own
+// inventory"): both mutate the same taskDecisionsStore rows dismiss does
+// (self-resolved / reversed-to-unanswered), so they belong in the same
+// write-surface census. Recorded here again per the beat's own instruction
+// to call the widening out explicitly wherever it lands.
+//
+// This mounts its OWN app (not the shared `beforeEach` one above) because it
+// needs a dashboard.js router alongside the scan routes, sharing one real
+// `taskDecisionsStore` and one real `sessionsFeedCache` — mirroring
+// server.js's single process-wide cache wired into every route factory.
+describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
+  const CACHE_URL_KEY = 'test-workspace';
+
+  function buildCrossRouterApp() {
+    const localCollection = createMockCollection();
+    const localTaskDecisionsStore = new TaskDecisionsStore({ collection: localCollection });
+    let historyReads = 0;
+    const dispatchQueueStore = {
+      async listItems() { return []; },
+      async listHistory() { historyReads++; return { items: [] }; }, // no loop-backed rows — isolates the task-bound writes
+    };
+    const sessionsFeedCache = createSessionsFeedCache();
+
+    const localApp = express();
+    localApp.use(express.json());
+    localApp.use(createWorkspaceApiRoutes({
+      workspaceFromUrl: (req, _res, next) => {
+        req.workspace = { accessToken: 'test-token', urlKey: CACHE_URL_KEY };
+        req.session = {};
+        next();
+      },
+      freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) }, customPromptsStore: {}, recapCacheStore: {},
+      briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
+      taskDecisionsStore: localTaskDecisionsStore,
+      // LIN-2755 beat 2: not yet a real parameter (beat 1's sweep found
+      // this) — silently ignored today, which is exactly why this is red.
+      sessionsFeedCache,
+    }));
+    localApp.use((req, res, next) => {
+      req.session = { workspaces: [{ urlKey: CACHE_URL_KEY, name: 'Test' }] };
+      next();
+    }, createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache,
+      taskDecisionsStore: localTaskDecisionsStore,
+    }));
+
+    return { app: localApp, taskDecisionsStore: localTaskDecisionsStore, historyReads: () => historyReads };
+  }
+
+  async function getRulings(app) {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    const { port } = server.address();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/workspace/${CACHE_URL_KEY}/api/dashboard/rulings`);
+      return await res.json();
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }
+
+  async function postLocal(app, path, body) {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    const { port } = server.address();
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}),
+      });
+      let parsed = null;
+      try { parsed = await res.json(); } catch { /* no body */ }
+      return { status: res.status, body: parsed };
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }
+
+  async function assertInvalidatesAndBounded(app, historyReads, doWrite) {
+    const warm = await getRulings(app);
+    assert.equal(warm.count, 0);
+    assert.equal(historyReads(), 1, 'sanity: the first poll always reconstructs');
+
+    const stillWarm = await getRulings(app);
+    assert.equal(historyReads(), 1, 'sanity: a second poll within the 5s TTL is still served from cache');
+
+    await doWrite();
+
+    const afterWrite = await getRulings(app);
+    assert.equal(historyReads(), 2,
+      'THE RED: the next poll after a successful write must reconstruct — only true if the write invalidated the cache');
+
+    const afterWriteAgain = await getRulings(app);
+    assert.equal(historyReads(), 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
+  }
+
+  test('scan dismiss (workspace-api.js:2699) invalidates the rulings cache — witness 1+3', async () => {
+    const { app, taskDecisionsStore: store, historyReads } = buildCrossRouterApp();
+    const seeded = await store.recordScan({
+      urlKey: CACHE_URL_KEY, issueId: CANONICAL_DECISION_ISSUE_ID, issueIdentifier: 'seeded', inputHash: 'cache-dismiss'.padEnd(64, '0'),
+      decision: seededDecision()
+    });
+
+    await assertInvalidatesAndBounded(app, historyReads, async () => {
+      const result = await postLocal(app, `/workspace/${CACHE_URL_KEY}/api/scan/${DECISION_ISSUE}/dismiss`, { id: seeded.id });
+      assert.equal(result.status, 200, 'the dismiss itself must succeed');
+    });
+  });
+
+  test('scan retire (workspace-api.js:2877) invalidates the rulings cache — witness 1+3', async () => {
+    const { app, taskDecisionsStore: store, historyReads } = buildCrossRouterApp();
+    const seeded = await store.recordScan({
+      urlKey: CACHE_URL_KEY, issueId: CANONICAL_ZERO_FINDING_ISSUE_ID, issueIdentifier: 'seeded', inputHash: 'cache-retire'.padEnd(64, '0'),
+      decision: seededDecision()
+    });
+
+    await assertInvalidatesAndBounded(app, historyReads, async () => {
+      const result = await postLocal(app, `/workspace/${CACHE_URL_KEY}/api/scan/${ZERO_FINDING_ISSUE}/retire`, { id: seeded.id });
+      assert.equal(result.status, 200);
+      assert.equal(result.body.retired, true, 'sanity: the retire itself must succeed');
+    });
+  });
+
+  test('scan unretire (workspace-api.js:2986) invalidates the rulings cache — witness 1+3', async () => {
+    const { app, taskDecisionsStore: store, historyReads } = buildCrossRouterApp();
+    const seeded = await store.recordScan({
+      urlKey: CACHE_URL_KEY, issueId: CANONICAL_ZERO_FINDING_ISSUE_ID, issueIdentifier: 'seeded', inputHash: 'cache-unretire'.padEnd(64, '0'),
+      decision: seededDecision()
+    });
+    const stamped = await store.markOutcome({
+      urlKey: CACHE_URL_KEY, issueId: CANONICAL_ZERO_FINDING_ISSUE_ID, id: seeded.id, outcome: 'self-resolved',
+      outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+    });
+
+    await assertInvalidatesAndBounded(app, historyReads, async () => {
+      const result = await postLocal(app, `/workspace/${CACHE_URL_KEY}/api/scan/${ZERO_FINDING_ISSUE}/unretire`, { id: stamped.id });
+      assert.equal(result.status, 200, 'the unretire itself must succeed');
+    });
   });
 });
