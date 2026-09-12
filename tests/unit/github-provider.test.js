@@ -749,6 +749,106 @@ describe('createGitHubClient listRepos → installation repositories (LIN-710)',
 });
 
 // ---------------------------------------------------------------------------
+// Bounded page-number walk + `.truncated` flag (LIN-2820)
+//
+// `Link`-header walking is infeasible (client.js's request() discards the
+// Response and existing fetch stubs carry no headers), so the client walks by
+// PAGE NUMBER instead against the `{total_count, repositories}` envelope.
+// Page 1's URL must stay byte-identical to the pre-pagination call (covered
+// above); these pin the walk itself and the safety-cap truncation signal.
+// ---------------------------------------------------------------------------
+describe('createGitHubClient listRepos/listUserInstallationRepos pagination (LIN-2820)', () => {
+  test('listRepos walks multiple pages by page number, keeping page 1 unparameterized', async () => {
+    const calls = [];
+    const pages = [
+      { total_count: 150, repositories: Array.from({ length: 100 }, (_, i) => ({ full_name: `o/r${i}`, private: false })) },
+      { total_count: 150, repositories: Array.from({ length: 50 }, (_, i) => ({ full_name: `o/r${100 + i}`, private: false })) },
+    ];
+    const fetchImpl = async (url) => {
+      calls.push(url);
+      const page = calls.length === 1 ? pages[0] : pages[1];
+      return { ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify(page) };
+    };
+    const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
+
+    const repos = await client.listRepos();
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0], 'https://api.github.com/installation/repositories?per_page=100');
+    assert.equal(calls[1], 'https://api.github.com/installation/repositories?per_page=100&page=2');
+    assert.equal(repos.length, 150);
+    assert.ok(!repos.truncated, 'a complete read carries no .truncated own property');
+  });
+
+  test('listRepos stops and marks .truncated once the safety cap is hit', async () => {
+    let page = 0;
+    const fetchImpl = async () => {
+      page += 1;
+      return {
+        ok: true, status: 200, statusText: 'OK',
+        text: async () => JSON.stringify({
+          total_count: 10000,
+          repositories: Array.from({ length: 100 }, (_, i) => ({ full_name: `o/r${page}-${i}`, private: false })),
+        }),
+      };
+    };
+    const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
+
+    const repos = await client.listRepos({ cap: 250 });
+
+    assert.equal(repos.length, 250);
+    assert.equal(repos.truncated, true);
+  });
+
+  // LIN-2820 review F2: DEFAULT_REPO_CAP (500) is an exact multiple of PER_PAGE
+  // (100), so the walk lands EXACTLY on the cap on every production call (no
+  // caller passes a custom `cap`) — unlike the `cap: 250` case above, which only
+  // reaches the slice/truncate branch because 250 is not a page boundary. A
+  // `> cap` comparison would never fire here; this pins the production path.
+  test('listRepos marks .truncated at the PRODUCTION default cap (no custom cap passed)', async () => {
+    let page = 0;
+    const fetchImpl = async () => {
+      page += 1;
+      return {
+        ok: true, status: 200, statusText: 'OK',
+        text: async () => JSON.stringify({
+          total_count: 10000,
+          repositories: Array.from({ length: 100 }, (_, i) => ({ full_name: `o/r${page}-${i}`, private: false })),
+        }),
+      };
+    };
+    const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
+
+    const repos = await client.listRepos(); // no cap option — the real production call shape
+
+    assert.equal(repos.length, 500, 'stops at DEFAULT_REPO_CAP');
+    assert.equal(repos.truncated, true, 'a 10000-repo installation capped at the default must be flagged truncated');
+  });
+
+  test('listUserInstallationRepos walks multiple pages for one installation, keeping page 1 unparameterized', async () => {
+    const calls = [];
+    const pages = [
+      { total_count: 120, repositories: Array.from({ length: 100 }, (_, i) => ({ full_name: `o/r${i}`, private: false })) },
+      { total_count: 120, repositories: Array.from({ length: 20 }, (_, i) => ({ full_name: `o/r${100 + i}`, private: false })) },
+    ];
+    const fetchImpl = async (url) => {
+      calls.push(url);
+      const page = calls.length === 1 ? pages[0] : pages[1];
+      return { ok: true, status: 200, statusText: 'OK', text: async () => JSON.stringify(page) };
+    };
+    const client = createGitHubClient({ token: 't', baseUrl: 'https://api.github.com', fetchImpl });
+
+    const repos = await client.listUserInstallationRepos('42');
+
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0], 'https://api.github.com/user/installations/42/repositories?per_page=100');
+    assert.equal(calls[1], 'https://api.github.com/user/installations/42/repositories?per_page=100&page=2');
+    assert.equal(repos.length, 120);
+    assert.ok(!repos.truncated, 'a complete read carries no .truncated own property');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // refreshCredential — provider-aware re-mint seam (LIN-712, surface 6)
 // ---------------------------------------------------------------------------
 // GitHub App installation tokens carry NO refresh_token; they are RE-MINTED from
