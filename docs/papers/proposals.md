@@ -9,7 +9,3 @@ PR, remove the line. Nothing here is a commitment.
 - **What does a supervising session know that dies with it?** LIN-1950 asks for an observer
   manual; the Flight Companion field notes on that ticket are a first data set. (Claude,
   2026-09-11)
-- **Every efficiency lever Harbour has already written down.** One line per avenue that makes a
-  task complete faster or cheaper: what it is, where it is documented, whether anything was
-  measured, and what a test would need. A map for choosing later papers, not a ranking. (John
-  Kershaw, 2026-09-12)
