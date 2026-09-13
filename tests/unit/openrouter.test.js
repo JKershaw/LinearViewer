@@ -2493,17 +2493,24 @@ describe('streamChat pre-aborted signal (LIN-2637)', () => {
     // The abort fires while streamChat is suspended inside initProxyFetch —
     // before the request branch (and its listener) has been reached. The
     // post-setup guard must catch it, or the request would proceed with an
-    // abort that no listener will ever see.
+    // abort that no listener will ever see. The transport counter pins "no
+    // request is issued for the setup window" — a listener-only shape would
+    // still reject (via the 120s timeout rescue) but would first put a call
+    // on the wire.
     const ac = new AbortController();
-    setFetchImpl((url, opts) => new Promise((resolve, reject) => {
-      const rejectAborted = () => {
-        const err = new Error('The operation was aborted');
-        err.name = 'AbortError';
-        reject(err);
-      };
-      if (opts.signal.aborted) return rejectAborted();
-      opts.signal.addEventListener('abort', rejectAborted);
-    }));
+    let fetchCalls = 0;
+    setFetchImpl((url, opts) => {
+      fetchCalls++;
+      return new Promise((resolve, reject) => {
+        const rejectAborted = () => {
+          const err = new Error('The operation was aborted');
+          err.name = 'AbortError';
+          reject(err);
+        };
+        if (opts.signal.aborted) return rejectAborted();
+        opts.signal.addEventListener('abort', rejectAborted);
+      });
+    });
 
     const { streamChat } = await import('../../lib/openrouter.js');
     const pending = streamChat(
@@ -2513,6 +2520,7 @@ describe('streamChat pre-aborted signal (LIN-2637)', () => {
     );
     ac.abort();
     await assert.rejects(pending, /OpenRouter request timed out/);
+    assert.strictEqual(fetchCalls, 0, 'no transport call is made when the abort lands during setup');
   });
 
   test('an abort after the request is in flight rejects via the abort listener', async () => {
@@ -2544,6 +2552,53 @@ describe('streamChat pre-aborted signal (LIN-2637)', () => {
     await fetchStartedP;
     ac.abort();
     await assert.rejects(pending, /OpenRouter request timed out/);
+  });
+
+  test('streamChatWithTools re-entering runToolHop with an already-aborted signal issues NO request', async () => {
+    // The runToolHop half of the shared guard (LIN-2637). An abort that lands
+    // during hop 1's executeTool leaves the signal ALREADY aborted when the loop
+    // re-enters runToolHop for hop 2. The up-front guard there must fail BEFORE
+    // any transport call, or the loop buys a full second tool hop for nothing.
+    // This pins the runToolHop call site of throwIfAborted, which the final-hop
+    // test above cannot reach: its single hop breaks out of the loop before
+    // runToolHop is ever re-entered with the aborted signal.
+    const ac = new AbortController();
+    const calls = [];
+    setFetchImpl(async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push({ streaming: body.stream === true, toolHop: Array.isArray(body.tools) });
+      // Non-streaming tool hop: the model asks for a tool again.
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{
+            finish_reason: 'tool_calls',
+            message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'sample_tool', arguments: '{}' } }] }
+          }]
+        })
+      };
+    });
+
+    const { streamChatWithTools } = await import('../../lib/openrouter.js');
+    await assert.rejects(
+      streamChatWithTools(
+        [{ role: 'user', content: 'hi' }],
+        {
+          apiKey: 'test-key',
+          tools: [{ type: 'function', function: { name: 'sample_tool', parameters: { type: 'object', properties: {} } } }],
+          maxIterations: 2,
+          signal: ac.signal,
+          executeTool: async () => { ac.abort(); return 'tool result'; }
+        },
+        () => {}
+      ),
+      /OpenRouter request timed out/,
+      'a signal aborted during a tool hop must fail the NEXT runToolHop with the abort contract error'
+    );
+
+    // Only hop 1's request happened. Hop 2 must NOT reach the transport.
+    assert.strictEqual(calls.length, 1, 'no second tool-hop request for a pre-aborted signal');
+    assert.strictEqual(calls[0].toolHop, true, 'the only request is the non-streaming tool hop');
   });
 
   test('streamChatWithTools final streamChat makes NO request when the abort lands during the last tool hop', async () => {
