@@ -24,6 +24,8 @@ AI agents, and verifies the work on real evidence.
 - `npm run test:hermetic` - Run the SAME unit suite under a socket-level watcher and additionally fail if any test opens a non-loopback socket (LIN-1880). This is what CI runs in place of `test:unit`, so it costs no extra time there. The unit suite reached `api.linear.app` on every run for months while two other instruments reported clean — see `tests/fixtures/network-guard.js`
 - `npm run test:hermetic:proxy` - The same check with `HTTPS_PROXY`/`HTTP_PROXY` set. Native `fetch` ignores proxy env vars entirely, so a proxy-based counter cannot see this class; both arms are part of LIN-1880's acceptance
 - `npm run test:ui` - Run Playwright tests with the Playwright UI
+- `npm run secret-scan` - Run secret scan over repository source in CI (LIN-2573)
+- `npm run scan:public-pages` - Run public pages secret scan on schedule (landing, /kpis, /archive/:n; LIN-2573)
 
 ## Architecture
 
@@ -172,6 +174,8 @@ lib/
   llm-call-log.js      Append-only per-LLM-call metadata log (model, provider, tokens, cost, time; LIN-418)
   prompt-trace-store.js  Prompt trace storage + provider-context disclosure (LIN-578, LIN-2357)
   free-tier-store.js   Free tier usage tracking and rate limiting
+  secret-scan.js       High-confidence secret scanner for source and served JS (LIN-2573)
+  scan-public-pages.js Public pages crawler and secret scanner (landing, /kpis, /archive/:n; LIN-2573)
   proxy-tokens.js      Proxy token hashing and validation
   proxy-events.js      Proxy event audit logging
   proxy-fetch.js       Proxy-aware fetch for HTTP_PROXY environments
