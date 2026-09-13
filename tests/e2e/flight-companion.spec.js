@@ -1318,6 +1318,72 @@ test.describe('LIN-2772: a restored proposal re-renders read-only after reload',
   });
 });
 
+// LIN-2771 review ledger: a reload mid-window must resume the wake at the
+// REMAINING time, not restart a fresh full delay. Two witnesses, because the
+// strip's "next check-in" line is minute-resolution (`formatNextCheckIn`
+// renders HH:MM only): the strip text distinguishes resume from restart only
+// when the anchor minute and the fresh-restart minute differ (~50% of runs),
+// so the wake-TIMING interception is the non-vacuous half and the strip
+// assertion pins the reviewer's named observable for the runs that can tell.
+test.describe('LIN-2771: a reload mid-window resumes the wake at the remaining time', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('reload with ~10s of a window remaining fires the wake at the remaining time, and the strip reflects the anchor', async ({ page }) => {
+    // Complete a REAL turn first so an anchor is genuinely stamped by the
+    // turn -> reset -> scheduleAutoWake -> persistCadence path.
+    await mockTurn(page, { token: 'ack' });
+    await page.locator('#flight-companion-question').fill('still there?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+
+    // Now simulate the mid-window reload deterministically: overwrite the
+    // stored cadence so the anchor is ~10s out (a tab reloaded 20s into a
+    // 30s window). Format the expected strip line IN THE BROWSER so the
+    // locale/ICU formatting cannot drift between the page's render and the
+    // assertion.
+    const key = `flight-companion-session:${URL_KEY}`;
+    const { anchorText } = await page.evaluate((storageKey) => {
+      const anchor = Date.now() + 10000;
+      sessionStorage.setItem(storageKey, JSON.stringify({
+        history: [],
+        tabCheckInCount: 0,
+        tabTotalCost: 0,
+        selectedModel: null,
+        cadence: { delayMs: 30000, nextFireAt: anchor, stoppedReason: null },
+      }));
+      return { anchorText: 'next check-in: ' + new Date(anchor).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+    }, key);
+
+    // Time the auto-wake turn POST — the FIRST request after reload is the
+    // wake (no user turn happens on this page load). Registered after the
+    // turn above, so this handler wins for the post-reload wake.
+    let wakeHitAt = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      wakeHitAt = Date.now();
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
+    });
+
+    const reloadStart = Date.now();
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Strip: resume renders minute(anchor) EXACTLY (the anchor does not move);
+    // a fresh restart would render minute(loadNow + 30s).
+    await expect(page.locator('#flight-companion-strip-next')).toHaveText(anchorText);
+
+    // Wake: fires at the REMAINING time (~10s), never a fresh 30s.
+    await expect.poll(() => wakeHitAt, { timeout: 25000, intervals: [500] }).not.toBeNull();
+    const elapsed = wakeHitAt - reloadStart;
+    expect(elapsed).toBeGreaterThan(500);
+    expect(elapsed).toBeLessThan(25000);
+  });
+});
+
 // LIN-2623 beat 3: the per-turn model picker. Real <select>/<option>
 // semantics (selectedIndex, the selected option's own data-pricing
 // attribute) are exactly what the vm-sandboxed client-unit harness
