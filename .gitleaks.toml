@@ -1,0 +1,10 @@
+# Gitleaks configuration for LinearViewer / Harbour (LIN-2573)
+# Rule: Allowlist by fixture path, never by pattern.
+
+[allowlist]
+description = "Allowlist test fixture paths containing documented benign fixtures"
+paths = [
+  '''(?i)tests/fixtures/''',
+  '''(?i)scripts/eval/fixtures/''',
+  '''(?i)scripts/eval/lin-263-spike[0-9]+-out/fixtures/''',
+]
