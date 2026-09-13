@@ -1,11 +1,11 @@
 ---
 title: Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
-version: 4
+version: 5
 date: 2026-09-13
 authors: [Claude, John Kershaw]
 model: the conning session wrote this by hand over the read-write proxy; the implementations it dispatched ran z-ai/glm-5.3, deepseek/deepseek-v4.1-flash and google/gemini-3.8-flash on opencode (no effort field), the floor run deepseek/deepseek-v4-flash-0731, openai/gpt-oss-120b and meta-llama/llama-3.1-8b-instruct on the same harness, the gating reviews and close-outs claude-opus-5 on claude-code at effort medium, the shadow reviews z-ai/glm-5.3 on opencode, as the dispatch lineages under sessionId LIN-2828-bakeoff report
-grounded_at: 85584846 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13, merged 2026-09-13), PR #1485 and PR #1486 (2026-09-13, merged 2026-09-13), LIN-2697 and LIN-2637 (close-out comments, 2026-09-13), LIN-2856, simple-dispatcher PR #233 (2026-09-12, merged 2026-09-13), LIN-2415 (comment 48055064, 2026-09-13), LIN-2637 and LIN-2697 (review and shadow comments, 2026-09-13), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
+grounded_at: c4724419 (LinearViewer), d3c27c4 (simple-dispatcher)
+cites: [LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13, merged 2026-09-13), PR #1485 and PR #1486 (2026-09-13, merged 2026-09-13), LIN-2697 and LIN-2637 (close-out comments, 2026-09-13), LIN-2856, LIN-2772 and PR #1487, LIN-2121 and PR #1488, LIN-2787 and PR #1489, LIN-2771 and PR #1491, LIN-2153 and LIN-2322 (research, plan and plan-review comments, 2026-09-13), docs/papers/harbour/capability-ledger.md (v2, 2026-09-13), simple-dispatcher PR #233 (2026-09-12, merged 2026-09-13), LIN-2415 (comment 48055064, 2026-09-13), LIN-2637 and LIN-2697 (review and shadow comments, 2026-09-13), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
 ---
 
 # Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
@@ -26,7 +26,13 @@ this harness: the older DeepSeek V4 Flash produced two green PRs for a tenth of 
 each, gpt-oss-120b reported done or failed inside a minute without touching the tree, and
 an 8B Llama hung until aborted. The seven launch failures in
 the round were a daily spend cap, a stale model catalog, and CPU starvation, none of them
-the model.
+the model. An evening of one-ticket experiments then pushed the boundary outward: Flash
+implemented an hour-plus provider-and-docs ticket, a thin ticket with no plan, and a
+client-side page ticket both single-shot and stepped, all four approved by Opus within one
+round and all four merged and set Done by Flash close-outs after a human read each ledger,
+so the subscription's share of those tickets was one Opus review each. Flash research on two
+tickets went unfaulted by Opus plan-review; Flash plans on the same two went round twice
+without clearing, on the class bound each time.
 
 ## Findings
 
@@ -143,6 +149,47 @@ in error, forbids code. GLM confirmed the prerequisite deploy, found the real ca
 missing stamp, a trailing newline, wrote a runbook and parked BLOCKED in four minutes. The
 fix it implied became LIN-2838, implemented by Flash and approved the same morning.
 
+**The boundary is not where the bake-off left it.** Four one-ticket experiments the same
+evening, each judged by Opus review with a cold GLM shadow. LIN-2787, an hour-plus ticket
+across the Linear provider, a proxy route, the docs contract and a regression test, on
+Flash 0731 after two launch-time HTTP 500s on Flash V4.1: Approve, conditional, both
+reviewers finding the same inherited pagination item cold. LIN-2121, a thin ticket with no
+plan, on Flash V4.1: Approve, conditional, one hard gate item on a data path that the same
+session fixed with the reviewer's own probe as its test. LIN-2772, a client-side page
+behaviour ticket single-shot on Flash 0731: Approve, conditional, with the shadow stricter
+than Opus for the first time, on an unpinned rollback exit the session then pinned.
+LIN-2771, its sibling from the same review, stepped in four beats with the conning session
+at the wheel: Approve, conditional on the same two surfaces both reviewers named. Every
+send-back-shaped finding was closed in-session by a follow-up for pennies. Nothing here says
+where the boundary is; it says it is further out than one ticket per shape can see.
+
+**Cheap close-out held on non-empty ledgers when a human read them first.** Four more Flash
+close-outs after LIN-2697: LIN-2772, LIN-2121, LIN-2787 and LIN-2771, each on a ledger with
+inside items, each after the conning session read the ledger, accepted the items on the
+ticket with the precondition each named, and had the in-session follow-up close the rest.
+Each merged, verified on the landed commit, set Done, cited the acceptance item by item and
+filed only outside items; LIN-2787's ran the review's post-deploy check on the live site.
+Two to ten minutes and under a cent each, against $1.62 to $8.88 on Opus. The condition is
+the whole finding: the cheap close-out did not judge, it cited.
+
+**Cheap research passed the gate; cheap plans did not, twice.** Flash 0731 wrote research on
+LIN-2153 and LIN-2322 in under 25 minutes each for a third of a cent, with file-and-line
+citations across both repositories, the papers read, and on LIN-2153 the finding that the
+proposal collides with the manual's own doctrine. Neither Opus plan-review faulted it. The
+Flash plans built on it were sent back twice each, both times on the class bound rather than
+a member, with six of seven checks passing on the second round. The gate sends 88% of plans
+back once and a third back twice, so two rounds is inside the population; the difference
+from Sonnet, if there is one, is not visible at two tickets. One second-round plan session
+hung for an hour and was aborted; its retry finished.
+
+**The harness failed where the models did not.** With seven or eight opencode servers on
+one host, three launches died before any tool ran, two with an HTTP 500 on the first
+message and one with the server not ready in twenty seconds, and one session hung. Every
+retry worked. The runner's five-minute stall note carries a fixed placeholder session id in
+every instance, so it is a template, not a signal; the duplicate-dispatch guard refuses a
+retry for five minutes after a launch failure and `force` does not override it on the
+recommend-and-dispatch verb.
+
 ## Method
 
 Twelve small tickets whose descriptions were already the plan, plus one filed during the
@@ -199,6 +246,9 @@ review costs but not with the OpenRouter export.
 - Run the empty-ledger close-out on Flash five more times, each with the review's ledger
   read by a human first, before deciding whether the empty-ledger case can leave Opus.
   One clean merge is one clean merge.
-- Try the cheap models on bigger tickets. Every ticket here was small because it was safe
-  to try, and nothing in this paper says how any of them fares on an hour-plus or thin
-  ticket; that is unmeasured, not unfavourable.
+- Run the stepper pair the other way round, the easier ticket stepped, and on a shape that
+  failed single-shot, before reading anything about stepping from one pair.
+- Give Flash a plan on a ticket small enough to bound in one query, with nothing landing
+  under it, and see whether the second round clears.
+- Exempt a launch-time failure from the duplicate-dispatch guard, and give the runner's
+  stall note a real session id or no id.

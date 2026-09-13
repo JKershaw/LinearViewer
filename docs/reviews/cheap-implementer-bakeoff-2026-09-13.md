@@ -48,6 +48,17 @@ session, no send-backs, no conflicts, `main` green throughout on both repositori
 $8.88 each, $51.95 in all, median nine minutes. Review plus close-out is about $8.80 of Opus
 per cheap-implemented ticket; the implementer's share is $0.45 to $3.75.
 
+**The evening's experiments, one ticket per shape, all on Flash.** LIN-2787 (hour-plus,
+provider plus docs), LIN-2121 (thin, no plan), LIN-2772 (page behaviour, single-shot) and
+LIN-2771 (the same shape, stepped in four beats): all four Approve conditional at Opus
+review within one round, every finding closed by an in-session follow-up, all four merged
+and Done by Flash close-outs after the conning session read each ledger. Subscription share
+per ticket: one Opus review, $2.83 to $4.25. Flash research on LIN-2153 and LIN-2322 was
+unfaulted by Opus plan-review; the Flash plans on both went round twice without clearing,
+on the class bound each time, and the threads stopped there. Three launches died before
+any tool ran and one plan session hung; every retry worked. Details in
+`docs/papers/harbour/capability-ledger.md` edition 2.
+
 **A cheap close-out on an empty ledger worked once.** LIN-2697's close-out ran on DeepSeek
 V4 Flash 0731: PR #1485 merged, suite re-run on the landed commit, Done set, one outside
 follow-up filed (LIN-2856), 13 minutes, $0.001. The Opus control on LIN-2637 merged
@@ -123,9 +134,10 @@ LIN-2834's question and is deferred to the close-out.
 
 - Per-model cost per ticket is an hourly-total split by session-minutes, not a per-session
   read; GLM's implementation and shadow costs share one bucket.
-- Whether any of the three models holds up on a ticket larger than an hour. Untried is
-  not unfavourable: the tickets were small because they were safe to try.
-- Whether a cheap close-out holds beyond one empty-ledger ticket.
+- Whether the evening's one-ticket-per-shape results are rates. Each is a first sighting.
+- Whether stepping beats single-shot: the stepped ticket was the harder of the pair.
+- Whether a Flash plan can clear plan-review: two tickets, two rounds each, neither clear,
+  one confounded by HEAD moving under it.
 - Whether a cheap reviewer on a *different* model from the implementer does better than GLM
   reviewing GLM.
 - The upstream host and quantisation OpenRouter routed each session to, which was not

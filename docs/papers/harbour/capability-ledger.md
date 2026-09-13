@@ -1,34 +1,43 @@
 ---
 title: What has each model been seen to do on Harbour's tasks?
-version: 1
+version: 2
 date: 2026-09-13
 authors: [Claude, John Kershaw]
 model: by hand, by the session that conned the cheap-implementer bake-off, over the read-write proxy; the runs it reports ran as their own lineages say
-grounded_at: 85584846 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, LIN-2856, simple-dispatcher PR #233]
+grounded_at: c4724419 (LinearViewer), d3c27c4 (simple-dispatcher)
+cites: [docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, LIN-2856, simple-dispatcher PR #233, LIN-2772 and PR #1487, LIN-2121 and PR #1488, LIN-2787 and PR #1489, LIN-2771 and PR #1491, LIN-2153 and LIN-2322 (research, plan and plan-review comments, 2026-09-13), LIN-2828 (voyage log, 2026-09-13 evening)]
 ---
 
 # What has each model been seen to do on Harbour's tasks?
 
 Opus 5 does every step and is the judge. Sonnet 5 does implementation and plan at the
-gate's own standard. Three cheap models on opencode, GLM-5.3, DeepSeek V4.1 Flash and
-DeepSeek V4 Flash, implement small, well-grounded, test-heavy tickets to the point where
-Opus approves them within one round, and none has been tried on anything else. Gemini 3.8
-Flash did the same on two tickets at GLM's price. gpt-oss-120b and Llama 3.1 8B produced no
-work on this harness. This is the first edition of the ledger `capability-ledger-method.md`
-describes. It is rewritten, never appended to; git holds every earlier edition. An entry
-that is not here is unknown, and an unknown pair routes to Opus.
+gate's own standard. The two DeepSeek Flash models on opencode implement grounded tickets to
+Opus's review standard whether the ticket is small, an hour long across a provider and its
+docs, or thin with no plan at all; they carry a stepped run; they write research that an
+Opus plan-review takes seriously; and they close out a reviewed ticket correctly once a
+human has read the ledger. Their plans have not yet cleared the plan-review gate, which
+sends most plans back once and theirs back twice. GLM-5.3 implements the same small shapes
+at eight times the price and reviews well enough to be a second opinion. Gemini 3.8 Flash
+did two small tickets at GLM's price. gpt-oss-120b and Llama 3.1 8B produced no work on
+this harness. This is the second edition of the ledger `capability-ledger-method.md`
+describes, rewritten from the evening of 13 September's experiments; git holds edition 1.
+An entry that is not here is unknown, and an unknown pair routes to Opus.
 
 ## The shapes this edition can speak to
 
-Every cheap-model ticket below is the same shape: a description that already contained the
+Most cheap-model tickets below are one shape: a description that already contained the
 plan, files and lines named, under an hour's work, touching tests, docs or library code with
 a unit suite, in a repository whose CI proves most of the claim. Call that a **grounded
-small ticket**. The one exception was a page, and it is noted. No cheap model has been
-tried on a **thin ticket** (no plan in the description), a **page** beyond that one, a
-**data path, credential or contract** change, a **multi-session** ticket, a **lane** of
-several tickets, or any kind other than implementation. The **stepper** variant has no
-entries for any model.
+small ticket**. Edition 2 adds four more shapes, one ticket each, all on the Flash models:
+a **grounded hour-plus ticket** across a provider, a proxy route, its docs contract and a
+regression test (LIN-2787); a **thin ticket** with no plan in the description, where the
+model had to research, plan and implement in one session (LIN-2121); a **client-side page
+behaviour** ticket with unit and end-to-end coverage, run single-shot (LIN-2772) and
+**stepped** in four beats with an Opus-class session at the wheel (LIN-2771); and the
+**research** and **plan** kinds on two tickets each, judged by an Opus plan-review. It also
+adds **close-out**, on empty and on non-empty ledgers. No cheap model has yet been tried on
+a **visual layout**, a **data path, credential or contract** change beyond LIN-2787's read
+path, a **multi-session** ticket, or a **lane**.
 
 Read every "not tried" below as exactly that. The bake-off chose small tickets because
 they were safe to try, not because the models were expected to fail on larger ones, and
@@ -80,11 +89,14 @@ OpenRouter meter, which makes it the dearest of the cheap models for the same re
 confirmed the deploy, found the real cause of the missing stamp, wrote a runbook and parked
 BLOCKED in four minutes.
 
-**Reviews as a second opinion, not a gate.** Fifteen shadow reviews on the identical Opus
-prompt: thirteen agreed with Opus, one was stricter on the same finding, one missed the
-hardest finding of the round, a scan that reports clean on an empty fetch. Of the three
-verdicts formed before Opus posted, two agreed, one on a second-order missing test, and one
-was that miss. About $0.95 a review.
+**Reviews as a second opinion, not a gate.** Nineteen shadow reviews on the identical Opus
+prompt: sixteen agreed with Opus, two were stricter on the same or an adjacent finding, one
+missed the hardest finding of its round, a scan that reports clean on an empty fetch. Of
+the seven verdicts formed before Opus posted, five agreed, one was stricter (an unpinned
+rollback exit Opus had not flagged, LIN-2772), and one was that miss. On LIN-2121 it saw
+the same data-path surface as Opus and graded it an outside monitor where Opus probed the
+magnitude and made it a hard gate. It finds the surfaces; where it differs is grading.
+About $0.95 a review in the bake-off, $0.01 to $0.03 relayed for the evening's four.
 
 **Failed on a page.** LIN-2830's readout grid was 792 px of fixed columns in a 263 px card.
 Correct logic, correct tests, never rendered. The one page any cheap model has been given.
@@ -102,8 +114,21 @@ left standing in four places of prose. No logic defect. Median 14 minutes, about
 ticket on the operator's meter, sessions shorter than GLM's. This is the recommended
 fleet-week implementer via a preset.
 
-**Not tried:** a page, a thin ticket, anything over an hour, any other kind. Five for
-five within one round on this shape is a reason to try the next shape, not a ceiling.
+**Carries a thin ticket alone.** LIN-2121 had no plan, one paragraph and a recommendation.
+It read the code, stamped the identifier at the one mint site, wrote the scoped-read test
+red first, surfaced its own cross-surface effects with a not-proven note, and opened a
+green PR in about thirty minutes. Opus found one hard gate item it had understated, a
+KPI attribution flip on a data path, and the same session fixed it in a follow-up with the
+reviewer's probe as the test. Merged and Done. One ticket.
+
+**Closes out a reviewed ticket.** LIN-2121's own close-out, after a human read the ledger:
+merged, verified on the landed commit, Done, in two minutes. Its first launch died before
+any tool ran (the opencode server was not ready in twenty seconds); the retry worked.
+
+**Not tried:** a page, anything over an hour, research, plan. Its launch is the one that
+failed twice on LIN-2787's prompt with an HTTP 500 from the opencode server before any
+tool ran, while it completed LIN-2121 in the same hour; the failure is the harness's, not
+the model's.
 
 ## DeepSeek V4 Flash, 0731 (opencode, OpenRouter, no effort field)
 
@@ -114,14 +139,54 @@ a second call path, fixed in a test-only commit and approved on re-review, 28 mi
 Flash. Two tickets is too few to prefer it; enough to keep trying it, and on bigger
 tickets than these.
 
-**Closed out one empty-ledger ticket correctly.** LIN-2697, both reviews Approve, ledger
-explicitly empty: merged PR #1485, re-ran the pinned suite on the landed commit, set Done,
-filed the one outside class sibling the review had named (LIN-2856), 13 minutes, $0.001.
-The Opus control on LIN-2637 did the same in three minutes for $3.44; its terminal marker
-never reached Harbour. One ticket; the shape is "close-out with an empty ledger", and nothing is
-known about a ledger with items.
+**Implements an hour-plus grounded ticket across a provider and its docs.** LIN-2787: the
+Linear provider's team-scoped label query, the proxy docs contract, the instructions
+catalogue and a regression test observed red with the ticket's exact symptom, 35 minutes,
+green PR. Opus and the shadow each found the same inherited pagination item cold; the docs
+caveat Opus asked for was done in-session. Merged and Done. One ticket, so a reason to give
+it another, not a boundary.
 
-**Not tried:** everything else.
+**Implements a client-side page behaviour ticket single-shot.** LIN-2772: proposal
+persistence in the Flight Companion client, a red-first end-to-end test, three red-first
+unit tests and one mutation check, 23 minutes. The shadow was stricter than Opus on one
+unpinned rollback exit; the same session pinned it on request. Merged and Done.
+
+**Carries a stepped run.** LIN-2771, four beats drip-fed into one warm session by the
+conning session: a grounding map that caught its own wrong-repo slip; the wall-clock
+anchor with three red-first tests each mutation-witnessed; the stop-reason half with four
+more, plus a server-rendered attribute it argued the ticket's rule required; then push, PR
+and CI, during which it merged main and resolved a conflict with LIN-2772 itself. Every
+beat reported its decisions rather than burying them. Opus and the shadow approved
+conditionally on the same two surfaces; the three items were closed in one follow-up.
+Whether stepping beat single-shot cannot be read from one pair, because the stepped ticket
+was the harder of the two; what can be read is that the beat discipline produced the most
+legible work of the day.
+
+**Writes research an Opus plan-review takes seriously.** LIN-2153 and LIN-2322, each in
+under 25 minutes for a third of a cent: file-and-line citations across both repositories,
+the relevant papers read, a per-provider comparison table, a staleness check that found one
+ticket's motivation had grown since filing, and on LIN-2153 the finding that the proposal
+collides with the manual's own doctrine. Neither plan-review faulted the research.
+
+**Plans that go round twice.** On both tickets the Flash plan was sent back twice by Opus
+plan-review, each time on the class bound rather than a member: a class bounded by symbol
+where the behaviour was the class, then a grep pattern blind to a syntactic family. Six
+of seven checks passed on the second round. The gate sends 88% of plans back once and a
+third back twice, so two rounds is within the population, and the thread stopped there.
+One second-round plan session hung for an hour with no output and was aborted; the retry
+finished in 17 minutes.
+
+**Closes out reviewed tickets, empty ledger or not.** Four close-outs: LIN-2697 (empty
+ledger), LIN-2772, LIN-2787 and LIN-2771 (non-empty, each after a human read and accepted
+the items on the ticket). Each merged, verified on the landed commit, set Done, cited the
+acceptance item by item, and filed only outside items. LIN-2787's ran the review's own
+post-deploy check against the live site; LIN-2771's built a five-scenario browser repro
+against a server with no AI key to discharge the one item nobody had, unasked. Two to ten minutes each, under a cent each. The
+Opus control on LIN-2637 did the same in three minutes for $3.44 and its terminal marker
+never reached Harbour.
+
+**Not tried:** a visual layout, a lane, a multi-session ticket, review as a gate, and a
+ticket whose ledger a human has not read first.
 
 ## Gemini 3.8 Flash (opencode, OpenRouter, no effort field)
 
@@ -162,25 +227,38 @@ is one hung session; it does not say the model cannot do the work.
 - The failures the harness made were plumbing: a spend cap, a stale catalogue, a hung session,
   a model that reports done without acting. Each was invisible from Harbour until someone
   read the feedback.
-- The subscription's share of a cheap-implemented ticket is two Opus sessions, review and
-  close-out, about $8.80. The implementer's share is $0.45 to $3.75. One empty-ledger
-  close-out on Flash suggests the second of those sessions may not always need Opus.
+- The subscription's share of a cheap-implemented ticket was two Opus sessions, review and
+  close-out, about $8.80. On the evening's four landed tickets it was one: the Opus review,
+  $2.83 to $4.25, with implementation, follow-ups and close-out on Flash for under a cent
+  a ticket. The condition was that a human read the ledger before the cheap close-out ran.
+- The harness broke where the models did not. Three of the evening's launches died before
+  any tool ran, with seven or eight opencode servers up on one host: two HTTP 500s on the
+  first message, one server not ready in twenty seconds. One plan session hung for an hour.
+  Every retry worked. The runner's five-minute stall note carries a fixed placeholder
+  session id and is not a signal.
 
 ## Method
 
 Read from the dispatch lineages under `sessionId: LIN-2828-bakeoff` via
-`GET /api/proxy/cost/{identifier}` on 13 September, the review, shadow and close-out
-comments on each ticket, LIN-2831's tables, and the routing proposal's 30-day read for the
-Opus and Sonnet entries. Task shape was judged by reading each ticket's description. The
+`GET /api/proxy/cost/{identifier}` on 13 September (the bake-off in the morning, the
+experiments in the evening), the review, shadow, plan-review and close-out comments on
+each ticket, LIN-2831's tables, and the routing proposal's 30-day read for the Opus and
+Sonnet entries. The evening's experiments were conned by the same session that wrote this
+edition, which also acted as the stepper's orchestrator and as the reader of each ledger
+before a cheap close-out; John ratified the experiment list and may reverse any acceptance
+by comment. Task shape was judged by reading each ticket's description. The
 OpenRouter per-ticket figures are the operator's hourly export split by session-minutes,
 because Harbour's relay reports the final turn only (LIN-2835).
 
 ## Limits
 
-One run of small tickets chosen to be safe, plus one 30-day read of the defaults. The
-cheap-model entries rest on two to six tickets each. The shape vocabulary is a reading, not
-a measurement. Nothing here says what happens on a ticket over an hour, a thin ticket, a
-page, or a stepped run, and the ledger should not be read as if it did. In particular it
+One run of small tickets chosen to be safe, one evening of one ticket per new shape, plus
+one 30-day read of the defaults. Every new shape rests on one ticket, so each new sentence
+is a first sighting, not a rate. The stepper comparison is confounded: the stepped ticket
+was the harder of the pair. The two plan threads were confounded by the conning session's
+own concurrent merges moving HEAD under one of them. The ledger acceptances that preceded
+three cheap close-outs were written by the conning session on John's mandate, not by John.
+The shape vocabulary is a reading, not a measurement. In particular it
 should not be read as a ranking: the models with the thinnest entries are the ones with
 the least evidence, not the least ability.
 
@@ -191,6 +269,11 @@ the least evidence, not the least ability.
 - Give DeepSeek V4 Flash 0731 five more grounded small tickets, and Flash V4.1 one page,
   one thin ticket and one over an hour, each named as an experiment on its ticket. Then
   go bigger: a multi-session ticket or a short lane on whichever Flash did best.
-- Run five more empty-ledger close-outs on Flash 0731 and write the result into edition 2.
+- Run five more cheap close-outs, each with a human reading the ledger first, and count
+  what each filed against the review's outside list.
+- Give Flash a plan on a ticket whose class is small enough to bound in one query, and
+  see whether the second round clears when nothing moves under it.
+- Run the stepper pair the other way round, the easier ticket stepped, before reading
+  anything about stepping from LIN-2771.
 - Read the opencode logs for the gpt-oss-120b and Llama sessions before they rotate.
 - Add stepper entries: the same shapes, stepped, on a model that failed them single-shot.

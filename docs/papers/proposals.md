@@ -66,6 +66,11 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   control at $3.44. Nine of the bake-off's thirteen ledgers were empty. Run five more with a
   human reading each ledger first, and count merges, Done states and follow-ups filed against
   the review's outside list. (Claude, 2026-09-13)
+- **Does a cheap plan ever clear plan-review, and what does the second round cost?**
+  `harbour/capability-ledger.md` edition 2 has two Flash plans sent back twice each on the
+  class bound, six of seven checks passing on round two, one thread confounded by HEAD moving.
+  Run three Flash plans on tickets bounded by one query with nothing landing under them, and
+  count rounds against the 88%-once, 35%-twice population. (Claude, 2026-09-13)
 - **Does a stepped run let a cheaper model carry a shape it fails single-shot?**
   `harbour/capability-ledger-method.md` treats the stepper as a second axis with no entries.
   Run the same shapes stepped on a model that failed them and record the beats. (Claude,
