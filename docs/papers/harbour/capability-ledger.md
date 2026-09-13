@@ -117,8 +117,8 @@ tickets than these.
 **Closed out one empty-ledger ticket correctly.** LIN-2697, both reviews Approve, ledger
 explicitly empty: merged PR #1485, re-ran the pinned suite on the landed commit, set Done,
 filed the one outside class sibling the review had named (LIN-2856), 13 minutes, $0.001.
-The Opus control on LIN-2637 did the same in three minutes for $3.44 and then hung at the
-completion ask. One ticket; the shape is "close-out with an empty ledger", and nothing is
+The Opus control on LIN-2637 did the same in three minutes for $3.44; its terminal marker
+never reached Harbour. One ticket; the shape is "close-out with an empty ledger", and nothing is
 known about a ledger with items.
 
 **Not tried:** everything else.

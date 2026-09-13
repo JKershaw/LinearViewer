@@ -51,8 +51,9 @@ per cheap-implemented ticket; the implementer's share is $0.45 to $3.75.
 **A cheap close-out on an empty ledger worked once.** LIN-2697's close-out ran on DeepSeek
 V4 Flash 0731: PR #1485 merged, suite re-run on the landed commit, Done set, one outside
 follow-up filed (LIN-2856), 13 minutes, $0.001. The Opus control on LIN-2637 merged
-PR #1486 and set Done in three minutes for $3.44, then never posted a terminal marker and
-was aborted after three hours. One each; the empty-ledger case is worth five more.
+PR #1486 and set Done in three minutes for $3.44; the dispatcher marked it COMPLETED but
+Harbour never received the terminal marker, and the dispatch was aborted by hand after
+three hours. One each; the empty-ledger case is worth five more.
 
 **The floor run: DeepSeek V4 Flash works, two cheaper models do not.**
 

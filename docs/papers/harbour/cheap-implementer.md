@@ -104,10 +104,11 @@ both reviews Approve) was given to DeepSeek V4 Flash 0731 on opencode, with LIN-
 close-out on Opus as the control. Flash merged PR #1485, verified the landed commit,
 re-ran the pinned suite, set Done, posted a summary of the house shape and filed one
 follow-up for a class sibling the review had named as outside scope, in 13 minutes for a
-tenth of a cent. Opus merged PR #1486 and set Done within three minutes for $3.44, then its
-session sat at the completion ask for over three hours without a terminal marker and was
-aborted by hand. One ticket each; the Flash result is a reason to run the empty-ledger case
-again, not to change the default, and the Opus non-finish is a harness fault, not a
+tenth of a cent. Opus merged PR #1486 and set Done within three minutes for $3.44; the dispatcher
+recorded that session COMPLETED, but Harbour never received its terminal marker, so the
+dispatch read as still running for over three hours until it was aborted by hand. One
+ticket each; the Flash result is a reason to run the empty-ledger case again, not to
+change the default, and the lost marker is a relay fault of the LIN-2835 kind, not a
 model one.
 
 **The floor of this harness is the older DeepSeek Flash; two cheaper models did no work.**
