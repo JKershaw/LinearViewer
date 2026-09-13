@@ -3723,8 +3723,22 @@ function syncDueBulkBar() {
     // and the Scan-selected run control must stay reachable for it.)
     const coverable = dueSelectableItems();
     const coverableSelected = coverable.filter((item) => dueSelectedIds.has(String(item.issueId))).length;
-    selectAll.checked = coverable.length > 0 && coverableSelected === coverable.length;
-    selectAll.indeterminate = coverableSelected > 0 && coverableSelected < coverable.length;
+    if (coverable.length > 0) {
+      selectAll.checked = coverableSelected === coverable.length;
+      selectAll.indeterminate = coverableSelected > 0 && coverableSelected < coverable.length;
+    } else {
+      // LIN-2760 follow-up ruling (2026-09-13): with NOTHING coverable, the
+      // coverable keying above would render unchecked and not indeterminate
+      // even while hand-picked rows are selected — leaving "check" (a no-op
+      // with nothing coverable) as the only reachable click and stranding the
+      // uncheck branch ("clears every loaded row", deliberately preserved by
+      // the ruling) behind per-row unticks only. Fall back to the pre-ruling
+      // ALL-LOADED keying, the same keying the bar's own visibility above
+      // already uses and for the same reason: a skipped row is still
+      // hand-pickable, so the control that can clear it must stay reachable.
+      selectAll.checked = total > 0 && selectedCount === total;
+      selectAll.indeterminate = selectedCount > 0 && selectedCount < total;
+    }
   }
   if (countEl) countEl.textContent = dueSelectedCountText();
   if (estimateEl) estimateEl.textContent = formatDueScanCostEstimate(observationData?.scanCostEstimate, selectedCount);

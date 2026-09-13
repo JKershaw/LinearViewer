@@ -669,6 +669,50 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     assert.equal(selectAll.checked, false);
     assert.equal(selectAll.indeterminate, false, 'hand-picked skipped rows alone must not read as "some coverable selected"');
   });
+
+  // LIN-2760 follow-up ruling (2026-09-13): when EVERY loaded row is skipped
+  // (not-due/errored) the coverable population is empty, and the coverable-
+  // keyed tri-state above would render the checkbox unchecked and not
+  // indeterminate even while hand-picked rows are selected — leaving
+  // "check" (a no-op with nothing coverable) as the only reachable click and
+  // stranding the uncheck branch ("clears every loaded row", deliberately
+  // preserved by the ruling) behind per-row unticks only. The tri-state
+  // therefore falls back to the pre-ruling ALL-LOADED keying when coverable
+  // is empty — the same all-loaded keying the bar's own visibility already
+  // uses, and the same rationale: a skipped row is still hand-pickable, so
+  // the control that can clear it must stay reachable.
+  test('empty-coverable fallback: on an all-skipped page the tri-state keys on all loaded rows so a hand-picked selection is clearable from select-all', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, toggleDueSelection, setAllDueSelected, dueSelectedIds } = sandbox.module.exports;
+    const selectAll = sandbox.__nodes.get('obs-due-select-all');
+
+    paintDuePage([
+      { issueId: 'not-due', issueIdentifier: 'LIN-1', dueStatus: false },
+      { issueId: 'errored', issueIdentifier: 'LIN-2', dueStatus: null, error: true },
+    ], 2, { append: false });
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, false, 'nothing selected on an all-skipped page: plain unchecked');
+
+    // One of the two loaded rows hand-picked: all-loaded keying reads
+    // "some" — the indeterminate state the coverable keying cannot show
+    // with an empty coverable population (0 < n < 0 is impossible).
+    toggleDueSelection('not-due', true);
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, true, 'a partial hand-pick on an all-skipped page must read indeterminate under the all-loaded fallback');
+
+    // Every loaded row hand-picked: checked — so the operator's next click
+    // on the control is the UNCHECK branch, which clears every loaded row.
+    toggleDueSelection('errored', true);
+    assert.equal(selectAll.checked, true, 'all loaded rows hand-picked on an all-skipped page: the fallback reads checked, keeping the clear path reachable');
+    assert.equal(selectAll.indeterminate, false);
+
+    // The escape hatch itself: the uncheck branch (what a click on the
+    // checked box drives) clears the hand-picked selection.
+    setAllDueSelected(false);
+    assert.equal(dueSelectedIds.size, 0, 'the hand-picked selection must be clearable from the select-all control itself');
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, false);
+  });
 });
 
 // ─── Exact count, honest cost estimate, over-ceiling refusal (LIN-2706 §B.4/§B.5/§B.8) ───
