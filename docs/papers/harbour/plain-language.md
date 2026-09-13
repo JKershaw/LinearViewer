@@ -3,7 +3,7 @@ title: Could Harbour adopt the plain-language standard, ISO 24495-1?
 version: 1
 date: 2026-09-13
 authors: [Claude, John Kershaw]
-model: Claude Code on the web, interactive session rather than a dispatch; the hand-read is the author's own
+model: claude-fable-5-1, Claude Code on the web, effort default; an interactive session rather than a dispatch, so no lineage record exists; the hand-read is the author's own
 grounded_at: 5b3e599
 cites: [ISO 24495-1:2023 (iso.org/standard/78907), docs/autopilot-operating-manual.md@5b3e599:437, lib/prompt-template-defs.js@5b3e599:1026, lib/prompts/flight-companion-brief.js@5b3e599:132, docs/papers/standard.md@5b3e599:25, lib/prompt-formatters.js@5b3e599:889, lib/prompts/meta-prompt-template.js@5b3e599:112, docs/papers/harbour/writing-length.md@5b3e599, LIN-2839 (ruling read 2026-09-13)]
 ---
