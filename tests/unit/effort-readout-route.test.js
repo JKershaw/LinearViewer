@@ -148,6 +148,41 @@ describe('the happy path populates both survival rows through the provider seam'
     assert.match(body, /data-testid="effort-card-plan"/);
     assert.match(body, /Effort Self-Assessment/);
   });
+
+  // LIN-2830: the page must show an opencode run as its own row — harness
+  // `opencode`, model `z-ai/glm-5.3`, and a visible "—" where claude-code
+  // would show a realised effort level (opencode posts no effort field).
+  test('the page renders the harness/model/effort breakdown rows, with "—" for a missing effort (LIN-2830)', async () => {
+    const historyRows = [
+      doneRow({ id: 'r1', issueIdentifier: 'LIN-1', kind: 'plan', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' }),
+      {
+        id: 'r2', issueId: 'uuid-LIN-2', issueIdentifier: 'LIN-2', kind: 'implementation', status: 'taken',
+        dispatchedAt: '2026-09-02T00:00:00.000Z', resolvedAt: '2026-09-02T00:40:00.000Z',
+        feedback: [
+          { kind: 'usage', message: `[usage] ${JSON.stringify({ schema: 1, harness: 'opencode', model: 'z-ai/glm-5.3', inputTokens: 100, outputTokens: 50, costUsd: 0.42, lane: 'openrouter' })}` },
+          { message: '[done] complete', timestamp: '2026-09-02T00:30:00.000Z' },
+        ],
+      },
+    ];
+    const store = fakeStore({ historyRows });
+    const { name } = fakeProvider({ comments: [] });
+    const { status, body } = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/effort-readout');
+    assert.equal(status, 200);
+    assert.match(body, /data-testid="effort-card-rows-implementation"/, 'the implementation card carries the rows breakdown');
+    const rowsBlock = body.match(/data-testid="effort-card-rows-implementation"[\s\S]*?<div class="effort-card-footnote/)?.[0]
+      || body.slice(body.indexOf('effort-card-rows-implementation'));
+    assert.ok(rowsBlock.includes('opencode'), 'the row names its harness');
+    assert.ok(rowsBlock.includes('z-ai/glm-5.3'), 'the row names its model');
+    assert.ok(/>—<\/span>/.test(rowsBlock), 'a missing effort renders as the visible "—" placeholder');
+    // The JSON route carries the same breakdown.
+    const jsonRes = await get(buildApp({ store, providerName: name }), '/workspace/ws-1/api/effort-readout');
+    const json = JSON.parse(jsonRes.body);
+    const implCard = json.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.rows.length, 1);
+    assert.equal(implCard.rows[0].harness, 'opencode');
+    assert.equal(implCard.rows[0].model, 'z-ai/glm-5.3');
+    assert.equal(implCard.rows[0].effort, null);
+  });
 });
 
 describe('H1 — the two reads carry their two REAL bounds', () => {
