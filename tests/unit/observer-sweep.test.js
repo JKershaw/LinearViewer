@@ -62,6 +62,7 @@ import { stableStringify } from '../../lib/recap-cache.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';
+import { isDecisionAnswered } from '../../lib/unanswered-decisions.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 
 const { _buildLoops } = __internal;
@@ -124,6 +125,27 @@ function agentStatusEntry(overrides = {}) {
     timestamp: '2026-04-11T11:02:00.000Z',
     ...overrides
   };
+}
+
+// LIN-2671: the two feedback entries a loop's decision/answer facts derive
+// from, built in the REAL wire shapes `_buildLoops` parses (`kind: 'decision'`
+// via `parseDecision`; `kind: 'decision-answer'` via `_findDecisionAnswer`) —
+// never hand-baked onto a Loop record, so the fixtures exercise the same
+// derivation production reads.
+function decisionFeedbackEntry(decisionId, timestamp = '2026-04-11T11:06:00.000Z') {
+  return {
+    kind: 'decision',
+    timestamp,
+    message: `[decision] ${JSON.stringify({
+      decision_id: decisionId,
+      question: 'Proceed?',
+      options: [{ id: 'a', label: 'Go' }, { id: 'b', label: 'Hold' }]
+    })}`
+  };
+}
+
+function answerFeedbackEntry(decisionId, timestamp = '2026-04-11T11:08:00.000Z') {
+  return { kind: 'decision-answer', timestamp, message: JSON.stringify({ decision_id: decisionId }) };
 }
 
 // ─── A. Classification ────────────────────────────────────────────────────
@@ -342,6 +364,85 @@ describe('observer-sweep: classification (LIN-2131)', () => {
     assert.notStrictEqual(withExclusion, 'blocked', 'x1 has been answered by a cross-issue follow-up — must not read as forever-blocked');
     assert.strictEqual(withExclusion, 'silent', 'excluded from blocked, x1 falls through to its own (stale) activity signal');
   });
+
+  // ── LIN-2671: an answered decision discharges the blocked lifecycle ───────
+  //
+  // The independent signal the sweep never consulted before: a loop can carry
+  // a `[blocked]` marker AND an answered decision at once — the LIN-2632
+  // dispatch `67b7b85a` shape, answered out of band and merged without a
+  // follow-up resume. `answeredDecisionId` is derived onto the lean loop the
+  // same way `wakeMarker`/`decision` are (LIN-1728), so these fixture-driven
+  // tests fail on a lean-conditional threading.
+  //
+  // The answer's lane is `resolved`, NOT `silent`: both `silent` and `blocked`
+  // are attention lanes, so a `silent` lane would keep the row on the
+  // waiting-on-a-human list this ticket exists to remove it from.
+
+  test('LIN-2671: a blocked row whose decision has been answered out of band lands resolved', () => {
+    const hist = historyItem({
+      id: 'h-answered', issueIdentifier: 'LIN-320',
+      dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:05:00.000Z' },
+        decisionFeedbackEntry('dec-1'),
+        answerFeedbackEntry('dec-1')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker is really present');
+    assert.strictEqual(loop.decision.decision_id, 'dec-1', 'sanity: the decision derives onto the lean loop');
+    assert.strictEqual(loop.answeredDecisionId, 'dec-1', 'sanity: the matching answer derives onto the lean loop');
+
+    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'resolved', 'the human answered — this row is done-with, not waiting on anyone');
+    assert.notStrictEqual(lane, 'silent', 'silent is still a waiting-on-a-human lane and would keep the row in attention');
+  });
+
+  test('LIN-2671: the same blocked row with a MISMATCHED answeredDecisionId stays blocked', () => {
+    const hist = historyItem({
+      id: 'h-answered-stale', issueIdentifier: 'LIN-321',
+      dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:05:00.000Z' },
+        decisionFeedbackEntry('dec-new'),
+        answerFeedbackEntry('dec-old')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.decision.decision_id, 'dec-new', 'sanity: the CURRENT decision is the new, unanswered one');
+    assert.strictEqual(loop.answeredDecisionId, 'dec-old', 'sanity: the answer stamp names the OLD decision');
+
+    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'blocked', 'a stale answer for an older decision must not discharge a newer, unanswered one');
+  });
+
+  test('LIN-2671: an answered decision does NOT override supersession — a follow-up still wins', () => {
+    const original = historyItem({
+      id: 'z1', issueIdentifier: 'LIN-322', dispatchedAt: '2026-04-11T10:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
+        decisionFeedbackEntry('dec-1', '2026-04-11T10:06:00.000Z'),
+        answerFeedbackEntry('dec-1', '2026-04-11T10:08:00.000Z')
+      ]
+    });
+    const followUp = historyItem({
+      id: 'z2', issueIdentifier: 'LIN-322', followUpTo: 'z1',
+      feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:40:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [original, followUp], now: NOW, lean: true });
+    const loopZ = loops.find((l) => l.loopId === 'z1');
+    assert.strictEqual(loopZ.answeredDecisionId, 'dec-1', 'sanity: the row is answered too');
+    const superseded = computeSupersededLoopIds(loops);
+    assert.ok(superseded.has('z1'), 'sanity: and a follow-up names it');
+
+    const lane = classifyLoop(loopZ, { superseded, now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(
+      lane, 'silent',
+      'supersession keeps its prior path — an answered decision only clears blocked when nothing supersedes it'
+    );
+  });
 });
 
 // ─── B. Payload contract (buildSweepPayload, the production entry point) ───
@@ -414,6 +515,62 @@ describe('observer-sweep: payload contract (LIN-2131)', () => {
     assert.strictEqual(payload.lanes.blocked, 0, 'exclusion must apply to the agent-status channel exactly as it does to the feedback-marker one');
     assert.strictEqual(payload.lanes.unknown, 1, 'an excluded waiting row is not active (agentState "waiting"), so it falls to unknown');
     assert.ok(!payload.attention.some((row) => row.loopId === 'a1'), 'an answered row must never be surfaced as waiting on a human');
+  });
+
+  test('LIN-2671 — an answered blocked row leaves lanes.blocked AND attentionKeysFull, so the companion gate reads a genuine delta', () => {
+    const answered = historyItem({
+      id: 'ans-blocked', issueIdentifier: 'LIN-441', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
+        decisionFeedbackEntry('gate-dec', '2026-04-11T11:57:00.000Z'),
+        answerFeedbackEntry('gate-dec', '2026-04-11T11:58:00.000Z')
+      ]
+    });
+    const open = historyItem({
+      id: 'open-blocked', issueIdentifier: 'LIN-442', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
+        decisionFeedbackEntry('open-dec', '2026-04-11T11:57:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [answered, open], now: NOW, lean: true });
+
+    // Control for the DELTA: before the answer stamp exists, the same row is
+    // blocked and IS in attentionKeysFull. A payload assertion alone would be
+    // satisfiable by the row simply never having been attention-eligible.
+    const preAnswer = _buildLoops({
+      historyItems: [
+        { ...answered, feedback: answered.feedback.filter((e) => e.kind !== 'decision-answer') },
+        open
+      ],
+      now: NOW, lean: true
+    });
+    const before = buildSweepPayload(preAnswer, { now: NOW_MS, staleMs: STALE_MS });
+    assert.ok(
+      before.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'),
+      'control: before the answer lands, the row IS waiting on a human'
+    );
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.lanes.blocked, 1, 'only the genuinely open decision is still blocked');
+    assert.strictEqual(payload.lanes.resolved, 1, 'the answered row is done-with');
+
+    assert.ok(
+      payload.attention.some((row) => row.loopId === 'open-blocked'),
+      'an unanswered blocked row is still waiting on a human'
+    );
+    assert.ok(
+      !payload.attention.some((row) => row.loopId === 'ans-blocked'),
+      'an answered blocked row must never be surfaced as waiting'
+    );
+    assert.ok(
+      !payload.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'),
+      'attentionKeysFull membership must reflect the lifecycle transition, or the companion gate sees no delta'
+    );
+    assert.ok(
+      payload.attentionKeysFull.some((tuple) => tuple[0] === 'open-blocked'),
+      'the untouched open row stays in the gate key — the delta is the answered row alone'
+    );
   });
 
   test('ledger 3 — attention is deterministically sorted, from a fixture whose insertion order is NOT already sorted (LIN-2619: by recency, not loopId — attentionKeysFull stays loopId-sorted)', () => {
@@ -1164,10 +1321,31 @@ describe('observer-sweep: negative capability — no automated-intervention path
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js'].sort(),
+      ['./live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './unanswered-decisions.js'].sort(),
       'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion. ' +
-      './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance'
+      './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance. ' +
+      './unanswered-decisions.js (LIN-2671) is itself pure (imports only ./loop-supersede.js; see unanswered-decisions.js) and exports the ONE answered-decision predicate classifyLoop must reuse rather than fork'
     );
+  });
+
+  test('LIN-2671 import-by-reference: classifyLoop reuses isDecisionAnswered from lib/unanswered-decisions.js, never forks the comparison', () => {
+    const modulePath = fileURLToPath(new URL('../../lib/observer-sweep.js', import.meta.url));
+    const src = readFileSync(modulePath, 'utf8');
+    assert.match(
+      src,
+      /^import\s*\{\s*isDecisionAnswered\s*\}\s*from\s*'\.\/unanswered-decisions\.js';/m,
+      'the answered-decision predicate must be imported by name from the shared module, not re-derived here'
+    );
+    assert.ok(
+      !/answeredDecisionId\s*===/.test(src),
+      'observer-sweep must NOT re-derive the comparison locally — a forked predicate is exactly how the census and the rulings feed disagreed (LIN-2671)'
+    );
+    // The name imported above is the shared module's real export, not a
+    // same-named local; a renamed/re-exported shim would fail here.
+    assert.strictEqual(typeof isDecisionAnswered, 'function');
+    assert.strictEqual(isDecisionAnswered({ decision: { decision_id: 'd-1' }, answeredDecisionId: 'd-1' }), true);
+    assert.strictEqual(isDecisionAnswered({ decision: { decision_id: 'd-1' }, answeredDecisionId: 'd-2' }), false);
+    assert.strictEqual(isDecisionAnswered({ decision: null, answeredDecisionId: null }), false);
   });
 });
 
