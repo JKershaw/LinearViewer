@@ -17,8 +17,8 @@ one round. No reviewer found a logic defect; the five send-backs were all second
 layout, a docblock claim, a missing test, stale prose, a monitor that reports clean on an
 empty fetch. Each Opus review cost $2.26 to $4.79 API-equivalent regardless of the ticket's
 size, so the 22 reviews of the round cost about $62, which is about one and a half points
-of the weekly subscription window. The implementations cost a few dollars each on GLM and
-cents on Flash, on readings Harbour's own relay cannot make. The seven launch failures in
+of the weekly subscription window. The implementations cost about $3.75 a ticket on GLM and
+$0.45 on Flash, on the operator's OpenRouter export, a reading Harbour's own relay cannot make. The seven launch failures in
 the round were a daily spend cap, a stale model catalog, and CPU starvation, none of them
 the model.
 
@@ -62,9 +62,11 @@ of small tickets, chosen small for safety, understates what a cheap implementer 
 **Harbour cannot see what an opencode session cost.** The runner posts the usage of the one
 message it awaited, which is the final step (`opencode-runner.js:383-387`), so the relayed
 figure for a thirty-minute GLM session was $0.027 against $3.45 on the OpenRouter meter, and
-Flash sessions relayed under a cent. Filed as LIN-2835. Until it lands, per-ticket cost is
-whatever the operator reads off the activity page, and this paper carries no per-model
-figure.
+Flash sessions relayed under a cent. Filed as LIN-2835. The operator's hourly export for the window (12 September 19:00Z to
+13 September 09:59Z) reads GLM $34.68 across nine implementation sessions, one blocked run
+and thirteen shadows, Flash $2.27 across eight sessions, Gemini $7.07 across four. Split by
+session-minutes, GLM is about $3.75 a ticket and $0.95 a shadow, Flash $0.45 a ticket,
+Gemini $3.55. Flash matched GLM's approval rate at an eighth of its price.
 
 **A cheap reviewer agrees with Opus when the PR is clean and misses the second-order
 finding cold.** Thirteen shadow reviews on GLM used the identical prompt Opus received, with a
@@ -113,8 +115,8 @@ LIN-2828.
 ## Limits
 
 Thirteen results, all small, none over an hour, chosen by the person running the bake-off.
-Per-ticket implementation cost is unmeasured: the relay is wrong by two orders and the
-operator's meter readings were cumulative and shared. The shadow reviewer is the same model
+Per-ticket implementation cost is an hourly total split by session-minutes, because the
+relay is wrong by two orders; GLM's implementation and shadow sessions share one bucket. The shadow reviewer is the same model
 as one of the implementers, and eleven of its thirteen verdicts were on PRs Opus also
 approved, where agreement is cheap; its one cold test was a miss. Gemini had two tickets. The
 upstream host and quantisation behind each session was not recorded. The failure-rate figure
@@ -123,8 +125,8 @@ week-old model id would not have hit.
 
 ## Next
 
-- Read the operator's OpenRouter activity page per session and put a per-model cost per
-  ticket in this paper's third edition.
+- Land LIN-2835 so the per-ticket cost is a per-session read rather than an hourly total
+  split by minutes.
 - Run a fleet week on medium tickets, where the review-to-implementation ratio is the
   interesting one, and measure the saving per Opus review rather than per ticket.
 - Give a cheap reviewer on a *different* model from the implementer a cold pass on PRs

@@ -12,11 +12,11 @@ full: `docs/papers/harbour/cheap-implementer.md`.
 
 ## The short version
 
-| Model | Tickets | First-pass | Approved within one round | Median implementation | Opus review per ticket |
-|---|---|---|---|---|---|
-| z-ai/glm-5.3 | 6 | 4 of 6 | 6 of 6 | 20 min | $4.90 API-equivalent |
-| deepseek/deepseek-v4.1-flash | 5 (incl. one bonus) | 3 of 5 | 5 of 5 | 14 min | $4.45 |
-| google/gemini-3.8-flash (control) | 2 | 1 of 2 | 2 of 2 | 24 min | $3.61 |
+| Model | Tickets | First-pass | Approved within one round | Median implementation | OpenRouter per ticket | Opus review per ticket |
+|---|---|---|---|---|---|---|
+| z-ai/glm-5.3 | 6 | 4 of 6 | 6 of 6 | 20 min | about $3.75 | $4.90 API-equivalent |
+| deepseek/deepseek-v4.1-flash | 5 (incl. one bonus) | 3 of 5 | 5 of 5 | 14 min | about $0.45 | $4.45 |
+| google/gemini-3.8-flash (control) | 2 | 1 of 2 | 2 of 2 | 24 min | about $3.55 | $3.61 |
 
 Every one of the thirteen produced a PR with green CI on its first session. No session looped
 on error recovery. No reviewer found a logic defect in any of the thirteen: all five
@@ -30,11 +30,16 @@ clean after fetching nothing.
 six against three of five first-pass, both at 100% after one round. The difference is inside
 the noise of thirteen tickets. Gemini's two are too few to place.
 
-**Per-ticket cost on OpenRouter** is to be filled in from the operator's activity-page readout
-at the pause; Harbour's own relay reports the final turn only (LIN-2835) and is not usable.
-The two readings taken on 12 September put GLM at roughly $2 to $3.50 per ticket. Flash's
-sessions read 100k to 300k cache-read tokens for under a cent relayed, and its list price is
-a tenth of GLM's.
+**Per-ticket cost on OpenRouter, from the operator's activity export** (hourly totals per
+model, 12 September 19:00Z to 13 September 09:59Z): GLM-5.3 $34.68, Gemini 3.8 Flash $7.07,
+DeepSeek V4.1 Flash $2.27, plus $2.85 of Harbour's own calls on GPT-5.6 Sol and GPT-5.4 Mini.
+$46.86 in all, about £35. The GLM figure covers its nine implementation sessions, the
+blocked LIN-2415 run and all thirteen shadow reviews; split by session-minutes that is about
+$22.50 for implementation, $3.75 a ticket, and $12 for the shadows, about $0.95 each. Flash's
+five tickets cost $2.27 together, about $0.45 a ticket, eight times cheaper than GLM for the
+same approval rate. Gemini's two cost $3.55 each, GLM's price for a worse and smaller
+record. Harbour's own relay reports the final turn only (LIN-2835) and is not usable for
+any of this.
 
 **Opus review is the expense and is nearly flat with ticket size.** Harbour prices the 22
 reviews of this round at $2.26 to $4.79 each from their relayed tokens, five to nine minutes
@@ -76,10 +81,11 @@ is LIN-2837.
 ## Recommendation
 
 Both GLM-5.3 and DeepSeek V4.1 Flash cleared the 70% bar on approval-within-one-round and
-neither cleared it cleanly on first pass. On quality they tie. On price Flash is an order of
-magnitude cheaper on paper and its sessions were shorter. The recommendation is **Flash as the
-fleet-week implementer via a preset, GLM as the fallback**, with the choice made final once
-the operator's OpenRouter readout gives a per-model cost per ticket. The Sonnet-on-Bedrock
+neither cleared it cleanly on first pass. On quality they tie. On price Flash is eight times cheaper per ticket on the operator's
+meter, and its sessions were shorter. The recommendation is **Flash as the fleet-week
+implementer via a preset, GLM as the fallback**. A fleet week of forty medium tickets on
+Flash would cost under $50 on OpenRouter against about $180 of Opus review API-equivalent,
+which is where the money goes. The Sonnet-on-Bedrock
 fallback in the plan was not needed.
 
 Whether the winner becomes the workspace default for implementation or stays a preset is
@@ -87,7 +93,8 @@ LIN-2834's question and is deferred to the close-out.
 
 ## Not proven
 
-- Per-model cost per ticket: pending the operator's readout.
+- Per-model cost per ticket is an hourly-total split by session-minutes, not a per-session
+  read; GLM's implementation and shadow costs share one bucket.
 - Whether any of the three models holds up on a ticket larger than an hour.
 - Whether a cheap reviewer on a *different* model from the implementer does better than GLM
   reviewing GLM.
