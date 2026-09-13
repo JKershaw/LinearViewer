@@ -527,39 +527,82 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     assert.doesNotMatch(html, /data-issue-id="b" checked/, "row 'b' must stay unchecked across the repaint");
   });
 
-  test('select-all-loaded selects only the currently PAINTED rows, never an implicit all-pages sweep', () => {
-    const sandbox = makeSandbox();
+  // LIN-2760 (John's ruling on LIN-2241 F3, decision `lin2241-f3-selectall`)
+  // rewrote this pin: select-all used to select every loaded row — a
+  // deliberate day-one choice pinned here, because on day one every
+  // previously-scanned task reads `unknown` and a strict due-only rule would
+  // select nothing. The ruling keeps day one (unknown stays selected) while
+  // stopping the blind billing of the other two statuses: not-due rows are
+  // unchanged by definition, and errored rows must not be re-billed blindly
+  // — each selected row costs one billable LLM scan.
+  test('select-all selects due + unknown only — not-due and errored rows are skipped, exactly two of the four-status fixture selected', () => {
+    const sandbox = makeSandbox({ scanCostEstimate: { calls: 4, pricedCalls: 4, meanUsd: 0.02, unknown: false } });
     const { paintDuePage, setAllDueSelected, dueSelectedIds } = sandbox.module.exports;
-    paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
+    paintDuePage([
+      { issueId: 'due', issueIdentifier: 'LIN-1', dueStatus: true },
+      { issueId: 'unknown', issueIdentifier: 'LIN-2', dueStatus: null },
+      { issueId: 'not-due', issueIdentifier: 'LIN-3', dueStatus: false },
+      { issueId: 'errored', issueIdentifier: 'LIN-4', dueStatus: null, error: true },
+    ], 4, { append: false });
 
     setAllDueSelected(true);
-    assert.deepEqual([...dueSelectedIds].sort(), ['a', 'b']);
+    assert.deepEqual([...dueSelectedIds].sort(), ['due', 'unknown'], 'select-all covers due + unknown only — not-due and errored rows are skipped');
+    assert.equal(dueSelectedIds.size, 2, 'exactly two of the four rows are selected');
+
+    // Acceptance: the pre-run count and cost estimate reflect the two
+    // selected rows (they are unchanged in MECHANISM — they read
+    // dueSelectedIds, which the select-all filter now bounds).
+    assert.equal(sandbox.__nodes.get('obs-due-selected-count').textContent, '2 selected (exact)');
+    assert.equal(sandbox.__nodes.get('obs-due-selected-cost').textContent, 'est. $0.0400', 'meanUsd × 2, not × 4 — the estimate follows the bounded selection');
 
     setAllDueSelected(false);
     assert.equal(dueSelectedIds.size, 0, 'select-all off must clear exactly the loaded rows');
   });
 
+  // The per-row checkbox stays free under LIN-2760's rule: select-all skips
+  // not-due/errored rows, but an operator can still hand-pick one.
+  test('a hand-picked not-due row stays selected — select-all off still clears it with the rest', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, toggleDueSelection, setAllDueSelected, dueSelectedIds } = sandbox.module.exports;
+    paintDuePage([
+      { issueId: 'due', issueIdentifier: 'LIN-1', dueStatus: true },
+      { issueId: 'not-due', issueIdentifier: 'LIN-2', dueStatus: false },
+    ], 2, { append: false });
+
+    setAllDueSelected(true);
+    toggleDueSelection('not-due', true);
+    assert.deepEqual([...dueSelectedIds].sort(), ['due', 'not-due'], 'a hand-picked not-due row must remain selectable');
+
+    setAllDueSelected(false);
+    assert.equal(dueSelectedIds.size, 0, 'select-all off clears every loaded row, hand-picked ones included');
+  });
+
   test('select-all-loaded repaints the list so every row reflects the new membership', () => {
     const sandbox = makeSandbox();
     const { paintDuePage, setAllDueSelected } = sandbox.module.exports;
+    // LIN-2760: one due + one not-due row — the repaint must reflect the
+    // FILTERED membership, not just "everything checked", so this fixture
+    // pins both halves of the render at once.
     paintDuePage([{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }, { issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], 2, { append: false });
 
     setAllDueSelected(true);
     const html = sandbox.__nodes.get('obs-due-list').innerHTML;
-    assert.match(html, /data-issue-id="a" checked/);
-    assert.match(html, /data-issue-id="b" checked/);
+    assert.match(html, /data-issue-id="a" checked/, 'the due row must render checked');
+    assert.doesNotMatch(html, /data-issue-id="b" checked/, 'the not-due row must render unchecked — select-all skips it (LIN-2760)');
   });
 
   test('select-all-loaded, driven across a load-more, covers BOTH pages — the loaded population grows additively', async () => {
     const sandbox = makeSandbox({
       fetchImpl: async (url) => (url.includes('cursor')
-        ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: false }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
+        ? jsonResponse({ items: [{ issueId: 'b', issueIdentifier: 'LIN-2', dueStatus: null }], nextCursor: null, pageCandidateCount: 1, totalCandidateCount: 2 })
         : jsonResponse({ items: [{ issueId: 'a', issueIdentifier: 'LIN-1', dueStatus: true }], nextCursor: 'CUR1', pageCandidateCount: 1, totalCandidateCount: 2 }))
     });
     const { loadInitialDueCheckPage, loadMoreDueChecks, setAllDueSelected, dueSelectedIds } = sandbox.module.exports;
     await loadInitialDueCheckPage();
     await loadMoreDueChecks();
     setAllDueSelected(true);
+    // Both pages' rows are select-all-covered (due + unknown — LIN-2760), so
+    // the additive-population property still holds under the new rule.
     assert.deepEqual([...dueSelectedIds].sort(), ['a', 'b']);
   });
 
@@ -589,6 +632,86 @@ test.describe('per-row checkbox + select-all — rendering and tri-state (LIN-27
     toggleDueSelection('a', false);
     assert.equal(selectAll.checked, false);
     assert.equal(selectAll.indeterminate, true, 'dropping back to "some" must clear the all-checked state');
+  });
+
+  // LIN-2760: the select-all tri-state is keyed on the coverable population
+  // (due + unknown), mirroring syncRulingsBulkBar's selectable-keyed tri-state
+  // — NOT on all loaded rows. The fixture above cannot distinguish the two
+  // semantics (its states coincide under both); this one holds skipped rows
+  // and asserts the states where they differ. Without the re-base the
+  // checkbox snaps back unchecked the moment a not-due/errored row exists on
+  // screen, even though the click did exactly what its label says.
+  test('select-all tri-state is keyed on the due+unknown population — checked survives skipped rows, hand-picks alone never read indeterminate', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, setAllDueSelected, toggleDueSelection, dueSelectedIds } = sandbox.module.exports;
+    const selectAll = sandbox.__nodes.get('obs-due-select-all');
+
+    paintDuePage([
+      { issueId: 'due', issueIdentifier: 'LIN-1', dueStatus: true },
+      { issueId: 'not-due', issueIdentifier: 'LIN-2', dueStatus: false },
+      { issueId: 'errored', issueIdentifier: 'LIN-3', dueStatus: null, error: true },
+    ], 3, { append: false });
+
+    setAllDueSelected(true);
+    assert.deepEqual([...dueSelectedIds], ['due'], 'only the coverable row is selected');
+    assert.equal(selectAll.checked, true, 'select-all did its whole job (all due+unknown selected) — the checkbox must stay checked, not snap back');
+    assert.equal(selectAll.indeterminate, false);
+
+    // A hand-picked skipped row beside a complete coverable selection
+    // neither satisfies nor defeats the checked state.
+    toggleDueSelection('not-due', true);
+    assert.equal(selectAll.checked, true, 'a hand-picked skipped row must not un-check select-all');
+    assert.equal(selectAll.indeterminate, false);
+
+    // Dropping the one coverable row leaves only hand-picked skipped rows
+    // selected — plain unchecked, never indeterminate.
+    toggleDueSelection('due', false);
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, false, 'hand-picked skipped rows alone must not read as "some coverable selected"');
+  });
+
+  // LIN-2760 follow-up ruling (2026-09-13): when EVERY loaded row is skipped
+  // (not-due/errored) the coverable population is empty, and the coverable-
+  // keyed tri-state above would render the checkbox unchecked and not
+  // indeterminate even while hand-picked rows are selected — leaving
+  // "check" (a no-op with nothing coverable) as the only reachable click and
+  // stranding the uncheck branch ("clears every loaded row", deliberately
+  // preserved by the ruling) behind per-row unticks only. The tri-state
+  // therefore falls back to the pre-ruling ALL-LOADED keying when coverable
+  // is empty — the same all-loaded keying the bar's own visibility already
+  // uses, and the same rationale: a skipped row is still hand-pickable, so
+  // the control that can clear it must stay reachable.
+  test('empty-coverable fallback: on an all-skipped page the tri-state keys on all loaded rows so a hand-picked selection is clearable from select-all', () => {
+    const sandbox = makeSandbox();
+    const { paintDuePage, toggleDueSelection, setAllDueSelected, dueSelectedIds } = sandbox.module.exports;
+    const selectAll = sandbox.__nodes.get('obs-due-select-all');
+
+    paintDuePage([
+      { issueId: 'not-due', issueIdentifier: 'LIN-1', dueStatus: false },
+      { issueId: 'errored', issueIdentifier: 'LIN-2', dueStatus: null, error: true },
+    ], 2, { append: false });
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, false, 'nothing selected on an all-skipped page: plain unchecked');
+
+    // One of the two loaded rows hand-picked: all-loaded keying reads
+    // "some" — the indeterminate state the coverable keying cannot show
+    // with an empty coverable population (0 < n < 0 is impossible).
+    toggleDueSelection('not-due', true);
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, true, 'a partial hand-pick on an all-skipped page must read indeterminate under the all-loaded fallback');
+
+    // Every loaded row hand-picked: checked — so the operator's next click
+    // on the control is the UNCHECK branch, which clears every loaded row.
+    toggleDueSelection('errored', true);
+    assert.equal(selectAll.checked, true, 'all loaded rows hand-picked on an all-skipped page: the fallback reads checked, keeping the clear path reachable');
+    assert.equal(selectAll.indeterminate, false);
+
+    // The escape hatch itself: the uncheck branch (what a click on the
+    // checked box drives) clears the hand-picked selection.
+    setAllDueSelected(false);
+    assert.equal(dueSelectedIds.size, 0, 'the hand-picked selection must be clearable from the select-all control itself');
+    assert.equal(selectAll.checked, false);
+    assert.equal(selectAll.indeterminate, false);
   });
 });
 

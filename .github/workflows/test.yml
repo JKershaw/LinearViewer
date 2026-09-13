@@ -108,6 +108,24 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  secret-scan:
+    name: Secret scan (source)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run secret scan over source
+        run: npm run secret-scan
+
   # Single stable check that aggregates all test jobs above. The e2e job names
   # are dynamic (they embed the shard index), which makes them awkward to pin
   # as required status checks. Require this job instead: it's one fixed name
@@ -116,13 +134,13 @@ jobs:
   ci-success:
     name: CI success
     if: always()
-    needs: [unit, e2e]
+    needs: [unit, e2e, secret-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all test jobs passed
         run: |
-          if [ "${{ needs.unit.result }}" != "success" ] || [ "${{ needs.e2e.result }}" != "success" ]; then
-            echo "::error::One or more test jobs failed (unit=${{ needs.unit.result }}, e2e=${{ needs.e2e.result }})."
+          if [ "${{ needs.unit.result }}" != "success" ] || [ "${{ needs.e2e.result }}" != "success" ] || [ "${{ needs.secret-scan.result }}" != "success" ]; then
+            echo "::error::One or more test jobs failed (unit=${{ needs.unit.result }}, e2e=${{ needs.e2e.result }}, secret-scan=${{ needs.secret-scan.result }})."
             exit 1
           fi
           echo "All test jobs passed."

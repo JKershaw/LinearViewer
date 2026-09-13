@@ -38,6 +38,12 @@ describe('buildPassagePlannerKickoff', () => {
     assert.ok(text.includes('### Leg:'));
   });
 
+  test('instructs the planner to self-check leg blocks before writing (LIN-1857)', () => {
+    const text = buildPassagePlannerKickoff();
+    assert.ok(text.includes('Self-check before writing'));
+    assert.ok(text.includes('Heading is `### Leg: <name>`'));
+  });
+
   test('the wording fix at the access-block reference is conditionally accurate', () => {
     const text = buildPassagePlannerKickoff();
     assert.ok(text.includes('appended below this prompt'));

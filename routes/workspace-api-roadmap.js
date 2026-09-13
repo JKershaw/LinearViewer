@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { createHash } from 'crypto';
 import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
-import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
+import { getNorthStarDocVersion, normalizeNorthStarText } from '../lib/north-star-resolver.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
 import { buildRoadmapNarrativeMessages } from '../lib/prompts/roadmap-narrative-template.js';
@@ -135,14 +135,20 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     }
     req.session.northStarByWorkspace[req.workspace.urlKey] = northStar;
 
-    // Doc-version stamping (LIN-2254): a stamp is recorded ONLY when the
-    // pasted text byte-matches docs/north-star.md's current content — every
-    // other (typical, unrelated) workspace value gets no stamp at all,
-    // rather than a fabricated drift claim against arbitrary text. Always
-    // overwritten (including to null) so an edit that breaks a prior match
-    // doesn't leave a stale stamp behind.
+    // Doc-version stamping (LIN-2254, comparison rule LIN-2838): a stamp is
+    // recorded ONLY when the pasted text matches docs/north-star.md's current
+    // content after normalising whitespace on BOTH sides (normalizeNorthStarText:
+    // fold CRLF to LF, strip trailing whitespace) — every other (typical,
+    // unrelated) workspace value gets no stamp at all, rather than a fabricated
+    // drift claim against arbitrary text. The UI cannot preserve the doc's
+    // trailing newline (LIN-2838), so byte-exact matching was unreachable; the
+    // normalised form still asserts the operator pasted this edition (a
+    // one-character edit does not match). Always overwritten (including to null)
+    // so an edit that breaks a prior match doesn't leave a stale stamp behind.
     const currentDoc = getNorthStarDocVersion();
-    const pastedHash = createHash('sha256').update(northStar).digest('hex');
+    const pastedHash = createHash('sha256')
+      .update(normalizeNorthStarText(northStar))
+      .digest('hex');
     const stampedDocVersion = (currentDoc.hash && pastedHash === currentDoc.hash)
       ? { hash: currentDoc.hash, title: currentDoc.title }
       : null;

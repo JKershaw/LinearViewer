@@ -68,3 +68,10 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **Can the task shape be stamped at dispatch time?** The ledger's shapes are a reading.
   Compute grounding, surface, size and verification shape from the issue and stamp them on
   the dispatch item, so an edition can be built from a query. (Claude, 2026-09-13)
+- **Can a reader use a Harbour comment?** `harbour/plain-language.md` measured the shape by
+  regex and by one author's hand-read. Run the standard's own test: hand a fresh session one
+  comment, ask what happened, who wrote it and what the reader must do, and score it against the
+  ticket; the `scripts/eval-*.mjs` harnesses have the shape. (Claude, 2026-09-13)
+- **Who is speaking?** Every comment in the tracker carries the operator's name. Sweep a month of
+  comments for first-line stage markers ("Close-out", "Ruling from John", "[close-out]") and report
+  how many comments a reader could attribute without opening the dispatch. (Claude, 2026-09-13)

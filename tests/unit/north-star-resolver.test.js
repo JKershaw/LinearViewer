@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getWorkspaceNorthStar, getWorkspaceNorthStarDocVersion, getNorthStarDocVersion } from '../../lib/north-star-resolver.js';
+import { getWorkspaceNorthStar, getWorkspaceNorthStarDocVersion, getNorthStarDocVersion, normalizeNorthStarText } from '../../lib/north-star-resolver.js';
 
 const DOC_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'north-star.md');
 
@@ -110,9 +110,9 @@ describe('getWorkspaceNorthStarDocVersion', () => {
 });
 
 describe('getNorthStarDocVersion', () => {
-  test('hashes the real docs/north-star.md content and reads its title', () => {
+  test('hashes the real docs/north-star.md content (normalised) and reads its title', () => {
     const raw = readFileSync(DOC_PATH, 'utf-8');
-    const expectedHash = createHash('sha256').update(raw).digest('hex');
+    const expectedHash = createHash('sha256').update(normalizeNorthStarText(raw)).digest('hex');
     const { hash, title } = getNorthStarDocVersion();
     assert.equal(hash, expectedHash);
     assert.equal(title, 'North star — v2, the self-funding loop');
@@ -152,5 +152,49 @@ describe('getNorthStarDocVersion', () => {
     const staleHash = createHash('sha256').update(staleV1Payload).digest('hex');
     const { hash } = getNorthStarDocVersion();
     assert.notEqual(hash, staleHash);
+  });
+});
+
+describe('normalizeNorthStarText (LIN-2838)', () => {
+  test('folds CRLF and a lone CR to LF', () => {
+    assert.equal(normalizeNorthStarText('a\r\nb\r\nc'), 'a\nb\nc');
+    assert.equal(normalizeNorthStarText('a\rb\rc'), 'a\nb\nc');
+  });
+
+  test('strips a trailing newline (the byte the UI paste path loses)', () => {
+    assert.equal(normalizeNorthStarText('line\n'), 'line');
+    assert.equal(normalizeNorthStarText('line'), 'line');
+  });
+
+  test('collapses a trailing run of blank lines / whitespace', () => {
+    assert.equal(normalizeNorthStarText('line\n\n\n  \n'), 'line');
+  });
+
+  test('strips trailing spaces/tabs on interior lines without touching their text', () => {
+    assert.equal(normalizeNorthStarText('a  \nb\t\nc'), 'a\nb\nc');
+    assert.equal(normalizeNorthStarText('a  b\nc'), 'a  b\nc');
+  });
+
+  test('does not otherwise loosen the match: interior and case differences survive', () => {
+    assert.notEqual(normalizeNorthStarText('The Star'), normalizeNorthStarText('the star'));
+    assert.notEqual(normalizeNorthStarText('one two'), normalizeNorthStarText('one  two'));
+    assert.notEqual(normalizeNorthStarText('abc'), normalizeNorthStarText('abd'));
+  });
+
+  test('is idempotent and non-string-safe', () => {
+    const once = normalizeNorthStarText('a \r\n\r\n');
+    assert.equal(normalizeNorthStarText(once), once);
+    assert.equal(normalizeNorthStarText(null), '');
+    assert.equal(normalizeNorthStarText(undefined), '');
+  });
+
+  test('the real doc hashes the same with or without its trailing newline / with CRLF', () => {
+    const raw = readFileSync(DOC_PATH, 'utf-8');
+    const { hash } = getNorthStarDocVersion();
+    const noTrailingNewline = raw.replace(/\n$/, '');
+    const crlf = raw.replace(/\n/g, '\r\n');
+    const hashOf = (t) => createHash('sha256').update(normalizeNorthStarText(t)).digest('hex');
+    assert.equal(hash, hashOf(noTrailingNewline));
+    assert.equal(hash, hashOf(crlf));
   });
 });

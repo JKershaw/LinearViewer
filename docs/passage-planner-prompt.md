@@ -147,6 +147,16 @@ Creating the passage task needs its own explicit yes, after ratification. On tha
 **Wind down if:** <declarative triggers, one per line>
 ```
 
+- **Self-check before writing.** Verify every drafted leg block against the mandated shape
+  before creating the passage task:
+  - Heading is `### Leg: <name>` — depth is H3 (`###`, never `##`), label has no `Leg N —`
+    numbering prefix.
+  - Flush lines, no bullet prefixes — field names start at the line margin (`**Anchors:**`,
+    not `* **Anchors:**` or `- **Anchors:**`).
+  - All five fields present — every leg must carry `**Anchors:**`, `**Intent:**`,
+    `**Budget:**`, `**Making port:**`, and `**Wind down if:**`.
+  If any block deviates, correct it before calling the write endpoint. The Passage Runner
+  parses this block strictly and will park BLOCKED on any deviation.
 - The leg↔anchor mapping lives **inline in the description text** (relations carry no
   label, so the text is the only place it survives).
 - Anchor each leg's tasks with relations of type **`related`** — never `blocks`/

@@ -1,0 +1,16 @@
+# Gitleaks configuration for LinearViewer / Harbour (LIN-2573)
+#
+# NOTE: This file is NOT part of CI or automated test suites.
+# CI uses Harbour's native scanner in lib/secret-scan.js (which introduces no scanner dependencies).
+# This configuration exists solely for optional, ad-hoc local gitleaks runs.
+# See ALLOWLISTED_FIXTURE_PATHS in lib/secret-scan.js for the authoritative fixture allowlist.
+#
+# Rule: Allowlist by fixture path, never by pattern.
+
+[allowlist]
+description = "Allowlist test fixture paths containing documented benign fixtures"
+paths = [
+  '''(?i)tests/fixtures/''',
+  '''(?i)scripts/eval/fixtures/''',
+  '''(?i)scripts/eval/lin-263-spike[0-9]+-out/fixtures/''',
+]

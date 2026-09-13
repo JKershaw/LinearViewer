@@ -173,6 +173,50 @@ describe('observer-pass: buildPassMessages', () => {
     const systemMsg = messages.find((m) => m.role === 'system').content;
     assert.match(systemMsg, /never invent/i);
   });
+
+  test('LIN-2645: a fossil-dominated census is told its folded count even when the fresh list is short and truncated is false', () => {
+    // The LIN-2619 motivating failure, in the pass-message surface: the fresh
+    // population falls UNDER REPORT_ATTENTION_CAP, so the pre-existing
+    // overflow line (`attention.length > cap`) never fires. Without the
+    // fossil line the narrating model is told a small attention count with
+    // `truncated: false` and no fossil count anywhere — a fleet with hundreds
+    // of rows waiting on a human reads as quiet.
+    const censusDoc = {
+      rev: 9,
+      updatedAt: new Date('2026-09-05T06:00:00.000Z'),
+      state: {
+        lanes: { working: 1, silent: 313, blocked: 52, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+        attention: [{ loopId: 'l1', issue: 'LIN-1', lane: 'blocked', stage: 'implement', since: '2026-09-05T05:00:00.000Z' }],
+        truncated: false,
+        staleAttentionCount: 365,
+        staleAttentionThresholdMs: 7 * 24 * 60 * 60 * 1000
+      }
+    };
+    const userMsg = buildPassMessages({ censusDoc, priorSummary: null }).find((m) => m.role === 'user').content;
+    assert.match(userMsg, /365/, 'the folded fossil count must reach the narrating model');
+    assert.match(userMsg, /7d/, 'the threshold must be stated alongside the count');
+    // `truncated: false` is now scoped to the fresh population — the fossil
+    // line must make clear it is not the whole overflow story.
+    assert.match(userMsg, /truncated/i);
+  });
+
+  test('LIN-2645: a census without the fossil fields renders no folded-count line (pre-LIN-2619 docs, and the zero case)', () => {
+    const withoutFields = {
+      rev: 2,
+      updatedAt: new Date('2026-09-05T06:00:00.000Z'),
+      state: { lanes: { working: 1, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 }, attention: [], truncated: false }
+    };
+    const userMsg = buildPassMessages({ censusDoc: withoutFields }).find((m) => m.role === 'user').content;
+    assert.doesNotMatch(userMsg, /folded/i, 'no stale count => no folded-count line (never a fabricated zero)');
+
+    const withZero = {
+      rev: 3,
+      updatedAt: new Date('2026-09-05T06:00:00.000Z'),
+      state: { lanes: { working: 1 }, attention: [], truncated: false, staleAttentionCount: 0, staleAttentionThresholdMs: 7 * 24 * 60 * 60 * 1000 }
+    };
+    const zeroMsg = buildPassMessages({ censusDoc: withZero }).find((m) => m.role === 'user').content;
+    assert.doesNotMatch(zeroMsg, /folded/i, 'a zero fossil count is noise, not a line');
+  });
 });
 
 // ─── B. runObserverPass — real MangoDB tmpdir ──────────────────────────────
@@ -296,6 +340,40 @@ describe('observer-pass: runObserverPass', () => {
     assert.deepStrictEqual(doc.state.report.flags, ['blocked-cluster']);
     assert.strictEqual(doc.state.report.censusRev, 1);
     assert.ok(doc.state.report.censusGroundedAt, 'the census own updatedAt is carried through as the grounding stamp');
+  });
+
+  test('LIN-2645: the report lifts staleAttentionCount AND staleAttentionThresholdMs off the census doc', async () => {
+    // The panel reads `report.*` only (`renderObserverReportPanel`), so these
+    // fields must survive the lift or the panel cannot render the summary
+    // line at all. Deleting either line from `runObserverPass`'s report object
+    // turns this test red.
+    const observerStateStore = freshStore();
+    const urlKey = `ws-stale-${randomUUID()}`;
+    const censusWithFossils = {
+      v: 1,
+      lanes: { working: 1, silent: 313, blocked: 52, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+      attention: [],
+      truncated: false,
+      staleAttentionCount: 365,
+      staleAttentionThresholdMs: 7 * 24 * 60 * 60 * 1000
+    };
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, censusWithFossils);
+
+    const fakeStreamChatWithTools = async (messages, options, onEvent) => {
+      onEvent('token', { token: JSON.stringify({ narrative: 'Mostly fossils.', flags: [] }) });
+      onEvent('done', { finishReason: 'stop' });
+    };
+    await runObserverPass(urlKey, {
+      observerStateStore,
+      workspacePreferencesStore: fakeWorkspacePreferencesStore(),
+      streamChatWithTools: fakeStreamChatWithTools,
+      getPaidEnvKey: () => 'fake-key',
+      now: Date.now()
+    });
+
+    const doc = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.strictEqual(doc.state.report.staleAttentionCount, 365, 'the fossil count must be lifted into report.*');
+    assert.strictEqual(doc.state.report.staleAttentionThresholdMs, 7 * 24 * 60 * 60 * 1000, 'the threshold must be lifted alongside the count');
   });
 
   test('LIN-2408: a degraded tick is retried on the next tick even with an UNCHANGED census, and the retry does not become permanent', async () => {

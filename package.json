@@ -10,7 +10,9 @@
     "env:check": "bash scripts/env-check.sh",
     "setup": "bash scripts/setup.sh",
     "test:hermetic": "node scripts/assert-unit-suite-hermetic.mjs",
-    "test:hermetic:proxy": "node scripts/assert-unit-suite-hermetic.mjs --proxy"
+    "test:hermetic:proxy": "node scripts/assert-unit-suite-hermetic.mjs --proxy",
+    "secret-scan": "node scripts/secret-scan.mjs",
+    "scan:public-pages": "node scripts/scan-public-pages.mjs"
   },
   "dependencies": {
     "@jkershaw/mangodb": "^0.1.2",
@@ -22,8 +24,7 @@
     "graphql-request": "^6.1.0",
     "https-proxy-agent": "^7.0.6",
     "marked": "^17.0.1",
-    "mongodb": "^7.0.0",
-    "undici": "^7.18.2"
+    "mongodb": "^7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "1.57.0",
