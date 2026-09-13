@@ -134,3 +134,45 @@ describe('PUT /workspace/:urlKey/api/roadmap/north-star — docVersion stamping 
     assert.deepEqual(session.northStarDocVersionByWorkspace[URL_KEY], { hash: real.hash, title: real.title });
   });
 });
+
+describe('PUT /workspace/:urlKey/api/roadmap/north-star — normalised matching (LIN-2838)', () => {
+  test('pasting the doc WITHOUT its trailing newline stamps (the UI paste path that dropped it)', async () => {
+    const real = getNorthStarDocVersion();
+    const withoutTrailingNewline = DOC_TEXT.replace(/\n$/, '');
+    assert.notEqual(withoutTrailingNewline, DOC_TEXT); // the byte loss is real
+    const userPreferencesStore = fakeStore();
+    const { app, session } = buildApp({ userPreferencesStore });
+
+    const { status } = await put(app, withoutTrailingNewline);
+    assert.equal(status, 200);
+    assert.deepEqual(session.northStarDocVersionByWorkspace[URL_KEY], { hash: real.hash, title: real.title });
+    // The stored value is what the operator pasted — normalisation is only for
+    // the comparison, never a rewrite of the saved text.
+    assert.equal(session.northStarByWorkspace[URL_KEY], withoutTrailingNewline);
+  });
+
+  test('pasting the doc with CRLF line endings stamps', async () => {
+    const real = getNorthStarDocVersion();
+    const crlf = DOC_TEXT.replace(/\n/g, '\r\n');
+    const { app, session } = buildApp({ userPreferencesStore: fakeStore() });
+
+    const { status } = await put(app, crlf);
+    assert.equal(status, 200);
+    assert.deepEqual(session.northStarDocVersionByWorkspace[URL_KEY], { hash: real.hash, title: real.title });
+  });
+
+  test('a single changed character does NOT stamp', async () => {
+    const userPreferencesStore = fakeStore();
+    const { app, session } = buildApp({ userPreferencesStore });
+    // Flip one interior character while keeping every whitespace property
+    // (including the dropped trailing newline) identical to a genuine paste.
+    const oneCharOff = DOC_TEXT.replace(/\n$/, '').replace(/Harbour/, 'Harbor');
+    assert.notEqual(oneCharOff, DOC_TEXT);
+
+    const { status } = await put(app, oneCharOff);
+    assert.equal(status, 200);
+    assert.equal(session.northStarDocVersionByWorkspace[URL_KEY], null);
+    const stored = userPreferencesStore.saved.get('creator-1');
+    assert.equal(stored.northStarDocVersionByWorkspace[URL_KEY], null);
+  });
+});
