@@ -16,6 +16,7 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
 import { runObserverPass, PASS_INSTANCE_PREFIX } from '../../lib/observer-pass.js';
@@ -384,5 +385,33 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
     const app = buildApp({ observerStateStore });
     const { text } = await get(app, '/workspace/acme/flight-companion');
     assert.match(text, /\+365 silent \/ blocked rows older than 7d, not listed above/);
+  });
+
+  /**
+   * LIN-2645 close-out, ledger item L1. The route tests above assert the line
+   * is EMITTED; none of them proves it is legible in place. Shipped without a
+   * rule, `.fc-obs-stale` inherited the page body's full size and colour with
+   * no bottom margin, so the quietest line in the panel rendered as the
+   * loudest and butted flush against the meta line (witnessed in a browser
+   * against this very route, at report.staleAttentionCount > 0).
+   *
+   * Asserted against the stylesheet source rather than a browser, the way
+   * tests/unit/theme.test.js pins style.css: the failure mode is an ABSENT
+   * rule, which a text assertion catches exactly. The reference is the
+   * directly analogous sibling `.fc-obs-attention-overflow` — the summary
+   * line's register is "a footnote to the list above", not "another finding".
+   */
+  test('LIN-2645 L1: .fc-obs-stale carries a de-emphasised rule matching its .fc-obs-attention-overflow sibling', () => {
+    const css = readFileSync(new URL('../../public/flight-companion.css', import.meta.url), 'utf8');
+    const ruleOf = (selector) => {
+      const match = css.match(new RegExp(`\\${selector.startsWith('.') ? '.' : ''}${selector.slice(1)}\\s*\\{([^}]*)\\}`));
+      assert.ok(match, `expected a ${selector} rule in public/flight-companion.css`);
+      return match[1].split(';').map((d) => d.trim().replace(/\s+/g, ' ')).filter(Boolean).sort();
+    };
+    assert.deepStrictEqual(
+      ruleOf('.fc-obs-stale'),
+      ruleOf('.fc-obs-attention-overflow'),
+      'expected the fossil summary line to take the same de-emphasised register (muted colour, reduced size, 0.6rem rhythm) as the attention-overflow line it sits beside'
+    );
   });
 });

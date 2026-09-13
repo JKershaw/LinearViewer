@@ -99,6 +99,19 @@
   margin: 0 0 0.6rem;
 }
 
+/* LIN-2645: the fossil summary line (`renderObserverReportPanel`,
+   lib/render-flight-companion.js) — a de-emphasised summary OF the list above
+   it, not another finding, so it takes the same register as the directly
+   analogous `.fc-obs-attention-overflow` above. Without a rule it rendered at
+   full body size and colour, reading as the loudest line in the panel, and
+   with no bottom margin it butted flush against the meta line (witnessed in a
+   browser at close-out, ledger item L1). */
+.fc-obs-stale {
+  color: var(--muted);
+  font-size: 0.85em;
+  margin: 0 0 0.6rem;
+}
+
 .flight-companion-observer-meta {
   color: var(--muted);
   font-size: 0.85em;
