@@ -1,11 +1,11 @@
 ---
 title: Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
-version: 2
+version: 3
 date: 2026-09-13
 authors: [Claude, John Kershaw]
-model: the conning session wrote this by hand over the read-write proxy; the implementations it dispatched ran z-ai/glm-5.3, deepseek/deepseek-v4.1-flash and google/gemini-3.8-flash on opencode (no effort field), the gating reviews claude-opus-5 on claude-code at effort medium, the shadow reviews z-ai/glm-5.3 on opencode, as the dispatch lineages under sessionId LIN-2828-bakeoff report
-grounded_at: 5b3e5990 (LinearViewer), 135991f (simple-dispatcher)
-cites: [LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13), simple-dispatcher PR #233 (2026-09-12), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
+model: the conning session wrote this by hand over the read-write proxy; the implementations it dispatched ran z-ai/glm-5.3, deepseek/deepseek-v4.1-flash and google/gemini-3.8-flash on opencode (no effort field), the floor run deepseek/deepseek-v4-flash-0731, openai/gpt-oss-120b and meta-llama/llama-3.1-8b-instruct on the same harness, the gating reviews and close-outs claude-opus-5 on claude-code at effort medium, the shadow reviews z-ai/glm-5.3 on opencode, as the dispatch lineages under sessionId LIN-2828-bakeoff report
+grounded_at: 85584846 (LinearViewer), d3c27c4 (simple-dispatcher)
+cites: [LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13, merged 2026-09-13), PR #1485 and PR #1486 (2026-09-13), simple-dispatcher PR #233 (2026-09-12, merged 2026-09-13), LIN-2415 (comment 48055064, 2026-09-13), LIN-2637 and LIN-2697 (review and shadow comments, 2026-09-13), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
 ---
 
 # Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
@@ -17,8 +17,14 @@ one round. No reviewer found a logic defect; the five send-backs were all second
 layout, a docblock claim, a missing test, stale prose, a monitor that reports clean on an
 empty fetch. Each Opus review cost $2.26 to $4.79 API-equivalent regardless of the ticket's
 size, so the 22 reviews of the round cost about $62, which is about one and a half points
-of the weekly subscription window. The implementations cost about $3.75 a ticket on GLM and
-$0.45 on Flash, on the operator's OpenRouter export, a reading Harbour's own relay cannot make. The seven launch failures in
+of the weekly subscription window; the thirteen Opus close-outs that then merged every PR
+cost another $52. The implementations cost about $3.75 a ticket on GLM and
+$0.45 on Flash, on the operator's OpenRouter export, a reading Harbour's own relay cannot
+make, so the subscription's share of a cheap-implemented ticket is two Opus sessions, about
+$7.50, and the implementer's share is noise. A floor run afterwards found the bottom of
+this harness: the older DeepSeek V4 Flash produced two green PRs for a tenth of a cent
+each, gpt-oss-120b reported done or failed inside a minute without touching the tree, and
+an 8B Llama hung until aborted. The seven launch failures in
 the round were a daily spend cap, a stale model catalog, and CPU starvation, none of them
 the model.
 
@@ -39,7 +45,7 @@ sessions, did not appear once.
 | google/gemini-3.8-flash | 2 | 1 | 2 | 24 min |
 
 The routing proposal's Sonnet baseline is 84% first-pass over 115 cases. Thirteen is too few
-to place either model against it, but seven of thirteen first-pass with every miss recovered
+to place either model against it, but eight of thirteen first-pass with every miss recovered
 in one round is not obviously worse.
 
 **The misses are all second-order, and they are the misses a test would not catch.** LIN-2830:
@@ -75,8 +81,38 @@ full. One (LIN-2760) found the same case Opus raised as a ruling for the operato
 on it instead. One (LIN-2573) approved, before Opus posted, the scan that reports clean on an
 empty fetch. The two Request Changes agreements (LIN-2575, LIN-2838) were formed with the
 Opus comment already on the thread, because the proxy's issue read returns every comment;
-the shadow said so itself. So the cold evidence is one miss on one hard finding, and the
-warm evidence is that GLM reproduces Opus's findings when it can see them.
+the shadow said so itself. The floor run added two more cold pairs: on LIN-2697 both
+approved, and on LIN-2637 the shadow asked for the same missing test Opus asked for, a
+second-order finding, formed before Opus posted. So the cold evidence is now two agreements
+and one miss, the miss on the hardest finding of the round, and the warm evidence is that
+GLM reproduces Opus's findings when it can see them.
+
+**Close-out costs what review costs, so the subscription pays twice per ticket.** The
+thirteen approved PRs were merged by thirteen Opus close-outs on 13 September, dispatched in
+batches of four with nothing else on the queue. Every one merged and set Done in a single
+session; none was sent back, none hit a merge conflict, and `main` stayed green through the
+sequence on both repositories. They cost $1.62 to $8.88 each, $51.95 in all, with a median
+of nine minutes; the three over $5 (LIN-2575, LIN-2645, LIN-2573) were the ones with
+non-empty ledgers to discharge on the landed commit. With the reviews, that
+is about $114 of Opus per thirteen tickets, or $8.80 a ticket, against an implementer cost
+of $0.45 to $3.75. The cheap implementer removes the one session whose price scaled with
+the work and leaves the two whose price does not.
+
+**The floor of this harness is the older DeepSeek Flash; two cheaper models did no work.**
+Five more tickets of the same shape ran after the close-outs: two each on
+`deepseek/deepseek-v4-flash-0731` and `openai/gpt-oss-120b`, one on
+`meta-llama/llama-3.1-8b-instruct` as a control expected to fail. DeepSeek V4 Flash
+produced two PRs with green CI (LIN-2697 in 10 minutes, LIN-2637 in 28), one approved first
+time with an empty ledger and one sent back for a single missing test, fixed in a
+test-only commit and approved on re-review, so two of two within one round; relayed usage for all three sessions was under a third of
+a cent. gpt-oss-120b posted `[done]` on LIN-2504 after six seconds and fifteen output
+tokens with no tool call, and `[failed]` on LIN-2708 after a minute, claiming that
+`public/observation.js` and the function the ticket names do not exist; both exist on
+`main`. Llama 3.1 8B sat at a frozen ten-minute heartbeat for 49 minutes and was aborted,
+with no usage relayed at all. The two zero-work results cost under a tenth of a cent each,
+which is the point: below some capability line the failure is not a bad PR but a confident
+non-event, and Harbour's terminal markers cannot tell it from a finished ticket without
+reading the feedback.
 
 **The failures were the plumbing's, and every one was invisible from Harbour.** Seven
 launches died: three to a $20 daily spend cap on the OpenRouter key (12 September from
@@ -112,6 +148,15 @@ ticket. Durations and review prices are Harbour's `/cost` lineages, read 09:25Z 
 September. The results table is LIN-2831's description; every event is a comment on
 LIN-2828.
 
+Close-outs were dispatched the same way with `kind: close-out` and no model, after the
+operator's pause and decision on 13 September: LIN-2838 first so LIN-2415 could be verified
+on the deploy, LIN-1220 alone because a merge to simple-dispatcher's `main` restarts the
+dispatcher through its watcher, then the remaining eleven in three batches. The floor run
+used the same implementation dispatch with the three floor model ids, an Opus review only
+where a PR reached green CI, and the shadow dispatched within seconds of the Opus review so
+its verdict formed before any Opus comment existed. The Llama session was aborted over the
+proxy after 49 minutes at an unchanging heartbeat.
+
 ## Limits
 
 Thirteen results, all small, none over an hour, chosen by the person running the bake-off.
@@ -121,7 +166,12 @@ as one of the implementers, and eleven of its thirteen verdicts were on PRs Opus
 approved, where agreement is cheap; its one cold test was a miss. Gemini had two tickets. The
 upstream host and quantisation behind each session was not recorded. The failure-rate figure
 for the harness is inflated by one configuration fault (the cap) and one catalog race that a
-week-old model id would not have hit.
+week-old model id would not have hit. The floor run is two tickets per model, and it says
+nothing about why gpt-oss-120b did not act or why the 8B model hung: opencode relays neither
+the tool trace nor the provider's response for either, so the cause could be the model, the
+harness's tool-calling on that model, or the upstream host, and this run cannot tell them
+apart. Close-out costs are Harbour's own relayed Opus tokens and are comparable with the
+review costs but not with the OpenRouter export.
 
 ## Next
 
@@ -131,5 +181,8 @@ week-old model id would not have hit.
   interesting one, and measure the saving per Opus review rather than per ticket.
 - Give a cheap reviewer on a *different* model from the implementer a cold pass on PRs
   where Opus found a blocking defect, and count what it catches. One miss is a hint.
-- Find the lower floor: two tickets each on `deepseek/deepseek-v4-flash-0731` and
-  `openai/gpt-oss-120b`, one on `meta-llama/llama-3.1-8b-instruct` as the control.
+- Read the opencode session log for the gpt-oss-120b and Llama sessions before the host
+  rotates it, to learn whether the non-events were the model or the harness's tool calling.
+- Decide whether close-out, the cheaper of the two irreversible-adjacent Opus sessions to
+  argue about, could run on a cheap model for the empty-ledger case, which was nine of
+  thirteen here. That is a separate experiment with its own safety design.

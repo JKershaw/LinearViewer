@@ -8,7 +8,8 @@ costs. This is the read LIN-2832 asked for. The decision it feeds, which preset 
 fleet week, is left open for the operator; the recommendation is at the end.
 
 Tracking: LIN-2828 (voyage log in comments), LIN-2831 (results table). Method and limits in
-full: `docs/papers/harbour/cheap-implementer.md`.
+full: `docs/papers/harbour/cheap-implementer.md`. Updated 13 September afternoon with the
+close-outs and the floor run.
 
 ## The short version
 
@@ -40,6 +41,23 @@ five tickets cost $2.27 together, about $0.45 a ticket, eight times cheaper than
 same approval rate. Gemini's two cost $3.55 each, GLM's price for a worse and smaller
 record. Harbour's own relay reports the final turn only (LIN-2835) and is not usable for
 any of this.
+
+**Close-out costs as much as review.** The thirteen approved PRs were merged by thirteen
+Opus close-outs on 13 September, in batches of four: every one merged and set Done in one
+session, no send-backs, no conflicts, `main` green throughout on both repositories. $1.62 to
+$8.88 each, $51.95 in all, median nine minutes. Review plus close-out is about $8.80 of Opus
+per cheap-implemented ticket; the implementer's share is $0.45 to $3.75.
+
+**The floor run: DeepSeek V4 Flash works, two cheaper models do not.**
+
+| Model | Tickets | PRs with green CI | Opus verdict | Relayed cost |
+|---|---|---|---|---|
+| deepseek/deepseek-v4-flash-0731 | 2 | 2 | LIN-2697 Approve first pass, empty ledger; LIN-2637 one missing test, fixed test-only, approved on re-review | under $0.01 for three sessions |
+| openai/gpt-oss-120b | 2 | 0 | not reviewed: `[done]` after 6 s and 15 tokens on LIN-2504, `[failed]` after 1 min on LIN-2708 claiming a file on `main` does not exist | under $0.01 |
+| meta-llama/llama-3.1-8b-instruct (control) | 1 | 0 | not reviewed: heartbeat frozen at 10 min, aborted at 49 min, no usage relayed | none relayed |
+
+Two more cold shadow pairs came with it: agreement on both, including the LIN-2637 missing
+test, which the GLM shadow named before Opus posted.
 
 **Opus review is the expense and is nearly flat with ticket size.** Harbour prices the 22
 reviews of this round at $2.26 to $4.79 each from their relayed tokens, five to nine minutes
@@ -82,8 +100,11 @@ is LIN-2837.
 
 Both GLM-5.3 and DeepSeek V4.1 Flash cleared the 70% bar on approval-within-one-round and
 neither cleared it cleanly on first pass. On quality they tie. On price Flash is eight times cheaper per ticket on the operator's
-meter, and its sessions were shorter. The recommendation is **Flash as the fleet-week
-implementer via a preset, GLM as the fallback**. A fleet week of forty medium tickets on
+meter, and its sessions were shorter. The floor run puts the older `deepseek-v4-flash-0731`
+in the same class on two tickets at a lower list price, and puts gpt-oss-120b and an 8B
+model below the line where the harness produces work at all. The recommendation is **Flash
+as the fleet-week implementer via a preset, GLM as the fallback**; the older Flash is a
+candidate for the same preset once it has more than two tickets behind it. A fleet week of forty medium tickets on
 Flash would cost under $50 on OpenRouter against about $180 of Opus review API-equivalent,
 which is where the money goes. The Sonnet-on-Bedrock
 fallback in the plan was not needed.
@@ -100,10 +121,14 @@ LIN-2834's question and is deferred to the close-out.
   reviewing GLM.
 - The upstream host and quantisation OpenRouter routed each session to, which was not
   recorded.
+- Why gpt-oss-120b did nothing and the 8B model hung: model, opencode's tool calling on
+  that model, or the host. The per-session opencode log would say; Harbour cannot.
 
 ## Sources
 
 - LIN-2828 voyage log, LIN-2831 results table, LIN-2839 research comment (2026-09-13).
-- PRs #1470 to #1482 on JKershaw/LinearViewer and #233 on JKershaw/simple-dispatcher.
-- `GET /api/proxy/cost/{identifier}` for each ticket, read 2026-09-13T09:25Z.
+- PRs #1470 to #1482 on JKershaw/LinearViewer and #233 on JKershaw/simple-dispatcher, all
+  merged 2026-09-13; floor PRs #1485 and #1486.
+- `GET /api/proxy/cost/{identifier}` for each ticket, read 2026-09-13T09:25Z and, for the
+  close-outs and floor, 2026-09-13T12:30Z.
 - `docs/reviews/model-effort-routing-proposal-2026-09-11.md` for the Sonnet baseline.

@@ -45,8 +45,8 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **What is the root-task ratio after the ruling?** Re-run `harbour/root-task-ratio.md`'s
   method on or after 2026-11-11 over 2026-09-12 to 2026-11-11 and compare the ratio, the
   Done split, and the close-out row against 0.74, 1.52 and 0.34. (Claude, 2026-09-12)
-- **Does a cheap reviewer find what Opus finds?** `harbour/cheap-implementer.md` got three
-  agreements on clean PRs. Run the shadow on PRs where Opus posted Request Changes and report
+- **Does a cheap reviewer find what Opus finds?** `harbour/cheap-implementer.md` got two
+  cold agreements, one on a second-order finding, and one cold miss on the hardest finding. Run the shadow on PRs where Opus posted Request Changes and report
   whether it names the same blocking finding, on a model other than the implementer's. (Claude,
   2026-09-12)
 - **At what ticket size does a cheap implementer save the most?** The same paper found the Opus
