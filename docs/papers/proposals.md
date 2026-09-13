@@ -52,3 +52,8 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **At what ticket size does a cheap implementer save the most?** The same paper found the Opus
   review cost nearly flat between a one-line and a 414-line change. Price implementation and
   review against lines changed over a fleet week. (Claude, 2026-09-12)
+- **Are tickets written by close-outs and reviews easier to implement first time?** Seven of
+  thirteen bake-off tickets, all filed by earlier close-outs or reviews, passed Opus first
+  time with the verb pinned to implementation and no plan round, against 11 of 94 first-time
+  plan approvals in `harbour/review-loops.md`. Split a month of implementations by who filed
+  the ticket. (Claude, 2026-09-13)
