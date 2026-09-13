@@ -41,7 +41,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { MangoClient } from '@jkershaw/mangodb';
 
 import { __internal } from '../../lib/pipeline-loops.js';
@@ -53,13 +53,16 @@ import {
   sweepOneWorkspace,
   resolveRosterFromSessions,
   mergeRosterUnion,
-  createObserverSweepRun
+  createObserverSweepRun,
+  FOSSIL_AGE_MS
 } from '../../lib/observer-sweep.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
-import { ObserverShadowLogStore } from '../../lib/observer-shadow-log.js';
+import { computeWouldBeActions, ObserverShadowLogStore } from '../../lib/observer-shadow-log.js';
+import { stableStringify } from '../../lib/recap-cache.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';
+import { isDecisionAnswered } from '../../lib/unanswered-decisions.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 
 const { _buildLoops } = __internal;
@@ -122,6 +125,27 @@ function agentStatusEntry(overrides = {}) {
     timestamp: '2026-04-11T11:02:00.000Z',
     ...overrides
   };
+}
+
+// LIN-2671: the two feedback entries a loop's decision/answer facts derive
+// from, built in the REAL wire shapes `_buildLoops` parses (`kind: 'decision'`
+// via `parseDecision`; `kind: 'decision-answer'` via `_findDecisionAnswer`) —
+// never hand-baked onto a Loop record, so the fixtures exercise the same
+// derivation production reads.
+function decisionFeedbackEntry(decisionId, timestamp = '2026-04-11T11:06:00.000Z') {
+  return {
+    kind: 'decision',
+    timestamp,
+    message: `[decision] ${JSON.stringify({
+      decision_id: decisionId,
+      question: 'Proceed?',
+      options: [{ id: 'a', label: 'Go' }, { id: 'b', label: 'Hold' }]
+    })}`
+  };
+}
+
+function answerFeedbackEntry(decisionId, timestamp = '2026-04-11T11:08:00.000Z') {
+  return { kind: 'decision-answer', timestamp, message: JSON.stringify({ decision_id: decisionId }) };
 }
 
 // ─── A. Classification ────────────────────────────────────────────────────
@@ -340,6 +364,85 @@ describe('observer-sweep: classification (LIN-2131)', () => {
     assert.notStrictEqual(withExclusion, 'blocked', 'x1 has been answered by a cross-issue follow-up — must not read as forever-blocked');
     assert.strictEqual(withExclusion, 'silent', 'excluded from blocked, x1 falls through to its own (stale) activity signal');
   });
+
+  // ── LIN-2671: an answered decision discharges the blocked lifecycle ───────
+  //
+  // The independent signal the sweep never consulted before: a loop can carry
+  // a `[blocked]` marker AND an answered decision at once — the LIN-2632
+  // dispatch `67b7b85a` shape, answered out of band and merged without a
+  // follow-up resume. `answeredDecisionId` is derived onto the lean loop the
+  // same way `wakeMarker`/`decision` are (LIN-1728), so these fixture-driven
+  // tests fail on a lean-conditional threading.
+  //
+  // The answer's lane is `resolved`, NOT `silent`: both `silent` and `blocked`
+  // are attention lanes, so a `silent` lane would keep the row on the
+  // waiting-on-a-human list this ticket exists to remove it from.
+
+  test('LIN-2671: a blocked row whose decision has been answered out of band lands resolved', () => {
+    const hist = historyItem({
+      id: 'h-answered', issueIdentifier: 'LIN-320',
+      dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:05:00.000Z' },
+        decisionFeedbackEntry('dec-1'),
+        answerFeedbackEntry('dec-1')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker is really present');
+    assert.strictEqual(loop.decision.decision_id, 'dec-1', 'sanity: the decision derives onto the lean loop');
+    assert.strictEqual(loop.answeredDecisionId, 'dec-1', 'sanity: the matching answer derives onto the lean loop');
+
+    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'resolved', 'the human answered — this row is done-with, not waiting on anyone');
+    assert.notStrictEqual(lane, 'silent', 'silent is still a waiting-on-a-human lane and would keep the row in attention');
+  });
+
+  test('LIN-2671: the same blocked row with a MISMATCHED answeredDecisionId stays blocked', () => {
+    const hist = historyItem({
+      id: 'h-answered-stale', issueIdentifier: 'LIN-321',
+      dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:05:00.000Z' },
+        decisionFeedbackEntry('dec-new'),
+        answerFeedbackEntry('dec-old')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.decision.decision_id, 'dec-new', 'sanity: the CURRENT decision is the new, unanswered one');
+    assert.strictEqual(loop.answeredDecisionId, 'dec-old', 'sanity: the answer stamp names the OLD decision');
+
+    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'blocked', 'a stale answer for an older decision must not discharge a newer, unanswered one');
+  });
+
+  test('LIN-2671: an answered decision does NOT override supersession — a follow-up still wins', () => {
+    const original = historyItem({
+      id: 'z1', issueIdentifier: 'LIN-322', dispatchedAt: '2026-04-11T10:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
+        decisionFeedbackEntry('dec-1', '2026-04-11T10:06:00.000Z'),
+        answerFeedbackEntry('dec-1', '2026-04-11T10:08:00.000Z')
+      ]
+    });
+    const followUp = historyItem({
+      id: 'z2', issueIdentifier: 'LIN-322', followUpTo: 'z1',
+      feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:40:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [original, followUp], now: NOW, lean: true });
+    const loopZ = loops.find((l) => l.loopId === 'z1');
+    assert.strictEqual(loopZ.answeredDecisionId, 'dec-1', 'sanity: the row is answered too');
+    const superseded = computeSupersededLoopIds(loops);
+    assert.ok(superseded.has('z1'), 'sanity: and a follow-up names it');
+
+    const lane = classifyLoop(loopZ, { superseded, now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(
+      lane, 'silent',
+      'supersession keeps its prior path — an answered decision only clears blocked when nothing supersedes it'
+    );
+  });
 });
 
 // ─── B. Payload contract (buildSweepPayload, the production entry point) ───
@@ -412,6 +515,62 @@ describe('observer-sweep: payload contract (LIN-2131)', () => {
     assert.strictEqual(payload.lanes.blocked, 0, 'exclusion must apply to the agent-status channel exactly as it does to the feedback-marker one');
     assert.strictEqual(payload.lanes.unknown, 1, 'an excluded waiting row is not active (agentState "waiting"), so it falls to unknown');
     assert.ok(!payload.attention.some((row) => row.loopId === 'a1'), 'an answered row must never be surfaced as waiting on a human');
+  });
+
+  test('LIN-2671 — an answered blocked row leaves lanes.blocked AND attentionKeysFull, so the companion gate reads a genuine delta', () => {
+    const answered = historyItem({
+      id: 'ans-blocked', issueIdentifier: 'LIN-441', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
+        decisionFeedbackEntry('gate-dec', '2026-04-11T11:57:00.000Z'),
+        answerFeedbackEntry('gate-dec', '2026-04-11T11:58:00.000Z')
+      ]
+    });
+    const open = historyItem({
+      id: 'open-blocked', issueIdentifier: 'LIN-442', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
+        decisionFeedbackEntry('open-dec', '2026-04-11T11:57:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [answered, open], now: NOW, lean: true });
+
+    // Control for the DELTA: before the answer stamp exists, the same row is
+    // blocked and IS in attentionKeysFull. A payload assertion alone would be
+    // satisfiable by the row simply never having been attention-eligible.
+    const preAnswer = _buildLoops({
+      historyItems: [
+        { ...answered, feedback: answered.feedback.filter((e) => e.kind !== 'decision-answer') },
+        open
+      ],
+      now: NOW, lean: true
+    });
+    const before = buildSweepPayload(preAnswer, { now: NOW_MS, staleMs: STALE_MS });
+    assert.ok(
+      before.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'),
+      'control: before the answer lands, the row IS waiting on a human'
+    );
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.lanes.blocked, 1, 'only the genuinely open decision is still blocked');
+    assert.strictEqual(payload.lanes.resolved, 1, 'the answered row is done-with');
+
+    assert.ok(
+      payload.attention.some((row) => row.loopId === 'open-blocked'),
+      'an unanswered blocked row is still waiting on a human'
+    );
+    assert.ok(
+      !payload.attention.some((row) => row.loopId === 'ans-blocked'),
+      'an answered blocked row must never be surfaced as waiting'
+    );
+    assert.ok(
+      !payload.attentionKeysFull.some((tuple) => tuple[0] === 'ans-blocked'),
+      'attentionKeysFull membership must reflect the lifecycle transition, or the companion gate sees no delta'
+    );
+    assert.ok(
+      payload.attentionKeysFull.some((tuple) => tuple[0] === 'open-blocked'),
+      'the untouched open row stays in the gate key — the delta is the answered row alone'
+    );
   });
 
   test('ledger 3 — attention is deterministically sorted, from a fixture whose insertion order is NOT already sorted (LIN-2619: by recency, not loopId — attentionKeysFull stays loopId-sorted)', () => {
@@ -575,6 +734,157 @@ describe('observer-sweep: freshness ranking & fossil collapse (LIN-2619)', () =>
       'attentionKeysFull still carries its identity tuple, untouched by the fossil filter'
     );
   });
+
+  // ── LIN-2647: the payload's two clock boundaries, on pure clock advances ──
+  //
+  // The measured LIN-2619 review probe, now pinned — plus its pre-LIN-2619
+  // sibling. The idempotency suite's "different times" tick advances 5
+  // minutes against ~now-aged activity, deliberately clear of ANY boundary,
+  // so nothing before this caught either clock dependence
+  // (buildSweepPayload's header names both; each gets its own test here):
+  // the lane census's `staleMs` working→silent crossing, and
+  // `staleAttentionCount`'s `FOSSIL_AGE_MS` fossil fold.
+
+  // Mirrors the store's own hashState() (lib/observer-state-store.js):
+  // sha256 over stableStringify(state). `canonicalizeForHash` is not
+  // exported, but it is the identity over this JSON-safe payload (no
+  // Maps/Sets/Dates), so this reproduces the hashed shape the dedup gate
+  // actually compares.
+  const hashOfPayload = (payload) => createHash('sha256').update(stableStringify(payload)).digest('hex');
+
+  test('LIN-2647: a pure clock advance across a row\'s 7-day FOSSIL_AGE_MS boundary moves the payload hash but NOT attentionKeysFull', () => {
+    // One blocked row whose last activity sits 2 minutes SHORT of the
+    // fossil boundary at tick A. Tick B advances the clock 5 minutes — past
+    // the boundary — over an otherwise IDENTICAL fleet: no new dispatch, no
+    // new feedback, only `now` moved.
+    const sinceMs = NOW_MS - FOSSIL_AGE_MS + 2 * 60 * 1000;
+    const rows = [historyItem({
+      id: 'bb-boundary', issueIdentifier: 'LIN-521',
+      dispatchedAt: new Date(sinceMs).toISOString(),
+      feedback: [{ message: '[blocked] nearly fossil', timestamp: new Date(sinceMs).toISOString() }]
+    })];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+
+    const payloadA = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payloadA.attention.length, 1, 'tick A: the row is still fresh — enumerated');
+    assert.strictEqual(payloadA.staleAttentionCount, 0, 'tick A: not yet counted as a fossil');
+    assert.strictEqual(payloadA.attentionKeysFull.length, 1, 'tick A: the identity key carries the row');
+
+    const payloadB = buildSweepPayload(loops, { now: NOW_MS + 5 * 60 * 1000, staleMs: STALE_MS });
+    assert.strictEqual(payloadB.attention.length, 0, 'tick B: the crossed row drops out of the enumerated array');
+    assert.strictEqual(payloadB.staleAttentionCount, 1, 'tick B: …and is folded into the fossil count instead');
+    assert.strictEqual(payloadB.attentionKeysFull.length, 1, 'tick B: the identity key still carries the row');
+
+    // The FOSSIL clock-dependence is real and load-bearing (one of the two
+    // boundaries the corrected header names — see the lane-staleness test
+    // below for the other): staleAttentionCount is derived from `now`, so
+    // the store's dedup gate MUST see a genuine transition here (documented
+    // in buildSweepPayload's own docblock — the header's old
+    // "no per-tick-varying value anywhere" claim was false since LIN-2619,
+    // and this assertion is what pins the corrected claim). Removing the
+    // fossil filter entirely makes this assertion fail (the hash stops
+    // moving) — that is the point.
+    assert.notStrictEqual(
+      hashOfPayload(payloadA), hashOfPayload(payloadB),
+      'the payload hash must move when a row crosses the fossil boundary on a pure clock advance'
+    );
+    // …while the companion gate's own key must not:
+    assert.deepStrictEqual(
+      payloadB.attentionKeysFull, payloadA.attentionKeysFull,
+      'attentionKeysFull is clock-INDEPENDENT — a row ageing from enumerated to counted is not a set-membership change the gate can see'
+    );
+  });
+
+  test('LIN-2647: a pure clock advance across a row\'s 1h lane-staleness boundary moves the payload hash AND changes attentionKeysFull — the census\'s own, pre-LIN-2619 clock dependence', () => {
+    // The sibling of the fossil-boundary test above, pinning the OTHER
+    // clock dependence the corrected header names: classifyLoop's
+    // `now - loopLastActivityMs(loop) > staleMs` working→silent crossing,
+    // which predates LIN-2619 entirely (it is the lane census's own
+    // staleness rule, `DEFAULT_LANE_STALE_MS`). A working row —
+    // agentState 'running', no terminal marker, no blocked signal — whose
+    // last activity sits 59 minutes before tick A crosses the 1h threshold
+    // on a 5-minute pure clock advance: identical fleet, only `now` moved.
+    //
+    // Unlike the fossil crossing, this one is a REAL attention-membership
+    // change (a row that stopped being worked and started waiting), so
+    // BOTH the hash and attentionKeysFull must move — the companion gate's
+    // no-delta fold is scoped to fossil-boundary crossings, and this
+    // crossing is exactly the kind of genuine membership change it exists
+    // to let through.
+    const sinceMs = NOW_MS - 59 * 60 * 1000;
+    const rows = [historyItem({
+      id: 'lane-staleness-boundary', issueIdentifier: 'LIN-524',
+      dispatchedAt: new Date(sinceMs).toISOString(),
+      feedback: [] // no blocked signal, no terminal marker — a plain working run
+    })];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+    const working = loops[0];
+    assert.strictEqual(working.agentState, 'running', 'sanity: the row is an active working run (isLoopActive true)');
+
+    const payloadA = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payloadA.lanes.working, 1, 'tick A: 59 minutes old — still freshly active, working');
+    assert.strictEqual(payloadA.lanes.silent, 0, 'tick A: not yet silent');
+    assert.strictEqual(payloadA.attention.length, 0, 'tick A: working is not an attention lane');
+    assert.strictEqual(payloadA.attentionKeysFull.length, 0, 'tick A: no attention-eligible row exists yet');
+
+    const payloadB = buildSweepPayload(loops, { now: NOW_MS + 5 * 60 * 1000, staleMs: STALE_MS });
+    assert.strictEqual(payloadB.lanes.working, 0, 'tick B: 64 minutes old — past the 1h threshold, no longer working');
+    assert.strictEqual(payloadB.lanes.silent, 1, 'tick B: the row crossed to silent on a pure clock advance');
+    assert.strictEqual(payloadB.attention.length, 1, 'tick B: silent is attention-eligible — the row is now waiting');
+    assert.strictEqual(payloadB.attentionKeysFull.length, 1, 'tick B: the identity key gained the row');
+
+    assert.notStrictEqual(
+      hashOfPayload(payloadA), hashOfPayload(payloadB),
+      'the payload hash must move when a row crosses the lane-staleness boundary on a pure clock advance — this dependence predates LIN-2619'
+    );
+    // The deliberate contrast with the fossil-boundary test above: this
+    // crossing is a genuine set-membership change, so attentionKeysFull
+    // MUST move too — the gate's no-delta fold is fossil-boundary-scoped,
+    // not clock-scoped in general.
+    assert.notDeepStrictEqual(
+      payloadB.attentionKeysFull, payloadA.attentionKeysFull,
+      'a working→silent crossing adds a real member to attentionKeysFull — the gate correctly sees (and may spend on) this crossing; only the fossil boundary is invisible to it'
+    );
+    assert.deepStrictEqual(
+      payloadB.attentionKeysFull,
+      [['lane-staleness-boundary', 'silent', 'implementation']],
+      'the gained member is the crossed row\'s own identity tuple'
+    );
+  });
+
+  test('LIN-2647: a fossil blocked row produces NO would-be shadow action — INTENDED (LIN-2619/2647), with a fresh control that still does', () => {
+    // The shadow-log consequence of the fossil fold (LIN-2132 consumer,
+    // unreviewed for LIN-2619's change): rows at/over fossil age drop out
+    // of `attention`, so computeWouldBeActions (lib/observer-shadow-log.js)
+    // no longer enumerates a would-be action for them. Recorded here as
+    // intended — they are exactly the rows LIN-2619 set out to stop
+    // enumerating — and pinned so the behaviour change is held by a test,
+    // not by silence.
+    const fossilSinceMs = NOW_MS - FOSSIL_AGE_MS - 60 * 1000;
+    const rows = [
+      historyItem({
+        id: 'aa-fossil-shadow', issueIdentifier: 'LIN-522',
+        dispatchedAt: new Date(fossilSinceMs).toISOString(),
+        feedback: [{ message: '[blocked] already fossil', timestamp: new Date(fossilSinceMs).toISOString() }]
+      }),
+      historyItem({
+        id: 'zz-fresh-shadow', issueIdentifier: 'LIN-523', dispatchedAt: '2026-04-11T11:00:00.000Z',
+        feedback: [{ message: '[blocked] fresh', timestamp: '2026-04-11T11:00:00.000Z' }]
+      })
+    ];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+
+    assert.strictEqual(payload.attention.length, 1, 'only the fresh row is enumerated');
+    assert.strictEqual(payload.staleAttentionCount, 1, 'the fossil row is folded into the count');
+    assert.strictEqual(payload.attentionKeysFull.length, 2, 'both rows stay in the identity key — the gate still sees the fossil row');
+
+    const actions = computeWouldBeActions(payload);
+    assert.deepStrictEqual(
+      actions.map((a) => a.loopId), ['zz-fresh-shadow'],
+      'the fossil blocked row produces no would-be action — intended (see computeWouldBeActions\'s own docblock), not a lost write'
+    );
+  });
 });
 
 // ─── C. Idempotency (real MangoDB tmpdir) ─────────────────────────────────
@@ -658,14 +968,18 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     // `sweptAt: new Date(now).toISOString()` to buildSweepPayload's return
     // survived them. Fire a third tick with the clock advanced by ADVANCE_MS
     // (5 min — the fixture's activity is ~`now`, so every row stays ~5 min
-    // old against a 1h staleness threshold, far from the boundary and
-    // therefore classified identically). Same fleet, later clock, same
-    // document: that is the actual no-per-tick-varying-field contract.
+    // old against a 1h staleness threshold and days short of a 7-day fossil
+    // threshold, far from BOTH boundaries and therefore classified
+    // identically). Same fleet, later clock, same document: that is the
+    // actual contract — no payload field varies per tick while the clock
+    // stays clear of the two boundaries buildSweepPayload's header names
+    // (the lane-staleness and fossil crossings, each pinned by its own
+    // LIN-2647 boundary test above).
     const ADVANCE_MS = 5 * 60 * 1000;
     assert.ok(ADVANCE_MS * 2 < DEFAULT_LANE_STALE_MS, 'sanity: the advance must stay well clear of the staleness boundary');
     await sweepOneWorkspace(urlKey, { ...deps, now: now + ADVANCE_MS });
     const doc3 = await observerStateStore.readCurrent(instanceKey);
-    assert.strictEqual(doc3.rev, doc1.rev, 'an ADVANCING clock over identical fleet state must not advance rev — no payload field may vary per tick');
+    assert.strictEqual(doc3.rev, doc1.rev, 'an ADVANCING clock over identical fleet state must not advance rev while every row stays clear of the lane-staleness and fossil boundaries — a boundary crossing legitimately moves the hash (see the LIN-2647 boundary tests)');
     assert.strictEqual(doc3.ledger.length, doc1.ledger.length, 'a later-clock tick must not grow the ledger');
     assert.deepStrictEqual(doc3.state, doc1.state, 'the stored document must be byte-identical across ticks taken at DIFFERENT times');
   });
@@ -1007,10 +1321,31 @@ describe('observer-sweep: negative capability — no automated-intervention path
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js'].sort(),
+      ['./live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './unanswered-decisions.js'].sort(),
       'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion. ' +
-      './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance'
+      './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance. ' +
+      './unanswered-decisions.js (LIN-2671) is itself pure (imports only ./loop-supersede.js; see unanswered-decisions.js) and exports the ONE answered-decision predicate classifyLoop must reuse rather than fork'
     );
+  });
+
+  test('LIN-2671 import-by-reference: classifyLoop reuses isDecisionAnswered from lib/unanswered-decisions.js, never forks the comparison', () => {
+    const modulePath = fileURLToPath(new URL('../../lib/observer-sweep.js', import.meta.url));
+    const src = readFileSync(modulePath, 'utf8');
+    assert.match(
+      src,
+      /^import\s*\{\s*isDecisionAnswered\s*\}\s*from\s*'\.\/unanswered-decisions\.js';/m,
+      'the answered-decision predicate must be imported by name from the shared module, not re-derived here'
+    );
+    assert.ok(
+      !/answeredDecisionId\s*===/.test(src),
+      'observer-sweep must NOT re-derive the comparison locally — a forked predicate is exactly how the census and the rulings feed disagreed (LIN-2671)'
+    );
+    // The name imported above is the shared module's real export, not a
+    // same-named local; a renamed/re-exported shim would fail here.
+    assert.strictEqual(typeof isDecisionAnswered, 'function');
+    assert.strictEqual(isDecisionAnswered({ decision: { decision_id: 'd-1' }, answeredDecisionId: 'd-1' }), true);
+    assert.strictEqual(isDecisionAnswered({ decision: { decision_id: 'd-1' }, answeredDecisionId: 'd-2' }), false);
+    assert.strictEqual(isDecisionAnswered({ decision: null, answeredDecisionId: null }), false);
   });
 });
 

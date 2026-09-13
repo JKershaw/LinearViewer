@@ -2013,6 +2013,24 @@ function supersededBlockedHistory() {
   ];
 }
 
+// LIN-2671: a [blocked] run whose decision was answered OUT OF BAND — the
+// `answeredDecisionId` signal, with NO follow-up loop naming it. The
+// superseded fixture above cannot exercise this: there the answer evidence is
+// the follow-up's `followUpTo`, here it is the decision-answer stamp alone.
+function answeredDecisionHistory() {
+  return [
+    sessionHistoryItem({
+      id: 'sess-dec-answered', kind: 'autopilot', issueIdentifier: 'LIN-740', target: 'cli',
+      dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+      feedback: [
+        { message: '[blocked] which option?', timestamp: T_FLEET_OLD },
+        decisionEntry('dec-answer-me', 'which option?', T_FLEET_OLD),
+        answerEntry('dec-answer-me', T_FLEET_MID),
+      ],
+    }),
+  ];
+}
+
 function makeFleetCatalog(history) {
   const stores = makeMockSessionStores({ history });
   const { executeTool } = createChatToolCatalog({
@@ -2121,6 +2139,33 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     const row = result.sessions.find(r => r.sessionId === 'sess-answered');
     assert.notStrictEqual(row.lifecycle, 'blocked');
     assert.strictEqual(row.waitingOnHuman, false, 'an answered decision is not still waiting');
+  });
+
+  test('LIN-2671: an answered decision id clears waitingOnHuman with NO follow-up loop (the out-of-band answer)', async () => {
+    // The class the ticket exists for: LIN-2632's dispatch `67b7b85a` was
+    // answered and merged, but no follow-up ever named it, so supersession
+    // alone could not discharge it. `projectActiveSession` consumes
+    // `classifyLoop`, so the fix must move this surface with it.
+    const { executeTool } = makeFleetCatalog(answeredDecisionHistory());
+
+    const all = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+    const row = all.sessions.find(r => r.sessionId === 'sess-dec-answered');
+    assert.ok(row, 'sanity: the session is reported under lane:all');
+    assert.strictEqual(row.lifecycle, 'resolved', 'the answered decision discharges the blocked lifecycle');
+    assert.strictEqual(row.waitingOnHuman, false, 'answered out of band is not still waiting on a human');
+
+    // And the default "still in flight" read now omits it entirely, because
+    // `resolved` is a finished lane — before the fix it leaked in as blocked.
+    const dflt = await executeTool({ name: 'list_active_sessions', arguments: {} });
+    assert.strictEqual(
+      dflt.sessions.some(r => r.sessionId === 'sess-dec-answered'), false,
+      'a resolved answered row must not appear in the default in-flight read'
+    );
+
+    // The waiting filter — the headline "what is waiting on me?" — must not
+    // list it either.
+    const waiting = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'waiting' } });
+    assert.strictEqual(waiting.sessions.some(r => r.sessionId === 'sess-dec-answered'), false);
   });
 
   test("lane 'waiting' finds a session parked on a human whose latest run has since moved on", async () => {
@@ -2244,6 +2289,12 @@ function decisionEntry(id, question, timestamp, optionCount = 0) {
       decision_id: id, question, options, recommended: options[1].id,
     })}`,
   };
+}
+
+// LIN-2671: the `decision-answer` stamp `markDecisionAnswered` writes, in the
+// shape `_findDecisionAnswer` parses — so `answeredDecisionId` derives for real.
+function answerEntry(decisionId, timestamp) {
+  return { kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId }), timestamp };
 }
 
 // One of each of the predicate's three inputs, exactly as the acceptance names

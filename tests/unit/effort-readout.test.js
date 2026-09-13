@@ -388,3 +388,210 @@ describe('a blocked row is right-censored (LIN-2079)', () => {
     assert.equal(inFlightByKind.implementation.blocked, 1);
   });
 });
+
+// ─── LIN-2830: harness/model grouping columns, effort-less rows survive ─────
+//
+// The bake-off (LIN-2828/LIN-2831) reads this page to compare cost/duration
+// across harnesses and models. Two wire shapes matter here, both REAL:
+// - claude-code's hook.js postUsageSnapshot: {harness: 'claude-code',
+//   model, effort, tokens..., costUsd: null (derived on Harbour's side),
+//   lane: 'subscription'}.
+// - opencode's opencode-runner.js postUsageFeedback (LIN-1425): {harness:
+//   'opencode', model: info.modelID, tokens..., costUsd: <native>, lane:
+//   'openrouter'} — and DELIBERATELY NO effort field (Simple Dispatcher
+//   omits it for that harness; opencode has no documented effort key).
+function claudeCodeUsageRow({ id, issueId, issueIdentifier, kind, dispatchedAt, completedAt, model, effort, costUsd }) {
+  return {
+    id, issueId, issueIdentifier, kind, status: 'taken', dispatchedAt,
+    feedback: [
+      { kind: 'usage', message: `[usage] ${JSON.stringify({ schema: 1, harness: 'claude-code', model, effort, inputTokens: 100, outputTokens: 50, costUsd, lane: 'subscription' })}` },
+      { message: '[done] complete', timestamp: completedAt },
+    ],
+  };
+}
+
+function opencodeUsageRow({ id, issueId, issueIdentifier, kind, dispatchedAt, completedAt, model = 'z-ai/glm-5.3', costUsd }) {
+  return {
+    id, issueId, issueIdentifier, kind, status: 'taken', dispatchedAt,
+    feedback: [
+      { kind: 'usage', message: `[usage] ${JSON.stringify({ schema: 1, harness: 'opencode', model, inputTokens: 100, outputTokens: 50, costUsd, lane: 'openrouter' })}` },
+      { message: '[done] complete', timestamp: completedAt },
+    ],
+  };
+}
+
+describe('LIN-2830 — harness/model split rows per kind', () => {
+  test('a claude-code run and an opencode run of the same kind land in two distinct rows with their own figures', () => {
+    const rows = [
+      claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
+      opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T00:30:00.000Z', costUsd: 0.42 }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.ok(Array.isArray(implCard.rows), 'the kind card must carry a per-(harness, model, effort) rows breakdown');
+    assert.equal(implCard.rows.length, 2, 'the two harnesses must be distinguishable — one row each, never merged');
+    const claudeRow = implCard.rows.find((r) => r.harness === 'claude-code');
+    const opencodeRowRow = implCard.rows.find((r) => r.harness === 'opencode');
+    assert.ok(claudeRow, 'the claude-code run is its own row');
+    assert.ok(opencodeRowRow, 'the opencode run is its own row');
+    assert.equal(claudeRow.model, 'anthropic/claude-sonnet-5');
+    assert.equal(claudeRow.effort, 'high');
+    assert.equal(claudeRow.sessionCount, 1);
+    assert.equal(claudeRow.durationMs, 60 * 60 * 1000);
+    assert.equal(opencodeRowRow.model, 'z-ai/glm-5.3');
+    assert.equal(opencodeRowRow.sessionCount, 1);
+    assert.equal(opencodeRowRow.durationMs, 30 * 60 * 1000);
+    // The rows are a partition of the card, never a second population: the
+    // row session counts and row costs must sum to the kind-level figures.
+    assert.equal(implCard.rows.reduce((sum, r) => sum + r.sessionCount, 0), implCard.sessionCount);
+    const pricedRowSum = implCard.rows.reduce((sum, r) => sum + (r.costUsd || 0), 0);
+    assert.ok(Math.abs(pricedRowSum - implCard.costUsd) < 1e-9, 'row costs partition the kind-level cost sum');
+    assert.ok(Math.abs((claudeRow.costUsd || 0) + (opencodeRowRow.costUsd || 0) - implCard.costUsd) < 1e-9);
+  });
+
+  test('same harness and model but different effort levels still split by effort', () => {
+    const rows = [
+      claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
+      claudeCodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'low', costUsd: null }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.rows.length, 2, 'effort is part of the row key');
+    assert.deepEqual(implCard.rows.map((r) => r.effort).sort(), ['high', 'low']);
+  });
+
+  // The bake-off's exact distinguishing case (LIN-2830: "a run on opencode is
+  // indistinguishable from one on claude-code") — rows that differ ONLY in
+  // harness, or ONLY in model, must still split. Pinning each key column in
+  // isolation so a grouping that silently drops one column cannot pass.
+  test('rows differing only in harness, or only in model, still split — each key column is load-bearing', () => {
+    const sameModelDifferentHarness = [
+      claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'z-ai/glm-5.3', effort: null, costUsd: null }),
+      opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'z-ai/glm-5.3', costUsd: 0.42 }),
+    ];
+    let readout = computeEffortReadout({ liveRows: [], historyRows: sameModelDifferentHarness, issueContext: new Map(), asOf: ASOF });
+    let implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.rows.length, 2, 'same model + same (null) effort, different harness: two rows');
+    assert.deepEqual(implCard.rows.map((r) => r.harness).sort(), ['claude-code', 'opencode']);
+
+    const sameHarnessDifferentModel = [
+      opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'z-ai/glm-5.3', costUsd: 0.42 }),
+      opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'deepseek/deepseek-v4.1-flash', costUsd: 0.10 }),
+    ];
+    readout = computeEffortReadout({ liveRows: [], historyRows: sameHarnessDifferentModel, issueContext: new Map(), asOf: ASOF });
+    implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.rows.length, 2, 'same harness + same (null) effort, different model: two rows');
+    assert.deepEqual(implCard.rows.map((r) => r.model).sort(), ['deepseek/deepseek-v4.1-flash', 'z-ai/glm-5.3']);
+  });
+});
+
+describe('LIN-2830 — an effort-less opencode row survives, never dropped', () => {
+  test('an opencode session with no effort field keeps its own row with effort null', () => {
+    const rows = [
+      opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.sessionCount, 1);
+    assert.equal(implCard.rows.length, 1, 'the effort-less row must not be dropped from the breakdown');
+    assert.equal(implCard.rows[0].harness, 'opencode');
+    assert.equal(implCard.rows[0].model, 'z-ai/glm-5.3');
+    assert.equal(implCard.rows[0].effort, null, 'no effort reported — null, the renderer shows "—"');
+    assert.equal(implCard.rows[0].sessionCount, 1);
+    assert.equal(implCard.rows[0].costUsd, 0.42);
+  });
+
+  test('an effort-less opencode row and a claude-code row with effort never merge into one group', () => {
+    const rows = [
+      opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
+      claudeCodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.rows.length, 2);
+    const effortless = implCard.rows.find((r) => r.effort === null);
+    assert.ok(effortless, 'the null-effort bucket exists as its own row');
+    assert.equal(effortless.harness, 'opencode');
+  });
+
+  test('a session with no usage telemetry at all still gets a row (all three columns null)', () => {
+    const rows = [doneRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z' })];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.rows.length, 1, 'no telemetry is a row with unknown columns, not a dropped row');
+    assert.equal(implCard.rows[0].harness, null);
+    assert.equal(implCard.rows[0].model, null);
+    assert.equal(implCard.rows[0].effort, null);
+    assert.equal(implCard.rows[0].sessionCount, 1);
+  });
+
+  test('row ordering is deterministic: harness, then model, then effort, nulls last', () => {
+    const rows = [
+      claudeCodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T01:00:00.000Z', model: 'anthropic/claude-sonnet-5', effort: 'high', costUsd: null }),
+      opencodeUsageRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T00:30:00.000Z', costUsd: 0.42 }),
+      opencodeUsageRow({ id: 'r3', issueId: 'i3', issueIdentifier: 'LIN-3', kind: 'implementation', dispatchedAt: '2026-09-02T02:00:00.000Z', completedAt: '2026-09-02T02:30:00.000Z', model: 'deepseek/deepseek-v4.1-flash', costUsd: 0.10 }),
+      doneRow({ id: 'r4', issueId: 'i4', issueIdentifier: 'LIN-4', kind: 'implementation', dispatchedAt: '2026-09-03T00:00:00.000Z', completedAt: '2026-09-03T00:30:00.000Z' }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.deepEqual(
+      implCard.rows.map((r) => [r.harness, r.model, r.effort]),
+      [
+        ['claude-code', 'anthropic/claude-sonnet-5', 'high'],
+        ['opencode', 'deepseek/deepseek-v4.1-flash', null],
+        ['opencode', 'z-ai/glm-5.3', null],
+        [null, null, null],
+      ]
+    );
+  });
+
+  test('requested (row-level) harness/model/effort values never substitute for realised ones (D10 rule, extended)', () => {
+    // The dispatch row's own `harness`/`model`/`effort` fields are REQUESTED
+    // values (what was asked to run); the row breakdown reports REALISED
+    // telemetry only. A row claiming claude-code/wrong-model/high must not
+    // leak those into the breakdown when the run's [usage] payload says
+    // opencode/z-ai/glm-5.3/absent.
+    const row = {
+      ...opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
+      harness: 'claude-code', model: 'wrong/model', effort: 'high',
+    };
+    const readout = computeEffortReadout({ liveRows: [], historyRows: [row], issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    assert.equal(implCard.rows.length, 1);
+    assert.equal(implCard.rows[0].harness, 'opencode', 'the requested row harness must never populate the breakdown');
+    assert.equal(implCard.rows[0].model, 'z-ai/glm-5.3');
+    assert.equal(implCard.rows[0].effort, null, 'the requested row effort must never populate the breakdown');
+  });
+
+  test('row-level cost/duration coverage counts disclose partial figures (R2 discipline, row-scoped)', () => {
+    // One priced+timed opencode lineage and one telemetry-free (but still
+    // timed — a [done] marker timestamp is enough for duration) lineage: the
+    // opencode row reports full coverage, the no-telemetry row reports an
+    // unpriced cost only — a row must never present a partial figure as if
+    // it covered its sessions.
+    const rows = [
+      opencodeUsageRow({ id: 'r1', issueId: 'i1', issueIdentifier: 'LIN-1', kind: 'implementation', dispatchedAt: '2026-09-01T00:00:00.000Z', completedAt: '2026-09-01T00:30:00.000Z', costUsd: 0.42 }),
+      doneRow({ id: 'r2', issueId: 'i2', issueIdentifier: 'LIN-2', kind: 'implementation', dispatchedAt: '2026-09-02T00:00:00.000Z', completedAt: '2026-09-02T00:30:00.000Z' }),
+    ];
+    const readout = computeEffortReadout({ liveRows: [], historyRows: rows, issueContext: new Map(), asOf: ASOF });
+    const implCard = readout.perKind.find((k) => k.kind === 'implementation');
+    const opencodeRowRow = implCard.rows.find((r) => r.harness === 'opencode');
+    const unknownRow = implCard.rows.find((r) => r.harness === null);
+    assert.equal(opencodeRowRow.costPricedCount, 1);
+    assert.equal(opencodeRowRow.durationCoveredCount, 1);
+    assert.equal(opencodeRowRow.costUsd, 0.42);
+    assert.equal(opencodeRowRow.durationMs, 30 * 60 * 1000);
+    // No telemetry ⇒ no price, but the terminal marker still times it.
+    assert.equal(unknownRow.costUsd, null);
+    assert.equal(unknownRow.costPricedCount, 0);
+    assert.equal(unknownRow.durationMs, 30 * 60 * 1000);
+    assert.equal(unknownRow.durationCoveredCount, 1);
+  });
+
+  test('notes disclose the row provenance: realised telemetry values, and why opencode reads "—" for effort', () => {
+    const readout = computeEffortReadout({ liveRows: [], historyRows: [], issueContext: new Map(), asOf: ASOF });
+    assert.ok(readout.notes.harnessModelRows, 'the readout must ship the provenance note');
+    assert.match(readout.notes.harnessModelRows, /opencode/i);
+    assert.match(readout.notes.harnessModelRows, /never the dispatch row/i);
+  });
+});

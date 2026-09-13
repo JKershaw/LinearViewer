@@ -7,7 +7,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectUnansweredDecisions, resolveDisposition, resolveEffect } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered } from '../../lib/unanswered-decisions.js';
 
 const NOW = new Date('2026-08-22T12:00:00.000Z');
 const REAP_INACTIVITY_MS = 21600000; // 6h, mirrors simple-dispatcher's config.js
@@ -34,6 +34,33 @@ function loop(overrides = {}) {
     ...overrides
   };
 }
+
+describe('isDecisionAnswered (LIN-2671: the one exported predicate)', () => {
+  test('the answer id matching the current decision id → true', () => {
+    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-1'), answeredDecisionId: 'd-1' })), true);
+  });
+
+  test('a mismatched answer id (a newer decision after an older answer) → false', () => {
+    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-2'), answeredDecisionId: 'd-1' })), false);
+  });
+
+  test('no decision at all is never answered — even with a stray answer id', () => {
+    assert.strictEqual(isDecisionAnswered(loop({ decision: null, answeredDecisionId: 'd-1' })), false);
+  });
+
+  test('no answer stamps is never answered', () => {
+    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-1'), answeredDecisionId: null })), false);
+  });
+
+  test('a malformed null decision_id cannot match a null answer', () => {
+    assert.strictEqual(isDecisionAnswered(loop({ decision: { question: 'q?' }, answeredDecisionId: null })), false);
+  });
+
+  test('null/undefined loops are tolerated, never throw', () => {
+    assert.strictEqual(isDecisionAnswered(null), false);
+    assert.strictEqual(isDecisionAnswered(undefined), false);
+  });
+});
 
 describe('resolveDisposition (LIN-1728 Revision 3, F8: total mapping)', () => {
   test('permanently-parked [blocked], non-terminal → resumable', () => {
