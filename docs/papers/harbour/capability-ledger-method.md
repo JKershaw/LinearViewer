@@ -117,3 +117,6 @@ model at one effort, and the ledger inherits whatever that reviewer systematical
   exists, with the absent-entry rule as its first line.
 - Give the stepper its own entries: the same shapes, stepped, on the cheapest model that
   failed them single-shot.
+- Grow the ledger upward as well as sideways: give the models that cleared small tickets a
+  bigger one each, since a thin entry measures how little was tried, not how little the
+  model can do.

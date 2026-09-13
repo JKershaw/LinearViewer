@@ -30,6 +30,13 @@ tried on a **thin ticket** (no plan in the description), a **page** beyond that 
 several tickets, or any kind other than implementation. The **stepper** variant has no
 entries for any model.
 
+Read every "not tried" below as exactly that. The bake-off chose small tickets because
+they were safe to try, not because the models were expected to fail on larger ones, and
+nothing in this edition is evidence either way about a shape a model has not been given.
+The absent-entry rule routes an unknown pair to Opus for safety; it is a routing default,
+not a prediction. A model whose entry is thin is a model worth giving a bigger ticket to,
+on a ticket that says so.
+
 ## Opus 5 (claude-code, effort high or medium)
 
 **Does every step.** Autopilot, research, plan, plan-review, implementation, bug, review,
@@ -82,7 +89,9 @@ was that miss. About $0.95 a review.
 **Failed on a page.** LIN-2830's readout grid was 792 px of fixed columns in a 263 px card.
 Correct logic, correct tests, never rendered. The one page any cheap model has been given.
 
-**Not tried:** anything but grounded small implementation and shadow review.
+**Not tried:** anything but grounded small implementation and shadow review. Its six
+implementations and the LIN-2415 park give no reason to expect it to fail on a larger or
+thinner ticket; that is simply unmeasured.
 
 ## DeepSeek V4.1 Flash (opencode, OpenRouter, no effort field)
 
@@ -93,7 +102,8 @@ left standing in four places of prose. No logic defect. Median 14 minutes, about
 ticket on the operator's meter, sessions shorter than GLM's. This is the recommended
 fleet-week implementer via a preset.
 
-**Not tried:** a page, a thin ticket, anything over an hour, any other kind.
+**Not tried:** a page, a thin ticket, anything over an hour, any other kind. Five for
+five within one round on this shape is a reason to try the next shape, not a ceiling.
 
 ## DeepSeek V4 Flash, 0731 (opencode, OpenRouter, no effort field)
 
@@ -101,7 +111,8 @@ fleet-week implementer via a preset.
 first pass with an empty ledger in 10 minutes; LIN-2637 sent back for one missing test on
 a second call path, fixed in a test-only commit and approved on re-review, 28 minutes plus
 16. Under a cent relayed for the three sessions. Cheaper on OpenRouter's list than V4.1
-Flash. Two tickets is too few to prefer it; enough to keep trying it.
+Flash. Two tickets is too few to prefer it; enough to keep trying it, and on bigger
+tickets than these.
 
 **Not tried:** everything else.
 
@@ -116,7 +127,8 @@ evidence to choose it over Flash.
 fixture Linear key in full and tripped GitHub's secret scanning. Not a code defect; a
 handling one worth knowing about.
 
-**Not tried:** everything else.
+**Not tried:** everything else. Two clean results on this shape say nothing against it on
+any other.
 
 ## gpt-oss-120b (opencode, OpenRouter)
 
@@ -125,12 +137,15 @@ and fifteen output tokens, no tool call, no change. LIN-2708: `[failed]` after a
 claiming `public/observation.js` and the function the ticket names do not exist; both are
 on `main`. Under a tenth of a cent each. Whether this is the model, opencode's tool
 calling on it, or the upstream host is not known; the per-session opencode log would say.
-Until it does, this model has no entry for any shape.
+Until it does, this model has no entry for any shape. That is not a verdict on the
+model: two non-events on one harness in one hour could be the plumbing, and a fixed
+harness or a different ticket has not been tried.
 
 ## Llama 3.1 8B Instruct (opencode, OpenRouter)
 
 **Hung.** The deliberate low control. LIN-2407, one test to write: heartbeat frozen at ten
-minutes, aborted at 49, no usage relayed, no PR. No entry for any shape.
+minutes, aborted at 49, no usage relayed, no PR. No entry for any shape. One hung session
+is one hung session; it does not say the model cannot do the work.
 
 ## What every cheap-model entry has in common
 
@@ -157,13 +172,16 @@ because Harbour's relay reports the final turn only (LIN-2835).
 One run of small tickets chosen to be safe, plus one 30-day read of the defaults. The
 cheap-model entries rest on two to six tickets each. The shape vocabulary is a reading, not
 a measurement. Nothing here says what happens on a ticket over an hour, a thin ticket, a
-page, or a stepped run, and the ledger should not be read as if it did.
+page, or a stepped run, and the ledger should not be read as if it did. In particular it
+should not be read as a ranking: the models with the thinnest entries are the ones with
+the least evidence, not the least ability.
 
 ## Next
 
 - Run the fleet week with this edition consulted by hand, and write edition 2 from every
   place it was wrong or silent.
 - Give DeepSeek V4 Flash 0731 five more grounded small tickets, and Flash V4.1 one page,
-  one thin ticket and one over an hour, each named as an experiment on its ticket.
+  one thin ticket and one over an hour, each named as an experiment on its ticket. Then
+  go bigger: a multi-session ticket or a short lane on whichever Flash did best.
 - Read the opencode logs for the gpt-oss-120b and Llama sessions before they rotate.
 - Add stepper entries: the same shapes, stepped, on a model that failed them single-shot.
