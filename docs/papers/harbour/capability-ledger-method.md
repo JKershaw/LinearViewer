@@ -5,7 +5,7 @@ date: 2026-09-13
 authors: [Claude, John Kershaw]
 model: by hand, by the session that conned the cheap-implementer bake-off, over the read-write proxy
 grounded_at: 85584846 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [lib/prompts/meta-prompt-template.js@85584846:129-230, lib/dispatch-factory.js@85584846:503-512, lib/proxy-instructions.js@85584846:706-713, docs/papers/harbour/cheap-implementer.md (v3, 2026-09-13), docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger.md (v1, 2026-09-13), LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (2026-09-13)]
+cites: [lib/prompts/meta-prompt-template.js@85584846:129-230, lib/dispatch-factory.js@85584846:503-512, lib/proxy-instructions.js@85584846:706-713, docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger.md (v1, 2026-09-13), LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (2026-09-13)]
 ---
 
 # How should Harbour learn which model can do which task?
@@ -63,7 +63,10 @@ the labels for that class drift with the reviewer, and the ledger stops being co
 with itself. The shadow-review record in the bake-off (two cold agreements, one cold miss on
 the hardest finding) is the beginning of a case for a cheap reviewer on some shapes, but
 that decision is made on the ledger, and the ledger is written by the fixed judge.
-Routing that changed the reviewer would be marking its own homework.
+Routing that changed the reviewer would be marking its own homework. Close-out is
+different: it acts on the judge's verdict rather than forming one, so a cheap close-out
+does not move the labels, and the one tried so far (LIN-2697, empty ledger, Flash 0731)
+merged correctly.
 
 **The stepper is a second axis, not a second row.** A single-shot task has one boundary per
 model. A stepped task (`variant: stepper`, `lib/proxy-instructions.js:706-713`) decomposes

@@ -1,11 +1,11 @@
 ---
 title: Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
-version: 3
+version: 4
 date: 2026-09-13
 authors: [Claude, John Kershaw]
 model: the conning session wrote this by hand over the read-write proxy; the implementations it dispatched ran z-ai/glm-5.3, deepseek/deepseek-v4.1-flash and google/gemini-3.8-flash on opencode (no effort field), the floor run deepseek/deepseek-v4-flash-0731, openai/gpt-oss-120b and meta-llama/llama-3.1-8b-instruct on the same harness, the gating reviews and close-outs claude-opus-5 on claude-code at effort medium, the shadow reviews z-ai/glm-5.3 on opencode, as the dispatch lineages under sessionId LIN-2828-bakeoff report
 grounded_at: 85584846 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13, merged 2026-09-13), PR #1485 and PR #1486 (2026-09-13), simple-dispatcher PR #233 (2026-09-12, merged 2026-09-13), LIN-2415 (comment 48055064, 2026-09-13), LIN-2637 and LIN-2697 (review and shadow comments, 2026-09-13), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
+cites: [LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13, merged 2026-09-13), PR #1485 and PR #1486 (2026-09-13, merged 2026-09-13), LIN-2697 and LIN-2637 (close-out comments, 2026-09-13), LIN-2856, simple-dispatcher PR #233 (2026-09-12, merged 2026-09-13), LIN-2415 (comment 48055064, 2026-09-13), LIN-2637 and LIN-2697 (review and shadow comments, 2026-09-13), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
 ---
 
 # Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
@@ -98,6 +98,18 @@ is about $114 of Opus per thirteen tickets, or $8.80 a ticket, against an implem
 of $0.45 to $3.75. The cheap implementer removes the one session whose price scaled with
 the work and leaves the two whose price does not.
 
+**One cheap close-out on an empty ledger merged correctly; one Opus close-out finished and
+then never said so.** After the floor run, LIN-2697's close-out (ledger explicitly empty,
+both reviews Approve) was given to DeepSeek V4 Flash 0731 on opencode, with LIN-2637's
+close-out on Opus as the control. Flash merged PR #1485, verified the landed commit,
+re-ran the pinned suite, set Done, posted a summary of the house shape and filed one
+follow-up for a class sibling the review had named as outside scope, in 13 minutes for a
+tenth of a cent. Opus merged PR #1486 and set Done within three minutes for $3.44, then its
+session sat at the completion ask for over three hours without a terminal marker and was
+aborted by hand. One ticket each; the Flash result is a reason to run the empty-ledger case
+again, not to change the default, and the Opus non-finish is a harness fault, not a
+model one.
+
 **The floor of this harness is the older DeepSeek Flash; two cheaper models did no work.**
 Five more tickets of the same shape ran after the close-outs: two each on
 `deepseek/deepseek-v4-flash-0731` and `openai/gpt-oss-120b`, one on
@@ -183,6 +195,9 @@ review costs but not with the OpenRouter export.
   where Opus found a blocking defect, and count what it catches. One miss is a hint.
 - Read the opencode session log for the gpt-oss-120b and Llama sessions before the host
   rotates it, to learn whether the non-events were the model or the harness's tool calling.
-- Decide whether close-out, the cheaper of the two irreversible-adjacent Opus sessions to
-  argue about, could run on a cheap model for the empty-ledger case, which was nine of
-  thirteen here. That is a separate experiment with its own safety design.
+- Run the empty-ledger close-out on Flash five more times, each with the review's ledger
+  read by a human first, before deciding whether the empty-ledger case can leave Opus.
+  One clean merge is one clean merge.
+- Try the cheap models on bigger tickets. Every ticket here was small because it was safe
+  to try, and nothing in this paper says how any of them fares on an hour-plus or thin
+  ticket; that is unmeasured, not unfavourable.

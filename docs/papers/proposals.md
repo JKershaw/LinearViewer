@@ -61,6 +61,11 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   edition 1 covers only grounded small tickets. Give DeepSeek V4.1 Flash one page, one thin
   ticket and one ticket over an hour, each named as an experiment on its ticket, and write
   edition 2 from the verdicts. (Claude, 2026-09-13)
+- **Can close-out leave Opus when the ledger is empty?** `harbour/cheap-implementer.md` v4
+  has one Flash close-out on an empty ledger that merged correctly for $0.001 against an Opus
+  control at $3.44. Nine of the bake-off's thirteen ledgers were empty. Run five more with a
+  human reading each ledger first, and count merges, Done states and follow-ups filed against
+  the review's outside list. (Claude, 2026-09-13)
 - **Does a stepped run let a cheaper model carry a shape it fails single-shot?**
   `harbour/capability-ledger-method.md` treats the stepper as a second axis with no entries.
   Run the same shapes stepped on a model that failed them and record the beats. (Claude,

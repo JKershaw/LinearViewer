@@ -48,6 +48,12 @@ session, no send-backs, no conflicts, `main` green throughout on both repositori
 $8.88 each, $51.95 in all, median nine minutes. Review plus close-out is about $8.80 of Opus
 per cheap-implemented ticket; the implementer's share is $0.45 to $3.75.
 
+**A cheap close-out on an empty ledger worked once.** LIN-2697's close-out ran on DeepSeek
+V4 Flash 0731: PR #1485 merged, suite re-run on the landed commit, Done set, one outside
+follow-up filed (LIN-2856), 13 minutes, $0.001. The Opus control on LIN-2637 merged
+PR #1486 and set Done in three minutes for $3.44, then never posted a terminal marker and
+was aborted after three hours. One each; the empty-ledger case is worth five more.
+
 **The floor run: DeepSeek V4 Flash works, two cheaper models do not.**
 
 | Model | Tickets | PRs with green CI | Opus verdict | Relayed cost |
@@ -116,7 +122,9 @@ LIN-2834's question and is deferred to the close-out.
 
 - Per-model cost per ticket is an hourly-total split by session-minutes, not a per-session
   read; GLM's implementation and shadow costs share one bucket.
-- Whether any of the three models holds up on a ticket larger than an hour.
+- Whether any of the three models holds up on a ticket larger than an hour. Untried is
+  not unfavourable: the tickets were small because they were safe to try.
+- Whether a cheap close-out holds beyond one empty-ledger ticket.
 - Whether a cheap reviewer on a *different* model from the implementer does better than GLM
   reviewing GLM.
 - The upstream host and quantisation OpenRouter routed each session to, which was not
@@ -128,7 +136,7 @@ LIN-2834's question and is deferred to the close-out.
 
 - LIN-2828 voyage log, LIN-2831 results table, LIN-2839 research comment (2026-09-13).
 - PRs #1470 to #1482 on JKershaw/LinearViewer and #233 on JKershaw/simple-dispatcher, all
-  merged 2026-09-13; floor PRs #1485 and #1486.
+  merged 2026-09-13; floor PRs #1485 and #1486, merged 2026-09-13.
 - `GET /api/proxy/cost/{identifier}` for each ticket, read 2026-09-13T09:25Z and, for the
-  close-outs and floor, 2026-09-13T12:30Z.
+  close-outs and floor, 2026-09-13T12:30Z, and for the two step-4 close-outs 2026-09-13T17:15Z.
 - `docs/reviews/model-effort-routing-proposal-2026-09-11.md` for the Sonnet baseline.

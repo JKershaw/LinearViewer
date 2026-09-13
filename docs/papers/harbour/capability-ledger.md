@@ -5,7 +5,7 @@ date: 2026-09-13
 authors: [Claude, John Kershaw]
 model: by hand, by the session that conned the cheap-implementer bake-off, over the read-write proxy; the runs it reports ran as their own lineages say
 grounded_at: 85584846 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [docs/papers/harbour/cheap-implementer.md (v3, 2026-09-13), docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, simple-dispatcher PR #233]
+cites: [docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, LIN-2856, simple-dispatcher PR #233]
 ---
 
 # What has each model been seen to do on Harbour's tasks?
@@ -114,6 +114,13 @@ a second call path, fixed in a test-only commit and approved on re-review, 28 mi
 Flash. Two tickets is too few to prefer it; enough to keep trying it, and on bigger
 tickets than these.
 
+**Closed out one empty-ledger ticket correctly.** LIN-2697, both reviews Approve, ledger
+explicitly empty: merged PR #1485, re-ran the pinned suite on the landed commit, set Done,
+filed the one outside class sibling the review had named (LIN-2856), 13 minutes, $0.001.
+The Opus control on LIN-2637 did the same in three minutes for $3.44 and then hung at the
+completion ask. One ticket; the shape is "close-out with an empty ledger", and nothing is
+known about a ledger with items.
+
 **Not tried:** everything else.
 
 ## Gemini 3.8 Flash (opencode, OpenRouter, no effort field)
@@ -156,7 +163,8 @@ is one hung session; it does not say the model cannot do the work.
   a model that reports done without acting. Each was invisible from Harbour until someone
   read the feedback.
 - The subscription's share of a cheap-implemented ticket is two Opus sessions, review and
-  close-out, about $8.80. The implementer's share is $0.45 to $3.75.
+  close-out, about $8.80. The implementer's share is $0.45 to $3.75. One empty-ledger
+  close-out on Flash suggests the second of those sessions may not always need Opus.
 
 ## Method
 
@@ -183,5 +191,6 @@ the least evidence, not the least ability.
 - Give DeepSeek V4 Flash 0731 five more grounded small tickets, and Flash V4.1 one page,
   one thin ticket and one over an hour, each named as an experiment on its ticket. Then
   go bigger: a multi-session ticket or a short lane on whichever Flash did best.
+- Run five more empty-ledger close-outs on Flash 0731 and write the result into edition 2.
 - Read the opencode logs for the gpt-oss-120b and Llama sessions before they rotate.
 - Add stepper entries: the same shapes, stepped, on a model that failed them single-shot.
