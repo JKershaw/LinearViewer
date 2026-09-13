@@ -45,6 +45,34 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **What is the root-task ratio after the ruling?** Re-run `harbour/root-task-ratio.md`'s
   method on or after 2026-11-11 over 2026-09-12 to 2026-11-11 and compare the ratio, the
   Done split, and the close-out row against 0.74, 1.52 and 0.34. (Claude, 2026-09-12)
+- **Does a cheap reviewer find what Opus finds?** `harbour/cheap-implementer.md` got two
+  cold agreements, one on a second-order finding, and one cold miss on the hardest finding. Run the shadow on PRs where Opus posted Request Changes and report
+  whether it names the same blocking finding, on a model other than the implementer's. (Claude,
+  2026-09-12)
+- **At what ticket size does a cheap implementer save the most?** The same paper found the Opus
+  review cost nearly flat between a one-line and a 414-line change. Price implementation and
+  review against lines changed over a fleet week. (Claude, 2026-09-12)
+- **Are tickets written by close-outs and reviews easier to implement first time?** Seven of
+  thirteen bake-off tickets, all filed by earlier close-outs or reviews, passed Opus first
+  time with the verb pinned to implementation and no plan round, against 11 of 94 first-time
+  plan approvals in `harbour/review-loops.md`. Split a month of implementations by who filed
+  the ticket. (Claude, 2026-09-13)
+- **Where does a cheap implementer stop being approved?** `harbour/capability-ledger.md`
+  edition 1 covers only grounded small tickets. Give DeepSeek V4.1 Flash one page, one thin
+  ticket and one ticket over an hour, each named as an experiment on its ticket, and write
+  edition 2 from the verdicts. (Claude, 2026-09-13)
+- **Can close-out leave Opus when the ledger is empty?** `harbour/cheap-implementer.md` v4
+  has one Flash close-out on an empty ledger that merged correctly for $0.001 against an Opus
+  control at $3.44. Nine of the bake-off's thirteen ledgers were empty. Run five more with a
+  human reading each ledger first, and count merges, Done states and follow-ups filed against
+  the review's outside list. (Claude, 2026-09-13)
+- **Does a stepped run let a cheaper model carry a shape it fails single-shot?**
+  `harbour/capability-ledger-method.md` treats the stepper as a second axis with no entries.
+  Run the same shapes stepped on a model that failed them and record the beats. (Claude,
+  2026-09-13)
+- **Can the task shape be stamped at dispatch time?** The ledger's shapes are a reading.
+  Compute grounding, surface, size and verification shape from the issue and stamp them on
+  the dispatch item, so an edition can be built from a query. (Claude, 2026-09-13)
 - **Can a reader use a Harbour comment?** `harbour/plain-language.md` measured the shape by
   regex and by one author's hand-read. Run the standard's own test: hand a fresh session one
   comment, ask what happened, who wrote it and what the reader must do, and score it against the
