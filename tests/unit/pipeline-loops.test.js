@@ -435,6 +435,22 @@ describe('_buildLoops', () => {
     assert.strictEqual(warnMock.mock.calls.length, 1, 'must not re-warn on every poll for the same malformed cause');
   });
 
+  // ─── LIN-2121: the deliberate cross-surface effect of stamping the scope ────
+  //
+  // Once a wake row carries an `issueIdentifier`, the identifier-less skip no
+  // longer applies and the row is built as an ordinary loop (attached to its
+  // parent chain via `followUpTo`/`sessionGroupId`). Pinned here so the
+  // consequence of LIN-2121 is a witnessed behaviour, not a silent change.
+  test('LIN-2121: a wake row WITH issueIdentifier is built as a loop, not skipped as identifier-less', () => {
+    const wake = historyItem({ id: 'wake-lin2121', kind: 'wake', issueIdentifier: ISSUE_A, followUpTo: 'root-1' });
+    const loops = _buildLoops({ historyItems: [wake], now: NOW });
+    assert.strictEqual(loops.length, 1, 'a scoped wake row is a first-class loop');
+    assert.strictEqual(loops[0].loopId, 'wake-lin2121');
+    assert.strictEqual(loops[0].kind, 'wake');
+    assert.strictEqual(loops[0].issueIdentifier, ISSUE_A, 'its issue scope rides through to the loop');
+    assert.strictEqual(loops[0].followUpTo, 'root-1', 'and it still points at its parent for session stitching');
+  });
+
   test('same-millisecond dispatchedAt → stable order via loopId tie-breaker', () => {
     const ts = '2026-04-10T10:00:00.000Z';
     const a = historyItem({ id: 'aaa', dispatchedAt: ts, resolvedAt: ts });

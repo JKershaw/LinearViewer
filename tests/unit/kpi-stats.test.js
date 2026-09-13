@@ -19,6 +19,7 @@ import {
   OUTCOME_WINDOW_WEEKS, OUTCOME_WINDOW_DAYS,
   harnessOf, usageOf, evidenceCountOf, ticketMarkerEntriesOf, loadDispatchHistory, groupDispatchLineages
 } from '../../lib/kpi-stats.js';
+import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
 // find({}).toArray() and countDocuments({} | simple equality filter).
@@ -993,6 +994,45 @@ describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
     assert.strictEqual(stats.dispatchOutcomes.aborted, 1);
     assert.strictEqual(stats.dispatchOutcomes.resolved, 4);
     assert.strictEqual(stats.dispatchOutcomes.rate, 0.5);
+  });
+
+  // ── LIN-2121 L1: a wake row may INHERIT a lineage's attribution, never FOUND it ──
+  //
+  // LIN-2121 stamped `issueIdentifier` onto wake rows. `groupDispatchLineages`
+  // captures a lineage's identifier from the earliest row carrying one, keyed on
+  // `rootItemId ?? _id`; LIN-1468's self-heal can reconcile a wake row onto an
+  // identifier-LESS parent lineage (an autopilot or general run whose root has
+  // no issue). Without the wake exclusion that wake's identifier would found the
+  // whole lineage's attribution on /kpis, moving its cost from the overhead
+  // bucket into the wake's issue. The rule: an identifier-less root lineage stays
+  // in overhead exactly as before the stamp.
+  test("LIN-2121 L1: a wake row must never found a lineage's attribution — an identifier-less root stays in overhead, not the wake's issue", () => {
+    const rows = [
+      // Identifier-less root (autopilot / general run): done + priced ($30).
+      // The usage payload carries `harness` so parseUsage treats it as a real
+      // usage entry (a costUsd-only payload with no token/harness field parses
+      // to null — see USAGE_NUMBER_FIELDS in session-telemetry.js).
+      {
+        _id: 'root', rootItemId: 'root', kind: 'autopilot', harness: 'claude-code',
+        status: 'taken', dispatchedAt: daysAgo(3),
+        feedback: [
+          { kind: 'usage', message: '[usage] {"harness":"claude-code","costUsd":30}', timestamp: daysAgo(3).toISOString() },
+          { message: '[done] run complete', timestamp: daysAgo(2.9).toISOString() }
+        ]
+      },
+      // A wake row self-healed onto the root's lineage, now stamped with an
+      // issue identifier (LIN-2121). It must not become the lineage's anchor.
+      {
+        _id: 'wake', rootItemId: 'root', followUpTo: 'root', kind: 'wake',
+        issueIdentifier: 'LIN-9999', harness: 'claude-code', status: 'taken', dispatchedAt: daysAgo(2),
+        feedback: [{ message: '[done] parent reacted', timestamp: daysAgo(1.9).toISOString() }]
+      }
+    ];
+    const result = computeTerminalMarkedTaskCost(rows, NOW);
+    assert.strictEqual(result.issueCount, 0,
+      'the wake row must not found attribution — the identifier-less root keeps the lineage in overhead');
+    assert.strictEqual(result.overheadUsd, 30,
+      'the lineage cost stays in overhead exactly as before the wake stamp');
   });
 });
 

@@ -1262,6 +1262,62 @@ test.describe('LIN-2716: reload persists and resumes the session', () => {
   });
 });
 
+// LIN-2772: proposals arrive as ephemeral `phase: 'proposed'` tool-call SSE
+// events and were never persisted — a proposal on screen when the page
+// reloaded rendered as NOTHING after it (not an interactive card, not a
+// read-only one, not a note that one existed). These tests pin the corrected
+// behaviour: a proposal's {sessionId, prompt} round-trips through the same
+// sessionStorage persistence LIN-2716 built, and on reload re-renders as a
+// READ-ONLY card. The live proposal id is gone after a reload (the SSE
+// stream and its correlation state do not survive one), so the approve path
+// must be unreachable — the restored card is evidence of what was proposed,
+// never an actionable control.
+test.describe('LIN-2772: a restored proposal re-renders read-only after reload', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('a proposal visible before reload re-renders after it, read-only, with no reachable approve control', async ({ page }) => {
+    const proposal = { proposed: true, sessionId: 'sess-2772', prompt: 'Approve dispatching a follow-up run to close LIN-2772?' };
+    const proposalFrame = ['tool', { phase: 'proposed', id: 't1', name: 'send_follow_up', result: JSON.stringify(proposal) }];
+    await mockTurn(page, { toolFrames: [proposalFrame], token: 'ack' });
+
+    await page.locator('#flight-companion-question').fill('is there anything I should approve?');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+
+    // Live proposal: interactive — the approve control is present and
+    // reachable (the very thing the reload must take away).
+    const liveCard = page.locator('.fc-proposal');
+    await expect(liveCard).toHaveCount(1);
+    await expect(liveCard.locator('.fc-proposal-text')).toHaveText(proposal.prompt);
+    await expect(liveCard.locator('.fc-proposal-approve')).toBeVisible();
+    await expect(liveCard).not.toHaveClass(/fc-proposal--resolved/);
+
+    // The reload is the event under test: the persisted proposal must come
+    // back, not vanish.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    const restored = page.locator('.fc-proposal');
+    await expect(restored).toHaveCount(1);
+    await expect(restored.locator('.fc-proposal-text')).toHaveText(proposal.prompt);
+
+    // Read-only: the resolved class hides the action row entirely
+    // (CSS: .fc-proposal--resolved .fc-proposal-actions { display: none })
+    // — there is no reachable approve control after a reload.
+    await expect(restored).toHaveClass(/fc-proposal--resolved/);
+    await expect(restored.locator('.fc-proposal-approve')).toBeHidden();
+    await expect(restored.locator('.fc-proposal-dismiss')).toBeHidden();
+    await expect(restored.locator('.fc-proposal-feedback')).toContainText('no longer actionable');
+
+    // Not duplicated: one reload re-renders one card, never two.
+    await expect(page.locator('.fc-proposal')).toHaveCount(1);
+  });
+});
+
 // LIN-2623 beat 3: the per-turn model picker. Real <select>/<option>
 // semantics (selectedIndex, the selected option's own data-pricing
 // attribute) are exactly what the vm-sandboxed client-unit harness

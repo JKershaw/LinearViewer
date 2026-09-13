@@ -57,17 +57,19 @@ describe('buildWakeFollowUp — descriptor shape', () => {
     assert.ok(wake.prompt.includes('[done] shipped in 40s'), 'carries the terminal outcome');
   });
 
-  // LIN-1430 (S2), test 4: the pure builder must stay exactly 6 keys. Credential
-  // provisioning (bootstrapToken) is attached in the STORE, never here — a wake
-  // descriptor with no route/store context has no way to resolve a donor harness.
-  test('the descriptor is exactly 6 keys — no bootstrapToken, no issueIdentifier (LIN-1430)', () => {
+  // LIN-1430 (S2), test 4: the pure builder still attaches no credential —
+  // bootstrapToken provisioning stays in the STORE, never here. LIN-2121 added
+  // the 7th key (`issueIdentifier`, the issue-scoping stamp); the shape is now
+  // pinned at 7 so any FURTHER key (especially a credential) must be a
+  // deliberate change to this witness.
+  test('the descriptor is exactly 7 keys — issueIdentifier present, no bootstrapToken (LIN-1430/LIN-2121)', () => {
     const wake = buildWakeFollowUp(makeChild(), doneFeedback);
     assert.deepEqual(
       Object.keys(wake).sort(),
-      ['followUpTo', 'kind', 'prompt', 'queueIfBusy', 'sessionId', 'subscription'].sort()
+      ['followUpTo', 'issueIdentifier', 'kind', 'prompt', 'queueIfBusy', 'sessionId', 'subscription'].sort()
     );
     assert.ok(!('bootstrapToken' in wake), 'the builder never sets bootstrapToken');
-    assert.ok(!('issueIdentifier' in wake), 'the builder never sets issueIdentifier');
+    assert.equal(wake.issueIdentifier, 'LIN-42', 'the builder stamps the issue-scoping field (LIN-2121)');
   });
 });
 
@@ -1228,5 +1230,57 @@ describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed
     const edgeDoc = await store.historyCollection.findOne({ _id: child._id });
     assert.equal((edgeDoc.terminalWakeItems || []).includes(child._id), false,
       '[pending] never touches the terminal witness set at all');
+  });
+});
+
+// ── LIN-2121: wake rows carry issueIdentifier, reachable by issue-scoped reads ──
+//
+// Wake follow-up rows are minted by `buildWakeFollowUp` (addressed to a parent
+// session, `kind:'wake'`) and were historically identifier-less, so the
+// `?issueIdentifier=` scoped listing (`listItems`/`listHistory`, the
+// proxy-dispatch read path) could not reach them — they surfaced only in the
+// shallow, truncated unscoped view. The fix stamps the triggering dispatch's
+// own `issueIdentifier` onto the wake descriptor at construction time, so the
+// minted row is scoped-reachable from the moment it is enqueued.
+describe('buildWakeFollowUp / addFeedback — LIN-2121 issue-scoped wake rows', () => {
+  test('the descriptor inherits issueIdentifier from the triggering child dispatch', () => {
+    const wake = buildWakeFollowUp(makeChild({ issueIdentifier: 'LIN-2121' }), doneFeedback);
+    assert.ok(wake, 'expected a descriptor');
+    assert.equal(wake.issueIdentifier, 'LIN-2121', 'the scoping field rides the descriptor');
+  });
+
+  test('an identifier-less trigger stamps null — never a fabricated id, never a crash', () => {
+    const wake = buildWakeFollowUp(makeChild({ issueIdentifier: undefined }), doneFeedback);
+    assert.ok(wake, 'a terminal on an identifier-less edge still wakes');
+    assert.equal(wake.issueIdentifier, null, 'absent trigger identifier stamps an explicit null');
+  });
+
+  test('the enqueued wake is returned by BOTH issue-scoped reads (listItems live, listHistory archived)', async () => {
+    const { store, collection, historyCollection } = makeStore();
+    const child = await takenChild(store);
+
+    await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
+    await drain();
+
+    const [wake] = wakeItems(collection, historyCollection);
+    assert.ok(wake, 'a wake was enqueued');
+    assert.equal(wake.issueIdentifier, 'LIN-42',
+      'THE PIN: the minted wake row carries the scoping field — pre-fix this is null and the two reads below miss it');
+
+    // While queued: the scoped listing (indexed on {urlKey, issueIdentifier}) reaches it.
+    const live = await store.listItems(URL_KEY, { issueIdentifier: 'LIN-42' });
+    assert.ok(live.some(i => i.id === wake._id),
+      'issue-scoped listItems returns the wake row');
+
+    // Once claimed and archived: scoped history reaches it too.
+    await store.takeItem(wake._id, URL_KEY, 'token-b');
+    const hist = await store.listHistory(URL_KEY, { issueIdentifier: 'LIN-42' });
+    assert.ok(hist.items.some(i => i.id === wake._id),
+      'issue-scoped listHistory returns the archived wake row');
+
+    // And the scope is a real filter, not a pass-through: a different issue misses it.
+    const other = await store.listHistory(URL_KEY, { issueIdentifier: 'LIN-9999' });
+    assert.ok(!other.items.some(i => i.id === wake._id),
+      'the wake does not leak into an unrelated issue-scoped read');
   });
 });

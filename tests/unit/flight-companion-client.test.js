@@ -3363,3 +3363,176 @@ describe('flight-companion.js — LIN-2771 beat 3: persisted stop reason decides
     assert.strictEqual(fetchCalls.length, 1, 'no anchor + no reason = today\'s fresh base start');
   });
 });
+// ─── Proposal persistence + rehydration (LIN-2772) ─────────────────────────
+//
+// LIN-2716 persisted only {role, content} turns; proposals arrived as
+// ephemeral `phase: 'proposed'` SSE tool events and never entered the stored
+// record, so a proposal on screen when the page reloaded rendered as nothing
+// after it. These tests pin the widened record shape — a proposal is an entry
+// kind alongside {role, content}, storing {sessionId, prompt} — and the
+// rehydrate behaviour: a restored proposal re-renders READ-ONLY (the live
+// proposal id is unreachable after a reload), never as an interactive card.
+describe('flight-companion.js — proposal persistence + read-only rehydrate (LIN-2772)', () => {
+  const proposalFrame = (proposal) => (
+    sseFrame('tool', { phase: 'proposed', id: 't1', name: 'send_follow_up', result: JSON.stringify(proposal) })
+  );
+  const PROPOSAL = { proposed: true, sessionId: 'sess-1', prompt: 'approve me?' };
+
+  test('a live proposal enters chatHistory as {kind, sessionId, prompt} and round-trips through storage', async () => {
+    const storage = makeFakeStorage();
+    const { exports: m, questionInput } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => sseResponse([
+        proposalFrame(PROPOSAL),
+        sseFrame('done', {}),
+      ]),
+    });
+    questionInput.value = 'is there a proposal?';
+    m.submitQuestion();
+    await flush();
+
+    looseDeepEqual(m.getChatHistory(), [
+      { role: 'user', content: 'is there a proposal?' },
+      { kind: 'proposal', sessionId: 'sess-1', prompt: 'approve me?' },
+    ]);
+
+    // The persistence is what makes the reload case work: the proposal turn
+    // is in the SAME stored session the next page load rehydrates from.
+    // (LIN-2771: the blob also carries a cadence record with a wall-clock
+    // anchor, so the whole-object equality below is asserted field-by-field
+    // rather than as one literal — the anchor is not deterministic.)
+    const stored = m.loadStoredSession('acme');
+    looseDeepEqual(stored.history, [
+      { role: 'user', content: 'is there a proposal?' },
+      { kind: 'proposal', sessionId: 'sess-1', prompt: 'approve me?' },
+    ]);
+    assert.strictEqual(stored.tabCheckInCount, 1);
+    assert.strictEqual(stored.tabTotalCost, 0);
+    assert.strictEqual(stored.selectedModel, null);
+    assert.strictEqual(stored.cadence.stoppedReason, null, 'the cadence record is present but not stopped');
+  });
+
+  test('a persisted proposal survives the loadStoredSession filter and rehydrates as a read-only card', () => {
+    const storage = makeFakeStorage({
+      'flight-companion-session:acme': JSON.stringify({
+        history: [
+          { role: 'user', content: 'is there a proposal?' },
+          { kind: 'proposal', sessionId: 'sess-1', prompt: 'approve me?' },
+          { role: 'assistant', content: 'ack' },
+        ],
+        tabCheckInCount: 1,
+        tabTotalCost: 0.0042,
+        selectedModel: null,
+      }),
+    });
+    const { exports: m, thread } = loadClient({ storageImpl: storage });
+
+    const proposal = findByClass(thread, 'fc-proposal');
+    assert.notStrictEqual(proposal, null, 'the restored proposal card re-renders after a reload');
+    // Read-only from birth: the resolved class hides the action row (CSS
+    // .fc-proposal--resolved .fc-proposal-actions { display: none }) — no
+    // reachable approve control after a reload.
+    assert.ok(proposal.classList.contains('fc-proposal--resolved'), 'restored proposals must be resolved/read-only');
+    assert.strictEqual(findByClass(proposal, 'fc-proposal-text')._text, 'approve me?', 'the prompt text is preserved');
+    assert.strictEqual(findByClass(proposal, 'fc-proposal-approve').disabled, true, 'approve is unreachable after a reload');
+    assert.strictEqual(findByClass(proposal, 'fc-proposal-dismiss').disabled, true, 'dismiss is unreachable too — not merely hidden');
+    assert.match(findByClass(proposal, 'fc-proposal-feedback')._text, /no longer actionable/);
+
+    // The rehydrate render must NOT re-push the restored proposal into
+    // chatHistory — the entry is already there from storage, so a second
+    // push would duplicate it and double-render on the NEXT reload.
+    assert.strictEqual(m.getChatHistory().length, 3, 'restored history keeps exactly the three stored turns');
+  });
+
+  test('a malformed proposal entry is dropped by the load filter like any other malformed turn', () => {
+    const storage = makeFakeStorage({
+      'flight-companion-session:acme': JSON.stringify({
+        history: [
+          { role: 'user', content: 'hi' },
+          { kind: 'proposal', sessionId: 'sess-1' }, // missing prompt
+          { kind: 'proposal', prompt: 'orphan' }, // missing sessionId
+          { kind: 'proposal', sessionId: 'sess-2', prompt: 'valid' },
+        ],
+        tabCheckInCount: 0,
+        tabTotalCost: 0,
+      }),
+    });
+    const { exports: m, thread } = loadClient({ storageImpl: storage });
+    assert.strictEqual(findByClass(thread, 'fc-proposal').classList.contains('fc-proposal--resolved'), true, 'only the well-formed proposal renders');
+    looseDeepEqual(m.getChatHistory(), [
+      { role: 'user', content: 'hi' },
+      { kind: 'proposal', sessionId: 'sess-2', prompt: 'valid' },
+    ]);
+  });
+
+  // The one error path interaction LIN-2772 introduces: a proposal rendered
+  // mid-stream now rides chatHistory ABOVE the turn's user message, so the
+  // error paths' plain `pop()` would remove the proposal and STRAND the
+  // unanswered user message in history — forwarded to the model on the very
+  // next turn. The rollback must clear both.
+  test('a failed turn rolls back both the rendered proposal and the unanswered user message', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([
+        proposalFrame(PROPOSAL),
+        sseFrame('error', { message: 'boom' }),
+      ]),
+    });
+    questionInput.value = 'is there a proposal?';
+    m.submitQuestion();
+    await flush();
+    looseDeepEqual(m.getChatHistory(), []);
+  });
+
+  // The NETWORK-FAILURE face of the same rollback (`public/flight-companion.js:1506`,
+  // the fetch-rejection `.catch`) — implemented by the fix but, per the Opus shadow
+  // review on PR #1487, unpinned: only the mid-stream `error` frame face above was
+  // covered. This drives that exit as a genuine mid-stream transport drop: the fetch
+  // delivers the `proposed` tool frame and THEN rejects on the next read, so the
+  // proposal is already in chatHistory when the connection dies — the exact scenario
+  // the :1506 comment names. A bare `fetchImpl: () => Promise.reject(...)` cannot
+  // witness this (with no proposal ever rendered, a plain `pop()` would behave
+  // identically to the rollback, so the mutation check would not go red); the
+  // proposal must be rendered first.
+  test('a network failure mid-stream rolls back the rendered proposal and the unanswered user message from chatHistory and the stored session', async () => {
+    const storage = makeFakeStorage();
+    const { exports: m, questionInput } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => ({
+        ok: true,
+        status: 200,
+        headers: { get: (name) => (String(name).toLowerCase() === 'content-type' ? 'text/event-stream' : null) },
+        body: {
+          getReader() {
+            let reads = 0;
+            return {
+              read() {
+                reads += 1;
+                if (reads === 1) {
+                  return Promise.resolve({ done: false, value: new TextEncoder().encode(proposalFrame(PROPOSAL)) });
+                }
+                return Promise.reject(new Error('connection reset'));
+              },
+            };
+          },
+        },
+      }),
+    });
+    questionInput.value = 'is there a proposal?';
+    m.submitQuestion();
+    await flush();
+
+    // The network-failure exit must clear BOTH the rendered proposal and the
+    // unanswered user message — from memory AND from the stored session the next
+    // page load would rehydrate from. (LIN-2771: the cadence record rides the
+    // same blob with a nondeterministic wall-clock anchor, so the stored-session
+    // claim is asserted field-by-field, including that the cadence is not
+    // stopped.)
+    looseDeepEqual(m.getChatHistory(), []);
+    const stored = m.loadStoredSession('acme');
+    looseDeepEqual(stored.history, []);
+    assert.strictEqual(stored.tabCheckInCount, 0);
+    assert.strictEqual(stored.tabTotalCost, 0);
+    assert.strictEqual(stored.selectedModel, null);
+    assert.strictEqual(stored.cadence.stoppedReason, null);
+  });
+});

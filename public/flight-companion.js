@@ -17,7 +17,11 @@
  * 40 turns, mirrors public/task-chat.js) and is POSTed as `body.history` on
  * EVERY turn, auto-wake included — the route applies history unconditionally
  * regardless of turn kind, so an auto-wake turn sending `[]` would make the
- * companion forget its own prior narration every tick.
+ * companion forget its own prior narration every tick. LIN-2772: proposal
+ * turns are part of that same record — an entry kind alongside {role,
+ * content}, storing {sessionId, prompt} — so a proposal survives a reload
+ * and re-renders read-only (the server's filterChatTurns drops the entry
+ * from body.history, so it never reaches the model).
  *
  * Cadence: chained `setTimeout`, base 30s, doubling 30→60→120→180s (capped),
  * visible-tab only (`document.hidden` — never `document.visibilityState`,
@@ -36,7 +40,10 @@
  * client-only (the router has no dismiss endpoint) — zero `fetch` calls.
  * Approve POSTs to §A.6's `approve-follow-up` route; the proposed prompt
  * text is always rendered via `textContent`, never `html:` — it is
- * model-authored.
+ * model-authored. LIN-2772: each rendered proposal is also persisted (see
+ * renderProposal), and a restored one re-renders READ-ONLY via its own
+ * forced `setResolved` — after a reload the approve path cannot reach a
+ * live proposal id, so the card must never be interactive again.
  */
 (function () {
   'use strict';
@@ -236,7 +243,13 @@
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.history)) return emptyStoredSession();
       var history = parsed.history.filter(function (turn) {
-        return turn && typeof turn.role === 'string' && typeof turn.content === 'string';
+        if (turn && typeof turn.role === 'string' && typeof turn.content === 'string') return true;
+        // LIN-2772: proposal turns ride the SAME persisted record as
+        // {role, content} turns, as a distinct entry kind storing
+        // {sessionId, prompt}. A well-formed proposal entry survives the
+        // filter so rehydration can re-render it read-only; a malformed one
+        // is dropped the same way a malformed chat turn is.
+        return turn && turn.kind === 'proposal' && typeof turn.sessionId === 'string' && typeof turn.prompt === 'string';
       });
       capHistory(history);
       var tabCheckInCount = typeof parsed.tabCheckInCount === 'number' && isFinite(parsed.tabCheckInCount) ? parsed.tabCheckInCount : 0;
@@ -783,15 +796,44 @@
     return base;
   }
 
+  // LIN-2772: the one error-path interaction the proposal persistence
+  // introduces. A proposal rendered mid-stream now rides chatHistory ABOVE
+  // the turn's own user message (pushed at turn start), so a plain `pop()`
+  // on a failed turn would remove the proposal and STRAND the unanswered
+  // user message in history — forwarded to the model on the very next turn
+  // as a question that was never answered. Pop any trailing proposal entries
+  // first, then the user message, so a failed turn leaves neither behind.
+  // Only the mid-stream error and network-failure exits can have proposals
+  // on the tail (a non-stream outcome never processes tool events, so its
+  // `pop()` sites keep their plain shape).
+  function popPendingUserTurn() {
+    while (chatHistory.length && chatHistory[chatHistory.length - 1] && chatHistory[chatHistory.length - 1].kind === 'proposal') {
+      chatHistory.pop();
+    }
+    chatHistory.pop();
+  }
+
   // ─── Proposal control (§A.4 `phase: 'proposed'`) ───────────────────────
 
-  function renderProposal(resultString, beforeLi) {
+  function renderProposal(resultString, beforeLi, opts) {
     var parsed = parseProposalResult(resultString);
     if (!parsed.ok) {
       showInlineNote('The companion proposed a follow-up, but its details were too long to show in full — dismissed automatically.', beforeLi);
       return;
     }
     var proposal = parsed.proposal;
+
+    // LIN-2772: a proposal is a turn, not a transient artifact — persist it
+    // so a reload re-renders it instead of losing it. An entry kind
+    // alongside {role, content}, storing {sessionId, prompt}; the server's
+    // filterChatTurns drops it from body.history (it has no user/assistant
+    // role), so it never reaches the model. Skipped on the rehydrate call
+    // (opts.restored): the entry is already in the restored chatHistory, and
+    // pushing again would duplicate it and double-render on the NEXT reload.
+    if (!(opts && opts.restored)) {
+      chatHistory.push({ kind: 'proposal', sessionId: proposal.sessionId, prompt: proposal.prompt });
+      capHistory(chatHistory);
+    }
 
     var wrap = document.createElement('div');
     wrap.className = 'fc-proposal';
@@ -881,6 +923,17 @@
         }
       });
     });
+
+    // LIN-2772: a restored proposal is rendered read-only from birth. After
+    // a reload the SSE stream and its correlation state are gone, so the
+    // approve path genuinely cannot reach a live proposal id — the card is
+    // evidence of what was proposed, never an actionable control. Forcing
+    // setResolved reuses the exact resolved shape an approved/dismissed card
+    // takes: both buttons disabled and the action row hidden by CSS (never
+    // merely visually greyed), so there is no reachable approve path.
+    if (opts && opts.restored) {
+      setResolved('Restored after reload — no longer actionable.');
+    }
   }
 
   // LIN-2621 beat 4: a waiting-on-you decision, rendered as the SAME option-
@@ -1542,7 +1595,10 @@
             // LIN-2622: a boot's cadence is left alone on an error, same as
             // user-initiated — "reset on done only" means an error moves it
             // neither way, never a 'double' the way an auto-wake's does.
-            if (turnKind === 'user-initiated' || turnKind === 'boot') chatHistory.pop();
+            // LIN-2772: a mid-stream error rolls back the turn's user message
+            // AND any proposal rendered before the failure (popPendingUserTurn),
+            // so neither leaks into the next turn's history.
+            if (turnKind === 'user-initiated' || turnKind === 'boot') popPendingUserTurn();
             else applyCadenceEffect('double');
             finishTurn(turnKind);
           }
@@ -1560,7 +1616,10 @@
       // Network failure (fetch itself rejected).
       var networkMessage = 'Network failure — try again.';
       if (turnKind === 'user-initiated' || turnKind === 'boot') {
-        chatHistory.pop();
+        // LIN-2772: same rollback as the mid-stream error above — a proposal
+        // rendered before the connection dropped must not survive in history
+        // alongside the unanswered user message.
+        popPendingUserTurn();
         showInlineNote(networkMessage);
         if (turnKind === 'user-initiated') setComposerValue(message);
       } else {
@@ -1679,14 +1738,15 @@
   // before it), the visible thread (through the SAME render path A1 landed:
   // appendUserBubble / appendAssistantBubble -> window.ChatUI.
   // renderMarkdownText -> setBubbleState(..., 'done') — no second rendering
-  // path for restored turns), and the tab cost/counter total. Proposals are
-  // NOT part of chatHistory (they arrive as ephemeral tool-call SSE events,
-  // never persisted) and so are never reconstructed on reload — the
-  // ticket's "read-only unless the approve path can still reach a live
-  // proposal id" default resolves to "absent" here, which is trivially safe
-  // (nothing stale to approve). A restored assistant turn also renders no
-  // per-message cost meta line (LIN-2621 beat 3's `.fc-msg-meta`) — only the
-  // running tab total is persisted, not each turn's own usage payload.
+// path for restored turns), and the tab cost/counter total. LIN-2772:
+  // proposal turns are part of that same persisted record (an entry kind
+  // storing {sessionId, prompt}, see renderProposal) and re-render READ-ONLY
+  // — the live proposal id cannot be reached after a reload (the SSE stream
+  // and its correlation state are gone), so the restored card is evidence
+  // of what was proposed, never an actionable control. A restored assistant
+  // turn also renders no per-message cost meta line (LIN-2621 beat 3's
+  // `.fc-msg-meta`) — only the running tab total is persisted, not each
+  // turn's own usage payload.
   var resumeAnchorMs = null;
   var keepStopped = false;
   if (urlKey) {
@@ -1700,6 +1760,13 @@
           var restoredBody = appendAssistantBubble();
           window.ChatUI.renderMarkdownText(restoredBody, turn.content);
           setBubbleState(restoredBody.closest('li'), 'done');
+        } else if (turn.kind === 'proposal') {
+          // LIN-2772: re-render through the SAME renderProposal the live
+          // stream uses (no second rendering path for restored proposals),
+          // immediately forced into its read-only resolved state — the
+          // approve path cannot reach a live id after reload, so the card
+          // must never be interactive.
+          renderProposal(JSON.stringify({ sessionId: turn.sessionId, prompt: turn.prompt }), null, { restored: true });
         }
       });
     }
