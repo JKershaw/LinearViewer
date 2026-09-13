@@ -180,7 +180,8 @@ finished in 17 minutes.
 ledger), LIN-2772, LIN-2787 and LIN-2771 (non-empty, each after a human read and accepted
 the items on the ticket). Each merged, verified on the landed commit, set Done, cited the
 acceptance item by item, and filed only outside items. LIN-2787's ran the review's own
-post-deploy check against the live site. Two to ten minutes each, under a cent each. The
+post-deploy check against the live site; LIN-2771's built a five-scenario browser repro
+against a server with no AI key to discharge the one item nobody had, unasked. Two to ten minutes each, under a cent each. The
 Opus control on LIN-2637 did the same in three minutes for $3.44 and its terminal marker
 never reached Harbour.
 
