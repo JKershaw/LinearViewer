@@ -414,3 +414,25 @@ describe('renderFlightCompanionPage — LIN-2717: the composer is a textarea, an
     assert.doesNotMatch(composer, /\btype="text"/);
   });
 });
+
+describe('renderFlightCompanionPage — LIN-2771 beat 3: data-fc-ai-configured attribute', () => {
+  // Producer-side pin for the attribute the client's load-time re-arm decision
+  // reads (public/flight-companion.js shouldReArmOnLoad keys on
+  // page.dataset.fcAiConfigured). Mirrors the data-ai-unconfigured pattern in
+  // tests/unit/render-task-chat.test.js — a rename on EITHER side goes red.
+
+  test('emits data-fc-ai-configured="true" when aiConfigured is true', () => {
+    const html = renderFlightCompanionPage({}, { urlKey: 'ws', aiConfigured: true });
+    assert.match(html, /<main class="flight-companion-page"[^>]*data-fc-ai-configured="true"/);
+  });
+
+  test('emits data-fc-ai-configured="false" when aiConfigured is false', () => {
+    const html = renderFlightCompanionPage({}, { urlKey: 'ws', aiConfigured: false });
+    assert.match(html, /<main class="flight-companion-page"[^>]*data-fc-ai-configured="false"/);
+  });
+
+  test('omitted aiConfigured defaults to "false" — the client treats absent/anything-but-false as re-arm', () => {
+    const html = renderFlightCompanionPage({}, { urlKey: 'ws' });
+    assert.match(html, /<main class="flight-companion-page"[^>]*data-fc-ai-configured="false"/);
+  });
+});

@@ -1177,12 +1177,27 @@
     sendTurn(null, 'auto-wake');
   }
 
+  // LIN-2771 (review ledger): a pending resume anchor survives a hidden load
+  // and is consumed by whichever arm happens FIRST — the initial load when
+  // the tab is visible, or onVisibilityChange when it starts hidden — so the
+  // first wake after reveal lands at the REMAINING time, never a fresh full
+  // step. Clearing on consumption is what keeps a LATER visibility change
+  // (timer already armed, then hidden and revealed again) on the full delay.
+  function consumeResumeAnchorDelay() {
+    if (resumeAnchorMs === null) return null;
+    var remaining = Math.max(0, resumeAnchorMs - now());
+    resumeAnchorMs = null;
+    return remaining;
+  }
+
   function onVisibilityChange() {
     // Deliberately no eager refresh on regaining visibility — that would
-    // defeat the 30s floor for a billable call. Just resume the paused
-    // countdown at its current delay.
+    // defeat the 30s floor for a billable call. Resume the paused countdown
+    // at its current delay — except when a hidden-at-load resume anchor is
+    // pending, which lands the first wake at the remaining time instead.
     if (!document.hidden && !timerId && !cadence.stopped && !inFlight) {
-      scheduleAutoWake(cadence.delayMs);
+      var remaining = consumeResumeAnchorDelay();
+      scheduleAutoWake(remaining !== null ? remaining : cadence.delayMs);
     }
   }
   document.addEventListener('visibilitychange', onVisibilityChange);
@@ -1825,7 +1840,11 @@
   if (keepStopped) {
     if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
   } else if (!document.hidden) {
-    scheduleAutoWake(resumeAnchorMs !== null ? Math.max(0, resumeAnchorMs - now()) : cadence.delayMs);
+    // LIN-2771 (review ledger): consume (and clear) the pending resume anchor
+    // here too — when the tab is visible at load the anchor is used now, so
+    // a later visibility change must not re-fire the stale remaining time.
+    var initialDelayMs = consumeResumeAnchorDelay();
+    scheduleAutoWake(initialDelayMs !== null ? initialDelayMs : cadence.delayMs);
   }
 
   // Test-only seam (inert in the browser, where `module` is undefined):

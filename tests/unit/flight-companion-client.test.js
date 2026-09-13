@@ -3275,6 +3275,43 @@ describe('flight-companion.js — LIN-2771: cadence resumes against a wall-clock
     assert.strictEqual(blob.cadence.delayMs, m.CADENCE_BASE_MS, 'the record names the cadence backoff length');
     assert.strictEqual(blob.cadence.nextFireAt, NOW + 60000, 'the anchor is wall-clock: now() + the ARMED delay, not cadence.delayMs');
   });
+
+  // LIN-2771 review ledger: a tab that reloads HIDDEN must still resume the
+  // anchor — the first wake after reveal lands at the remaining time, not a
+  // fresh full step. The load path computes resumeAnchorMs but only schedules
+  // when visible, so the pending anchor has to be retained and consumed by
+  // onVisibilityChange.
+  test('hidden at load with a stored anchor: reveal fires at the remaining time, not a fresh full step', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    // Real-clock-relative anchor, same rationale as the visible-resume test
+    // above: the load-time arithmetic runs before the setNowFn seam can act.
+    const storage = makeFakeStorage({
+      [STORAGE_KEY]: JSON.stringify({
+        history: [],
+        tabCheckInCount: 0,
+        tabTotalCost: 0,
+        selectedModel: null,
+        cadence: { delayMs: 60000, nextFireAt: Date.now() + 5000 },
+      }),
+    });
+    const { exports: m, fetchCalls, doc } = loadClient({
+      hiddenInitial: true,
+      storageImpl: storage,
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    assert.strictEqual(m.getCadenceState().delayMs, 60000, 'the stored delay is restored');
+    t.mock.timers.tick(60000);
+    assert.strictEqual(fetchCalls.length, 0, 'hidden at load schedules nothing');
+    // Reveal: the first wake must fire at the ~5s REMAINING time, not a
+    // fresh 60s step.
+    doc.hidden = false;
+    doc.dispatch('visibilitychange');
+    t.mock.timers.tick(4500);
+    assert.strictEqual(fetchCalls.length, 0, 'no wake before the remaining time elapses');
+    t.mock.timers.tick(1000);
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1, 'fires ~5s after reveal against the wall-clock anchor, not a fresh 60s');
+  });
 });
 
 describe('flight-companion.js — LIN-2771 beat 3: persisted stop reason decides re-arm on reload', () => {
