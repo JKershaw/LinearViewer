@@ -646,11 +646,18 @@ GET /api/proxy/labels?teamId={uuid}
 |-----------|------|----------|-------------|
 | `teamId` | UUID | No | Filter by team |
 
+A team-scoped request returns that team's labels **plus** the workspace-level
+labels (`team: null`) — a workspace-level label is applicable to an issue on
+any team, so a scoped catalog is never a silent subset that hides type labels
+like `Bug`/`Feature`/`Improvement` (LIN-2787). The unfiltered call returns the
+whole catalog.
+
 Response:
 ```json
 {
   "labels": [
-    { "id": "uuid", "name": "bug", "color": "#eb5757", "team": { "id": "uuid", "name": "Engineering" } }
+    { "id": "uuid", "name": "bug", "color": "#eb5757", "team": { "id": "uuid", "name": "Engineering" } },
+    { "id": "uuid", "name": "Improvement", "color": "#eb5757", "team": null }
   ]
 }
 ```

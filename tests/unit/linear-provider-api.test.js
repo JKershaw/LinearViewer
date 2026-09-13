@@ -237,12 +237,62 @@ describe('Linear provider API reads (LIN-307)', () => {
     assert.deepStrictEqual(variables, {});
   });
 
-  test('labels: teamId selects the team-filtered query and passes the id', async () => {
+  test('labels: teamId no longer selects a team-filtered query — the org-wide catalog is fetched and filtered in-process', async () => {
     const m = stub(async () => ({ issueLabels: { nodes: [] } }));
     await labels(API_KEY, 'team-9');
     const [query, variables] = m.mock.calls[0].arguments;
-    assert.match(query, /\$teamId/);
-    assert.deepStrictEqual(variables, { teamId: 'team-9' });
+    assert.doesNotMatch(query, /\$teamId/);
+    assert.deepStrictEqual(variables, {});
+  });
+
+  // LIN-2787: a team-scoped catalog request must surface workspace-level labels
+  // (team: null) too. Team-scoped Linear queries returned only that team's own
+  // labels, so a workspace whose type labels (Bug/Feature/Improvement) live at
+  // workspace level saw an empty type catalog and close-outs recorded "no type
+  // label exists". The stub mirrors Linear's real behavior: the (now unused)
+  // team-filtered query returns only team-owned nodes, the org-wide query
+  // returns everything including team: null.
+  test('labels: teamId returns team-owned AND workspace-level labels (LIN-2787 regression)', async () => {
+    const linearViewer = { id: '7e6de730-3028-4ebc-af8a-a4de237a686d', name: 'LinearViewer' };
+    const teamOwned = [
+      { id: 'l1', name: 'small-model-candidate', color: '#c0c0c0', team: linearViewer },
+      { id: 'l2', name: 'scoping', color: '#c0c0c0', team: linearViewer },
+      { id: 'l3', name: 'in-research', color: '#c0c0c0', team: linearViewer },
+    ];
+    const workspaceLevel = [
+      { id: 'l4', name: 'retro-candidate', color: '#c0c0c0', team: null },
+      { id: 'l5', name: 'Preparing', color: '#c0c0c0', team: null },
+      { id: 'l6', name: 'Blocked', color: '#c0c0c0', team: null },
+      { id: 'l7', name: 'Improvement', color: '#c0c0c0', team: null },
+      { id: 'l8', name: 'Feature', color: '#c0c0c0', team: null },
+      { id: 'l9', name: 'Bug', color: '#c0c0c0', team: null },
+    ];
+    const otherTeamOnly = [{ id: 'l10', name: 'other-team-only', color: '#c0c0c0', team: { id: 'other-team', name: 'Other' } }];
+
+    stub(async (query) => {
+      if (/\$teamId/.test(query)) {
+        return { issueLabels: { nodes: teamOwned } };
+      }
+      return { issueLabels: { nodes: [...teamOwned, ...workspaceLevel, ...otherTeamOnly] } };
+    });
+
+    const result = await labels(API_KEY, '7e6de730-3028-4ebc-af8a-a4de237a686d');
+    const names = result.map(l => l.name);
+    // The workspace's type labels are workspace-level; the team-scoped call
+    // must surface them or a close-out falsely concludes none exist.
+    for (const typeLabel of ['Bug', 'Feature', 'Improvement']) {
+      assert.ok(names.includes(typeLabel), `team-scoped catalog must include ${typeLabel}, got: ${names.join(', ')}`);
+    }
+    // Team-owned labels stay, and another team's labels stay out.
+    assert.ok(names.includes('small-model-candidate'), `team-scoped catalog must include the team's own labels, got: ${names.join(', ')}`);
+    assert.ok(!names.includes('other-team-only'), `team-scoped catalog must not include another team's labels, got: ${names.join(', ')}`);
+    assert.strictEqual(result.length, teamOwned.length + workspaceLevel.length);
+  });
+
+  test('labels: the unfiltered call still returns the whole catalog untouched', async () => {
+    const nodes = [{ id: 'l1', name: 'bug', team: null }, { id: 'l2', name: 'scoping', team: { id: 't1' } }];
+    stub(async () => ({ issueLabels: { nodes } }));
+    assert.deepStrictEqual(await labels(API_KEY), nodes);
   });
 
   test('cycles: no teamId uses the unfiltered query; teamId filters', async () => {
