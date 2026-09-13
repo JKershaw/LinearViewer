@@ -10,6 +10,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   shannonEntropy,
   redactSecret,
@@ -205,6 +207,21 @@ const dummy = "placeholder";
     assert.equal(findings.length, 1);
     assert.equal(findings[0].line, 3);
     assert.equal(findings[0].column, 16);
+  });
+
+  test('scanFile uses repo-relative path when options.filePath is provided (F3)', () => {
+    const text = `const apiKey = "${FIXTURE_SECRETS.linearApiKey}";`;
+    const tempFile = path.resolve('temp-planted-secret.js');
+    fs.writeFileSync(tempFile, text);
+    try {
+      const findings = scanFile(tempFile, { filePath: 'lib/temp-planted-secret.js' });
+      assert.equal(findings.length, 1);
+      assert.equal(findings[0].filePath, 'lib/temp-planted-secret.js');
+    } finally {
+      if (fs.existsSync(tempFile)) {
+        fs.unlinkSync(tempFile);
+      }
+    }
   });
 });
 

@@ -140,8 +140,48 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
   });
 
   test('discoverPublicPages discovers /, /kpis, and probes /archive/1..2 stopping at /archive/3 (404)', async () => {
-    const pages = await discoverPublicPages(baseUrl, { maxArchive: 5 });
+    let archiveProbeCount = 0;
+    const instrumentedFetch = async (url, opts) => {
+      if (String(url).includes('/archive/')) {
+        archiveProbeCount++;
+      }
+      return fetch(url, opts);
+    };
+
+    const pages = await discoverPublicPages(baseUrl, { maxArchive: 5, fetchImpl: instrumentedFetch });
     assert.deepEqual(pages, ['/', '/kpis', '/archive/1', '/archive/2']);
+    assert.equal(archiveProbeCount, 3, 'Expected exactly 3 archive probes (stopping at /archive/3 404)');
+  });
+
+  test('discoverPublicPages stops probing and records error on non-200/non-404 status', async () => {
+    const errors = [];
+    const errorFetch = async (url, opts) => {
+      if (String(url).includes('/archive/2')) {
+        return new Response('Server Error', { status: 500 });
+      }
+      return fetch(url, opts);
+    };
+
+    const pages = await discoverPublicPages(baseUrl, { maxArchive: 5, fetchImpl: errorFetch, errors });
+    assert.deepEqual(pages, ['/', '/kpis', '/archive/1']);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0].type, 'archive-probe');
+    assert.equal(errors[0].status, 500);
+  });
+
+  test('discoverPublicPages warns when maxArchive cap is reached without 404 (F5)', async () => {
+    const warnings = [];
+    const origWarn = console.warn;
+    console.warn = (msg) => warnings.push(msg);
+
+    try {
+      const always200Fetch = async () => new Response('<html>Archive</html>', { status: 200 });
+      const pages = await discoverPublicPages('http://127.0.0.1:3000', { maxArchive: 3, fetchImpl: always200Fetch });
+      assert.equal(pages.length, 5); // / , /kpis, /archive/1, 2, 3
+      assert.ok(warnings.some(w => w.includes('Reached maxArchive cap of 3')));
+    } finally {
+      console.warn = origWarn;
+    }
   });
 
   test('scanPublicPages returns clean: true on clean site', async () => {
@@ -149,10 +189,63 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
     const result = await scanPublicPages({ baseUrl, maxArchive: 5 });
     assert.equal(result.clean, true);
     assert.equal(result.findings.length, 0);
+    assert.equal(result.errors.length, 0);
     assert.ok(result.scannedPages.includes('/'));
     assert.ok(result.scannedPages.includes('/kpis'));
     assert.ok(result.scannedPages.includes('/archive/1'));
     assert.ok(result.scannedPages.includes('/archive/2'));
+  });
+
+  test('scanPublicPages fails when host is unreachable (F1 vacuous pass prevention)', async () => {
+    const result = await scanPublicPages({ baseUrl: 'http://127.0.0.1:1' });
+    assert.equal(result.clean, false);
+    assert.ok(result.errors.length > 0);
+    assert.equal(result.scannedPages.length, 0);
+    assert.equal(result.scannedScripts.length, 0);
+    const pageFetchError = result.errors.find(e => e.type === 'page-fetch');
+    assert.ok(pageFetchError, 'Expected page-fetch error for unreachable host');
+    const zeroScriptsError = result.errors.find(e => e.type === 'zero-scripts');
+    assert.ok(zeroScriptsError, 'Expected zero-scripts error for unreachable host');
+  });
+
+  test('scanPublicPages fails when a required public page returns 500', async () => {
+    const errorFetch = async (url, opts) => {
+      if (String(url).endsWith('/kpis')) {
+        return new Response('Internal Server Error', { status: 500 });
+      }
+      return fetch(url, opts);
+    };
+
+    const result = await scanPublicPages({ baseUrl, maxArchive: 2, fetchImpl: errorFetch });
+    assert.equal(result.clean, false);
+    assert.ok(result.errors.some(e => e.type === 'page-fetch' && e.pagePath === '/kpis'));
+  });
+
+  test('scanPublicPages fails when an external script returns 404', async () => {
+    const brokenScriptFetch = async (url, opts) => {
+      if (String(url).endsWith('/common.js')) {
+        return new Response('Not Found', { status: 404 });
+      }
+      return fetch(url, opts);
+    };
+
+    const result = await scanPublicPages({ baseUrl, maxArchive: 2, fetchImpl: brokenScriptFetch });
+    assert.equal(result.clean, false);
+    assert.ok(result.errors.some(e => e.type === 'script-fetch' && String(e.url).endsWith('/common.js')));
+  });
+
+  test('scanPublicPages fails when zero JavaScript assets are analyzed', async () => {
+    const noScriptFetch = async (url, opts) => {
+      return new Response('<html><body>No scripts here</body></html>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html' }
+      });
+    };
+
+    const result = await scanPublicPages({ baseUrl, maxArchive: 2, fetchImpl: noScriptFetch });
+    assert.equal(result.clean, false);
+    assert.ok(result.errors.some(e => e.type === 'zero-scripts'));
+    assert.equal(result.scannedScripts.length, 0);
   });
 
   test('scanPublicPages flags secret in inline script with P1 severity', async () => {
