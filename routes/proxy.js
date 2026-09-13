@@ -70,7 +70,7 @@ import { snapshotFromContext } from '../lib/task-snapshot-store.js';
 import { isBlocked } from '../lib/tree.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
-import { getPeriodicals } from '../lib/periodicals.js';
+import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
 import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
@@ -1440,7 +1440,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         truncated: false,
         repo: parseRepoFromDescription(mockProject?.content),
         recommendedAction,
-        deferTo: null
+        deferTo: null,
+        // LIN-2575: derive the periodical join key from the issue's gate marker
+        // (test-mode parity with the live path below).
+        periodicalId: resolvePeriodicalIdFromGateMarker(mockIssue.description)
       };
     }
 
@@ -1503,7 +1506,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // the descent against terminal nodes (LIN-353) without an extra fetch — both
       // are already in hand from the context fetched for this hop.
       state: issue.state,
-      children
+      children,
+      // LIN-2575: the periodical join key, derived from this issue's own LIN-694
+      // gate marker. Returned (rather than re-derived by the caller) because the
+      // recommendation-derived branch in routes/proxy-dispatch.js holds no issue
+      // description — this hop's fetched context is the only place it is in hand.
+      periodicalId: resolvePeriodicalIdFromGateMarker(issue.description)
     };
   }
 
