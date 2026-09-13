@@ -25,5 +25,5 @@ export const FIXTURE_SECRETS = {
     'QRSTUVWXYZ0123456789+/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP',
     '-----END RSA PRIVATE KEY-----'
   ].join('\n'),
-  bootstrapToken: ['HB19bVzY33cspAkW_', 'NT3X0j1Ko3pIeZQWeCU0-D6zYs'].join('')
+  bootstrapToken: ['HB', 'FIXTURE-not-a-real-token-x9Q4mZ7kT2pW3vR8'].join('')
 };
