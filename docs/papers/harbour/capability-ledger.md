@@ -1,11 +1,11 @@
 ---
 title: What has each model been seen to do on Harbour's tasks?
-version: 1
+version: 2
 date: 2026-09-13
 authors: [Claude, John Kershaw]
-model: by hand, by the session that conned the cheap-implementer bake-off, over the read-write proxy; the runs it reports ran as their own lineages say
+model: by hand, by the session that conned the cheap-implementer bake-off, over the read-write proxy; edition 2 adds the LIN-2153 research pass, run on opencode by deepseek/deepseek-v4-flash-0731, recorded in this edition
 grounded_at: 85584846 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, LIN-2856, simple-dispatcher PR #233]
+cites: [docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, LIN-2856, simple-dispatcher PR #233, LIN-2153 (research pass, 2026-09-13)]
 ---
 
 # What has each model been seen to do on Harbour's tasks?
@@ -13,21 +13,26 @@ cites: [docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/
 Opus 5 does every step and is the judge. Sonnet 5 does implementation and plan at the
 gate's own standard. Three cheap models on opencode, GLM-5.3, DeepSeek V4.1 Flash and
 DeepSeek V4 Flash, implement small, well-grounded, test-heavy tickets to the point where
-Opus approves them within one round, and none has been tried on anything else. Gemini 3.8
+Opus approves them within one round, and before this edition none had been tried on anything
+else. Gemini 3.8
 Flash did the same on two tickets at GLM's price. gpt-oss-120b and Llama 3.1 8B produced no
-work on this harness. This is the first edition of the ledger `capability-ledger-method.md`
+work on this harness. This is the second edition of the ledger `capability-ledger-method.md`
 describes. It is rewritten, never appended to; git holds every earlier edition. An entry
-that is not here is unknown, and an unknown pair routes to Opus.
+that is not here is unknown, and an unknown pair routes to Opus. Edition 2 adds one thing
+edition 1 could not say: what a cheap model does when asked to research rather than
+implement. The LIN-2153 research pass is recorded below, with the judge — plan-review on
+the plan built from its notes — still to run.
 
 ## The shapes this edition can speak to
 
 Every cheap-model ticket below is the same shape: a description that already contained the
 plan, files and lines named, under an hour's work, touching tests, docs or library code with
 a unit suite, in a repository whose CI proves most of the claim. Call that a **grounded
-small ticket**. The one exception was a page, and it is noted. No cheap model has been
-tried on a **thin ticket** (no plan in the description), a **page** beyond that one, a
-**data path, credential or contract** change, a **multi-session** ticket, a **lane** of
-several tickets, or any kind other than implementation. The **stepper** variant has no
+small ticket**. The exceptions were a page and one research pass, and both are noted. No
+cheap model has been tried on a **thin ticket** (no plan in the description), a **page**
+beyond that one, a **data path, credential or contract** change, a **multi-session**
+ticket, or a **lane** of several tickets. Research has been tried once, on a small
+single-surface question; the entry below says how it went. The **stepper** variant has no
 entries for any model.
 
 Read every "not tried" below as exactly that. The bake-off chose small tickets because
@@ -121,6 +126,18 @@ The Opus control on LIN-2637 did the same in three minutes for $3.44; its termin
 never reached Harbour. One ticket; the shape is "close-out with an empty ledger", and nothing is
 known about a ledger with items.
 
+**Researched one small single-surface question; judge pending.** LIN-2153 ran as the first
+cheap-model research in the ledger, dispatch `8c88473a` under `sessionId: LIN-2828-bakeoff`
+on 13 September. It verified the review-feedback handoff mechanism at HEAD (`followUpTo` /
+resume windows), reconciled it against the review-loops measurement (LIN-2800), and named
+the design tension — the manual's fresh-by-default rule versus the handoff — and the
+decisive unknown: whether a resumed re-pass fixes a review's findings as well as a fresh
+one. Its Surface Assessment was "lands cleanly": the change, if pursued, is prompt policy
+over an existing mechanism, not code. Whether the research is good enough shows in the
+plan-review verdict on the plan built from its notes, which is the judge and has not
+landed. Cost and duration were not yet reported when this edition was written; the LIN-2153
+lineage records them.
+
 **Not tried:** everything else.
 
 ## Gemini 3.8 Flash (opencode, OpenRouter, no effort field)
@@ -186,11 +203,14 @@ the least evidence, not the least ability.
 
 ## Next
 
-- Run the fleet week with this edition consulted by hand, and write edition 2 from every
+- Run the fleet week with this edition consulted by hand, and write edition 3 from every
   place it was wrong or silent.
+- Judge the LIN-2153 research pass: build the plan from its notes, run plan-review, and
+  fold the verdict into this ledger — whether the plan survives plan-review as well as one
+  built on Opus research is the experiment's outcome, not a side note.
 - Give DeepSeek V4 Flash 0731 five more grounded small tickets, and Flash V4.1 one page,
   one thin ticket and one over an hour, each named as an experiment on its ticket. Then
   go bigger: a multi-session ticket or a short lane on whichever Flash did best.
-- Run five more empty-ledger close-outs on Flash 0731 and write the result into edition 2.
+- Run five more empty-ledger close-outs on Flash 0731 and write the result into edition 3.
 - Read the opencode logs for the gpt-oss-120b and Llama sessions before they rotate.
 - Add stepper entries: the same shapes, stepped, on a model that failed them single-shot.
