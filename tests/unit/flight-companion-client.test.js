@@ -3292,4 +3292,54 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
     await flush();
     looseDeepEqual(m.getChatHistory(), []);
   });
+
+  // The NETWORK-FAILURE face of the same rollback (`public/flight-companion.js:1506`,
+  // the fetch-rejection `.catch`) — implemented by the fix but, per the Opus shadow
+  // review on PR #1487, unpinned: only the mid-stream `error` frame face above was
+  // covered. This drives that exit as a genuine mid-stream transport drop: the fetch
+  // delivers the `proposed` tool frame and THEN rejects on the next read, so the
+  // proposal is already in chatHistory when the connection dies — the exact scenario
+  // the :1506 comment names. A bare `fetchImpl: () => Promise.reject(...)` cannot
+  // witness this (with no proposal ever rendered, a plain `pop()` would behave
+  // identically to the rollback, so the mutation check would not go red); the
+  // proposal must be rendered first.
+  test('a network failure mid-stream rolls back the rendered proposal and the unanswered user message from chatHistory and the stored session', async () => {
+    const storage = makeFakeStorage();
+    const { exports: m, questionInput } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => ({
+        ok: true,
+        status: 200,
+        headers: { get: (name) => (String(name).toLowerCase() === 'content-type' ? 'text/event-stream' : null) },
+        body: {
+          getReader() {
+            let reads = 0;
+            return {
+              read() {
+                reads += 1;
+                if (reads === 1) {
+                  return Promise.resolve({ done: false, value: new TextEncoder().encode(proposalFrame(PROPOSAL)) });
+                }
+                return Promise.reject(new Error('connection reset'));
+              },
+            };
+          },
+        },
+      }),
+    });
+    questionInput.value = 'is there a proposal?';
+    m.submitQuestion();
+    await flush();
+
+    // The network-failure exit must clear BOTH the rendered proposal and the
+    // unanswered user message — from memory AND from the stored session the next
+    // page load would rehydrate from.
+    looseDeepEqual(m.getChatHistory(), []);
+    looseDeepEqual(m.loadStoredSession('acme'), {
+      history: [],
+      tabCheckInCount: 0,
+      tabTotalCost: 0,
+      selectedModel: null,
+    });
+  });
 });
