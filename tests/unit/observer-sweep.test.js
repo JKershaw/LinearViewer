@@ -41,7 +41,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { MangoClient } from '@jkershaw/mangodb';
 
 import { __internal } from '../../lib/pipeline-loops.js';
@@ -53,10 +53,12 @@ import {
   sweepOneWorkspace,
   resolveRosterFromSessions,
   mergeRosterUnion,
-  createObserverSweepRun
+  createObserverSweepRun,
+  FOSSIL_AGE_MS
 } from '../../lib/observer-sweep.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
-import { ObserverShadowLogStore } from '../../lib/observer-shadow-log.js';
+import { computeWouldBeActions, ObserverShadowLogStore } from '../../lib/observer-shadow-log.js';
+import { stableStringify } from '../../lib/recap-cache.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';
@@ -573,6 +575,95 @@ describe('observer-sweep: freshness ranking & fossil collapse (LIN-2619)', () =>
     assert.ok(
       payload.attentionKeysFull.some((tuple) => tuple[0] === 'hand-blocked-zero' && tuple[1] === 'blocked' && tuple[2] === 'implementation'),
       'attentionKeysFull still carries its identity tuple, untouched by the fossil filter'
+    );
+  });
+
+  // ── LIN-2647: the fossil boundary itself, on a pure clock advance ───────
+  //
+  // The measured LIN-2619 review probe, now pinned: the idempotency suite's
+  // "different times" tick advances 5 minutes against ~now-aged activity,
+  // deliberately clear of any boundary, so nothing before this caught the
+  // clock-dependence LIN-2619 introduced via `staleAttentionCount`.
+
+  // Mirrors the store's own hashState() (lib/observer-state-store.js):
+  // sha256 over stableStringify(state). `canonicalizeForHash` is not
+  // exported, but it is the identity over this JSON-safe payload (no
+  // Maps/Sets/Dates), so this reproduces the hashed shape the dedup gate
+  // actually compares.
+  const hashOfPayload = (payload) => createHash('sha256').update(stableStringify(payload)).digest('hex');
+
+  test('LIN-2647: a pure clock advance across a row\'s 7-day FOSSIL_AGE_MS boundary moves the payload hash but NOT attentionKeysFull', () => {
+    // One blocked row whose last activity sits 2 minutes SHORT of the
+    // fossil boundary at tick A. Tick B advances the clock 5 minutes — past
+    // the boundary — over an otherwise IDENTICAL fleet: no new dispatch, no
+    // new feedback, only `now` moved.
+    const sinceMs = NOW_MS - FOSSIL_AGE_MS + 2 * 60 * 1000;
+    const rows = [historyItem({
+      id: 'bb-boundary', issueIdentifier: 'LIN-521',
+      dispatchedAt: new Date(sinceMs).toISOString(),
+      feedback: [{ message: '[blocked] nearly fossil', timestamp: new Date(sinceMs).toISOString() }]
+    })];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+
+    const payloadA = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payloadA.attention.length, 1, 'tick A: the row is still fresh — enumerated');
+    assert.strictEqual(payloadA.staleAttentionCount, 0, 'tick A: not yet counted as a fossil');
+    assert.strictEqual(payloadA.attentionKeysFull.length, 1, 'tick A: the identity key carries the row');
+
+    const payloadB = buildSweepPayload(loops, { now: NOW_MS + 5 * 60 * 1000, staleMs: STALE_MS });
+    assert.strictEqual(payloadB.attention.length, 0, 'tick B: the crossed row drops out of the enumerated array');
+    assert.strictEqual(payloadB.staleAttentionCount, 1, 'tick B: …and is folded into the fossil count instead');
+    assert.strictEqual(payloadB.attentionKeysFull.length, 1, 'tick B: the identity key still carries the row');
+
+    // The clock-dependence exception is real and load-bearing:
+    // staleAttentionCount is derived from `now`, so the store's dedup gate
+    // MUST see a genuine transition here (documented in buildSweepPayload's
+    // own docblock — the header's old "no per-tick-varying value anywhere"
+    // claim was false since LIN-2619, and this assertion is what pins the
+    // corrected claim). Removing the fossil filter entirely makes this
+    // assertion fail (the hash stops moving) — that is the point.
+    assert.notStrictEqual(
+      hashOfPayload(payloadA), hashOfPayload(payloadB),
+      'the payload hash must move when a row crosses the fossil boundary on a pure clock advance'
+    );
+    // …while the companion gate's own key must not:
+    assert.deepStrictEqual(
+      payloadB.attentionKeysFull, payloadA.attentionKeysFull,
+      'attentionKeysFull is clock-INDEPENDENT — a row ageing from enumerated to counted is not a set-membership change the gate can see'
+    );
+  });
+
+  test('LIN-2647: a fossil blocked row produces NO would-be shadow action — INTENDED (LIN-2619/2647), with a fresh control that still does', () => {
+    // The shadow-log consequence of the fossil fold (LIN-2132 consumer,
+    // unreviewed for LIN-2619's change): rows at/over fossil age drop out
+    // of `attention`, so computeWouldBeActions (lib/observer-shadow-log.js)
+    // no longer enumerates a would-be action for them. Recorded here as
+    // intended — they are exactly the rows LIN-2619 set out to stop
+    // enumerating — and pinned so the behaviour change is held by a test,
+    // not by silence.
+    const fossilSinceMs = NOW_MS - FOSSIL_AGE_MS - 60 * 1000;
+    const rows = [
+      historyItem({
+        id: 'aa-fossil-shadow', issueIdentifier: 'LIN-522',
+        dispatchedAt: new Date(fossilSinceMs).toISOString(),
+        feedback: [{ message: '[blocked] already fossil', timestamp: new Date(fossilSinceMs).toISOString() }]
+      }),
+      historyItem({
+        id: 'zz-fresh-shadow', issueIdentifier: 'LIN-523', dispatchedAt: '2026-04-11T11:00:00.000Z',
+        feedback: [{ message: '[blocked] fresh', timestamp: '2026-04-11T11:00:00.000Z' }]
+      })
+    ];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+
+    assert.strictEqual(payload.attention.length, 1, 'only the fresh row is enumerated');
+    assert.strictEqual(payload.staleAttentionCount, 1, 'the fossil row is folded into the count');
+    assert.strictEqual(payload.attentionKeysFull.length, 2, 'both rows stay in the identity key — the gate still sees the fossil row');
+
+    const actions = computeWouldBeActions(payload);
+    assert.deepStrictEqual(
+      actions.map((a) => a.loopId), ['zz-fresh-shadow'],
+      'the fossil blocked row produces no would-be action — intended (see computeWouldBeActions\'s own docblock), not a lost write'
     );
   });
 });
