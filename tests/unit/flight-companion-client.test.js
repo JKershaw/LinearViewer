@@ -3175,3 +3175,121 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
     );
   });
 });
+
+// ─── Proposal persistence + rehydration (LIN-2772) ─────────────────────────
+//
+// LIN-2716 persisted only {role, content} turns; proposals arrived as
+// ephemeral `phase: 'proposed'` SSE tool events and never entered the stored
+// record, so a proposal on screen when the page reloaded rendered as nothing
+// after it. These tests pin the widened record shape — a proposal is an entry
+// kind alongside {role, content}, storing {sessionId, prompt} — and the
+// rehydrate behaviour: a restored proposal re-renders READ-ONLY (the live
+// proposal id is unreachable after a reload), never as an interactive card.
+describe('flight-companion.js — proposal persistence + read-only rehydrate (LIN-2772)', () => {
+  const proposalFrame = (proposal) => (
+    sseFrame('tool', { phase: 'proposed', id: 't1', name: 'send_follow_up', result: JSON.stringify(proposal) })
+  );
+  const PROPOSAL = { proposed: true, sessionId: 'sess-1', prompt: 'approve me?' };
+
+  test('a live proposal enters chatHistory as {kind, sessionId, prompt} and round-trips through storage', async () => {
+    const storage = makeFakeStorage();
+    const { exports: m, questionInput } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => sseResponse([
+        proposalFrame(PROPOSAL),
+        sseFrame('done', {}),
+      ]),
+    });
+    questionInput.value = 'is there a proposal?';
+    m.submitQuestion();
+    await flush();
+
+    looseDeepEqual(m.getChatHistory(), [
+      { role: 'user', content: 'is there a proposal?' },
+      { kind: 'proposal', sessionId: 'sess-1', prompt: 'approve me?' },
+    ]);
+
+    // The persistence is what makes the reload case work: the proposal turn
+    // is in the SAME stored session the next page load rehydrates from.
+    looseDeepEqual(m.loadStoredSession('acme'), {
+      history: [
+        { role: 'user', content: 'is there a proposal?' },
+        { kind: 'proposal', sessionId: 'sess-1', prompt: 'approve me?' },
+      ],
+      tabCheckInCount: 1,
+      tabTotalCost: 0,
+      selectedModel: null,
+    });
+  });
+
+  test('a persisted proposal survives the loadStoredSession filter and rehydrates as a read-only card', () => {
+    const storage = makeFakeStorage({
+      'flight-companion-session:acme': JSON.stringify({
+        history: [
+          { role: 'user', content: 'is there a proposal?' },
+          { kind: 'proposal', sessionId: 'sess-1', prompt: 'approve me?' },
+          { role: 'assistant', content: 'ack' },
+        ],
+        tabCheckInCount: 1,
+        tabTotalCost: 0.0042,
+        selectedModel: null,
+      }),
+    });
+    const { exports: m, thread } = loadClient({ storageImpl: storage });
+
+    const proposal = findByClass(thread, 'fc-proposal');
+    assert.notStrictEqual(proposal, null, 'the restored proposal card re-renders after a reload');
+    // Read-only from birth: the resolved class hides the action row (CSS
+    // .fc-proposal--resolved .fc-proposal-actions { display: none }) — no
+    // reachable approve control after a reload.
+    assert.ok(proposal.classList.contains('fc-proposal--resolved'), 'restored proposals must be resolved/read-only');
+    assert.strictEqual(findByClass(proposal, 'fc-proposal-text')._text, 'approve me?', 'the prompt text is preserved');
+    assert.strictEqual(findByClass(proposal, 'fc-proposal-approve').disabled, true, 'approve is unreachable after a reload');
+    assert.strictEqual(findByClass(proposal, 'fc-proposal-dismiss').disabled, true, 'dismiss is unreachable too — not merely hidden');
+    assert.match(findByClass(proposal, 'fc-proposal-feedback')._text, /no longer actionable/);
+
+    // The rehydrate render must NOT re-push the restored proposal into
+    // chatHistory — the entry is already there from storage, so a second
+    // push would duplicate it and double-render on the NEXT reload.
+    assert.strictEqual(m.getChatHistory().length, 3, 'restored history keeps exactly the three stored turns');
+  });
+
+  test('a malformed proposal entry is dropped by the load filter like any other malformed turn', () => {
+    const storage = makeFakeStorage({
+      'flight-companion-session:acme': JSON.stringify({
+        history: [
+          { role: 'user', content: 'hi' },
+          { kind: 'proposal', sessionId: 'sess-1' }, // missing prompt
+          { kind: 'proposal', prompt: 'orphan' }, // missing sessionId
+          { kind: 'proposal', sessionId: 'sess-2', prompt: 'valid' },
+        ],
+        tabCheckInCount: 0,
+        tabTotalCost: 0,
+      }),
+    });
+    const { exports: m, thread } = loadClient({ storageImpl: storage });
+    assert.strictEqual(findByClass(thread, 'fc-proposal').classList.contains('fc-proposal--resolved'), true, 'only the well-formed proposal renders');
+    looseDeepEqual(m.getChatHistory(), [
+      { role: 'user', content: 'hi' },
+      { kind: 'proposal', sessionId: 'sess-2', prompt: 'valid' },
+    ]);
+  });
+
+  // The one error path interaction LIN-2772 introduces: a proposal rendered
+  // mid-stream now rides chatHistory ABOVE the turn's user message, so the
+  // error paths' plain `pop()` would remove the proposal and STRAND the
+  // unanswered user message in history — forwarded to the model on the very
+  // next turn. The rollback must clear both.
+  test('a failed turn rolls back both the rendered proposal and the unanswered user message', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([
+        proposalFrame(PROPOSAL),
+        sseFrame('error', { message: 'boom' }),
+      ]),
+    });
+    questionInput.value = 'is there a proposal?';
+    m.submitQuestion();
+    await flush();
+    looseDeepEqual(m.getChatHistory(), []);
+  });
+});
