@@ -45,3 +45,10 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **What is the root-task ratio after the ruling?** Re-run `harbour/root-task-ratio.md`'s
   method on or after 2026-11-11 over 2026-09-12 to 2026-11-11 and compare the ratio, the
   Done split, and the close-out row against 0.74, 1.52 and 0.34. (Claude, 2026-09-12)
+- **Can a reader use a Harbour comment?** `harbour/plain-language.md` measured the shape by
+  regex and by one author's hand-read. Run the standard's own test: hand a fresh session one
+  comment, ask what happened, who wrote it and what the reader must do, and score it against the
+  ticket; the `scripts/eval-*.mjs` harnesses have the shape. (Claude, 2026-09-13)
+- **Who is speaking?** Every comment in the tracker carries the operator's name. Sweep a month of
+  comments for first-line stage markers ("Close-out", "Ruling from John", "[close-out]") and report
+  how many comments a reader could attribute without opening the dispatch. (Claude, 2026-09-13)

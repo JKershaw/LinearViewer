@@ -14,6 +14,7 @@ is written. `proposals.md` lists the questions waiting for a paper.
 | [never-worked-pile](harbour/never-worked-pile.md) | What is in the never-worked pile, and what do the worked chains look like? | Live work in the wrong place: 34 of 40 filings still true at HEAD and 38 self-contained, but 23 of 40 are the parent ticket's own unfinished scope. Worked chains mostly narrow — 54 of 84 hops. |
 | [close-out-claims](harbour/close-out-claims.md) | When a close-out files its own unfinished scope next door, does it say so? | Always — 23 of 23 name the filing in the comment that closes the ticket. Five call it the parent's own scope left undone, 18 call it a separate matter now owned elsewhere, and all 23 parents are Done while the filing is unworked. |
 | [root-task-ratio](harbour/root-task-ratio.md) | Does the system run out of tasks, or generate them forever? | Neither: collapsing breakdown trees to one unit, 1,484 tickets are 1,340 units and each causes 0.74 further ones. Three in four cause none, but a unit that reaches Done causes 1.52 — the population number is under one only because most filings are never worked. |
+| [plain-language](harbour/plain-language.md) | Could Harbour adopt the plain-language standard, ISO 24495-1? | Yes, as a reader rule rather than a readability gate. Comments put the outcome up front (68% within 60 words) and name their stage (17 of 21), but only 4 of 21 say whether the reader is needed, and all 155 carry the operator's name. |
 
 ## About the process
 
