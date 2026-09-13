@@ -652,6 +652,11 @@ any team, so a scoped catalog is never a silent subset that hides type labels
 like `Bug`/`Feature`/`Improvement` (LIN-2787). The unfiltered call returns the
 whole catalog.
 
+The `team` key and the inclusive `?teamId=` behaviour above are the
+Linear-backed shape. On GitHub-, Jira- and Local-backed workspaces the catalog
+is flat — `{ id, name, color }`, no `team` key — and `teamId` is ignored
+entirely.
+
 Response:
 ```json
 {
