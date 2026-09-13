@@ -251,13 +251,19 @@
       // "no cadence persistence" behaviour) rather than half-restoring a
       // broken anchor. `delayMs` must be a finite number (the backoff
       // length); `nextFireAt` a finite number (a pending wall-clock anchor)
-      // or null (no timer armed). Anything else is not a cadence record.
+      // or null (no timer armed). `stoppedReason` is LIN-2771 beat 3 — a
+      // non-empty string naming why the cadence stopped, or null/absent when
+      // it is not stopped (an old blob without it loads as not-stopped).
       var cadence = null;
       if (parsed.cadence && typeof parsed.cadence === 'object'
         && typeof parsed.cadence.delayMs === 'number' && isFinite(parsed.cadence.delayMs)
         && (parsed.cadence.nextFireAt === null
           || (typeof parsed.cadence.nextFireAt === 'number' && isFinite(parsed.cadence.nextFireAt)))) {
-        cadence = { delayMs: parsed.cadence.delayMs, nextFireAt: parsed.cadence.nextFireAt };
+        cadence = {
+          delayMs: parsed.cadence.delayMs,
+          nextFireAt: parsed.cadence.nextFireAt,
+          stoppedReason: typeof parsed.cadence.stoppedReason === 'string' && parsed.cadence.stoppedReason ? parsed.cadence.stoppedReason : null,
+        };
       }
       return { history: history, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost, selectedModel: selectedModel, cadence: cadence };
     } catch (e) {
@@ -294,7 +300,13 @@
   // "no anchor" case loadStoredSession's resume logic treats as "start as
   // today".
   function currentCadenceRecord() {
-    return { delayMs: cadence.delayMs, nextFireAt: timerId ? now() + timerDelayMs : null };
+    return {
+      delayMs: cadence.delayMs,
+      nextFireAt: timerId ? now() + timerDelayMs : null,
+      // LIN-2771 beat 3: while stopped, the record carries WHY (so a reload
+      // can decide whether to re-arm); while running it is null.
+      stoppedReason: cadence.stopped ? (cadence.stoppedReason || null) : null,
+    };
   }
 
   // LIN-2771: merge ONLY the cadence record into the stored blob (a
@@ -307,6 +319,31 @@
     var session = loadStoredSession(urlKey);
     session.cadence = currentCadenceRecord();
     saveStoredSession(urlKey, session);
+  }
+
+  // LIN-2771 beat 3: whether a cadence stopped for `stoppedReason` should
+  // re-arm on a freshly-rendered page. Pure so the decision is unit-testable.
+  // The rule: re-arm when the reason can be shown to no longer hold, or when
+  // it cannot be checked at all (the first auto-wake re-detects and re-stops
+  // if the condition actually persists — the cheap path). Keep stopped only
+  // when the page can still show the reason holds.
+  //
+  // `aiConfigured` is the page's own `data-fc-ai-configured` value ('true'/
+  // 'false'/absent), which the renderer emits from the route's key-resolution
+  // — the ONE reason the page can genuinely still show holds (the page
+  // renders whether or not AI is configured).
+  function shouldReArmOnLoad(stoppedReason, aiConfigured) {
+    if (stoppedReason === 'ai-not-configured') {
+      // The page can show this still holds: keep stopped only when it
+      // explicitly says AI is not configured; anything else (including an
+      // absent attribute) means "may have cleared" → re-arm.
+      return aiConfigured !== 'false';
+    }
+    // session-expired and flag-off cannot survive onto a rendered page — a
+    // 401 never renders the page, and the page redirects to /settings when
+    // the flag is off — so they no longer hold. Any unknown reason cannot be
+    // checked; treat it as may-have-cleared too.
+    return true;
   }
 
   // General-purpose helper: removes the stored session outright. LIN-2716
@@ -407,11 +444,11 @@
   // The pure cadence reducer: `state` in, an `effect` in
   // ('reset'|'double'|'stop'|'none'), a new `state` out. Once stopped, every
   // further effect is a no-op — there is no un-stopping short of a reload.
-  function advanceCadence(state, effect) {
+  function advanceCadence(state, effect, reason) {
     if (state.stopped) return state;
-    if (effect === 'stop') return { delayMs: state.delayMs, stopped: true };
-    if (effect === 'reset') return { delayMs: CADENCE_BASE_MS, stopped: false };
-    if (effect === 'double') return { delayMs: nextCadenceDelay(state.delayMs), stopped: false };
+    if (effect === 'stop') return { delayMs: state.delayMs, stopped: true, stoppedReason: reason || null };
+    if (effect === 'reset') return { delayMs: CADENCE_BASE_MS, stopped: false, stoppedReason: null };
+    if (effect === 'double') return { delayMs: nextCadenceDelay(state.delayMs), stopped: false, stoppedReason: null };
     return state;
   }
 
@@ -831,7 +868,10 @@
           setResolved((err && err.message) || 'That approval was rejected.');
         } else if (status === 403) {
           setResolved((err && err.message) || 'Flight Companion is disabled.');
-          applyCadenceEffect('stop');
+          // LIN-2771 beat 3: this 403 is the flag-off class ("Flight Companion
+          // is disabled") — record it so a reload re-arms once the flag is
+          // back on, instead of freezing the cadence forever.
+          applyCadenceEffect('stop', 'flag-off');
         } else {
           // 429/500, or a network failure — restore the control so the
           // human can retry (disable-then-restore idiom).
@@ -1044,8 +1084,8 @@
   // shared timer using the new delay — this is what makes a user-initiated
   // reset actually move the auto-wake's next firing to send+30s, not just
   // change a value the next tick happens to read later.
-  function applyCadenceEffect(effect) {
-    cadence = advanceCadence(cadence, effect);
+  function applyCadenceEffect(effect, reason) {
+    cadence = advanceCadence(cadence, effect, reason);
     if (cadence.stopped) {
       if (timerId) { clearTimeout(timerId); timerId = null; timerDelayMs = null; }
       // LIN-2771: no timer is armed — the stored anchor must say so, or a
@@ -1239,7 +1279,7 @@
         break;
       case 'session-expired':
         showInlineNote(classification.message);
-        applyCadenceEffect('stop');
+        applyCadenceEffect('stop', 'session-expired');
         if (turnKind === 'user-initiated' || turnKind === 'boot') {
           chatHistory.pop();
           if (turnKind === 'user-initiated') setComposerValue(sentMessage);
@@ -1247,7 +1287,7 @@
         break;
       case 'flag-off':
         showInlineNote(classification.message);
-        applyCadenceEffect('stop');
+        applyCadenceEffect('stop', 'flag-off');
         if (turnKind === 'user-initiated' || turnKind === 'boot') {
           chatHistory.pop();
           if (turnKind === 'user-initiated') setComposerValue(sentMessage);
@@ -1264,7 +1304,7 @@
       case 'ai-not-configured':
         showInlineNote(classification.message);
         if (turnKind === 'auto-wake') {
-          applyCadenceEffect('stop');
+          applyCadenceEffect('stop', 'ai-not-configured');
         } else {
           chatHistory.pop();
           if (turnKind === 'user-initiated') setComposerValue(sentMessage);
@@ -1648,6 +1688,7 @@
   // per-message cost meta line (LIN-2621 beat 3's `.fc-msg-meta`) — only the
   // running tab total is persisted, not each turn's own usage payload.
   var resumeAnchorMs = null;
+  var keepStopped = false;
   if (urlKey) {
     var restoredSession = loadStoredSession(urlKey);
     if (restoredSession.history.length) {
@@ -1678,13 +1719,25 @@
     // cadence with a finite nextFireAt means a wake was PENDING when the tab
     // left — restore its backoff length and let the first auto-wake fire at
     // the ORIGINAL anchor (remaining time), not a fresh full wait. A record
-    // with nextFireAt: null (timer was not armed — stopped or hidden) and an
-    // absent record both leave cadence at today's default. The stop-reason
-    // half of this ticket (beat 3) owns what a stopped cadence does on
-    // reload; here, only the anchor drives the restore.
+    // with nextFireAt: null and no stoppedReason (timer was not armed — just
+    // hidden, or an old blob) leaves cadence at today's default. LIN-2771
+    // beat 3: a record with nextFireAt: null AND a stoppedReason means the
+    // cadence was deliberately stopped — re-arm it (at CADENCE_BASE_MS, the
+    // cheap path) unless the page can still show the reason holds.
     if (restoredSession.cadence && typeof restoredSession.cadence.nextFireAt === 'number') {
-      cadence = { delayMs: restoredSession.cadence.delayMs, stopped: false };
+      cadence = { delayMs: restoredSession.cadence.delayMs, stopped: false, stoppedReason: null };
       resumeAnchorMs = restoredSession.cadence.nextFireAt;
+    } else if (restoredSession.cadence && restoredSession.cadence.stoppedReason) {
+      // The page's own AI-config attribute (server-rendered) is the one
+      // reason signal the page can still show holds; everything else is
+      // either provably cleared or uncheckable → re-arm.
+      var aiConfigured = page && page.dataset ? page.dataset.fcAiConfigured : undefined;
+      if (shouldReArmOnLoad(restoredSession.cadence.stoppedReason, aiConfigured)) {
+        cadence = { delayMs: CADENCE_BASE_MS, stopped: false, stoppedReason: null };
+      } else {
+        cadence = { delayMs: restoredSession.cadence.delayMs, stopped: true, stoppedReason: restoredSession.cadence.stoppedReason };
+        keepStopped = true;
+      }
     }
   }
 
@@ -1699,8 +1752,12 @@
   // becomes visible instead. LIN-2771: with a restored wall-clock anchor the
   // first attempt is at the ORIGINAL fire time's remaining duration
   // (Math.max(0, ...) — an anchor already past fires on the next tick),
-  // never a fresh full wait.
-  if (!document.hidden) {
+  // never a fresh full wait. LIN-2771 beat 3: a cadence kept stopped (the
+  // page can still show the stop reason holds) schedules nothing and shows
+  // the stopped placeholder, exactly as a live stop does today.
+  if (keepStopped) {
+    if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
+  } else if (!document.hidden) {
     scheduleAutoWake(resumeAnchorMs !== null ? Math.max(0, resumeAnchorMs - now()) : cadence.delayMs);
   }
 
@@ -1715,6 +1772,7 @@
       formatNoCensus, formatNextCheckIn, formatCost, formatTurnMeta, formatTabTotal, parseDecisionsResult,
       applyCadenceEffect, scheduleAutoWake, autoWakeTick, sendTurn, submitQuestion, startBoot,
       resizeComposer,
+      shouldReArmOnLoad,
       sessionStorageKey, loadStoredSession, saveStoredSession, clearStoredSession,
       // LIN-2771: the clock seam. Defaults to Date.now; tests pin the wall
       // clock so the anchor math is deterministic. `now()` itself is not

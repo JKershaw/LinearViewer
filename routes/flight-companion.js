@@ -510,6 +510,14 @@ export function createFlightCompanionRoutes({
       const model = await resolveAiOperationModel({
         urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier, opKind: 'flight-companion',
       });
+      // LIN-2771 beat 3: whether AI is configured for THIS page load — the
+      // SAME key-resolution the turn endpoint's ai-not-configured 503 uses
+      // (sessionApiKey || paid env || free-tier key), so the page's
+      // data-fc-ai-configured attribute tells the client whether a stored
+      // `ai-not-configured` stop reason can still hold. The page renders
+      // regardless of this (only the flag gates the page), which is exactly
+      // why the attribute is needed.
+      const aiConfigured = !!(sessionApiKey || getPaidEnvKey() || freeTierKey);
       // Read-only, same discipline as observerReportDoc above: readCurrent
       // ONLY, feeding the strip's last-check-in / sweep-liveness / no-census
       // lines (see buildFlightCompanionStripData's own doc comment).
@@ -529,6 +537,7 @@ export function createFlightCompanionRoutes({
           openRouterSource: getOpenRouterSource(req),
           workspaces: req.session.workspaces,
           featureFlags,
+          aiConfigured,
         }
       );
       res.send(html);

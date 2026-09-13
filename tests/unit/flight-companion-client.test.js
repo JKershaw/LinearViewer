@@ -370,10 +370,15 @@ function sseResponse(frames) {
   };
 }
 
-function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl, storageImpl } = {}) {
+function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl, storageImpl, pageDataset } = {}) {
   const doc = makeDocument({ hiddenInitial });
   const page = new FakeElement('main');
   page.dataset.urlKey = 'acme';
+  // LIN-2771 beat 3: the real renderer emits `data-fc-ai-configured` on the
+  // page element (lib/render-flight-companion.js); tests seed it here so the
+  // client's load-time per-reason decision reads a page the same way it would
+  // in a browser.
+  if (pageDataset) Object.assign(page.dataset, pageDataset);
   doc._setPage(page);
 
   const thread = new FakeElement('ul');
@@ -544,22 +549,30 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
 
   test('advanceCadence: double/reset/stop reducer, and stopped is a true terminal state', () => {
     const { exports: m } = loadClient();
+    // LIN-2771 beat 3: the reducer also carries `stoppedReason` — null while
+    // running, the reason while stopped (null when 'stop' is applied with no
+    // reason).
     let s = { delayMs: 30000, stopped: false };
     s = m.advanceCadence(s, 'double');
-    looseDeepEqual(s, { delayMs: 60000, stopped: false });
+    looseDeepEqual(s, { delayMs: 60000, stopped: false, stoppedReason: null });
     s = m.advanceCadence(s, 'double');
-    looseDeepEqual(s, { delayMs: 120000, stopped: false });
+    looseDeepEqual(s, { delayMs: 120000, stopped: false, stoppedReason: null });
     s = m.advanceCadence(s, 'double');
-    looseDeepEqual(s, { delayMs: 180000, stopped: false });
+    looseDeepEqual(s, { delayMs: 180000, stopped: false, stoppedReason: null });
     s = m.advanceCadence(s, 'double');
-    looseDeepEqual(s, { delayMs: 180000, stopped: false }, 'capped');
+    looseDeepEqual(s, { delayMs: 180000, stopped: false, stoppedReason: null }, 'capped');
     s = m.advanceCadence(s, 'reset');
-    looseDeepEqual(s, { delayMs: 30000, stopped: false });
+    looseDeepEqual(s, { delayMs: 30000, stopped: false, stoppedReason: null });
     s = m.advanceCadence(s, 'stop');
-    looseDeepEqual(s, { delayMs: 30000, stopped: true });
+    looseDeepEqual(s, { delayMs: 30000, stopped: true, stoppedReason: null });
+    // A reason is threaded through from the stop site (from a fresh,
+    // non-stopped state — reset is a no-op once stopped, so it cannot be
+    // used to un-stop and re-stop here).
+    looseDeepEqual(m.advanceCadence({ delayMs: 30000, stopped: false }, 'stop', 'session-expired'),
+      { delayMs: 30000, stopped: true, stoppedReason: 'session-expired' });
     // Terminal: nothing un-stops it.
-    looseDeepEqual(m.advanceCadence(s, 'reset'), { delayMs: 30000, stopped: true });
-    looseDeepEqual(m.advanceCadence(s, 'double'), { delayMs: 30000, stopped: true });
+    looseDeepEqual(m.advanceCadence(s, 'reset'), { delayMs: 30000, stopped: true, stoppedReason: null });
+    looseDeepEqual(m.advanceCadence(s, 'double'), { delayMs: 30000, stopped: true, stoppedReason: null });
   });
 
   test('autoWakeErrorCadenceEffect: session-expired/flag-off/ai-not-configured stop; everything else doubles', () => {
@@ -3261,5 +3274,92 @@ describe('flight-companion.js — LIN-2771: cadence resumes against a wall-clock
     assert.ok(blob.cadence, 'the stored blob carries a cadence record after a schedule');
     assert.strictEqual(blob.cadence.delayMs, m.CADENCE_BASE_MS, 'the record names the cadence backoff length');
     assert.strictEqual(blob.cadence.nextFireAt, NOW + 60000, 'the anchor is wall-clock: now() + the ARMED delay, not cadence.delayMs');
+  });
+});
+
+describe('flight-companion.js — LIN-2771 beat 3: persisted stop reason decides re-arm on reload', () => {
+  const STORAGE_KEY = 'flight-companion-session:acme';
+
+  test('re-arm: stored stoppedReason session-expired re-arms on a normal load (page loaded = session valid)', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const storage = makeFakeStorage({
+      [STORAGE_KEY]: JSON.stringify({
+        history: [],
+        tabCheckInCount: 0,
+        tabTotalCost: 0,
+        selectedModel: null,
+        cadence: { delayMs: 60000, nextFireAt: null, stoppedReason: 'session-expired' },
+      }),
+    });
+    const { exports: m, fetchCalls } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    assert.strictEqual(m.getCadenceState().stopped, false, 'session-expired cannot hold on a rendered page');
+    assert.strictEqual(m.getCadenceState().delayMs, m.CADENCE_BASE_MS, 're-arms at the base delay, not the stored backoff');
+    t.mock.timers.tick(29999);
+    assert.strictEqual(fetchCalls.length, 0);
+    t.mock.timers.tick(1);
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1, 're-armed: first wake fires at the base 30s');
+  });
+
+  test('keep stopped: stored stoppedReason ai-not-configured with the page showing AI unconfigured does NOT re-arm', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const storage = makeFakeStorage({
+      [STORAGE_KEY]: JSON.stringify({
+        history: [],
+        tabCheckInCount: 0,
+        tabTotalCost: 0,
+        selectedModel: null,
+        cadence: { delayMs: 60000, nextFireAt: null, stoppedReason: 'ai-not-configured' },
+      }),
+    });
+    const { exports: m, fetchCalls } = loadClient({
+      storageImpl: storage,
+      pageDataset: { fcAiConfigured: 'false' },
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    assert.strictEqual(m.getCadenceState().stopped, true, 'a reason the page can still show holds keeps the cadence stopped');
+    assert.strictEqual(m.getNextCheckInText(), 'next check-in: —');
+    t.mock.timers.tick(120000);
+    await flush();
+    assert.strictEqual(fetchCalls.length, 0, 'no auto-wake while kept stopped');
+  });
+
+  test('live stop: a session-expired turn writes the reason into storage and clears nextFireAt', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { exports: m, storage } = loadClient({
+      fetchImpl: () => jsonResponse(401, {}),
+    });
+    t.mock.timers.tick(30000);
+    await flush();
+    assert.strictEqual(m.getCadenceState().stopped, true, 'a 401 session-expired turn stops the cadence');
+    const blob = JSON.parse(storage.getItem(STORAGE_KEY));
+    assert.strictEqual(blob.cadence.stoppedReason, 'session-expired', 'the stop reason is persisted');
+    assert.strictEqual(blob.cadence.nextFireAt, null, 'nextFireAt stays null while stopped');
+  });
+
+  test('legacy: an old blob with cadence but no stoppedReason loads as not-stopped', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const storage = makeFakeStorage({
+      [STORAGE_KEY]: JSON.stringify({
+        history: [],
+        tabCheckInCount: 0,
+        tabTotalCost: 0,
+        selectedModel: null,
+        cadence: { delayMs: 60000, nextFireAt: null },
+      }),
+    });
+    const { exports: m, fetchCalls } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    assert.strictEqual(m.getCadenceState().stopped, false, 'no stoppedReason means not stopped');
+    t.mock.timers.tick(29999);
+    assert.strictEqual(fetchCalls.length, 0);
+    t.mock.timers.tick(1);
+    await flush();
+    assert.strictEqual(fetchCalls.length, 1, 'no anchor + no reason = today\'s fresh base start');
   });
 });
