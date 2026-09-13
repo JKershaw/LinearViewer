@@ -389,6 +389,87 @@ describe('LIN-2575 — a lane-produced report row folds to recent once its dispa
   });
 });
 
+// ── LIN-2575 close-out: the derivation × queue-branch interaction ─────────
+//
+// Review's ledger item 2. Stamping the derived `periodicalId` at the dispatch
+// seam changes how an IN-FLIGHT edition reads, not just an archived one: a
+// queue row is Rule 1 evidence (`recent`) the moment it can be joined, and a
+// queue row carries no run evidence, so a stamped in-flight hop reads
+// `recent` with `runs: 0` and `lastDispatchedAt: null`.
+//
+// That transient reading is intended, and it is transient BY CONSTRUCTION
+// rather than by convention: LIN-2385's evidence gate (`status: 'taken'` AND
+// a terminal `done` marker) drops the row again on archive unless the run
+// actually finished. Row C is the load-bearing one — it proves the false
+// reading cannot outlive the queue row. Without it, a future relaxation of
+// the evidence gate could turn the transient `recent` into a permanent one
+// and no test would redden.
+//
+// A→B is the behaviour change this ticket introduces; C is its self-correction;
+// D is the ticket's acceptance witness holding end to end.
+
+describe('LIN-2575 — a stamped in-flight edition reads recent transiently, and the evidence gate reverts it on archive', () => {
+  const t = template({ id: 'code-quality', title: 'Code Quality Review' });
+  // The canonical id as the dispatch seam derives it from the minted Stage-2
+  // task's LIN-694 gate marker — not a literal, so this block fails if the
+  // slug→id resolution ever drifts.
+  const derived = resolvePeriodicalIdFromGateMarker(
+    `${buildPeriodicalGateMarker('Code Quality Review')}\n\nRun the review.`
+  );
+
+  /** The lane's own batch header: matches no template title, so the title-fallback join cannot fire. */
+  const LANE_PROMPT_NAME = 'W8 advisory reviews — overdue periodicals';
+
+  function fold(rows) {
+    return foldPeriodicalRuns([t], rows, { now: NOW, historyTtlMs: HISTORY_TTL_MS })[0];
+  }
+
+  test('A — unstamped in-flight lane hop is invisible to the fold', () => {
+    const row = fold({ queueRows: [queueRow({ kind: 'implementation', periodicalId: null, promptName: LANE_PROMPT_NAME })] });
+    assert.equal(row.state, 'never');
+    assert.equal(row.runs, 0);
+    assert.equal(row.lastDispatchedAt, null);
+  });
+
+  test('B — the same hop, stamped by the derivation, reads recent with no run evidence', () => {
+    const row = fold({ queueRows: [queueRow({ kind: 'implementation', periodicalId: derived, promptName: LANE_PROMPT_NAME })] });
+    assert.equal(row.state, 'recent', 'a joinable live queue row is Rule 1 evidence');
+    assert.equal(row.runs, 0, 'a queue row is not run evidence — `recent` here means in flight, not completed');
+    assert.equal(row.lastDispatchedAt, null);
+  });
+
+  test('C — on archive without a terminal done marker the reading reverts: the transient recent cannot persist', () => {
+    const row = fold({
+      historyRows: [historyRow({
+        kind: 'implementation',
+        periodicalId: derived,
+        promptName: LANE_PROMPT_NAME,
+        dispatchedAt: new Date(NOW - DAY_MS).toISOString(),
+        // Archived having never declared completion — LIN-2385's gate drops it.
+        feedback: [{ message: 'Working on it', timestamp: new Date(NOW - DAY_MS).toISOString() }]
+      })]
+    });
+    assert.equal(row.state, 'never', 'LIN-2385 gate drops the row; the stamp alone never manufactures evidence');
+    assert.equal(row.runs, 0);
+    assert.equal(row.lastDispatchedAt, null);
+  });
+
+  test('D — archived having reached terminal done, the stamped row is durable run evidence', () => {
+    const dispatchedAt = new Date(NOW - DAY_MS).toISOString();
+    const row = fold({
+      historyRows: [historyRow({
+        kind: 'implementation',
+        periodicalId: derived,
+        promptName: LANE_PROMPT_NAME,
+        dispatchedAt
+      })]
+    });
+    assert.equal(row.state, 'recent');
+    assert.equal(row.runs, 1);
+    assert.equal(row.lastDispatchedAt, new Date(dispatchedAt).getTime());
+  });
+});
+
 // ── Evidence rules ───────────────────────────────────────────────────────────
 
 describe('foldPeriodicalRuns — evidence rules', () => {
