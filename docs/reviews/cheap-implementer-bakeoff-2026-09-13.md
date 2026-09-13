@@ -16,7 +16,7 @@ full: `docs/papers/harbour/cheap-implementer.md`.
 |---|---|---|---|---|---|
 | z-ai/glm-5.3 | 6 | 4 of 6 | 6 of 6 | 20 min | $4.90 API-equivalent |
 | deepseek/deepseek-v4.1-flash | 5 (incl. one bonus) | 3 of 5 | 5 of 5 | 14 min | $4.45 |
-| google/gemini-3.8-flash (control) | 2 | 1 of 2 | re-review pending on the second | 24 min | $2.87 so far |
+| google/gemini-3.8-flash (control) | 2 | 1 of 2 | 2 of 2 | 24 min | $3.61 |
 
 Every one of the thirteen produced a PR with green CI on its first session. No session looped
 on error recovery. No reviewer found a logic defect in any of the thirteen: all five
@@ -36,7 +36,7 @@ The two readings taken on 12 September put GLM at roughly $2 to $3.50 per ticket
 sessions read 100k to 300k cache-read tokens for under a cent relayed, and its list price is
 a tenth of GLM's.
 
-**Opus review is the expense and is nearly flat with ticket size.** Harbour prices the 21
+**Opus review is the expense and is nearly flat with ticket size.** Harbour prices the 22
 reviews of this round at $2.26 to $4.79 each from their relayed tokens, five to nine minutes
 each, about $60 of API-equivalent in total, which is about one and a half points of the
 weekly window at the LIN-2087 calibration. A one-line doc change cost $2.54 to review; a

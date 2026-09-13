@@ -16,7 +16,7 @@ three OpenRouter models through opencode over an evening and a morning, 12 to 13
 one round. No reviewer found a logic defect; the five send-backs were all second-order, a
 layout, a docblock claim, a missing test, stale prose, a monitor that reports clean on an
 empty fetch. Each Opus review cost $2.26 to $4.79 API-equivalent regardless of the ticket's
-size, so the 21 reviews of the round cost about $60, which is about one and a half points
+size, so the 22 reviews of the round cost about $62, which is about one and a half points
 of the weekly subscription window. The implementations cost a few dollars each on GLM and
 cents on Flash, on readings Harbour's own relay cannot make. The seven launch failures in
 the round were a daily spend cap, a stale model catalog, and CPU starvation, none of them
@@ -36,7 +36,7 @@ sessions, did not appear once.
 |---|---|---|---|---|
 | z-ai/glm-5.3 | 6 | 4 | 6 | 20 min |
 | deepseek/deepseek-v4.1-flash | 5 | 3 | 5 | 14 min |
-| google/gemini-3.8-flash | 2 | 1 | 1, second re-review pending | 24 min |
+| google/gemini-3.8-flash | 2 | 1 | 2 | 24 min |
 
 The routing proposal's Sonnet baseline is 84% first-pass over 115 cases. Thirteen is too few
 to place either model against it, but seven of thirteen first-pass with every miss recovered
