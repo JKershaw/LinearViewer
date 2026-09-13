@@ -1024,13 +1024,13 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
       basisHash: 'basis-abc', decision: sampleDecision()
     });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
-    assert.equal(status.basisVersion, null);
+    assert.strictEqual(status.basisVersion, null);
   });
 
   test('an omitted basisHash persists as null — UNKNOWN, never a stand-in value', async () => {
     await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
-    assert.equal(status.basisHash, null);
+    assert.strictEqual(status.basisHash, null);
   });
 
   test('a legacy row with no basisHash field at all reads as null, not undefined', async () => {
@@ -1044,8 +1044,8 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
       outcome: null, outcomeAt: null
     });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
-    assert.equal(status.basisHash, null);
-    assert.equal(status.basisVersion, null);
+    assert.strictEqual(status.basisHash, null);
+    assert.strictEqual(status.basisVersion, null);
   });
 
   test('basisHash surfaces on the bulk unanswered read the rulings feed uses', async () => {
@@ -1096,7 +1096,7 @@ describe('TaskDecisionsStore recordScan — dueBasisHash (LIN-2649 WS2)', () => 
   test('an omitted dueBasisHash persists as null — UNKNOWN, never a stand-in value; no other recordScan caller changes', async () => {
     await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, basisHash: 'basis-abc', decision: sampleDecision() });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
-    assert.equal(status.dueBasisHash, null);
+    assert.strictEqual(status.dueBasisHash, null);
     assert.equal(status.basisHash, 'basis-abc'); // unaffected — backward-compatible
   });
 
@@ -1108,7 +1108,22 @@ describe('TaskDecisionsStore recordScan — dueBasisHash (LIN-2649 WS2)', () => 
       outcome: null, outcomeAt: null
     });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
-    assert.equal(status.dueBasisHash, null);
+    assert.strictEqual(status.dueBasisHash, null);
+  });
+
+  test('a legacy row with no dueBasisVersion field at all reads as null, not undefined', async () => {
+    // The sibling of the basisVersion legacy contract above: rows raised before
+    // LIN-2665 store no dueBasisVersion field. `toRecord`'s `?? null` must
+    // project it as null — `undefined` would be dropped by JSON.stringify at
+    // the S3 wire boundary.
+    collection._docs.push({
+      _id: TaskDecisionsStore.buildId(ISSUE_ID, HASH_A),
+      urlKey: 'ws-a', issueId: ISSUE_ID, issueIdentifier: 'LIN-1',
+      inputHash: HASH_A, decision: sampleDecision(), scannedAt: new Date(), seq: 0,
+      outcome: null, outcomeAt: null
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.strictEqual(status.dueBasisVersion, null);
   });
 });
 
