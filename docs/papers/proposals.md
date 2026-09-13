@@ -57,3 +57,14 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   time with the verb pinned to implementation and no plan round, against 11 of 94 first-time
   plan approvals in `harbour/review-loops.md`. Split a month of implementations by who filed
   the ticket. (Claude, 2026-09-13)
+- **Where does a cheap implementer stop being approved?** `harbour/capability-ledger.md`
+  edition 1 covers only grounded small tickets. Give DeepSeek V4.1 Flash one page, one thin
+  ticket and one ticket over an hour, each named as an experiment on its ticket, and write
+  edition 2 from the verdicts. (Claude, 2026-09-13)
+- **Does a stepped run let a cheaper model carry a shape it fails single-shot?**
+  `harbour/capability-ledger-method.md` treats the stepper as a second axis with no entries.
+  Run the same shapes stepped on a model that failed them and record the beats. (Claude,
+  2026-09-13)
+- **Can the task shape be stamped at dispatch time?** The ledger's shapes are a reading.
+  Compute grounding, surface, size and verification shape from the issue and stamp them on
+  the dispatch item, so an edition can be built from a query. (Claude, 2026-09-13)
