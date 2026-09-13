@@ -5,8 +5,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, PERIODICAL_AUTOPILOT_TAIL } from '../../lib/periodicals.js';
+import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, PERIODICAL_AUTOPILOT_TAIL, resolvePeriodicalIdFromGateMarker } from '../../lib/periodicals.js';
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
+import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
 
 describe('periodicals registry', () => {
   test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, Data & Fetch Architecture, Integration & Surface Maturity, and Onboarding & Cold-Start (15 templates)', () => {
@@ -1124,5 +1125,45 @@ describe('buildPeriodicalNodes()', () => {
     // The group id itself is synthetic; node ids are template ids (no slashes/UUIDs).
     assert.strictEqual(PERIODICALS_PROJECT_ID, '__periodicals__');
     assert.strictEqual(nodes[0].issue.id, 'documentation-review');
+  });
+});
+
+// ── LIN-2575: resolvePeriodicalIdFromGateMarker ──────────────────────────────
+//
+// The dispatch-seam derivation of the periodical join key from a minted task's
+// LIN-694 gate marker. The marker slug is derived from the DISPLAY TITLE, which
+// is deliberately not the registry id for most templates (e.g.
+// 'Code Quality Review' -> 'code-quality-review' vs id 'code-quality'), so this
+// pins that the resolver maps by re-slugifying each title rather than by
+// string equality.
+
+describe('resolvePeriodicalIdFromGateMarker (LIN-2575)', () => {
+  test('resolves EVERY registry template from its own gate marker back to the canonical id', () => {
+    for (const t of PERIODICALS) {
+      const description = `${buildPeriodicalGateMarker(t.title)}\n\nRun the review.`;
+      assert.strictEqual(
+        resolvePeriodicalIdFromGateMarker(description),
+        t.id,
+        `template '${t.id}' must round-trip through its gate marker`
+      );
+    }
+  });
+
+  test('a description with no marker (an ordinary issue) resolves to null', () => {
+    assert.strictEqual(resolvePeriodicalIdFromGateMarker('Just an ordinary task description.'), null);
+    assert.strictEqual(resolvePeriodicalIdFromGateMarker(''), null);
+    assert.strictEqual(resolvePeriodicalIdFromGateMarker(null), null);
+    assert.strictEqual(resolvePeriodicalIdFromGateMarker(undefined), null);
+  });
+
+  test('a marker naming no live template (since-removed) resolves to null, never throws', () => {
+    assert.strictEqual(
+      resolvePeriodicalIdFromGateMarker('<!-- harbour-periodical-gate id="a-removed-template" -->'),
+      null
+    );
+  });
+
+  test('spurious/typographic marker-like text does not resolve', () => {
+    assert.strictEqual(resolvePeriodicalIdFromGateMarker('mentioning harbour-periodical-gate in prose'), null);
   });
 });

@@ -18,7 +18,7 @@ import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '
 import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
-import { getPeriodicals } from '../lib/periodicals.js';
+import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { isValidIssueId, UUID_REGEX } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
@@ -712,6 +712,16 @@ export function createDispatchRoutes({
         }
 
         const { issue, parent, siblings, project, children, comments, attachments } = ctx;
+        // LIN-2575: a caller-supplied `periodicalId` always wins (it is the
+        // explicit join key); when absent, derive it from the issue's own
+        // LIN-694 gate marker. This is the seam a lane/batch dispatch of a
+        // minted periodical review task uses — the agent running the task
+        // need not know, or remember to pass, the template id. A description
+        // with no marker (the ordinary case) derives null, byte-identical to
+        // the prior `periodicalId || null`.
+        const overridePeriodicalId = (periodicalId !== undefined
+          ? periodicalId
+          : resolvePeriodicalIdFromGateMarker(issue.description)) || null;
         // Forward `attachments` (LIN-776): the verb-override dispatch path must
         // surface the same Attachments section as the LLM recommend-and-dispatch
         // path, which already passes the full context. provider?.ui is threaded
@@ -780,8 +790,10 @@ export function createDispatchRoutes({
               // own project repo wins over it instead (repoInherited: true).
               repo: resolveDispatchRepo(repo, parseRepoFromDescription(project?.description), { inherited: repoInherited === true }),
               sessionId: sessionId || null,
-              // Periodical-template join key (LIN-1825/LIN-2385): validated above.
-              periodicalId: periodicalId || null,
+              // Periodical-template join key (LIN-1825/LIN-2385): validated above
+              // when caller-supplied; otherwise derived from the issue's LIN-694
+              // gate marker (LIN-2575) — see `overridePeriodicalId` above.
+              periodicalId: overridePeriodicalId,
               // Push-comms: `subscription` is the declared edge (LIN-900 §6),
               // `terminal-only` unless the caller declares `everything`; queueIfBusy
               // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
@@ -916,6 +928,14 @@ export function createDispatchRoutes({
         // task it is actually working on (LIN-327). For a leaf these are identical.
         const terminalIdentifier = rec.identifier || issueIdentifier;
 
+        // LIN-2575: caller-supplied `periodicalId` wins; otherwise use the one
+        // `computeRecommendation` derived from the resolved issue's LIN-694 gate
+        // marker (routes/proxy.js) — the everyday autopilot/lane path, which
+        // carries no `kind` and lands here. Null for any ordinary issue.
+        const recommendedPeriodicalId = (periodicalId !== undefined
+          ? periodicalId
+          : rec.periodicalId) || null;
+
         // kind provenance: parseRecommendedAction (in computeRecommendation) →
         // recommendedAction → deriveDispatchKind → BOTH the stored item's kind
         // and the response kind (same value); falls back to 'custom' when the
@@ -978,11 +998,13 @@ export function createDispatchRoutes({
             // the worker runs in the child project's repo, not the parent's (LIN-1210).
             repo: resolveDispatchRepo(repo, rec.repo, { inherited: repoInherited === true }),
             sessionId: sessionId || null,
-            // Periodical-template join key (LIN-1825/LIN-2385): validated above.
-            // This is the branch autopilot actually takes on the normal
-            // Stage-2-opening trigger (no `kind` override) — see the route's
-            // own doc comment above for why both fields blocks must carry it.
-            periodicalId: periodicalId || null,
+            // Periodical-template join key (LIN-1825/LIN-2385): validated above
+            // when caller-supplied, else derived from the issue's gate marker
+            // (LIN-2575). This is the branch autopilot actually takes on the
+            // normal Stage-2-opening trigger (no `kind` override) — see the
+            // route's own doc comment above for why both fields blocks must
+            // carry it.
+            periodicalId: recommendedPeriodicalId,
             // Opt-in completion hold (LIN-797), forwarded blindly to the runner.
             waitForFollowUps: waitForFollowUps === true,
             // Push-comms: `subscription` is the declared edge (LIN-900 §6),

@@ -24,6 +24,8 @@ import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+import { testMockData } from '../fixtures/mock-data.js';
+import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
 
 const KNOWN_ID = 'documentation-review';
 const UNKNOWN_ID = 'not-a-real-template';
@@ -330,5 +332,81 @@ describe('LIN-2385 B6 — POST /api/proxy/recommend-and-dispatch stamps periodic
     assert.equal(res.status, 400);
     assert.equal(res.body.error, 'periodicalId must be one of the known periodical template ids');
     assert.equal(captured.item, undefined, 'a rejected dispatch must never reach addItem');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-2575 — derive periodicalId from the dispatched issue's LIN-694 gate
+// marker at the dispatch seam, so a lane/batch dispatch of a minted periodical
+// review task is stamped without the caller having to know the template id.
+//
+// The registry id and the marker slug deliberately differ for most templates
+// ('Code Quality Review' -> marker 'code-quality-review', id 'code-quality'),
+// so these tests pin the slug -> canonical-id resolution, not string equality.
+// TEST-1 (In Progress) exercises the verb-override branch; TEST-14 (started)
+// exercises the recommendation-derived branch the everyday autopilot/lane
+// trigger actually lands on (same fixtures as the B6 tests above).
+// ---------------------------------------------------------------------------
+
+describe('LIN-2575 — recommend-and-dispatch derives periodicalId from the issue gate marker', () => {
+  const CODE_MARKER = buildPeriodicalGateMarker('Code Quality Review'); // slug 'code-quality-review', id 'code-quality'
+
+  function withDescription(identifier, description) {
+    const issue = testMockData.issues.find(i => i.identifier === identifier);
+    const prior = issue.description;
+    issue.description = description;
+    return () => { issue.description = prior; };
+  }
+
+  test('verb-override branch (kind set): no caller periodicalId + marker -> derived canonical id', async () => {
+    const restore = withDescription('TEST-1', `${CODE_MARKER}\n\nRun the review.`);
+    try {
+      const captured = {};
+      const res = await call(buildRecommendApp(captured), 'post', '/api/proxy/recommend-and-dispatch', {
+        issueIdentifier: 'TEST-1', kind: 'review'
+      }, AUTH);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.strictEqual(captured.item.periodicalId, 'code-quality');
+    } finally {
+      restore();
+    }
+  });
+
+  test('verb-override branch: an explicit caller periodicalId still wins over the derived one', async () => {
+    const restore = withDescription('TEST-1', `${CODE_MARKER}\n\nRun the review.`);
+    try {
+      const captured = {};
+      const res = await call(buildRecommendApp(captured), 'post', '/api/proxy/recommend-and-dispatch', {
+        issueIdentifier: 'TEST-1', kind: 'review', periodicalId: KNOWN_ID
+      }, AUTH);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.strictEqual(captured.item.periodicalId, KNOWN_ID);
+    } finally {
+      restore();
+    }
+  });
+
+  test('verb-override branch: an ordinary description (no marker) still stamps null', async () => {
+    const captured = {};
+    const res = await call(buildRecommendApp(captured), 'post', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'TEST-1', kind: 'review'
+    }, AUTH);
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(captured.item.periodicalId, null);
+  });
+
+  test('recommendation-derived branch (no kind — the everyday autopilot/lane trigger): marker -> derived canonical id', async () => {
+    const restore = withDescription('TEST-14', `${buildPeriodicalGateMarker('Documentation Review')}\n\nRun the review.`);
+    try {
+      const captured = {};
+      const res = await call(buildRecommendApp(captured), 'post', '/api/proxy/recommend-and-dispatch', {
+        issueIdentifier: 'TEST-14'
+      }, AUTH);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.equal(captured.item.kind, 'implementation', 'sanity: this must be the recommendation-derived branch');
+      assert.strictEqual(captured.item.periodicalId, 'documentation-review');
+    } finally {
+      restore();
+    }
   });
 });

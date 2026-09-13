@@ -52,7 +52,8 @@ import {
   DEFAULT_HORIZON_MS
 } from '../../lib/periodical-runs.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION, DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { PERIODICALS } from '../../lib/periodicals.js';
+import { PERIODICALS, resolvePeriodicalIdFromGateMarker } from '../../lib/periodicals.js';
+import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
 
 const WEEK_MS = CADENCE_MS.weekly;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -347,6 +348,44 @@ describe('foldPeriodicalRuns — joins', () => {
       assert.equal(result.runs, 0);
       assert.equal(result.state, 'never');
     });
+  });
+});
+
+// ── LIN-2575 acceptance witness: the derived join key ────────────────────────
+//
+// The lane/batch shape that produced the 2026-08-23 reports: a non-'periodical'
+// history row whose promptName is the lane's own batch header (matching no
+// template title) and which carries no periodicalId, so the fold cannot match
+// it. The dispatch seam derives the canonical id from the minted task's LIN-694
+// gate marker at dispatch time (lib/periodicals.js's
+// resolvePeriodicalIdFromGateMarker); stamped, the same row folds to `recent`.
+// These two assertions are the witness the ticket names: unstamped = invisible,
+// stamped-with-the-derived-id = run evidence.
+
+describe('LIN-2575 — a lane-produced report row folds to recent once its dispatch stamps the derived periodicalId', () => {
+  test('unstamped batch/lane row is not evidence; the same row stamped with the gate-derived id is', () => {
+    const t = template({ id: 'code-quality', title: 'Code Quality Review' });
+    const laneRow = historyRow({
+      kind: 'implementation',
+      periodicalId: null,
+      promptName: 'W8 advisory reviews — overdue periodicals',
+      dispatchedAt: new Date(NOW - DAY_MS).toISOString()
+    });
+
+    const [unstamped] = foldPeriodicalRuns([t], { historyRows: [laneRow] }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(unstamped.runs, 0);
+    assert.equal(unstamped.state, 'never', 'no join key and no title match: the 08-23 false-`due` shape');
+
+    // The minted Stage-2 task carries the gate marker; the registry id and the
+    // marker slug DELIBERATELY differ ('code-quality-review' vs 'code-quality'),
+    // so this pins the slug -> id resolution rather than a string equality.
+    const mintedTaskDescription = `${buildPeriodicalGateMarker('Code Quality Review')}\n\nRun the review.`;
+    const derived = resolvePeriodicalIdFromGateMarker(mintedTaskDescription);
+    assert.equal(derived, 'code-quality');
+
+    const [stamped] = foldPeriodicalRuns([t], { historyRows: [{ ...laneRow, periodicalId: derived }] }, { now: NOW, historyTtlMs: HISTORY_TTL_MS });
+    assert.equal(stamped.runs, 1);
+    assert.equal(stamped.state, 'recent');
   });
 });
 
