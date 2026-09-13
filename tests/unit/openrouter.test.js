@@ -2427,6 +2427,173 @@ describe('streamChat reasoning wire body (LIN-1000)', () => {
 });
 
 // ===========================================================================
+// Pre-aborted signal handling (LIN-2637)
+//
+// An AbortSignal that is ALREADY aborted when streamChat is entered fires no
+// future `abort` event — the event has been and gone — so a listener alone
+// lets a late abort slip through and buy a full streaming call. The guard must
+// therefore run up front, BEFORE the request starts: the test asserts that the
+// transport is never invoked, not merely that the call rejects.
+// ===========================================================================
+describe('streamChat pre-aborted signal (LIN-2637)', () => {
+  let originalFetch;
+  let savedProxyEnv;
+
+  beforeEach(() => {
+    originalFetch = global.fetch;
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy
+    };
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    setFetchImpl(null);
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+
+  function mockStreamResponse(pieces) {
+    const enc = new TextEncoder();
+    const blocks = pieces.map(p => `data: ${JSON.stringify({ choices: [{ delta: { content: p }, finish_reason: null }] })}\n\n`);
+    blocks.push(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`);
+    blocks.push('data: [DONE]\n\n');
+    return { ok: true, body: (async function* () { for (const b of blocks) yield enc.encode(b); })() };
+  }
+
+  test('streamChat with an already-aborted signal issues NO upstream request', async () => {
+    const ac = new AbortController();
+    ac.abort();
+
+    // A transport that would FAIL the test if it were invoked.
+    let fetchCalls = 0;
+    setFetchImpl(() => { fetchCalls++; throw new Error('transport must not be invoked'); });
+
+    const events = [];
+    const { streamChat } = await import('../../lib/openrouter.js');
+    await assert.rejects(
+      streamChat(
+        [{ role: 'user', content: 'hi' }],
+        { apiKey: 'test-key', signal: ac.signal },
+        (type, data) => events.push({ type, data })
+      ),
+      /OpenRouter request timed out/,
+      'an already-aborted signal surfaces as the abort contract error'
+    );
+
+    assert.strictEqual(fetchCalls, 0, 'no request is made for a pre-aborted signal');
+    assert.strictEqual(events.length, 0, 'no tokens/done are emitted for a pre-aborted signal');
+  });
+
+  test('an abort landing during streamChat setup is still caught by the up-front guard', async () => {
+    // The abort fires while streamChat is suspended inside initProxyFetch —
+    // before the request branch (and its listener) has been reached. The
+    // post-setup guard must catch it, or the request would proceed with an
+    // abort that no listener will ever see.
+    const ac = new AbortController();
+    setFetchImpl((url, opts) => new Promise((resolve, reject) => {
+      const rejectAborted = () => {
+        const err = new Error('The operation was aborted');
+        err.name = 'AbortError';
+        reject(err);
+      };
+      if (opts.signal.aborted) return rejectAborted();
+      opts.signal.addEventListener('abort', rejectAborted);
+    }));
+
+    const { streamChat } = await import('../../lib/openrouter.js');
+    const pending = streamChat(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'test-key', signal: ac.signal },
+      () => {}
+    );
+    ac.abort();
+    await assert.rejects(pending, /OpenRouter request timed out/);
+  });
+
+  test('an abort after the request is in flight rejects via the abort listener', async () => {
+    // The genuine mid-flight case: the request is already out when the signal
+    // fires, so only the listener wiring can abort it. Guards the listener
+    // path the fix relies on for aborts that land after the up-front check.
+    const ac = new AbortController();
+    let fetchStarted;
+    const fetchStartedP = new Promise((resolve) => { fetchStarted = resolve; });
+    setFetchImpl((url, opts) => {
+      fetchStarted();
+      return new Promise((resolve, reject) => {
+        const rejectAborted = () => {
+          const err = new Error('The operation was aborted');
+          err.name = 'AbortError';
+          reject(err);
+        };
+        if (opts.signal.aborted) return rejectAborted();
+        opts.signal.addEventListener('abort', rejectAborted);
+      });
+    });
+
+    const { streamChat } = await import('../../lib/openrouter.js');
+    const pending = streamChat(
+      [{ role: 'user', content: 'hi' }],
+      { apiKey: 'test-key', signal: ac.signal },
+      () => {}
+    );
+    await fetchStartedP;
+    ac.abort();
+    await assert.rejects(pending, /OpenRouter request timed out/);
+  });
+
+  test('streamChatWithTools final streamChat makes NO request when the abort lands during the last tool hop', async () => {
+    const ac = new AbortController();
+    const calls = [];
+    setFetchImpl(async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      calls.push({ streaming: body.stream === true, toolHop: Array.isArray(body.tools) });
+      if (body.tools) {
+        // Non-streaming tool hop: the model asks for a tool.
+        return {
+          ok: true,
+          json: async () => ({
+            choices: [{
+              finish_reason: 'tool_calls',
+              message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'sample_tool', arguments: '{}' } }] }
+            }]
+          })
+        };
+      }
+      // Streaming final answer — reaching here means the fix failed.
+      return mockStreamResponse(['should not happen']);
+    });
+
+    const { streamChatWithTools } = await import('../../lib/openrouter.js');
+    await assert.rejects(
+      streamChatWithTools(
+        [{ role: 'user', content: 'hi' }],
+        {
+          apiKey: 'test-key',
+          tools: [{ type: 'function', function: { name: 'sample_tool', parameters: { type: 'object', properties: {} } } }],
+          maxIterations: 1,
+          signal: ac.signal,
+          executeTool: async () => { ac.abort(); return 'tool result'; }
+        },
+        () => {}
+      ),
+      /OpenRouter request timed out/,
+      'a signal aborted during the last tool hop must fail the mandatory final streamChat'
+    );
+
+    // Exactly ONE request happened — the tool hop. The final streamed answer
+    // must NOT be issued.
+    assert.strictEqual(calls.length, 1, 'no streaming call after the tool hop');
+    assert.strictEqual(calls[0].toolHop, true, 'the only request is the non-streaming tool hop');
+    assert.strictEqual(calls[0].streaming, false);
+  });
+});
+
+// ===========================================================================
 // Prompt trace recorder (LIN-578) — content-bearing capture at the two
 // recommendation seams only. Verifies traces are captured WITHOUT changing the
 // user-facing recommendation result, and that the generic chat path is NOT captured.
