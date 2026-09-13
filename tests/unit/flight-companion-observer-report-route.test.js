@@ -16,8 +16,10 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import express from 'express';
-import { createFlightCompanionRoutes } from '../../routes/flight-companion.js';
+import { createFlightCompanionRoutes, buildCensusSeedText } from '../../routes/flight-companion.js';
+import { runObserverPass, PASS_INSTANCE_PREFIX } from '../../lib/observer-pass.js';
 
 function readOnlyObserverStateStore(doc) {
   return {
@@ -33,6 +35,36 @@ function readOnlyObserverStateStore(doc) {
     async advance() {
       this.calls.push({ method: 'advance' });
       throw new Error('the Flight Companion route must never call advance — read-only');
+    }
+  };
+}
+
+/**
+ * LIN-2645: a permissive in-memory ObserverStateStore — enough of the real
+ * contract (ensureSeeded/readCurrent/advance with CAS + identical-state no-op)
+ * for `runObserverPass` to write a report, so the agreement test can render
+ * the page from a report the pass actually produced rather than a hand-built
+ * literal.
+ */
+function memoryObserverStateStore(seed = {}) {
+  const docs = new Map(Object.entries(seed));
+  return {
+    calls: [],
+    async readCurrent(instanceKey) {
+      this.calls.push({ method: 'readCurrent', instanceKey });
+      return docs.get(instanceKey) || null;
+    },
+    async ensureSeeded(instanceKey, seedState) {
+      if (!docs.has(instanceKey)) docs.set(instanceKey, { rev: 1, state: seedState, stateHash: 'seed' });
+      const doc = docs.get(instanceKey);
+      return { rev: doc.rev, state: doc.state };
+    },
+    async advance(instanceKey, expectedRev, nextState) {
+      const doc = docs.get(instanceKey);
+      if (!doc || doc.rev !== expectedRev) return false;
+      if (JSON.stringify(doc.state) === JSON.stringify(nextState)) return true;
+      docs.set(instanceKey, { rev: doc.rev + 1, state: nextState, stateHash: `h${doc.rev + 1}` });
+      return true;
     }
   };
 }
@@ -264,5 +296,122 @@ describe('Flight Companion — LIN-2395 observer report panel (route)', () => {
       { method: 'readCurrent', instanceKey: 'companion:v1:acme' },
       { method: 'readCurrent', instanceKey: 'sweep:v1:acme' },
     ]);
+  });
+
+  test('LIN-2645: renders the fossil summary line from report.* so a truncated:false report is not read as a clean fleet', async () => {
+    const reportDoc = {
+      rev: 7,
+      updatedAt: new Date('2026-09-05T07:15:00.000Z'),
+      state: {
+        v: 1,
+        authority: 'off',
+        summary: 'Fossil-dominated.',
+        report: {
+          lanes: { working: 1, silent: 313, blocked: 52, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+          attentionCount: 1,
+          attention: [{ loopId: 'l1', issue: 'LIN-1', lane: 'blocked', stage: 'implement', since: '2026-09-05T05:00:00.000Z' }],
+          staleAttentionCount: 365,
+          staleAttentionThresholdMs: 7 * 24 * 60 * 60 * 1000,
+          narrative: 'One fresh decision; a large fossil tail.',
+          flags: [],
+          degraded: null,
+          censusGroundedAt: '2026-09-05T07:00:00.000Z',
+          censusRev: 12
+        }
+      }
+    };
+    const observerStateStore = readOnlyObserverStateStore(reportDoc);
+    const app = buildApp({ observerStateStore });
+    const { status, text } = await get(app, '/workspace/acme/flight-companion');
+    assert.strictEqual(status, 200);
+    assert.match(text, /<p class="fc-obs-stale">\+365 silent \/ blocked rows older than 7d, not listed above<\/p>/);
+  });
+
+  test('LIN-2645: a report without the stale fields renders no summary line (pre-LIN-2619 report docs)', async () => {
+    const reportDoc = {
+      rev: 8,
+      updatedAt: new Date('2026-09-05T07:15:00.000Z'),
+      state: {
+        v: 1,
+        authority: 'off',
+        summary: 'Quiet.',
+        report: {
+          lanes: { working: 0, silent: 0, blocked: 0, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+          attentionCount: 0,
+          attention: [],
+          narrative: 'Nothing to report.',
+          flags: [],
+          degraded: null,
+          censusGroundedAt: '2026-09-05T07:00:00.000Z',
+          censusRev: 3
+        }
+      }
+    };
+    const observerStateStore = readOnlyObserverStateStore(reportDoc);
+    const app = buildApp({ observerStateStore });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.doesNotMatch(text, /fc-obs-stale/);
+  });
+
+  test('LIN-2645 agreement: the panel line and the companion census seed carry the SAME fossil count off one census', async () => {
+    const censusDoc = {
+      rev: 4,
+      stateHash: 'h',
+      updatedAt: new Date('2026-09-05T07:00:00.000Z'),
+      state: {
+        lanes: { working: 1, silent: 313, blocked: 52, terminal: 0, queued: 0, resolved: 0, unknown: 0 },
+        attention: [],
+        truncated: false,
+        staleAttentionCount: 365,
+        staleAttentionThresholdMs: 7 * 24 * 60 * 60 * 1000
+      }
+    };
+    // The seed reads the census doc directly (buildCensusSeedText) ...
+    const seedText = buildCensusSeedText(censusDoc);
+    assert.ok(seedText.includes('+365 silent / blocked rows older than 7d, not listed'), seedText);
+
+    // ... and the panel reads report.*, which the pass lifts off that SAME
+    // census doc. Run the real pass so the agreement is end-to-end rather
+    // than a hand-built report literal.
+    const observerStateStore = memoryObserverStateStore({ 'sweep:v1:acme': censusDoc });
+    await runObserverPass('acme', {
+      observerStateStore,
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+      now: Date.parse('2026-09-05T07:15:00.000Z')
+    });
+    const reportDoc = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}acme`);
+    assert.strictEqual(reportDoc.state.report.staleAttentionCount, 365);
+
+    const app = buildApp({ observerStateStore });
+    const { text } = await get(app, '/workspace/acme/flight-companion');
+    assert.match(text, /\+365 silent \/ blocked rows older than 7d, not listed above/);
+  });
+
+  /**
+   * LIN-2645 close-out, ledger item L1. The route tests above assert the line
+   * is EMITTED; none of them proves it is legible in place. Shipped without a
+   * rule, `.fc-obs-stale` inherited the page body's full size and colour with
+   * no bottom margin, so the quietest line in the panel rendered as the
+   * loudest and butted flush against the meta line (witnessed in a browser
+   * against this very route, at report.staleAttentionCount > 0).
+   *
+   * Asserted against the stylesheet source rather than a browser, the way
+   * tests/unit/theme.test.js pins style.css: the failure mode is an ABSENT
+   * rule, which a text assertion catches exactly. The reference is the
+   * directly analogous sibling `.fc-obs-attention-overflow` — the summary
+   * line's register is "a footnote to the list above", not "another finding".
+   */
+  test('LIN-2645 L1: .fc-obs-stale carries a de-emphasised rule matching its .fc-obs-attention-overflow sibling', () => {
+    const css = readFileSync(new URL('../../public/flight-companion.css', import.meta.url), 'utf8');
+    const ruleOf = (selector) => {
+      const match = css.match(new RegExp(`\\${selector.startsWith('.') ? '.' : ''}${selector.slice(1)}\\s*\\{([^}]*)\\}`));
+      assert.ok(match, `expected a ${selector} rule in public/flight-companion.css`);
+      return match[1].split(';').map((d) => d.trim().replace(/\s+/g, ' ')).filter(Boolean).sort();
+    };
+    assert.deepStrictEqual(
+      ruleOf('.fc-obs-stale'),
+      ruleOf('.fc-obs-attention-overflow'),
+      'expected the fossil summary line to take the same de-emphasised register (muted colour, reduced size, 0.6rem rhythm) as the attention-overflow line it sits beside'
+    );
   });
 });
