@@ -1046,8 +1046,10 @@ endpoint's copy is the best-effort cross-device mirror of it.
   title of Harbour's own `docs/north-star.md` (a local file read, never Linear-backed).
   `stamped` is the doc hash recorded when this workspace's `northStar` was pasted via the
   Roadmap page — `null` for the (typical) workspace whose north star has nothing to do
-  with that doc, since a stamp is only ever recorded on a byte-identical paste at write
-  time. `drift` is `true`/`false` only when a `stamped` value exists to compare against
+  with that doc, since a stamp is only ever recorded when the paste matches that doc
+  after normalising whitespace on both sides (CRLF folded to LF, trailing whitespace and
+  trailing blank lines stripped — LIN-2838) at write time. `drift` is `true`/`false` only
+  when a `stamped` value exists to compare against
   `current`; otherwise `null` — "no claim made," never a fabricated staleness signal
   against a workspace's own unrelated preference text. Backward-compatible: a deployment
   whose proxy router doesn't wire this dependency still returns `stamped`/`drift: null`,
