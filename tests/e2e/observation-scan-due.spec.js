@@ -93,7 +93,9 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     await page.locator('#obs-due-select-all').check();
     await expect(bar).toBeVisible();
     await expect(bar).toHaveCSS('display', 'flex');
-    await expect(page.locator('#obs-due-selected-count')).toHaveText('3 selected (exact)');
+    // LIN-2760: the not-due row (issue-2, dueStatus: false) is skipped by
+    // select-all, so the count reflects the two due rows only.
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
 
     // Review finding 3 / N2 (LIN-2706 PR #1424) — the STYLING witness. The
     // fix for finding 3 (the count/estimate/refusal/quota-note rendering as
@@ -224,6 +226,93 @@ test.describe('Scan-due bulk-scan bar — real render + real stylesheet (LIN-270
     // LIN-2701 §B.7: the control now exists on both tiers — it is not
     // itself free-tier-gated; only the quota disclosure above is.
     await expect(page.locator('#obs-due-scan-selected')).toBeVisible();
+  });
+
+  // LIN-2760 (John's ruling on LIN-2241 F3): select-all covers due + unknown
+  // and skips not-due and errored rows — each selected row costs one
+  // billable LLM scan, not-due rows are unchanged by definition, and errored
+  // rows must not be re-billed blindly. Day one is preserved (unknown rows
+  // are still selected). The per-row checkbox stays free: a hand-picked
+  // not-due row remains selectable.
+  test('select-all on a mixed four-status list leaves not-due and errored unchecked, and a hand-pick still works', async ({ page }) => {
+    await page.route(SCAN_DUE_ROUTE, (route) => route.fulfill({
+      json: {
+        items: [
+          { issueId: 'issue-due', issueIdentifier: 'LIN-1', dueStatus: true },
+          { issueId: 'issue-unknown', issueIdentifier: 'LIN-2', dueStatus: null },
+          { issueId: 'issue-not-due', issueIdentifier: 'LIN-3', dueStatus: false },
+          { issueId: 'issue-errored', issueIdentifier: 'LIN-4', dueStatus: null, error: true },
+        ],
+        nextCursor: null,
+        pageCandidateCount: 4,
+        totalCandidateCount: 4,
+      },
+    }));
+    await openDueTab(page);
+    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(4);
+
+    // LIN-2757: the control names its outcome — the label (and so the
+    // checkbox's accessible name) says what it selects.
+    await expect(page.getByRole('checkbox', { name: 'select all due + unknown' })).toBeVisible();
+
+    await page.locator('#obs-due-select-all').check();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
+    await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-2' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-3' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-4' })).not.toBeChecked();
+
+    // A hand-pick still works: the per-row checkbox stays free, so an
+    // operator can still select a not-due row by hand.
+    await page.getByRole('checkbox', { name: 'select LIN-3' }).check();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('3 selected (exact)');
+    await expect(page.getByRole('checkbox', { name: 'select LIN-3' })).toBeChecked();
+  });
+
+  // LIN-2760 follow-up ruling (2026-09-13): on a page where EVERY loaded row
+  // is skipped (not-due/errored — coverable is empty), the select-all
+  // tri-state falls back to all-loaded keying so a hand-picked selection can
+  // still be cleared FROM the select-all control. Without the fallback the
+  // only reachable click is "check", a no-op with nothing coverable, and the
+  // uncheck branch (clears every loaded row) is unreachable — the operator
+  // would have to clear each row by hand.
+  test('an all-skipped page still lets select-all clear a hand-picked selection (empty-coverable fallback)', async ({ page }) => {
+    await page.route(SCAN_DUE_ROUTE, (route) => route.fulfill({
+      json: {
+        items: [
+          { issueId: 'issue-not-due', issueIdentifier: 'LIN-1', dueStatus: false },
+          { issueId: 'issue-errored', issueIdentifier: 'LIN-2', dueStatus: null, error: true },
+        ],
+        nextCursor: null,
+        pageCandidateCount: 2,
+        totalCandidateCount: 2,
+      },
+    }));
+    await openDueTab(page);
+    await expect(page.locator('#obs-due-list .obs-due-select')).toHaveCount(2);
+
+    // Hand-pick both skipped rows — the only way to select anything here,
+    // since select-all itself covers nothing on this page.
+    await page.getByRole('checkbox', { name: 'select LIN-1' }).check();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('1 selected (exact)');
+    // One of two loaded rows selected: the fallback reads "some" —
+    // indeterminate, a state the coverable keying cannot show when the
+    // coverable population is empty.
+    await expect(page.locator('#obs-due-select-all')).toHaveJSProperty('indeterminate', true);
+    await page.getByRole('checkbox', { name: 'select LIN-2' }).check();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('2 selected (exact)');
+
+    // Every loaded row hand-picked: the fallback reads checked, so the
+    // operator's next click on the control is the UNCHECK branch.
+    await expect(page.locator('#obs-due-select-all')).toBeChecked();
+
+    // The escape hatch itself: unchecking clears the hand-picked selection
+    // (Playwright's uncheck clicks the checked box and asserts it ends
+    // unchecked — exactly the click the pre-fallback code could not offer).
+    await page.locator('#obs-due-select-all').uncheck();
+    await expect(page.locator('#obs-due-selected-count')).toHaveText('0 selected (exact)');
+    await expect(page.getByRole('checkbox', { name: 'select LIN-1' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'select LIN-2' })).not.toBeChecked();
   });
 
   // Review N3 (LIN-2706 PR #1424): the per-row checkbox's accessible name,
