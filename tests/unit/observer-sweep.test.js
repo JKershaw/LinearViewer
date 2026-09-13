@@ -578,12 +578,15 @@ describe('observer-sweep: freshness ranking & fossil collapse (LIN-2619)', () =>
     );
   });
 
-  // ── LIN-2647: the fossil boundary itself, on a pure clock advance ───────
+  // ── LIN-2647: the payload's two clock boundaries, on pure clock advances ──
   //
-  // The measured LIN-2619 review probe, now pinned: the idempotency suite's
-  // "different times" tick advances 5 minutes against ~now-aged activity,
-  // deliberately clear of any boundary, so nothing before this caught the
-  // clock-dependence LIN-2619 introduced via `staleAttentionCount`.
+  // The measured LIN-2619 review probe, now pinned — plus its pre-LIN-2619
+  // sibling. The idempotency suite's "different times" tick advances 5
+  // minutes against ~now-aged activity, deliberately clear of ANY boundary,
+  // so nothing before this caught either clock dependence
+  // (buildSweepPayload's header names both; each gets its own test here):
+  // the lane census's `staleMs` working→silent crossing, and
+  // `staleAttentionCount`'s `FOSSIL_AGE_MS` fossil fold.
 
   // Mirrors the store's own hashState() (lib/observer-state-store.js):
   // sha256 over stableStringify(state). `canonicalizeForHash` is not
@@ -615,13 +618,15 @@ describe('observer-sweep: freshness ranking & fossil collapse (LIN-2619)', () =>
     assert.strictEqual(payloadB.staleAttentionCount, 1, 'tick B: …and is folded into the fossil count instead');
     assert.strictEqual(payloadB.attentionKeysFull.length, 1, 'tick B: the identity key still carries the row');
 
-    // The clock-dependence exception is real and load-bearing:
-    // staleAttentionCount is derived from `now`, so the store's dedup gate
-    // MUST see a genuine transition here (documented in buildSweepPayload's
-    // own docblock — the header's old "no per-tick-varying value anywhere"
-    // claim was false since LIN-2619, and this assertion is what pins the
-    // corrected claim). Removing the fossil filter entirely makes this
-    // assertion fail (the hash stops moving) — that is the point.
+    // The FOSSIL clock-dependence is real and load-bearing (one of the two
+    // boundaries the corrected header names — see the lane-staleness test
+    // below for the other): staleAttentionCount is derived from `now`, so
+    // the store's dedup gate MUST see a genuine transition here (documented
+    // in buildSweepPayload's own docblock — the header's old
+    // "no per-tick-varying value anywhere" claim was false since LIN-2619,
+    // and this assertion is what pins the corrected claim). Removing the
+    // fossil filter entirely makes this assertion fail (the hash stops
+    // moving) — that is the point.
     assert.notStrictEqual(
       hashOfPayload(payloadA), hashOfPayload(payloadB),
       'the payload hash must move when a row crosses the fossil boundary on a pure clock advance'
@@ -630,6 +635,63 @@ describe('observer-sweep: freshness ranking & fossil collapse (LIN-2619)', () =>
     assert.deepStrictEqual(
       payloadB.attentionKeysFull, payloadA.attentionKeysFull,
       'attentionKeysFull is clock-INDEPENDENT — a row ageing from enumerated to counted is not a set-membership change the gate can see'
+    );
+  });
+
+  test('LIN-2647: a pure clock advance across a row\'s 1h lane-staleness boundary moves the payload hash AND changes attentionKeysFull — the census\'s own, pre-LIN-2619 clock dependence', () => {
+    // The sibling of the fossil-boundary test above, pinning the OTHER
+    // clock dependence the corrected header names: classifyLoop's
+    // `now - loopLastActivityMs(loop) > staleMs` working→silent crossing,
+    // which predates LIN-2619 entirely (it is the lane census's own
+    // staleness rule, `DEFAULT_LANE_STALE_MS`). A working row —
+    // agentState 'running', no terminal marker, no blocked signal — whose
+    // last activity sits 59 minutes before tick A crosses the 1h threshold
+    // on a 5-minute pure clock advance: identical fleet, only `now` moved.
+    //
+    // Unlike the fossil crossing, this one is a REAL attention-membership
+    // change (a row that stopped being worked and started waiting), so
+    // BOTH the hash and attentionKeysFull must move — the companion gate's
+    // no-delta fold is scoped to fossil-boundary crossings, and this
+    // crossing is exactly the kind of genuine membership change it exists
+    // to let through.
+    const sinceMs = NOW_MS - 59 * 60 * 1000;
+    const rows = [historyItem({
+      id: 'lane-staleness-boundary', issueIdentifier: 'LIN-524',
+      dispatchedAt: new Date(sinceMs).toISOString(),
+      feedback: [] // no blocked signal, no terminal marker — a plain working run
+    })];
+    const loops = _buildLoops({ historyItems: rows, now: NOW, lean: true });
+    const working = loops[0];
+    assert.strictEqual(working.agentState, 'running', 'sanity: the row is an active working run (isLoopActive true)');
+
+    const payloadA = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payloadA.lanes.working, 1, 'tick A: 59 minutes old — still freshly active, working');
+    assert.strictEqual(payloadA.lanes.silent, 0, 'tick A: not yet silent');
+    assert.strictEqual(payloadA.attention.length, 0, 'tick A: working is not an attention lane');
+    assert.strictEqual(payloadA.attentionKeysFull.length, 0, 'tick A: no attention-eligible row exists yet');
+
+    const payloadB = buildSweepPayload(loops, { now: NOW_MS + 5 * 60 * 1000, staleMs: STALE_MS });
+    assert.strictEqual(payloadB.lanes.working, 0, 'tick B: 64 minutes old — past the 1h threshold, no longer working');
+    assert.strictEqual(payloadB.lanes.silent, 1, 'tick B: the row crossed to silent on a pure clock advance');
+    assert.strictEqual(payloadB.attention.length, 1, 'tick B: silent is attention-eligible — the row is now waiting');
+    assert.strictEqual(payloadB.attentionKeysFull.length, 1, 'tick B: the identity key gained the row');
+
+    assert.notStrictEqual(
+      hashOfPayload(payloadA), hashOfPayload(payloadB),
+      'the payload hash must move when a row crosses the lane-staleness boundary on a pure clock advance — this dependence predates LIN-2619'
+    );
+    // The deliberate contrast with the fossil-boundary test above: this
+    // crossing is a genuine set-membership change, so attentionKeysFull
+    // MUST move too — the gate's no-delta fold is fossil-boundary-scoped,
+    // not clock-scoped in general.
+    assert.notDeepStrictEqual(
+      payloadB.attentionKeysFull, payloadA.attentionKeysFull,
+      'a working→silent crossing adds a real member to attentionKeysFull — the gate correctly sees (and may spend on) this crossing; only the fossil boundary is invisible to it'
+    );
+    assert.deepStrictEqual(
+      payloadB.attentionKeysFull,
+      [['lane-staleness-boundary', 'silent', 'implementation']],
+      'the gained member is the crossed row\'s own identity tuple'
     );
   });
 
@@ -749,14 +811,18 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
     // `sweptAt: new Date(now).toISOString()` to buildSweepPayload's return
     // survived them. Fire a third tick with the clock advanced by ADVANCE_MS
     // (5 min — the fixture's activity is ~`now`, so every row stays ~5 min
-    // old against a 1h staleness threshold, far from the boundary and
-    // therefore classified identically). Same fleet, later clock, same
-    // document: that is the actual no-per-tick-varying-field contract.
+    // old against a 1h staleness threshold and days short of a 7-day fossil
+    // threshold, far from BOTH boundaries and therefore classified
+    // identically). Same fleet, later clock, same document: that is the
+    // actual contract — no payload field varies per tick while the clock
+    // stays clear of the two boundaries buildSweepPayload's header names
+    // (the lane-staleness and fossil crossings, each pinned by its own
+    // LIN-2647 boundary test above).
     const ADVANCE_MS = 5 * 60 * 1000;
     assert.ok(ADVANCE_MS * 2 < DEFAULT_LANE_STALE_MS, 'sanity: the advance must stay well clear of the staleness boundary');
     await sweepOneWorkspace(urlKey, { ...deps, now: now + ADVANCE_MS });
     const doc3 = await observerStateStore.readCurrent(instanceKey);
-    assert.strictEqual(doc3.rev, doc1.rev, 'an ADVANCING clock over identical fleet state must not advance rev — no payload field may vary per tick');
+    assert.strictEqual(doc3.rev, doc1.rev, 'an ADVANCING clock over identical fleet state must not advance rev while every row stays clear of the lane-staleness and fossil boundaries — a boundary crossing legitimately moves the hash (see the LIN-2647 boundary tests)');
     assert.strictEqual(doc3.ledger.length, doc1.ledger.length, 'a later-clock tick must not grow the ledger');
     assert.deepStrictEqual(doc3.state, doc1.state, 'the stored document must be byte-identical across ticks taken at DIFFERENT times');
   });

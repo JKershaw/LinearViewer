@@ -13,6 +13,11 @@
  *   D. Orchestration (collectNewHarnessSignal/collectIncumbentSignal) — a
  *      real MangoDB tmpdir, precedent: tests/unit/observer-sweep.test.js's
  *      idempotency tier, plus guardNetwork() proving no external call.
+ *      Includes the LIN-2647 cross-module fossil-cap test: a blocked row
+ *      driven through the REAL producer path (buildSweepPayload →
+ *      computeWouldBeActions → recordActions) across its FOSSIL_AGE_MS
+ *      boundary, proving computeNewHarnessSignal's duration maths freezes
+ *      at the boundary with truncated === false.
  *   E. Static import assertion.
  */
 import { test, describe, before, after } from 'node:test';
@@ -25,6 +30,8 @@ import { randomUUID } from 'node:crypto';
 import { MangoClient } from '@jkershaw/mangodb';
 
 import { __internal } from '../../lib/pipeline-loops.js';
+import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
+import { buildSweepPayload } from '../../lib/observer-sweep.js';
 import {
   computeNewHarnessSignal,
   computeIncumbentSignal,
@@ -32,7 +39,7 @@ import {
   collectNewHarnessSignal,
   collectIncumbentSignal
 } from '../../lib/observer-efficacy-signal.js';
-import { ObserverShadowLogStore, computeWouldBeAction } from '../../lib/observer-shadow-log.js';
+import { ObserverShadowLogStore, computeWouldBeAction, computeWouldBeActions } from '../../lib/observer-shadow-log.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
@@ -556,6 +563,87 @@ describe('observer-efficacy-signal: collectNewHarnessSignal / collectIncumbentSi
     const result = await collectNewHarnessSignal(urlKey, { observerShadowLogStore });
     assert.strictEqual(result.count, 3, 'only the newest 3 loops survived _pruneToCapacity');
     assert.strictEqual(result.truncated, true, 'the store actually evicted rows — truncated must be true, not just constructible from an injected capacity');
+  });
+
+  // LIN-2647 (F2 discharge): the fossil fold's consumer consequence, driven
+  // through the REAL producer path — buildSweepPayload → computeWouldBeActions
+  // → recordActions (the exact functions sweepOneWorkspace's shadow branch
+  // calls) — over a fleet whose one blocked row crosses FOSSIL_AGE_MS
+  // mid-window. Before this, CI exercised computeWouldBeActions only in
+  // isolation; nothing ran fossil-truncated shadow entries through
+  // computeNewHarnessSignal's duration maths. The pinned facts (all
+  // documented beside the LIN-2263 truncated caveat in
+  // lib/observer-efficacy-signal.js): the per-loop series FREEZES at the
+  // boundary — stillBlockedObservedMs caps at ≈FOSSIL_AGE_MS minus detection
+  // lag and relayCount stops growing even though the loop is still blocked —
+  // and `truncated` stays false, because it keys on the retention cap, an
+  // unrelated bound.
+  test('LIN-2647: a loop blocked past FOSSIL_AGE_MS freezes the shadow series at the boundary — stillBlockedObservedMs caps, relayCount stops, truncated stays false', async () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const T_MS = new Date('2026-08-20T10:00:00.000Z').getTime(); // the row's since (dispatchedAt)
+    // One blocked row (same _buildLoops discipline as section B's fixtures —
+    // a real dispatch-history row with a real [blocked] marker, never a
+    // hand-built Loop literal).
+    const loops = _buildLoops({
+      historyItems: [{
+        id: 'fossil-capped-loop', promptName: 'implementation', prompt: 'p',
+        issueId: 'uuid-1', issueIdentifier: 'LIN-77', issueTitle: 'Issue',
+        issueUrl: 'https://linear.app/x/issue/LIN-77', workspace: { urlKey: 'ws' },
+        dispatchedAt: new Date(T_MS).toISOString(), dispatchedBy: 'user-1',
+        target: 'cli', repo: null, status: 'taken',
+        resolvedAt: new Date(T_MS + 60_000).toISOString(), takenByTokenLabel: 'consumer-1',
+        feedback: [{ message: '[blocked] need a decision', timestamp: new Date(T_MS).toISOString() }]
+      }],
+      now: new Date(T_MS + 10 * DAY_MS), lean: true
+    });
+    assert.strictEqual(loops.length, 1, 'sanity: one loop in the fleet');
+
+    const db = client.db(`eff_${dbCounter++}`);
+    const observerShadowLogStore = new ObserverShadowLogStore({ collection: db.collection('observer-shadow-log') });
+    const urlKey = `ws-${randomUUID()}`;
+
+    // Ten daily ticks, identical fleet, only the clock moving — the same
+    // recordActions call sweepOneWorkspace makes when a shadow store is
+    // threaded. Days 1-7: the row is fresh enough to enumerate, so each tick
+    // logs one would-be action. Day 7 exactly hits FOSSIL_AGE_MS (the fossil
+    // check is `now - since > FOSSIL_AGE_MS`, strict), day 8 crosses it.
+    for (let day = 1; day <= 10; day++) {
+      const tickNow = T_MS + day * DAY_MS;
+      const payload = buildSweepPayload(loops, { now: tickNow, staleMs: DEFAULT_LANE_STALE_MS });
+      const actions = computeWouldBeActions(payload);
+      if (actions.length) {
+        await observerShadowLogStore.recordActions(urlKey, actions, new Date(tickNow));
+      }
+    }
+
+    // Producer-side sanity, so the consumer assertions below cannot pass
+    // vacuously: at day 10 the loop is STILL blocked and STILL counted by the
+    // census — it has merely dropped out of the enumerated attention array.
+    const day10 = buildSweepPayload(loops, { now: T_MS + 10 * DAY_MS, staleMs: DEFAULT_LANE_STALE_MS });
+    assert.strictEqual(day10.lanes.blocked, 1, 'the loop is still blocked at day 10');
+    assert.strictEqual(day10.staleAttentionCount, 1, '…and still counted — folded into the fossil count, not enumerated');
+    assert.strictEqual(computeWouldBeActions(day10).length, 0, '…so day 10 produced no shadow entry');
+
+    const result = await collectNewHarnessSignal(urlKey, { observerShadowLogStore });
+    assert.strictEqual(result.count, 1);
+    const [row] = result.perLoop;
+    assert.strictEqual(row.relayCount, 7, 'relayCount freezes at the boundary: one entry per day-1..7 tick; days 8-10 produced none, so it stops growing at 7 despite the loop still being blocked');
+    assert.strictEqual(
+      new Date(row.lastLoggedAt).getTime(), T_MS + 7 * DAY_MS,
+      'lastLoggedAt stops at the last pre-boundary tick — the producer stopped emitting entries the moment the row crossed FOSSIL_AGE_MS'
+    );
+    assert.strictEqual(
+      row.stillBlockedObservedMs, 6 * DAY_MS,
+      'stillBlockedObservedMs is capped at ≈FOSSIL_AGE_MS minus detection lag (first-to-last SURVIVING tick, 6d) — never the true ≥10-day still-blocked span'
+    );
+    assert.strictEqual(
+      row.detectionLagMs, DAY_MS,
+      'detectionLagMs still measures first tick minus since (1d) — the cap biases the SPAN, not the lag'
+    );
+    assert.strictEqual(
+      result.truncated, false,
+      'truncated does NOT flag the fossil cap — it keys on the retention cap (entries.length >= capacity, LIN-2263), an unrelated bound; this bias is docblock-only by design (LIN-2647)'
+    );
   });
 
   function forbiddenProxy(target, allowedMethods, label) {
