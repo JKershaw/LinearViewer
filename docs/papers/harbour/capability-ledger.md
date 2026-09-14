@@ -1,11 +1,11 @@
 ---
 title: What has each model been seen to do on Harbour's tasks?
-version: 2
-date: 2026-09-13
+version: 3
+date: 2026-09-14
 authors: [Claude, John Kershaw]
 model: by hand, by the session that conned the cheap-implementer bake-off, over the read-write proxy; the runs it reports ran as their own lineages say
-grounded_at: c4724419 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [docs/papers/harbour/cheap-implementer.md (v4, 2026-09-13), docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, LIN-2856, simple-dispatcher PR #233, LIN-2772 and PR #1487, LIN-2121 and PR #1488, LIN-2787 and PR #1489, LIN-2771 and PR #1491, LIN-2153 and LIN-2322 (research, plan and plan-review comments, 2026-09-13), LIN-2828 (voyage log, 2026-09-13 evening)]
+grounded_at: fcd0a71 (LinearViewer), 7617b731 (simple-dispatcher)
+cites: [docs/papers/harbour/cheap-implementer.md (v6, 2026-09-14), LIN-2875 (run brief and the driver's summary comments, 2026-09-14), LIN-2873 and simple-dispatcher PR #234, LIN-2872 and PR #1493, LIN-2837 and simple-dispatcher PR #235, LIN-2874 and LIN-2835 (research comments, 2026-09-14), LIN-2876 to LIN-2881, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/papers/harbour/capability-ledger-method.md (v1, 2026-09-13), LIN-2831 (results, close-out and floor tables, 2026-09-13), LIN-2828 (voyage log, 2026-09-12 and 2026-09-13), PR #1470 to PR #1482, PR #1485, PR #1486, LIN-2856, simple-dispatcher PR #233, LIN-2772 and PR #1487, LIN-2121 and PR #1488, LIN-2787 and PR #1489, LIN-2771 and PR #1491, LIN-2153 and LIN-2322 (research, plan and plan-review comments, 2026-09-13), LIN-2828 (voyage log, 2026-09-13 evening)]
 ---
 
 # What has each model been seen to do on Harbour's tasks?
@@ -37,7 +37,11 @@ behaviour** ticket with unit and end-to-end coverage, run single-shot (LIN-2772)
 **research** and **plan** kinds on two tickets each, judged by an Opus plan-review. It also
 adds **close-out**, on empty and on non-empty ledgers. No cheap model has yet been tried on
 a **visual layout**, a **data path, credential or contract** change beyond LIN-2787's read
-path, a **multi-session** ticket, or a **lane**.
+path, a **multi-session** ticket, or a **lane**. Edition 3 adds **harness code**: three
+simple-dispatcher and Harbour tickets that change how dispatches are guarded, reported or
+finalised, each a predicate or a state write over the feedback the harness itself emits
+(LIN-2873, LIN-2872 with LIN-2869, LIN-2837), and it adds the **autopilot driver** as a
+shape for Opus, since this edition's run was driven by one rather than conned by hand.
 
 Read every "not tried" below as exactly that. The bake-off chose small tickets because
 they were safe to try, not because the models were expected to fail on larger ones, and
@@ -59,6 +63,26 @@ to $8.88 on the bake-off's thirteen small tickets, each four to eighteen minutes
 the size of the change. Implementation on Opus is the one place the data argues against
 it: nine sessions, five approved first pass, at four times Sonnet's median cost, probably
 chosen for hardness.
+
+**Drives a run.** LIN-2875, six harness tickets, 226 minutes: read a brief, dispatched four
+workers in parallel inside four minutes, parked, and woke on each result. It verified every
+worker's claim before accepting it, twice by fetching the shipped predicate and running it
+against the real stored rows, which is how it caught two green-CI legs that were wrong. It
+waited at every human gate the brief named, refused to write the ledger acceptance
+reserved for a human, declined a conning instruction to re-dispatch a research worker once
+it had found the permission wedge that would have taken it, and stopped lanes at the
+brief's stop conditions rather than loop. It blocked twice on gates a human had already
+answered on the ticket, because its own last read was older than the answer. About
+seventeen wakes; 150 thousand output tokens, 364 thousand cache writes, fifty million
+cache reads; about $32 at Harbour's Opus 5 table, which is what a hand-conned evening cost
+on 13 September. The discipline is the reason to use it; the cache-read line is the reason
+it is not yet cheap.
+
+**Reads the host where a cheap worker cannot.** LIN-2874 research, eleven minutes, about
+$6: found the 502 burst that ate a finalize tail in the dispatcher's oplog, and found that
+the other case was unprovable because the reaper had deleted the log, and said so rather
+than guess. Two Flash research workers before it had wedged on the permission prompt the
+host directory raises.
 
 **Not tried:** nothing relevant. Effort levels below high have one week of stamped data and
 no gate outcomes yet.
@@ -174,7 +198,46 @@ where the behaviour was the class, then a grep pattern blind to a syntactic fami
 of seven checks passed on the second round. The gate sends 88% of plans back once and a
 third back twice, so two rounds is within the population, and the thread stopped there.
 One second-round plan session hung for an hour with no output and was aborted; the retry
-finished in 17 minutes.
+finished in 17 minutes. Its log was reaped before anyone read it, but three sessions the
+next day with the same signature each ended on an unanswered opencode permission prompt
+(LIN-2874), so the hang was probably the harness, not the plan.
+
+**Researches the harness against its own live servers.** LIN-2835, eighteen minutes, a
+fifth of a cent: found four running opencode servers from the same morning, queried each,
+and showed the session roll-up equals the sum over its 23 assistant messages to the last
+digit, which settled the ticket's open question and named the one-fetch fix. The Opus
+driver verified the comment rather than the claim and closed the lane on it.
+
+**Implements harness code, and is green when it is wrong.** Three tickets on 14 September,
+all predicates or state writes over the feedback the harness emits. LIN-2873 (the runner's
+stalled note): fixed the real defect, an eight-character prefix of an id whose first eight
+characters are the same on every session, and also built a fire-time re-read for a cause the
+ticket asserted and the code contradicts; Opus review proved the hypothesis false at HEAD
+and approved with the dead branch as a named-rollback item. LIN-2872 (exempt a launch-time
+failure from the duplicate guard): three legs, each green on seven checks and eleven
+thousand hermetic tests, each with mutation witnesses, and the first two returned false on
+all three incident rows the ticket was filed for, because the tests encoded the same
+assumption as the code about which harness lines mean work. Given the criterion as an
+allow-list instead of a symptom, the third leg fixed the three rows first try and
+over-fired on a fourth class the criterion had not named. LIN-2837 (surface the provider's
+refusal): first leg fixed the three named surfaces and reverted a guard on a terminal
+write; second leg guarded that arm and left its sibling; «2837-OUTCOME». The
+pattern across both tickets, in the driver's words, is that each pass fixes the instance
+it was shown and leaves the adjacent member of the class, and a research pass before the
+first leg would have enumerated the class in each case.
+
+**Closes out harness tickets once told to stay home.** LIN-2873's first close-out wedged
+ten minutes in on the permission prompt, grepping the host's state directory for a proxy
+token it already held. The second, with one line at the top of its prompt saying never to
+read outside the clone, merged in five minutes, verified the landed commit, and discharged
+the review's monitor item with a live sighting of the fixed note.
+
+**Wedges on a permission prompt when sent outside its clone.** Four opencode sessions in
+one morning, two research and one close-out on 14 September and probably one plan on the
+13th, each ended on `permission=external_directory` in its own log and heartbeat as busy
+until aborted, for between ten and eighty minutes. A prompt line prevented it twice out of
+two. The fix belongs to the harness (LIN-2876), and until it lands no opencode worker
+should be told to read the host.
 
 **Closes out reviewed tickets, empty ledger or not.** Four close-outs: LIN-2697 (empty
 ledger), LIN-2772, LIN-2787 and LIN-2771 (non-empty, each after a human read and accepted
@@ -185,8 +248,8 @@ against a server with no AI key to discharge the one item nobody had, unasked. T
 Opus control on LIN-2637 did the same in three minutes for $3.44 and its terminal marker
 never reached Harbour.
 
-**Not tried:** a visual layout, a lane, a multi-session ticket, review as a gate, and a
-ticket whose ledger a human has not read first.
+**Not tried:** a visual layout, a lane, a multi-session ticket, review as a gate, a plan
+after its own research, and a ticket whose ledger a human has not read first.
 
 ## Gemini 3.8 Flash (opencode, OpenRouter, no effort field)
 
@@ -234,8 +297,19 @@ is one hung session; it does not say the model cannot do the work.
 - The harness broke where the models did not. Three of the evening's launches died before
   any tool ran, with seven or eight opencode servers up on one host: two HTTP 500s on the
   first message, one server not ready in twenty seconds. One plan session hung for an hour.
-  Every retry worked. The runner's five-minute stall note carries a fixed placeholder
-  session id and is not a signal.
+  Every retry worked. The runner's five-minute stall note carried a fixed placeholder
+  session id until LIN-2873 landed on 14 September.
+- Green CI and mutation witnesses did not distinguish a right harness predicate from a
+  wrong one. On the 14 September run five of Flash's six deliverables were green and four
+  were wrong, and every defect was found the same way, by executing the code against real
+  stored rows or against the base branch. Mutation testing proves the tests pin the code,
+  not that the code matches the harness it describes.
+- An opencode worker that reads outside its clone hangs on a permission prompt nobody can
+  answer, and the runner reports it healthy throughout. Four sessions in one morning. One
+  prompt line prevents it; LIN-2876 is the real fix.
+- Flash research passed the Opus gate every time it was tried, three of three, for under a
+  cent each. The three implementation tickets that went round more than once were the three
+  where the conning session had judged research unnecessary.
 
 ## Method
 
@@ -250,6 +324,13 @@ by comment. Task shape was judged by reading each ticket's description. The
 OpenRouter per-ticket figures are the operator's hourly export split by session-minutes,
 because Harbour's relay reports the final turn only (LIN-2835).
 
+Edition 3 adds the 14 September run under `sessionId: e0bbc3a9`, six harness tickets
+driven by an Opus autopilot session from a brief on LIN-2875, with the conning session
+reading each ledger, answering gates on the tickets and, after the driver finished,
+dispatching the last leg and review by hand. Costs for that run are the sessions' own
+cumulative usage rows priced at Harbour's Opus 5 table, since the cost endpoint keys on
+tickets, not sessions; the driver's row is one cumulative snapshot across its wakes.
+
 ## Limits
 
 One run of small tickets chosen to be safe, one evening of one ticket per new shape, plus
@@ -258,22 +339,25 @@ is a first sighting, not a rate. The stepper comparison is confounded: the stepp
 was the harder of the pair. The two plan threads were confounded by the conning session's
 own concurrent merges moving HEAD under one of them. The ledger acceptances that preceded
 three cheap close-outs were written by the conning session on John's mandate, not by John.
-The shape vocabulary is a reading, not a measurement. In particular it
+The harness-code entries rest on three tickets in one morning, two of which were
+sent round on criteria the conning session wrote, so the miss rate is at least partly the
+spec's. The driver cost figure is one run and includes about fifty minutes of idling on a
+gate the conning session's watcher missed. The shape vocabulary is a reading, not a measurement. In particular it
 should not be read as a ranking: the models with the thinnest entries are the ones with
 the least evidence, not the least ability.
 
 ## Next
 
-- Run the fleet week with this edition consulted by hand, and write edition 2 from every
-  place it was wrong or silent.
-- Give DeepSeek V4 Flash 0731 five more grounded small tickets, and Flash V4.1 one page,
-  one thin ticket and one over an hour, each named as an experiment on its ticket. Then
-  go bigger: a multi-session ticket or a short lane on whichever Flash did best.
-- Run five more cheap close-outs, each with a human reading the ledger first, and count
-  what each filed against the review's outside list.
-- Give Flash a plan on a ticket whose class is small enough to bound in one query, and
-  see whether the second round clears when nothing moves under it.
-- Run the stepper pair the other way round, the easier ticket stepped, before reading
-  anything about stepping from LIN-2771.
-- Read the opencode logs for the gpt-oss-120b and Llama sessions before they rotate.
-- Add stepper entries: the same shapes, stepped, on a model that failed them single-shot.
+- Put research first on every cheap-worker ticket, including the ones that look understood,
+  and count the review rounds against this edition's three.
+- Land LIN-2876 and give Flash the LIN-2874 research again, on the same prompt, to see
+  whether the permission fix or the prompt line is what it needed.
+- Run the fleet week on Flash with a driver whose context is compacted at each beat
+  (LIN-2117), and price the driver against this edition's $32.
+- Give Flash a plan on a ticket it has just researched, which no run has yet done, before
+  reading anything more about Flash plans.
+- Run five more cheap close-outs on tickets in the simple-dispatcher repository, each with
+  the stay-inside line, and count wedges.
+- Try one harness-code ticket on Sonnet, to learn whether green-and-wrong is a Flash trait
+  or a shape trait.
+- Read the opencode logs for the gpt-oss-120b and Llama sessions if any survive LIN-2877.
