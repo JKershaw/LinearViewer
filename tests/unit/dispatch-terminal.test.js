@@ -10,7 +10,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback, isLaunchTimeFailure } from '../../lib/dispatch-terminal.js';
+import { LIN2872_INCIDENT_ROW_IDS, LIN2872_INCIDENT_FEEDBACK, CATEGORIZED_BEAT_THEN_FAILED, USAGE_OUTPUT_TOKENS_THEN_FAILED } from '../fixtures/dispatch-launch-failures.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -495,5 +496,163 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
       const merged = mergeLineageFeedback(anchorParkedFeedback(), [followUpRow], ANCHOR, SINCE);
       assert.equal(deriveLifecycleStatus(merged), 'blocked', 'unanchored feedback is filtered out by mergeLineageFeedback, so the anchor stays on its own last marker');
     });
+  });
+});
+
+/**
+ * LIN-2872 — the launch-time-failure predicate the duplicate-dispatch guard
+ * uses to exempt a prior that died before any work started. The exemption must
+ * be EXACT: a terminal `[failed]` with NO evidence of work is a launch-time
+ * failure (not a duplicate risk); anything else keeps blocking.
+ *
+ * "Evidence of work" is an ALLOW-LIST, not a deny-list of liveness strings: a
+ * categorized `[working · <category>]` beat, an `[evidence]` row, a `[usage]`
+ * row with `outputTokens > 0`, or a `[ticket]` marker. Everything else the
+ * harness posts — `[started] …`, the executor's `[working] Session launched …`
+ * announcement (executors.js:711), the opencode reaper's
+ * `[working] (opencode — Ns so far; next check in …)` poll, and `[working]
+ * Session resumed. …` — is LIVENESS, not work, and never fires the predicate.
+ *
+ * The fixtures are re-derived verbatim from the live incident rows (see
+ * tests/fixtures/dispatch-launch-failures.js): each carries BOTH the `Session
+ * launched` announcement AND the post-failure reaper poll — the two liveness
+ * beats that defeated the first two passes of this predicate.
+ */
+describe('isLaunchTimeFailure (LIN-2872)', () => {
+  // The three incident rows this ticket was filed for, verbatim stored
+  // feedback. All must be true — this is the predicate's whole reason to exist.
+  test('true for ALL THREE live incident rows — the verbatim stored feedback, both liveness beats included', () => {
+    for (const id of LIN2872_INCIDENT_ROW_IDS) {
+      const feedback = LIN2872_INCIDENT_FEEDBACK[id];
+      assert.equal(isLaunchTimeFailure(feedback), true, `row ${id} must be a launch-time failure`);
+    }
+  });
+
+  test('true for the launch-failure shape: terminal [failed], no work evidence anywhere', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[failed] opencode server never became ready within 20000ms' }
+    ]), true);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[failed] opencode HTTP 500 on the first message' }
+    ]), true);
+    // A runner detail line before the terminal marker does not count as work.
+    assert.equal(isLaunchTimeFailure([
+      { message: 'claiming item' },
+      { message: '[failed] Failed to launch iTerm session: boom' }
+    ]), true);
+  });
+
+  // LIN-2872 review F1: the executor posts `[working] Session launched ...` the
+  // instant the terminal window opens — BEFORE the harness has run a single
+  // message. It is a launch announcement, not evidence of work.
+  test('true with only the [working] Session launched announcement ahead of the [failed]', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] Session launched (session: 4cbf91c1, tty: unknown)' },
+      { message: '[failed] opencode runner error: message request failed: HTTP 500 ' }
+    ]), true);
+  });
+
+  // LIN-2875 run verification: the opencode reaper's POST-FAILURE liveness poll
+  // is evidence of polling a dead session, not of work — it must NOT keep the
+  // window. This is the specific beat that defeated the second rework.
+  test('true despite the opencode reaper liveness poll — [working] (opencode — Ns so far; next check in …) is not work', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] (opencode — 12s so far; next check in 30s)' },
+      { message: '[failed] opencode exited with code 1' }
+    ]), true);
+  });
+
+  test('true despite [started], [working] Session resumed, and bare [working] liveness leads', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[started] Running task in linearviewer (opencode)' },
+      { message: '[working] Session resumed. Executing follow-up...' },
+      { message: '[failed] boom' }
+    ]), true);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] no tool calls in 30s · 0 total' },
+      { message: '[failed] boom' }
+    ]), true);
+  });
+
+  // LIN-2872 review F2: the CATEGORIZED lead `[working · <category>]`
+  // (heartbeat.js:282) IS real work — the window must keep blocking.
+  test('false once a CATEGORIZED heartbeat appeared — [working · <cat>] is real work', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working · editing] 4 tools/20s: editing 3, search 1 · 4 total' },
+      { message: '[failed] tests red' }
+    ]), false);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working · verifying] verifying in background · idle 30s' },
+      { message: '[failed] boom' }
+    ]), false);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working · running] e2e running for 2m' },
+      { message: '[failed] boom' }
+    ]), false);
+  });
+
+  test('false once an [evidence] row appeared — a produced artifact is real work', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[evidence] PR opened · https://example.com/pr/1' },
+      { message: '[failed] boom' }
+    ]), false);
+  });
+
+  test('false once a [usage] row with outputTokens > 0 appeared — token output is real work', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[usage] {"schema":1,"harness":"opencode","inputTokens":5529,"outputTokens":25811,"costUsd":null}' },
+      { message: '[failed] boom' }
+    ]), false);
+  });
+
+  test('true despite a [usage] row with outputTokens absent or 0 — no work was done', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[usage] {"schema":1,"harness":"opencode","inputTokens":0,"outputTokens":0}' },
+      { message: '[failed] boom' }
+    ]), true);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[usage] {"schema":1,"harness":"opencode"}' },
+      { message: '[failed] boom' }
+    ]), true);
+    // A malformed [usage] payload is not evidence of work.
+    assert.equal(isLaunchTimeFailure([
+      { message: '[usage] not json' },
+      { message: '[failed] boom' }
+    ]), true);
+  });
+
+  test('false once a [ticket] marker appeared — a lane-marker relay line is real work', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[ticket] LIN-2423 started' },
+      { message: '[failed] boom' }
+    ]), false);
+  });
+
+  test('the negative fixtures — categorized-beat-then-failed and usage-output-then-failed — both return false', () => {
+    assert.equal(isLaunchTimeFailure(CATEGORIZED_BEAT_THEN_FAILED), false);
+    assert.equal(isLaunchTimeFailure(USAGE_OUTPUT_TOKENS_THEN_FAILED), false);
+  });
+
+  test('false for every non-failed terminal — done/aborted/skipped are not launch-time failures', () => {
+    assert.equal(isLaunchTimeFailure([{ message: '[done] finished' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[complete] all green' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[aborted] cancelled' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[skipped] human-continued session' }]), false);
+  });
+
+  test('false when there is no terminal marker at all — the prior is still taken/running', () => {
+    assert.equal(isLaunchTimeFailure([]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[working] still going' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: 'started work' }]), false);
+  });
+
+  test('fails CLOSED on non-array / unreadable feedback', () => {
+    assert.equal(isLaunchTimeFailure(undefined), false);
+    assert.equal(isLaunchTimeFailure(null), false);
+    assert.equal(isLaunchTimeFailure('nope'), false);
+  });
+
+  test('case-insensitive and tolerant of leading whitespace, matching the terminal regex', () => {
+    assert.equal(isLaunchTimeFailure([{ message: '  [FAILED] boom' }]), true);
   });
 });

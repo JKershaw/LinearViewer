@@ -17,6 +17,7 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection as createDocCollection } from '../fixtures/mock-collection.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { TERMINAL_TYPES } from '../../lib/providers/models.js';
+import { LIN2872_INCIDENT_FEEDBACK, CATEGORIZED_BEAT_THEN_FAILED, USAGE_OUTPUT_TOKENS_THEN_FAILED } from '../fixtures/dispatch-launch-failures.js';
 
 function createMockCollection() {
   const docs = [];
@@ -1145,6 +1146,170 @@ describe('createDispatchItem — force bypasses the duplicate guard (LIN-1656)',
       );
       assert.equal(store.addItemCalls, 1);
     }
+  });
+});
+
+/**
+ * LIN-2872 — the launch-time-failure exemption.
+ *
+ * A prior that reached terminal `[failed]` BEFORE any real work started died at
+ * launch (opencode HTTP 500 on the first message, "serve never became ready"):
+ * it is not a duplicate risk, so a retry inside the five-minute window must be
+ * ACCEPTED — the retry tax this ticket exists to remove. The window must remain
+ * for a prior that is still running (no terminal marker), one that actually ran
+ * (any work evidence), or one whose terminal is anything other than `[failed]`.
+ *
+ * CRITICAL SHAPE (LIN-2872 review F1 + the LIN-2875 run's verification): the
+ * incident rows carry the executor's `[working] Session launched …` announcement
+ * AND the opencode reaper's post-failure liveness poll `[working] (opencode — Ns
+ * so far; next check in …)`. Both are LIVENESS, not work. `isLaunchTimeFailure`
+ * is an ALLOW-LIST of work evidence (a categorized `[working · cat]` beat, an
+ * `[evidence]` row, a `[usage]` row with `outputTokens > 0`, a `[ticket]`
+ * marker) — so a prior that never posted any of those is exempt even with every
+ * liveness beat present. The fixtures below are the VERBATIM stored feedback of
+ * the live rows, re-derived via `GET /api/proxy/dispatch/<id>` (see
+ * tests/fixtures/dispatch-launch-failures.js) — never from the marker
+ * vocabulary alone.
+ *
+ * The priors are seeded directly into the store's history collection (the
+ * launch-time-failed row has been taken, so it lives in history), with the
+ * runner's real marker shapes, and dispatched against inside the window via
+ * the injected clock — mirroring the window-edge tests above.
+ */
+describe('createDispatchItem — duplicate guard, launch-time-failure exemption (LIN-2872)', () => {
+  const t0 = new Date('2026-07-26T12:00:00.000Z');
+  const seedPrior = (store, feedback) => store.historyCollection.insertOne({
+    _id: 'prior', urlKey: 'acme', issueIdentifier: 'LIN-1', kind: 'implementation',
+    followUpTo: null, abort: false, prompt: 'x', feedback,
+    dispatchedAt: t0,
+    expiresAt: new Date(t0.getTime() + 86_400_000)
+  });
+
+  // The three live incident shapes from LIN-2872, VERBATIM stored feedback (the
+  // launch announcement AND the post-failure reaper poll must not count as work).
+  const liveLaunchFailures = Object.values(LIN2872_INCIDENT_FEEDBACK);
+
+  test('a retry inside the window of a launch-time [failed] is ACCEPTED — ALL THREE verbatim incident rows', async () => {
+    assert.equal(liveLaunchFailures.length, 3, 'exactly the three incident rows');
+    for (const feedback of liveLaunchFailures) {
+      const store = realStore();
+      await seedPrior(store, feedback);
+      await freshDispatch(store, { now: () => t0.getTime() + 60_000 });
+      assert.equal(store.addItemCalls, 1, 'the retry must dispatch inside the window');
+    }
+  });
+
+  test('a retry inside the window of a bare [failed] (terminal never opened, or no launch beat at all) is ACCEPTED', async () => {
+    for (const message of [
+      '[failed] Failed to launch iTerm session: boom',
+      '[failed] Unknown repo "x": no configured workspace has a matching folder basename.'
+    ]) {
+      const store = realStore();
+      await seedPrior(store, [{ message }]);
+      await freshDispatch(store, { now: () => t0.getTime() + 60_000 });
+      assert.equal(store.addItemCalls, 1, `expected the retry after ${message} to dispatch`);
+    }
+  });
+
+  test('a retry inside the window of a prior that ran and emitted a CATEGORIZED beat is still refused (review F2)', async () => {
+    const store = realStore();
+    await seedPrior(store, CATEGORIZED_BEAT_THEN_FAILED);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+    assert.ok(err, 'a dispatch that ran (categorized heartbeat) is still a duplicate risk');
+    assert.equal(err.status, 409);
+    assert.equal(store.addItemCalls, 0);
+  });
+
+  test('a retry inside the window of a prior that ran and emitted a [usage] row with outputTokens > 0 is still refused', async () => {
+    const store = realStore();
+    await seedPrior(store, USAGE_OUTPUT_TOKENS_THEN_FAILED);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+    assert.ok(err, 'a dispatch that ran (token output) is still a duplicate risk');
+    assert.equal(err.status, 409);
+    assert.equal(store.addItemCalls, 0);
+  });
+
+  test('a retry inside the window of a prior that ran and emitted an [evidence] or [ticket] marker is still refused', async () => {
+    for (const feedback of [
+      [
+        { message: '[evidence] PR opened · https://example.com/pr/1' },
+        { message: '[failed] boom' }
+      ],
+      [
+        { message: '[ticket] LIN-2423 started' },
+        { message: '[failed] boom' }
+      ]
+    ]) {
+      const store = realStore();
+      await seedPrior(store, feedback);
+      const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+      assert.ok(err, 'work evidence must keep the window');
+      assert.equal(err.status, 409);
+      assert.equal(store.addItemCalls, 0);
+    }
+  });
+
+  test('a retry inside the window of a prior that posted only LIVENESS beats is ACCEPTED (the reaper poll is not work)', async () => {
+    const store = realStore();
+    await seedPrior(store, [
+      { message: '[started] Running task in linearviewer (opencode)' },
+      { message: '[working] Session launched (session: 4cbf91c1, tty: unknown)' },
+      { message: '[failed] opencode runner error: message request failed: HTTP 500 ' },
+      { message: '[working] (opencode — 12s so far; next check in 30s)' },
+      { message: '[failed] opencode exited with code 1' }
+    ]);
+    await freshDispatch(store, { now: () => t0.getTime() + 60_000 });
+    assert.equal(store.addItemCalls, 1, 'liveness beats are not work — the retry must dispatch');
+  });
+
+  test('a retry inside the window of a prior still RUNNING (a [working] heartbeat, no terminal) is still refused', async () => {
+    const store = realStore();
+    await seedPrior(store, [{ message: '[working] still going' }]);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+    assert.ok(err);
+    assert.equal(err.status, 409);
+  });
+
+  test('a retry inside the window of a prior that COMPLETED ([done]) is still refused', async () => {
+    const store = realStore();
+    await seedPrior(store, [{ message: '[done] finished in 40s' }]);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+    assert.ok(err);
+    assert.equal(err.status, 409);
+  });
+
+  test('the exemption FAILS CLOSED: a prior with no feedback (unreadable) still refuses', async () => {
+    const store = realStore();
+    await seedPrior(store, null);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+    assert.ok(err, 'the exemption must never silently widen to an unreadable prior');
+    assert.equal(err.status, 409);
+  });
+
+  test('a still-blocked refusal keeps the existing body shape, clearsAt-derived retryAfter untouched', async () => {
+    const store = realStore();
+    await seedPrior(store, [{ message: '[working] still going' }]);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 30_000 }).then(() => null, e => e);
+    assert.ok(err);
+    assert.equal(err.status, 409);
+    assert.equal(err.duplicateDispatch.code, 'DUPLICATE_DISPATCH');
+    assert.equal(err.duplicateDispatch.id, 'prior');
+    assert.equal(err.duplicateDispatch.issueIdentifier, 'LIN-1');
+    assert.equal(err.duplicateDispatch.kind, 'implementation');
+    assert.equal(err.duplicateDispatch.dispatchedAt, t0.toISOString());
+    // clearsAt = prior + window; retryAfter clamps to (0, 300]. At +30s the
+    // prior is 270s from clearing, so retryAfter must be ~270.
+    assert.equal(err.duplicateDispatch.retryAfter, 270);
+  });
+
+  test('the exemption is scoped to the exact launch-time shape: an explicit force is still honored for any other prior', async () => {
+    // The escape hatch must keep working for a still-running prior — the
+    // exemption narrows the guard, it never disables it.
+    const store = realStore();
+    await seedPrior(store, [{ message: '[working] still going' }]);
+    const forced = await freshDispatch(store, { now: () => t0.getTime() + 60_000, fields: { force: true } });
+    assert.equal(forced.force, true, 'the flag is still stored and forwarded');
+    assert.equal(store.addItemCalls, 1);
   });
 });
 
