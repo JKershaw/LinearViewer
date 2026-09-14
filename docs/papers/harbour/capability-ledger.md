@@ -221,7 +221,7 @@ assumption as the code about which harness lines mean work. Given the criterion 
 allow-list instead of a symptom, the third leg fixed the three rows first try and
 over-fired on a fourth class the criterion had not named. LIN-2837 (surface the provider's
 refusal): first leg fixed the three named surfaces and reverted a guard on a terminal
-write; second leg guarded that arm and left its sibling; «2837-OUTCOME». The
+write; second leg guarded that arm and left its sibling; third leg fixed the sibling arm and the third review found the fourth member of the same class in the test rather than the code, a catch that relabels every concurrent error as a timeout, so the lane stopped with PR #235 green and one test-side item open. The
 pattern across both tickets, in the driver's words, is that each pass fixes the instance
 it was shown and leaves the adjacent member of the class, and a research pass before the
 first leg would have enumerated the class in each case.

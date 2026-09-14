@@ -25,7 +25,7 @@ last leg and its review by hand.
 | LIN-2835, the usage relay reports the final turn only | Research done on Flash against four live opencode servers. Lane closed; the fix is a one-fetch runner change. |
 | LIN-2874, two silent terminations | Research done on Opus after two Flash workers wedged. Case A was a Harbour 502 burst; case B is unprovable because the reaper deleted the log. |
 | LIN-2872 with LIN-2869, the duplicate guard and the fused verb's dropped fields | Stopped after three Flash legs and two Opus send-backs. PR #1493 open; the fused-verb half is twice reviewed correct. Needs an Opus plan. |
-| LIN-2837, a bare exit 1 hides the provider's refusal | «2837-OUTCOME» |
+| LIN-2837, a bare exit 1 hides the provider's refusal | Stopped after three Flash legs and three Opus reviews. PR #235 open and green at `1a727a1`; the remaining hard item is a test-side guard the review names and validates. Nothing merged. |
 
 ## What it cost
 
