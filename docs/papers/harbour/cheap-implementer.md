@@ -1,11 +1,11 @@
 ---
 title: Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
-version: 5
-date: 2026-09-13
+version: 6
+date: 2026-09-14
 authors: [Claude, John Kershaw]
 model: the conning session wrote this by hand over the read-write proxy; the implementations it dispatched ran z-ai/glm-5.3, deepseek/deepseek-v4.1-flash and google/gemini-3.8-flash on opencode (no effort field), the floor run deepseek/deepseek-v4-flash-0731, openai/gpt-oss-120b and meta-llama/llama-3.1-8b-instruct on the same harness, the gating reviews and close-outs claude-opus-5 on claude-code at effort medium, the shadow reviews z-ai/glm-5.3 on opencode, as the dispatch lineages under sessionId LIN-2828-bakeoff report
-grounded_at: c4724419 (LinearViewer), d3c27c4 (simple-dispatcher)
-cites: [LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13, merged 2026-09-13), PR #1485 and PR #1486 (2026-09-13, merged 2026-09-13), LIN-2697 and LIN-2637 (close-out comments, 2026-09-13), LIN-2856, LIN-2772 and PR #1487, LIN-2121 and PR #1488, LIN-2787 and PR #1489, LIN-2771 and PR #1491, LIN-2153 and LIN-2322 (research, plan and plan-review comments, 2026-09-13), docs/papers/harbour/capability-ledger.md (v2, 2026-09-13), simple-dispatcher PR #233 (2026-09-12, merged 2026-09-13), LIN-2415 (comment 48055064, 2026-09-13), LIN-2637 and LIN-2697 (review and shadow comments, 2026-09-13), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
+grounded_at: fcd0a71 (LinearViewer), 7617b731 (simple-dispatcher)
+cites: [LIN-2875 (run brief and the driver's summary comments 0cac1af0 and the final summary, 2026-09-14), LIN-2873 and simple-dispatcher PR #234, LIN-2872 and PR #1493 (three legs and two reviews, 2026-09-14), LIN-2837 and simple-dispatcher PR #235 (three legs and three reviews, 2026-09-14), LIN-2874 (research comments, 2026-09-14), LIN-2835 (research comment 43c9a295, 2026-09-14), LIN-2876 to LIN-2881, lib/model-pricing.js@fcd0a71:126, LIN-2828 (comments 2026-09-12 and 2026-09-13), LIN-2831 (results table, 2026-09-13), LIN-2839 (research comment f415b68a, 2026-09-13), LIN-2830 (comments 401bfecc and d6eb6469), LIN-2573 (comment a0d9de81), PR #1470 to PR #1482 (2026-09-12 and 2026-09-13, merged 2026-09-13), PR #1485 and PR #1486 (2026-09-13, merged 2026-09-13), LIN-2697 and LIN-2637 (close-out comments, 2026-09-13), LIN-2856, LIN-2772 and PR #1487, LIN-2121 and PR #1488, LIN-2787 and PR #1489, LIN-2771 and PR #1491, LIN-2153 and LIN-2322 (research, plan and plan-review comments, 2026-09-13), docs/papers/harbour/capability-ledger.md (v2, 2026-09-13), simple-dispatcher PR #233 (2026-09-12, merged 2026-09-13), LIN-2415 (comment 48055064, 2026-09-13), LIN-2637 and LIN-2697 (review and shadow comments, 2026-09-13), simple-dispatcher/opencode-runner.js@135991f:383-387, simple-dispatcher/config.js@135991f:1093, simple-dispatcher/admission.js@135991f:33-37, docs/reviews/model-effort-routing-proposal-2026-09-11.md, docs/reviews/cheap-implementer-bakeoff-2026-09-13.md]
 ---
 
 # Can a cheap model implement Harbour tickets to Opus's review standard, and what does it cost?
@@ -32,7 +32,11 @@ client-side page ticket both single-shot and stepped, all four approved by Opus 
 round and all four merged and set Done by Flash close-outs after a human read each ledger,
 so the subscription's share of those tickets was one Opus review each. Flash research on two
 tickets went unfaulted by Opus plan-review; Flash plans on the same two went round twice
-without clearing, on the class bound each time.
+without clearing, on the class bound each time. A run the next morning, driven by an Opus
+autopilot session rather than conned by hand, gave Flash six harness-code tickets: one
+merged, two research passes cleared the gate, and two implementation tickets went round
+three times each on green-CI legs that were wrong against the real rows. The driver cost
+what conning had, about $32, and research would have saved every extra round.
 
 ## Findings
 
@@ -190,6 +194,68 @@ every instance, so it is a template, not a signal; the duplicate-dispatch guard 
 retry for five minutes after a launch failure and `force` does not override it on the
 recommend-and-dispatch verb.
 
+**Cheap implementation of harness code was green and wrong, four times in six.** The 14
+September run (LIN-2875) gave Flash 0731 three tickets whose subject is the harness's own
+feedback: a stalled note's id (LIN-2873), a guard over prior dispatches (LIN-2872 with
+LIN-2869), and a state write on a failed turn (LIN-2837). Six implementation legs; five
+green on CI with mutation witnesses; four wrong. LIN-2872's first leg returned false on all
+three incident rows the ticket was filed for, its second still did, and its third, given the
+criterion as an allow-list rather than a symptom, fixed the three rows and exempted every
+failed opencode row instead. LIN-2837's first leg reverted a guard from LIN-2556, its
+second guarded one arm and left the sibling, and its third fixed exactly what it was
+told to, after which the review found the fourth member of the class in a test. Every defect was found the same way and never
+by CI: the Opus reviewer, and then the driver, fetched the shipped predicate and ran it
+against the real stored feedback, or diffed the branch's behaviour against base. The tests
+encoded the same assumption as the code about which harness lines mean work, so a mutation
+witness proved the tests pinned the code and nothing about whether the code matched the
+harness. On the one leg that had an explicit criterion Flash was right first time about the
+thing the criterion named and wrong about the thing it did not; the driver's reading, which
+this paper adopts, is that the failure mode is under-specification, not capability. That
+distinction is exactly what the next finding is for.
+
+**Research first, always, on cheap workers.** Three tickets in that run were judged by the
+conning session to be understood to the line, and research was skipped on all three. Each
+then cost at least one review round on something research asks for by name: LIN-2873's
+ticket asserted a root cause the code contradicts, which the staleness check exists to
+catch; LIN-2872 needed the class of markers a failed opencode row carries enumerated before
+anyone wrote a predicate over them; LIN-2837's two-arm guard is the sibling sweep. Flash
+research on the same harness cleared the Opus gate three of three times on 13 and 14
+September (LIN-2153, LIN-2322, LIN-2835), in 12 to 22 minutes for under a cent each, and
+LIN-2835's found four live opencode servers and proved its answer against them. A failed
+review round costs an Opus review at $3 to $4, two or three driver wakes at about $3 each,
+and forty to fifty minutes. Research pays for itself at one round saved in twenty; on this
+run it would have been three of three. Flash plans stay out of the loop on the evidence so
+far; Flash research goes in front of every cheap implementation, and the exemption for a
+ticket that looks understood is withdrawn.
+
+**A driver at the top costs what conning costs, for now.** The run's orchestrator was an
+Opus autopilot session launched from a brief on LIN-2875 and observed by the conning
+session, which read ledgers and answered gates on the tickets. The driver's discipline was
+the best seen on Harbour: it verified every worker claim against the artefact rather than
+the report, waited at every human gate, declined an instruction it had evidence against,
+and stopped lanes at the brief's conditions. It also woke about seventeen times, and each
+wake re-read its whole history: fifty million cache-read tokens against 150 thousand output,
+about $32 at Harbour's Opus 5 table (`lib/model-pricing.js`), against about $35 for the
+hand-conned evening before. The whole run was about $57 API-equivalent on the subscription
+and two cents relayed from OpenRouter: five Opus reviews at $3.70 each, one Opus research
+at $6, the driver, and Flash. The saving the driver buys is the conning session's attention,
+not tokens, until its context is compacted between wakes (LIN-2117) or the cloud Flight
+Companion takes the seat.
+
+**The silent hangs were a permission prompt.** Four opencode sessions across the two days
+heartbeat as busy for ten to eighty minutes with no output. The driver read the per-session
+log of the first one and found it ends on `permission=external_directory`: the worker had
+read outside its clone, opencode asked, and in a headless run nobody answers. A sweep of
+all twelve sessions on the host found exactly one unanswered prompt, the wedged one. A
+close-out then wedged the same way while grepping the host's state directory for a proxy
+token it already held, so the trap is not about the task's subject. One line at the top of
+the prompt, stay inside the clone, prevented it in both later workers. The Opus research on
+LIN-2874 also settled the other silent case: the LIN-2637 close-out did post its terminal
+marker, and Harbour returned 502 to the entire finalize tail inside 174 milliseconds, the
+only seven failed feedback posts in two days of oplog. Neither was the model. Both are on
+the board (LIN-2876, LIN-2879), with the reaper that deleted the one log that could have
+answered the 13 September hang (LIN-2877).
+
 ## Method
 
 Twelve small tickets whose descriptions were already the plan, plus one filed during the
@@ -235,20 +301,16 @@ review costs but not with the OpenRouter export.
 
 ## Next
 
-- Land LIN-2835 so the per-ticket cost is a per-session read rather than an hourly total
-  split by minutes.
-- Run a fleet week on medium tickets, where the review-to-implementation ratio is the
-  interesting one, and measure the saving per Opus review rather than per ticket.
-- Give a cheap reviewer on a *different* model from the implementer a cold pass on PRs
-  where Opus found a blocking defect, and count what it catches. One miss is a hint.
-- Read the opencode session log for the gpt-oss-120b and Llama sessions before the host
-  rotates it, to learn whether the non-events were the model or the harness's tool calling.
-- Run the empty-ledger close-out on Flash five more times, each with the review's ledger
-  read by a human first, before deciding whether the empty-ledger case can leave Opus.
-  One clean merge is one clean merge.
+- Research first on every cheap-worker ticket for the fleet week, and count review rounds
+  against this run's three-per-ticket on the two harness tickets.
+- Land LIN-2876 and LIN-2835, then re-run the LIN-2874 research on Flash with the same
+  prompt, to learn whether the permission fix alone makes the host readable.
+- Price the driver again with beat-boundary compaction (LIN-2117), and again from the cloud
+  Flight Companion when it can dispatch; the number to beat is $32 for six tickets.
+- Give a harness-code ticket to Sonnet, to learn whether green-and-wrong is the model or
+  the shape.
 - Run the stepper pair the other way round, the easier ticket stepped, and on a shape that
   failed single-shot, before reading anything about stepping from one pair.
-- Give Flash a plan on a ticket small enough to bound in one query, with nothing landing
-  under it, and see whether the second round clears.
-- Exempt a launch-time failure from the duplicate-dispatch guard, and give the runner's
-  stall note a real session id or no id.
+- Give Flash a plan on a ticket it has just researched, with nothing landing under it.
+- Finish LIN-2872 from an Opus plan over the review's six ledger items, and decide whether
+  its correct half (LIN-2869) lands first.
