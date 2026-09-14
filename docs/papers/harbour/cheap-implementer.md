@@ -201,8 +201,9 @@ LIN-2869), and a state write on a failed turn (LIN-2837). Six implementation leg
 green on CI with mutation witnesses; four wrong. LIN-2872's first leg returned false on all
 three incident rows the ticket was filed for, its second still did, and its third, given the
 criterion as an allow-list rather than a symptom, fixed the three rows and exempted every
-failed opencode row instead. LIN-2837's first leg reverted a guard from LIN-2556 and its
-second guarded one arm and left the sibling. Every defect was found the same way and never
+failed opencode row instead. LIN-2837's first leg reverted a guard from LIN-2556, its
+second guarded one arm and left the sibling, and its third fixed exactly what it was
+told to, after which the review found the fourth member of the class in a test. Every defect was found the same way and never
 by CI: the Opus reviewer, and then the driver, fetched the shipped predicate and ran it
 against the real stored feedback, or diffed the branch's behaviour against base. The tests
 encoded the same assumption as the code about which harness lines mean work, so a mutation
