@@ -501,11 +501,15 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
 /**
  * LIN-2872 — the launch-time-failure predicate the duplicate-dispatch guard
  * uses to exempt a prior that died before any work started. The exemption must
- * be EXACT: a terminal `[failed]` with no `[working]` heartbeat ever is a
+ * be EXACT: a terminal `[failed]` with no REAL work-started marker is a
  * launch-time failure (not a duplicate risk); anything else keeps blocking.
+ * The executor's `[working] Session launched …` beat is a launch ANNOUNCEMENT
+ * (posted the instant the terminal window opens, before any tool runs) and does
+ * NOT count as work (LIN-2872 review F1); every other `[working]`/`[working · cat]`
+ * heartbeat does (review F2).
  */
 describe('isLaunchTimeFailure (LIN-2872)', () => {
-  test('true for the launch-failure shape: terminal [failed], no [working] heartbeat anywhere', () => {
+  test('true for the launch-failure shape: terminal [failed], no work-started marker anywhere', () => {
     assert.equal(isLaunchTimeFailure([
       { message: '[failed] opencode server never became ready within 20000ms' }
     ]), true);
@@ -519,19 +523,63 @@ describe('isLaunchTimeFailure (LIN-2872)', () => {
     ]), true);
   });
 
-  test('false once any [working] heartbeat appeared — the dispatch actually ran before it failed', () => {
+  // LIN-2872 review F1: the executor posts `[working] Session launched ...` the
+  // instant the terminal window opens (simple-dispatcher/executors.js:711) — BEFORE
+  // the harness has run a single message. Every opencode launch-time failure carries
+  // this beat, so "any [working] marker = work started" misses the ticket's own
+  // motivating rows (a995b517, 2c174598, ce42c335). The launch announcement is NOT
+  // evidence of work.
+  test('true for the REAL launch-failure shape: only the [working] Session launched announcement precedes the [failed]', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] Session launched (session: 4cbf91c1, tty: unknown)' },
+      { message: '[failed] opencode runner error: message request failed: HTTP 500 ' }
+    ]), true);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] Session launched (session: ce42c335, tty: unknown)' },
+      { message: '[failed] opencode runner error: opencode serve never became ready within 20000ms' }
+    ]), true);
+    // A bare mention of the launch beat (no session/tty payload) is still the announcement.
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] Session launched' },
+      { message: '[failed] boom' }
+    ]), true);
+  });
+
+  test('false once a real during-work beat appeared — the dispatch actually ran before it failed', () => {
     assert.equal(isLaunchTimeFailure([
       { message: '[working] 4 tools/20s · alive' },
       { message: '[failed] tests red' }
     ]), false);
-    // Even a single launch beat ("Session launched") means work began.
+    // A non-launch liveness beat (the opencode reaper's during-run heartbeat) is
+    // still evidence the process ran — conservative: ONLY the launch announcement
+    // is ignored, never a post-launch heartbeat.
     assert.equal(isLaunchTimeFailure([
-      { message: '[working] Session launched' },
-      { message: '[failed] boom' }
+      { message: '[working] (opencode — 12s so far; next check in 30s)' },
+      { message: '[failed] opencode exited with code 1' }
     ]), false);
     // The resume marker is a [working] marker too (LIN-2123's shared prefix).
     assert.equal(isLaunchTimeFailure([
       { message: '[working] Session resumed. Executing follow-up...' },
+      { message: '[failed] boom' }
+    ]), false);
+  });
+
+  // LIN-2872 review F2: heartbeat.js also emits the CATEGORIZED lead
+  // `[working · <category>]` (e.g. `[working · editing] 4 tools/20s`). A regex keyed
+  // on `[working]` alone would miss it and wrongly exempt a dispatch that genuinely
+  // ran and failed after only categorized beats — the exact gap that goes live once
+  // F1 stops counting the launch announcement.
+  test('false once a CATEGORIZED heartbeat appeared — [working · <cat>] is real work, not a launch announcement', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working · editing] 4 tools/20s: editing 3, search 1 · 4 total' },
+      { message: '[failed] tests red' }
+    ]), false);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working · verifying] verifying in background · idle 30s' },
+      { message: '[failed] boom' }
+    ]), false);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working · running] e2e running for 2m' },
       { message: '[failed] boom' }
     ]), false);
   });

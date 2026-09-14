@@ -1151,13 +1151,21 @@ describe('createDispatchItem — force bypasses the duplicate guard (LIN-1656)',
 /**
  * LIN-2872 — the launch-time-failure exemption.
  *
- * A prior that reached terminal `[failed]` BEFORE any `[working]` heartbeat
- * died at launch (opencode HTTP 500 on the first message, "serve never became
- * ready"): it never started work, so it is not a duplicate risk and a retry
- * inside the five-minute window must be ACCEPTED — the retry tax this ticket
- * exists to remove. The window must remain for a prior that is still running
- * (no terminal marker), one that actually ran (any `[working]` heartbeat), or
- * one whose terminal is anything other than `[failed]`.
+ * A prior that reached terminal `[failed]` BEFORE any real work started died at
+ * launch (opencode HTTP 500 on the first message, "serve never became ready"):
+ * it is not a duplicate risk, so a retry inside the five-minute window must be
+ * ACCEPTED — the retry tax this ticket exists to remove. The window must remain
+ * for a prior that is still running (no terminal marker), one that actually ran
+ * (any real during-work beat), or one whose terminal is anything other than
+ * `[failed]`.
+ *
+ * CRITICAL SHAPE (LIN-2872 review F1): the executor posts `[working] Session
+ * launched (session: …, tty: …)` the instant the terminal window opens — BEFORE
+ * the harness runs a message. Every real launch-time failure row therefore
+ * carries that beat ahead of its `[failed]`. The fixtures below are re-derived
+ * from the LIVE rows this ticket was filed for (a995b517, 2c174598: HTTP 500 on
+ * the first message; ce42c335: serve never became ready within 20000ms) — never
+ * from the marker vocabulary alone.
  *
  * The priors are seeded directly into the store's history collection (the
  * launch-time-failed row has been taken, so it lives in history), with the
@@ -1173,16 +1181,30 @@ describe('createDispatchItem — duplicate guard, launch-time-failure exemption 
     expiresAt: new Date(t0.getTime() + 86_400_000)
   });
 
-  test('a retry inside the window of a launch-time [failed] (no [working] heartbeat) is ACCEPTED', async () => {
-    const store = realStore();
-    await seedPrior(store, [{ message: '[failed] opencode server never became ready within 20000ms' }]);
-    await freshDispatch(store, { now: () => t0.getTime() + 60_000 });
-    assert.equal(store.addItemCalls, 1, 'the retry must dispatch inside the window');
+  // The three live incident shapes from LIN-2872, verbatim feedback arrays (the
+  // launch announcement must not count as work).
+  const liveLaunchFailures = [
+    [
+      { message: '[working] Session launched (session: 4cbf91c1, tty: unknown)' },
+      { message: '[failed] opencode runner error: message request failed: HTTP 500 ' }
+    ],
+    [
+      { message: '[working] Session launched (session: ce42c335, tty: unknown)' },
+      { message: '[failed] opencode runner error: opencode serve never became ready within 20000ms' }
+    ]
+  ];
+
+  test('a retry inside the window of a launch-time [failed] is ACCEPTED — the LIVE incident shapes, launch announcement included', async () => {
+    for (const feedback of liveLaunchFailures) {
+      const store = realStore();
+      await seedPrior(store, feedback);
+      await freshDispatch(store, { now: () => t0.getTime() + 60_000 });
+      assert.equal(store.addItemCalls, 1, 'the retry must dispatch inside the window');
+    }
   });
 
-  test('a retry inside the window of a bare [failed] (the LIN-2787/2121 message shapes) is ACCEPTED', async () => {
+  test('a retry inside the window of a bare [failed] (terminal never opened, or no launch beat at all) is ACCEPTED', async () => {
     for (const message of [
-      '[failed] opencode HTTP 500 on the first message',
       '[failed] Failed to launch iTerm session: boom',
       '[failed] Unknown repo "x": no configured workspace has a matching folder basename.'
     ]) {
@@ -1193,7 +1215,7 @@ describe('createDispatchItem — duplicate guard, launch-time-failure exemption 
     }
   });
 
-  test('a retry inside the window of a prior that RAN (a [working] heartbeat before the [failed]) is still refused', async () => {
+  test('a retry inside the window of a prior that RAN (a real [working] heartbeat before the [failed]) is still refused', async () => {
     const store = realStore();
     await seedPrior(store, [
       { message: '[working] 4 tools/20s · alive' },
@@ -1204,6 +1226,29 @@ describe('createDispatchItem — duplicate guard, launch-time-failure exemption 
     assert.equal(err.status, 409);
     assert.equal(err.duplicateDispatch.id, 'prior');
     assert.equal(store.addItemCalls, 0, 'a refused dispatch must not reach addItem');
+  });
+
+  test('a retry inside the window of a prior that ran and emitted only CATEGORIZED beats is still refused (review F2)', async () => {
+    const store = realStore();
+    await seedPrior(store, [
+      { message: '[working · editing] 4 tools/20s: editing 3, search 1 · 4 total' },
+      { message: '[failed] tests red' }
+    ]);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+    assert.ok(err, 'a dispatch that ran (categorized heartbeat) is still a duplicate risk');
+    assert.equal(err.status, 409);
+    assert.equal(store.addItemCalls, 0);
+  });
+
+  test('a retry inside the window of a prior with a non-launch liveness beat is still refused (only the launch announcement is exempt)', async () => {
+    const store = realStore();
+    await seedPrior(store, [
+      { message: '[working] (opencode — 12s so far; next check in 30s)' },
+      { message: '[failed] opencode exited with code 1' }
+    ]);
+    const err = await freshDispatch(store, { now: () => t0.getTime() + 60_000 }).then(() => null, e => e);
+    assert.ok(err);
+    assert.equal(err.status, 409);
   });
 
   test('a retry inside the window of a prior still RUNNING (a [working] heartbeat, no terminal) is still refused', async () => {
