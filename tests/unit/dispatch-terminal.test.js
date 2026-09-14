@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback, isLaunchTimeFailure } from '../../lib/dispatch-terminal.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -495,5 +495,67 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
       const merged = mergeLineageFeedback(anchorParkedFeedback(), [followUpRow], ANCHOR, SINCE);
       assert.equal(deriveLifecycleStatus(merged), 'blocked', 'unanchored feedback is filtered out by mergeLineageFeedback, so the anchor stays on its own last marker');
     });
+  });
+});
+
+/**
+ * LIN-2872 — the launch-time-failure predicate the duplicate-dispatch guard
+ * uses to exempt a prior that died before any work started. The exemption must
+ * be EXACT: a terminal `[failed]` with no `[working]` heartbeat ever is a
+ * launch-time failure (not a duplicate risk); anything else keeps blocking.
+ */
+describe('isLaunchTimeFailure (LIN-2872)', () => {
+  test('true for the launch-failure shape: terminal [failed], no [working] heartbeat anywhere', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[failed] opencode server never became ready within 20000ms' }
+    ]), true);
+    assert.equal(isLaunchTimeFailure([
+      { message: '[failed] opencode HTTP 500 on the first message' }
+    ]), true);
+    // A runner detail line before the terminal marker does not count as work.
+    assert.equal(isLaunchTimeFailure([
+      { message: 'claiming item' },
+      { message: '[failed] Failed to launch iTerm session: boom' }
+    ]), true);
+  });
+
+  test('false once any [working] heartbeat appeared — the dispatch actually ran before it failed', () => {
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] 4 tools/20s · alive' },
+      { message: '[failed] tests red' }
+    ]), false);
+    // Even a single launch beat ("Session launched") means work began.
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] Session launched' },
+      { message: '[failed] boom' }
+    ]), false);
+    // The resume marker is a [working] marker too (LIN-2123's shared prefix).
+    assert.equal(isLaunchTimeFailure([
+      { message: '[working] Session resumed. Executing follow-up...' },
+      { message: '[failed] boom' }
+    ]), false);
+  });
+
+  test('false for every non-failed terminal — done/aborted/skipped are not launch-time failures', () => {
+    assert.equal(isLaunchTimeFailure([{ message: '[done] finished' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[complete] all green' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[aborted] cancelled' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[skipped] human-continued session' }]), false);
+  });
+
+  test('false when there is no terminal marker at all — the prior is still taken/running', () => {
+    assert.equal(isLaunchTimeFailure([]), false);
+    assert.equal(isLaunchTimeFailure([{ message: '[working] still going' }]), false);
+    assert.equal(isLaunchTimeFailure([{ message: 'started work' }]), false);
+  });
+
+  test('fails CLOSED on non-array / unreadable feedback', () => {
+    assert.equal(isLaunchTimeFailure(undefined), false);
+    assert.equal(isLaunchTimeFailure(null), false);
+    assert.equal(isLaunchTimeFailure('nope'), false);
+  });
+
+  test('case-insensitive and tolerant of leading whitespace, matching the terminal regex', () => {
+    assert.equal(isLaunchTimeFailure([{ message: '  [FAILED] boom' }]), true);
   });
 });
