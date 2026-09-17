@@ -873,6 +873,15 @@ a.wordmark:hover {
   border-color: var(--brand);
 }
 
+/* Consumer poll-recency warning (LIN-2885): --amber-dim is the AA-safe
+   warning text token defined for both themes (see the status-palette block
+   above), reused here rather than a new color. */
+.queue-item-warning {
+  font-size: 0.8em;
+  color: var(--amber-dim);
+  margin-top: var(--space-1);
+}
+
 .queue-panel-empty {
   padding: var(--space-5) var(--space-3);
   text-align: center;

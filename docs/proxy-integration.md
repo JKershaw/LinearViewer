@@ -1612,9 +1612,12 @@ When `maxTasks` is set, every worker dispatch stamped with this run's `sessionId
   "variant": "standard",
   "issueIdentifier": null,
   "target": "cli",
-  "dispatchedAt": "..."
+  "dispatchedAt": "...",
+  "consumerLastSeenAt": "2026-06-06T09:10:00.000Z"
 }
 ```
+
+Carries the same `consumerLastSeenAt` stamp and, when stale/never, the same top-level `warning` as `POST /api/proxy/dispatch` (LIN-2885) — it does not refuse the kickoff.
 
 #### Autopilot Manual
 
@@ -2063,8 +2066,16 @@ Content-Type: application/json
 
 Returns `201`:
 ```json
-{ "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+{ "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "consumerLastSeenAt": "2026-06-06T09:10:00.000Z" }
 ```
+
+**Consumer poll-recency warning (LIN-2885).** `consumerLastSeenAt` is the most recent `lastUsedAt` across the workspace's non-revoked consumer tokens, stamped once at enqueue time — `null` means no consumer token has ever polled/taken in this workspace ("never", not merely "not recently"). When that stamp is `null` or older than the staleness threshold (default 1 hour, configurable via the `CONSUMER_POLL_WARNING_THRESHOLD_MS` env var), the response also carries a top-level `warning` string naming the last poll time or "never":
+
+```json
+{ "id": "uuid", "status": "queued", "...": "...", "consumerLastSeenAt": null, "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts." }
+```
+
+**This does not refuse the dispatch — it still enqueues.** A runner may come up later; the warning is read-only telemetry so you can tell "queued, nothing polling yet" apart from "queued, a runner will pick this up any second." The same `consumerLastSeenAt` stamp (and a derived `consumerPollWarning`, re-evaluated against the current time) is also readable later via `GET /api/proxy/dispatch/{id}` and `GET /api/proxy/dispatch` — see below.
 
 Returns `409` — **duplicate dispatch** (LIN-1656). A *fresh* dispatch for an `issueIdentifier` + `kind` this workspace already dispatched within the last **5 minutes** is refused, because two independent orchestrators (an autopilot run and a human on the board) can otherwise start the same step minutes apart and duplicate the work:
 
@@ -2164,8 +2175,10 @@ descents, repo-less children, and dispatches that pass no `repo` are unaffected.
 
 Returns `201`:
 ```json
-{ "id": "uuid", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z" }
+{ "id": "uuid", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "consumerLastSeenAt": "2026-06-06T09:10:00.000Z" }
 ```
+
+Carries the same `consumerLastSeenAt` stamp and, when stale/never, the same top-level `warning` as `POST /api/proxy/dispatch` above (LIN-2885) — it does not refuse the dispatch.
 
 With a `kind` override the response also carries `"override": true` and omits the descent fields (`deferredVia`/`descent`), since the override does not descend:
 ```json
@@ -2222,6 +2235,8 @@ Notes:
   "dispatchedAt": "...",
   "resolvedAt": "...",
   "completedAt": "...",
+  "consumerLastSeenAt": "2026-06-06T09:10:00.000Z",
+  "consumerPollWarning": null,
   "reason": "change|timeout|terminal",
   "waitedMs": 50000,
   "feedback": [
@@ -2235,6 +2250,8 @@ Notes:
 (`reason` and `waitedMs` are shown above for completeness; they are present only on `?wait>0` responses and absent from the plain short-poll.) Feedback is free-form text — read it (the recap, heartbeats) for detail; `status` gives the terminal signal and `[evidence]` entries give the artifact URLs to verify against. Poll until `status` is terminal. (If you poll in a shell loop, don't name the variable `status`: zsh reserves it as a read-only alias for `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.)
 
 **Timestamps — don't mistake `resolvedAt` for completion.** `resolvedAt` is stamped when the runner *claims* the item (take/archive time); it lands seconds after `dispatchedAt` no matter how long the task runs, so it is **not** a completion signal. The truthful completion time is **`completedAt`** — the timestamp of the terminal `[done]`/`[failed]`/`[aborted]` feedback marker, `null` until that marker exists. `status` remains the authoritative completion *signal*; `completedAt` is the completion *time*.
+
+**`consumerLastSeenAt` / `consumerPollWarning` (LIN-2885).** `consumerLastSeenAt` is the poll-recency stamp taken once when this item was enqueued — the most recent `lastUsedAt` across the workspace's consumer tokens at that moment, or `null` for "never." `consumerPollWarning` is re-derived from that same stamp against the **current** clock on every read, so a queued item that grows stale while sitting unpolled will start showing a warning here even if the workspace looked fine at dispatch time; it goes back to `null` once a consumer actually polls/takes. Same threshold as the enqueue-time `warning` above (default 1h, `CONSUMER_POLL_WARNING_THRESHOLD_MS`).
 
 #### Read a Dispatch's Prompt
 
@@ -2276,8 +2293,10 @@ All query params optional. Merges the live queue and recent history, newest firs
 **Filter semantics (LIN-2079):** the filter runs on the **derived** status, so `status=taken` no longer returns rows that derive to `blocked` — query `status=blocked` for those. `total` follows the same filter. This is deliberate: it is what separates rows still being worked from rows parked waiting on a human. An unfiltered list returns the same rows as before; only the reported `status` string changes for the affected rows.
 
 ```json
-{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10 } ], "total": 1, "truncated": false }
+{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10, "consumerLastSeenAt": "2026-06-06T09:10:00.000Z", "consumerPollWarning": null } ], "total": 1, "truncated": false }
 ```
+
+**`consumerLastSeenAt` / `consumerPollWarning` (LIN-2885)** — same fields, same meaning as on `GET /api/proxy/dispatch/{id}` above: the enqueue-time poll-recency stamp, and a warning re-derived against the current clock on every read. Lets you spot a stale queued row directly from the list, without a per-item watch call.
 
 **`total` / `truncated` semantics (LIN-1494).** The read merges the live queue with the *newest 200* history rows. For an unfiltered or `?issueIdentifier=`-scoped read, `total` is the **exact full matching count** — queued items plus the store's pre-window history count — so it can exceed the number of rows the window (and therefore `items`) covers. For a `?status=` read, `total` remains the count of matching rows **within that window** (status is derived from feedback at read time, so an exact per-status total is not knowable without reading the whole history). `truncated: true` discloses that the 200-row window did not cover the whole history — in that case older rows exist that this response's `items` (and the lineage join's anchor seeding) never saw, so page by `issueIdentifier` or treat window-derived aggregates as recent-window signals, not a census.
 

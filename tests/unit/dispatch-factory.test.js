@@ -517,7 +517,7 @@ describe('createDispatchItem — field passthrough', () => {
       promptName: 'Triage', issueIdentifier: 'LIN-9', target: 'cli',
       dispatchedBy: 'u1', force: true, waitForFollowUps: true,
       prompt: 'x', kind: 'triage', model: null, harness: 'claude-code', terminal: null, effort: null, bootstrapToken: null,
-      presetConfig: null, presetName: null,
+      presetConfig: null, presetName: null, consumerLastSeenAt: null,
     });
     assert.equal(store.captured.urlKey, 'acme');
   });
@@ -1554,5 +1554,40 @@ describe('createDispatchItem — terminal-anchor guard (LIN-2775 Area 8)', () =>
     });
     assert.ok(store.captured.item);
     assert.equal(providerCalls, 0);
+  });
+});
+
+describe('createDispatchItem — consumer poll-recency stamp (LIN-2885)', () => {
+  test('stamps consumerLastSeenAt from the dispatchTokenStore\'s max lastUsedAt', async () => {
+    const store = capturingStore();
+    const dispatchTokenStore = {
+      listTokens: async () => [
+        { tokenId: 'a', lastUsedAt: '2026-06-01T00:00:00.000Z' },
+        { tokenId: 'b', lastUsedAt: '2026-06-05T00:00:00.000Z' }
+      ]
+    };
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', prompt: 'x', dispatchTokenStore });
+    assert.equal(store.captured.item.consumerLastSeenAt, '2026-06-05T00:00:00.000Z');
+  });
+
+  test('stamps null when no dispatchTokenStore is provided', async () => {
+    const store = capturingStore();
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', prompt: 'x' });
+    assert.strictEqual(store.captured.item.consumerLastSeenAt, null);
+  });
+
+  test('stamps null when the workspace has no consumer tokens at all', async () => {
+    const store = capturingStore();
+    const dispatchTokenStore = { listTokens: async () => [] };
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', prompt: 'x', dispatchTokenStore });
+    assert.strictEqual(store.captured.item.consumerLastSeenAt, null);
+  });
+
+  test('never gates or delays the enqueue — a failing token-store read still dispatches with a null stamp', async () => {
+    const store = capturingStore();
+    const dispatchTokenStore = { listTokens: async () => { throw new Error('backend down'); } };
+    await createDispatchItem({ store, urlKey: 'acme', kind: 'implementation', prompt: 'x', dispatchTokenStore });
+    assert.ok(store.captured.item, 'the dispatch must still enqueue');
+    assert.strictEqual(store.captured.item.consumerLastSeenAt, null);
   });
 });

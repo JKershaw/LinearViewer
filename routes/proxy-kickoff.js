@@ -17,6 +17,7 @@ import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { isValidIssueId } from '../lib/workspace.js';
 import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
+import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 
 /**
  * @param {Object} deps
@@ -25,6 +26,9 @@ import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-gr
  * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
+ * @param {Object} [deps.dispatchTokenStore] - Consumer-token store (LIN-2885):
+ *   threaded into `createDispatchItem` to stamp `consumerLastSeenAt`. Optional —
+ *   an absent store just means every kickoff stamps null (never seen).
  * @param {Object} deps.dispatchPresetsStore - Dispatch preset storage instance
  * @param {Object} deps.workspacePreferencesStore - Workspace-level preference storage
  * @param {Object} deps.proxyTokenStore - Proxy token storage instance
@@ -44,6 +48,7 @@ export function createKickoffRoutes({
   requireWriteScope,
   logEvent,
   dispatchQueueStore,
+  dispatchTokenStore = null,
   dispatchPresetsStore,
   workspacePreferencesStore,
   proxyTokenStore,
@@ -323,6 +328,7 @@ export function createKickoffRoutes({
         urlKey: req.proxyUrlKey,
         workspacePreferencesStore,
         dispatchPresetsStore,
+        dispatchTokenStore,
         presetId: presetId || null,
         kind: 'autopilot',
         model,
@@ -391,6 +397,9 @@ export function createKickoffRoutes({
       });
 
       logEvent(req, '/api/proxy/autopilot/kickoff', 201);
+      // Consumer poll-recency warning (LIN-2885) — same pure derivation as
+      // every other enqueue seam (POST /dispatch, /recommend-and-dispatch).
+      const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
       res.status(201).json({
         success: true,
         // The dispatch id IS the autopilot session id (LIN-591/LIN-599); surface
@@ -405,7 +414,9 @@ export function createKickoffRoutes({
         issueIdentifier: item.issueIdentifier,
         target: item.target,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
-        maxTasks: item.maxTasks
+        maxTasks: item.maxTasks,
+        consumerLastSeenAt: item.consumerLastSeenAt || null,
+        ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
       });
     } catch (err) {
       // An issue-scoped kickoff (kind 'autopilot') can duplicate like any other

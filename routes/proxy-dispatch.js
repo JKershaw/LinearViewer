@@ -16,6 +16,7 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, graphqlErrorExtra } from '../lib/proxy-graphql-errors.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
+import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
@@ -95,6 +96,15 @@ function formatDispatchWatch(item, meta = null) {
     // completion. completedAt is the real completion time, null until terminal.
     resolvedAt: item.resolvedAt || null,
     completedAt: deriveCompletedAt(item.feedback),
+    // Consumer poll-recency stamp + derived warning (LIN-2885): the stamp is
+    // whatever createDispatchItem persisted at enqueue time; the warning is
+    // re-derived against the CURRENT clock each read (via the same pure
+    // buildConsumerPollWarning the 201 responses use), so a queued item that
+    // grows stale while sitting unpolled surfaces that on every subsequent
+    // watch, not just at dispatch time. null when the workspace is (or has
+    // become) actively polled.
+    consumerLastSeenAt: item.consumerLastSeenAt || null,
+    consumerPollWarning: buildConsumerPollWarning(item.consumerLastSeenAt || null),
     feedback: (item.feedback || []).map(f => {
       const entry = {
         message: f.message,
@@ -136,6 +146,9 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} deps.computeRecommendation - Shared recommendation compute path (closure-local, also injected into group F's routes/proxy-compute.js)
  * @param {Function} deps.denyIfUnsupported - Capability gate; 422s an unsupported provider method (closure-local)
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
+ * @param {Object} [deps.dispatchTokenStore] - Consumer-token store (LIN-2885):
+ *   threaded into `createDispatchItem` to stamp `consumerLastSeenAt`. Optional —
+ *   an absent store just means every dispatch stamps null (never seen).
  * @param {Function} deps.getWorkspaceOpenRouterKey - Resolves the token-creator's OAuth OpenRouter key for a workspace (closure-local)
  * @param {Function} deps.graphqlErrorStatus - Maps a provider/GraphQL error to an HTTP status (closure-local, the route's own registry-bound error mapper)
  * @param {number} deps.LINEAGE_QUERY_LIMIT - Defensive cap on the list endpoint's lineage batch query (module-scope, exported from routes/proxy.js)
@@ -162,6 +175,7 @@ export function createDispatchRoutes({
   computeRecommendation,
   denyIfUnsupported,
   dispatchQueueStore,
+  dispatchTokenStore = null,
   getWorkspaceOpenRouterKey,
   graphqlErrorStatus,
   LINEAGE_QUERY_LIMIT,
@@ -397,6 +411,7 @@ export function createDispatchRoutes({
         store: dispatchQueueStore,
         urlKey: req.proxyUrlKey,
         workspacePreferencesStore,
+        dispatchTokenStore,
         kind,
         model,
         harness,
@@ -488,6 +503,11 @@ export function createDispatchRoutes({
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
+      // Consumer poll-recency warning (LIN-2885) — see formatDispatchWatch's
+      // comment above for why the SAME pure function derives this both here
+      // (at enqueue) and on every later watch. Omitted entirely, never
+      // `warning: null`, when the workspace is being actively polled.
+      const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
       res.status(201).json({
         success: true,
         id: item._id,
@@ -500,7 +520,9 @@ export function createDispatchRoutes({
         abortTo: item.abortTo || null,
         cascade: item.cascade === true,
         sessionId: item.sessionId || null,
-        dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt
+        dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+        consumerLastSeenAt: item.consumerLastSeenAt || null,
+        ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
       });
     } catch (err) {
       // Duplicate-dispatch refusal (LIN-1656) — see the responder. Ahead of the
@@ -748,6 +770,7 @@ export function createDispatchRoutes({
             store: dispatchQueueStore,
             urlKey: req.proxyUrlKey,
             workspacePreferencesStore,
+            dispatchTokenStore,
             kind,
             model,
             harness,
@@ -806,20 +829,27 @@ export function createDispatchRoutes({
           // engine's verb was demonstrably wrong here (LIN-573). The distinct
           // endpoint tag keeps these auditable in the proxy event log.
           logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 201);
-          return res.status(201).json({
-            success: true,
-            id: item._id,
-            status: 'queued',
-            kind: item.kind,
-            promptName: item.promptName,
-            issueIdentifier: item.issueIdentifier,
-            target: item.target,
-            sessionId: item.sessionId || null,
-            dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
-            // The override pins the named issue with no descent — surface that
-            // explicitly so callers can distinguish it from the LLM-driven path.
-            override: true
-          });
+          {
+            // Consumer poll-recency warning (LIN-2885) — see formatDispatchWatch's
+            // comment for why this is the same pure function used everywhere.
+            const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
+            return res.status(201).json({
+              success: true,
+              id: item._id,
+              status: 'queued',
+              kind: item.kind,
+              promptName: item.promptName,
+              issueIdentifier: item.issueIdentifier,
+              target: item.target,
+              sessionId: item.sessionId || null,
+              dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+              consumerLastSeenAt: item.consumerLastSeenAt || null,
+              ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
+              // The override pins the named issue with no descent — surface that
+              // explicitly so callers can distinguish it from the LLM-driven path.
+              override: true
+            });
+          }
         } catch (err) {
           // Duplicate-dispatch refusal (LIN-1656). This is the verb-OVERRIDE arm,
           // which creates its dispatch BEFORE `armKeepalive` runs, so it replies on
@@ -953,6 +983,7 @@ export function createDispatchRoutes({
           store: dispatchQueueStore,
           urlKey: req.proxyUrlKey,
           workspacePreferencesStore,
+          dispatchTokenStore,
           kind: effectiveKind,
           model,
           harness,
@@ -1021,6 +1052,9 @@ export function createDispatchRoutes({
         // (LIN-327): they let Autopilot read the descent ("LIN-318 → LIN-297
         // (research) · dispatched") from the structured header, never a prompt body.
         const descent = describeDescent(deferredVia, rec);
+        // Consumer poll-recency warning (LIN-2885) — same pure function as
+        // every other enqueue seam; see formatDispatchWatch's comment above.
+        const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
         keepalive.send(201, {
           success: true,
           id: item._id,
@@ -1031,6 +1065,8 @@ export function createDispatchRoutes({
           target: item.target,
           sessionId: item.sessionId || null,
           dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+          consumerLastSeenAt: item.consumerLastSeenAt || null,
+          ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
           deferredVia,
           deferTruncated,
           ...(descent ? { descent: `${descent} · dispatched` } : {})
@@ -1276,7 +1312,13 @@ export function createDispatchRoutes({
         // LIN-1470: lineage-wide (own + verified siblings), not just this row's
         // own stored feedback — see the merge above. Excludes any synthetic
         // harvested-abort entry (that only lives in `_terminalFeedback`).
-        feedbackCount: i._lineageFeedback.length
+        feedbackCount: i._lineageFeedback.length,
+        // Consumer poll-recency stamp + derived warning (LIN-2885) — same
+        // fields, same pure derivation as the `:id` watch endpoint above, so a
+        // lean-list reader doesn't need a second GET to see whether a queued
+        // row is sitting unpolled.
+        consumerLastSeenAt: i.consumerLastSeenAt || null,
+        consumerPollWarning: buildConsumerPollWarning(i.consumerLastSeenAt || null)
       }));
 
       logEvent(req, '/api/proxy/dispatch', 200);

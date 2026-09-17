@@ -98,8 +98,11 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
     const keys = literalKeys(itemsLiteral);
     assert.deepStrictEqual(
       new Set(keys),
+      // LIN-2885: consumerLastSeenAt/consumerPollWarning added deliberately
+      // (the consumer poll-recency stamp + derived warning) — not a leak.
       new Set(['id', 'status', 'promptName', 'kind', 'issueIdentifier', 'issueUrl', 'target',
-        'dispatchedAt', 'resolvedAt', 'completedAt', 'feedbackCount']),
+        'dispatchedAt', 'resolvedAt', 'completedAt', 'feedbackCount',
+        'consumerLastSeenAt', 'consumerPollWarning']),
       'list item field set drifted — check whether sessionId was added (voyage reconstruction leak) or a field was silently dropped'
     );
     assert.ok(!keys.includes('sessionId'), 'sessionId must not appear on the list item');
