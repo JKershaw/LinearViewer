@@ -7,9 +7,14 @@
  * onto whichever createDispatchItem arm the verb resolves — the deterministic
  * verb-override arm (`kind` set) and the recommendation-derived arm (no
  * `kind`) — and validated with the same rules the main dispatch handlers
- * enforce. The guard's own behavior (force bypasses; a launch-time `[failed]`
- * prior exempts a retry) is pinned at the factory seam in
- * tests/unit/dispatch-factory.test.js.
+ * enforce. The guard's own force-bypass behavior is pinned at the factory
+ * seam in tests/unit/dispatch-factory.test.js ("createDispatchItem — force
+ * bypasses the duplicate guard (LIN-1656)"). NOTE for whoever picks up
+ * LIN-2900: the launch-time-failure exemption (a terminal `[failed]` prior
+ * that never worked should not count as a duplicate) does NOT exist in this
+ * tree and has NO coverage anywhere — half 1 was split off this PR
+ * undelivered. Design its tests from scratch; nothing here or at the factory
+ * seam pins it.
  *
  * Set NODE_ENV before importing the routes so the test-mode short-circuit
  * (token === 'test-token') and module-level rate-limiter skips apply.
@@ -222,6 +227,53 @@ describe('LIN-2869 — recommend-and-dispatch forwards followUpTo (resume the pr
       'the opt-in must not come at the cost of dropping the follow-up itself');
     assert.ok(captured.item.prompt.includes('workspace API proxy'),
       'an explicit opt-in re-appends the proxy context for a follow-up');
+  });
+
+  // The three follow-up context/credential tests above all take the
+  // RECOMMENDATION-DERIVED arm (no `kind`). This PR duplicated the LIN-805
+  // suppression and LIN-1429 provisioning branches into the VERB-OVERRIDE arm
+  // too, and review 0358b37a proved that copy unpinned: reverting arm 1's
+  // suppression to `appendProxyContext !== false` (M11) or disabling arm 1's
+  // credential branch (M12) left the whole related suite green. The reachable
+  // failure is a `kind`-override follow-up beat that gets the proxy prose
+  // re-appended, or lands with `bootstrapToken: null` on a broker-dependent
+  // harness and so cannot authenticate on turn one. These three tests are the
+  // missing pin — the arm-2 cases above, re-run with `kind` supplied.
+  test('arm 1 (kind override): a fused follow-up suppresses the prose but still gets a live credential (M11/M12)', async () => {
+    const captured = {};
+    const res = await call(buildApp(captured), ENDPOINT, {
+      issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: FOLLOW_UP_ID
+    });
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.ok(captured.item.prompt, 'the verb-override arm still produced a body');
+    assert.ok(!captured.item.prompt.includes('workspace API proxy'),
+      'the verb-override arm must suppress the prose for a warm follow-up too (kills M11)');
+    assert.ok(captured.item.bootstrapToken,
+      'the verb-override arm must still provision a live credential when the prose is suppressed (kills M12)');
+  });
+
+  test('arm 1 (kind override): an explicit appendProxyContext:false opts out of BOTH the prose and the credential', async () => {
+    const captured = {};
+    const res = await call(buildApp(captured), ENDPOINT, {
+      issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: FOLLOW_UP_ID, appendProxyContext: false
+    });
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.followUpTo, FOLLOW_UP_ID,
+      'the opt-out must not come at the cost of dropping the follow-up itself');
+    assert.ok(!captured.item.prompt.includes('workspace API proxy'));
+    assert.strictEqual(captured.item.bootstrapToken, null,
+      'an explicit opt-out means neither the prose nor a fresh credential, on this arm too');
+  });
+
+  test('arm 1 (kind override): an explicit appendProxyContext:true opts a fused follow-up back into the append', async () => {
+    const captured = {};
+    const res = await call(buildApp(captured), ENDPOINT, {
+      issueIdentifier: 'TEST-1', kind: 'implementation', followUpTo: FOLLOW_UP_ID, appendProxyContext: true
+    });
+    assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(captured.item.followUpTo, FOLLOW_UP_ID);
+    assert.ok(captured.item.prompt.includes('workspace API proxy'),
+      'an explicit opt-in re-appends the proxy context on the verb-override arm');
   });
 
   test('a fused follow-up never consults the duplicate guard (the factory gate exempts followUpTo)', async () => {
