@@ -330,6 +330,13 @@ window.renderQueueRow = function renderQueueRow(item, urlKey, { card = false } =
   const snippet = firstPromptLine(item.prompt, 140);
   const snippetHtml = snippet ? `<div class="queue-item-snippet">${esc(snippet)}</div>` : '';
 
+  // Consumer poll-recency warning (LIN-2885): the server derives the message
+  // (never/since text) from the item's own `consumerLastSeenAt` stamp so this
+  // renderer never re-implements the staleness threshold.
+  const warningHtml = item.consumerPollWarning
+    ? `<div class="queue-item-warning">${esc(item.consumerPollWarning)}</div>`
+    : '';
+
   // Field chips — surface the prompt's real identity + execution intent that the
   // opaque title/meta hid. The kind chip is suppressed when it would just repeat
   // the title (e.g. an issueless custom prompt whose title already IS its name).
@@ -354,6 +361,7 @@ window.renderQueueRow = function renderQueueRow(item, urlKey, { card = false } =
           <button class="queue-item-remove" data-item-id="${esc(item.id)}" data-url-key="${esc(urlKey)}">remove</button>
         </div>
         <div class="queue-item-meta">${metaHtml}</div>
+        ${warningHtml}
         ${snippetHtml}
         ${chipsHtml}
       </div>

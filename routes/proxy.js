@@ -454,6 +454,9 @@ async function fetchWithTimeout(workFn, ms) {
  * @param {Object} [options.savedChatStore] - Threaded into createProxyFlightCompanionRoutes (LIN-2634)
  *   for GET .../flight-companion/transcripts, a creator-scoped read of the token creator's own saved
  *   companion chats. Absent → that one route 503s.
+ * @param {Object} [options.dispatchTokenStore] - Consumer-token store (LIN-2885), threaded into the
+ *   kickoff/dispatch sub-routers' `createDispatchItem` calls to stamp `consumerLastSeenAt`. Absent →
+ *   every dispatch stamps null (never seen), same as no store configured at all.
  * @param {Object} [options.provider] - TEST-ONLY provider override (LIN-581). In production this is
  *   unset and the active provider is resolved per-workspace via getProviderForWorkspace inside
  *   resolveProviderAccess. Tests that need a non-registered fake provider (e.g. to observe ref
@@ -462,7 +465,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null }) {
   const router = Router();
 
   /**
@@ -1551,11 +1554,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
+  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
 
   // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router
   // (routes/proxy-flight-companion.js) built on the extracted turn core

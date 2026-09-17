@@ -37,6 +37,7 @@ import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE } from '../lib/workspace.js
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
+import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -463,6 +464,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         harness,
         terminal,
         effort,
+        dispatchTokenStore,
         // LIN-2775 Area 8: threaded straight through, unvalidated here — the
         // marker's own validation and the terminal-anchor guard it gates
         // both live inside createDispatchItem (the one reusable, testable
@@ -622,6 +624,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
+      // Consumer poll-recency warning (LIN-2885): read-only telemetry derived
+      // from the stamp createDispatchItem already persisted on the item —
+      // never a refusal, and omitted entirely (not `warning: null`) when the
+      // workspace is being actively polled, per the ticket's own "a dispatch
+      // into a live workspace shows nothing new".
+      const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
       res.status(201).json({
         success: true,
         item: {
@@ -630,8 +638,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           kind: item.kind,
           issueIdentifier: item.issueIdentifier,
           target: item.target,
-          dispatchedAt: item.dispatchedAt
+          dispatchedAt: item.dispatchedAt,
+          consumerLastSeenAt: item.consumerLastSeenAt
         },
+        ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
         ...(spawn ? { spawn } : {})
       });
     } catch (err) {
@@ -696,7 +706,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     try {
       const items = await dispatchQueueStore.listItems(workspace.urlKey);
-      res.json({ items });
+      // Consumer poll-recency warning (LIN-2885), derived fresh against the
+      // current clock from each item's own enqueue-time stamp — same pure
+      // function the proxy watch/list endpoints use — so the dispatch page's
+      // queue list and the nav-badge popover (both rendered off this response
+      // via window.renderQueueRow) can show "no runner has polled..." on a
+      // stale queued row without duplicating the threshold logic client-side.
+      res.json({ items: items.map(item => ({ ...item, consumerPollWarning: buildConsumerPollWarning(item.consumerLastSeenAt) })) });
     } catch (err) {
       console.error('List dispatch items error:', err.message);
       jsonError(res, 500, 'Failed to list dispatch items');
