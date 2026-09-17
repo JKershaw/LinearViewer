@@ -2109,7 +2109,8 @@ describe('Audit the Layers (handwritten path)', () => {
 
 // Scale-to-task (lower bound, LIN-260). The heavy generative phases must tell the
 // agent to size output to the task — proven on the meta-prompt path via
-// scripts/eval-prompt-scaling.mjs and mirrored here per CLAUDE.md's both-paths rule.
+// scripts/eval-prompt-scaling.mjs and mirrored here per
+// docs/architecture/prompt-system.md's both-paths rule.
 describe('Scale to the task (handwritten path)', () => {
   const mockIssue = {
     id: 'issue-st', identifier: 'TEST-ST1', title: 'Add a thing',
