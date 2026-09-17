@@ -139,16 +139,20 @@ export function createRulingsRoutes({
       ? await sessionsFeedCache.get(sessionsFeedCache.keyFor([{ urlKey }], 'proxy-rulings'), loadLoops)
       : await loadLoops();
 
-    const [taskDecisions, shelvedRulings] = await Promise.all([
+    const [taskDecisions, shelvedRulings, newestScanByTask] = await Promise.all([
       taskDecisionsStore ? taskDecisionsStore.listUnansweredForWorkspaces([urlKey]) : Promise.resolve([]),
-      shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
+      shelvedRulingsStore ? shelvedRulingsStore.listForWorkspaces([urlKey]) : Promise.resolve([]),
+      // LIN-2729 / LIN-2893 Step 5: same `[urlKey]` scope as `taskDecisions`
+      // above — see `listNewestScanPerTask`'s own doc for why this read
+      // needs it too.
+      taskDecisionsStore ? taskDecisionsStore.listNewestScanPerTask([urlKey]) : Promise.resolve({})
     ]);
     // LIN-2773 Area 4: same `liveDispatchOnAnchor` predicate as the
     // session-authed feed (routes/dashboard.js), reusing the SAME exported
     // `isTerminalLoop` rather than a second hand-rolled terminal check —
     // zero new reads, scanning only the `loops` array already fetched above.
     // `anchorTerminal` stays unpassed here too (S3's press-time read).
-    return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings }, {
+    return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings, newestScanByTask }, {
       now: new Date(),
       liveDispatchOnAnchor: (issueIdentifier) =>
         loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))

@@ -2344,7 +2344,10 @@ function makeDecisionsCatalog({ history, taskDecisions, shelvedRulings }) {
     provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
     dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
     sessionIsTerminal: () => false,
-    taskDecisionsStore: { async listUnansweredForWorkspaces() { return taskDecisions; } },
+    taskDecisionsStore: {
+      async listUnansweredForWorkspaces() { return taskDecisions; },
+      async listNewestScanPerTask() { return {}; }
+    },
     shelvedRulingsStore: { async listForWorkspaces() { return shelvedRulings; } },
   });
   return { executeTool, stores };
@@ -2436,6 +2439,7 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
       dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
       taskDecisionsStore: new Proxy({
         async listUnansweredForWorkspaces() { return fixture.taskDecisions; },
+        async listNewestScanPerTask() { return {}; },
       }, { get(t, k) { calls.push(String(k)); return t[k]; } }),
       shelvedRulingsStore: new Proxy({
         async listForWorkspaces() { return fixture.shelvedRulings; },
@@ -2443,8 +2447,8 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
     });
     await executeTool({ name: 'list_pending_decisions', arguments: {} });
     assert.deepStrictEqual(
-      [...new Set(calls)].sort(), ['listForWorkspaces', 'listUnansweredForWorkspaces'],
-      'only the two list reads — never markDecisionAnswered/dismiss/shelve'
+      [...new Set(calls)].sort(), ['listForWorkspaces', 'listNewestScanPerTask', 'listUnansweredForWorkspaces'],
+      'only the three list reads — never markDecisionAnswered/dismiss/shelve'
     );
   });
 });
@@ -2619,7 +2623,7 @@ describe('pass-4 fleet reads — review-ledger witnesses (LIN-2617)', () => {
     const build = (enrichLoop) => createChatToolCatalog({
       provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
       dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
-      taskDecisionsStore: { async listUnansweredForWorkspaces() { return []; } },
+      taskDecisionsStore: { async listUnansweredForWorkspaces() { return []; }, async listNewestScanPerTask() { return {}; } },
       shelvedRulingsStore: { async listForWorkspaces() { return []; } },
       ...(enrichLoop ? { enrichLoop } : {}),
     }).executeTool;
@@ -3168,7 +3172,10 @@ describe('pass-4 — review-ledger discharge (LIN-2617)', () => {
         },
       },
       agentStatusStore: base.agentStatusStore,
-      taskDecisionsStore: { async listUnansweredForWorkspaces() { return fixture.taskDecisions; } },
+      taskDecisionsStore: {
+        async listUnansweredForWorkspaces() { return fixture.taskDecisions; },
+        async listNewestScanPerTask() { return {}; }
+      },
       shelvedRulingsStore: { async listForWorkspaces() { return fixture.shelvedRulings; } },
     });
     await executeTool({ name: 'list_pending_decisions', arguments: {} });

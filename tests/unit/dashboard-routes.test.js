@@ -388,7 +388,8 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
           issueIdentifier: 'LIN-30', decision: { decision_id: 'd-task-1', question: 'Proceed?' },
           scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
         }];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     const router = createDashboardRoutes({
       workspaceFromUrl: (req, res, next) => next(),
@@ -436,7 +437,8 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
           decision: { decision_id: 'd-task-2', question: 'Proceed?', on_answer: { effect: 'dispatch' } },
           scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
         }];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     // A live (queued, non-terminal) loop anchored on the SAME issue — this is
     // what forces liveDispatchOnAnchor: true. Zero new reads: `merged` is
@@ -476,7 +478,8 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
           decision: { decision_id: 'd-task-3', question: 'Proceed?', on_answer: { effect: 'dispatch' } },
           scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
         }];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     const { dispatchQueueStore, agentStatusStore } = makeStores({}); // no loops at all anywhere
     const router = createDashboardRoutes({
@@ -519,7 +522,8 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
             decision: { decision_id: 'd-task-l5', question: 'Proceed?', on_answer: { effect: 'dispatch' } },
             scannedAt: new Date().toISOString(), outcome: null, outcomeAt: null
           }];
-        }
+        },
+        async listNewestScanPerTask() { return {}; }
       };
       const perWorkspace = {
         'ws-a': { live: liveLoopItem.source === 'live' ? [liveLoopItem.item] : [], history: liveLoopItem.source === 'history' ? [liveLoopItem.item] : [], agentStatus: liveLoopAgentStatus ? [liveLoopAgentStatus] : [] }
@@ -1144,7 +1148,8 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
           issueIdentifier: 'LIN-4', decision: { decision_id: 'scan_2', question: 'q?' },
           scannedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), outcome: null, outcomeAt: null
         }];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
     const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
@@ -1177,7 +1182,8 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
             scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
           }
         ];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] }, 'ws-b': { live: [], history: [], agentStatus: [] } };
     const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
@@ -1237,7 +1243,8 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
             scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
           }
         ];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
     const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
@@ -1289,7 +1296,8 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
             scannedAt: new Date(staleMs).toISOString(), outcome: null, outcomeAt: null
           }
         ];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
     const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
@@ -1338,7 +1346,8 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
             scannedAt: new Date(freshMs).toISOString(), outcome: null, outcomeAt: null
           }
         ];
-      }
+      },
+      async listNewestScanPerTask() { return {}; }
     };
     const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] }, 'ws-b': { live: [], history: [], agentStatus: [] } };
     const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
@@ -4745,6 +4754,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       sessionsFeedCache: createSessionsFeedCache(),
       taskDecisionsStore: {
         async listUnansweredForWorkspaces() { return []; },
+        async listNewestScanPerTask() { return {}; },
         async markOutcome() { return { outcomeAt: new Date(Date.now() + 60000).toISOString() }; }
       }
     });
