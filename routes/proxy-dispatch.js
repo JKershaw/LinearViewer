@@ -420,7 +420,8 @@ export function createDispatchRoutes({
       // opts back in. Fresh dispatches keep the default-ON behaviour (opt out with
       // appendProxyContext:false). This is the systemic fix — every follow-up
       // consumer benefits, not just one orchestrator. (`/recommend-and-dispatch`
-      // accepts no followUpTo, so it needs no equivalent suppression.)
+      // applies the SAME suppression since LIN-2869 made it a follow-up-capable
+      // verb — its handler derives `shouldAppendProxyContext` identically.)
       //
       // LIN-1429: this suppression governs the PROSE APPEND only. Whether a
       // credential is PROVISIONED is now a separate decision, keyed on the resolved
@@ -608,6 +609,18 @@ export function createDispatchRoutes({
    * actually calls to continue a tracked task (see `lib/prompts/
    * autopilot-kickoff.js`'s "Trigger the next step"), and the normal trigger
    * carries no `kind`, landing on the recommendation-derived branch.
+   *
+   * `followUpTo` (LIN-2869): optional well-formed UUID, cli/web targets only,
+   * threaded onto whichever `createDispatchItem` call this route resolves to —
+   * the recommendation still runs and the generated body becomes a follow-up
+   * instruction resuming the prior session. A fused follow-up is exempt from
+   * the duplicate guard by the factory's own gate, and suppresses the
+   * proxy-context prose append by default (LIN-805).
+   *
+   * `force` (LIN-2872): optional boolean. Forwarded verbatim onto the item so
+   * `force: true` bypasses the duplicate-dispatch guard on THIS verb too — the
+   * documented operator escape hatch (`dispatch-factory.js`) is now reachable
+   * on both dispatch verbs.
    */
   router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     if (!dispatchQueueStore) {
@@ -616,7 +629,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { issueIdentifier, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId } = req.body || {};
+      const { issueIdentifier, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -727,6 +740,32 @@ export function createDispatchRoutes({
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, recommendSessionIdError.error);
       }
+      // Follow-up reference (LIN-2869): the fused verb can now express "resume
+      // the prior session" — thread it through under the SAME well-formed-UUID
+      // + cli/web-only rule the main dispatch handlers enforce via
+      // validateDispatchPayload (the server-generated prompt never reaches
+      // validateDispatchPayload, so the rule is mirrored here).
+      if (followUpTo !== undefined && followUpTo !== null) {
+        if (!UUID_REGEX.test(followUpTo)) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+          return badRequest.json(res, 'Invalid followUpTo format');
+        }
+        const followUpTarget = target || 'cli';
+        if (!['cli', 'web'].includes(followUpTarget)) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+          return badRequest.json(res, 'followUpTo is only supported for cli/web targets');
+        }
+      }
+      // Force flag (LIN-2872): boolean only. On this verb `force: true` is
+      // ALWAYS meaningful — `issueIdentifier` is required above, so the
+      // duplicate guard in `createDispatchItem` always has a key to override
+      // (the operator rescue hatch). No followUpTo/abort combination check is
+      // needed: `cascade` does not exist on this verb and the followUpTo/abort
+      // shapes are the runner's own gates, forwarded blindly either way.
+      if (force !== undefined && typeof force !== 'boolean') {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, 'force must be a boolean');
+      }
 
       // Resolve the subscription edge once for both dispatch paths below (LIN-900
       // §6): DECLARED on the edge, never reconstructed from `sessionId`. An
@@ -735,6 +774,18 @@ export function createDispatchRoutes({
       // caller that wants a worker's every event to wake it declares
       // `subscription: 'everything'`.
       const subscriptionResolved = subscription ?? DEFAULT_SUBSCRIPTION;
+
+      // LIN-805 proxy-context suppression, mirrored from POST /dispatch: a fused
+      // follow-up (`followUpTo` set) resumes a warm session that already received
+      // the proxy-context block on its first beat, so the prose append defaults
+      // OFF; an explicit appendProxyContext:true opts back in. Fresh dispatches
+      // keep the default-ON behaviour (opt out with appendProxyContext:false).
+      // The credential half is separate (LIN-1429) — see finalizePrompt below.
+      const isFollowUp = followUpTo !== undefined && followUpTo !== null;
+      const explicitOptOut = appendProxyContext === false;
+      const shouldAppendProxyContext = isFollowUp
+        ? appendProxyContext === true
+        : !explicitOptOut;
 
       // Recommendation preconditions — identical to GET /recommend.
       const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
@@ -839,7 +890,7 @@ export function createDispatchRoutes({
             harness,
             effort,
             finalizePrompt: async (resolvedHarness) => {
-              if (appendProxyContext !== false) {
+              if (shouldAppendProxyContext) {
                 const baseUrl = `${req.protocol}://${req.get('host')}`;
                 // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
                 // LIN-1155: claude-code harness -> token stripped from prose, returned here.
@@ -860,6 +911,24 @@ export function createDispatchRoutes({
                   providerUi: resolvedProviderUi(req)
                 });
               }
+              // LIN-1429: the prose block may be suppressed for a warm follow-up
+              // (LIN-805), but a broker-dependent (claude-code/MCP) harness still
+              // needs a LIVE credential — the original died with the window that
+              // held it (LIN-1375/1362). Provision without appending, mirroring
+              // POST /dispatch's identical branch. Keyed on the RESOLVED harness,
+              // never on isFollowUp; an explicit appendProxyContext:false opts out
+              // of both the prose AND the credential.
+              if (!explicitOptOut && shouldUseMcpTokenField(resolvedHarness)) {
+                const bootstrapToken = await provisionBootstrapToken({
+                  proxyTokenStore,
+                  urlKey: req.proxyUrlKey,
+                  baseUrl: `${req.protocol}://${req.get('host')}`,
+                  label: 'dispatch-bootstrap',
+                  harness: resolvedHarness,
+                  createdBy: req.proxyCreatedBy || null
+                });
+                return { prompt: generated.prompt, bootstrapToken };
+              }
               return { prompt: generated.prompt, bootstrapToken: null };
             },
             fields: {
@@ -878,6 +947,14 @@ export function createDispatchRoutes({
               // (LIN-2886) — never the raw candidate.
               repo: overrideResolvedRepo,
               sessionId: sessionId || null,
+              // LIN-2869: the fused verb's verb-override arm forwards a
+              // follow-up reference verbatim — the runner owns session
+              // liveness, and the factory's guard gate exempts it.
+              followUpTo: followUpTo || null,
+              // LIN-2872: forward the operator escape hatch so `force: true`
+              // bypasses the duplicate guard on this verb too (the plain
+              // /dispatch handler already forwards it).
+              force: force === true,
               // Periodical-template join key (LIN-1825/LIN-2385): validated above
               // when caller-supplied; otherwise derived from the issue's LIN-694
               // gate marker (LIN-2575) — see `overridePeriodicalId` above.
@@ -1076,7 +1153,7 @@ export function createDispatchRoutes({
           harness,
           effort,
           finalizePrompt: async (resolvedHarness) => {
-            if (appendProxyContext !== false) {
+            if (shouldAppendProxyContext) {
               const baseUrl = `${req.protocol}://${req.get('host')}`;
               // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
               // LIN-1155: claude-code harness -> token stripped from prose, returned here.
@@ -1096,6 +1173,24 @@ export function createDispatchRoutes({
                 // LIN-2804: same stamped req.resolvedProvider, capability half.
                 providerUi: resolvedProviderUi(req)
               });
+            }
+            // LIN-1429: the prose block may be suppressed for a warm follow-up
+            // (LIN-805), but a broker-dependent (claude-code/MCP) harness still
+            // needs a LIVE credential — the original died with the window that
+            // held it (LIN-1375/1362). Provision without appending, mirroring
+            // POST /dispatch's identical branch. Keyed on the RESOLVED harness,
+            // never on isFollowUp; an explicit appendProxyContext:false opts out
+            // of both the prose AND the credential.
+            if (!explicitOptOut && shouldUseMcpTokenField(resolvedHarness)) {
+              const bootstrapToken = await provisionBootstrapToken({
+                proxyTokenStore,
+                urlKey: req.proxyUrlKey,
+                baseUrl: `${req.protocol}://${req.get('host')}`,
+                label: 'dispatch-bootstrap',
+                harness: resolvedHarness,
+                createdBy: req.proxyCreatedBy || null
+              });
+              return { prompt: rec.prompt, bootstrapToken };
             }
             return { prompt: rec.prompt, bootstrapToken: null };
           },
@@ -1118,6 +1213,15 @@ export function createDispatchRoutes({
             // (LIN-2886) — never the raw candidate.
             repo: recommendResolvedRepo,
             sessionId: sessionId || null,
+            // LIN-2869: the fused verb's recommendation-derived arm (the one
+            // autopilot's normal trigger actually takes) forwards a follow-up
+            // reference verbatim — the runner owns session liveness, and the
+            // factory's guard gate exempts it.
+            followUpTo: followUpTo || null,
+            // LIN-2872: forward the operator escape hatch so `force: true`
+            // bypasses the duplicate guard on this verb too (the plain
+            // /dispatch handler already forwards it).
+            force: force === true,
             // Periodical-template join key (LIN-1825/LIN-2385): validated above
             // when caller-supplied, else derived from the issue's gate marker
             // (LIN-2575). This is the branch autopilot actually takes on the
