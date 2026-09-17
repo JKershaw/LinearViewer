@@ -192,7 +192,8 @@ And add `https://yourdomain.com/auth/callback` to your Linear OAuth app's redire
 
 ## Documentation
 
-- [`CLAUDE.md`](CLAUDE.md) - Architecture and full project reference
+- [`CLAUDE.md`](CLAUDE.md) - Agent-facing conventions and quick reference
+- [`docs/architecture/`](docs/architecture/) - Architecture and full project reference
 - [`docs/dispatch-integration.md`](docs/dispatch-integration.md) - Dispatch queue consumer guide
 - [`docs/proxy-integration.md`](docs/proxy-integration.md) - Workspace API Proxy consumer guide (source-neutral)
 

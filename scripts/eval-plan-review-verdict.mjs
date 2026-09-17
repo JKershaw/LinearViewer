@@ -15,7 +15,8 @@
  *    — LIN-1859, extending the acceptance criterion to the 7th check
  *
  * The seeded plan is realistic for THIS codebase (the four hand-rolled Markdown
- * typography subsets are real — see CLAUDE.md on `.desc-full-content` /
+ * typography subsets are real — see docs/architecture/source-map.md on
+ * `.desc-full-content` /
  * `.comment-body` / `.swipe-accordion-body` / `.task-edit-preview`), and all three
  * defects are detectable from the plan's own text, which matters because this
  * harness makes a single tool-less call:

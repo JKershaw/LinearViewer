@@ -359,10 +359,15 @@ describe('LIN-2618: the "separate, older mechanism" claim is retired everywhere 
     // entries and llms.txt's prose block and missed three more — including one
     // in the route file this change edits, ~100 lines above a new comment
     // asserting the opposite.
+    //
+    // CLAUDE.md's own two entries relocated to docs/architecture/source-map.md
+    // (LIN-2896); both paths are checked so the guard doesn't go vacuously
+    // green once CLAUDE.md is shrunk and no longer carries this prose.
     for (const path of [
       '../../routes/flight-companion.js',
       '../../public/llms.txt',
       '../../CLAUDE.md',
+      '../../docs/architecture/source-map.md',
       '../../lib/render-flight-companion.js',
     ]) {
       const src = read(path);

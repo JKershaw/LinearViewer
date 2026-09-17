@@ -1550,7 +1550,8 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
     // login preserves and appends to session.workspaces rather than replacing
     // it (routes/auth.js's mode:'new' callback restores existingWorkspaces
     // before upsertWorkspace), so a PAT session can accumulate a co-resident
-    // OAuth workspace (CLAUDE.md: "OAuth still works alongside PAT"). Evicting
+    // OAuth workspace (docs/architecture/auth.md: "OAuth still works alongside
+    // PAT"). Evicting
     // only `workspace` would leave that co-resident workspace's cached token
     // outliving the session for up to the full TTL — the exact defect this
     // ticket exists to close. Evict every workspace on the session, the same

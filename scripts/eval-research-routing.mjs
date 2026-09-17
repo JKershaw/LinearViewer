@@ -15,7 +15,8 @@
  *
  * Workflow: iterate candidate.txt → run AB → when Arm B lifts research recall on the
  * LIN-325 gold case WITHOUT raising over-fire on the guard cases, make ONE manual edit
- * to lib/prompts/meta-prompt-template.js (+ the research aiHint, per CLAUDE.md). The
+ * to lib/prompts/meta-prompt-template.js (+ the research aiHint, per
+ * docs/architecture/prompt-system.md). The
  * live prompt stays plain text; nothing here is wired into it.
  *
  * Both files use placeholders {{ISSUE_CONTEXT}} and {{IDENTIFIER}}, filled per case.
