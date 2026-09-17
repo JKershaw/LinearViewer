@@ -514,6 +514,114 @@ describe('collectUnansweredDecisions — taskDecisions branch (LIN-2197 Phase 3)
   });
 });
 
+// LIN-2729 / LIN-2893 Step 5: `taskDecisions` (above) is already the
+// `outcome:null`-filtered candidate set `listUnansweredForWorkspaces`
+// returns, so `latestByTask`'s own reduction only ever sees unanswered rows
+// — it cannot by itself tell that a task's TRUE newest scan has since become
+// outcome-bearing. `newestScanByTask` (from `listNewestScanPerTask`, keyed
+// identically to `latestByTask`: `${urlKey}::${issueId}`) is the unfiltered
+// second input that restores "newest, then filter".
+describe('collectUnansweredDecisions — newestScanByTask / LIN-2729 fix (LIN-2893 Step 5)', () => {
+  const TASK_URL_KEY = 'acme';
+  const TASK_ISSUE_ID = 'uuid-task-newest';
+  const TASK_KEY = `${TASK_URL_KEY}::${TASK_ISSUE_ID}`;
+  const OLDER_SCANNED_AT = new Date(NOW.getTime() - 60000).toISOString();
+
+  // The candidate row: this is what `listUnansweredForWorkspaces` returns —
+  // an `outcome:null` row is the ONLY shape that query can ever surface, so
+  // every fixture below reuses this same row as the "candidate" input and
+  // varies only `newestScanByTask`, matching how the real bug manifests: the
+  // candidate query itself never changes shape, only the newest-scan side does.
+  function candidate() {
+    return taskDecision({
+      id: 'scan_uuid1234_older111111',
+      urlKey: TASK_URL_KEY,
+      issueId: TASK_ISSUE_ID,
+      decision: decision('scan-d-older'),
+      scannedAt: OLDER_SCANNED_AT,
+      outcome: null,
+      outcomeAt: null
+    });
+  }
+
+  function newestScan(overrides = {}) {
+    return {
+      urlKey: TASK_URL_KEY,
+      issueId: TASK_ISSUE_ID,
+      outcome: null,
+      scannedAt: OLDER_SCANNED_AT,
+      ...overrides
+    };
+  }
+
+  // Ports LIN-2729's own three-line repro (before retire / after retire /
+  // after dismiss) directly against `collectUnansweredDecisions`.
+  test('LIN-2729 repro — before retire: the candidate is its own newest row (still unanswered), so it surfaces', () => {
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [candidate()],
+      newestScanByTask: { [TASK_KEY]: newestScan() } // newest IS the candidate itself — unanswered
+    }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].decision.decision_id, 'scan-d-older');
+  });
+
+  test('LIN-2729 repro — after retire (self-resolved): a newer, outcome-bearing scan the candidate query filtered out drops the older unanswered row', () => {
+    const rows = collectUnansweredDecisions({
+      // The candidate set is UNCHANGED — the newer row is outcome-bearing, so
+      // `listUnansweredForWorkspaces` excluded it upstream; this is the exact
+      // shape of the LIN-2729 bug (an older `outcome:null` row is the only
+      // thing the old code could ever see).
+      taskDecisions: [candidate()],
+      newestScanByTask: { [TASK_KEY]: newestScan({ outcome: 'self-resolved', scannedAt: NOW.toISOString() }) }
+    }, { now: NOW });
+    assert.deepStrictEqual(rows, [], 'the true newest row (self-resolved, newer) must discharge the older candidate — this is the LIN-2729 fix');
+  });
+
+  test('LIN-2729 repro — after dismiss: the newest row\'s outcome always wins, regardless of which outcome value it carries', () => {
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [candidate()],
+      newestScanByTask: { [TASK_KEY]: newestScan({ outcome: 'dismissed', scannedAt: NOW.toISOString() }) }
+    }, { now: NOW });
+    assert.deepStrictEqual(rows, [], 'a newer dismissed row must discharge the older candidate exactly like a newer self-resolved row does');
+  });
+
+  // F5 (plan-review): the named zero-finding-rescan regression. This is the
+  // case an over-broad "any newer row wins" reading of the fix would break.
+  test('F5 regression — a newer ZERO-FINDING rescan (outcome: null) must NOT drop an older, still-unanswered candidate', () => {
+    // Live path this pins: ticket text edited -> new inputHash -> rescan
+    // finds nothing -> that zero-finding row is now the task's newest
+    // scannedAt, while an older decision row is still genuinely open. The
+    // older ruling must stay visible; a rescan alone must never discharge it.
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [candidate()],
+      newestScanByTask: { [TASK_KEY]: newestScan({ outcome: null, scannedAt: NOW.toISOString() }) } // newer scannedAt, but zero-finding
+    }, { now: NOW });
+    assert.strictEqual(rows.length, 1, 'a newer outcome:null row is not grounds to drop the candidate');
+    assert.strictEqual(rows[0].decision.decision_id, 'scan-d-older');
+  });
+
+  test('a newestScanByTask entry that is NOT newer than the candidate never drops it, even if outcome-bearing', () => {
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [candidate()],
+      newestScanByTask: { [TASK_KEY]: newestScan({ outcome: 'answered', scannedAt: new Date(NOW.getTime() - 120000).toISOString() }) } // OLDER than the candidate's own scannedAt
+    }, { now: NOW });
+    assert.strictEqual(rows.length, 1, 'the drop rule requires the newest row to be strictly newer than the candidate, not merely outcome-bearing');
+  });
+
+  test('newestScanByTask omitted entirely (default {}) behaves exactly as before this input existed', () => {
+    const rows = collectUnansweredDecisions({ taskDecisions: [candidate()] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+  });
+
+  test('no matching newestScanByTask entry for this task key is tolerated — never throws, never drops', () => {
+    const rows = collectUnansweredDecisions({
+      taskDecisions: [candidate()],
+      newestScanByTask: { 'some-other-workspace::some-other-task': newestScan({ outcome: 'answered', scannedAt: NOW.toISOString() }) }
+    }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+  });
+});
+
 describe('canReplyFor via collectUnansweredDecisions — task-bound always admits a reply', () => {
   test('task-bound is not gated by liveness, unlike resumable/gone/mid-turn/indeterminate', () => {
     const rows = collectUnansweredDecisions({ taskDecisions: [taskDecision()] }, { now: NOW });

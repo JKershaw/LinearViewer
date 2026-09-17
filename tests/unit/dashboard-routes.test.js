@@ -426,6 +426,52 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
     assert.equal(res.jsonBody.rulings[0].disposition !== 'task-bound', true);
   });
 
+  // LIN-2729 / LIN-2893 Step 5, site 1: proves this route actually calls
+  // `listNewestScanPerTask` with its own workspace-key scope and threads the
+  // result into `collectUnansweredDecisions` — not just that a stub exists
+  // to keep the route from 500ing.
+  test('LIN-2729 fix: listNewestScanPerTask is called and its result actually discharges an older candidate row', async () => {
+    const newestScanCalls = [];
+    const taskDecisionsStore = {
+      async listUnansweredForWorkspaces() {
+        return [{
+          id: 'scan_task_nf_older11111', urlKey: 'ws-a', issueId: '99999999-1111-2222-3333-444444444444',
+          issueIdentifier: 'LIN-90', decision: { decision_id: 'd-task-nf', question: 'Proceed?' },
+          scannedAt: new Date(Date.now() - 60000).toISOString(), outcome: null, outcomeAt: null
+        }];
+      },
+      async listNewestScanPerTask(urlKeys) {
+        newestScanCalls.push(urlKeys);
+        return {
+          'ws-a::99999999-1111-2222-3333-444444444444': {
+            urlKey: 'ws-a', issueId: '99999999-1111-2222-3333-444444444444',
+            outcome: 'self-resolved', scannedAt: new Date().toISOString()
+          }
+        };
+      }
+    };
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      taskDecisionsStore
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(newestScanCalls.length, 1, 'listNewestScanPerTask must actually be called by this route');
+    assert.deepEqual(newestScanCalls[0], ['ws-a'], 'called with this route\'s own workspace-key scope');
+    assert.equal(res.jsonBody.count, 0, 'the older candidate must be discharged — its task\'s true newest row is self-resolved');
+  });
+
   // ─── liveDispatchOnAnchor (LIN-2773 Area 4) ─────────────────────────────
 
   test('liveDispatchOnAnchor forces effect: "record" on a task-bound row, even over a declared "dispatch"', async () => {
@@ -1161,6 +1207,46 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     assert.equal(res.jsonBody.timeToResponse.count, 1);
     assert.equal(res.jsonBody.falseEscalation.answered, 1);
     assert.equal(res.jsonBody.unansweredAge.count, 1);
+  });
+
+  // LIN-2729 / LIN-2893 Step 5, site 2: proves computeWorkspaceEscalationKpis
+  // actually calls `listNewestScanPerTask` (with its OWN workspace-key
+  // scope — a bare array of urlKeys, not the `{urlKey,name}` shape site 1
+  // uses) and threads the result into the SAME predicate, so a task's true
+  // newest outcome-bearing scan discharges the KPI's own unansweredAge row
+  // too — never a divergent derivation from the live feed's.
+  test('LIN-2729 fix: listNewestScanPerTask is called with this site\'s own scope and discharges the KPI\'s unansweredAge row', async () => {
+    const newestScanCalls = [];
+    const taskDecisionsStore = {
+      async listResolvedForWorkspaces() { return []; },
+      async listUnansweredForWorkspaces(urlKeys) {
+        assert.deepEqual(urlKeys, ['ws-a']);
+        return [{
+          id: 'scan_nf_kpi', urlKey: 'ws-a', issueId: '88888888-1111-2222-3333-444444444444',
+          issueIdentifier: 'LIN-91', decision: { decision_id: 'd-task-nf-kpi', question: 'q?' },
+          scannedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(), outcome: null, outcomeAt: null
+        }];
+      },
+      async listNewestScanPerTask(urlKeys) {
+        newestScanCalls.push(urlKeys);
+        return {
+          'ws-a::88888888-1111-2222-3333-444444444444': {
+            urlKey: 'ws-a', issueId: '88888888-1111-2222-3333-444444444444',
+            outcome: 'dismissed', scannedAt: new Date().toISOString()
+          }
+        };
+      }
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace, taskDecisionsStore);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(newestScanCalls.length, 1, 'listNewestScanPerTask must actually be called by this consumer');
+    assert.deepEqual(newestScanCalls[0], ['ws-a'], 'called with this site\'s own scope (bare urlKeys array, matching its candidate fetch)');
+    assert.equal(res.jsonBody.unansweredAge.count, 0, 'the older candidate must be discharged — its task\'s true newest row is dismissed');
   });
 
   test('LIN-2291: task-bound unansweredRows attributes raisedAt to the row\'s own workspace, not the first workspace sharing decision_id', async () => {

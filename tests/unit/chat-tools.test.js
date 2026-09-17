@@ -2451,6 +2451,38 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
       'only the three list reads — never markDecisionAnswered/dismiss/shelve'
     );
   });
+
+  // LIN-2729 / LIN-2893 Step 5, site 4: proves this tool doesn't just CALL
+  // `listNewestScanPerTask` (the call-set test above) but actually threads
+  // its result into `collectUnansweredDecisions` — a task's true newest
+  // outcome-bearing scan discharges the older candidate row this tool would
+  // otherwise still list.
+  test('LIN-2729 fix: a newer, outcome-bearing scan the candidate query filtered out drops the older task-bound row from the pending list', async () => {
+    const fixture = decisionsFixture();
+    const taskKey = `${URL_KEY}::${TASK_DECISION_UUID}`;
+
+    const stores = makeMockSessionStores({ history: fixture.history });
+    const { executeTool } = createChatToolCatalog({
+      provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
+      dispatchQueueStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
+      sessionIsTerminal: () => false,
+      taskDecisionsStore: {
+        async listUnansweredForWorkspaces() { return fixture.taskDecisions; }, // still just the older, unanswered candidate
+        async listNewestScanPerTask() {
+          return { [taskKey]: { urlKey: URL_KEY, issueId: TASK_DECISION_UUID, outcome: 'answered', scannedAt: new Date().toISOString() } };
+        }
+      },
+      shelvedRulingsStore: { async listForWorkspaces() { return fixture.shelvedRulings; } },
+    });
+
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    assert.strictEqual(
+      result.decisions.some(d => d.decisionId === 'dec-task'), false,
+      'the task-bound row must be discharged — its task\'s true newest scan is answered'
+    );
+    // Control: the loop-backed row is untouched by this task-only fix.
+    assert.strictEqual(result.decisions.some(d => d.decisionId === 'dec-loop'), true);
+  });
 });
 
 // LIN-2704: the pending-set exit is the acceptance criterion, not "a tap
