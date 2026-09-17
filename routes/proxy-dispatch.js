@@ -388,7 +388,16 @@ export function createDispatchRoutes({
       // item; a validated repo is never stored in its unnormalized form.
       let resolvedRepo = repo || null;
       if (!isAbort && repo) {
-        const repoResult = await validateDispatchRepo({ repo, provider: providerAccess?.provider, scope: providerAccess?.token });
+        // LIN-1880 hermetic guard: `test-token` is this codebase's established
+        // test-mode sentinel (see routes/proxy-dispatch.js's own `isTestMode`
+        // a few hundred lines below, and resolvePromptIssueContext's identical
+        // check) — a real `provider.fetchProjects` call under it would reach
+        // the live Linear API from a unit test. Passing `provider: null` rides
+        // validateDispatchRepo's own existing fail-open path (no extra branch
+        // needed there); a route-level test that wants to exercise validation
+        // for real supplies a non-'test-token' scope.
+        const isTestMode = process.env.NODE_ENV === 'test' && providerAccess?.token === 'test-token';
+        const repoResult = await validateDispatchRepo({ repo, provider: isTestMode ? null : providerAccess?.provider, scope: providerAccess?.token });
         if (!repoResult.ok) {
           logEvent(req, '/api/proxy/dispatch', 422, `UNKNOWN_REPO ${repo}`);
           return jsonError(res, 422, `Unknown repo "${repo}"`, {
@@ -802,7 +811,10 @@ export function createDispatchRoutes({
           const overrideRepoCandidate = resolveDispatchRepo(repo, parseRepoFromDescription(project?.description), { inherited: repoInherited === true });
           let overrideResolvedRepo = overrideRepoCandidate;
           if (overrideRepoCandidate) {
-            const repoResult = await validateDispatchRepo({ repo: overrideRepoCandidate, provider, scope: accessToken });
+            // LIN-1880 hermetic guard: reuse this route's own `isTestMode`
+            // (computed above from the `test-token` sentinel) — see the
+            // matching comment on the plain POST /dispatch guard above.
+            const repoResult = await validateDispatchRepo({ repo: overrideRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
             if (!repoResult.ok) {
               logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 422, `UNKNOWN_REPO ${overrideRepoCandidate}`);
               return jsonError(res, 422, `Unknown repo "${overrideRepoCandidate}"`, { code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
@@ -1036,7 +1048,9 @@ export function createDispatchRoutes({
         const recommendRepoCandidate = resolveDispatchRepo(repo, rec.repo, { inherited: repoInherited === true });
         let recommendResolvedRepo = recommendRepoCandidate;
         if (recommendRepoCandidate) {
-          const repoResult = await validateDispatchRepo({ repo: recommendRepoCandidate, provider, scope: accessToken });
+          // LIN-1880 hermetic guard: same `isTestMode` reuse as the
+          // verb-override branch above.
+          const repoResult = await validateDispatchRepo({ repo: recommendRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
           if (!repoResult.ok) {
             keepalive.stop();
             logEvent(req, '/api/proxy/recommend-and-dispatch', 422, `UNKNOWN_REPO ${recommendRepoCandidate}`);
