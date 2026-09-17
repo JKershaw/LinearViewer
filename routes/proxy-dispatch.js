@@ -17,6 +17,7 @@ import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, gr
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
+import { validateDispatchRepo, UNKNOWN_REPO_CODE } from '../lib/dispatch-repo-guard.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
@@ -342,22 +343,28 @@ export function createDispatchRoutes({
         return res.status(201).json({ success: true, cascade: true, ...result });
       }
 
-      // Dangling-referent guard (LIN-1948, surface 2a). MUST run before
-      // createDispatchItem: `finalizePrompt` mints a single-use bootstrap token
-      // inside the factory, so refusing afterwards would leak a minted
-      // credential and burn a dedupe-window slot for a dispatch that never
-      // existed.
+      // Dangling-referent guard (LIN-1948, surface 2a) + repo validation
+      // (LIN-2886) share one provider resolution below — both need it, and
+      // resolving twice would be a redundant network round-trip. MUST run
+      // before createDispatchItem: `finalizePrompt` mints a single-use
+      // bootstrap token inside the factory, so refusing afterwards would leak
+      // a minted credential (dangling-referent) or enqueue on an already-known-
+      // bad repo (LIN-2886) and burn a dedupe-window slot for a dispatch that
+      // never existed.
       //
-      // This route resolves no provider of its own — dispatch has never needed
-      // one, and the guard is written to keep that true: every non-definitive
-      // outcome allows (see lib/dispatch-referent-guard.js). The added
-      // resolution is diagnostic-safe; `resolveProviderAccess`'s
-      // `recordCredentialResolution` is explicitly read by nothing downstream.
-      // Skipped for aborts/cascades so a cancel can never be blocked by a
-      // dangling referent.
+      // This route resolved no provider of its own before LIN-2886 — dispatch
+      // never needed one for the referent guard, which is written to keep
+      // every non-definitive outcome permissive (see
+      // lib/dispatch-referent-guard.js) regardless of whether resolution
+      // itself succeeds. Skipped for aborts/cascades so a cancel can never be
+      // blocked by either guard.
+      let providerAccess = null;
+      if (!isAbort && (issueIdentifier || repo)) {
+        providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      }
+
       if (!isAbort && issueIdentifier) {
-        const { token: referentToken, provider: referentProvider } =
-          await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+        const { token: referentToken, provider: referentProvider } = providerAccess;
         if (await isDanglingReferent({ provider: referentProvider, token: referentToken, issueIdentifier })) {
           logEvent(req, '/api/proxy/dispatch', 422, `${ISSUE_NOT_FOUND_CODE} ${issueIdentifier}`);
           return jsonError(res, 422, DANGLING_REFERENT_MESSAGE, {
@@ -365,6 +372,40 @@ export function createDispatchRoutes({
             issueIdentifier,
           });
         }
+      }
+
+      // Repo override validation at the Harbour seam (LIN-2886): resolve
+      // `repo` against the workspace's known repos (LIN-1935's
+      // `knownWorkspaceRepos` inventory seam) BEFORE enqueueing — a typo, a
+      // URL where a basename was meant, or an injected value should never
+      // reach the runner as a wasted dispatch + confusing terminal failure +
+      // five-minute duplicate-guard wait (LIN-2872). Fails OPEN when the
+      // capability isn't there to check with (see
+      // lib/dispatch-repo-guard.js) — the runner's own reject
+      // (simple-dispatcher's admission.js) remains the second line of
+      // defense for exactly that case. `resolvedRepo` (normalized to the
+      // basename on a URL/owner-name match) replaces the raw `repo` on the
+      // item; a validated repo is never stored in its unnormalized form.
+      let resolvedRepo = repo || null;
+      if (!isAbort && repo) {
+        // LIN-1880 hermetic guard: `test-token` is this codebase's established
+        // test-mode sentinel (see routes/proxy-dispatch.js's own `isTestMode`
+        // a few hundred lines below, and resolvePromptIssueContext's identical
+        // check) — a real `provider.fetchProjects` call under it would reach
+        // the live Linear API from a unit test. Passing `provider: null` rides
+        // validateDispatchRepo's own existing fail-open path (no extra branch
+        // needed there); a route-level test that wants to exercise validation
+        // for real supplies a non-'test-token' scope.
+        const isTestMode = process.env.NODE_ENV === 'test' && providerAccess?.token === 'test-token';
+        const repoResult = await validateDispatchRepo({ repo, provider: isTestMode ? null : providerAccess?.provider, scope: providerAccess?.token });
+        if (!repoResult.ok) {
+          logEvent(req, '/api/proxy/dispatch', 422, `UNKNOWN_REPO ${repo}`);
+          return jsonError(res, 422, `Unknown repo "${repo}"`, {
+            code: UNKNOWN_REPO_CODE,
+            knownRepos: repoResult.knownRepos
+          });
+        }
+        resolvedRepo = repoResult.repo;
       }
 
       // Auto-append the proxy context (workspace API access + reporting channel) by
@@ -488,7 +529,9 @@ export function createDispatchRoutes({
           issueUrl: issueUrl || null,
           dispatchedBy: req.proxyCreatedBy || null,
           target: target || 'cli',
-          repo: repo || null,
+          // LIN-2886: the validated/normalized repo (basename), never the
+          // raw caller value when it was a URL/owner-name form that matched.
+          repo: resolvedRepo,
           followUpTo: followUpTo || null,
           force: force === true,
           abort: isAbort,
@@ -759,6 +802,26 @@ export function createDispatchRoutes({
         // length checks the caller-supplied POST /dispatch path runs, and is
         // never returned to the caller — same contract as the LLM-driven path.
         try {
+          // Repo override validation at the Harbour seam (LIN-2886): resolve
+          // the SAME repo value this branch is about to store — after LIN-537/
+          // LIN-1210 precedence, not the raw caller value — against the
+          // workspace's known repos. See the plain POST /dispatch guard above
+          // and lib/dispatch-repo-guard.js for the full rationale; fails OPEN
+          // when the capability isn't there to check with.
+          const overrideRepoCandidate = resolveDispatchRepo(repo, parseRepoFromDescription(project?.description), { inherited: repoInherited === true });
+          let overrideResolvedRepo = overrideRepoCandidate;
+          if (overrideRepoCandidate) {
+            // LIN-1880 hermetic guard: reuse this route's own `isTestMode`
+            // (computed above from the `test-token` sentinel) — see the
+            // matching comment on the plain POST /dispatch guard above.
+            const repoResult = await validateDispatchRepo({ repo: overrideRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
+            if (!repoResult.ok) {
+              logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 422, `UNKNOWN_REPO ${overrideRepoCandidate}`);
+              return jsonError(res, 422, `Unknown repo "${overrideRepoCandidate}"`, { code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
+            }
+            overrideResolvedRepo = repoResult.repo;
+          }
+
           // Create the dispatch item through the shared factory (LIN-1139): it
           // resolves model/harness from workspace dispatchDefaults (LIN-1099;
           // `kind` is guaranteed set on this verb-override branch), interposes the
@@ -811,7 +874,9 @@ export function createDispatchRoutes({
               // description, with an explicit caller repo winning (LIN-537). When
               // the caller marks its repo as inherited (LIN-1210), the named node's
               // own project repo wins over it instead (repoInherited: true).
-              repo: resolveDispatchRepo(repo, parseRepoFromDescription(project?.description), { inherited: repoInherited === true }),
+              // Validated + normalized against the workspace's known repos above
+              // (LIN-2886) — never the raw candidate.
+              repo: overrideResolvedRepo,
               sessionId: sessionId || null,
               // Periodical-template join key (LIN-1825/LIN-2385): validated above
               // when caller-supplied; otherwise derived from the issue's LIN-694
@@ -972,6 +1037,28 @@ export function createDispatchRoutes({
         // action can't be parsed.
         const effectiveKind = deriveDispatchKind(rec.recommendedAction);
 
+        // Repo override validation at the Harbour seam (LIN-2886): resolve the
+        // SAME repo value this branch is about to store — after LIN-537/
+        // LIN-1210 precedence, not the raw caller value — against the
+        // workspace's known repos. See the plain POST /dispatch guard and
+        // lib/dispatch-repo-guard.js for the full rationale; fails OPEN when
+        // the capability isn't there to check with. This branch is
+        // keepalive-armed, so a refusal rides `keepalive.send` like the
+        // deferred-action check above, not a plain `res`.
+        const recommendRepoCandidate = resolveDispatchRepo(repo, rec.repo, { inherited: repoInherited === true });
+        let recommendResolvedRepo = recommendRepoCandidate;
+        if (recommendRepoCandidate) {
+          // LIN-1880 hermetic guard: same `isTestMode` reuse as the
+          // verb-override branch above.
+          const repoResult = await validateDispatchRepo({ repo: recommendRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
+          if (!repoResult.ok) {
+            keepalive.stop();
+            logEvent(req, '/api/proxy/recommend-and-dispatch', 422, `UNKNOWN_REPO ${recommendRepoCandidate}`);
+            return keepalive.send(422, { error: `Unknown repo "${recommendRepoCandidate}"`, code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
+          }
+          recommendResolvedRepo = repoResult.repo;
+        }
+
         // Create the dispatch item through the shared factory (LIN-1139): it
         // resolves model/harness from workspace dispatchDefaults (LIN-1099, keyed
         // on the recommendation-derived effectiveKind), interposes the default
@@ -1027,7 +1114,9 @@ export function createDispatchRoutes({
             // On a cross-project descent the terminal child's repo (rec.repo) also
             // wins over a merely *inherited* caller repo (repoInherited: true), so
             // the worker runs in the child project's repo, not the parent's (LIN-1210).
-            repo: resolveDispatchRepo(repo, rec.repo, { inherited: repoInherited === true }),
+            // Validated + normalized against the workspace's known repos above
+            // (LIN-2886) — never the raw candidate.
+            repo: recommendResolvedRepo,
             sessionId: sessionId || null,
             // Periodical-template join key (LIN-1825/LIN-2385): validated above
             // when caller-supplied, else derived from the issue's gate marker
