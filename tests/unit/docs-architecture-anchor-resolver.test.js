@@ -19,11 +19,28 @@
  * defect this test exists to not repeat — see the plan-review finding on
  * the sibling LIN-2897 resolver).
  *
+ * Review found this test itself under-bounded (implementation review,
+ * 2026-09-18): 31 of 53 citation rows — every citation to 5 of the 8 docs —
+ * had neither a literal quote nor a "both-paths" keyword nearby, so they fell
+ * through to an `else` branch that only asserted "the file has a markdown
+ * heading somewhere". Replacing those 5 docs' entire contents with a single
+ * `## Stub` heading and filler text passed the full unit suite. The `else`
+ * branch below now asserts each doc still contains the section heading it
+ * was moved with, derived from that doc's own creation commit in git history
+ * (not the doc's current working-tree content, which is exactly what a
+ * mutation corrupts, and not a pinned list, which is the under-bounding
+ * class this ticket exists to stop).
+ *
+ * The same review also found the one surviving `CLAUDE.md:<line>` anchor
+ * (into CLAUDE.md itself, not docs/architecture/) had no drift guard at all.
+ * The second describe block below extends the sweep to that class.
+ *
  * Run with: node --test tests/unit/docs-architecture-anchor-resolver.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -65,6 +82,41 @@ const COMMENT_PREFIX = /^\s*(\*\/?|\/\/|>)\s?/;
 // pinned list reproduces the exact under-bounding this test exists to stop).
 const sourceFiles = walk(repoRoot, '', []);
 const existingDocs = new Set(readdirSync(architectureDir).filter((f) => f.endsWith('.md')));
+
+const HEADING_PATTERN = /^#{2,3} .+$/m;
+
+function git(args) {
+  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
+}
+
+// The commit that first added this doc — i.e. the move itself, not the
+// current working tree (which is exactly what a mutation corrupts).
+function creationCommit(relPath) {
+  // No --follow: these docs were newly created by the move (LIN-2896 beat
+  // 1), not renamed from an existing file, and --follow's similarity-based
+  // rename detection has been observed to trace some of them back past
+  // their real creation commit to an unrelated earlier file.
+  const hashes = git(['log', '--format=%H', '--diff-filter=A', '--', relPath])
+    .trim().split('\n').filter(Boolean);
+  assert.ok(hashes.length > 0,
+    `git history has no creation commit for ${relPath} — cannot derive the heading it was moved with`);
+  return hashes[hashes.length - 1]; // oldest = creation
+}
+
+// The section heading each doc was moved with, read from its own creation
+// commit's blob — not from the doc's current content (self-referential,
+// would pass no matter what the doc says now) and not a pinned list of
+// heading text (the under-bounding class this ticket exists to stop).
+function expectedHeading(doc) {
+  const relPath = `docs/architecture/${doc}`;
+  const historicalText = git(['show', `${creationCommit(relPath)}:${relPath}`]);
+  const match = historicalText.match(HEADING_PATTERN);
+  assert.ok(match,
+    `docs/architecture/${doc} had no markdown heading in its creation commit — cannot derive the heading it was moved with`);
+  return match[0];
+}
+
+const docHeadings = new Map([...existingDocs].map((doc) => [doc, expectedHeading(doc)]));
 
 const rows = [];
 for (const relFile of sourceFiles) {
@@ -152,9 +204,76 @@ describe('docs/architecture/ anchor resolver (LIN-2896)', () => {
           `(lib/openrouter.js). A both-paths rule that only names one path is a false claim of exactly the ` +
           `class LIN-2302 landed.`);
       } else {
-        assert.ok(/^#{2,3} /m.test(docText),
-          `${row.file}:${row.line} cites docs/architecture/${row.targetDoc}, which exists but carries no ` +
-          `markdown heading — it is either empty or filler, not the real moved content the citation expects.`);
+        // No literal quote and no both-paths keyword nearby — the weakest
+        // remaining citation class, and the one review found landing 31 of
+        // 53 rows in an `else` that only checked "has a heading" (any
+        // heading, e.g. `## Stub`). Assert the doc still contains the
+        // specific section heading it was moved with (derived above from
+        // its own creation commit), not just any heading.
+        const heading = docHeadings.get(row.targetDoc);
+        assert.ok(docText.includes(heading),
+          `${row.file}:${row.line} cites docs/architecture/${row.targetDoc}, which no longer contains the ` +
+          `section heading it was moved with (${JSON.stringify(heading)}, derived from the doc's creation ` +
+          `commit) — the referring site expected that section's content to still be here.`);
+      }
+    });
+  }
+});
+
+// Residual anchors into CLAUDE.md itself (review item 2). The sweep above
+// only ever looks for docs/architecture/ citations, so a reference that
+// still points at "CLAUDE.md" plus a line number — left behind because the
+// content it names never moved out of CLAUDE.md — gets no drift guard at
+// all: CLAUDE.md is live real estate, so a future edit can silently move or
+// delete that line and nothing here would notice. Swept over the same
+// walk/denylist as above, enumerated at run time (not a pinned list of
+// known anchors, for the same reason as the docs/architecture/ sweep).
+const CLAUDE_MD_LINE_ANCHOR = /CLAUDE\.md:(\d+)/;
+const BACKTICK_PATTERN = /`([^`]{6,})`/g;
+
+const claudeMdAnchorRows = [];
+for (const relFile of sourceFiles) {
+  const absFile = join(repoRoot, relFile);
+  const lines = readFileSync(absFile, 'utf8').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(CLAUDE_MD_LINE_ANCHOR);
+    if (!match) continue;
+    const nextLineStripped = i + 1 < lines.length ? lines[i + 1].replace(COMMENT_PREFIX, '') : '';
+    const context = `${lines[i]} ${nextLineStripped}`.replace(/\s+/g, ' ');
+    // What the citation names, verifiable: any backtick-quoted code span
+    // near it, long enough (6+ chars) to not be a generic word like `fetch`.
+    const quotedSpans = [...context.matchAll(BACKTICK_PATTERN)].map((m) => m[1]);
+    claudeMdAnchorRows.push({ file: relFile, line: i + 1, targetLine: Number(match[1]), quotedSpans });
+  }
+}
+
+describe('residual CLAUDE.md line anchors (LIN-2896 review item 2)', () => {
+  test('the sweep found the anchor(s) it expects (guard against a silently-broken pattern)', () => {
+    assert.ok(claudeMdAnchorRows.length >= 1,
+      `the sweep found ${claudeMdAnchorRows.length} residual CLAUDE.md line anchor(s) outside denylisted ` +
+      `dirs — expected at least 1 (tests/unit/session-id-render-seam.test.js's reference to the house ` +
+      `test-harness pattern). Either the anchor moved/was removed (update this expectation deliberately) or ` +
+      `the pattern (${CLAUDE_MD_LINE_ANCHOR}) stopped matching.`);
+  });
+
+  for (const row of claudeMdAnchorRows) {
+    test(`${row.file}:${row.line} -> CLAUDE.md line ${row.targetLine} still holds the cited content`, () => {
+      const claudeLines = readFileSync(join(repoRoot, 'CLAUDE.md'), 'utf8').split('\n');
+      assert.ok(row.targetLine >= 1 && row.targetLine <= claudeLines.length,
+        `${row.file}:${row.line} cites CLAUDE.md line ${row.targetLine}, which is past CLAUDE.md's current ` +
+        `${claudeLines.length} lines — CLAUDE.md has shrunk or that content moved since this anchor was written.`);
+
+      assert.ok(row.quotedSpans.length > 0,
+        `${row.file}:${row.line} cites CLAUDE.md line ${row.targetLine} but names no backtick-quoted content ` +
+        `near the citation, so there is nothing here to verify it against — add a quoted excerpt of what that ` +
+        `line says, or drop the line-numbered citation in favour of a section reference.`);
+
+      const citedLine = claudeLines[row.targetLine - 1];
+      for (const span of row.quotedSpans) {
+        assert.ok(citedLine.includes(span),
+          `${row.file}:${row.line} cites CLAUDE.md line ${row.targetLine} for the content ${JSON.stringify(span)}, ` +
+          `but that line now reads: ${JSON.stringify(citedLine)}. The citation has drifted — CLAUDE.md moved or ` +
+          `changed since this anchor was written.`);
       }
     });
   }
