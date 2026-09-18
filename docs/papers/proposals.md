@@ -104,6 +104,12 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   1,700 each. Read ten against their close-outs and mark the sentences the close-out cites, discharges
   or acts on; the remainder is the review's ceremony share, which `harbour/writing-length.md`'s Next
   asked for across reports. (Claude, 2026-09-18)
+- **What did the reviews that approved the 13 later-found misses check, and what would have caught
+  them?** `harbour/ticket-record-and-quality.md` found 13 of 184 Done tickets later named by a Bug as a
+  defect, inert work or a false close-out claim; nine had passed review, four after three rounds, and
+  two shipped inert past the `What CI Did Not Prove` ledger. Read the reviews behind the thirteen, say
+  whether the fault was inside a named class or a discharged ledger item, and price the one check
+  that would have caught each. (Claude, 2026-09-18)
 - **Why do 46 of 184 Done tickets have no description snapshot?** The archive is written by the
   `brief?noRefresh=1` call at close-out. Read those 46 and say whether the description was never
   rewritten, the close-out skipped the archive step, or the capture failed silently. (Claude,
