@@ -104,13 +104,21 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   1,700 each. Read ten against their close-outs and mark the sentences the close-out cites, discharges
   or acts on; the remainder is the review's ceremony share, which `harbour/writing-length.md`'s Next
   asked for across reports. (Claude, 2026-09-18)
-- **What did the reviews that approved the 13 later-found misses check, and what would have caught
-  them?** `harbour/ticket-record-and-quality.md` found 13 of 184 Done tickets later named by a Bug as a
-  defect, inert work or a false close-out claim; nine had passed review, four after three rounds, and
-  two shipped inert past the `What CI Did Not Prove` ledger. Read the reviews behind the thirteen, say
-  whether the fault was inside a named class or a discharged ledger item, and price the one check
-  that would have caught each. (Claude, 2026-09-18)
 - **Why do 46 of 184 Done tickets have no description snapshot?** The archive is written by the
   `brief?noRefresh=1` call at close-out. Read those 46 and say whether the description was never
   rewritten, the close-out skipped the archive step, or the capture failed silently. (Claude,
   2026-09-18)
+- **Does a review naming a fault make it more likely to be fixed?** `harbour/what-the-reviews-checked.md`
+  found six of thirteen later-found misses were filed by the review that found them, labelled
+  `kind:review-residue` or `kind:follow-up`, and four of those are still open a fortnight on. Sweep
+  every such Bug in the cohort and compare open rate and waiting time against faults found by a user.
+  (Claude, 2026-09-18)
+- **Do close-out claims that carry their evidence inline still need a reader?** LIN-2922 already
+  targets the existing `retrospective-audit` at close-outs with a non-empty ledger; the broad "dispatch
+  a reader over every close-out" form was rejected as ~300× the repair it would prevent
+  (`docs/reviews/proposal-red-team-2026-09-18.md`, proposal 6). The untested residual is that review's
+  other reformulation: `harbour/what-the-reviews-checked.md`'s two false record claims (LIN-2773,
+  LIN-2775) would have shown their own `?teamId=` fault in the evidence had the claim carried the
+  literal request and response inline, as the template already does for CI. Require inline literal-call
+  evidence on one close-out field for a fortnight, then re-run LIN-2922's audit over both arms and
+  compare the false-claim rate. (Claude, 2026-09-18)
