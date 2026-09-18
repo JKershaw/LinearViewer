@@ -25,7 +25,7 @@ function isTerminalState(stateType) {
 
 // NOTE: Canonical source of truth for state ordering is lib/providers/models.js +
 // state-map.js. This browser copy (terminal-collapse variant, matching
-// swim-lanes.js's SEGMENT_RANK) is duplicated because the no-build-step constraint
+// swim-lanes.js's SEGMENT_RANK) is duplicated because the `no build step` constraint
 // (CLAUDE.md) prevents importing from lib/. Keep in sync; unifying client+server
 // is a candidate follow-up under LIN-174.
 var SEGMENT_RANK = { started: 0, unstarted: 1, backlog: 2, completed: 3, canceled: 3, duplicate: 3 };

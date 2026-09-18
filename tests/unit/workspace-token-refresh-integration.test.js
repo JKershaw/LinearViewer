@@ -520,7 +520,7 @@ async function resolveWorkspaceAccessMirror({ collection, urlKey, ownerAccountId
 // Extracts the body of `async function resolveWorkspaceAccess` from server.js
 // (the exact idiom + rationale as linear-token-isolation.test.js's Block F):
 // from the function keyword to the next TOP-LEVEL `\n}`. Relies on the repo's
-// consistent 2-space indentation (CLAUDE.md) — every inner brace is
+// consistent `2-space indentation` (CLAUDE.md) — every inner brace is
 // space-prefixed, so only the function's own closing brace matches "\n}".
 function extractResolveWorkspaceAccessBody(src) {
   const start = src.indexOf('async function resolveWorkspaceAccess');

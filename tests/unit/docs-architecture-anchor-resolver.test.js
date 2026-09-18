@@ -62,6 +62,17 @@
  * (into CLAUDE.md itself, not docs/architecture/) had no drift guard at all.
  * The second describe block below extends the sweep to that class.
  *
+ * The third review (2026-09-18, ledger item 3) found the *other* two anchored
+ * shapes into CLAUDE.md still ungated: a quoted/paraphrased heading title, and
+ * an assertion that specific prose currently lives there. The third describe
+ * block below gates both, for the shapes that carry something checkable — a
+ * heading title, or a backtick/quote-delimited excerpt in the same sentence as
+ * the citation. KNOWN BOUND, stated rather than left to be discovered: a
+ * citation that paraphrases CLAUDE.md while quoting no excerpt and naming no
+ * heading has no machine-checkable expectation, so it gets no check here — see
+ * the comment above HEADING_CLAIM for that residual set and why the three
+ * live-code instances were reworded to carry an excerpt instead.
+ *
  * Run with: node --test tests/unit/docs-architecture-anchor-resolver.test.js
  */
 import { test, describe } from 'node:test';
@@ -80,7 +91,12 @@ const architectureDir = join(repoRoot, 'docs/architecture');
 // nested, NON-denylisted directory) slip through a real sweep once already.
 const DENYLIST_DIRS = ['docs/reviews', 'docs/archive', 'plans', 'scripts/eval'];
 const SKIP_DIR_NAMES = new Set(['node_modules', '.git']);
-const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.md']);
+// `.txt`/`.html` are in the set because they were not, and a citation in
+// public/llms.txt (the live agent-facing file) or a shipped .html page would
+// have got no check at all. Adding them found zero new citations outside the
+// denylisted dirs at the time of writing — this bounds the sweep for the next
+// one, it does not fix a present miss.
+const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.md', '.txt', '.html']);
 
 function isDenylisted(relPath) {
   return DENYLIST_DIRS.some((d) => relPath === d || relPath.startsWith(`${d}/`));
@@ -242,13 +258,13 @@ describe('docs/architecture/ anchor resolver (LIN-2896)', () => {
         // remaining citation class, and the one review found landing 31 of
         // 53 rows in an `else` that only checked "has a heading" (any
         // heading, e.g. `## Stub`). Assert the doc still contains the
-        // specific section heading it was moved with (derived above from
-        // its own creation commit), not just any heading.
+        // specific section heading it was moved with (from the literal
+        // EXPECTED_HEADINGS map above), not just any heading.
         const heading = EXPECTED_HEADINGS.get(row.targetDoc);
         assert.ok(docText.includes(heading),
           `${row.file}:${row.line} cites docs/architecture/${row.targetDoc}, which no longer contains the ` +
-          `section heading it was moved with (${JSON.stringify(heading)}, derived from the doc's creation ` +
-          `commit) — the referring site expected that section's content to still be here.`);
+          `section heading it was moved with (${JSON.stringify(heading)}, per EXPECTED_HEADINGS in this ` +
+          `file) — the referring site expected that section's content to still be here.`);
       }
     });
   }
@@ -308,6 +324,175 @@ describe('residual CLAUDE.md line anchors (LIN-2896 review item 2)', () => {
           `${row.file}:${row.line} cites CLAUDE.md line ${row.targetLine} for the content ${JSON.stringify(span)}, ` +
           `but that line now reads: ${JSON.stringify(citedLine)}. The citation has drifted — CLAUDE.md moved or ` +
           `changed since this anchor was written.`);
+      }
+    });
+  }
+});
+
+// Residual CONTENT anchors into CLAUDE.md — the two anchored shapes that name
+// no line number (review item 3). The `CLAUDE.md:<line>` sweep above covers the
+// line-number shape; the ticket's own definition of "anchored" is broader: a
+// hit is anchored iff it contains the literal `CLAUDE.md` AND makes a location
+// claim — a line number, a quoted/paraphrased heading title, or an assertion
+// that specific prose currently lives there. CLAUDE.md is live real estate
+// (106 lines, every one of them editable), so those two shapes drift the same
+// way the line numbers do, and nothing checked them.
+//
+// Enumerated at run time over the same walk/denylist, never a pinned list of
+// known sites. Two classifiers, both deliberately narrow — a false positive
+// here fails an unrelated PR, so the cues are explicit location claims only:
+//
+//   heading claim: `CLAUDE.md -> <Section>`, `CLAUDE.md#<anchor>`, or
+//                  `CLAUDE.md's "<Section>" section` -> CLAUDE.md must still
+//                  carry a heading whose text contains that title.
+//   prose claim:   an attribution cue naming the file — per, parenthetical,
+//                  stated in, documented in, says, see (PROSE_CLAIM_CUE has
+//                  the exact shapes) — plus a backtick- or quote-delimited
+//                  excerpt in the SAME SENTENCE -> every such excerpt must
+//                  still appear in CLAUDE.md.
+//
+// Past-tense mentions are excluded (HISTORICAL_MENTION): several sites
+// correctly record what CLAUDE.md *used to* say — e.g. the false Jira consent
+// reason "inherited from CLAUDE.md" in tests/unit/jira-consent-copy.test.js and
+// lib/render-pages.js, prose LIN-2302 deleted from CLAUDE.md back at cd233879.
+// Those must NOT resolve; asserting they do would demand re-introducing
+// deleted prose.
+//
+// RESIDUAL, ungated by design: a citation that paraphrases CLAUDE.md with no
+// quoted excerpt and no heading title. At the time of writing that set is
+// entirely dated research/spike documents (docs/autopilot-operating-manual-
+// research.md, docs/recommendation-engine-redesign.md, docs/spike-LIN-192-
+// refactoring-recommendations.md, docs/lin-260-prompt-scaling-research.md,
+// docs/pipeline-design-history.md) — the same species as DENYLIST_DIRS, frozen
+// analyses that legitimately keep citing where something lived when they were
+// written. The three instances in LIVE code (public/swim.js,
+// tests/unit/linear-token-isolation.test.js and
+// tests/unit/workspace-token-refresh-integration.test.js) were reworded to
+// backtick the excerpt they rely on, so the prose sweep below checks them
+// instead of leaving them in the residual.
+const HEADING_CLAIM = /CLAUDE\.md\s*(?:→|->|#+)\s*"?([A-Z][^".\n)]{3,60}?)"?\s*(?=[.,)]|$)|CLAUDE\.md's\s+(?:own\s+)?(?:"([^"]{4,60})"|([A-Z][A-Za-z0-9 ()-]{3,60}?))\s+section/;
+const PROSE_CLAIM_CUE = /(?:\bper\s+`?CLAUDE\.md`?|(?<!\])\(`?CLAUDE\.md`?\)|\bstated in\s+`?CLAUDE\.md`?|\bdocumented in\s+`?CLAUDE\.md`?|`?CLAUDE\.md`?\s+says|\bsee\s+`?CLAUDE\.md`?)/i;
+const HISTORICAL_MENTION = /\binherited\b|\bused to\b|\bformerly\b|\bpre-shrink\b|\bno longer\b|\bwas shrunk\b|\bmoved verbatim\b|\brelocated\b|\bhistorical\b/i;
+const EXCERPT_PATTERN = /`([^`]{6,})`|"([^"]{8,})"/g;
+const SENTENCE_BOUNDARY = /[.!?]["')\]]?\s/g;
+// A title/excerpt carrying a template or placeholder marker is a description of
+// the shape, not a claim about CLAUDE.md's content (this file's own template
+// literals and wrapped message strings are the reason) — same rule as
+// isLiteralQuote above.
+const PLACEHOLDER = /[<>${}`+]/;
+
+// Dash/quote/whitespace-insensitive: a comment may wrap, and an em dash in
+// prose is the same claim as a hyphen in the source it quotes.
+function normalizeText(text) {
+  return text
+    .replace(/[‐-―−→]/g, '-')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// The sentence around index `at`, so an excerpt from a NEIGHBOURING sentence is
+// not read as part of this citation's claim (docs/spike-LIN-192-refactoring-
+// recommendations.md:22 quotes the ticket's own words one sentence before it
+// cites CLAUDE.md).
+function sentenceAround(text, at) {
+  let start = 0;
+  let end = text.length;
+  SENTENCE_BOUNDARY.lastIndex = 0;
+  let match;
+  while ((match = SENTENCE_BOUNDARY.exec(text)) !== null) {
+    if (match.index + match[0].length <= at) start = match.index + match[0].length;
+    else { end = match.index + 1; break; }
+  }
+  return text.slice(start, end);
+}
+
+function excerptsIn(text) {
+  return [...text.matchAll(EXCERPT_PATTERN)]
+    .map((m) => m[1] || m[2])
+    // Not verifiable against CLAUDE.md's prose: the filename itself, a path or
+    // filename (the citation's own target, or a neighbouring module), and a
+    // template/placeholder rather than literal expected text.
+    .filter((span) => !span.includes('CLAUDE.md') && !span.includes('/') &&
+      !/\.(md|js|mjs|txt|html)$/.test(span) && !/[<>]|\$\{|\.\.\.\s*$/.test(span));
+}
+
+const claudeMdText = readFileSync(join(repoRoot, 'CLAUDE.md'), 'utf8');
+const claudeMdNormalized = normalizeText(claudeMdText);
+const claudeMdHeadings = claudeMdText
+  .split('\n')
+  .filter((line) => /^#+\s+/.test(line))
+  .map((line) => normalizeText(line.replace(/^#+\s+/, '')));
+
+const claudeMdHeadingRows = [];
+const claudeMdProseRows = [];
+for (const relFile of sourceFiles) {
+  if (relFile === 'CLAUDE.md') continue;
+  const lines = readFileSync(join(repoRoot, relFile), 'utf8').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes('CLAUDE.md')) continue;
+    const prev = i > 0 ? lines[i - 1].replace(COMMENT_PREFIX, '') : '';
+    const next = i + 1 < lines.length ? lines[i + 1].replace(COMMENT_PREFIX, '') : '';
+    const context = `${lines[i]} ${next}`.replace(/\s+/g, ' ');
+    const wide = `${prev} ${lines[i]} ${next}`.replace(/\s+/g, ' ');
+    if (HISTORICAL_MENTION.test(wide)) continue;
+    const headingMatch = context.match(HEADING_CLAIM);
+    if (headingMatch) {
+      const title = normalizeText(headingMatch[1] || headingMatch[2] || headingMatch[3] || '');
+      if (!PLACEHOLDER.test(title)) claudeMdHeadingRows.push({ file: relFile, line: i + 1, title });
+      continue;
+    }
+    const cue = wide.match(PROSE_CLAIM_CUE);
+    if (!cue) continue;
+    const excerpts = excerptsIn(sentenceAround(wide, cue.index));
+    if (excerpts.length === 0) continue; // the residual class documented above
+    claudeMdProseRows.push({ file: relFile, line: i + 1, cue: cue[0].trim(), excerpts });
+  }
+}
+
+describe('residual CLAUDE.md content anchors (LIN-2896 review item 3)', () => {
+  test('the heading-title sweep found the claims it expects (guard against a silently-broken pattern)', () => {
+    assert.ok(claudeMdHeadingRows.length >= 4,
+      `the sweep found ${claudeMdHeadingRows.length} heading-title claim(s) into CLAUDE.md outside ` +
+      `denylisted dirs — expected at least 4: the assertion-failure string in ` +
+      `tests/unit/test-server-listen-bind.test.js, plus the "Where the detail lives" and "Invariants" ` +
+      `citations in this file and in tests/unit/claude-md-line-budget.test.js. Either those citations were ` +
+      `reworded (update this expectation deliberately) or the pattern stopped matching.`);
+  });
+
+  test('the prose-excerpt sweep found the claims it expects (guard against a silently-broken pattern)', () => {
+    assert.ok(claudeMdProseRows.length >= 4,
+      `the sweep found ${claudeMdProseRows.length} prose-excerpt claim(s) into CLAUDE.md outside denylisted ` +
+      `dirs — expected at least 4: the house-harness citations in ` +
+      `scripts/assert-unit-suite-hermetic.mjs and tests/fixtures/network-guard.js, and the indentation ` +
+      `citations in tests/unit/linear-token-isolation.test.js and ` +
+      `tests/unit/workspace-token-refresh-integration.test.js. Either those citations stopped quoting an ` +
+      `excerpt — in which case they fall into the documented residual class and this expectation must be ` +
+      `lowered deliberately — or the cue pattern stopped matching.`);
+  });
+
+  for (const row of claudeMdHeadingRows) {
+    test(`${row.file}:${row.line} -> CLAUDE.md heading "${row.title}" still exists`, () => {
+      const title = row.title.toLowerCase();
+      assert.ok(claudeMdHeadings.some((heading) => heading.toLowerCase().includes(title)),
+        `${row.file}:${row.line} cites CLAUDE.md's "${row.title}" section, but no CLAUDE.md heading ` +
+        `contains that title. CLAUDE.md's headings are: ` +
+        `${claudeMdHeadings.map((h) => JSON.stringify(h)).join(', ')}. Either the section was ` +
+        `renamed or moved into docs/architecture/ and this citation must be re-pointed, or the heading ` +
+        `text drifted.`);
+    });
+  }
+
+  for (const row of claudeMdProseRows) {
+    test(`${row.file}:${row.line} -> CLAUDE.md still carries the prose it cites`, () => {
+      for (const excerpt of row.excerpts) {
+        assert.ok(claudeMdNormalized.includes(normalizeText(excerpt)),
+          `${row.file}:${row.line} attributes ${JSON.stringify(excerpt)} to CLAUDE.md (cue: ` +
+          `${JSON.stringify(row.cue)}), but that text is not in CLAUDE.md. Either the prose moved into ` +
+          `docs/architecture/ and this citation must be re-pointed there, or it was edited and the ` +
+          `excerpt is stale. If the mention is about what CLAUDE.md USED TO say, word it in the past ` +
+          `tense so it reads as history, not as a live location claim.`);
       }
     });
   }
