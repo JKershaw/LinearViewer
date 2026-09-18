@@ -592,6 +592,97 @@ test('buildConsoleFeed threads credentialByToken through to the lanes', () => {
   assert.equal(lanes[0].credential.state, 'dead');
 });
 
+// ─── deriveLoopLanes: session-keyed wake fold (LIN-2905, requirement iv) ──────
+//
+// A wake loop resumes its target's session, so it must not spawn a second,
+// mislabeled "Working now" lane. `deriveLoopLanes` resolves each loop's
+// IDENTITY SOURCE (a wake's followUpTo target, when resolvable; itself
+// otherwise), groups ACTIVE loops by that identity source's loopId, and picks
+// the freshest member for liveness — never a full loop swap.
+
+test("LIN-2905: a woken session's lane carries the TARGET's issueIdentifier — the ticket's own primary (terminal-target) case resolves an honest, non-fabricated action/credential, never the wake's placeholder", () => {
+  const target = loop({
+    loopId: 'target-1', issueIdentifier: 'LIN-TARGET', terminalStatus: 'done',
+    agentAction: 'implementation', agentTokenId: 'tok-target',
+  });
+  const wake = loop({
+    loopId: 'wake-1', issueIdentifier: 'LIN-CHILD', kind: 'wake', followUpTo: 'target-1',
+    agentAction: null, stage: 'Prompt', agentTokenId: null,
+  });
+  const lanes = deriveLoopLanes([target, wake], { credentialByToken: { 'tok-target': 'ok' } });
+  assert.equal(lanes.length, 1, 'the terminal target is inactive — only the wake is active, in one lane');
+  assert.equal(lanes[0].task, 'LIN-TARGET', 'task is the target\'s real issue, not the wake\'s triggering-child issue');
+  assert.equal(lanes[0].action, 'Prompt', 'action is the wake\'s own honest signal, not the target\'s STALE pre-terminal action');
+  assert.equal(lanes[0].credential.state, 'unknown', 'never fabricate ok from a terminal target\'s unreachable token — LIN-1588');
+});
+
+test('LIN-2905 (plan-review finding 2 regression pin): a still-active target + its wake emit exactly ONE lane, not two, and the reachable credential is used', () => {
+  const target = loop({
+    loopId: 'target-2', issueIdentifier: 'LIN-TARGET2', terminalStatus: undefined,
+    agentAction: 'implementation', agentTokenId: 'tok-live',
+    dispatchedAt: '2026-07-19T11:00:00.000Z', agentTimestamp: '2026-07-19T11:10:00.000Z',
+  });
+  const wake = loop({
+    loopId: 'wake-2', issueIdentifier: 'LIN-CHILD2', kind: 'wake', followUpTo: 'target-2',
+    agentAction: null, agentTokenId: null,
+    dispatchedAt: '2026-07-19T11:55:00.000Z', agentTimestamp: '2026-07-19T11:59:00.000Z',
+  });
+  const lanes = deriveLoopLanes([target, wake], { credentialByToken: { 'tok-live': 'ok' } });
+  assert.equal(lanes.length, 1, 'two active loops sharing a session — folded to one lane, not two colliding on mergeLanes\' key');
+  assert.equal(lanes[0].task, 'LIN-TARGET2');
+  assert.equal(lanes[0].action, 'implementation', 'target still active — its real action is used, not the wake\'s placeholder');
+  assert.equal(lanes[0].credential.state, 'ok', 'the target\'s real, live credential is reachable and used');
+});
+
+test("LIN-2905: the lane still carries the WAKE loop's own heartbeat/lastActivityMs/sinceMs/ticketWalk/parkedWait when it is the freshest member (partial substitution, not a full loop swap)", () => {
+  const target = loop({
+    loopId: 'target-3', issueIdentifier: 'LIN-TARGET3', terminalStatus: undefined,
+    dispatchedAt: '2026-07-19T09:00:00.000Z', agentTimestamp: '2026-07-19T09:05:00.000Z',
+    telemetry: { metrics: [{ toolCount: 1, total: 1, timestamp: '2026-07-19T09:05:00.000Z' }], producedArtifacts: [] },
+  });
+  const wake = loop({
+    loopId: 'wake-3', issueIdentifier: 'LIN-CHILD3', kind: 'wake', followUpTo: 'target-3',
+    dispatchedAt: '2026-07-19T11:55:00.000Z', agentTimestamp: '2026-07-19T11:59:00.000Z',
+    telemetry: {
+      metrics: [{ toolCount: 5, total: 5, timestamp: '2026-07-19T11:59:00.000Z' }],
+      producedArtifacts: [],
+      ticketWalk: [{ identifier: 'LIN-CHILD3', state: 'started', outcomeLine: null, timestamp: null }],
+      parkedWait: { since: '2026-07-19T11:58:00.000Z', latest: '2026-07-19T11:59:00.000Z' },
+    },
+  });
+  const [lane] = deriveLoopLanes([target, wake]);
+  assert.equal(lane.sinceMs, Date.parse('2026-07-19T11:55:00.000Z'), 'sinceMs from the freshest (wake) member');
+  assert.equal(lane.lastActivityMs, Date.parse('2026-07-19T11:59:00.000Z'));
+  assert.equal(lane.heartbeat.toolCount, 5);
+  assert.equal(lane.ticketWalk.length, 1);
+  assert.deepEqual(lane.parkedWait, { since: '2026-07-19T11:58:00.000Z', latest: '2026-07-19T11:59:00.000Z' });
+});
+
+test("LIN-2905: an unresolvable target (followUpTo points outside the loop set) falls back to the wake's own fields, never throws", () => {
+  const wake = loop({
+    loopId: 'wake-4', issueIdentifier: 'LIN-CHILD4', kind: 'wake', followUpTo: 'missing-target',
+    agentAction: null, agentTokenId: 'tok-wake',
+  });
+  assert.doesNotThrow(() => deriveLoopLanes([wake], { credentialByToken: { 'tok-wake': 'ok' } }));
+  const [lane] = deriveLoopLanes([wake], { credentialByToken: { 'tok-wake': 'ok' } });
+  assert.equal(lane.task, 'LIN-CHILD4');
+  assert.equal(lane.credential.state, 'ok');
+});
+
+test("LIN-2905 (LIN-1588 regression pin): a woken lane resolves DEAD honestly, in the SAME one-lane fold, when the target's real reachable credential is dead", () => {
+  const target = loop({
+    loopId: 'target-5', issueIdentifier: 'LIN-TARGET5', terminalStatus: undefined,
+    agentTokenId: 'tok-dead-5',
+  });
+  const wake = loop({
+    loopId: 'wake-5', issueIdentifier: 'LIN-CHILD5', kind: 'wake', followUpTo: 'target-5',
+    agentTokenId: null,
+  });
+  const lanes = deriveLoopLanes([target, wake], { credentialByToken: { 'tok-dead-5': 'credential_dead' } });
+  assert.equal(lanes.length, 1, 'one lane, not two colliding/duplicate lanes for one session');
+  assert.equal(lanes[0].credential.state, 'dead');
+});
+
 // ─── evidence events from [evidence] artifacts ────────────────────────────────
 
 test('normalizeEvidenceEvents turns produced artifacts into linked evidence events', () => {

@@ -858,6 +858,71 @@ test.describe('Live Console (experimental)', () => {
       expect(staleAnim).toBe('none');
     });
 
+    test('LIN-2905: folded wakeMarkers render as ticks inside the target bar with a " · N wakes" label suffix', async ({ page }) => {
+      let injected = false;
+      await page.route(`**${EVENTS_API}*`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const target = {
+            id: 'f2905-target', issueIdentifier: 'LIN-9300', kind: 'implementation', promptName: null,
+            outcomeKind: 'done', start: now - 3 * 60 * 60000, end: now - 60 * 60000,
+            stillRunning: false, clippedStart: false, groupKey: 'f2905-target', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+            // A wake fires AFTER its target's own bar ends — this is the
+            // ticket's own primary scenario, and the reason the client MUST
+            // clamp a marker's local position rather than trust pct() as-is.
+            wakeMarkers: [
+              { id: 'f2905-wake-done', at: now - 30 * 60000, issueIdentifier: 'LIN-9301', outcomeKind: 'done', stillRunning: false },
+              { id: 'f2905-wake-running', at: now - 5 * 60000, issueIdentifier: 'LIN-9302', outcomeKind: 'working', stillRunning: true },
+            ],
+            wakeCount: 2,
+          };
+          body.timeline = { rows: [[target]], connectors: [], truncated: false, totalInWindow: 1 };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9300"]');
+      await expect(bar).toBeVisible();
+      await expect(bar).toHaveAttribute('aria-label', /· 2 wakes$/);
+
+      const markers = bar.locator('[data-testid="live-console-timeline-wake-marker"]');
+      await expect(markers).toHaveCount(2);
+
+      const doneMarker = bar.locator('[data-testid="live-console-timeline-wake-marker"][aria-label*="LIN-9301"]');
+      const runningMarker = bar.locator('[data-testid="live-console-timeline-wake-marker"][aria-label*="LIN-9302"]');
+      await expect(doneMarker).toHaveAttribute('data-still-running', 'false');
+      await expect(runningMarker).toHaveAttribute('data-still-running', 'true');
+      await expect(runningMarker).toHaveAttribute('aria-label', 'woken by LIN-9302');
+
+      // The marker's LOCAL left% must stay clamped inside the bar's own box
+      // (never < 0, never > 100) even though the wake fired after the bar's
+      // own rendered end — the routine case for a terminal target's wake.
+      const lefts = await markers.evaluateAll(nodes => nodes.map(n => parseFloat(n.style.left)));
+      for (const left of lefts) {
+        expect(left).toBeGreaterThanOrEqual(0);
+        expect(left).toBeLessThanOrEqual(100);
+      }
+
+      // A tick's rendered box must land WITHIN the bar's own rendered box —
+      // `left: 100%` alone places a fixed-width element entirely past the
+      // bar's right edge (onto the page background, invisible against white),
+      // which the percent-only clamp above does not catch by itself.
+      const boxes = await markers.evaluateAll(nodes => nodes.map(n => {
+        const barRect = n.parentElement.getBoundingClientRect();
+        const tickRect = n.getBoundingClientRect();
+        return { barLeft: barRect.left, barRight: barRect.right, tickLeft: tickRect.left, tickRight: tickRect.right };
+      }));
+      for (const box of boxes) {
+        expect(box.tickRight).toBeGreaterThan(box.barLeft);
+        expect(box.tickLeft).toBeLessThan(box.barRight);
+      }
+    });
+
     test('the still-running bar animation is suppressed under prefers-reduced-motion', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9210' });

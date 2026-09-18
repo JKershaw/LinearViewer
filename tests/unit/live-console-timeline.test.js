@@ -381,6 +381,100 @@ test('packTimelineRows accepts a custom groupKeyOf', () => {
   assert.deepEqual(rows[0].map(r => r.id), ['a', 'b']);
 });
 
+// ─── packTimelineRows: fold kind:'wake' runs into their target (LIN-2905) ─────
+
+test('LIN-2905: a parent run + 20 wake loops targeting it yields ONE row with 20 wakeMarkers, not 21 runs', () => {
+  const parent = run({ id: 'parent', groupKey: 'g', start: NOW - 3 * HOUR, end: null, stillRunning: true });
+  const wakes = Array.from({ length: 20 }, (_, i) => run({
+    id: `wake${i}`, kind: 'wake', followUpTo: 'parent', groupKey: 'g',
+    issueIdentifier: `LIN-CHILD-${i}`, start: NOW - HOUR + i * MIN,
+  }));
+  const { rows, connectors } = packTimelineRows([parent, ...wakes]);
+  assert.equal(rows.flat().length, 1, 'only the parent gets a row — no wake row of its own');
+  const packedParent = rows.flat()[0];
+  assert.equal(packedParent.id, 'parent');
+  assert.equal(packedParent.wakeMarkers.length, 20);
+  assert.equal(packedParent.wakeCount, 20);
+  assert.deepEqual(connectors, [], 'a folded wake never draws a connector — it has no bar to connect');
+});
+
+test('LIN-2905: a wake whose target is outside the packed run list is dropped — no bar, no connector, no marker anywhere', () => {
+  const wake = run({ id: 'wake1', kind: 'wake', followUpTo: 'aged-out-of-window', groupKey: 'g' });
+  const { rows, connectors } = packTimelineRows([wake]);
+  assert.equal(rows.flat().length, 0);
+  assert.deepEqual(connectors, []);
+});
+
+test('LIN-2905: a wake whose target was truncated away by TIMELINE_RUN_CAP drops the same way — byId.has() is false identically for both causes', () => {
+  const wake = run({ id: 'wake1', kind: 'wake', followUpTo: 'truncated-away-by-cap', groupKey: 'g' });
+  const { rows, connectors } = packTimelineRows([wake]);
+  assert.equal(rows.flat().length, 0);
+  assert.deepEqual(connectors, []);
+});
+
+test('LIN-2905: a non-wake followUpTo run is completely unaffected by the fold — connector + own bar exactly as today', () => {
+  const a = run({ id: 'a', groupKey: 'g', start: NOW - 3 * HOUR, end: NOW - 2 * HOUR });
+  const b = run({ id: 'b', groupKey: 'g', start: NOW - HOUR, end: NOW - 30 * MIN, followUpTo: 'a' });
+  const wake = run({ id: 'wake1', kind: 'wake', followUpTo: 'b', groupKey: 'g', start: NOW - 20 * MIN });
+  const { rows, connectors } = packTimelineRows([a, b, wake]);
+  assert.deepEqual(connectors, [{ fromId: 'a', toId: 'b' }]);
+  const packedB = rows.flat().find(r => r.id === 'b');
+  assert.equal(packedB.connectorTruncated, false);
+  assert.equal(rows.flat().length, 2, 'a and b render; the wake targeting b is folded away');
+});
+
+test("LIN-2905: wakeMarkers carry {id, at, issueIdentifier, outcomeKind, stillRunning} per wake; wakeCount === wakeMarkers.length", () => {
+  const target = run({ id: 'target', groupKey: 'g', end: null, stillRunning: true });
+  const wake = run({
+    id: 'wake1', kind: 'wake', followUpTo: 'target', groupKey: 'g',
+    issueIdentifier: 'LIN-CHILD', start: NOW - 10 * MIN, outcomeKind: 'done', stillRunning: false,
+  });
+  const { rows } = packTimelineRows([target, wake]);
+  const packed = rows.flat().find(r => r.id === 'target');
+  assert.equal(packed.wakeCount, 1);
+  assert.deepEqual(packed.wakeMarkers, [{
+    id: 'wake1', at: NOW - 10 * MIN, issueIdentifier: 'LIN-CHILD', outcomeKind: 'done', stillRunning: false,
+  }]);
+});
+
+test('LIN-2905 (F1): a folded wake that is still running or ended non-done carries that on its marker, distinct from a quiet done wake', () => {
+  const target = run({ id: 'target', groupKey: 'g' });
+  const runningWake = run({ id: 'w-running', kind: 'wake', followUpTo: 'target', groupKey: 'g', outcomeKind: 'working', stillRunning: true });
+  const failedWake = run({ id: 'w-failed', kind: 'wake', followUpTo: 'target', groupKey: 'g', outcomeKind: 'failed', stillRunning: false });
+  const { rows } = packTimelineRows([target, runningWake, failedWake]);
+  const packed = rows.flat().find(r => r.id === 'target');
+  const byId = Object.fromEntries(packed.wakeMarkers.map(m => [m.id, m]));
+  assert.equal(byId['w-running'].stillRunning, true);
+  assert.equal(byId['w-running'].outcomeKind, 'working');
+  assert.equal(byId['w-failed'].outcomeKind, 'failed');
+  assert.equal(byId['w-failed'].stillRunning, false);
+});
+
+test('LIN-2905: packing a wake + its target does not mutate the runs array buildTimeline produced', () => {
+  const target = run({ id: 'target', groupKey: 'g' });
+  const wake = run({ id: 'wake1', kind: 'wake', followUpTo: 'target', groupKey: 'g' });
+  const inputs = [target, wake];
+  const refs = inputs.slice();
+  const snapshots = inputs.map(r => JSON.stringify(r));
+  packTimelineRows(inputs);
+  inputs.forEach((r, i) => {
+    assert.equal(r, refs[i], 'same object reference after packing — no write-through via byId');
+    assert.equal(JSON.stringify(r), snapshots[i], 'own-property snapshot unchanged after packing');
+  });
+});
+
+test('LIN-2905 (F3): a non-wake run whose followUpTo resolves to a FOLDED wake loses its connector and is marked truncated', () => {
+  // Convention is that a non-wake run's followUpTo points at a session ROOT,
+  // never a wake — but the API forwards followUpTo blindly, so an
+  // out-of-convention caller pointing at a wake is reachable.
+  const wake = run({ id: 'wake1', kind: 'wake', followUpTo: 'ghost-target', groupKey: 'g', start: NOW - 3 * HOUR });
+  const follower = run({ id: 'follower', groupKey: 'g', followUpTo: 'wake1', start: NOW - HOUR });
+  const { rows, connectors } = packTimelineRows([wake, follower]);
+  assert.deepEqual(connectors, []);
+  const packedFollower = rows.flat().find(r => r.id === 'follower');
+  assert.equal(packedFollower.connectorTruncated, true);
+});
+
 // ─── buildConsoleFeed integration ─────────────────────────────────────────────
 
 test('buildConsoleFeed folds a packed timeline into its return, sharing laneStaleMs with lane-dropping', () => {
