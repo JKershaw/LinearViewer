@@ -936,6 +936,104 @@ describe('TaskDecisionsStore.listUnansweredForWorkspaces (LIN-2215)', () => {
   });
 });
 
+// LIN-2729 / LIN-2893 Step 5: the second, unfiltered, narrow-projection
+// read `collectUnansweredDecisions` needs to restore newest-then-filter —
+// see lib/unanswered-decisions.js's own newestScanByTask tests for the
+// reduction-side behavior this store method feeds.
+describe('TaskDecisionsStore.listNewestScanPerTask (LIN-2729 / LIN-2893 Step 5)', () => {
+  let collection, store, findCalls;
+  const ISSUE_ID_2 = '22222222-3333-4444-5555-666666666666';
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    findCalls = [];
+    const realFind = collection.find.bind(collection);
+    collection.find = (query, options) => {
+      findCalls.push({ query, options });
+      return realFind(query, options);
+    };
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('query-cost: the projection is exactly the 4 named fields plus _id: 0 — never a decision payload or behavior history', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    findCalls.length = 0; // only the listNewestScanPerTask call below matters here
+
+    await store.listNewestScanPerTask([URL_KEY]);
+
+    assert.equal(findCalls.length, 1, 'exactly one query');
+    const { options } = findCalls[0];
+    assert.deepEqual(
+      options.projection,
+      { urlKey: 1, issueId: 1, outcome: 1, scannedAt: 1, _id: 0 },
+      'the projection must be exactly these 4 fields (plus the _id exclusion) — no more, no less'
+    );
+    assert.equal('decision' in options.projection, false, 'must never fetch the decision payload');
+    assert.equal('inputHash' in options.projection, false);
+    assert.equal('basisHash' in options.projection, false);
+    assert.equal('dueBasisHash' in options.projection, false);
+    assert.equal('outcomeReason' in options.projection, false);
+    assert.equal('outcomeBasisHash' in options.projection, false);
+    assert.equal('optionId' in options.projection, false);
+  });
+
+  test('applies NO outcome filter at the query level — it must see outcome-bearing rows too, unlike listUnansweredForWorkspaces', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered' });
+    findCalls.length = 0;
+
+    const result = await store.listNewestScanPerTask([URL_KEY]);
+
+    const { query } = findCalls[0];
+    assert.equal('outcome' in query, false, 'the query itself must carry no outcome filter — that is the whole point of this method');
+    // And the outcome-bearing row is actually returned — the reason the query has no filter.
+    const key = `${URL_KEY}::${ISSUE_ID}`;
+    assert.equal(result[key].outcome, 'answered');
+  });
+
+  test('returns the narrow 4-field shape, keyed ${urlKey}::${issueId}, newest row per task', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision({ question: 'first scan' }) });
+    // A second, newer scan for the SAME task — the newest must win.
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B, decision: sampleDecision({ decision_id: 'scan_11111111_bbbbbbbbbbbb', question: 'second scan, new content' }) });
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID_2, inputHash: HASH_A, decision: sampleDecision({ decision_id: 'scan_22222222_aaaaaaaaaaaa' }) });
+
+    const result = await store.listNewestScanPerTask([URL_KEY]);
+
+    const key1 = `${URL_KEY}::${ISSUE_ID}`;
+    const key2 = `${URL_KEY}::${ISSUE_ID_2}`;
+    assert.deepEqual(new Set(Object.keys(result)), new Set([key1, key2]), 'one entry per task, not one per row');
+    assert.deepEqual(new Set(Object.keys(result[key1])), new Set(['urlKey', 'issueId', 'outcome', 'scannedAt']));
+    assert.equal(result[key1].urlKey, URL_KEY);
+    assert.equal(result[key1].issueId, ISSUE_ID);
+  });
+
+  test('a different workspace not in the requested set never appears', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    await store.recordScan({ urlKey: 'ws-other', issueId: ISSUE_ID_2, inputHash: HASH_A, decision: sampleDecision({ decision_id: 'scan_22222222_aaaaaaaaaaaa' }) });
+
+    const result = await store.listNewestScanPerTask([URL_KEY]);
+    assert.deepEqual(Object.keys(result), [`${URL_KEY}::${ISSUE_ID}`]);
+  });
+
+  test('a persisted zero-finding row (decision: null) still appears — this method sees every row regardless of decision content', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: null });
+    const result = await store.listNewestScanPerTask([URL_KEY]);
+    assert.equal(result[`${URL_KEY}::${ISSUE_ID}`].outcome, null);
+  });
+
+  test('empty or absent urlKeys degrade to {} without touching the collection', async () => {
+    assert.deepEqual(await store.listNewestScanPerTask([]), {});
+    assert.deepEqual(await store.listNewestScanPerTask(), {});
+    assert.equal(findCalls.length, 0);
+  });
+
+  test('an unconfigured store (no collection) degrades to {}', async () => {
+    const unconfigured = new TaskDecisionsStore({});
+    assert.deepEqual(await unconfigured.listNewestScanPerTask([URL_KEY]), {});
+  });
+});
+
 // LIN-1736: the task-bound half of the escalation KPIs' time-to-response and
 // false-escalation inputs.
 describe('TaskDecisionsStore.listResolvedForWorkspaces (LIN-1736)', () => {

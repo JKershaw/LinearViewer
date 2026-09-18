@@ -639,6 +639,7 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
     return {
       calls,
       async listUnansweredForWorkspaces() { return []; }, // this half's write is exercised in isolation below
+      async listNewestScanPerTask() { return {}; },
       async markOutcome(args) { calls.push(args); return { ...args, outcomeAt: new Date().toISOString() }; },
     };
   }

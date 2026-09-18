@@ -1499,6 +1499,13 @@ export function createDashboardRoutes({
       const taskDecisions = taskDecisionsStore
         ? await taskDecisionsStore.listUnansweredForWorkspaces(workspaces.map(w => w.urlKey))
         : [];
+      // LIN-2729 / LIN-2893 Step 5: the newest-scan-per-task input the
+      // reduction needs to tell a candidate row apart from one already
+      // superseded by a newer, outcome-bearing scan the query above
+      // filtered out. Same `workspaces` scope as `taskDecisions` above.
+      const newestScanByTask = taskDecisionsStore
+        ? await taskDecisionsStore.listNewestScanPerTask(workspaces.map(w => w.urlKey))
+        : {};
       // Additive THIRD input (LIN-1727) — same `workspaces` scope, same
       // local/fast-read discipline as taskDecisions above; no new caching
       // layer. Raw rows; collectUnansweredDecisions owns the active/lapsed
@@ -1532,7 +1539,7 @@ export function createDashboardRoutes({
       // must never evaluate it — full stop, not merely omitted by convention.
       const rulings = attachStandingSuggestions(
         collectUnansweredDecisions(
-          { loops: merged, taskDecisions, shelvedRulings },
+          { loops: merged, taskDecisions, shelvedRulings, newestScanByTask },
           {
             now: new Date(),
             liveDispatchOnAnchor: (issueIdentifier) =>
@@ -1805,6 +1812,14 @@ export function createDashboardRoutes({
     const taskUnansweredRows = taskDecisionsStore
       ? await taskDecisionsStore.listUnansweredForWorkspaces(workspaces)
       : [];
+    // LIN-2729 / LIN-2893 Step 5: same `workspaces` scope as the candidate
+    // fetch immediately above — see that method's own doc for why this KPI
+    // needs it too (an older unanswered row must not outlive its task's
+    // true newest, outcome-bearing scan just because this reduction never
+    // saw that newer row).
+    const newestScanByTask = taskDecisionsStore
+      ? await taskDecisionsStore.listNewestScanPerTask(workspaces)
+      : {};
     // Same predicate the live rulings feed uses (routes/dashboard.js's own
     // /api/dashboard/rulings above) — never a second, divergent "is this
     // unanswered" derivation. Deliberately OMITS `shelvedRulings`: unanswered
@@ -1812,7 +1827,7 @@ export function createDashboardRoutes({
     // constraint) — a shelved-but-still-unanswered decision must keep
     // counting toward this KPI, not be hidden by it the way it is hidden
     // from the live queue.
-    const unansweredRulings = collectUnansweredDecisions({ loops, taskDecisions: taskUnansweredRows }, { now });
+    const unansweredRulings = collectUnansweredDecisions({ loops, taskDecisions: taskUnansweredRows, newestScanByTask }, { now });
 
     const unansweredRows = unansweredRulings.map(row => {
       if (row.disposition === 'task-bound') {

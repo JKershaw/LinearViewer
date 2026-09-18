@@ -725,6 +725,118 @@ describe('GET /api/proxy/rulings — task-bound rows via a real TaskDecisionsSto
   });
 });
 
+// LIN-2729 / LIN-2893 Step 5, site 3 (routes/proxy-rulings.js): proves
+// `listNewestScanPerTask` is actually threaded through end to end, through a
+// real HTTP round trip against the real router and a real TaskDecisionsStore
+// — not just that the store method exists.
+describe('GET /api/proxy/rulings — LIN-2729 fix: newest-then-filter for task-bound rows (LIN-2893 Step 5)', () => {
+  const NF_URL_KEY = 'newest-fix-ws';
+  const NF_ISSUE_ID = '77777777-8888-9999-0000-111111111111';
+  const HASH_OLD = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+  const HASH_NEW = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+
+  let nfServer, nfBaseUrl, nfTaskDecisionsStore;
+
+  before(async () => {
+    const collection = createTaskDecisionsMockCollectionForNewestFix();
+    nfTaskDecisionsStore = new TaskDecisionsStore({ collection });
+
+    // Two rows for the SAME task, exactly the LIN-2729 shape: an OLDER row
+    // that stays unanswered (what listUnansweredForWorkspaces alone would
+    // return as the candidate), then a NEWER rescan that gets self-resolved
+    // — outcome-bearing, so it never enters the candidate set itself, but it
+    // IS the task's true newest row.
+    const older = await nfTaskDecisionsStore.recordScan({
+      urlKey: NF_URL_KEY, issueId: NF_ISSUE_ID, issueIdentifier: 'LIN-300', inputHash: HASH_OLD,
+      decision: { decision_id: 'scan_77777777_older111111', question: 'Old question?', options: [{ id: 'a', label: 'A' }], free_text: false }
+    });
+    const newer = await nfTaskDecisionsStore.recordScan({
+      urlKey: NF_URL_KEY, issueId: NF_ISSUE_ID, issueIdentifier: 'LIN-300', inputHash: HASH_NEW,
+      decision: { decision_id: 'scan_77777777_newer222222', question: 'New question?', options: [{ id: 'a', label: 'A' }], free_text: false }
+    });
+    // Force deterministic scannedAt ordering rather than relying on real-clock
+    // sequencing between the two recordScan calls above (millisecond
+    // resolution can land two fast, sequential calls in the same tick).
+    const oldDoc = collection._docs.find(d => d._id === older.id);
+    const newDoc = collection._docs.find(d => d._id === newer.id);
+    oldDoc.scannedAt = new Date(Date.now() - 60000);
+    newDoc.scannedAt = new Date();
+    await nfTaskDecisionsStore.markOutcome({
+      urlKey: NF_URL_KEY, issueId: NF_ISSUE_ID, id: newer.id, outcome: 'self-resolved',
+      outcomeReason: 'superseded by rescan', outcomeBasisHash: 'basis-newest-fix'
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use(createRulingsRoutes({
+      proxyLimiter: (req, res, next) => next(),
+      authenticateProxyToken: (req, res, next) => {
+        req.proxyUrlKey = NF_URL_KEY;
+        req.proxyTokenScope = 'read';
+        req.proxyCreatedBy = 'account-123';
+        req.proxyTokenLabel = 'a-label';
+        next();
+      },
+      requireWriteScope: (req, res, next) => next(),
+      logEvent: () => {},
+      dispatchQueueStore: { async listItems() { return []; }, async listHistory() { return { items: [] }; } },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      taskDecisionsStore: nfTaskDecisionsStore,
+      shelvedRulingsStore: null,
+      dismissalSuggestionsStore: null,
+      sessionsFeedCache: null
+    }));
+
+    nfServer = http.createServer(app);
+    await new Promise(resolve => nfServer.listen(0, '127.0.0.1', resolve));
+    nfBaseUrl = `http://127.0.0.1:${nfServer.address().port}`;
+  });
+
+  after(() => nfServer?.close());
+
+  test('the older row is discharged — the LIN-2729 bug is fixed end to end through this route', async () => {
+    const res = await fetch(`${nfBaseUrl}/api/proxy/rulings`);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.rulings.length, 0, 'the older unanswered row must NOT resurface — its task\'s true newest row is self-resolved');
+  });
+});
+
+function createTaskDecisionsMockCollectionForNewestFix() {
+  const docs = [];
+  function matchesField(docValue, queryValue) {
+    if (queryValue && typeof queryValue === 'object' && Array.isArray(queryValue.$in)) {
+      return queryValue.$in.includes(docValue);
+    }
+    if (queryValue && typeof queryValue === 'object' && '$ne' in queryValue) {
+      return docValue !== queryValue.$ne;
+    }
+    return docValue === queryValue;
+  }
+  function matches(doc, query) {
+    if (query._id !== undefined && doc._id !== query._id) return false;
+    if (query.urlKey !== undefined && !matchesField(doc.urlKey, query.urlKey)) return false;
+    if (query.issueId !== undefined && doc.issueId !== query.issueId) return false;
+    if (query.outcome !== undefined && !matchesField(doc.outcome ?? null, query.outcome)) return false;
+    if (query.decision !== undefined && !matchesField(doc.decision ?? null, query.decision)) return false;
+    return true;
+  }
+  return {
+    _docs: docs,
+    async findOne(query) { return docs.find(d => matches(d, query)) || null; },
+    find(query = {}) {
+      const results = docs.filter(d => matches(d, query));
+      return { async toArray() { return results.slice(); } };
+    },
+    async updateOne(query, update, opts = {}) {
+      const idx = docs.findIndex(d => matches(d, query));
+      if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
+      if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0 }; }
+      return { matchedCount: 0 };
+    }
+  };
+}
+
 // LIN-2756 — the ticket's live repro, end to end through the real router +
 // real DismissalSuggestionsStore: session `74869c9c`'s review loop
 // `07509b1e` and close-out loop `0c912018` emit the SAME decision_id in the
