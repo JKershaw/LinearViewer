@@ -324,6 +324,59 @@
   border-bottom-right-radius: 0;
 }
 
+/* LIN-2905: a folded `kind:'wake'` run never gets a bar/row of its own — it
+   renders as a thin vertical tick inside the target bar it resumes instead,
+   positioned via an inline `left` (public/live-console.js renormalises the
+   wake's window-relative `pct()` to the bar's own local span, already
+   clamped to [0,100] there — `.lc-timeline-bar` sets no `overflow`, so an
+   unclamped tick would otherwise spill past the bar's right edge). Left
+   unset here (not `pointer-events: none`) so a tick can carry its own
+   hoverable title/aria-label ("woken by <issueIdentifier>"), distinct from
+   the bar's own. */
+.lc-timeline-wake-marker {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  /* `left` is a percentage of the BAR's own box (see live-console.js), so the
+     tick's own 2px width would otherwise land entirely past the right edge at
+     the clamped localPct===100 case — the routine one for this ticket's own
+     primary scenario — landing on the page background instead of the bar
+     fill and reading as invisible. Centering the fixed-width tick on its
+     percentage point keeps it visibly on the bar at both edges. */
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.75);
+  /* Review finding B2a: a wake fires AFTER its target goes terminal, so
+     `localPct` clamps to 100 for essentially every wake on a finished bar —
+     every such tick lands at the SAME point, and without an explicit
+     z-index, DOM/paint order (marker array order) decides which one the
+     viewer actually sees. A quiet, done wake must never paint over a live
+     one just by virtue of coming later in the array — see the override
+     below, which always keeps a live/non-done tick on top regardless of
+     order. */
+  z-index: 2;
+}
+/* F1 (plan-review pass 2): a folded wake that is still running, or ended
+   non-done, must render distinctly from a quiet, successful one — otherwise
+   live or failed work happening right now would silently disappear into an
+   indistinguishable tick on a bar that itself looks finished and green. */
+.lc-timeline-wake-marker[data-still-running="true"] {
+  background: var(--amber);
+  animation: lc-bar 1.8s ease-in-out infinite;
+}
+/* B2a discharge: a quiet, DONE wake (not still-running) sits BELOW any
+   live/non-done tick sharing the same clamped point, so it can never paint
+   over the one the operator actually needs to see. */
+.lc-timeline-wake-marker[data-outcome="done"]:not([data-still-running="true"]) {
+  z-index: 1;
+}
+.lc-timeline-wake-marker[data-outcome="failed"] {
+  background: var(--red);
+}
+.lc-timeline-wake-marker[data-outcome="blocked"] {
+  background: var(--slate);
+}
+
 /* ── Pulse-lane rail ────────────────────────────────────────────────────── */
 .lc-lanes-section { margin-bottom: 1.75rem; }
 .lc-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
@@ -573,5 +626,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lc-status-dot--pulse, .lc-lane--pulse .lc-lane-bar, .lc-event--new, .lc-skel,
-  .lc-timeline-bar[data-still-running="true"] { animation: none; }
+  .lc-timeline-bar[data-still-running="true"],
+  .lc-timeline-wake-marker[data-still-running="true"] { animation: none; }
 }

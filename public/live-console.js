@@ -239,6 +239,11 @@
     const labelNode = document.createElement('span');
     labelNode.className = 'lc-timeline-bar-label';
     div.appendChild(labelNode);
+    // LIN-2905: folded-wake tick nodes, keyed by marker id — reconciled the
+    // same way the bars themselves are (paintTimeline), so a tick's node
+    // reference survives an in-place update rather than being torn down and
+    // rebuilt every poll.
+    div._wakeMarkerNodes = new Map();
     updateTimelineBarNode(div, run, 0);
     return div;
   }
@@ -287,10 +292,54 @@
     const ticketSuffix = run.ticketWalk && run.ticketWalk.length
       ? ` (${ticketProgressText(run.ticketWalk)})`
       : '';
-    const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}${ticketSuffix}`;
+    // LIN-2905 (ii): a folded wake's own bar/row is suppressed server-side —
+    // its count survives as a " · N wakes" suffix on the target bar's own
+    // label/title instead.
+    const wakeSuffix = run.wakeCount > 0 ? ` · ${run.wakeCount} wakes` : '';
+    const label = `${run.issueIdentifier || '?'} — ${timelineLabel(run)}${ticketSuffix}${wakeSuffix}`;
     div.title = label;
     div.setAttribute('aria-label', label);
     if (div.firstElementChild) div.firstElementChild.textContent = label;
+
+    // LIN-2905 (i)/(ii): render each folded wake as a thin tick inside the
+    // bar, positioned at the wake's own dispatch time RENORMALISED to the
+    // bar's own local span — `pct()` above is window-relative, but
+    // `.lc-timeline-bar` is `position:absolute` and is itself the containing
+    // block for its own absolutely-positioned children (the same mechanism
+    // `.lc-timeline-bar-label`'s `inset:0` already relies on), so a tick's
+    // `left` must resolve against the BAR's box, not the window's.
+    const wakeMarkers = Array.isArray(run.wakeMarkers) ? run.wakeMarkers : [];
+    const wantedMarkerIds = new Set(wakeMarkers.map(m => m.id));
+    for (const [id, node] of div._wakeMarkerNodes) {
+      if (!wantedMarkerIds.has(id)) { node.remove(); div._wakeMarkerNodes.delete(id); }
+    }
+    for (const marker of wakeMarkers) {
+      let tick = div._wakeMarkerNodes.get(marker.id);
+      if (!tick) {
+        tick = document.createElement('span');
+        tick.className = 'lc-timeline-wake-marker';
+        tick.setAttribute('data-testid', 'live-console-timeline-wake-marker');
+        div._wakeMarkerNodes.set(marker.id, tick);
+        div.appendChild(tick);
+      }
+      // The clamp is mandatory, not defensive: a wake fires AFTER its target
+      // goes terminal, so a marker's time is routinely LATER than a terminal
+      // bar's own rendered `end` — `localPct > 100` is the common case for
+      // this ticket's own primary scenario — and `.lc-timeline-bar` sets no
+      // `overflow` (defaults to visible), so an unclamped tick would render
+      // past the bar's right edge with nothing to contain it.
+      const localPct = Math.max(0, Math.min(100, (pct(marker.at) - startPct) / widthPct * 100));
+      tick.style.left = `${localPct}%`;
+      // F1: a folded wake that is still running, or ended non-done, must
+      // render distinctly from a quiet, successful one — otherwise live or
+      // failed work happening right now silently disappears into an
+      // indistinguishable tick on a bar that itself looks finished and green.
+      tick.setAttribute('data-still-running', marker.stillRunning === true ? 'true' : 'false');
+      tick.setAttribute('data-outcome', marker.outcomeKind || 'working');
+      const markerLabel = `woken by ${marker.issueIdentifier || '?'}`;
+      tick.title = markerLabel;
+      tick.setAttribute('aria-label', markerLabel);
+    }
   }
   // F1: "is there anything to show" must agree with "is this bar visible" —
   // both the chip filter AND the current view window, computed once here so
