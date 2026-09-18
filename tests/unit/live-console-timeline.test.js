@@ -475,6 +475,24 @@ test('LIN-2905 (F3): a non-wake run whose followUpTo resolves to a FOLDED wake l
   assert.equal(packedFollower.connectorTruncated, true);
 });
 
+test('LIN-2905 (L4): a wake whose followUpTo resolves to ANOTHER folded wake is dropped, not folded onto the root target', () => {
+  // A wake can never itself beget a wake in practice (dispatch-wake.js's
+  // `if (child.kind === 'wake') return null` guard, LIN-901) — but
+  // packTimelineRows forwards followUpTo blindly, so this path is reachable
+  // by construction here even though convention says it cannot happen (the
+  // same reachability argument F3's test above already exercises for its
+  // own sibling case).
+  const target = run({ id: 'target', groupKey: 'g' });
+  const w1 = run({ id: 'w1', kind: 'wake', followUpTo: 'target', groupKey: 'g', issueIdentifier: 'LIN-W1' });
+  const w2 = run({ id: 'w2', kind: 'wake', followUpTo: 'w1', groupKey: 'g', issueIdentifier: 'LIN-W2' });
+  const { rows, connectors } = packTimelineRows([target, w1, w2]);
+  assert.deepEqual(connectors, [], 'neither wake ever draws a connector — they have no bar to connect');
+  const packedTarget = rows.flat().find(r => r.id === 'target');
+  assert.equal(rows.flat().length, 1, 'only the root target gets a row');
+  assert.deepEqual(packedTarget.wakeMarkers.map(m => m.id), ['w1'], 'w2 is dropped outright — its marker is keyed to w1\'s id, which is never decorated');
+  assert.equal(packedTarget.wakeCount, 1);
+});
+
 // ─── buildConsoleFeed integration ─────────────────────────────────────────────
 
 test('buildConsoleFeed folds a packed timeline into its return, sharing laneStaleMs with lane-dropping', () => {

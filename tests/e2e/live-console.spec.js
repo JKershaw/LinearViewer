@@ -923,6 +923,61 @@ test.describe('Live Console (experimental)', () => {
       }
     });
 
+    test('LIN-2905 (review finding B2a): a live/non-done wake marker stays the TOPMOST visible element when it clamps to the same point as a later, quiet DONE marker', async ({ page }) => {
+      // A wake fires after its target goes terminal, so `localPct` clamps to
+      // 100 for essentially every wake on a finished bar — multiple markers
+      // routinely land at the exact same point. The still-running marker is
+      // deliberately placed FIRST in the array (paints first / underneath in
+      // plain DOM order) and the quiet done marker SECOND (paints last / on
+      // top in plain DOM order), so this only passes if the live tick wins
+      // on something other than array/paint order — the z-index rule, not a
+      // lucky ordering. Asserting via `elementFromPoint`, not attributes:
+      // the prior e2e coverage asserted marker attributes existed, which
+      // cannot see which one a viewer actually sees painted on top.
+      let injected = false;
+      await page.route(`**${EVENTS_API}*`, async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        if (!injected) {
+          injected = true;
+          const now = body.serverNow;
+          const target = {
+            id: 'f2905b2a-target', issueIdentifier: 'LIN-9500', kind: 'implementation', promptName: null,
+            outcomeKind: 'done', start: now - 3 * 60 * 60000, end: now - 60 * 60000,
+            stillRunning: false, clippedStart: false, groupKey: 'f2905b2a-target', followUpTo: null,
+            workspaceUrlKey: URL_KEY,
+            wakeMarkers: [
+              { id: 'f2905b2a-wake-running', at: now - 5 * 60000, issueIdentifier: 'LIN-9501', outcomeKind: 'working', stillRunning: true },
+              { id: 'f2905b2a-wake-done', at: now - 2 * 60000, issueIdentifier: 'LIN-9502', outcomeKind: 'done', stillRunning: false },
+            ],
+            wakeCount: 2,
+          };
+          body.timeline = { rows: [[target]], connectors: [], truncated: false, totalInWindow: 1 };
+        }
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+      });
+
+      await page.goto(PAGE_URL);
+      const bar = page.locator('[data-testid="live-console-timeline-bar"][aria-label*="LIN-9500"]');
+      await expect(bar).toBeVisible();
+      const markers = bar.locator('[data-testid="live-console-timeline-wake-marker"]');
+      await expect(markers).toHaveCount(2);
+
+      // Both markers clamp to the bar's own right edge (localPct === 100).
+      const lefts = await markers.evaluateAll(nodes => nodes.map(n => parseFloat(n.style.left)));
+      for (const left of lefts) expect(left).toBe(100);
+
+      const runningMarker = bar.locator('[data-testid="live-console-timeline-wake-marker"][aria-label*="LIN-9501"]');
+      const topmostLabel = await runningMarker.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const hit = document.elementFromPoint(cx, cy);
+        return hit ? hit.getAttribute('aria-label') : null;
+      });
+      expect(topmostLabel).toBe('woken by LIN-9501');
+    });
+
     test('the still-running bar animation is suppressed under prefers-reduced-motion', async ({ page }) => {
       await page.emulateMedia({ reducedMotion: 'reduce' });
       await seedRunningLoopWithToken(page, URL_KEY, { task: 'LIN-9210' });

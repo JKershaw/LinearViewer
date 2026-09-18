@@ -616,6 +616,24 @@ test("LIN-2905: a woken session's lane carries the TARGET's issueIdentifier — 
   assert.equal(lanes[0].credential.state, 'unknown', 'never fabricate ok from a terminal target\'s unreachable token — LIN-1588');
 });
 
+test("LIN-2905 (implementation review finding B1 regression pin): a WAITING/blocked target (not terminalStatus) resumed by a live wake must not donate its stale pre-park action to the lane", () => {
+  const target = loop({
+    loopId: 'target-1b', issueIdentifier: 'LIN-TARGET1B', terminalStatus: null,
+    agentState: 'waiting', agentStatus: 'blocked',
+    agentAction: 'blocked on review', agentTokenId: 'tok-target-1b',
+  });
+  const wake = loop({
+    loopId: 'wake-1b', issueIdentifier: 'LIN-CHILD1B', kind: 'wake', followUpTo: 'target-1b',
+    agentAction: null, stage: 'Prompt', agentTokenId: null,
+  });
+  const lanes = deriveLoopLanes([target, wake], { credentialByToken: { 'tok-target-1b': 'ok' } });
+  assert.equal(lanes.length, 1, 'the waiting target is inactive (agentState !== running) — only the wake is active, in one lane');
+  assert.equal(lanes[0].task, 'LIN-TARGET1B', 'task is still the target\'s real issue');
+  assert.notEqual(lanes[0].action, 'blocked on review', 'a parked target\'s last pre-park action must never leak into a live lane as though it were current');
+  assert.equal(lanes[0].action, 'Prompt', 'action is the wake\'s own honest signal, matching the terminal-target case exactly');
+  assert.equal(lanes[0].credential.state, 'unknown', 'never fabricate ok from a waiting target\'s unreachable token — LIN-1588');
+});
+
 test('LIN-2905 (plan-review finding 2 regression pin): a still-active target + its wake emit exactly ONE lane, not two, and the reachable credential is used', () => {
   const target = loop({
     loopId: 'target-2', issueIdentifier: 'LIN-TARGET2', terminalStatus: undefined,

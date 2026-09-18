@@ -346,6 +346,15 @@
      percentage point keeps it visibly on the bar at both edges. */
   margin-left: -1px;
   background: rgba(255, 255, 255, 0.75);
+  /* Review finding B2a: a wake fires AFTER its target goes terminal, so
+     `localPct` clamps to 100 for essentially every wake on a finished bar —
+     every such tick lands at the SAME point, and without an explicit
+     z-index, DOM/paint order (marker array order) decides which one the
+     viewer actually sees. A quiet, done wake must never paint over a live
+     one just by virtue of coming later in the array — see the override
+     below, which always keeps a live/non-done tick on top regardless of
+     order. */
+  z-index: 2;
 }
 /* F1 (plan-review pass 2): a folded wake that is still running, or ended
    non-done, must render distinctly from a quiet, successful one — otherwise
@@ -354,6 +363,12 @@
 .lc-timeline-wake-marker[data-still-running="true"] {
   background: var(--amber);
   animation: lc-bar 1.8s ease-in-out infinite;
+}
+/* B2a discharge: a quiet, DONE wake (not still-running) sits BELOW any
+   live/non-done tick sharing the same clamped point, so it can never paint
+   over the one the operator actually needs to see. */
+.lc-timeline-wake-marker[data-outcome="done"]:not([data-still-running="true"]) {
+  z-index: 1;
 }
 .lc-timeline-wake-marker[data-outcome="failed"] {
   background: var(--red);
