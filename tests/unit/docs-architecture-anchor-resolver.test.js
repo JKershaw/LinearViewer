@@ -26,10 +26,37 @@
  * heading somewhere". Replacing those 5 docs' entire contents with a single
  * `## Stub` heading and filler text passed the full unit suite. The `else`
  * branch below now asserts each doc still contains the section heading it
- * was moved with, derived from that doc's own creation commit in git history
- * (not the doc's current working-tree content, which is exactly what a
- * mutation corrupts, and not a pinned list, which is the under-bounding
- * class this ticket exists to stop).
+ * was moved with (not the doc's current working-tree content standing in for
+ * its own expectation, which is exactly what a mutation corrupts).
+ *
+ * A first fix derived that expected heading from each doc's own git
+ * creation commit (`git log --diff-filter=A`). Re-review (2026-09-18,
+ * follow-up) proved that CI-inert: `.github/workflows/test.yml` runs
+ * `actions/checkout@v4` with no `fetch-depth`, i.e. depth 1. In a depth-1
+ * clone HEAD is a grafted root commit, so `--diff-filter=A` reports every
+ * file as added at HEAD — the "expected" heading collapses to the doc's own
+ * current content, exactly the self-referential check this test exists to
+ * not be. The reviewer proved it by committing the same 5-doc `## Stub`
+ * mutation, cloning at `--depth 1`, and getting 57/57 green: the guard
+ * degrades silently in the one environment that judges merges.
+ *
+ * EXPECTED_HEADINGS below replaces the git-history lookup with a static,
+ * git-independent map. This is deliberately NOT the same move as pinning the
+ * *citation* list (forbidden below, and by LIN-2896): the citation sweep
+ * (`rows`, built by `walk()`) enumerates an open-ended, previously
+ * under-bounded set of referring *sites* across the whole repo — pinning
+ * that list is exactly the defect class this ticket exists to stop, because
+ * a new site nobody thought of would silently get no check. The heading map
+ * instead enumerates the *destination* set, which is closed and small: the
+ * ticket fixes it at exactly 8 filenames, `existingDocs` reads it from disk
+ * at run time, and the "lists exactly the docs that exist, both ways" test
+ * below already fails loudly if a doc is added/removed without updating
+ * CLAUDE.md. The self-consistency test right after EXPECTED_HEADINGS adds
+ * the matching guard for this map: it fails loudly if `existingDocs` and
+ * `EXPECTED_HEADINGS`'s keys ever diverge, so a doc added without an entry
+ * here cannot silently fall through to "no check" the way the citation sweep
+ * used to. Net effect: no git dependency (so no shallow-clone loophole), and
+ * no `.github/workflows/test.yml` or `package.json` change.
  *
  * The same review also found the one surviving `CLAUDE.md:<line>` anchor
  * (into CLAUDE.md itself, not docs/architecture/) had no drift guard at all.
@@ -40,7 +67,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -83,40 +109,27 @@ const COMMENT_PREFIX = /^\s*(\*\/?|\/\/|>)\s?/;
 const sourceFiles = walk(repoRoot, '', []);
 const existingDocs = new Set(readdirSync(architectureDir).filter((f) => f.endsWith('.md')));
 
-const HEADING_PATTERN = /^#{2,3} .+$/m;
-
-function git(args) {
-  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
-}
-
-// The commit that first added this doc — i.e. the move itself, not the
-// current working tree (which is exactly what a mutation corrupts).
-function creationCommit(relPath) {
-  // No --follow: these docs were newly created by the move (LIN-2896 beat
-  // 1), not renamed from an existing file, and --follow's similarity-based
-  // rename detection has been observed to trace some of them back past
-  // their real creation commit to an unrelated earlier file.
-  const hashes = git(['log', '--format=%H', '--diff-filter=A', '--', relPath])
-    .trim().split('\n').filter(Boolean);
-  assert.ok(hashes.length > 0,
-    `git history has no creation commit for ${relPath} — cannot derive the heading it was moved with`);
-  return hashes[hashes.length - 1]; // oldest = creation
-}
-
-// The section heading each doc was moved with, read from its own creation
-// commit's blob — not from the doc's current content (self-referential,
-// would pass no matter what the doc says now) and not a pinned list of
-// heading text (the under-bounding class this ticket exists to stop).
-function expectedHeading(doc) {
-  const relPath = `docs/architecture/${doc}`;
-  const historicalText = git(['show', `${creationCommit(relPath)}:${relPath}`]);
-  const match = historicalText.match(HEADING_PATTERN);
-  assert.ok(match,
-    `docs/architecture/${doc} had no markdown heading in its creation commit — cannot derive the heading it was moved with`);
-  return match[0];
-}
-
-const docHeadings = new Map([...existingDocs].map((doc) => [doc, expectedHeading(doc)]));
+// The section heading each doc was moved with (LIN-2896 beat 1), fixed here
+// as a literal — deliberately NOT read from git history (a depth-1 CI
+// checkout makes HEAD a grafted root commit, under which every file looks
+// "added at HEAD" and a history-derived heading collapses to the doc's own
+// current content — see the file header) and NOT read from the doc's
+// current working-tree content (self-referential: would pass no matter what
+// the doc says now, which is exactly what a `## Stub` mutation exploits).
+// This is a pinned map of the *destination* set (8 filenames, fixed by the
+// ticket), not the *citation* set (the open-ended, previously under-bounded
+// set of referring sites `rows` enumerates below) — see the file header for
+// why those are different under LIN-2896's "no pinned list" constraint.
+const EXPECTED_HEADINGS = new Map([
+  ['source-map.md', '## Architecture'],
+  ['prompt-system.md', '### Prompt System (two independent paths)'],
+  ['auth.md', '## Authentication'],
+  ['configuration.md', '## Environment Variables'],
+  ['dispatch-and-proxy.md', '## Dispatch API'],
+  ['views.md', '### View Tiers'],
+  ['ci.md', '## GitHub Actions CI (for AI Agents)'],
+  ['experiments.md', '## Collective (experimental, LIN-450)'],
+]);
 
 const rows = [];
 for (const relFile of sourceFiles) {
@@ -170,6 +183,27 @@ describe('docs/architecture/ anchor resolver (LIN-2896)', () => {
       `${danglingInClaudeMd.join(', ')} — the referring site is CLAUDE.md's "Where the detail lives" section.`);
   });
 
+  test('EXPECTED_HEADINGS (pinned, git-free) covers exactly the docs that exist, both ways', () => {
+    // Guards the pin itself: without this, a doc added under
+    // docs/architecture/ without a matching EXPECTED_HEADINGS entry would
+    // silently get no heading check at all (EXPECTED_HEADINGS.get(doc) would
+    // be undefined and docText.includes(undefined) would throw, but only if
+    // some citation happens to route through the `else` branch for it — a
+    // doc with only literal-quote/both-paths citations would get no signal
+    // whatsoever). Failing loudly here instead means the pinned map can
+    // never silently fall out of sync with the doc set it is supposed to
+    // cover.
+    const pinned = new Set(EXPECTED_HEADINGS.keys());
+    const missingFromPin = [...existingDocs].filter((d) => !pinned.has(d));
+    const staleInPin = [...pinned].filter((d) => !existingDocs.has(d));
+    assert.deepEqual(missingFromPin, [],
+      `docs/architecture/ has doc(s) with no EXPECTED_HEADINGS entry: ${missingFromPin.join(', ')} — add the ` +
+      `heading it was moved with, or its heading gets no drift check.`);
+    assert.deepEqual(staleInPin, [],
+      `EXPECTED_HEADINGS pins heading(s) for doc(s) that no longer exist under docs/architecture/: ` +
+      `${staleInPin.join(', ')} — remove the stale entry.`);
+  });
+
   for (const row of rows) {
     test(`${row.file}:${row.line} -> docs/architecture/${row.targetDoc} resolves`, () => {
       assert.ok(existingDocs.has(row.targetDoc),
@@ -210,7 +244,7 @@ describe('docs/architecture/ anchor resolver (LIN-2896)', () => {
         // heading, e.g. `## Stub`). Assert the doc still contains the
         // specific section heading it was moved with (derived above from
         // its own creation commit), not just any heading.
-        const heading = docHeadings.get(row.targetDoc);
+        const heading = EXPECTED_HEADINGS.get(row.targetDoc);
         assert.ok(docText.includes(heading),
           `${row.file}:${row.line} cites docs/architecture/${row.targetDoc}, which no longer contains the ` +
           `section heading it was moved with (${JSON.stringify(heading)}, derived from the doc's creation ` +
