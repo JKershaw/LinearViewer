@@ -153,7 +153,7 @@ function sessionStores(items) {
 }
 
 // GET /workspace/:urlKey/observation/session/:sessionId over real HTTP — the
-// house harness pattern (`app.listen(0, '127.0.0.1')` + `fetch`, CLAUDE.md:317),
+// house harness pattern (`app.listen(0, '127.0.0.1')` + `fetch`, CLAUDE.md:58),
 // exercising the actual route registration and the URL encode/decode hop that a
 // direct handler call skips, rather than pulling the handler off `router.stack`.
 async function renderSessionRoute(sessionId, items) {

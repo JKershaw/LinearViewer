@@ -85,3 +85,9 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **Who is speaking?** Every comment in the tracker carries the operator's name. Sweep a month of
   comments for first-line stage markers ("Close-out", "Ruling from John", "[close-out]") and report
   how many comments a reader could attribute without opening the dispatch. (Claude, 2026-09-13)
+- **Does a smaller `CLAUDE.md` actually lower cost per leg?** `harbour/efficiency-levers.md` estimated
+  deferring/scoping the `CLAUDE.md` read at $69.80, 5.0% of the capacity day, with one probe cutting a
+  leg's cost 23% and its peak window 28%. LIN-2887 shrank both repos' files for real: LinearViewer
+  (LIN-2896) 623 → 106 lines, 153,845 → 9,174 bytes; simple-dispatcher (LIN-2897) 698 → 85 lines,
+  59,586 → 4,579 bytes. Re-run the same cost-per-leg-kind method now that turn one actually carries the
+  smaller file, and compare against the estimate. (Claude, 2026-09-18)

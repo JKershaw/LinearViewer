@@ -31,7 +31,7 @@ fleet benefits, not just the next person who reads the ticket.
 
 ### 2. Change both prompt paths
 
-Per `CLAUDE.md`, prompt behavior lives in two places and both must change together:
+Per `docs/architecture/prompt-system.md`, prompt behavior lives in two places and both must change together:
 
 - **Handwritten**: `lib/prompt-template-defs.js` (+ shared blocks in
   `lib/prompt-formatters.js`), assembled by `generatePrompt()`.

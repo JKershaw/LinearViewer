@@ -180,8 +180,9 @@ describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', (
 // =============================================================================
 // The SAME drift, in the two internal current-state docs (LIN-2302 Instance 6).
 // `public/llms.txt` was guarded by the block above (LIN-2261), but that guard is
-// scoped to llms.txt only — CLAUDE.md and docs/executive-summary.md carry the
-// same hand-maintained count and were left unguarded. The figure has now drifted
+// scoped to llms.txt only — docs/architecture/source-map.md and
+// docs/executive-summary.md carry the same hand-maintained count and were
+// left unguarded. The figure has now drifted
 // three times inside one ticket's lifetime (14 -> 16 -> 17), and a stale value
 // has already been load-bearing once: an operator relied on the wrong figure
 // while filing LIN-2261 and propagated it into that ticket.
@@ -217,7 +218,7 @@ describe('current-state docs keep the prompt-template count in sync with PROMPT_
   const templateCount = Object.keys(PROMPT_TEMPLATES).length;
 
   const CURRENT_STATE_DOCS = [
-    { file: 'CLAUDE.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
+    { file: 'docs/architecture/source-map.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
     { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `aiHint`/ },
   ];
 
@@ -1455,7 +1456,8 @@ describe('triage template', () => {
 
   // LIN-1227: triage must not change task scope — no description/scope rewrite, no
   // follow-up task/subtask creation. Both prompt paths must carry the prohibition
-  // (CLAUDE.md "two independent paths" rule), mirroring breakdown's scope guardrail.
+  // (docs/architecture/prompt-system.md "two independent paths" rule), mirroring
+  // breakdown's scope guardrail.
   test('(handwritten) forbids rewriting scope and creating follow-up tasks/subtasks', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
     assert.ok(/preserves? scope/i.test(result.prompt),
@@ -2107,7 +2109,8 @@ describe('Audit the Layers (handwritten path)', () => {
 
 // Scale-to-task (lower bound, LIN-260). The heavy generative phases must tell the
 // agent to size output to the task — proven on the meta-prompt path via
-// scripts/eval-prompt-scaling.mjs and mirrored here per CLAUDE.md's both-paths rule.
+// scripts/eval-prompt-scaling.mjs and mirrored here per
+// docs/architecture/prompt-system.md's both-paths rule.
 describe('Scale to the task (handwritten path)', () => {
   const mockIssue = {
     id: 'issue-st', identifier: 'TEST-ST1', title: 'Add a thing',

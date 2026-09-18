@@ -1444,8 +1444,9 @@ describe('buildMetaPromptTemplate acceptance-witness discipline (LIN-2219)', () 
 
 // Class check (LIN-313) — bug and review prompts ask "isolated, or one of a
 // class?" so a narrowly-worded task doesn't clear while its siblings wait to
-// surprise the parent. Mirrors the handwritten path per CLAUDE.md's both-paths
-// rule (bug template step 4 / review "Isolated, or One of a Class?" section).
+// surprise the parent. Mirrors the handwritten path per
+// docs/architecture/prompt-system.md's both-paths rule (bug template step 4 /
+// review "Isolated, or One of a Class?" section).
 describe('buildMetaPromptTemplate class check (LIN-313)', () => {
   function build() {
     return buildMetaPromptTemplate({
@@ -1514,14 +1515,16 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
 // Mutation-check directive (LIN-2274) — the Review-prompts rule must instruct
 // the agent to independently mutation-check the load-bearing new/changed
 // tests before approving the close. Mirrors the handwritten path per
-// CLAUDE.md's both-paths rule (review template's Test Quality Check bullet +
-// checklist item). Nothing pinned this on the meta path either (LIN-2303).
+// docs/architecture/prompt-system.md's both-paths rule (review template's Test
+// Quality Check bullet + checklist item). Nothing pinned this on the meta
+// path either (LIN-2303).
 
 // LIN-1871 (revising LIN-1873) — argue the class, not the member, on the META
 // path, across all three templates (research/plan/plan-review) the ruling
 // names.
 //
-// The both-paths rule (CLAUDE.md, docs/prompt-change-validation.md) is why this
+// The both-paths rule (docs/architecture/prompt-system.md,
+// docs/prompt-change-validation.md) is why this
 // file mirrors tests/unit/prompt-templates.test.js: a rule that lands only in
 // the handwritten templates silently does not apply to any AI-generated prompt,
 // and the two drift without anything noticing. LIN-2303 is the precedent —
@@ -1825,7 +1828,8 @@ describe('buildMetaPromptTemplate Surface Assessment', () => {
 // Scale to the task (lower bound, LIN-260) — the meta-prompt must size the
 // generated prompt to the task, with the deceptive-small over-trim guard.
 // Proven via scripts/eval-prompt-scaling.mjs; mirrored in the handwritten path
-// (tests/unit/prompt-templates.test.js) per CLAUDE.md's both-paths rule.
+// (tests/unit/prompt-templates.test.js) per docs/architecture/prompt-system.md's
+// both-paths rule.
 // =============================================================================
 
 describe('buildMetaPromptTemplate scale to the task', () => {

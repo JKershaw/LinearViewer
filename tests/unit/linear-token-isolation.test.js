@@ -378,7 +378,7 @@ describe('classifyWorkspaceFailure (LIN-1506, Block E — ordering witness)', ()
 // from the function keyword to the next TOP-LEVEL `\n}` (a newline immediately
 // followed by a column-0 closing brace). A plain line-based find() would not
 // work here — the call site under test spans multiple lines. This relies on
-// the repo's consistent 2-space indentation (CLAUDE.md): every brace that
+// the repo's consistent `2-space indentation` (CLAUDE.md): every brace that
 // closes an inner block (if/try/etc.) is preceded by at least one space, so
 // only the function's own closing brace matches the literal substring "\n}".
 function extractResolveWorkspaceAccessBody(src) {

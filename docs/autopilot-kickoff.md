@@ -11,7 +11,7 @@
 > canonical source the app actually serves (the per-task **Autopilot** button, the swipe
 > overlay, the foreman/dispatch-page "general Autopilot", and `GET /api/proxy/autopilot/kickoff`).
 > The guide text here and there must be kept in sync — the same both-paths discipline
-> CLAUDE.md applies to the prompt templates. When you change one, change the other.
+> docs/architecture/prompt-system.md applies to the prompt templates. When you change one, change the other.
 >
 > Two halves, two lifecycles:
 > - **The guide** (everything down to the `---` before the snapshot) is *static* — the
