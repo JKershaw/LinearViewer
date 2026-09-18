@@ -2754,11 +2754,14 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the prune step explicitly excludes the cannot-close / stays-open branches');
   });
 
-  test('(g7) comments stay untouched — the prune is a description-only edit using an existing surface', () => {
+  test('(g7) comments stay untouched by policy — the prune is a description-only edit, and the existing comment-edit route is named for corrections', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/Comments are untouched — there is no comment-edit endpoint/i.test(prompt),
-      'comments are explicitly out of scope for the prune');
+    assert.ok(/Comments are untouched by policy/i.test(prompt),
+      'comments are explicitly out of scope for the prune, stated as a policy choice rather than a capability gap');
+    assert.ok(/the prune is a description edit only/i.test(prompt), 'the policy distinction is preserved');
     assert.ok(/adds no new capability/i.test(prompt), 'the prune uses only existing write surfaces');
+    assert.ok(/PATCH \/api\/proxy\/issues\/:issueId\/comments\/:commentId/i.test(prompt),
+      'the existing comment-edit route is named, acknowledging it exists for corrections');
   });
 
   test('(g8) close-out still emits no literal "Linear" with the archive+prune section included (LIN-177 parity)', () => {
