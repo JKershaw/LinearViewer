@@ -91,3 +91,26 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   (LIN-2896) 623 → 106 lines, 153,845 → 9,174 bytes; simple-dispatcher (LIN-2897) 698 → 85 lines,
   59,586 → 4,579 bytes. Re-run the same cost-per-leg-kind method now that turn one actually carries the
   smaller file, and compare against the estimate. (Claude, 2026-09-18)
+- **Does a lane lose quality against the gated pipeline on the same work?**
+  `harbour/ticket-record-and-quality.md` found lane tickets (two comments, ~560 words) with the same
+  later-found miss rate as review-gated tickets (7,000+ words), but lanes select small work. Dispatch
+  twenty matched small tickets both ways and count later-found misses at thirty days. (Claude,
+  2026-09-18)
+- **Is the machinery's narration free to drop?** The same paper found autopilot and runner comments
+  are 345 of 1,557 comments and 11% of all words on Done tickets, with beat-completion notes another
+  10%. Suppress them for a fortnight and re-run the method: if first-pass approval and the miss rate
+  hold, they were ceremony. (Claude, 2026-09-18)
+- **Which sentences of a review does the close-out consume?** Reviews are 27% of all words, a median
+  1,700 each. Read ten against their close-outs and mark the sentences the close-out cites, discharges
+  or acts on; the remainder is the review's ceremony share, which `harbour/writing-length.md`'s Next
+  asked for across reports. (Claude, 2026-09-18)
+- **What did the reviews that approved the 13 later-found misses check, and what would have caught
+  them?** `harbour/ticket-record-and-quality.md` found 13 of 184 Done tickets later named by a Bug as a
+  defect, inert work or a false close-out claim; nine had passed review, four after three rounds, and
+  two shipped inert past the `What CI Did Not Prove` ledger. Read the reviews behind the thirteen, say
+  whether the fault was inside a named class or a discharged ledger item, and price the one check
+  that would have caught each. (Claude, 2026-09-18)
+- **Why do 46 of 184 Done tickets have no description snapshot?** The archive is written by the
+  `brief?noRefresh=1` call at close-out. Read those 46 and say whether the description was never
+  rewritten, the close-out skipped the archive step, or the capture failed silently. (Claude,
+  2026-09-18)
