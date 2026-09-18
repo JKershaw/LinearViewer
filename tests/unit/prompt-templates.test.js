@@ -3417,11 +3417,24 @@ describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
       'review carries the named-monitor lane');
     assert.ok(/discharges through normal post-merge observation \*\*regardless of risk surface\*\*/i.test(review),
       'the named-monitor lane is not keyed on the risk surface');
-    assert.ok(/a log or oplog entry, a metric, a path that fails loudly, or a routed follow-up ticket that owns the watch/i.test(review),
+    assert.ok(/a log or oplog entry, a metric, or a path that fails loudly/i.test(review),
       'the monitor must be a specific, nameable thing');
+    // LIN-2917: a routed ticket does not fire, so it is not a monitor kind. It
+    // may be cited beside a monitor to record the watch, never instead of one.
+    assert.ok(!/a routed follow-up ticket that owns the watch/i.test(review),
+      'a routed follow-up ticket is no longer listed as a monitor kind');
+    assert.ok(/a routed follow-up ticket is not one/i.test(review),
+      'review says outright that a ticket is not a monitor');
+    assert.ok(/cited \*beside\* the monitor to record who holds the watch, never \*instead\* of it/i.test(review),
+      'a ticket may be cited beside the monitor, never instead of it');
     // Misfire guard: unprovable-in-principle is not "this CI run did not cover it".
     assert.ok(/a claim a test COULD have proven is not unprovable-in-principle/i.test(review),
       'an untested claim is not an unprovable one');
+    // LIN-2917: the guard is a required written line, not prose the reviewer may skim.
+    assert.ok(/write one line naming why no check short of production could prove the claim/i.test(review),
+      'the misfire guard is a step the review performs, not a caveat it reads');
+    assert.ok(/an entry with no such line does not take the lane, and close-out rejects it as undischarged/i.test(review),
+      'an unjustified lane entry is refused rather than merely discouraged');
     assert.ok(/If no monitor can be named, it stays a hard gate item/i.test(review),
       'no nameable monitor means no lane');
   });
@@ -3447,6 +3460,16 @@ describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
     assert.ok(/\*\*A named rollback\*\*/.test(closeout), 'close-out accepts a named rollback');
     assert.ok(/Cite that monitor and proceed, whatever the risk surface/i.test(closeout),
       'the named-monitor route is not keyed on the risk surface at discharge either');
+    // LIN-2917: the close-out mirror of the narrowed monitor list, plus the
+    // rejection of a lane entry review never justified in writing.
+    assert.ok(!/a routed follow-up that owns the watch/i.test(closeout),
+      'close-out no longer accepts a routed follow-up as the monitor itself');
+    assert.ok(/a ticket cited \*instead\* of one is an undischarged item/i.test(closeout),
+      'close-out refuses a ticket standing in for a monitor');
+    assert.ok(/Reject a lane entry missing review's justification line/i.test(closeout),
+      'close-out rejects an unprovable-lane entry with no written justification');
+    assert.ok(/is undischarged, whatever monitor it names/i.test(closeout),
+      'a named monitor does not rescue an entry whose justification line is missing');
     // Self-certification boundary: close-out cites a name, it never supplies one.
     assert.ok(/never a name you supply yourself/i.test(closeout),
       'close-out cites review\'s name rather than authoring its own');

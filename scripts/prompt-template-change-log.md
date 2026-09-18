@@ -66,6 +66,26 @@ Newest last.
 | 2026-09-12 | PR #1459 | LIN-1871 | handwritten + meta | Revised the LIN-1873 cited-sweep rule into class-not-member enumeration, extended to a third template: research now names each class and how it bounded it, plan works from research's classes and is sent back only for a missing class (never a missing member inside a class already bounded), and plan-review argues the class a missing member belongs to rather than stopping at the member. | **down** |
 | 2026-09-12 | PR #1467 | LIN-2825 | handwritten + meta | Review marks every class-check instance and ledger item inside/outside the ticket's bounded classes (LIN-1871); close-out's Ledger Gate now discharges an inside item only by cited evidence of done or an explicit drop, never by filing a follow-up ticket for it, and Follow-up Triage is restricted to outside items and explicitly-dropped inside items. | **down** |
 | 2026-09-18 | PR #1505 | LIN-2923 | handwritten | Corrected the close-out's stale "no comment-edit endpoint" claim: comments are untouched by policy (the prune is a description edit only), and the existing `PATCH /api/proxy/issues/:issueId/comments/:commentId` route is now acknowledged rather than denied. Meta twin never carried the claim; left unchanged. | unknown |
+| 2026-09-18 | PR #1506 | LIN-2917 | handwritten + meta | A routed follow-up ticket is no longer a monitor: struck "a routed follow-up ticket that owns the watch" from the named-monitor list on both the review and close-out sides of both paths, leaving a ticket citable *beside* a monitor but never as one; and turned the misfire guard from prose into a required step — review writes one line naming why no check short of production could prove the claim, and close-out rejects an unprovable-lane entry missing that line as undischarged. | **down** |
+
+### On the LIN-2917 row's `down`, recorded before the read
+
+**Expected direction: down.** A routed-follow-up-ticket-as-monitor discharge was
+sometimes itself the mechanism that *filed* a follow-up ticket — the ledger item
+discharged by naming a ticket that then had to exist. Removing that discharge route
+removes one source of such filings, so the follow-on ratio should fall.
+
+**The honest counter, recorded now rather than after the read.** Some claims that
+previously took the lane will fall back into the hard-gate class, because no monitor
+that actually fires can be named for them. That raises Request-Changes round-trips on
+the *review* side of a single ticket — a real within-ticket cost that the follow-on-ratio
+instrument counts generated tickets, not review rounds, and so may not register in
+either direction. If the ratio does not move, that is not by itself evidence the change
+did nothing; the cost and the benefit land on axes the instrument reads differently.
+
+**The `Commit` cell names PR #1506 rather than a sha**, for the reason the LIN-2618 note
+below already gives: the merge sha does not exist until the runner merges, and it cannot
+be self-referenced from inside the commit that would carry it.
 
 ### On the LIN-2618 row, and why its Paths cell reads `neither`
 
