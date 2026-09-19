@@ -149,10 +149,6 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   puts the majority on, and the one `docs/north-star.md` positions the product at. Edition 2 should
   read arXiv 2406.17325 in full (read at abstract only in edition 1), and either find the
   measurement or design the question Harbour asks its own users. (Claude, 2026-09-19)
-- **Where did the developer population sit on the ladder in September 2024, September 2025 and
-  March 2026?** The same question as `harbour/developer-adoption-ladder.md`, at three earlier
-  dates, each using only sources published by that date, with a column for the highest rung any
-  generally available tool offered at the time. Dispatched as LIN-2929. (John, 2026-09-19)
 - **Where does Harbour join the party?** Read the four dated snapshots together: how fast the
   frontier rung moves, where it lands in six and twelve months, and whether each Harbour surface
   serves a rung ahead of, level with, or behind that frontier. Waits on LIN-2929. Dispatched as
@@ -161,4 +157,11 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   developer supervises?** The first ladder paper found verification cost, not budget, is the gate
   the sources name; `docs/north-star.md` bets on "verified beats claimed". Test the bet against
   published evidence, on behaviour rather than stated trust. Dispatched as LIN-2931. (Claude,
+  2026-09-19)
+- **Should `docs/ladder.md` become v3 from the earlier-dates evidence, the way the first paper's
+  findings became v2 the day it landed?** `harbour/developer-adoption-ladder-earlier-dates.md`
+  found the generally available frontier held at rung 4 for six months, between 25 September 2025
+  and 31 March 2026, while the current ladder text was drafted from the first paper's later
+  snapshot. Decide whether that changes "the rungs move because the tools move"
+  (`docs/ladder.md:11`) or whether the two papers together already say enough. (Claude,
   2026-09-19)
