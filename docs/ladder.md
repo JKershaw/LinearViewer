@@ -2,11 +2,15 @@
 
 *Descriptive, not normative. This document models where developers are and what Harbour owes them at each step. Agents may maintain it and revise it from evidence; the first paper on it is LIN-2925. The rule it implies lives in the north star, which only a human accepts.*
 
-Drafted 19 September 2026 by a Claude session in conversation with John Kershaw, from his description of the ladder. His words are quoted where the rungs are defined. Grounded on the live workspace and the checked-out docs at that date.
+Drafted 19 September 2026 by a Claude session in conversation with John Kershaw, from his description of the ladder. His words are quoted where the rungs are defined. Revised the same day from the first paper (`docs/papers/harbour/developer-adoption-ladder.md@7f1da76f`), with the amendment accepted by John.
 
 ## Why a ladder
 
-Harbour exists to keep human intent in command of AI execution, so it has to model the human. People do not arrive at "feed tasks in and they land" in one step. They climb, and each step is gated by two things: **trust** (have I seen it be right enough times to let it do the next step without watching?) and **budget** (can I afford to let it run?). In John's words: *"it's more a single product, but we have to factor in how people will actually use it and how far along they'll go, and that's based on trust and budget and other factors like that."*
+Harbour exists to keep human intent in command of AI execution, so it has to model the human. People do not arrive at "feed tasks in and they land" in one step. They climb, and each step is gated by **trust**: have I seen it be right enough times to let it do the next step without watching? In John's words: *"it's more a single product, but we have to factor in how people will actually use it and how far along they'll go, and that's based on trust and budget and other factors like that."*
+
+The ladder is one person's path, and the population is not one person. In John's words, after the first paper: *"the rungs are my personal journey, which seems to be happening to everyone, though of course as people start these journeys at different points in time the models' behaviour is actually different."* Each cohort starts on a higher rung because the tools moved between their start dates, and later entrants arrive beside a colleague rather than by climbing. So "where developers are" is a distribution over cohorts, not a queue, and the rungs themselves are defined against the tools of the day.
+
+What the published sources name as the gate is narrower than "trust and budget". Every source that names a cause names the cost of verifying the work; budget barely appears at the level of the individual developer. Budget is the operator's gate and it is real at rung 6. Below that, the price a person pays is the price of checking.
 
 ## The rungs
 
@@ -15,7 +19,7 @@ Harbour exists to keep human intent in command of AI execution, so it has to mod
 | 1 | Asks a question, copies the answer, carries on | Nothing yet | Their own eyes | Trust in one answer |
 | 2 | Opens Claude Code and walks through the work by hand, meandering | Nothing yet | Their own eyes | Learns the sharp edges; learns to trust |
 | 3 | Bundles repeatable steps into prompts and saves them | The grounded next prompt for a task | The tracker: the issue moved after the prompt was copied | "Run the next one for me?" |
-| 4 | Lets Harbour run one task | Dispatch, a PR, CI, the review ledger, one approval click before merge | The PR and the ledger | Cost visible; a few clean landings |
+| 4 | Lets Harbour run one task, and watches | Dispatch, a PR, CI, the review ledger, one approval click before merge | The PR and the ledger | Checking a landing costs less than doing it |
 | 5 | Ratifies a passage of several tasks | Legs, task budgets, a landing report, rulings | The landing report | Rulings at a rate they can sustain |
 | 6 | Feeds tasks in | The always-on loop, a forecast, KPIs | Cost per verified task; the forecast scored against actuals | None; this is the top |
 
@@ -23,28 +27,37 @@ John's description of rungs 1 to 3, 19 September: *"First people will ask Claude
 
 And of what Harbour does with that: *"Harbour's first parlour trick is essentially giving them those prompts. They log in, they get their prompt, off they go. That is the core of Harbour, and everything else nearby exists to accelerate that: that's the autopilot, that's the automatic dispatch system. All of those exist to remove the friction of copying and pasting and then triggering the next actions. Harbour then extends this beyond where most developers are to the next level, which is multiple tasks as part of a passage, and leads eventually to an enormous, constantly running Harbour where you simply feed in tasks and they are done: complete, quick, no fuss, all correct, and land."*
 
+## Where the population sits, on published evidence
+
+From the first paper, each figure with its source's date. Rung 1 and above, 84 to 90% (mid-2025 to early 2026). Rung 2 and above, 62% (late 2025) rising to about 90% (mid-2026, on a broad definition of "agent"). Rung 3, unmeasured: no dated survey with a denominator asks whether developers save their prompts, so the "majority of developers today" line above is John's reading and stays labelled as such until a paper or a Harbour measurement says otherwise. Rung 4 and above, 31% (mid-2025) to 59% (April 2026), on the same Stack Overflow question asked twice. Rung 5 and above, about a fifth of all developers ever let an agent run unattended (April 2026). Rung 6, no figure; the defensible reading is low single digits or less.
+
+The one published within-user climb is Anthropic's auto-approve share: about 20% of sessions for a new Claude Code user, over 40% at 750 sessions. The same series shows experienced users interrupting more often, because they stop approving each action up front and step in when something goes wrong.
+
 ## What follows from the ladder
 
 **The instruments are the handrail.** Verified-beats-claimed, the ledger, rulings and cost per verified task are what make each climb safe to attempt. Each belongs to one rung. A person sees their rung plus one: a rung-3 developer needs "was that prompt good", not cost per verified task.
 
 **Rung-3 evidence is free.** Harbour reads the tracker, so it can see whether an issue moved after a prompt was copied without asking the user anything. That is the rung-3 form of external evidence over self-report.
 
-**The big jump is 3 to 4.** Below it the person does the work themselves. At rung 4 something runs without them, and that is where trust breaks. So rung 4 has to be tiny: one task, one bounded run, the merge waits for their click, the transcript in view. Harbour already built this shape for the Flight Companion (LIN-2627: read-only, then supervised writes, then unattended). The same three steps are a user's rung-4 on-ramp.
+**The big jump is later than it looks.** v1 put it at 3 to 4. The population does not stall there: agent use nearly doubled in eleven months, and a large organisation crossed that step in a quarter. Where the numbers fall off a cliff is between using an agent and not watching it: 59% use one, about a fifth ever let it run unattended, and standing loops are unmeasured. Rung 4 still has to be tiny, one task, one bounded run, the merge waiting for their click, the transcript in view, but the reason has changed. People do not refuse to reach rung 4; what they refuse is to stop watching, and the tiny shape is what lets them watch cheaply. The instruments that make watching cheap are the 4-to-5 handrail. Harbour already built this shape for the Flight Companion (LIN-2627: read-only, then supervised writes, then unattended). The same three steps are a user's on-ramp.
 
-**Budget lines up with rungs.** Rung 3 costs almost nothing to serve, because the handwritten prompt templates are deterministic. The AI recommendation is the first BYOK or free-tier step. Rung 4 is the first time a task costs money on someone's key.
+**Adoption is social, and lower-rung fluency does not carry.** The strongest disconfirming source in the first paper, a rollout across tens of thousands of Microsoft engineers, found that trying an agent was predicted by whether nearby colleagues already had, that tenure barely mattered, and that prior IDE-assistant use raised trying and lowered retention. If that generalises, the rung-4 on-ramp is partly a distribution problem: a person's first agent run is more likely to happen beside someone who already did one than at the end of a private climb. What that does to a product that meets people at rung 3 is John's call; LIN-2930 carries the question.
+
+**Budget lines up with rungs.** Rung 3 costs almost nothing to serve, because the handwritten prompt templates are deterministic. The AI recommendation is the first BYOK or free-tier step. Rung 4 is the first time a task costs money on someone's key. Budget is what the operator feels at rung 6; the sources do not name it as a gate below that.
 
 **The runner is the rung-4 on-ramp for people who are not the operator.** A rung-4 user will not install simple-dispatcher on their own machine. Machines as account objects (LIN-2883) and cloud execution (LIN-1301) exist for that step, and belong after rung-3 entry and before anyone is asked to climb.
 
-**Rungs 5 and 6 have one user today.** The operator uses them to build Harbour; that is dogfooding and it is valid. On 19 September 2026 roughly two-thirds of the open backlog was rung 5 and 6 work (the dispatcher-substrate, prompt-engine, cost-economy, proxy-api, rulings, operating-model, flight-companion and periodicals fronts). It is rationed to what raises verified tasks per week, not to new capability.
+**Rung 6 has one user today; rung 5 has more company than v1 assumed.** The operator uses rungs 5 and 6 to build Harbour; that is dogfooding and it is valid. About a fifth of developers sometimes let an agent run unattended, so a passage is a step people already take, not an exotic one. On 19 September 2026 roughly two-thirds of the open backlog was rung 5 and 6 work (the dispatcher-substrate, prompt-engine, cost-economy, proxy-api, rulings, operating-model, flight-companion and periodicals fronts). It is rationed to what raises verified tasks per week, not to new capability.
 
 ## What to measure
 
-A funnel: people per rung, time on rung, and why they stop, trust or budget. LIN-1644 (time-to-trust instrumentation) is the ticket. The first number worth watching is prompts copied before the first dispatch: the rung-3 to rung-4 trust threshold, measured on a real person rather than assumed.
+A funnel: people per rung, time on rung, and why they stop. LIN-1644 (time-to-trust instrumentation) is the ticket. The rung-3 number is the tracker-movement form, the issue moved after the prompt was copied, not prompts copied: an activity count can read green while the outcome is wrong, and METR's trial is the evidence, with developers who reported a 20% speedup measured 19% slower. For rungs 4 to 6 Harbour already has externally witnessed signals and should prefer them to any self-reported rung: the merged PR and discharged ledger at rung 4, rulings per landing report at rung 5, cost per verified task and forecast against actuals at rung 6. For the climb itself, the share of runs in each permission mode by session count is Harbour's analogue of Anthropic's auto-approve curve, computable from what every run already records.
 
 ## Where the estimate of "where developers are" comes from
 
-Today, from John's own reading of the developers he works with. LIN-2925 is the first paper on it: what published evidence says about developer adoption of AI coding tools, mapped onto these rungs, with the strongest disconfirming source named. Revise this document from that paper and its successors, never from the north star.
+v1, from John's own reading of the developers he works with. v2, from the first paper, `docs/papers/harbour/developer-adoption-ladder.md` (LIN-2925), which mapped fifteen published sources onto these rungs and named the strongest disconfirming source. Its successors are commissioned: LIN-2929 (the same question at September 2024, September 2025 and March 2026, with the highest rung any tool offered at each date), LIN-2930 (the frontier over four dates, projected, against each Harbour surface) and LIN-2931 (what lowers the cost of verifying, and whether a verified artifact changes supervision). Revise this document from those papers, never from the north star.
 
 ## Revision record
 
 - v1, 2026-09-19: drafted from the planning conversation; not yet checked against a paper.
+- v2, 2026-09-19: revised from the first paper. The gate narrowed to verification cost, budget kept as the operator's gate at rung 6; the big jump moved from 3-to-4 to handing over without watching; rung 3 marked unmeasured; the cohort reading and the social-adoption finding added; rung 5 re-sized; the rung-3 metric fixed to the tracker-movement form. Amendment proposed by the planning session and accepted by John Kershaw the same day.
