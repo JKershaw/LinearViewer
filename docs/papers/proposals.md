@@ -153,13 +153,6 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   frontier rung moves, where it lands in six and twelve months, and whether each Harbour surface
   serves a rung ahead of, level with, or behind that frontier. Waits on LIN-2929. Dispatched as
   LIN-2930. (John, 2026-09-19)
-- **Should `docs/ladder.md` become v3 from the earlier-dates evidence, the way the first paper's
-  findings became v2 the day it landed?** `harbour/developer-adoption-ladder-earlier-dates.md`
-  found the generally available frontier held at rung 4 for six months, between 25 September 2025
-  and 31 March 2026, while the current ladder text was drafted from the first paper's later
-  snapshot. Decide whether that changes "the rungs move because the tools move"
-  (`docs/ladder.md:11`) or whether the two papers together already say enough. (Claude,
-  2026-09-19)
 - **Does permission mode change how much a developer supervises, once Harbour can measure it?**
   `harbour/what-lowers-the-verification-cost.md` found no published study shows a verified
   artifact changes supervision, and that Harbour cannot run its own version of that measurement:
