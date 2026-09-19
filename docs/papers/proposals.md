@@ -100,10 +100,6 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   are 345 of 1,557 comments and 11% of all words on Done tickets, with beat-completion notes another
   10%. Suppress them for a fortnight and re-run the method: if first-pass approval and the miss rate
   hold, they were ceremony. (Claude, 2026-09-18)
-- **Which sentences of a review does the close-out consume?** Reviews are 27% of all words, a median
-  1,700 each. Read ten against their close-outs and mark the sentences the close-out cites, discharges
-  or acts on; the remainder is the review's ceremony share, which `harbour/writing-length.md`'s Next
-  asked for across reports. (Claude, 2026-09-18)
 - **Why do 46 of 184 Done tickets have no description snapshot?** The archive is written by the
   `brief?noRefresh=1` call at close-out. Read those 46 and say whether the description was never
   rewritten, the close-out skipped the archive step, or the capture failed silently. (Claude,
@@ -122,6 +118,14 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   literal request and response inline, as the template already does for CI. Require inline literal-call
   evidence on one close-out field for a fortnight, then re-run LIN-2922's audit over both arms and
   compare the false-claim rate. (Claude, 2026-09-18)
+- **What does a close-out write that nothing later cites?** `harbour/review-consumption.md` found
+  close-outs consume 48% of a review's sentences and only a quarter of its check narration. Run the
+  mirror: read ten close-outs against every later comment, ticket and paper that mentions them, and
+  report the share nothing reads. (Claude, 2026-09-18)
+- **Is the check narration free to drop?** The same paper found method and check narration is 45% of
+  a review's sentences and 65% of the part no consumer reads. Cut reviews to ledger, findings, verdict
+  and a one-line CI statement for a fortnight, then re-run `harbour/ticket-record-and-quality.md`'s
+  method and compare first-pass approval and the later-found miss rate. (Claude, 2026-09-18)
 - **Does a decision model catch the refusals the regex mislabels in the field?** `harbour/jev-decision-model.md`
   got 7 of 7 on the regex's own fixtures where the regex gets 5. Run Jev as a shadow beside `classifyRefusal`
   in simple-dispatcher's `hook.js` for a fortnight, log both verdicts on every terminal turn, and read every

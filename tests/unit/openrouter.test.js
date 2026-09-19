@@ -1130,6 +1130,33 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       assert.ok(/regardless of the item's inside\/outside mark — the named monitor stands as the cited evidence/i.test(closeout),
         'the named-monitor discharge is explicitly independent of the scope mark');
     });
+
+    // LIN-2917: the meta path carried the monitor list with no content pin at all —
+    // only lane survival above — so an edit to rules (6)(i) / (3a) shipped green
+    // either way. Pin the list itself, mirroring the handwritten pin in
+    // tests/unit/prompt-templates.test.js.
+    test('the meta-prompt monitor list names only things that fire — a routed ticket is cited beside a monitor, never as one', () => {
+      const review = reviewRule();
+      const closeout = closeoutRule();
+      assert.ok(/a log or oplog entry, a metric, a path that fails loudly/i.test(review),
+        'the meta Review rule still enumerates the nameable monitor kinds');
+      assert.ok(!/a routed follow-up that owns the watch/i.test(review),
+        'the meta Review rule no longer lists a routed follow-up as a monitor kind');
+      assert.ok(!/a routed follow-up that owns the watch/i.test(closeout),
+        'the meta Close-out rule no longer lists a routed follow-up as a monitor kind');
+      assert.ok(/a routed follow-up ticket is never the monitor and may only be cited BESIDE one, never instead of it/i.test(review),
+        'the meta Review rule states that a ticket is not a monitor');
+      assert.ok(/never a routed follow-up ticket, which does not fire and may only be cited beside the monitor, not as it/i.test(closeout),
+        'the meta Close-out rule refuses a ticket standing in for a monitor');
+      // The misfire guard is a required written line on the meta path too, and
+      // close-out rejects a lane entry that lacks it.
+      assert.ok(/the reviewer writes one line naming why no check short of production could prove the claim/i.test(review),
+        'the meta Review rule makes the misfire guard a written line');
+      assert.ok(/an entry with no such line does not take the lane and close-out rejects it/i.test(review),
+        'the meta Review rule states the consequence of a missing justification line');
+      assert.ok(/close-out rejects an entry missing that line as undischarged/i.test(closeout),
+        'the meta Close-out rule rejects a lane entry with no justification line');
+    });
   });
 
   test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {
