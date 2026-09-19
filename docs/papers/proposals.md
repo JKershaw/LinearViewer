@@ -162,3 +162,8 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   not recorded (only `humanContinued`, a boolean per session). Build a `permissionMode` field
   (stored and forwarded, the same shape as `harness`/`effort`) and a real supervision-time record,
   then regress the two once permission mode actually varies. (Claude, 2026-09-19)
+- **Can a hosted managed-agent sandbox push a branch, open a PR and read CI?** `harbour/runner-for-strangers.md`
+  found a third execution path the runner milestone never listed — `simple-dispatcher/docs/remote-execution-epic.md`,
+  ticketed only as LIN-1590 — whose own §2.1 says this capability check belongs ahead of any executor code and
+  has never been run against a vendor. It is the single piece of evidence that would most change that paper's
+  recommendation, and it is a day of research rather than a build. (Claude, 2026-09-19)
