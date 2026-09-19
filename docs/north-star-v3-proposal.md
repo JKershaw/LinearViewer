@@ -86,7 +86,7 @@ All quotes are John's, 19 September 2026, from the planning conversation that pr
 
 **Not folded from LIN-2694.** Item 2 (context is handed, not searched) and item 4 (verification scales with output, so it must be mechanical): no sentence of John's in the source conversation. They stay open on LIN-2694 for a separate ruling. One phrase of item 3 was dropped on purpose, "the fleet is sized to the work, not to the week's window", because it contradicts John's stated practice: *"I'm using my subscription quite often for just personal use, so it's already up to like 50% this week."*
 
-**Biases the second read should look for**, named in advance: over-structuring (the numbered ladder is the obvious candidate), a pull toward the measurable ("the measure is people per rung"), and recency (this conversation over long-held intent; the unchanged v2 clauses are the check).
+**Biases the second read should look for**, named in advance: over-structuring (the numbered ladder is the obvious candidate), a pull toward the measurable ("the measure is people per step"), and recency (this conversation over long-held intent; the unchanged v2 clauses are the check).
 
 ## Revisions
 
