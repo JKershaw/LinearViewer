@@ -1,0 +1,908 @@
+{
+  "model": "typesafe/jev-1.13",
+  "endpoint": "https://openrouter.ai/api/alpha/decisions",
+  "k": 3,
+  "ranAt": "2026-09-19T05:37:47.140Z",
+  "routing": [
+    {
+      "identifier": "HAR-697",
+      "expect": [
+        "bug",
+        "research"
+      ],
+      "avoid": "implement",
+      "scale": "real (frozen at the red moment: cause refuted, HAR-707 not yet filed)",
+      "hits": 2,
+      "avoidHits": 1,
+      "stable": false,
+      "meanPExpect": 0.34,
+      "meanConfidence": 0.247,
+      "meanOperator": 0.21,
+      "runs": [
+        {
+          "choice": "implement",
+          "confidence": 0.22,
+          "pExpect": 0.3,
+          "pAvoid": 0.26,
+          "top3": [
+            [
+              "implement",
+              0.26
+            ],
+            [
+              "bug",
+              0.26
+            ],
+            [
+              "plan",
+              0.11
+            ]
+          ],
+          "operator": 0.2,
+          "hit": false,
+          "avoidHit": true,
+          "inputTokens": 4021,
+          "latencyMs": 411,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "bug",
+          "confidence": 0.25,
+          "pExpect": 0.35,
+          "pAvoid": 0.26,
+          "top3": [
+            [
+              "bug",
+              0.31
+            ],
+            [
+              "implement",
+              0.26
+            ],
+            [
+              "plan",
+              0.1
+            ]
+          ],
+          "operator": 0.21,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 4021,
+          "latencyMs": 211,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "bug",
+          "confidence": 0.27,
+          "pExpect": 0.37,
+          "pAvoid": 0.26,
+          "top3": [
+            [
+              "bug",
+              0.32
+            ],
+            [
+              "implement",
+              0.26
+            ],
+            [
+              "plan",
+              0.1
+            ]
+          ],
+          "operator": 0.22,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 4021,
+          "latencyMs": 189,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        }
+      ]
+    },
+    {
+      "identifier": "LIN-420",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "scale": "real (frozen at landed-awaiting-review: PR open + CI green, before the approve/merge)",
+      "hits": 3,
+      "avoidHits": 0,
+      "stable": true,
+      "meanPExpect": 0.96,
+      "meanConfidence": 0.957,
+      "meanOperator": 0.123,
+      "runs": [
+        {
+          "choice": "review",
+          "confidence": 0.95,
+          "pExpect": 0.96,
+          "pAvoid": null,
+          "top3": [
+            [
+              "review",
+              0.96
+            ],
+            [
+              "close-out",
+              0.04
+            ],
+            [
+              "implement",
+              0
+            ]
+          ],
+          "operator": 0.13,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 1556,
+          "latencyMs": 195,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "review",
+          "confidence": 0.96,
+          "pExpect": 0.96,
+          "pAvoid": null,
+          "top3": [
+            [
+              "review",
+              0.96
+            ],
+            [
+              "close-out",
+              0.04
+            ],
+            [
+              "implement",
+              0
+            ]
+          ],
+          "operator": 0.13,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 1556,
+          "latencyMs": 149,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "review",
+          "confidence": 0.96,
+          "pExpect": 0.96,
+          "pAvoid": null,
+          "top3": [
+            [
+              "review",
+              0.96
+            ],
+            [
+              "close-out",
+              0.04
+            ],
+            [
+              "blocked",
+              0
+            ]
+          ],
+          "operator": 0.11,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 1556,
+          "latencyMs": 240,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        }
+      ]
+    },
+    {
+      "identifier": "LIN-510",
+      "expect": [
+        "implement",
+        "blocked",
+        "plan",
+        "bug"
+      ],
+      "avoid": "review",
+      "scale": "real (frozen at the red moment: 3× Request-Changes on an unaddressed blocker, pre-merge)",
+      "hits": 0,
+      "avoidHits": 3,
+      "stable": true,
+      "meanPExpect": 0.147,
+      "meanConfidence": 0.823,
+      "meanOperator": 0.657,
+      "runs": [
+        {
+          "choice": "review",
+          "confidence": 0.83,
+          "pExpect": 0.14,
+          "pAvoid": 0.85,
+          "top3": [
+            [
+              "review",
+              0.85
+            ],
+            [
+              "blocked",
+              0.13
+            ],
+            [
+              "close-out",
+              0.01
+            ]
+          ],
+          "operator": 0.68,
+          "hit": false,
+          "avoidHit": true,
+          "inputTokens": 8537,
+          "latencyMs": 187,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "review",
+          "confidence": 0.82,
+          "pExpect": 0.15000000000000002,
+          "pAvoid": 0.84,
+          "top3": [
+            [
+              "review",
+              0.84
+            ],
+            [
+              "blocked",
+              0.14
+            ],
+            [
+              "implement",
+              0.01
+            ]
+          ],
+          "operator": 0.65,
+          "hit": false,
+          "avoidHit": true,
+          "inputTokens": 8537,
+          "latencyMs": 175,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "review",
+          "confidence": 0.82,
+          "pExpect": 0.15,
+          "pAvoid": 0.84,
+          "top3": [
+            [
+              "review",
+              0.84
+            ],
+            [
+              "blocked",
+              0.13
+            ],
+            [
+              "implement",
+              0.02
+            ]
+          ],
+          "operator": 0.64,
+          "hit": false,
+          "avoidHit": true,
+          "inputTokens": 8537,
+          "latencyMs": 214,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        }
+      ]
+    },
+    {
+      "identifier": "LIN-537",
+      "expect": [
+        "implement",
+        "plan"
+      ],
+      "avoid": "bug",
+      "scale": "real (frozen after the investigation comment, before the fix landed)",
+      "hits": 3,
+      "avoidHits": 0,
+      "stable": true,
+      "meanPExpect": 0.857,
+      "meanConfidence": 0.843,
+      "meanOperator": 0.07,
+      "runs": [
+        {
+          "choice": "implement",
+          "confidence": 0.85,
+          "pExpect": 0.86,
+          "pAvoid": 0.01,
+          "top3": [
+            [
+              "implement",
+              0.86
+            ],
+            [
+              "plan-review",
+              0.13
+            ],
+            [
+              "bug",
+              0.01
+            ]
+          ],
+          "operator": 0.07,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 1719,
+          "latencyMs": 186,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "implement",
+          "confidence": 0.8,
+          "pExpect": 0.8200000000000001,
+          "pAvoid": 0.01,
+          "top3": [
+            [
+              "implement",
+              0.81
+            ],
+            [
+              "plan-review",
+              0.16
+            ],
+            [
+              "bug",
+              0.01
+            ]
+          ],
+          "operator": 0.07,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 1719,
+          "latencyMs": 254,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "implement",
+          "confidence": 0.88,
+          "pExpect": 0.89,
+          "pAvoid": 0.01,
+          "top3": [
+            [
+              "implement",
+              0.89
+            ],
+            [
+              "plan-review",
+              0.1
+            ],
+            [
+              "bug",
+              0.01
+            ]
+          ],
+          "operator": 0.07,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 1719,
+          "latencyMs": 192,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        }
+      ]
+    },
+    {
+      "identifier": "LIN-571",
+      "expect": [
+        "breakdown",
+        "implement"
+      ],
+      "avoid": "plan",
+      "scale": "real (frozen at step 2 of the 2026-06-22 LIN-571 autopilot run: settled multi-session plan in description + breakdown-shaped plan comments, before decomposition into LIN-582/583/584 — zero children)",
+      "hits": 0,
+      "avoidHits": 0,
+      "stable": true,
+      "meanPExpect": 0.437,
+      "meanConfidence": 0.26,
+      "meanOperator": 0.14,
+      "runs": [
+        {
+          "choice": "defer",
+          "confidence": 0.26,
+          "pExpect": 0.44,
+          "pAvoid": 0.04,
+          "top3": [
+            [
+              "defer",
+              0.31
+            ],
+            [
+              "breakdown",
+              0.26
+            ],
+            [
+              "plan-review",
+              0.21
+            ]
+          ],
+          "operator": 0.14,
+          "hit": false,
+          "avoidHit": false,
+          "inputTokens": 6547,
+          "latencyMs": 251,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "defer",
+          "confidence": 0.26,
+          "pExpect": 0.42000000000000004,
+          "pAvoid": 0.04,
+          "top3": [
+            [
+              "defer",
+              0.31
+            ],
+            [
+              "breakdown",
+              0.25
+            ],
+            [
+              "plan-review",
+              0.23
+            ]
+          ],
+          "operator": 0.14,
+          "hit": false,
+          "avoidHit": false,
+          "inputTokens": 6547,
+          "latencyMs": 258,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "defer",
+          "confidence": 0.26,
+          "pExpect": 0.45,
+          "pAvoid": 0.03,
+          "top3": [
+            [
+              "defer",
+              0.31
+            ],
+            [
+              "breakdown",
+              0.25
+            ],
+            [
+              "plan-review",
+              0.21
+            ]
+          ],
+          "operator": 0.14,
+          "hit": false,
+          "avoidHit": false,
+          "inputTokens": 6547,
+          "latencyMs": 181,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        }
+      ]
+    },
+    {
+      "identifier": "LIN-748",
+      "expect": [
+        "design"
+      ],
+      "avoid": null,
+      "scale": "real (frozen post-research, before \"direction locked\" — the harder real design case)",
+      "hits": 3,
+      "avoidHits": 0,
+      "stable": true,
+      "meanPExpect": 0.527,
+      "meanConfidence": 0.487,
+      "meanOperator": 0.9,
+      "runs": [
+        {
+          "choice": "design",
+          "confidence": 0.47,
+          "pExpect": 0.51,
+          "pAvoid": null,
+          "top3": [
+            [
+              "design",
+              0.51
+            ],
+            [
+              "blocked",
+              0.4
+            ],
+            [
+              "research",
+              0.05
+            ]
+          ],
+          "operator": 0.9,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 3806,
+          "latencyMs": 173,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "design",
+          "confidence": 0.43,
+          "pExpect": 0.48,
+          "pAvoid": null,
+          "top3": [
+            [
+              "design",
+              0.48
+            ],
+            [
+              "blocked",
+              0.41
+            ],
+            [
+              "research",
+              0.05
+            ]
+          ],
+          "operator": 0.91,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 3806,
+          "latencyMs": 227,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "design",
+          "confidence": 0.56,
+          "pExpect": 0.59,
+          "pAvoid": null,
+          "top3": [
+            [
+              "design",
+              0.59
+            ],
+            [
+              "blocked",
+              0.31
+            ],
+            [
+              "research",
+              0.05
+            ]
+          ],
+          "operator": 0.89,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 3806,
+          "latencyMs": 173,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        }
+      ]
+    },
+    {
+      "identifier": "LIN-813",
+      "expect": [
+        "design"
+      ],
+      "avoid": null,
+      "scale": "real (frozen pre-plan: scope narrowed by John, before the plan comment silently picked the shape)",
+      "hits": 0,
+      "avoidHits": 0,
+      "stable": true,
+      "meanPExpect": 0,
+      "meanConfidence": 0.803,
+      "meanOperator": 0.16,
+      "runs": [
+        {
+          "choice": "scoping",
+          "confidence": 0.82,
+          "pExpect": 0,
+          "pAvoid": null,
+          "top3": [
+            [
+              "scoping",
+              0.84
+            ],
+            [
+              "implement",
+              0.07
+            ],
+            [
+              "breakdown",
+              0.04
+            ]
+          ],
+          "operator": 0.16,
+          "hit": false,
+          "avoidHit": false,
+          "inputTokens": 2171,
+          "latencyMs": 254,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "scoping",
+          "confidence": 0.78,
+          "pExpect": 0,
+          "pAvoid": null,
+          "top3": [
+            [
+              "scoping",
+              0.8
+            ],
+            [
+              "implement",
+              0.08
+            ],
+            [
+              "breakdown",
+              0.04
+            ]
+          ],
+          "operator": 0.16,
+          "hit": false,
+          "avoidHit": false,
+          "inputTokens": 2171,
+          "latencyMs": 156,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "scoping",
+          "confidence": 0.81,
+          "pExpect": 0,
+          "pAvoid": null,
+          "top3": [
+            [
+              "scoping",
+              0.83
+            ],
+            [
+              "implement",
+              0.07
+            ],
+            [
+              "breakdown",
+              0.04
+            ]
+          ],
+          "operator": 0.16,
+          "hit": false,
+          "avoidHit": false,
+          "inputTokens": 2171,
+          "latencyMs": 183,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        }
+      ]
+    }
+  ],
+  "refusal": [
+    {
+      "id": "fixture-A",
+      "gold": true,
+      "lexical": true,
+      "meanNoul": 0.97,
+      "verdictAt05": true,
+      "correct": true,
+      "lexicalCorrect": true,
+      "spread": 0,
+      "runs": [
+        {
+          "noul": 0.97,
+          "latencyMs": 161,
+          "inputTokens": 521
+        },
+        {
+          "noul": 0.97,
+          "latencyMs": 197,
+          "inputTokens": 521
+        },
+        {
+          "noul": 0.97,
+          "latencyMs": 222,
+          "inputTokens": 521
+        }
+      ]
+    },
+    {
+      "id": "fixture-B",
+      "gold": true,
+      "lexical": true,
+      "meanNoul": 0.847,
+      "verdictAt05": true,
+      "correct": true,
+      "lexicalCorrect": true,
+      "spread": 0.01,
+      "runs": [
+        {
+          "noul": 0.84,
+          "latencyMs": 167,
+          "inputTokens": 486
+        },
+        {
+          "noul": 0.85,
+          "latencyMs": 165,
+          "inputTokens": 486
+        },
+        {
+          "noul": 0.85,
+          "latencyMs": 187,
+          "inputTokens": 486
+        }
+      ]
+    },
+    {
+      "id": "benign-blocked",
+      "gold": false,
+      "lexical": false,
+      "meanNoul": 0.173,
+      "verdictAt05": false,
+      "correct": true,
+      "lexicalCorrect": true,
+      "spread": 0.01,
+      "runs": [
+        {
+          "noul": 0.18,
+          "latencyMs": 212,
+          "inputTokens": 398
+        },
+        {
+          "noul": 0.17,
+          "latencyMs": 202,
+          "inputTokens": 398
+        },
+        {
+          "noul": 0.17,
+          "latencyMs": 175,
+          "inputTokens": 398
+        }
+      ]
+    },
+    {
+      "id": "done",
+      "gold": false,
+      "lexical": false,
+      "meanNoul": 0.01,
+      "verdictAt05": false,
+      "correct": true,
+      "lexicalCorrect": true,
+      "spread": 0,
+      "runs": [
+        {
+          "noul": 0.01,
+          "latencyMs": 180,
+          "inputTokens": 408
+        },
+        {
+          "noul": 0.01,
+          "latencyMs": 193,
+          "inputTokens": 408
+        },
+        {
+          "noul": 0.01,
+          "latencyMs": 208,
+          "inputTokens": 408
+        }
+      ]
+    },
+    {
+      "id": "meta-discussion",
+      "gold": false,
+      "lexical": false,
+      "meanNoul": 0.153,
+      "verdictAt05": false,
+      "correct": true,
+      "lexicalCorrect": true,
+      "spread": 0.01,
+      "runs": [
+        {
+          "noul": 0.15,
+          "latencyMs": 191,
+          "inputTokens": 406
+        },
+        {
+          "noul": 0.15,
+          "latencyMs": 148,
+          "inputTokens": 406
+        },
+        {
+          "noul": 0.16,
+          "latencyMs": 157,
+          "inputTokens": 406
+        }
+      ]
+    },
+    {
+      "id": "fp-merging-classifier",
+      "gold": false,
+      "lexical": true,
+      "meanNoul": 0.323,
+      "verdictAt05": false,
+      "correct": true,
+      "lexicalCorrect": false,
+      "spread": 0.01,
+      "runs": [
+        {
+          "noul": 0.33,
+          "latencyMs": 152,
+          "inputTokens": 406
+        },
+        {
+          "noul": 0.32,
+          "latencyMs": 160,
+          "inputTokens": 406
+        },
+        {
+          "noul": 0.32,
+          "latencyMs": 197,
+          "inputTokens": 406
+        }
+      ]
+    },
+    {
+      "id": "fp-third-party",
+      "gold": false,
+      "lexical": true,
+      "meanNoul": 0.04,
+      "verdictAt05": false,
+      "correct": true,
+      "lexicalCorrect": false,
+      "spread": 0,
+      "runs": [
+        {
+          "noul": 0.04,
+          "latencyMs": 186,
+          "inputTokens": 410
+        },
+        {
+          "noul": 0.04,
+          "latencyMs": 203,
+          "inputTokens": 410
+        },
+        {
+          "noul": 0.04,
+          "latencyMs": 167,
+          "inputTokens": 410
+        }
+      ]
+    },
+    {
+      "id": "recall-bound-short",
+      "gold": null,
+      "lexical": false,
+      "meanNoul": 0.13,
+      "verdictAt05": false,
+      "correct": null,
+      "lexicalCorrect": null,
+      "spread": 0.02,
+      "runs": [
+        {
+          "noul": 0.12,
+          "latencyMs": 200,
+          "inputTokens": 399
+        },
+        {
+          "noul": 0.14,
+          "latencyMs": 158,
+          "inputTokens": 399
+        },
+        {
+          "noul": 0.13,
+          "latencyMs": 210,
+          "inputTokens": 399
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "calls": 45,
+    "inputTokens": 95373,
+    "outputTokens": 4038,
+    "costUsd": 0.004005666000000001,
+    "latencyMs": {
+      "min": 148,
+      "median": 189,
+      "max": 411
+    },
+    "routingHits": 11,
+    "routingRuns": 21,
+    "routingAvoidHits": 4,
+    "routingStable": 6,
+    "refusalCorrect": 7,
+    "refusalGraded": 7,
+    "lexicalCorrect": 5
+  }
+}
