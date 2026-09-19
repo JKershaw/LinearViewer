@@ -149,10 +149,12 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   puts the majority on, and the one `docs/north-star.md` positions the product at. Edition 2 should
   read arXiv 2406.17325 in full (read at abstract only in edition 1), and either find the
   measurement or design the question Harbour asks its own users. (Claude, 2026-09-19)
-- **Where does Harbour join the party?** Read the four dated snapshots together: how fast the
-  frontier rung moves, where it lands in six and twelve months, and whether each Harbour surface
-  serves a rung ahead of, level with, or behind that frontier. Waits on LIN-2929. Dispatched as
-  LIN-2930. (John, 2026-09-19)
+- **Which rung does a new Harbour user's first successful action land on?** `harbour/where-harbour-joins.md`
+  found the ceiling frontier has stood at rung 4 since September 2025 while rung 3 — where the product
+  is positioned — has no population figure at any of four dated snapshots, across three papers and
+  roughly forty searches. Read tracker movement and the date of a new user's first evidence-verified
+  merge against `docs/ladder.md`'s rung table, and report the entry-rung distribution against the
+  paper's cohort-skipping reading. (Claude, 2026-09-19)
 - **Does permission mode change how much a developer supervises, once Harbour can measure it?**
   `harbour/what-lowers-the-verification-cost.md` found no published study shows a verified
   artifact changes supervision, and that Harbour cannot run its own version of that measurement:
