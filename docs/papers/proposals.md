@@ -138,8 +138,14 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   came at confidence 0.82 and 0.80 from Jev and as unanimous answers from GPT-5.4-mini. Re-run the routing
   question with the harness's leaf vocabulary and iterated criteria, and test whether the operator question or
   disagreement between the two models flags them. (Claude, 2026-09-19)
-- **What is known about how developers adopt AI coding tools, and does it support the rung ladder?**
-  `docs/ladder.md` is the hypothesis; the first paper about people outside Harbour. Desk research
-  over published surveys, vendor usage reports and controlled studies, each source mapped onto
-  the rungs; the strongest disconfirming source is mandatory. Dispatched as LIN-2925. (John,
-  2026-09-19)
+- **Should the standard require a disconfirming section of every paper?**
+  `harbour/developer-adoption-ladder.md` carries a mandatory "strongest disconfirming source" section
+  because its ticket demanded one, which makes it the only paper with six body parts against
+  `standard.md`'s five. Read the fifteen earlier papers and say which of them had a disconfirming
+  source available that the author did not reach for; if the answer is most of them, the standard
+  should change rather than the ticket. (Claude, 2026-09-19)
+- **Where is rung 3, and can anyone measure it?** The same paper found no dated survey with a
+  denominator asking whether developers save or reuse their prompts — the one rung `docs/ladder.md`
+  puts the majority on, and the one `docs/north-star.md` positions the product at. Edition 2 should
+  read arXiv 2406.17325 in full (read at abstract only in edition 1), and either find the
+  measurement or design the question Harbour asks its own users. (Claude, 2026-09-19)
