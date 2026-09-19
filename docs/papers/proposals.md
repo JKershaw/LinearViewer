@@ -162,3 +162,9 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   not recorded (only `humanContinued`, a boolean per session). Build a `permissionMode` field
   (stored and forwarded, the same shape as `harness`/`effort`) and a real supervision-time record,
   then regress the two once permission mode actually varies. (Claude, 2026-09-19)
+- **Does a human reader of a finished run behave like `review-consumption.md`'s machine reader?**
+  `harbour/what-a-run-must-show.md` found the only reader of a Harbour evidence artifact ever
+  measured is a machine, reading 97% of the ledger and 25% of the narration around it. Apply the
+  same method to the first invited runs of a finished-run page: record which sections a real
+  person opens, how long they stay, and whether they reach the ledger before clicking merge, and
+  report the share nothing reads. (Claude, 2026-09-19)
