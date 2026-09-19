@@ -1,6 +1,6 @@
 # North star v3: proposal and diff against v2
 
-**Status: a proposal. This file is not the north star.** `docs/north-star.md` stays at v2 until John applies this diff himself, in a PR he merges, and pastes the result into the Roadmap page's north-star input so the LIN-2254 doc-hash stamp matches. Nothing here edits the normative document.
+**Status: applied.** John accepted this draft on 19 September 2026 and asked for it to be applied; `docs/north-star.md` now carries the v3 text below with a provenance line. This file remains the record of the diff against v2 and of the sentence of John's behind each change.
 
 **Provenance.** Drafted 19 September 2026 by a Claude session (Claude Code on the web, interactive proxy session, read then readWrite; no dispatch lineage) in conversation with John Kershaw, the same session that wrote `docs/ladder.md`. It folds the LIN-2694 proposal (Archive #5, "The Cheap Ships") where a sentence of John's supports it, and replaces the v2 stranger clause with the rung rule the ladder implies. The header note follows the authorship rule John adopted on LIN-2926 (19 Sep 2026, all five mechanics).
 
