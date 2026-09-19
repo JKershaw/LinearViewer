@@ -157,8 +157,10 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   frontier rung moves, where it lands in six and twelve months, and whether each Harbour surface
   serves a rung ahead of, level with, or behind that frontier. Waits on LIN-2929. Dispatched as
   LIN-2930. (John, 2026-09-19)
-- **What lowers the cost of verifying agent work, and does a verified artifact change how much a
-  developer supervises?** The first ladder paper found verification cost, not budget, is the gate
-  the sources name; `docs/north-star.md` bets on "verified beats claimed". Test the bet against
-  published evidence, on behaviour rather than stated trust. Dispatched as LIN-2931. (Claude,
-  2026-09-19)
+- **Does permission mode change how much a developer supervises, once Harbour can measure it?**
+  `harbour/what-lowers-the-verification-cost.md` found no published study shows a verified
+  artifact changes supervision, and that Harbour cannot run its own version of that measurement:
+  permission mode is a hardcoded constant with zero variance or storage, and supervision time is
+  not recorded (only `humanContinued`, a boolean per session). Build a `permissionMode` field
+  (stored and forwarded, the same shape as `harness`/`effort`) and a real supervision-time record,
+  then regress the two once permission mode actually varies. (Claude, 2026-09-19)
