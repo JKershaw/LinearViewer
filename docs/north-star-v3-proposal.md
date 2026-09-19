@@ -4,7 +4,7 @@
 
 **Provenance.** Drafted 19 September 2026 by a Claude session (Claude Code on the web, interactive proxy session, read then readWrite; no dispatch lineage) in conversation with John Kershaw, the same session that wrote `docs/ladder.md`. It folds the LIN-2694 proposal (Archive #5, "The Cheap Ships") where a sentence of John's supports it, and replaces the v2 stranger clause with the rung rule the ladder implies. The header note follows the authorship rule John adopted on LIN-2926 (19 Sep 2026, all five mechanics).
 
-**Size.** v2 is 385 words, v3 is 602. About 245 words are new or changed, roughly 40% of v3; the step clause is the largest block. The drafting rule set a one-third bound; this is 7 points over it. The flagged row in the provenance table is the place to cut if John wants it under.
+**Length.** v2 is 385 words, v3 is 601. Length is not a constraint here: the document is read for orientation, and John's rule for it is accurate without being too specific. That is the test the second read applies alongside provenance.
 
 ## The mechanics this draft was written under (LIN-2926)
 
@@ -24,7 +24,7 @@
 
     **Verified beats claimed.** Work counts only when its evidence chain closes: CI green, merged, ledger discharged. done is a claim; the artifact is the fact.
 
-    **Cost per verified task, visible and falling — in the money actually spent.** Every session attributes its spend to the lane that billed it; cash the operator feels is the headline, API-equivalent keeps it honest. Every cycle forecasts the next and scores the last against actuals. Routing, plan-review, and re-grounding economy are judged by this number alone — and pricing is policy, never judgement: no agent reasons about price; defaults are config, changed only behind an eval, reverted in one line. Frontier price buys judgement only: work-shaped legs run on the cheapest tier that passes the verifier; plan-review, review, close-out and rulings may run on the frontier. The subscription is a lane, not a ceiling: the exchange rate at which the API lane costs less than the plan is a published number.
+    **Cost per verified task, visible and falling — in the money actually spent.** Every session attributes its spend to the lane that billed it; cash the operator feels is the headline, API-equivalent keeps it honest. Every cycle forecasts the next and scores the last against actuals. Routing, plan-review, and re-grounding economy are judged by this number alone — and pricing is policy, never judgement: no agent reasons about price; defaults are config, changed only behind an eval, reverted in one line. Frontier price buys judgement only: work-shaped legs run on the cheapest tier that passes the verifier; judgement legs may run on the frontier. The subscription is a lane, not a ceiling: the exchange rate at which the API lane costs less than the plan is a published number.
 
     **Operator minutes and sessions are the scarce resources.** Silent failures and detection gaps outrank feature work — a halt the system didn't report costs more than the halt. Follow-on tasks and wakes per verified task are tracked taxes; work that shrinks them ranks high. No autonomous run starts without a declared task budget, enforced at the seam — a run that cannot finish inside its bound hands back; it does not sprawl. False-escalation rate is a headline KPI: every surface that asks a human is judged by how often the answer was "why was I asked this?".
 
@@ -40,7 +40,7 @@
 
 ```diff
 --- docs/north-star.md	2026-09-18 20:21:09.368648665 +0000
-+++ /tmp/claude-0/-home-user/b26aec7c-ba1b-5cc0-abc0-a8f1a6bad478/scratchpad/v3.md	2026-09-19 08:57:32.724317412 +0000
++++ /tmp/claude-0/-home-user/b26aec7c-ba1b-5cc0-abc0-a8f1a6bad478/scratchpad/v3.md	2026-09-19 08:58:58.012041995 +0000
 @@ -1,19 +1,19 @@
 -# North star — v2, the self-funding loop
 +# North star — v3, the self-funding loop, one step at a time
@@ -54,7 +54,7 @@
  **Verified beats claimed.** Work counts only when its evidence chain closes: CI green, merged, ledger discharged. done is a claim; the artifact is the fact.
  
 -**Cost per verified task, visible and falling — in the money actually spent.** Every session attributes its spend to the lane that billed it; cash the operator feels is the headline, API-equivalent keeps it honest. Every cycle forecasts the next and scores the last against actuals. Routing, plan-review, and re-grounding economy are judged by this number alone — and pricing is policy, never judgement: no agent reasons about price; defaults are config, changed only behind an eval, reverted in one line.
-+**Cost per verified task, visible and falling — in the money actually spent.** Every session attributes its spend to the lane that billed it; cash the operator feels is the headline, API-equivalent keeps it honest. Every cycle forecasts the next and scores the last against actuals. Routing, plan-review, and re-grounding economy are judged by this number alone — and pricing is policy, never judgement: no agent reasons about price; defaults are config, changed only behind an eval, reverted in one line. Frontier price buys judgement only: work-shaped legs run on the cheapest tier that passes the verifier; plan-review, review, close-out and rulings may run on the frontier. The subscription is a lane, not a ceiling: the exchange rate at which the API lane costs less than the plan is a published number.
++**Cost per verified task, visible and falling — in the money actually spent.** Every session attributes its spend to the lane that billed it; cash the operator feels is the headline, API-equivalent keeps it honest. Every cycle forecasts the next and scores the last against actuals. Routing, plan-review, and re-grounding economy are judged by this number alone — and pricing is policy, never judgement: no agent reasons about price; defaults are config, changed only behind an eval, reverted in one line. Frontier price buys judgement only: work-shaped legs run on the cheapest tier that passes the verifier; judgement legs may run on the frontier. The subscription is a lane, not a ceiling: the exchange rate at which the API lane costs less than the plan is a published number.
  
 -**Operator minutes and sessions are the scarce resources.** Silent failures and detection gaps outrank feature work — a halt the system didn't report costs more than the halt. Follow-on tasks and wakes per verified task are tracked taxes; work that shrinks them ranks high. No autonomous run starts without a declared task budget, enforced at the seam — a run that cannot finish inside its bound hands back; it does not sprawl.
 +**Operator minutes and sessions are the scarce resources.** Silent failures and detection gaps outrank feature work — a halt the system didn't report costs more than the halt. Follow-on tasks and wakes per verified task are tracked taxes; work that shrinks them ranks high. No autonomous run starts without a declared task budget, enforced at the seam — a run that cannot finish inside its bound hands back; it does not sprawl. False-escalation rate is a headline KPI: every surface that asks a human is judged by how often the answer was "why was I asked this?".
@@ -90,6 +90,7 @@ All quotes are John's, 19 September 2026, from the planning conversation that pr
 
 ## Revisions
 
+- 19 Sep 2026, third draft: "plan-review, review, close-out and rulings may run on the frontier" became "judgement legs may run on the frontier", since naming today's stages fails the too-specific test; the one-third size bound was dropped as the drafter's invention, not John's.
 - 19 Sep 2026, second draft: after John's review, the step clause defines the steps in place and drops rung numbers so the document stands without `docs/ladder.md`; the claim that most developers are at the saved prompt was removed as empirical, not normative. Title follows.
 
 ## How to apply
