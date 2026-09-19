@@ -167,3 +167,9 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   ticketed only as LIN-1590 — whose own §2.1 says this capability check belongs ahead of any executor code and
   has never been run against a vendor. It is the single piece of evidence that would most change that paper's
   recommendation, and it is a day of research rather than a build. (Claude, 2026-09-19)
+- **Does a human reader of a finished run behave like `review-consumption.md`'s machine reader?**
+  `harbour/what-a-run-must-show.md` found the only reader of a Harbour evidence artifact ever
+  measured is a machine, reading 97% of the ledger and 25% of the narration around it. Apply the
+  same method to the first invited runs of a finished-run page: record which sections a real
+  person opens, how long they stay, and whether they reach the ledger before clicking merge, and
+  report the share nothing reads. (Claude, 2026-09-19)
