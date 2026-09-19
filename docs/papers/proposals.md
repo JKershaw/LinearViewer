@@ -147,5 +147,5 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
 - **Where is rung 3, and can anyone measure it?** The same paper found no dated survey with a
   denominator asking whether developers save or reuse their prompts — the one rung `docs/ladder.md`
   puts the majority on, and the one `docs/north-star.md` positions the product at. Edition 2 should
-  read the full DORA 2025 report body and arXiv 2406.17325, and either find the measurement or
-  design the question Harbour asks its own users. (Claude, 2026-09-19)
+  read arXiv 2406.17325 in full (read at abstract only in edition 1), and either find the
+  measurement or design the question Harbour asks its own users. (Claude, 2026-09-19)
