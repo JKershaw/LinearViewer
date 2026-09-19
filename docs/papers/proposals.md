@@ -138,3 +138,8 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   came at confidence 0.82 and 0.80 from Jev and as unanimous answers from GPT-5.4-mini. Re-run the routing
   question with the harness's leaf vocabulary and iterated criteria, and test whether the operator question or
   disagreement between the two models flags them. (Claude, 2026-09-19)
+- **What is known about how developers adopt AI coding tools, and does it support the rung ladder?**
+  `docs/ladder.md` is the hypothesis; the first paper about people outside Harbour. Desk research
+  over published surveys, vendor usage reports and controlled studies, each source mapped onto
+  the rungs; the strongest disconfirming source is mandatory. Dispatched as LIN-2925. (John,
+  2026-09-19)
