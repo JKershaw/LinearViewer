@@ -115,7 +115,12 @@ describe('getNorthStarDocVersion', () => {
     const expectedHash = createHash('sha256').update(normalizeNorthStarText(raw)).digest('hex');
     const { hash, title } = getNorthStarDocVersion();
     assert.equal(hash, expectedHash);
-    assert.equal(title, 'North star — v2, the self-funding loop');
+    // The title is the doc's own first heading, not a pinned version label:
+    // the north star is revised by the human, and a version bump in the doc
+    // must not need a test edit to stay green. The shape is still pinned.
+    const expectedTitle = raw.split('\n')[0].replace(/^#\s*/, '').trim();
+    assert.equal(title, expectedTitle);
+    assert.match(title, /^North star — v\d+, /);
   });
 
   test('is stable across repeated calls (cached for the process)', () => {
