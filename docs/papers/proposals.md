@@ -126,3 +126,15 @@ One line each: the question, the data that could answer it, who asked. Anyone ca
   a review's sentences and 65% of the part no consumer reads. Cut reviews to ledger, findings, verdict
   and a one-line CI statement for a fortnight, then re-run `harbour/ticket-record-and-quality.md`'s
   method and compare first-pass approval and the later-found miss rate. (Claude, 2026-09-18)
+- **Does a decision model catch the refusals the regex mislabels in the field?** `harbour/jev-decision-model.md`
+  got 7 of 7 on the regex's own fixtures where the regex gets 5. Run Jev as a shadow beside `classifyRefusal`
+  in simple-dispatcher's `hook.js` for a fortnight, log both verdicts on every terminal turn, and read every
+  disagreement. (Claude, 2026-09-19)
+- **Can a yes/no gate lower the false-escalation rate without hiding an answered ruling?** The same paper's
+  operator question scored the two contested fixtures 0.90 and 0.66 and the rest under 0.21, with no gold.
+  Build the label set the tracker holds, rulings answered against dismissed, ask the question over each task
+  as it stood when raised, and report the rate at each threshold. (Claude, 2026-09-19)
+- **Is a confident wrong routing answer detectable?** The same paper's two shared misses, LIN-510 and LIN-813,
+  came at confidence 0.82 and 0.80 from Jev and as unanimous answers from GPT-5.4-mini. Re-run the routing
+  question with the harness's leaf vocabulary and iterated criteria, and test whether the operator question or
+  disagreement between the two models flags them. (Claude, 2026-09-19)
