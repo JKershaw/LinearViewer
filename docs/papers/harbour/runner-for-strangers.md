@@ -5,7 +5,7 @@ date: 2026-09-19
 authors: [Claude, John Kershaw]
 model: claude-opus-5 on claude-code, effort high, dispatched as LIN-2937's research child (dispatch c4379756, session b3edaaa3)
 grounded_at: d249ec51 (LinearViewer), d0e809e3 (simple-dispatcher)
-cites: [docs/v1.md@d249ec51:98, docs/v1.md@d249ec51:83, docs/north-star.md@d249ec51:17, simple-dispatcher/executors.js@d0e809e3:117-131, simple-dispatcher/executors.js@d0e809e3:427-431, simple-dispatcher/executors.js@d0e809e3:483, simple-dispatcher/harnesses.js@d0e809e3:247-263, simple-dispatcher/harnesses.js@d0e809e3:355-369, simple-dispatcher/harbour-token-mcp-server.js@d0e809e3:19-24, simple-dispatcher/harbour-token-mcp-server.js@d0e809e3:232-235, simple-dispatcher/harbour-token-mcp-server.js@d0e809e3:358-363, simple-dispatcher/opencode-runner.js@d0e809e3:88-96, simple-dispatcher/opencode-runner.js@d0e809e3:409-430, simple-dispatcher/clones.js@d0e809e3:5-11, simple-dispatcher/dispatcher.js@d0e809e3:74, simple-dispatcher/config.js@d0e809e3:1100-1102, simple-dispatcher/deploy/provision.sh@d0e809e3:16, simple-dispatcher/deploy/provision.sh@d0e809e3:75, simple-dispatcher/deploy/provision.sh@d0e809e3:95-113, simple-dispatcher/docs/substrate.md@d0e809e3, simple-dispatcher/docs/deployment.md@d0e809e3, simple-dispatcher/docs/dispatching-into-a-repo.md@d0e809e3, simple-dispatcher/docs/remote-execution-epic.md@d0e809e3:25-80, simple-dispatcher/docs/cloud-deployment-feasibility.md@d0e809e3:1-14, lib/dispatch-store.js@d249ec51:170-171, lib/user-preferences.js@d249ec51:23-34, lib/user-preferences.js@d249ec51:152-178, lib/model-pricing.js@d249ec51:108-134, lib/terminal-marked-task-cost.js@d249ec51:137-161, lib/free-tier-store.js@d249ec51:23-39, routes/proxy.js@d249ec51:98-115, routes/openrouter-auth.js@d249ec51:1-12, docs/papers/harbour/cheap-implementer.md@d249ec51, LIN-1781 (description and comments, 2026-08-01 to 2026-09-19), LIN-1785 (description and comments, 2026-08-30 and 2026-09-19), LIN-2421, LIN-2422, LIN-1786, LIN-1301 (description and comments, 2026-07-13, 2026-07-31, 2026-08-01, 2026-08-29, 2026-09-19), LIN-1302 to LIN-1305, LIN-259, LIN-1590, LIN-2883 (2026-09-17), LIN-2884, LIN-1892, LIN-1234 (comments 2026-07-14), LIN-2412, LIN-1345, LIN-2934 (and its correction comment, 2026-09-19), LIN-2954, LIN-1635, LIN-1712, LIN-2114, LIN-1871]
+cites: [docs/v1.md@d249ec51:98, docs/v1.md@d249ec51:83, docs/north-star.md@d249ec51:11, simple-dispatcher/executors.js@d0e809e3:117-131, simple-dispatcher/executors.js@d0e809e3:427-431, simple-dispatcher/executors.js@d0e809e3:483, simple-dispatcher/harnesses.js@d0e809e3:247-263, simple-dispatcher/harnesses.js@d0e809e3:355-369, simple-dispatcher/harbour-token-mcp-server.js@d0e809e3:19-24, simple-dispatcher/harbour-token-mcp-server.js@d0e809e3:232-235, simple-dispatcher/harbour-token-mcp-server.js@d0e809e3:358-363, simple-dispatcher/opencode-runner.js@d0e809e3:88-96, simple-dispatcher/opencode-runner.js@d0e809e3:409-430, simple-dispatcher/clones.js@d0e809e3:5-11, simple-dispatcher/dispatcher.js@d0e809e3:74, simple-dispatcher/config.js@d0e809e3:1100-1102, simple-dispatcher/deploy/provision.sh@d0e809e3:16, simple-dispatcher/deploy/provision.sh@d0e809e3:75, simple-dispatcher/deploy/provision.sh@d0e809e3:95-113, simple-dispatcher/docs/substrate.md@d0e809e3, simple-dispatcher/docs/deployment.md@d0e809e3, simple-dispatcher/docs/dispatching-into-a-repo.md@d0e809e3, simple-dispatcher/docs/remote-execution-epic.md@d0e809e3:25-83, simple-dispatcher/docs/cloud-deployment-feasibility.md@d0e809e3:1-14, lib/dispatch-store.js@d249ec51:170-171, lib/user-preferences.js@d249ec51:23-34, lib/user-preferences.js@d249ec51:152-178, lib/model-pricing.js@d249ec51:108-134, lib/terminal-marked-task-cost.js@d249ec51:137-161, lib/free-tier-store.js@d249ec51:23-39, routes/proxy.js@d249ec51:98-115, routes/openrouter-auth.js@d249ec51:1-12, docs/papers/harbour/cheap-implementer.md@d249ec51, LIN-1781 (description and comments, 2026-08-01 to 2026-09-19), LIN-1785 (description and comments, 2026-08-30 and 2026-09-19), LIN-2421, LIN-2422, LIN-1786, LIN-1301 (description and comments, 2026-07-13, 2026-07-31, 2026-08-01, 2026-08-29, 2026-09-19), LIN-1302 to LIN-1305, LIN-259, LIN-1590, LIN-2883 (2026-09-17), LIN-2884, LIN-1892, LIN-1234 (comments 2026-07-14), LIN-2412, LIN-1345, LIN-2934 (and its correction comment, 2026-09-19), LIN-2954, LIN-1635, LIN-1712, LIN-2114, LIN-1871]
 ---
 
 # Which runner and which credential lane can run a stranger's task to a PR?
@@ -221,6 +221,68 @@ and none of which a host delivers. If that reading is right, LIN-2940 should be 
 "build the runner" to "build the per-task clone and the lane, on whatever host is cheapest to
 stand up", and the box wins by being cheapest to stand up rather than by being right.
 
+## The six questions, both paths, side by side
+
+| | **The Linux box** (LIN-1781/1785) | **Cloud execution** (LIN-1301) |
+|---|---|---|
+| **1. Credential lane** | *Exists:* the operator's plan login, placed by hand (LIN-1785 Secrets) — which is the lane v1 forbids. The account's own OpenRouter key exists durably (LIN-2412) and `opencode` already routes it (`opencode-runner.js:88-96`). *Left:* resolve that key per dispatch — blocked on the principal decision LIN-1234 deferred to LIN-1892. | *Exists:* nothing. *Left:* "injected per-session secrets" as designed, plus the same principal decision. The 2026-07-31 cost gate states the constraint plainly: a headless runner cannot use a desktop plan login, and migrating converts the burn to metered cash. |
+| **2. The clone** | *Exists:* a per-session filesystem copy of an operator-placed template (`executors.js:117-131`); `repo=` resolves basenames only. *Left:* everything — a URL from the payload, a per-task `git clone` with the account's token, and dropping it. Push identity today is the operator's `~/.ssh` + `gh` token (`harnesses.js:247-263`). | *Exists:* nothing, but the design is decided — `git clone <url>@<ref>` — with one open choice (Harbour supplies URL+ref, or SD resolves from `repo`). *Left:* all of it, plus `remote-execution-epic.md` §2.1's unrun capability check: can the sandbox push, open a PR and read CI? |
+| **3. Isolation** | *Exists:* per-session clone dir (LIN-558), per-session `TMPDIR` (LIN-1701), one non-root service user (`provision.sh:16,75`). *Left:* the temp dir is not `0700` (LIN-1712), all sessions share one Unix user, and every launch is `--dangerously-skip-permissions`. No per-account boundary at all. | *Exists:* nothing. *Designed:* container-per-task, which is a real boundary by construction and the one place this path is strictly better. *Left:* the runtime is undecided (Docker → Fargate / Cloud Run / K8s / Fly). |
+| **4. Hostile input** | Same three controls both paths inherit: `--strict-mcp-config` blocks the repo's own MCP servers (`executors.js:427-431`), `AskUserQuestion` denied, auto-updates off. Against them: the repo's own code runs in bypass mode, and the localhost broker accepts unauthenticated `/api/proxy/*` calls from anything in the session (`harbour-token-mcp-server.js:19-24,232-235`). Box-specific: CVE-2026-64600 local privesc, mitigated only by a reboot window; port 22 at `0.0.0.0/0` with the upstream firewall parked (LIN-2421). | The same three controls and the same broker hole. The container bounds the blast radius of what the repo's code can reach on the host — the one improvement — but it must then hold push credentials, which `remote-execution-epic.md` calls "the single most underestimated piece of P1". |
+| **5. Retention** | *Exists:* never delete (`clones.js:5-11`); a daily orphan reap on the box; transcripts persist under `~/.claude/projects/` by design, because the reboot recovery depends on it. Harbour side: 24h queue, 30d history (`dispatch-store.js:170-171`). *Left:* a written policy — none exists (LIN-2954, LIN-1635). | *Exists:* nothing. *By construction:* the container dies with the task, which answers the question for code but not for transcripts or feedback, which still land in Harbour under the same two TTLs. *Left:* the same written policy. |
+| **6. Spend** | *Exists:* `maxTasks`, which counts distinct issue identifiers and therefore cannot bound a one-task run (LIN-2934). Fixed cost €16.49/mo. *Left:* a per-run bound; and the telemetry to enforce it is default-off (`config.js:1100-1102`) with no cheap-model pricing rows. On the `claude-code` lane `costUsd` is null, so a money cap is not buildable there. | The same absent cap, plus per-minute compute that is directly metered ($0.01–$0.055 a 20-minute run). On the `opencode` lane the harness reports OpenRouter's own USD (`opencode-runner.js:409-430`) and `reduceLineageCost` sums it with an explicit `fullyPriced` flag — so a real money cap **is** buildable, on either host, if the harness is `opencode`. |
+
+## The recommendation
+
+**Host:** the Linux box. It is the only path with landed, reviewed, CI-green code (PR #199), its
+remaining Phase 1 work is a merge decision rather than a build, and its fixed cost is $18 a month
+against a token bill of $2–3 a run. **Lane:** the account's own OpenRouter key through the
+`opencode` harness — the only lane that is durable, per-account, consented for unattended use, and
+measurable in real money. **Method:** build LIN-1301's Phase 1 workspace-prep and secrets seam — a
+per-task `git clone <url>@<ref>` with the account's token, dropped after the run — on the box, not
+in a container, and take LIN-1302's `RuntimeProfile` refactor first so the seam exists to build
+against.
+
+Three things must land with it rather than after it, because a stranger reaches them on the first
+run: the `dispatch` scope (LIN-2884), so a triage token cannot start a session; a per-run spend
+bound with the usage relay on (LIN-2934); and `0700` on the session temp dir (LIN-1712). The
+machine record (LIN-2883) is needed before a *second* account, not before the dress rehearsal.
+
+**What it costs to be wrong, by what is wrong.** *Wrong about the host:* about $18 and a
+provisioning week. The clone, the secrets, the scope and the cap all sit above the `RuntimeProfile`
+seam and move to a container unchanged — which is the whole point of taking LIN-1302 first.
+*Wrong about the harness:* moderate. Choosing `claude-code` on the box is defensible now that tmux
+is measured, but it forfeits the only real-money cost reading Harbour has, and a spend cap on that
+lane would have to be rebuilt from a pricing table that has no cheap rows. *Wrong about the lane:*
+expensive, and it is the one that has already happened. A stranger's run on a shared key with a
+prompt-shaped meter and no per-run bound is LIN-1345's incident with a stranger's hand on it — one
+run exhausted the shared key's daily cap and halted every AI path in the product. *Wrong about the
+gate:* if the invited period starts with the rehearsal rather than after it, the box's one-user
+model is not adequate and the container becomes required, costing the difference between a
+provisioning week and LIN-1303 in full.
+
+## Questions for LIN-2938
+
+1. **The lane.** Is the account's own OpenRouter key the v1 lane, or does Harbour front metered
+   spend for strangers? `docs/v1.md:84` leaves it open and the plan asked for John's view directly.
+   If Harbour fronts it: what is the per-run cap in dollars, and what happens when a run hits it
+   mid-PR?
+2. **The gate.** Is the dress rehearsal single-tenant? The recommendation depends on it. If two
+   invited people may run concurrently, isolation stops being a deferred item.
+3. **The box's lapsed gates.** Merge PR #199 with the seven on-box ledger items deferred to first
+   provisioning, or provision first and discharge them properly? And the SSH-ingress ruling for
+   LIN-2421 — option (a) carrier-range allowlist, (b) SSH closed plus WireGuard/Tailscale, or (c)
+   record `0.0.0.0/0` as an accepted deviation. Both have waited since 2026-08-30 and both are
+   John's alone.
+4. **Which of LIN-1301's phases v1 needs.** The recommendation says Phase 0's seam and Phase 1's
+   prep-and-secrets half, and not the ContainerDriver, Phase 2 or Phase 3. Is that the cut?
+5. **The third path.** Should LIN-1590 run its capability check — can a hosted sandbox push, open a
+   PR and read CI — before LIN-2940 starts? It is the one piece of evidence that would most change
+   this recommendation, and it is a day of research, not a build.
+6. **The retention line.** What is kept of a user's code and transcripts, and for how long? The
+   repository's current answer is "never delete", which is a default rather than a decision, and
+   LIN-2954 cannot write the note until this is ruled.
+
 ## Method
 
 **Population.** Everything LIN-2937 names, plus what an adversarial sweep found beside it.
@@ -307,68 +369,6 @@ task crosses between a dispatch row and a PR is named above — binding, prep, l
 harness, liveness, feedback, retention — and each was walked in code rather than in prose. The one
 layer that is named but not readable is the policy layer, and it is recorded as unbounded rather
 than assumed empty.
-
-### The six questions, both paths, side by side
-
-| | **The Linux box** (LIN-1781/1785) | **Cloud execution** (LIN-1301) |
-|---|---|---|
-| **1. Credential lane** | *Exists:* the operator's plan login, placed by hand (LIN-1785 Secrets) — which is the lane v1 forbids. The account's own OpenRouter key exists durably (LIN-2412) and `opencode` already routes it (`opencode-runner.js:88-96`). *Left:* resolve that key per dispatch — blocked on the principal decision LIN-1234 deferred to LIN-1892. | *Exists:* nothing. *Left:* "injected per-session secrets" as designed, plus the same principal decision. The 2026-07-31 cost gate states the constraint plainly: a headless runner cannot use a desktop plan login, and migrating converts the burn to metered cash. |
-| **2. The clone** | *Exists:* a per-session filesystem copy of an operator-placed template (`executors.js:117-131`); `repo=` resolves basenames only. *Left:* everything — a URL from the payload, a per-task `git clone` with the account's token, and dropping it. Push identity today is the operator's `~/.ssh` + `gh` token (`harnesses.js:247-263`). | *Exists:* nothing, but the design is decided — `git clone <url>@<ref>` — with one open choice (Harbour supplies URL+ref, or SD resolves from `repo`). *Left:* all of it, plus `remote-execution-epic.md` §2.1's unrun capability check: can the sandbox push, open a PR and read CI? |
-| **3. Isolation** | *Exists:* per-session clone dir (LIN-558), per-session `TMPDIR` (LIN-1701), one non-root service user (`provision.sh:16,75`). *Left:* the temp dir is not `0700` (LIN-1712), all sessions share one Unix user, and every launch is `--dangerously-skip-permissions`. No per-account boundary at all. | *Exists:* nothing. *Designed:* container-per-task, which is a real boundary by construction and the one place this path is strictly better. *Left:* the runtime is undecided (Docker → Fargate / Cloud Run / K8s / Fly). |
-| **4. Hostile input** | Same three controls both paths inherit: `--strict-mcp-config` blocks the repo's own MCP servers (`executors.js:427-431`), `AskUserQuestion` denied, auto-updates off. Against them: the repo's own code runs in bypass mode, and the localhost broker accepts unauthenticated `/api/proxy/*` calls from anything in the session (`harbour-token-mcp-server.js:19-24,232-235`). Box-specific: CVE-2026-64600 local privesc, mitigated only by a reboot window; port 22 at `0.0.0.0/0` with the upstream firewall parked (LIN-2421). | The same three controls and the same broker hole. The container bounds the blast radius of what the repo's code can reach on the host — the one improvement — but it must then hold push credentials, which `remote-execution-epic.md` calls "the single most underestimated piece of P1". |
-| **5. Retention** | *Exists:* never delete (`clones.js:5-11`); a daily orphan reap on the box; transcripts persist under `~/.claude/projects/` by design, because the reboot recovery depends on it. Harbour side: 24h queue, 30d history (`dispatch-store.js:170-171`). *Left:* a written policy — none exists (LIN-2954, LIN-1635). | *Exists:* nothing. *By construction:* the container dies with the task, which answers the question for code but not for transcripts or feedback, which still land in Harbour under the same two TTLs. *Left:* the same written policy. |
-| **6. Spend** | *Exists:* `maxTasks`, which counts distinct issue identifiers and therefore cannot bound a one-task run (LIN-2934). Fixed cost €16.49/mo. *Left:* a per-run bound; and the telemetry to enforce it is default-off (`config.js:1100-1102`) with no cheap-model pricing rows. On the `claude-code` lane `costUsd` is null, so a money cap is not buildable there. | The same absent cap, plus per-minute compute that is directly metered ($0.01–$0.055 a 20-minute run). On the `opencode` lane the harness reports OpenRouter's own USD (`opencode-runner.js:409-430`) and `reduceLineageCost` sums it with an explicit `fullyPriced` flag — so a real money cap **is** buildable, on either host, if the harness is `opencode`. |
-
-### The recommendation
-
-**Host:** the Linux box. It is the only path with landed, reviewed, CI-green code (PR #199), its
-remaining Phase 1 work is a merge decision rather than a build, and its fixed cost is $18 a month
-against a token bill of $2–3 a run. **Lane:** the account's own OpenRouter key through the
-`opencode` harness — the only lane that is durable, per-account, consented for unattended use, and
-measurable in real money. **Method:** build LIN-1301's Phase 1 workspace-prep and secrets seam — a
-per-task `git clone <url>@<ref>` with the account's token, dropped after the run — on the box, not
-in a container, and take LIN-1302's `RuntimeProfile` refactor first so the seam exists to build
-against.
-
-Three things must land with it rather than after it, because a stranger reaches them on the first
-run: the `dispatch` scope (LIN-2884), so a triage token cannot start a session; a per-run spend
-bound with the usage relay on (LIN-2934); and `0700` on the session temp dir (LIN-1712). The
-machine record (LIN-2883) is needed before a *second* account, not before the dress rehearsal.
-
-**What it costs to be wrong, by what is wrong.** *Wrong about the host:* about $18 and a
-provisioning week. The clone, the secrets, the scope and the cap all sit above the `RuntimeProfile`
-seam and move to a container unchanged — which is the whole point of taking LIN-1302 first.
-*Wrong about the harness:* moderate. Choosing `claude-code` on the box is defensible now that tmux
-is measured, but it forfeits the only real-money cost reading Harbour has, and a spend cap on that
-lane would have to be rebuilt from a pricing table that has no cheap rows. *Wrong about the lane:*
-expensive, and it is the one that has already happened. A stranger's run on a shared key with a
-prompt-shaped meter and no per-run bound is LIN-1345's incident with a stranger's hand on it — one
-run exhausted the shared key's daily cap and halted every AI path in the product. *Wrong about the
-gate:* if the invited period starts with the rehearsal rather than after it, the box's one-user
-model is not adequate and the container becomes required, costing the difference between a
-provisioning week and LIN-1303 in full.
-
-### Questions for LIN-2938
-
-1. **The lane.** Is the account's own OpenRouter key the v1 lane, or does Harbour front metered
-   spend for strangers? `docs/v1.md:84` leaves it open and the plan asked for John's view directly.
-   If Harbour fronts it: what is the per-run cap in dollars, and what happens when a run hits it
-   mid-PR?
-2. **The gate.** Is the dress rehearsal single-tenant? The recommendation depends on it. If two
-   invited people may run concurrently, isolation stops being a deferred item.
-3. **The box's lapsed gates.** Merge PR #199 with the seven on-box ledger items deferred to first
-   provisioning, or provision first and discharge them properly? And the SSH-ingress ruling for
-   LIN-2421 — option (a) carrier-range allowlist, (b) SSH closed plus WireGuard/Tailscale, or (c)
-   record `0.0.0.0/0` as an accepted deviation. Both have waited since 2026-08-30 and both are
-   John's alone.
-4. **Which of LIN-1301's phases v1 needs.** The recommendation says Phase 0's seam and Phase 1's
-   prep-and-secrets half, and not the ContainerDriver, Phase 2 or Phase 3. Is that the cut?
-5. **The third path.** Should LIN-1590 run its capability check — can a hosted sandbox push, open a
-   PR and read CI — before LIN-2940 starts? It is the one piece of evidence that would most change
-   this recommendation, and it is a day of research, not a build.
-6. **The retention line.** What is kept of a user's code and transcripts, and for how long? The
-   repository's current answer is "never delete", which is a default rather than a decision, and
-   LIN-2954 cannot write the note until this is ruled.
 
 ## Limits
 
