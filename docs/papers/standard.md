@@ -42,7 +42,8 @@ A paper is as long as its findings need. A page is the usual size.
 
 ## Where a paper lives
 
-- `harbour/` for a question about Harbour: its code, its tracker, its sessions, its cost.
+- `harbour/` for a question about Harbour: its code, its tracker, its sessions, its cost — and
+  about the people it serves, where the answer changes what Harbour should build.
 - `process/` for a question about how we write papers.
 - The root holds only this file, the index in `README.md`, and `proposals.md`.
 
