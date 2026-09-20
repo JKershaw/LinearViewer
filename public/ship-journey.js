@@ -82,6 +82,17 @@
   // MARKER_PAD, which padded the content box by six whole steps.
   var DOT_REACH = WAYPOINT_RADIUS + WAYPOINT_HALO / 2;
 
+  // Narrow-viewport trail window (LIN-2959). The mark:step ratio above is
+  // scale-invariant (dot and step both live inside the zoomed <g>, LIN-2089),
+  // so a phone-width viewport does not fail on ratio — it fails on absolute
+  // pixel budget under fit-to-viewport. Below narrowMq's 640px breakpoint
+  // (declared below), paint() windows the fit input AND the dot/label/
+  // trail-segment create-cull loops to the most recent NARROW_TRAIL_WINDOW
+  // revealed waypoints, so DOM presence, visibility, and focusability/tab
+  // order all agree on the same window; unbounded (today's behavior, byte-
+  // identical) at or above the breakpoint.
+  var NARROW_TRAIL_WINDOW = 50;
+
   // A simple sailboat silhouette (hull + sail), centred on its own origin, in
   // outer-viewBox units — same scale class as the ★'s 6px font-size (P7 /
   // LIN-2067). The exact shape is a reversible rendering choice (Q3 ruling,
@@ -130,6 +141,13 @@
   // below both early returns above, though the `!svg` return already makes
   // that test never reach this line at all; the guard is defense in depth.
   var REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Same guard, same reasoning: mirrors common.js:2135's exact idiom (same
+  // 640px literal, same construction site) rather than introducing a new
+  // breakpoint convention. narrowMq itself is only a source for `.matches`
+  // (read fresh every paint() call) and the change listener wired near the
+  // bottom of this file — it is never treated as reveal state.
+  var narrowMq = window.matchMedia && window.matchMedia('(max-width: 640px)');
 
   // x/y are derived server-side (lib/ship-journey.js's derivePositions) —
   // read directly rather than re-deriving placement client-side.
@@ -287,7 +305,15 @@
 
   function paint(pos) {
     var revealIndex = Math.max(0, Math.min(waypoints.length - 1, Math.floor(pos)));
-    var revealed = points.slice(0, revealIndex + 1);
+    // Narrow-viewport trail window (LIN-2959): derived fresh from
+    // revealIndex on every paint — never a second reveal counter or
+    // independent window index. Unconditionally 0 (a no-op) whenever
+    // narrowMq doesn't match, so every desktop viewport keeps exactly
+    // today's unbounded behavior.
+    var windowFloor = (narrowMq && narrowMq.matches)
+      ? Math.max(0, revealIndex - NARROW_TRAIL_WINDOW + 1)
+      : 0;
+    var revealed = points.slice(windowFloor, revealIndex + 1);
     var frac = pos - Math.floor(pos);
 
     // Focus-preserving reassignment on cull (P8 / LIN-2068): determine which
@@ -358,11 +384,15 @@
     g.setAttribute('transform', 'translate(' + translateX + ',' + translateY + ') scale(' + zoom + ')');
 
     // Waypoint dots — keyed by array index, in place, never rebuilt. Cull
-    // anything beyond the revealed prefix first (a seek can move backward).
+    // anything beyond the revealed prefix (a seek can move backward) AND
+    // anything below windowFloor (LIN-2959) — the create loop below is
+    // windowed to match, so a hidden off-window dot never stays in the DOM,
+    // focusable and wired into the label-reveal delegation, once windowFloor
+    // has advanced past it.
     for (var key of Array.from(dotNodes.keys())) {
-      if (key > revealIndex) { dotNodes.get(key).remove(); dotNodes.delete(key); }
+      if (key > revealIndex || key < windowFloor) { dotNodes.get(key).remove(); dotNodes.delete(key); }
     }
-    for (var idx = 0; idx <= revealIndex; idx++) {
+    for (var idx = windowFloor; idx <= revealIndex; idx++) {
       var p = points[idx];
       var circle = dotNodes.get(idx);
       if (!circle) {
@@ -406,9 +436,9 @@
     // on which indices exist. Positioned via the same translate+zoom
     // transform as the ★/ship (outer-viewBox units, constant on-screen size).
     for (var labelKey of Array.from(labelNodes.keys())) {
-      if (labelKey > revealIndex) { labelNodes.get(labelKey).remove(); labelNodes.delete(labelKey); }
+      if (labelKey > revealIndex || labelKey < windowFloor) { labelNodes.get(labelKey).remove(); labelNodes.delete(labelKey); }
     }
-    for (var lidx = 0; lidx <= revealIndex; lidx++) {
+    for (var lidx = windowFloor; lidx <= revealIndex; lidx++) {
       var lp = points[lidx];
       var lbl = labelNodes.get(lidx);
       if (!lbl) {
@@ -432,8 +462,14 @@
     // user did not directly request (they clicked a different control), so
     // an unrequested page scroll on top of a culled node would be more
     // disorienting than the focus loss it fixes.
-    if (prevFocusedIdx !== null && prevFocusedIdx > revealIndex) {
-      var leading = dotNodes.get(revealIndex);
+    // Symmetric across both cull edges (LIN-2964): the narrow-viewport
+    // windowFloor can now cull a focused dot from below, not just from above,
+    // so clamp prevFocusedIdx into [windowFloor, revealIndex] rather than
+    // reassigning only against revealIndex. A no-op above the breakpoint
+    // (windowFloor === 0 keeps leadingIdx === revealIndex exactly as before).
+    if (prevFocusedIdx !== null && (prevFocusedIdx > revealIndex || prevFocusedIdx < windowFloor)) {
+      var leadingIdx = Math.max(windowFloor, Math.min(revealIndex, prevFocusedIdx));
+      var leading = dotNodes.get(leadingIdx);
       if (leading) leading.focus({ preventScroll: true });
     }
 
@@ -443,9 +479,14 @@
     // never rebuilt once it stops changing. The trailing (still-open) segment
     // additionally tracks the ship's own tween point, so the trail's tip
     // visibly leads into the ship rather than stopping dead at the last dot.
+    // segStart floors at windowFloor (LIN-2959), not always 0: the window
+    // floor index itself opens a segment the same way index 0 does today,
+    // even when it doesn't land on a breakBefore boundary — points[] (unlike
+    // dotNodes) is never windowed, so the anchor point at windowFloor always
+    // exists to draw from.
     var wantedSegs = new Set();
-    var segStart = 0;
-    for (var i2 = 1; i2 <= revealIndex + 1; i2++) {
+    var segStart = windowFloor;
+    for (var i2 = windowFloor + 1; i2 <= revealIndex + 1; i2++) {
       if (i2 === revealIndex + 1 || breakBefore[i2]) {
         var segPoints = points.slice(segStart, i2);
         if (i2 === revealIndex + 1 && canTween) segPoints = segPoints.concat([shipPoint]);
@@ -477,11 +518,15 @@
     // viewBox — positioned via the SAME translate+zoom transform as the ship
     // glyph below, anchored to its own junction point rather than the origin.
     // Culled (not hidden) once a seek un-reveals its star change, same
-    // discipline as dotNodes/segNodes.
+    // discipline as dotNodes/segNodes. AND anything below windowFloor
+    // (LIN-2964, same shape as the dot/label culls above): a break's
+    // junction can fold back inside the current window's fit box once its
+    // own trail segment and dots no longer exist, so the star must be
+    // windowed identically or it paints a marker with nothing under it.
     for (var starKey of Array.from(starNodes.keys())) {
-      if (starKey > revealIndex) { starNodes.get(starKey).remove(); starNodes.delete(starKey); }
+      if (starKey > revealIndex || starKey < windowFloor) { starNodes.get(starKey).remove(); starNodes.delete(starKey); }
     }
-    for (var bi = 1; bi <= revealIndex; bi++) {
+    for (var bi = Math.max(1, windowFloor); bi <= revealIndex; bi++) {
       if (!breakBefore[bi]) continue;
       var star = starNodes.get(bi);
       if (!star) {
@@ -619,6 +664,12 @@
   });
   svg.addEventListener('pointerover', function (e) { toggleLabel(e.target, true); });
   svg.addEventListener('pointerout', function (e) { toggleLabel(e.target, false); });
+
+  // Repaint immediately on a narrow-viewport crossing (resize / orientation
+  // change) rather than waiting for the next scrub/step/play tick to notice
+  // windowFloor has moved (LIN-2959). Exact idiom match to common.js:2239's
+  // mobileMq.addEventListener('change', ...).
+  if (narrowMq) narrowMq.addEventListener('change', function () { paint(position); });
 
   ensureStructure();
   paint(position);
