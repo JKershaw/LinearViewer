@@ -214,3 +214,36 @@ test('loads its own scoped assets in the correct script order (common.js before 
   const journeyJsIdx = html.indexOf('/ship-journey.js');
   assert.ok(commonIdx > 0 && journeyJsIdx > commonIdx, 'common.js must load before ship-journey.js');
 });
+
+// LIN-2066 close-out ledger item 3 (deferred to P8/LIN-2068, since until a
+// renderer consumed them these fields sat unread): title/topic/reason/source
+// are embedded in __SHIP_JOURNEY_DATA__.waypoints, not just carried in the
+// server-side journey object — the client-side identity/provenance render
+// (public/ship-journey.js) has nothing to read off without this wiring.
+test('embeds title, topic, reason, and source provenance on each waypoint in __SHIP_JOURNEY_DATA__', () => {
+  const journey = twoWaypointJourney({
+    waypoints: [
+      {
+        identifier: 'LIN-1', bearing: 'N', angle: 270, completedAt: '2026-01-01T00:00:00Z',
+        title: 'First waypoint', topic: 'Journey Project', reason: 'scored highly against the north star',
+        source: { id: 'report-1', generatedAt: '2026-01-01T00:00:00Z' },
+      },
+      {
+        identifier: 'LIN-2', bearing: 'S', angle: 90, completedAt: '2026-01-02T00:00:00Z',
+        title: 'Second waypoint', topic: null, reason: null,
+        source: { id: 'report-2', generatedAt: '2026-01-02T00:00:00Z' },
+      },
+    ],
+  });
+  const html = renderShipJourneyPage(journey, baseOptions());
+  assert.match(html, /"title":"First waypoint"/);
+  assert.match(html, /"topic":"Journey Project"/);
+  assert.match(html, /"reason":"scored highly against the north star"/);
+  assert.match(html, /"source":\{"id":"report-1","generatedAt":"2026-01-01T00:00:00Z"\}/);
+  // The second waypoint's null topic/reason ride through as JSON null, not
+  // omitted or invented — matching deriveWaypoints' own null-normalization
+  // contract (lib/ship-journey.js).
+  assert.match(html, /"identifier":"LIN-2"[^}]*"topic":null/);
+  assert.match(html, /"reason":null/);
+  assert.match(html, /"source":\{"id":"report-2","generatedAt":"2026-01-02T00:00:00Z"\}/);
+});

@@ -111,6 +111,44 @@
 }
 
 /*
+ * Run provenance (LIN-2068 / P8): a small 4-token cycle keyed by each source
+ * run's first-appearance rank (public/ship-journey.js's `runRank`), never a
+ * path segmentation — provenance interleaves across waypoints. Rank 0 repeats
+ * .sj-waypoint's own unconditional fill above so a single-source-run journey
+ * (today's common case) renders unchanged. None of these four tokens already
+ * carries product-wide status meaning (unlike --green/--red/--amber/--yellow),
+ * so a recoloured dot never reads as a measurement/status signal.
+ */
+.sj-waypoint[data-source-rank="0"] { fill: var(--brand); }
+.sj-waypoint[data-source-rank="1"] { fill: var(--slate); }
+.sj-waypoint[data-source-rank="2"] { fill: var(--purple); }
+.sj-waypoint[data-source-rank="3"] { fill: var(--blue); }
+
+/*
+ * Waypoint accessible-name label (LIN-2068 / P8): reveal-on-focus/hover, not
+ * permanently painted — legible at production scale (~121 waypoints) is not
+ * achievable with every label always on. `pointer-events: none` keeps the
+ * label from stealing hover from the dot underneath it, which is the thing
+ * that actually drives the reveal. Rendered outside the zoomed <g> (see
+ * paint()), so font-size is in outer-viewBox units and stays a constant size
+ * on screen at any fit zoom, same rationale as .sj-star-marker.
+ */
+.sj-waypoint-label {
+  font-family: var(--font-content);
+  font-size: 6px;
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: var(--card);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  text-anchor: middle;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) ease;
+}
+.sj-waypoint-label[data-revealed="true"] { opacity: 1; }
+
+/*
  * Rendered outside the zoomed <g> (see paint()), so this font-size is in
  * outer-viewBox units and the glyph stays a constant size on screen whatever
  * the fit zoom. Centred on its own junction point (LIN-2956) rather than
