@@ -313,6 +313,10 @@ describe('deriveJourney', () => {
     const result = deriveJourney({ reports, issues });
 
     assert.strictEqual(result.waypoints.length, 1);
+    assert.strictEqual(result.waypoints[0].title, issues[0].title,
+      'title must retain the issue title');
+    assert.strictEqual(result.waypoints[0].topic, 'Project Alpha',
+      'topic must retain the populated project name');
     assert.strictEqual(result.waypoints[0].reason, 'newer reason',
       'reason must come from the same (newest) reading that supplied the bearing, not the older one');
     assert.deepStrictEqual(result.waypoints[0].source, { id: 'run-newer', generatedAt: '2026-01-02T00:00:00Z' },
