@@ -291,9 +291,13 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     const urlKey = localWorkerUrlKey;
     const WAYPOINT_COUNT = 35;
 
-    // One waypoint under the first north star, then a change, then a long
-    // single-bearing run away from the berth.
-    const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, (i) => (i === 0 ? 'N' : 'S'));
+    // Every waypoint bears S, so the whole walk runs outbound from the berth:
+    // the revealed box is y ∈ [1, 34] and the origin the ★ anchors to is
+    // genuinely OUTSIDE it. Aim matters here — an `N` first waypoint would sit
+    // at y = -1 (BEARING_TO_ANGLE puts N at 270°), straddling the origin and
+    // making the fit's origin-union a no-op, so the case could not exercise
+    // what it exists for.
+    const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'S');
     await seedLocal(seed, { features: { shipJourney: true } });
     await seedReports(page, urlKey, [
       { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(0, 1) },
@@ -313,15 +317,26 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       const el = document.querySelector('[data-testid="ship-journey-star-marker"]');
       if (!el) return null;
       const r = el.getBoundingClientRect();
+      const wps = Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]'))
+        .map((w) => w.getBoundingClientRect());
+      const starCentreY = (r.top + r.bottom) / 2;
       return {
         overflowLeft: svgRect.left - r.left,
         overflowRight: r.right - svgRect.right,
         overflowTop: svgRect.top - r.top,
         overflowBottom: r.bottom - svgRect.bottom,
+        // Is the ★'s anchor (the origin) actually outside the waypoints' own
+        // box? If it isn't, this fixture is not exercising what it claims to.
+        originOutsideRevealedBox: starCentreY < Math.min(...wps.map((w) => (w.top + w.bottom) / 2)) - 0.5
+          || starCentreY > Math.max(...wps.map((w) => (w.top + w.bottom) / 2)) + 0.5,
       };
     });
 
     expect(star).not.toBeNull();
+    // Pin the fixture's AIM, not just its outcome: a future edit that lets the
+    // walk straddle the origin would otherwise leave this test green while
+    // silently no longer covering the outbound-walk case.
+    expect(star.originOutsideRevealedBox).toBe(true);
     expect(star.overflowLeft).toBeLessThanOrEqual(0.5);
     expect(star.overflowRight).toBeLessThanOrEqual(0.5);
     expect(star.overflowTop).toBeLessThanOrEqual(0.5);
@@ -332,20 +347,35 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
   // per-segment ★ glyphs render at identical coordinates — a starburst, not
   // crowding, which no glyph size can separate. They collapse to one counted
   // marker instead.
-  test('multiple north-star changes collapse to a single counted star marker', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  //
+  // A double-digit count is deliberate: collapsing widens the marker past a
+  // single glyph, and the counter's width — not the origin — is what the
+  // 10-unit fit pad actually has to absorb, so the containment assertion here
+  // is the guard on that (LIN-2089 review, F2).
+  test('multiple north-star changes collapse to one counted star marker that stays contained', async ({ page, seedLocal, localWorkerUrlKey }) => {
     const urlKey = localWorkerUrlKey;
-    const WAYPOINT_COUNT = 12;
+    const CHANGES = 13;
+    const PER_SEGMENT = 2;
+    const WAYPOINT_COUNT = (CHANGES + 1) * PER_SEGMENT;
 
     const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'E');
     await seedLocal(seed, { features: { shipJourney: true } });
-    // Three changes (A→B, B→C, C→D), each landing between two consecutive
-    // waypoints' completedAt.
-    await seedReports(page, urlKey, [
-      { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(0, 3) },
-      { generatedAt: '2026-01-03T12:00:00Z', northStar: 'Ship B', orientation: orientation.slice(3, 6) },
-      { generatedAt: '2026-01-06T12:00:00Z', northStar: 'Ship C', orientation: orientation.slice(6, 9) },
-      { generatedAt: '2026-01-09T12:00:00Z', northStar: 'Ship D', orientation: orientation.slice(9) },
-    ]);
+    // One report per north star, each generatedAt landing mid-way between two
+    // consecutive waypoints' completedAt so every change falls on a break.
+    const reports = [];
+    for (let s = 0; s <= CHANGES; s++) {
+      const first = s * PER_SEGMENT;
+      const day = String((first % 27) + 1).padStart(2, '0');
+      const month = String(Math.floor(first / 27) + 1).padStart(2, '0');
+      reports.push({
+        // The first report predates every waypoint; each later one lands 12h
+        // before the first waypoint of its own segment.
+        generatedAt: s === 0 ? '2026-01-01T00:00:00Z' : `2026-${month}-${day}T00:00:00Z`,
+        northStar: `Ship ${String.fromCharCode(65 + s)}`,
+        orientation: orientation.slice(first, first + PER_SEGMENT),
+      });
+    }
+    await seedReports(page, urlKey, reports);
     await page.request.get('/test/clear-workspace-issues-memo');
 
     await page.goto(`/workspace/${urlKey}/ship-journey`);
@@ -354,7 +384,24 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
 
     const marker = page.locator('[data-testid="ship-journey-star-marker"]');
     await expect(marker).toHaveCount(1);
-    await expect(marker).toContainText('×3');
+    await expect(marker).toContainText(`×${CHANGES}`);
+
+    const fit = await page.evaluate(() => {
+      const svg = document.getElementById('ship-journey-map');
+      const svgRect = svg.getBoundingClientRect();
+      const r = document.querySelector('[data-testid="ship-journey-star-marker"]').getBoundingClientRect();
+      return {
+        // The marker's width in viewBox units — the figure the fit's 10-unit
+        // pad has to absorb, and the one the code comment records.
+        widthInViewBoxUnits: (r.width / svgRect.width) * 200,
+        contained: r.left >= svgRect.left - 0.5 && r.right <= svgRect.right + 0.5
+          && r.top >= svgRect.top - 0.5 && r.bottom <= svgRect.bottom + 0.5,
+      };
+    });
+
+    expect(fit.contained).toBe(true);
+    // Half-reach must stay inside computeFitZoom's pad: 10.
+    expect(fit.widthInViewBoxUnits / 2).toBeLessThan(10);
   });
 
   test('redirects to settings when the flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {

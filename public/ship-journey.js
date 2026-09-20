@@ -125,11 +125,11 @@
       if (breakBefore[b]) starCount++;
     }
 
-    // The origin is the ★'s anchor but is never itself a plotted waypoint, so
-    // it has to be unioned into the fitted box explicitly — otherwise a long
-    // single-direction walk fits a box the origin sits outside, and the ★
-    // renders beyond the viewBox edge (the live clip LIN-2089 measured at
-    // 34.8px outside the SVG's own client rect).
+    // The ★ anchors at the origin, which is never itself a plotted waypoint, so
+    // a walk heading away from the berth fits a box the origin falls outside.
+    // Union it in so the fit is honest about everything it has to contain.
+    // Defensive, not load-bearing — see the containment note at the ★ below for
+    // the measurement that says so.
     var fitted = starCount > 0 ? revealed.concat([{ x: 0, y: 0 }]) : revealed;
     var box = boundingBox(fitted);
     var contentWidth = Math.max(1, box.maxX - box.minX + 2 * DOT_REACH);
@@ -203,11 +203,26 @@
       // those units. Do not "tidy" it back into `g` — a counter-scale on a
       // zoomed child would need a transform-origin correction to match.
       // Its screen position is zoom*(0,0) + translate, which reduces to the
-      // translate itself. Containment rides on computeFitZoom's pad: 10 above,
-      // which reserves a 10-unit margin between the fitted box and the ±100
-      // viewBox edge — comfortably more than this glyph's own ~3.6-unit reach,
-      // GIVEN the origin was unioned into that box. Both halves are load-
-      // bearing; changing either reopens the clip.
+      // translate itself.
+      //
+      // Containment, measured rather than estimated (LIN-2089 review). The
+      // margin is computeFitZoom's pad: 10 above — 10 viewBox units between
+      // the fitted box and the ±100 edge. Against that:
+      //   - This marker is '★×N', NOT one glyph: '★×13' measures ~14.4-14.8
+      //     viewBox units (14.42 and 14.79 on two machines — it is font-metric
+      //     dependent), so a ~7.4-unit half-reach. A 5-glyph count (>=100 star
+      //     changes) would reach ~9 units. Still inside pad, but the headroom
+      //     is ~26%, not the "comfortable" margin a single glyph would have.
+      //     Pinned by the ★-collapse e2e case, which asserts this width.
+      //   - The origin's own excursion is bounded: every segment's first
+      //     waypoint is exactly one unit from it, so the origin can never be
+      //     more than 1 CONTENT unit outside the revealed box — at most
+      //     maxZoom * 1 = 4 viewBox units. That is why the union above is
+      //     defensive redundancy and no test pins it: with the union deleted
+      //     the ★ still clears the edge by ~77px on a 34-step outbound walk.
+      // So the binding constraint here is the counter's width, not the origin.
+      // Shrinking pad, or letting this marker grow (a longer prefix, a bigger
+      // font-size), is what would reopen the clip.
       var flag = document.createElementNS(SVG_NS, 'text');
       flag.setAttribute('x', String(translateX));
       flag.setAttribute('y', String(translateY));
