@@ -624,5 +624,40 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       expect(after.shipPos.x).toBeCloseTo(snapped.shipPos.x, 3);
       expect(after.shipPos.y).toBeCloseTo(snapped.shipPos.y, 3);
     });
+
+    // S8 (review F1/F3): the trail must always paint BELOW the waypoint
+    // dots, in document order, so a dot's halo visibly cuts the trail where
+    // it passes underneath (LIN-2089's "beads on a thread" invariant, stated
+    // in public/ship-journey.css). This checks the occlusion outcome
+    // directly via document order (SVG has no z-index — later-painted wins),
+    // not merely a node count, and re-checks after a step-back/step-forward
+    // cycle, which is exactly when creation-order-dependent layering used to
+    // flip (review F1: circles appended before segments; non-deterministic
+    // across a session).
+    test('trail segments always paint below waypoint dots, at initial paint and after a step-back/step-forward cycle', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      await loadJourney(page, seedLocal, localWorkerUrlKey, 4);
+
+      async function trailPaintsBelowDots() {
+        return page.evaluate(() => {
+          const segs = Array.from(document.querySelectorAll('.sj-trail-segment'));
+          const dots = Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]'));
+          if (!segs.length || !dots.length) return false;
+          // A segment paints below a dot iff the segment comes EARLIER in
+          // document order (SVG paints later nodes on top; there is no
+          // z-index). DOCUMENT_POSITION_FOLLOWING on (seg, dot) means dot
+          // follows seg, i.e. dot paints on top of seg.
+          return segs.every((seg) => dots.every((dot) => Boolean(
+            seg.compareDocumentPosition(dot) & Node.DOCUMENT_POSITION_FOLLOWING
+          )));
+        });
+      }
+
+      expect(await trailPaintsBelowDots()).toBe(true);
+
+      await page.locator('[data-testid="ship-journey-step-back"]').click();
+      await page.locator('[data-testid="ship-journey-step-forward"]').click();
+
+      expect(await trailPaintsBelowDots()).toBe(true);
+    });
   });
 });

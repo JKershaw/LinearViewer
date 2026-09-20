@@ -145,7 +145,25 @@
   // `node.remove()`d, never hidden. `starNode`/`shipNode` are lazily-created
   // singletons, siblings of `g`, outside the zoomed group (like the ★) so
   // they stay a constant size on screen at any fit zoom.
+  //
+  // Paint order inside SVG is document order — there is no z-index. Review
+  // (LIN-2067 F1/F2) found the original code left that order to node
+  // *creation* order (segments/dots appended to `g` as they happened to be
+  // created; star/ship appended to `svg` as they happened to be created),
+  // which (a) let the trail paint over the waypoint halos, breaking the
+  // LIN-2089 "beads on a thread" cut, and (b) let the ★/ship sibling order
+  // flip after a seek re-created the star node. `trailLayer`/`dotLayer` and
+  // `starLayer`/`shipLayer` are persistent, empty layer groups created once
+  // in ensureStructure() in the declared paint order (trail below dots;
+  // star below ship) — every segment/dot/star/ship node is appended into
+  // its own layer, never directly into `g`/`svg`, so recreation after a cull
+  // can never change which layer (and therefore which paint order) it lands
+  // in.
   var g = null;
+  var trailLayer = null;
+  var dotLayer = null;
+  var starLayer = null;
+  var shipLayer = null;
   var dotNodes = new Map();
   var segNodes = new Map();
   var starNode = null;
@@ -167,6 +185,22 @@
     g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('data-testid', 'ship-journey-trail');
     svg.appendChild(g);
+
+    // Declared paint order, established once: trail below dots inside `g`
+    // (both live inside the zoomed group); star below ship as siblings of
+    // `g` in the outer viewBox. Appending trailLayer/dotLayer/starLayer/
+    // shipLayer in this order fixes the layering for the lifetime of the
+    // page — content nodes are always appended into their own layer, so no
+    // later creation/removal can move them relative to another layer.
+    trailLayer = document.createElementNS(SVG_NS, 'g');
+    dotLayer = document.createElementNS(SVG_NS, 'g');
+    g.appendChild(trailLayer);
+    g.appendChild(dotLayer);
+
+    starLayer = document.createElementNS(SVG_NS, 'g');
+    shipLayer = document.createElementNS(SVG_NS, 'g');
+    svg.appendChild(starLayer);
+    svg.appendChild(shipLayer);
   }
 
   function paint(pos) {
@@ -247,7 +281,7 @@
         circle.setAttribute('data-testid', 'ship-journey-waypoint');
         circle.setAttribute('data-identifier', wp.identifier);
         circle.setAttribute('data-bearing', wp.bearing);
-        g.appendChild(circle);
+        dotLayer.appendChild(circle);
         dotNodes.set(idx, circle);
       }
       circle.setAttribute('cx', String(p.x));
@@ -273,7 +307,7 @@
           if (!path) {
             path = document.createElementNS(SVG_NS, 'path');
             path.setAttribute('class', 'sj-trail-segment');
-            g.appendChild(path);
+            trailLayer.appendChild(path);
             segNodes.set(segStart, path);
           }
           path.setAttribute('d', d);
@@ -295,7 +329,7 @@
         starNode = document.createElementNS(SVG_NS, 'text');
         starNode.setAttribute('class', 'sj-star-marker');
         starNode.setAttribute('data-testid', 'ship-journey-star-marker');
-        svg.appendChild(starNode);
+        starLayer.appendChild(starNode);
       }
       starNode.textContent = starCount === 1 ? '★' : '★×' + starCount;
       starNode.setAttribute('x', String(translateX));
@@ -313,7 +347,7 @@
       shipNode.setAttribute('class', 'sj-ship-marker');
       shipNode.setAttribute('data-testid', 'ship-journey-ship');
       shipNode.setAttribute('d', SHIP_GLYPH_PATH);
-      svg.appendChild(shipNode);
+      shipLayer.appendChild(shipNode);
     }
     var shipScreenX = translateX + zoom * shipPoint.x;
     var shipScreenY = translateY + zoom * shipPoint.y;
