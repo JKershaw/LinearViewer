@@ -1195,6 +1195,16 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     // Two breaks: one below windowFloor once fully revealed (must be culled)
     // and one inside it (must still render, at its junction, contained) — so
     // the assertion proves alignment, not just an incidental zero count.
+    //
+    // The cull half only exercises anything if the star it culls was actually
+    // created first (review of LIN-2964/PR #1527, mutation M3): loading
+    // straight into the fully-revealed position puts windowFloor at 71 on
+    // the very first paint, so the index-1 star is never created and
+    // `starKey < windowFloor` never fires on a live node — reverting it left
+    // the suite green. Scrubbing back below the break first (windowFloor 0,
+    // create floor `max(1, windowFloor)` = 1) creates it in-window, then
+    // scrubbing forward past windowFloor forces the cull loop to actually
+    // remove a star that exists.
     test('windows ★ star markers with the same floor as dots: an off-window junction is culled, an in-window one stays contained', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const urlKey = localWorkerUrlKey;
       const WAYPOINT_COUNT = 121;
@@ -1213,6 +1223,27 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
 
       await page.goto(`/workspace/${urlKey}/ship-journey`);
       await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(NARROW_TRAIL_WINDOW);
+
+      // Scrub back to revealIndex 10: windowFloor = max(0, 10 - 50 + 1) = 0,
+      // so the index-1 break is in-window and the create loop actually
+      // builds its star. Break 90 hasn't been revealed yet, so a count of 1
+      // here is specifically the early star, created while in-window.
+      await page.evaluate(() => {
+        const scrub = document.getElementById('ship-journey-scrub');
+        scrub.value = '10';
+        scrub.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await expect(page.locator('[data-testid="ship-journey-star-marker"]')).toHaveCount(1);
+
+      // Now scrub forward to fully revealed: windowFloor advances to 71,
+      // past the index-1 star, which must be culled; the index-90 star
+      // enters the window and must be (re)created.
+      await page.evaluate((maxIdx) => {
+        const scrub = document.getElementById('ship-journey-scrub');
+        scrub.value = String(maxIdx);
+        scrub.dispatchEvent(new Event('input', { bubbles: true }));
+      }, WAYPOINT_COUNT - 1);
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(NARROW_TRAIL_WINDOW);
 
       // Exactly one star exists: the in-window junction at index 90. If the
