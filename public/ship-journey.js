@@ -1,5 +1,5 @@
 /**
- * Ship Journey client (experimental, LIN-1675 P3/P5/P7).
+ * Ship Journey client (experimental, LIN-1675 P3/P5/P7/P8).
  *
  * Plays back `window.__SHIP_JOURNEY_DATA__.waypoints` (ascending by
  * completedAt, already filtered server-side to placeable waypoints) as a
@@ -44,6 +44,19 @@
  * `prefers-reduced-motion` keeps the original per-waypoint step cadence, but
  * through this same reconcile (never a rebuild) so any future focusable
  * per-waypoint node survives every step.
+ *
+ * P8 (LIN-2068) adds waypoint identity + run provenance inside this same
+ * keyed reconcile: each waypoint `<circle>` becomes the repo's first
+ * focusable/labelled SVG node (`tabindex`, `role="img"`, an `aria-label` +
+ * nested `<title>` built from its already-embedded `identifier`/`title`/
+ * `topic`/`reason`/`source`), a reveal-on-focus/hover text label lives in its
+ * own declared layer keyed by the same index, and the dot's fill colour
+ * carries run provenance via `data-source-rank` — a small 4-token ramp keyed
+ * by each source run's first-appearance order, never a path segmentation
+ * (runs interleave). All of it is set once at create time; `paint()` still
+ * only mutates position-related attributes on repaint, and a focused
+ * waypoint culled by backward scrub or replay-to-start has its focus
+ * reassigned to the new leading waypoint rather than losing it to `<body>`.
  *
  * No-op when the map mount is absent (the server renders the honest thin-data
  * empty state instead of the map for a below-threshold journey).
@@ -168,10 +181,68 @@
   var dotLayer = null;
   var starLayer = null;
   var shipLayer = null;
+  var labelLayer = null;
   var dotNodes = new Map();
   var segNodes = new Map();
   var starNodes = new Map();
+  var labelNodes = new Map();
   var shipNode = null;
+
+  // The idx of a waypoint that just blurred straight into one of the three
+  // playback buttons (P8 / LIN-2068, narrowed LIN-2962), consumed exactly
+  // once by the next paint() call. A playback control is a <button>: the
+  // browser's mousedown default action moves focus to it (firing the
+  // circle's own blur/focusout) BEFORE the button's `click` listener runs —
+  // so by the time that listener calls paint(), document.activeElement is
+  // already the button, not the waypoint that was focused a moment ago. The
+  // delegated focusout handler below observes the blur synchronously, in the
+  // same task, before paint() runs, so this is read (and reset) at the top
+  // of paint() instead of trusting document.activeElement alone.
+  //
+  // Narrowed via e.relatedTarget to arm ONLY for that one button-steal case
+  // (LIN-2962 F2): the original shipped version recorded every waypoint
+  // blur, wherever focus was going, cleared only by the next paint() — so a
+  // legitimate blur to the scrub control (or anywhere else) left this idx
+  // armed, and any later paint() with a lower revealIndex yanked focus back
+  // into the map out from under the control the user had actually moved to
+  // (breaking keyboard scrubbing). The read side in paint() is unchanged;
+  // only this write is now conditional on relatedTarget being one of
+  // playBtn/stepBackBtn/stepForwardBtn.
+  var lastBlurredWaypointIdx = null;
+
+  // Waypoint identity/provenance (P8 / LIN-2068). `runRank` is a plain
+  // ordinal lookup off already-embedded `waypoints[idx].source.id` — a run's
+  // first-appearance rank among distinct source ids, computed once here (same
+  // "underlying data never changes during playback" placement as
+  // breakBefore above), never mutated after this one pass, and never a second
+  // copy of run metadata. RUN_COLOR_COUNT bounds the provenance colour ramp
+  // to the 4 semantic tokens that carry no status meaning elsewhere
+  // (public/ship-journey.css).
+  var runRank = {};
+  var runRankCount = 0;
+  for (var ri = 0; ri < waypoints.length; ri++) {
+    var sid = waypoints[ri].source && waypoints[ri].source.id;
+    if (sid != null && !(sid in runRank)) { runRank[sid] = runRankCount++; }
+  }
+  var RUN_COLOR_COUNT = 4;
+
+  // Builds the waypoint's accessible name (SVG <title> hover text AND
+  // aria-label) from fields already embedded on the client — tolerant of the
+  // nulls deriveWaypoints's contract allows (no project, no persisted reason).
+  function buildAccessibleLabel(wp) {
+    var parts = [wp.identifier];
+    if (wp.title) parts.push(wp.title);
+    var head = parts.join(' — ');
+    if (wp.topic) head += ' (' + wp.topic + ')';
+    var sentence = head + '.';
+    if (wp.reason) sentence += ' ' + wp.reason;
+    if (wp.source && wp.source.id) {
+      sentence += ' From run ' + wp.source.id;
+      if (wp.source.generatedAt) sentence += ' (' + wp.source.generatedAt + ')';
+      sentence += '.';
+    }
+    return sentence;
+  }
 
   // `currentIndex` is the single source of reveal truth (gates scrub.value,
   // clamping, bounds). `position` is transient float tween state — reset to
@@ -205,12 +276,39 @@
     shipLayer = document.createElementNS(SVG_NS, 'g');
     svg.appendChild(starLayer);
     svg.appendChild(shipLayer);
+
+    // Waypoint label layer (P8 / LIN-2068): appended last, so revealed labels
+    // paint on top of everything else. A sibling of `g`, not a child — like
+    // the ★/ship, a revealed label must stay a constant on-screen size at any
+    // fit zoom, positioned via the same translate+zoom transform as those.
+    labelLayer = document.createElementNS(SVG_NS, 'g');
+    svg.appendChild(labelLayer);
   }
 
   function paint(pos) {
     var revealIndex = Math.max(0, Math.min(waypoints.length - 1, Math.floor(pos)));
     var revealed = points.slice(0, revealIndex + 1);
     var frac = pos - Math.floor(pos);
+
+    // Focus-preserving reassignment on cull (P8 / LIN-2068): determine which
+    // waypoint (if any) was focused just before this paint(), so the dot-cull
+    // loop below never silently drops focus to <body>. document.activeElement
+    // is checked first (covers a hypothetical direct paint() with no
+    // intervening blur), falling back to lastBlurredWaypointIdx — the actual
+    // case for both residual paths the research found (step-back/backward
+    // scrub and play()'s replay-to-start applyPosition(0) wipe): both are
+    // triggered by clicking a <button>, whose mousedown default action moves
+    // focus to the button (blurring the circle) before its `click` listener
+    // (and therefore this paint() call) ever runs. One-shot: reset
+    // immediately so a later, unrelated paint() never reuses a stale blur.
+    var prevFocusedIdx = null;
+    var activeEl = document.activeElement;
+    if (activeEl && activeEl.getAttribute && activeEl.getAttribute('data-testid') === 'ship-journey-waypoint') {
+      prevFocusedIdx = parseInt(activeEl.getAttribute('data-idx'), 10);
+    } else if (lastBlurredWaypointIdx !== null) {
+      prevFocusedIdx = lastBlurredWaypointIdx;
+    }
+    lastBlurredWaypointIdx = null;
 
     // Interpolation is suppressed across a breakBefore boundary — the ship
     // snaps to the pre-break waypoint rather than tweening across the gap,
@@ -275,11 +373,68 @@
         circle.setAttribute('data-testid', 'ship-journey-waypoint');
         circle.setAttribute('data-identifier', wp.identifier);
         circle.setAttribute('data-bearing', wp.bearing);
+        // Identity/provenance/accessible-name attributes (P8 / LIN-2068), set
+        // ONCE here at create time — paint()'s per-frame work below this
+        // create-branch only ever mutates cx/cy, so a focused waypoint is
+        // never rebuilt (the LIN-1566 lesson). This is the first client of
+        // the title/topic/reason/source fields P6 (LIN-2066) embedded: at
+        // the reference workspace's 121 waypoints, worst case is already
+        // ≈35-45KB of inline JSON shipped on every page load regardless of
+        // what renders here (LIN-2066 close-out ledger item 4) — this step
+        // adds render cost, not payload.
+        circle.setAttribute('tabindex', '0');
+        circle.setAttribute('role', 'img');
+        circle.setAttribute('data-idx', String(idx));
+        circle.setAttribute('data-source-run', wp.source ? wp.source.id : '');
+        var rank = wp.source && wp.source.id != null ? runRank[wp.source.id] % RUN_COLOR_COUNT : 0;
+        circle.setAttribute('data-source-rank', String(rank));
+        var label = buildAccessibleLabel(wp);
+        circle.setAttribute('aria-label', label);
+        var titleEl = document.createElementNS(SVG_NS, 'title');
+        titleEl.textContent = label;
+        circle.appendChild(titleEl);
         dotLayer.appendChild(circle);
         dotNodes.set(idx, circle);
       }
       circle.setAttribute('cx', String(p.x));
       circle.setAttribute('cy', String(p.y));
+    }
+
+    // Waypoint labels — reveal-on-focus/hover, in their own declared layer
+    // (P8 / LIN-2068). Keyed by the same index and culled in the same
+    // revealIndex pass as the dots above so the two node sets never disagree
+    // on which indices exist. Positioned via the same translate+zoom
+    // transform as the ★/ship (outer-viewBox units, constant on-screen size).
+    for (var labelKey of Array.from(labelNodes.keys())) {
+      if (labelKey > revealIndex) { labelNodes.get(labelKey).remove(); labelNodes.delete(labelKey); }
+    }
+    for (var lidx = 0; lidx <= revealIndex; lidx++) {
+      var lp = points[lidx];
+      var lbl = labelNodes.get(lidx);
+      if (!lbl) {
+        var lwp = waypoints[lidx];
+        lbl = document.createElementNS(SVG_NS, 'text');
+        lbl.setAttribute('class', 'sj-waypoint-label');
+        lbl.setAttribute('data-testid', 'ship-journey-waypoint-label');
+        lbl.setAttribute('data-idx', String(lidx));
+        lbl.setAttribute('data-revealed', 'false');
+        lbl.textContent = lwp.title || lwp.identifier;
+        labelLayer.appendChild(lbl);
+        labelNodes.set(lidx, lbl);
+      }
+      lbl.setAttribute('x', String(translateX + zoom * lp.x));
+      lbl.setAttribute('y', String(translateY + zoom * lp.y));
+    }
+
+    // Reassign focus to the new leading waypoint if the previously-focused
+    // one was just culled, rather than letting it fall to <body> (P8 /
+    // LIN-2068). {preventScroll: true} — this is a programmatic refocus the
+    // user did not directly request (they clicked a different control), so
+    // an unrequested page scroll on top of a culled node would be more
+    // disorienting than the focus loss it fixes.
+    if (prevFocusedIdx !== null && prevFocusedIdx > revealIndex) {
+      var leading = dotNodes.get(revealIndex);
+      if (leading) leading.focus({ preventScroll: true });
     }
 
     // Trail segments — path d's are broken wherever a north-star change falls
@@ -429,6 +584,41 @@
       setIndex(parseInt(scrub.value, 10) || 0);
     });
   }
+
+  // Reveal-on-focus/hover for waypoint labels (P8 / LIN-2068), delegated on
+  // the persistent `svg` rather than per-node — the house pattern (LIN-1566 /
+  // next-run.js's delegated direction-chip listener) so the binding survives
+  // every repaint regardless of which dot nodes get culled/recreated.
+  // focusin/focusout/pointerover/pointerout all bubble (unlike
+  // focus/blur/pointerenter/pointerleave), which delegation requires.
+  function toggleLabel(target, revealed) {
+    var circle = target.closest && target.closest('[data-testid="ship-journey-waypoint"]');
+    if (!circle) return;
+    var idx = parseInt(circle.getAttribute('data-idx'), 10);
+    var lbl = labelNodes.get(idx);
+    if (lbl) lbl.setAttribute('data-revealed', revealed ? 'true' : 'false');
+  }
+  svg.addEventListener('focusin', function (e) { toggleLabel(e.target, true); });
+  svg.addEventListener('focusout', function (e) {
+    // toggleLabel is unconditional — label reveal is a separate concern from
+    // the focus-restoration fallback below and must not be coupled to it.
+    toggleLabel(e.target, false);
+    // See lastBlurredWaypointIdx's declaration: this fires synchronously,
+    // still inside the same task as (and before) a playback button's `click`
+    // listener, which is the only way paint() otherwise learns a waypoint
+    // was focused right before a button-triggered cull stole its focus.
+    // e.relatedTarget is the native, platform-supplied "where focus is
+    // going" field for a blur/focusout — restricting the write to it (rather
+    // than recording every waypoint blur) is what keeps this fallback from
+    // arming on a legitimate blur to the scrub control or anywhere else.
+    var circle = e.target.closest && e.target.closest('[data-testid="ship-journey-waypoint"]');
+    if (circle && (e.relatedTarget === playBtn || e.relatedTarget === stepBackBtn || e.relatedTarget === stepForwardBtn)) {
+      var idx = parseInt(circle.getAttribute('data-idx'), 10);
+      if (!isNaN(idx)) lastBlurredWaypointIdx = idx;
+    }
+  });
+  svg.addEventListener('pointerover', function (e) { toggleLabel(e.target, true); });
+  svg.addEventListener('pointerout', function (e) { toggleLabel(e.target, false); });
 
   ensureStructure();
   paint(position);

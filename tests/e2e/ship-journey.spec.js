@@ -497,9 +497,35 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
         dots[1].__probe = 'dot1';
       });
 
-      await page.locator('[data-testid="ship-journey-step-back"]').click();
+      // P8 / LIN-2068: focus dot1 before stepping — it is retained (not
+      // culled) by the step-back/step-forward cycle below, so this is the
+      // direct regression witness that a repaint never rebuilds (and so
+      // never un-focuses) a node that survives it. The cycle is driven
+      // through the scrub input's own `input` event, dispatched
+      // programmatically (not a real pointer interaction), rather than
+      // clicking the step buttons: clicking a <button> moves focus to that
+      // button as part of its own native mousedown handling, before its
+      // `click` listener (and this repaint) ever runs — an unrelated browser
+      // behaviour that would confound this specific assertion. That
+      // button-click focus-steal is exactly what paint()'s
+      // lastBlurredWaypointIdx tracking is FOR (see the separate
+      // backward-cull/replay-wipe reassignment cases below); this case
+      // isolates the other half of the guarantee — an UNCULLED, retained
+      // node's focus is never disturbed by the reconcile itself.
+      await page.locator('[data-testid="ship-journey-waypoint"]').nth(1).focus();
+      await expect(page.locator('[data-testid="ship-journey-waypoint"]').nth(1)).toBeFocused();
+
+      await page.evaluate(() => {
+        const scrub = document.getElementById('ship-journey-scrub');
+        scrub.value = '2';
+        scrub.dispatchEvent(new Event('input', { bubbles: true }));
+      });
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(3);
-      await page.locator('[data-testid="ship-journey-step-forward"]').click();
+      await page.evaluate(() => {
+        const scrub = document.getElementById('ship-journey-scrub');
+        scrub.value = '3';
+        scrub.dispatchEvent(new Event('input', { bubbles: true }));
+      });
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(4);
 
       const survived = await page.evaluate(() => {
@@ -512,12 +538,14 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
           // The 4th dot was removed by the step-back and MUST be a fresh node
           // on step-forward, not a resurrected one — it never got tagged.
           dot3IsFresh: dots[3].__probe === undefined,
+          dot1StillFocused: dots[1] === document.activeElement,
         };
       });
       expect(survived.gSurvived).toBe(true);
       expect(survived.dot0Survived).toBe(true);
       expect(survived.dot1Survived).toBe(true);
       expect(survived.dot3IsFresh).toBe(true);
+      expect(survived.dot1StillFocused).toBe(true);
     });
 
     // S3: standard-motion playback genuinely tweens the ship between
@@ -655,6 +683,323 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       await page.locator('[data-testid="ship-journey-step-forward"]').click();
 
       expect(await trailPaintsBelowDots()).toBe(true);
+    });
+  });
+
+  // ── LIN-2068 (P8): waypoint identity, labels, and run provenance ─────────
+  test.describe('waypoint identity, reveal-on-focus/hover labels, and run provenance (LIN-2068)', () => {
+    // A small fixture giving full control over title/reason text (walkFixture
+    // above hardcodes reason: 'r', too short to usefully assert substring
+    // containment against).
+    function identityFixture(urlKey, entries) {
+      const id = (rawId) => localSeedId(urlKey, rawId);
+      const issues = [];
+      const orientation = [];
+      entries.forEach((e, i) => {
+        const day = String(i + 1).padStart(2, '0');
+        issues.push({
+          id: id(`sj-id-issue-${i + 1}`), identifier: e.identifier, title: e.title, description: '',
+          projectId: id('sj-id-proj-1'), sortOrder: i + 1, state: { name: 'Done', type: 'completed' },
+          completedAt: `2026-01-${day}T00:00:00Z`,
+          url: `/workspace/${urlKey}/issue/${id(`sj-id-issue-${i + 1}`)}`,
+        });
+        orientation.push({ identifier: e.identifier, bearing: e.bearing, reason: e.reason, archived: false });
+      });
+      return {
+        seed: {
+          projects: [{ id: id('sj-id-proj-1'), name: 'Journey Project', content: '', sortOrder: 1 }],
+          issues,
+        },
+        orientation,
+      };
+    }
+
+    // 9a: keyboard reachability + accessible name (role="img", tabindex="0",
+    // aria-label AND a matching SVG <title> child naming identifier/title/
+    // topic/reason).
+    test('a waypoint circle is keyboard-focusable with role="img" and an accessible name naming identifier/title/topic/reason', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = identityFixture(urlKey, [
+        { identifier: 'LOCAL-1', bearing: 'N', reason: 'closes the onboarding gap the north star flagged', title: 'Ship onboarding fix' },
+        { identifier: 'LOCAL-2', bearing: 'S', reason: 'unblocks the next milestone', title: 'Second task' },
+      ]);
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+
+      const circle = page.locator('[data-testid="ship-journey-waypoint"]').first();
+      await expect(circle).toHaveAttribute('tabindex', '0');
+      await expect(circle).toHaveAttribute('role', 'img');
+
+      const ariaLabel = await circle.getAttribute('aria-label');
+      expect(ariaLabel).toContain('LOCAL-1');
+      expect(ariaLabel).toContain('Ship onboarding fix');
+      expect(ariaLabel).toContain('Journey Project');
+      expect(ariaLabel).toContain('closes the onboarding gap the north star flagged');
+
+      // The native pointer-hover tooltip (SVG <title>) carries the same text.
+      const titleText = await circle.locator('title').textContent();
+      expect(titleText).toBe(ariaLabel);
+
+      await circle.focus();
+      await expect(circle).toBeFocused();
+    });
+
+    // 9b: pointer reveal — hovering the dot reveals its paired label (matched
+    // by data-idx, not sibling order); moving away hides it again. The label
+    // itself must never become the hover target (pointer-events: none).
+    test('hovering a waypoint circle reveals its paired label; moving the pointer away hides it again', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = identityFixture(urlKey, [
+        { identifier: 'LOCAL-1', bearing: 'N', reason: 'r', title: 'First' },
+        { identifier: 'LOCAL-2', bearing: 'S', reason: 'r', title: 'Second' },
+      ]);
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+
+      const circle = page.locator('[data-testid="ship-journey-waypoint"]').first();
+      const idx = await circle.getAttribute('data-idx');
+      const label = page.locator(`.sj-waypoint-label[data-idx="${idx}"]`);
+      await expect(label).toHaveAttribute('data-revealed', 'false');
+
+      await circle.hover();
+      await expect(label).toHaveAttribute('data-revealed', 'true');
+
+      // Move the pointer well clear of the map to fire pointerout.
+      await page.mouse.move(5, 5);
+      await expect(label).toHaveAttribute('data-revealed', 'false');
+    });
+
+    // 9d: backward-cull focus reassignment. Stepping back culls the leading
+    // (highest-index) waypoint; if it was focused, focus must move to the new
+    // leading waypoint, never fall to <body>.
+    test('stepping back reassigns focus from a culled leading waypoint to the new leading waypoint, never to <body>', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = walkFixture(urlKey, 4, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      const dots = page.locator('[data-testid="ship-journey-waypoint"]');
+      await expect(dots).toHaveCount(4);
+
+      await dots.nth(3).focus(); // the leading (highest-index) waypoint
+      await expect(dots.nth(3)).toBeFocused();
+
+      await page.locator('[data-testid="ship-journey-step-back"]').click();
+      await expect(dots).toHaveCount(3);
+
+      const focusedIdx = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-idx'));
+      expect(focusedIdx).toBe('2'); // the new leading waypoint
+      const focusedIsBody = await page.evaluate(() => document.activeElement === document.body);
+      expect(focusedIsBody).toBe(false);
+    });
+
+    // 9e: replay-wipe focus reassignment. play()'s replay-from-start branch
+    // (applyPosition(0), fired because the journey loads fully revealed) must
+    // reassign a focused mid-walk waypoint to the new leading waypoint (dot
+    // 0), never <body>. Reduced motion keeps the first tick's cull/reassign
+    // synchronous with the click and the next tick 700ms away, so there is a
+    // stable window to assert in before playback advances further.
+    test('replay-to-start reassigns focus from a mid-walk waypoint to the new leading waypoint (dot 0), never to <body>', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = walkFixture(urlKey, 4, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      const dots = page.locator('[data-testid="ship-journey-waypoint"]');
+      await expect(dots).toHaveCount(4);
+
+      await dots.nth(1).focus();
+      await expect(dots.nth(1)).toBeFocused();
+
+      // Already fully revealed (currentIndex === length-1), so clicking Play
+      // immediately takes the replay-from-start branch and culls to dot 0.
+      await page.locator('[data-testid="ship-journey-play"]').click();
+      await expect(dots).toHaveCount(1);
+
+      const focusedIdx = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-idx'));
+      expect(focusedIdx).toBe('0');
+      const focusedIsBody = await page.evaluate(() => document.activeElement === document.body);
+      expect(focusedIsBody).toBe(false);
+
+      await page.locator('[data-testid="ship-journey-play"]').click(); // stop before the test ends
+    });
+
+    // 9f: provenance attributes. data-source-run must carry the real report
+    // id losslessly (not merely "some non-empty string"); waypoints sourced
+    // from different runs must receive different data-source-rank values.
+    // Attribute-level only — colour legibility is unmeasurable from this
+    // suite (research §5).
+    test('the dot fill channel carries run provenance losslessly via data-source-run/data-source-rank', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = walkFixture(urlKey, 4, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+
+      const resp = await page.request.post(`/test/seed-report-history?urlKey=${urlKey}`, {
+        data: {
+          records: [
+            { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(0, 2) },
+            { generatedAt: '2026-01-05T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(2, 4) },
+          ],
+        },
+      });
+      expect(resp.ok(), `seed-report-history failed: ${await resp.text()}`).toBeTruthy();
+      const { inserted } = await resp.json();
+      expect(inserted).toHaveLength(2);
+      const [firstRunId, secondRunId] = inserted;
+      expect(firstRunId).not.toBe(secondRunId);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      const dots = page.locator('[data-testid="ship-journey-waypoint"]');
+      await expect(dots).toHaveCount(4);
+
+      const attrs = await dots.evaluateAll((els) => els.map((el) => ({
+        run: el.getAttribute('data-source-run'),
+        rank: el.getAttribute('data-source-rank'),
+      })));
+
+      // Waypoints are ordered by completedAt ascending, matching walkFixture's
+      // issue order — dots 0-1 came from the first report, dots 2-3 from the
+      // second.
+      expect(attrs[0].run).toBe(firstRunId);
+      expect(attrs[1].run).toBe(firstRunId);
+      expect(attrs[2].run).toBe(secondRunId);
+      expect(attrs[3].run).toBe(secondRunId);
+      expect(attrs[0].rank).toBe(attrs[1].rank);
+      expect(attrs[2].rank).toBe(attrs[3].rank);
+      expect(attrs[0].rank).not.toBe(attrs[2].rank);
+    });
+
+    // 9g: focus-ring bounded size (LIN-2962 F1). The pre-fix global
+    // outline-based :focus-visible rule resolved `outline`/`outline-offset`
+    // in the waypoint's own local SVG user space, which the zoomed <g>'s
+    // scale(...) transform then scaled again — measured at ~13x the dot's
+    // own rendered size (a ~127px ring around a ~9.5px dot), a solid block
+    // covering most of the map. The fixed local-stroke ring must stay
+    // proportionate to the dot instead: assert a hard, bounded ratio rather
+    // than a screenshot, as a direct, named contrast with that measurement.
+    test('focusing a waypoint enlarges its rendered size by a bounded ratio, not the ~13x oversized global outline', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = walkFixture(urlKey, 4, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+
+      const circle = page.locator('[data-testid="ship-journey-waypoint"]').first();
+      const unfocused = await circle.boundingBox();
+
+      await circle.focus();
+      await expect(circle).toBeFocused();
+      const focused = await circle.boundingBox();
+
+      const ratio = focused.width / unfocused.width;
+      expect(ratio).toBeGreaterThan(1); // a focus indicator is actually present
+      expect(ratio).toBeLessThanOrEqual(2); // and stays proportionate to the dot, nowhere near ~13x
+
+      // The ratio above measures getBoundingClientRect, which CSS `outline`
+      // never contributes to — it cannot see the global :focus-visible
+      // outline rule reappearing, only the local stroke. Assert the
+      // computed outline is actually suppressed too, so this witness covers
+      // the named defect (the reintroduced outline) directly, not just a
+      // proxy it happens to correlate with today.
+      const outlineStyle = await circle.evaluate((el) => getComputedStyle(el).outlineStyle);
+      expect(outlineStyle).toBe('none');
+    });
+
+    // 9h: scrub-focus negative witness (LIN-2962 F2). The pre-fix
+    // `lastBlurredWaypointIdx` fallback armed on EVERY waypoint blur,
+    // wherever focus was actually going, one-shot-cleared only by the next
+    // paint() — so a legitimate blur away from a waypoint left it armed for
+    // whatever paint() ran next. Covers both of the ticket's repro paths:
+    // (1) focusing the scrub control and then scrubbing backward must never
+    // pull focus off the scrub and into the map; (2) focusing a waypoint,
+    // then legitimately blurring to <body> (a non-focusable click target),
+    // then clicking step-back must not steal focus into the map either —
+    // the narrowed relatedTarget allowlist only arms for the three playback
+    // buttons themselves.
+    test('the scrub control keeps focus during backward scrubbing, and a later step-back does not steal focus after a legitimate blur elsewhere', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = walkFixture(urlKey, 4, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      const dots = page.locator('[data-testid="ship-journey-waypoint"]');
+      const scrubInput = page.locator('[data-testid="ship-journey-scrub"]');
+      await expect(dots).toHaveCount(4);
+
+      // Repro path 1: focus a waypoint, then focus the scrub (blurring the
+      // circle straight to the scrub, which is never on the allowlist), then
+      // scrub backward — the leading waypoint gets culled, but focus must
+      // stay on the scrub throughout.
+      await dots.nth(3).focus();
+      await expect(dots.nth(3)).toBeFocused();
+
+      await scrubInput.focus();
+      await expect(scrubInput).toBeFocused();
+
+      await scrubInput.press('ArrowLeft'); // native backward scrub, fires `input`
+      await expect(dots).toHaveCount(3); // the leading waypoint was culled
+      await expect(scrubInput).toBeFocused(); // ...but focus never left the scrub
+
+      // Repro path 2 reloads the same fixture rather than continuing from
+      // path 1's now-culled 3-waypoint state — kept isolated so this leg
+      // exercises its own repro (and can be observed failing/passing on its
+      // own) without depending on path 1 first culling a waypoint.
+      // navigating resets ship-journey.js's module state (lastBlurredWaypointIdx
+      // included), so this is a clean slate, not a carried-over one.
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      await expect(dots).toHaveCount(4);
+
+      // Focus a (still-live) waypoint, click a non-focusable element so
+      // focus legitimately rests on <body>, then click step-back — the cull
+      // must not pull focus into the map. dots.nth(3) is the waypoint the
+      // step-back actually culls (revealIndex 3 -> 2); dots.nth(1) survives
+      // that cull and so can never expose the steal.
+      await dots.nth(3).focus();
+      await expect(dots.nth(3)).toBeFocused();
+
+      await page.locator('[data-testid="ship-journey-coverage"]').click();
+      const bodyFocused = await page.evaluate(() => document.activeElement === document.body);
+      expect(bodyFocused).toBe(true);
+
+      await page.locator('[data-testid="ship-journey-step-back"]').click();
+      const focusedTestId = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-testid'));
+      expect(focusedTestId).not.toBe('ship-journey-waypoint');
     });
   });
 });
