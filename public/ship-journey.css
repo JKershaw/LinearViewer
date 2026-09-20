@@ -121,3 +121,18 @@
   text-anchor: middle;
   dominant-baseline: central;
 }
+
+/*
+ * Ship glyph (LIN-1675 P7): a small vector silhouette, positioned via
+ * `transform: translate(...)` in public/ship-journey.js. Rendered outside the
+ * zoomed <g>, like the ★ above, so it stays a constant size on screen at any
+ * fit zoom. Its stroke-width is CSS-only, with no matching JS constant —
+ * deliberately NOT part of the WAYPOINT_HALO/TRAIL_STROKE hand-sync contract
+ * tests/unit/ship-journey-geometry.test.js pins.
+ */
+.sj-ship-marker {
+  fill: var(--brand);
+  stroke: var(--card);
+  stroke-width: 0.3;
+  stroke-linejoin: round;
+}
