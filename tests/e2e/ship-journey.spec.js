@@ -1148,6 +1148,55 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
     });
 
+    // LIN-2959 close-out (review ledger item 4): the D1 clamp is reachable by
+    // two routes — a playback tick (scrub/step/play, pinned above) and
+    // narrowMq's own `change` listener. Only the first had a committed
+    // witness, so a regression in the resize listener — or in the one-shot
+    // `lastBlurredWaypointIdx` reset that runs alongside it — would have gone
+    // unnoticed. This pins the resize route: focused on a dot that is legal at
+    // 1280px but sits far below the narrow window's floor, the crossing
+    // repaint must reassign focus to the new floor dot, never drop it to
+    // <body> and never leave it on a node that has just been culled.
+    test('crossing the 640px breakpoint on resize reassigns focus from a now-off-window dot to the new floor dot, never to <body>', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const WAYPOINT_COUNT = 121;
+      const NARROW_TRAIL_WINDOW = 50;
+
+      const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      // Start ABOVE the breakpoint, where the trail is unwindowed, so dot 5 is
+      // a legitimately focusable node before the crossing.
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+
+      const dot5 = page.locator('[data-testid="ship-journey-waypoint"][data-idx="5"]');
+      await dot5.focus();
+      await expect(dot5).toBeFocused();
+
+      // The crossing itself is the only interaction — no scrub, step or play
+      // tick. windowFloor goes 0 -> 71, culling dot 5 from below.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(NARROW_TRAIL_WINDOW);
+
+      const focused = await page.evaluate(() => ({
+        idx: document.activeElement && document.activeElement.getAttribute('data-idx'),
+        isBody: document.activeElement === document.body,
+        stillInDom: !!document.querySelector('[data-testid="ship-journey-waypoint"][data-idx="5"]'),
+      }));
+      // The clamp's lower bound, not the leading edge: focus lands on the new
+      // floor dot 71 (121 - 50), not on dot 120.
+      expect(focused.idx).toBe(String(WAYPOINT_COUNT - NARROW_TRAIL_WINDOW));
+      expect(focused.isBody).toBe(false);
+      expect(focused.stillInDom).toBe(false);
+    });
+
     // LIN-2964 (D1): windowFloor introduced a SECOND cull edge, but the
     // pre-existing focus-reassignment guard (P8 / LIN-2068) only ever covered
     // the upper one — a dot culled from below took focus straight to <body>.
