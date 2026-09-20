@@ -282,27 +282,21 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     expect(measured.widestMark / measured.medianStep).toBeLessThanOrEqual(0.8);
   });
 
-  // LIN-2089: a regression witness for a ★-clipping defect that was live on
-  // main before this fix. Every segment break resets the walk to a berth one
-  // unit from the shared origin, so the ★ anchors at an origin that is not
-  // itself a plotted waypoint — a walk heading away from it fits a content box
-  // the origin falls outside, and the marker renders past the SVG's own edge.
-  test('the star marker stays inside the map when the trail walks away from the berth origin', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // LIN-2956: with the reset-to-origin removed, a break's ★ now anchors at
+  // its own junction point on the trail (the first waypoint of the new
+  // segment) rather than at the shared origin — this is the regression
+  // witness for that placement, plus containment (the LIN-2089 concern this
+  // partly supersedes: an anchor outside the revealed content box would clip).
+  test('the star marker sits at its junction point, not the origin, and stays contained', async ({ page, seedLocal, localWorkerUrlKey }) => {
     const urlKey = localWorkerUrlKey;
     const WAYPOINT_COUNT = 35;
 
-    // Every waypoint bears S, so the whole walk runs outbound from the berth:
-    // the revealed box is y ∈ [1, 34] and the origin the ★ anchors to is
-    // genuinely OUTSIDE it. Aim matters here — an `N` first waypoint would sit
-    // at y = -1 (BEARING_TO_ANGLE puts N at 270°), straddling the origin and
-    // making the fit's origin-union a no-op, so the case could not exercise
-    // what it exists for.
     const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'S');
     await seedLocal(seed, { features: { shipJourney: true } });
     await seedReports(page, urlKey, [
       { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(0, 1) },
       // Lands between waypoint 1's and waypoint 2's completedAt, so the trail
-      // breaks there and the walk restarts at a fresh berth.
+      // breaks there — the walk continues, but the break is still marked.
       { generatedAt: '2026-01-01T12:00:00Z', northStar: 'Ship B', orientation: orientation.slice(1) },
     ]);
     await page.request.get('/test/clear-workspace-issues-memo');
@@ -310,49 +304,51 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     await page.goto(`/workspace/${urlKey}/ship-journey`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+    await expect(page.locator('[data-testid="ship-journey-star-marker"]')).toHaveCount(1);
 
-    const star = await page.evaluate(() => {
+    const result = await page.evaluate(() => {
+      const g = document.querySelector('[data-testid="ship-journey-trail"]');
+      const m = /translate\(([-\d.eE]+),([-\d.eE]+)\)\s*scale\(([-\d.eE]+)\)/.exec(g.getAttribute('transform'));
+      const translateX = parseFloat(m[1]);
+      const translateY = parseFloat(m[2]);
+      const zoom = parseFloat(m[3]);
+
+      // The junction is the SECOND waypoint (index 1) — the first waypoint
+      // AFTER the break — not the origin.
+      const junctionDot = document.querySelectorAll('[data-testid="ship-journey-waypoint"]')[1];
+      const junctionX = translateX + zoom * parseFloat(junctionDot.getAttribute('cx'));
+      const junctionY = translateY + zoom * parseFloat(junctionDot.getAttribute('cy'));
+
+      const star = document.querySelector('[data-testid="ship-journey-star-marker"]');
+      const starX = parseFloat(star.getAttribute('x'));
+      const starY = parseFloat(star.getAttribute('y'));
+
       const svg = document.getElementById('ship-journey-map');
       const svgRect = svg.getBoundingClientRect();
-      const el = document.querySelector('[data-testid="ship-journey-star-marker"]');
-      if (!el) return null;
-      const r = el.getBoundingClientRect();
-      const wps = Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]'))
-        .map((w) => w.getBoundingClientRect());
-      const starCentreY = (r.top + r.bottom) / 2;
+      const starRect = star.getBoundingClientRect();
+
       return {
-        overflowLeft: svgRect.left - r.left,
-        overflowRight: r.right - svgRect.right,
-        overflowTop: svgRect.top - r.top,
-        overflowBottom: r.bottom - svgRect.bottom,
-        // Is the ★'s anchor (the origin) actually outside the waypoints' own
-        // box? If it isn't, this fixture is not exercising what it claims to.
-        originOutsideRevealedBox: starCentreY < Math.min(...wps.map((w) => (w.top + w.bottom) / 2)) - 0.5
-          || starCentreY > Math.max(...wps.map((w) => (w.top + w.bottom) / 2)) + 0.5,
+        starAtJunction: Math.abs(starX - junctionX) < 1e-6 && Math.abs(starY - junctionY) < 1e-6,
+        starAtOrigin: Math.abs(starX) < 1e-6 && Math.abs(starY) < 1e-6,
+        overflowLeft: svgRect.left - starRect.left,
+        overflowRight: starRect.right - svgRect.right,
+        overflowTop: svgRect.top - starRect.top,
+        overflowBottom: starRect.bottom - svgRect.bottom,
       };
     });
 
-    expect(star).not.toBeNull();
-    // Pin the fixture's AIM, not just its outcome: a future edit that lets the
-    // walk straddle the origin would otherwise leave this test green while
-    // silently no longer covering the outbound-walk case.
-    expect(star.originOutsideRevealedBox).toBe(true);
-    expect(star.overflowLeft).toBeLessThanOrEqual(0.5);
-    expect(star.overflowRight).toBeLessThanOrEqual(0.5);
-    expect(star.overflowTop).toBeLessThanOrEqual(0.5);
-    expect(star.overflowBottom).toBeLessThanOrEqual(0.5);
+    expect(result.starAtJunction).toBe(true);
+    expect(result.starAtOrigin).toBe(false);
+    expect(result.overflowLeft).toBeLessThanOrEqual(0.5);
+    expect(result.overflowRight).toBeLessThanOrEqual(0.5);
+    expect(result.overflowTop).toBeLessThanOrEqual(0.5);
+    expect(result.overflowBottom).toBeLessThanOrEqual(0.5);
   });
 
-  // LIN-2089: derivePositions resets every segment to the SAME origin, so
-  // per-segment ★ glyphs render at identical coordinates — a starburst, not
-  // crowding, which no glyph size can separate. They collapse to one counted
-  // marker instead.
-  //
-  // A double-digit count is deliberate: collapsing widens the marker past a
-  // single glyph, and the counter's width — not the origin — is what the
-  // 10-unit fit pad actually has to absorb, so the containment assertion here
-  // is the guard on that (LIN-2089 review, F2).
-  test('multiple north-star changes collapse to one counted star marker that stays contained', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  // LIN-2956 reverts LIN-2089's collapse: once breaks no longer share one
+  // origin, each renders its own ★ at its own junction — a double-digit break
+  // count pins that N distinct, contained markers render, not one counted glyph.
+  test('multiple north-star changes render one distinct, contained star marker per junction', async ({ page, seedLocal, localWorkerUrlKey }) => {
     const urlKey = localWorkerUrlKey;
     const CHANGES = 13;
     const PER_SEGMENT = 2;
@@ -381,27 +377,28 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     await page.goto(`/workspace/${urlKey}/ship-journey`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+    await expect(page.locator('[data-testid="ship-journey-star-marker"]')).toHaveCount(CHANGES);
 
-    const marker = page.locator('[data-testid="ship-journey-star-marker"]');
-    await expect(marker).toHaveCount(1);
-    await expect(marker).toContainText(`×${CHANGES}`);
-
-    const fit = await page.evaluate(() => {
+    const result = await page.evaluate(() => {
       const svg = document.getElementById('ship-journey-map');
       const svgRect = svg.getBoundingClientRect();
-      const r = document.querySelector('[data-testid="ship-journey-star-marker"]').getBoundingClientRect();
-      return {
-        // The marker's width in viewBox units — the figure the fit's 10-unit
-        // pad has to absorb, and the one the code comment records.
-        widthInViewBoxUnits: (r.width / svgRect.width) * 200,
-        contained: r.left >= svgRect.left - 0.5 && r.right <= svgRect.right + 0.5
-          && r.top >= svgRect.top - 0.5 && r.bottom <= svgRect.bottom + 0.5,
-      };
+      const rects = Array.from(document.querySelectorAll('[data-testid="ship-journey-star-marker"]'))
+        .map((el) => el.getBoundingClientRect());
+      const contained = rects.every((r) => r.left >= svgRect.left - 0.5 && r.right <= svgRect.right + 0.5
+        && r.top >= svgRect.top - 0.5 && r.bottom <= svgRect.bottom + 0.5);
+      let distinct = true;
+      for (let i = 0; i < rects.length; i++) {
+        for (let j = i + 1; j < rects.length; j++) {
+          if (Math.abs(rects[i].left - rects[j].left) < 0.5 && Math.abs(rects[i].top - rects[j].top) < 0.5) {
+            distinct = false;
+          }
+        }
+      }
+      return { contained, distinct };
     });
 
-    expect(fit.contained).toBe(true);
-    // Half-reach must stay inside computeFitZoom's pad: 10.
-    expect(fit.widthInViewBoxUnits / 2).toBeLessThan(10);
+    expect(result.contained).toBe(true);
+    expect(result.distinct).toBe(true);
   });
 
   test('redirects to settings when the flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {

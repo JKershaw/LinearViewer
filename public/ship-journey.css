@@ -111,9 +111,10 @@
 }
 
 /*
- * Rendered outside the zoomed <g> (see render()), so this font-size is in
+ * Rendered outside the zoomed <g> (see paint()), so this font-size is in
  * outer-viewBox units and the glyph stays a constant size on screen whatever
- * the fit zoom. Centred on the berth origin rather than offset from it.
+ * the fit zoom. Centred on its own junction point (LIN-2956) rather than
+ * offset from it.
  */
 .sj-star-marker {
   font-size: 6px;

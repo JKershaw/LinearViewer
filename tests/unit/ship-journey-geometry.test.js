@@ -117,10 +117,9 @@ describe('ship-journey boundingBox', () => {
     assertBox(boundingBox([]), { minX: -1, maxX: 1, minY: -1, maxY: 1 });
   });
 
-  test('a walk that never passes near the origin excludes it — which is why render() unions it in', () => {
-    // The ★ anchors at (0,0) but is never a plotted waypoint. This is the
-    // arithmetic behind the live clip LIN-2089 measured: fit this box and the
-    // origin sits outside the fitted content entirely.
+  test('a walk that never passes near the origin excludes it from its bounding box', () => {
+    // Pure boundingBox() arithmetic: a point not in the input never appears
+    // in the box unless explicitly included.
     const eastwardWalk = [{ x: 10, y: 0 }, { x: 11, y: 0 }, { x: 12, y: 0 }];
     const box = boundingBox(eastwardWalk);
     assert.ok(box.minX > 0, 'the origin is outside a walk that never returns to it');

@@ -11,10 +11,13 @@
  * it, then advances one unit along the resulting heading, so a direct
  * reversal arcs over several steps instead of flipping across the ship's own
  * wake. A north-star change breaks the trail into a new segment (no
- * connecting line across the change, heading and position reset to a fresh
- * berth). Because every fresh berth sits one unit from the same origin, the
- * ★ markers for those changes are collapsed into a single counted marker at
- * that origin rather than drawn per segment (LIN-2089).
+ * connecting line across the change) but the walk itself continues from
+ * wherever it already is — it does not reset to a fresh berth (LIN-2956).
+ * Because each break now lands at its own distinct junction on the trail
+ * rather than colliding at a shared origin, the ★ markers are drawn one per
+ * junction, keyed by break index, rather than collapsed into a single counted
+ * marker (reverting LIN-2089's collapse, which only existed because every
+ * break shared one origin).
  *
  * Auto-fit (LIN-1682's window.computeFitZoom, common.js) recomputes on every
  * paint from the bounding box of the currently REVEALED points (plus the
@@ -137,14 +140,15 @@
   var stepForwardBtn = document.getElementById('ship-journey-step-forward');
   var scrub = document.getElementById('ship-journey-scrub');
 
-  // ── Keyed-reconcile state (P7 / LIN-2067) ─────────────────────────────────
+  // ── Keyed-reconcile state (P7 / LIN-2067; starNodes added LIN-2956) ───────
   // `g` is created once by ensureStructure() and only its `transform` is
-  // mutated thereafter. `dotNodes`/`segNodes` are index-keyed Maps (house
-  // pattern: public/live-console.js:87-89, public/next-run.js:239-280) so
-  // retained nodes keep identity across paints; culled nodes are
-  // `node.remove()`d, never hidden. `starNode`/`shipNode` are lazily-created
-  // singletons, siblings of `g`, outside the zoomed group (like the ★) so
-  // they stay a constant size on screen at any fit zoom.
+  // mutated thereafter. `dotNodes`/`segNodes`/`starNodes` are index-keyed Maps
+  // (house pattern: public/live-console.js:87-89, public/next-run.js:239-280)
+  // so retained nodes keep identity across paints; culled nodes are
+  // `node.remove()`d, never hidden. `starNodes` is keyed by break index (one
+  // ★ per revealed junction); `shipNode` is a lazily-created singleton,
+  // sibling of `g`, outside the zoomed group (like the ★s) so it stays a
+  // constant size on screen at any fit zoom.
   //
   // Paint order inside SVG is document order — there is no z-index. Review
   // (LIN-2067 F1/F2) found the original code left that order to node
@@ -166,7 +170,7 @@
   var shipLayer = null;
   var dotNodes = new Map();
   var segNodes = new Map();
-  var starNode = null;
+  var starNodes = new Map();
   var shipNode = null;
 
   // `currentIndex` is the single source of reveal truth (gates scrub.value,
@@ -221,22 +225,12 @@
       };
     }
 
-    // Every segment break resets the walk to a fresh berth one unit from the
-    // shared origin (lib/ship-journey.js's derivePositions), so ★ markers for
-    // *different* star changes land on top of each other rather than merely
-    // near each other — no glyph size can separate them. Collapse them into
-    // one counted marker anchored at that origin instead (LIN-2089).
-    var starCount = 0;
-    for (var b = 0; b <= revealIndex; b++) {
-      if (breakBefore[b]) starCount++;
-    }
-
-    // The ★ anchors at the origin, which is never itself a plotted waypoint, so
-    // a walk heading away from the berth fits a box the origin falls outside.
-    // Union it (and the ship's own in-progress point) in so the fit is honest
-    // about everything it has to contain.
+    // Every revealed break now lands at its own junction point on the trail
+    // (lib/ship-journey.js's derivePositions no longer resets to a shared
+    // origin, LIN-2956), so each already sits inside the revealed points —
+    // no separate union is needed to keep the fit honest (contrast LIN-2089's
+    // origin-union, removed along with the collapsed marker it existed for).
     var fitted = revealed.concat([shipPoint]);
-    if (starCount > 0) fitted = fitted.concat([{ x: 0, y: 0 }]);
     var box = boundingBox(fitted);
     var contentWidth = Math.max(1, box.maxX - box.minX + 2 * DOT_REACH);
     var contentHeight = Math.max(1, box.maxY - box.minY + 2 * DOT_REACH);
@@ -319,24 +313,33 @@
       if (!wantedSegs.has(segKey)) { segNodes.get(segKey).remove(); segNodes.delete(segKey); }
     }
 
-    // ★ star-change marker — deliberately a SIBLING of `g`, not a child: the
-    // dots and trail belong inside the zoomed group (that is what keeps the
-    // mark:step ratio scale-invariant), but the ★ has to stay a constant size
-    // on screen, so it lives in the unscaled outer viewBox. Removed (not
-    // hidden) once a seek un-reveals its star change.
-    if (starCount > 0) {
-      if (!starNode) {
-        starNode = document.createElementNS(SVG_NS, 'text');
-        starNode.setAttribute('class', 'sj-star-marker');
-        starNode.setAttribute('data-testid', 'ship-journey-star-marker');
-        starLayer.appendChild(starNode);
+    // ★ star-change markers — one per revealed junction, keyed by break index
+    // (LIN-2956; reverts LIN-2089's single counted marker, which only made
+    // sense while every break shared one origin). Deliberately SIBLINGS of
+    // `g`, not children: the dots and trail belong inside the zoomed group
+    // (that is what keeps the mark:step ratio scale-invariant), but a ★ has
+    // to stay a constant size on screen, so it lives in the unscaled outer
+    // viewBox — positioned via the SAME translate+zoom transform as the ship
+    // glyph below, anchored to its own junction point rather than the origin.
+    // Culled (not hidden) once a seek un-reveals its star change, same
+    // discipline as dotNodes/segNodes.
+    for (var starKey of Array.from(starNodes.keys())) {
+      if (starKey > revealIndex) { starNodes.get(starKey).remove(); starNodes.delete(starKey); }
+    }
+    for (var bi = 1; bi <= revealIndex; bi++) {
+      if (!breakBefore[bi]) continue;
+      var star = starNodes.get(bi);
+      if (!star) {
+        star = document.createElementNS(SVG_NS, 'text');
+        star.setAttribute('class', 'sj-star-marker');
+        star.setAttribute('data-testid', 'ship-journey-star-marker');
+        star.textContent = '★';
+        starLayer.appendChild(star);
+        starNodes.set(bi, star);
       }
-      starNode.textContent = starCount === 1 ? '★' : '★×' + starCount;
-      starNode.setAttribute('x', String(translateX));
-      starNode.setAttribute('y', String(translateY));
-    } else if (starNode) {
-      starNode.remove();
-      starNode = null;
+      var junction = points[bi];
+      star.setAttribute('x', String(translateX + zoom * junction.x));
+      star.setAttribute('y', String(translateY + zoom * junction.y));
     }
 
     // Ship glyph — same outer-viewBox rationale as the ★. Always present once
