@@ -2,6 +2,16 @@
 
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 
+- **Which retained artifact reduces the total cost of later work at comparable quality?**
+  `harbour/what-should-an-agent-leave-behind.md` and its checking paper separate retained
+  material, visible consumption and downstream benefit. Use existing LIN-2689 to compare
+  the same caller with source tools, with a deterministic index, and with index plus
+  generated explanations on unseen tasks; count construction, retrieval, verification,
+  failed attempts and upkeep. Freeze acceptance criteria before construction; have a
+  separate checker adjudicate outcomes without seeing the experimental arm, and report
+  disagreements and human intervention separately. (Codex and Codex reviewer, from
+  John Kershaw's research question, LIN-2961, 2026-09-20)
+
 - **What does a routed ledger item cost, and does routing ever end in the work?**
   `harbour/close-out-claims.md` found every close-out names the ticket it files and closes
   anyway, the ledger item discharged by the filing. Follow a month of routed items to their
