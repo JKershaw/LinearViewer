@@ -770,11 +770,36 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
 
       await circle.focus();
       await expect(circle).toBeFocused();
+
+      // Keyboard reachability must also reveal the paired label — the
+      // circle carries the accessible name, but the label is what makes
+      // the identity visibly readable to a sighted keyboard user (the
+      // `focusin` reveal path, mirroring the pointer-reveal case below).
+      const idx = await circle.getAttribute('data-idx');
+      const label = page.locator(`.sj-waypoint-label[data-idx="${idx}"]`);
+      await expect(label).toHaveAttribute('data-revealed', 'true');
     });
 
     // 9b: pointer reveal — hovering the dot reveals its paired label (matched
     // by data-idx, not sibling order); moving away hides it again. The label
-    // itself must never become the hover target (pointer-events: none).
+    // itself must never become the hover target (pointer-events: none). The
+    // reveal is witnessed via the browser's computed `opacity`, not text
+    // presence or Playwright's actionability-driven visibility alone, since
+    // the CSS rule that makes a revealed label opaque is what actually makes
+    // it readable.
+    //
+    // NOT exercised here: the label's `lwp.title || lwp.identifier` identifier
+    // fallback (public/ship-journey.js:421). Investigated and found genuinely
+    // unreachable from this suite's seeding surface — `LocalStore#createIssue`
+    // (lib/local-store.js:118) unconditionally defaults a falsy `data.title`
+    // to `'Untitled'`, and `seedLocal`/`seedLocalWorkspace` route every fixture
+    // issue through it, so `wp.title` can never come out null/empty here; it
+    // is always at least `'Untitled'`, which is truthy and never reaches the
+    // fallback. Exercising it for real would mean changing `lib/local-store.js`
+    // (production behavior) or exporting the inline label-building logic as a
+    // testable pure function from `public/ship-journey.js` — both out of scope
+    // for this test-only follow-up. Recorded as a discrepancy rather than
+    // silently claimed as covered.
     test('hovering a waypoint circle reveals its paired label; moving the pointer away hides it again', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const urlKey = localWorkerUrlKey;
       const { seed, orientation } = identityFixture(urlKey, [
@@ -794,17 +819,20 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       const idx = await circle.getAttribute('data-idx');
       const label = page.locator(`.sj-waypoint-label[data-idx="${idx}"]`);
       await expect(label).toHaveAttribute('data-revealed', 'false');
+      await expect(label).toHaveCSS('opacity', '0');
 
       await circle.hover();
       await expect(label).toHaveAttribute('data-revealed', 'true');
-      // The reveal must show the waypoint's actual title (identifier
-      // fallback when no title is present) — not just the attribute flip.
-      // identityFixture above set this waypoint's title to 'First'.
+      await expect(label).toHaveCSS('opacity', '1');
+      // The reveal must show the waypoint's actual title — not just the
+      // attribute flip. identityFixture above set this waypoint's title to
+      // 'First'.
       await expect(label).toHaveText('First');
 
       // Move the pointer well clear of the map to fire pointerout.
       await page.mouse.move(5, 5);
       await expect(label).toHaveAttribute('data-revealed', 'false');
+      await expect(label).toHaveCSS('opacity', '0');
     });
 
     // 9d: backward-cull focus reassignment. Stepping back culls the leading
