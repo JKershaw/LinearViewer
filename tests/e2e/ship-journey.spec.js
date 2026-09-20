@@ -924,6 +924,15 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       const ratio = focused.width / unfocused.width;
       expect(ratio).toBeGreaterThan(1); // a focus indicator is actually present
       expect(ratio).toBeLessThanOrEqual(2); // and stays proportionate to the dot, nowhere near ~13x
+
+      // The ratio above measures getBoundingClientRect, which CSS `outline`
+      // never contributes to — it cannot see the global :focus-visible
+      // outline rule reappearing, only the local stroke. Assert the
+      // computed outline is actually suppressed too, so this witness covers
+      // the named defect (the reintroduced outline) directly, not just a
+      // proxy it happens to correlate with today.
+      const outlineStyle = await circle.evaluate((el) => getComputedStyle(el).outlineStyle);
+      expect(outlineStyle).toBe('none');
     });
 
     // 9h: scrub-focus negative witness (LIN-2962 F2). The pre-fix
@@ -966,11 +975,23 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       await expect(dots).toHaveCount(3); // the leading waypoint was culled
       await expect(scrubInput).toBeFocused(); // ...but focus never left the scrub
 
-      // Repro path 2: focus a (still-live) waypoint, click a non-focusable
-      // element so focus legitimately rests on <body>, then click step-back
-      // — the cull must not pull focus into the map.
-      await dots.nth(1).focus();
-      await expect(dots.nth(1)).toBeFocused();
+      // Repro path 2 reloads the same fixture rather than continuing from
+      // path 1's now-culled 3-waypoint state — kept isolated so this leg
+      // exercises its own repro (and can be observed failing/passing on its
+      // own) without depending on path 1 first culling a waypoint.
+      // navigating resets ship-journey.js's module state (lastBlurredWaypointIdx
+      // included), so this is a clean slate, not a carried-over one.
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      await expect(dots).toHaveCount(4);
+
+      // Focus a (still-live) waypoint, click a non-focusable element so
+      // focus legitimately rests on <body>, then click step-back — the cull
+      // must not pull focus into the map. dots.nth(3) is the waypoint the
+      // step-back actually culls (revealIndex 3 -> 2); dots.nth(1) survives
+      // that cull and so can never expose the steal.
+      await dots.nth(3).focus();
+      await expect(dots.nth(3)).toBeFocused();
 
       await page.locator('[data-testid="ship-journey-coverage"]').click();
       const bodyFocused = await page.evaluate(() => document.activeElement === document.body);
