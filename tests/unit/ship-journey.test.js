@@ -5,7 +5,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { deriveJourney, MAX_TURN_DEGREES } from '../../lib/ship-journey.js';
+import { deriveJourney, MAX_TURN_DEGREES, MAX_WAYPOINT_REASON_CHARS } from '../../lib/ship-journey.js';
 import { ORIENTATION_CANDIDATE_CAP } from '../../lib/prompts/roadmap-orientation-template.js';
 
 // =============================================================================
@@ -280,6 +280,132 @@ describe('deriveJourney', () => {
     assert.deepStrictEqual(result.starChanges, [
       { from: 'star-A', to: 'star-B', at: '2026-01-02T00:00:00Z' }
     ], 'starChanges must read chronologically oldest -> newest regardless of input order');
+  });
+
+  // ── scenario 7b: reason/provenance pair with the newest reading, not bearing alone ──
+
+  test('carries reason and source provenance from the newest pre-completion reading', () => {
+    const reports = [
+      createReport({
+        id: 'run-newer',
+        generatedAt: '2026-01-02T00:00:00Z',
+        orientation: [
+          { identifier: 'T-X', bearing: 'E', reason: 'newer reason', archived: false }
+        ]
+      }),
+      createReport({
+        id: 'run-older',
+        generatedAt: '2026-01-01T00:00:00Z',
+        orientation: [
+          { identifier: 'T-X', bearing: 'N', reason: 'older reason', archived: false }
+        ]
+      })
+    ]; // newest-first — the order listFull() actually returns
+
+    const issues = [
+      createIssue({
+        identifier: 'T-X',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-03T00:00:00Z'
+      })
+    ];
+
+    const result = deriveJourney({ reports, issues });
+
+    assert.strictEqual(result.waypoints.length, 1);
+    assert.strictEqual(result.waypoints[0].reason, 'newer reason',
+      'reason must come from the same (newest) reading that supplied the bearing, not the older one');
+    assert.deepStrictEqual(result.waypoints[0].source, { id: 'run-newer', generatedAt: '2026-01-02T00:00:00Z' },
+      'source must be the run that supplied the retained bearing, not the older one');
+  });
+
+  // ── scenario 7c: no-project issue normalizes topic to null ─────────────────
+
+  test('normalizes topic to null when the issue has no project', () => {
+    const reports = [
+      createReport({
+        generatedAt: '2026-01-01T00:00:00Z',
+        orientation: [
+          { identifier: 'T-NOPROJ', bearing: 'N', reason: '', archived: false }
+        ]
+      })
+    ];
+    const issues = [
+      createIssue({
+        identifier: 'T-NOPROJ',
+        project: null,
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-01T00:00:00Z'
+      })
+    ];
+
+    const result = deriveJourney({ reports, issues });
+
+    assert.strictEqual(result.waypoints.length, 1);
+    assert.strictEqual(result.waypoints[0].topic, null);
+  });
+
+  // ── scenario 7d: empty persisted reason normalizes to null ──────────────────
+
+  test('normalizes an empty persisted reason to null', () => {
+    const reports = [
+      createReport({
+        generatedAt: '2026-01-01T00:00:00Z',
+        orientation: [
+          { identifier: 'T-EMPTYREASON', bearing: 'N', reason: '', archived: false }
+        ]
+      })
+    ];
+    const issues = [
+      createIssue({
+        identifier: 'T-EMPTYREASON',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-01T00:00:00Z'
+      })
+    ];
+
+    const result = deriveJourney({ reports, issues });
+
+    assert.strictEqual(result.waypoints.length, 1);
+    assert.strictEqual(result.waypoints[0].reason, null);
+  });
+
+  // ── scenario 7e: display-cap truncation boundary ────────────────────────────
+
+  test('leaves a reason at exactly MAX_WAYPOINT_REASON_CHARS unchanged, and ellipsises one char over', () => {
+    const exactReason = 'x'.repeat(MAX_WAYPOINT_REASON_CHARS);
+    const overReason = 'x'.repeat(MAX_WAYPOINT_REASON_CHARS + 1);
+
+    const reports = [
+      createReport({
+        generatedAt: '2026-01-01T00:00:00Z',
+        orientation: [
+          { identifier: 'T-EXACT', bearing: 'N', reason: exactReason, archived: false },
+          { identifier: 'T-OVER', bearing: 'N', reason: overReason, archived: false }
+        ]
+      })
+    ];
+    const issues = [
+      createIssue({
+        identifier: 'T-EXACT',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-01T00:00:00Z'
+      }),
+      createIssue({
+        identifier: 'T-OVER',
+        state: { name: 'Done', type: 'completed' },
+        completedAt: '2026-01-02T00:00:00Z'
+      })
+    ];
+
+    const result = deriveJourney({ reports, issues });
+
+    const exactWp = result.waypoints.find(w => w.identifier === 'T-EXACT');
+    const overWp = result.waypoints.find(w => w.identifier === 'T-OVER');
+
+    assert.strictEqual(exactWp.reason, exactReason, 'exact-length reason must be unchanged, no ellipsis');
+    assert.strictEqual(overWp.reason, `${'x'.repeat(MAX_WAYPOINT_REASON_CHARS)}…`,
+      'over-length reason must be sliced to the cap plus an ellipsis');
   });
 
   // ── scenario 8: a run at the cap ───────────────────────────────────────────
