@@ -1,5 +1,5 @@
 /**
- * Ship Journey client (experimental, LIN-1675 P3/P5).
+ * Ship Journey client (experimental, LIN-1675 P3/P5/P7).
  *
  * Plays back `window.__SHIP_JOURNEY_DATA__.waypoints` (ascending by
  * completedAt, already filtered server-side to placeable waypoints) as a
@@ -17,15 +17,30 @@
  * that origin rather than drawn per segment (LIN-2089).
  *
  * Auto-fit (LIN-1682's window.computeFitZoom, common.js) recomputes on every
- * frame from the bounding box of the currently REVEALED points, so the view
- * zooms out as playback advances and more of the trail comes into frame.
+ * paint from the bounding box of the currently REVEALED points (plus the
+ * ship's own in-progress position), so the view zooms out as playback
+ * advances and more of the trail comes into frame.
  *
  * Marker geometry is stated as a ratio against that one-unit step (LIN-2089):
  * a waypoint's PAINTED mark (2r plus its halo stroke) stays under 80% of the
  * step, so adjacent waypoints read as beads on a thread rather than merging
  * into a blob. The ratio is scale-invariant — dots and trail live inside the
  * zoomed <g>, so they shrink and grow with the fit exactly as the step does.
- * The ★ deliberately does the opposite (see render()).
+ * The ★ (and, since P7, the ship glyph) deliberately does the opposite (see
+ * paint()).
+ *
+ * P7 (LIN-2067) replaced the old teardown-and-rebuild `render()` with a
+ * build-once structure (`ensureStructure()`) plus an in-place keyed reconcile
+ * (`paint(position)`): retained trail/waypoint nodes keep their identity
+ * across updates (culled nodes are `node.remove()`d, never merely hidden —
+ * the e2e suite's waypoint-count assertions inspect DOM node counts), and a
+ * ship glyph tracks a float `position` — `currentIndex` stays the single
+ * source of reveal truth, `position`'s fractional part is transient
+ * sub-waypoint tween state only, reset to the integer index on every seek.
+ * Standard motion drives `position` continuously via requestAnimationFrame;
+ * `prefers-reduced-motion` keeps the original per-waypoint step cadence, but
+ * through this same reconcile (never a rebuild) so any future focusable
+ * per-waypoint node survives every step.
  *
  * No-op when the map mount is absent (the server renders the honest thin-data
  * empty state instead of the map for a below-threshold journey).
@@ -40,7 +55,9 @@
   // HALO and TRAIL_STROKE are declared here and *rendered* from the matching
   // stroke-width declarations in public/ship-journey.css; keep the two files'
   // numbers in step by hand (same JS-owns-the-attribute, CSS-owns-the-paint
-  // split this file already uses for the waypoint's fill and testids).
+  // split this file already uses for the waypoint's fill and testids). The
+  // ship glyph (P7) is deliberately NOT part of this hand-sync contract — its
+  // stroke width is CSS-only, with no matching JS constant.
   var WAYPOINT_RADIUS = 0.32;
   var WAYPOINT_HALO = 0.1; // .sj-waypoint stroke-width
   var TRAIL_STROKE = 0.08; // .sj-trail-segment stroke-width
@@ -48,6 +65,13 @@
   // half its centred halo stroke. Replaces LIN-1675 P3's blanket 6-unit
   // MARKER_PAD, which padded the content box by six whole steps.
   var DOT_REACH = WAYPOINT_RADIUS + WAYPOINT_HALO / 2;
+
+  // A simple sailboat silhouette (hull + sail), centred on its own origin, in
+  // outer-viewBox units — same scale class as the ★'s 6px font-size (P7 /
+  // LIN-2067). The exact shape is a reversible rendering choice (Q3 ruling,
+  // 2026-08-13), not locked by any test; heading/rotation is explicitly out
+  // of scope for this phase.
+  var SHIP_GLYPH_PATH = 'M -2.4,0.2 L 2.4,0.2 L 1.6,2 L -1.6,2 Z M 0,-3.2 L 0.2,0.2 L -1.8,0.2 Z';
 
   function boundingBox(pts) {
     if (!pts.length) return { minX: -1, maxX: 1, minY: -1, maxY: 1 };
@@ -85,6 +109,12 @@
   var starChanges = DATA.starChanges || [];
   if (!waypoints.length) return;
 
+  // Guarded per the house idiom (public/live-console.js:46) so the
+  // vm-sandboxed geometry unit test (`window: {}`) never throws — declared
+  // below both early returns above, though the `!svg` return already makes
+  // that test never reach this line at all; the guard is defense in depth.
+  var REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   // x/y are derived server-side (lib/ship-journey.js's derivePositions) —
   // read directly rather than re-deriving placement client-side.
   var points = waypoints.map(function (wp) { return { x: wp.x, y: wp.y }; });
@@ -107,13 +137,55 @@
   var stepForwardBtn = document.getElementById('ship-journey-step-forward');
   var scrub = document.getElementById('ship-journey-scrub');
 
+  // ── Keyed-reconcile state (P7 / LIN-2067) ─────────────────────────────────
+  // `g` is created once by ensureStructure() and only its `transform` is
+  // mutated thereafter. `dotNodes`/`segNodes` are index-keyed Maps (house
+  // pattern: public/live-console.js:87-89, public/next-run.js:239-280) so
+  // retained nodes keep identity across paints; culled nodes are
+  // `node.remove()`d, never hidden. `starNode`/`shipNode` are lazily-created
+  // singletons, siblings of `g`, outside the zoomed group (like the ★) so
+  // they stay a constant size on screen at any fit zoom.
+  var g = null;
+  var dotNodes = new Map();
+  var segNodes = new Map();
+  var starNode = null;
+  var shipNode = null;
+
+  // `currentIndex` is the single source of reveal truth (gates scrub.value,
+  // clamping, bounds). `position` is transient float tween state — reset to
+  // the integer `currentIndex` on every seek, and can only diverge from it
+  // during an active play() tween between two seeks.
   var currentIndex = waypoints.length - 1; // start fully revealed, matching the server-rendered scrub value
-  var playTimer = null;
+  var position = currentIndex;
 
-  function render() {
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
+  var playing = false;
+  var playTimer = null; // reduced-motion stepped cadence
+  var rafId = null; // standard-motion continuous tween
+  var lastFrameTime = null;
 
-    var revealed = points.slice(0, currentIndex + 1);
+  function ensureStructure() {
+    g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('data-testid', 'ship-journey-trail');
+    svg.appendChild(g);
+  }
+
+  function paint(pos) {
+    var revealIndex = Math.max(0, Math.min(waypoints.length - 1, Math.floor(pos)));
+    var revealed = points.slice(0, revealIndex + 1);
+    var frac = pos - Math.floor(pos);
+
+    // Interpolation is suppressed across a breakBefore boundary — the ship
+    // snaps to the pre-break waypoint rather than tweening across the gap,
+    // consistent with the trail's own segment split below.
+    var canTween = frac > 0 && revealIndex + 1 < points.length && !breakBefore[revealIndex + 1];
+    var shipPoint = points[revealIndex];
+    if (canTween) {
+      var next = points[revealIndex + 1];
+      shipPoint = {
+        x: shipPoint.x + (next.x - shipPoint.x) * frac,
+        y: shipPoint.y + (next.y - shipPoint.y) * frac,
+      };
+    }
 
     // Every segment break resets the walk to a fresh berth one unit from the
     // shared origin (lib/ship-journey.js's derivePositions), so ★ markers for
@@ -121,16 +193,16 @@
     // near each other — no glyph size can separate them. Collapse them into
     // one counted marker anchored at that origin instead (LIN-2089).
     var starCount = 0;
-    for (var b = 0; b < revealed.length; b++) {
+    for (var b = 0; b <= revealIndex; b++) {
       if (breakBefore[b]) starCount++;
     }
 
     // The ★ anchors at the origin, which is never itself a plotted waypoint, so
     // a walk heading away from the berth fits a box the origin falls outside.
-    // Union it in so the fit is honest about everything it has to contain.
-    // Defensive, not load-bearing — see the containment note at the ★ below for
-    // the measurement that says so.
-    var fitted = starCount > 0 ? revealed.concat([{ x: 0, y: 0 }]) : revealed;
+    // Union it (and the ship's own in-progress point) in so the fit is honest
+    // about everything it has to contain.
+    var fitted = revealed.concat([shipPoint]);
+    if (starCount > 0) fitted = fitted.concat([{ x: 0, y: 0 }]);
     var box = boundingBox(fitted);
     var contentWidth = Math.max(1, box.maxX - box.minX + 2 * DOT_REACH);
     var contentHeight = Math.max(1, box.maxY - box.minY + 2 * DOT_REACH);
@@ -157,105 +229,159 @@
     var translateX = -zoom * boxCenterX;
     var translateY = -zoom * boxCenterY;
 
-    var g = document.createElementNS(SVG_NS, 'g');
     g.setAttribute('transform', 'translate(' + translateX + ',' + translateY + ') scale(' + zoom + ')');
-    g.setAttribute('data-testid', 'ship-journey-trail');
 
-    // Path segments, broken wherever a north-star change falls between two
-    // consecutive revealed waypoints — no line is drawn across the change.
-    var segStart = 0;
-    for (var i = 1; i <= revealed.length; i++) {
-      if (i === revealed.length || breakBefore[i]) {
-        var seg = revealed.slice(segStart, i);
-        if (seg.length > 1) {
-          var d = 'M ' + seg.map(function (p) { return p.x + ',' + p.y; }).join(' L ');
-          var path = document.createElementNS(SVG_NS, 'path');
-          path.setAttribute('d', d);
-          path.setAttribute('class', 'sj-trail-segment');
-          g.appendChild(path);
-        }
-        segStart = i;
-      }
+    // Waypoint dots — keyed by array index, in place, never rebuilt. Cull
+    // anything beyond the revealed prefix first (a seek can move backward).
+    for (var key of Array.from(dotNodes.keys())) {
+      if (key > revealIndex) { dotNodes.get(key).remove(); dotNodes.delete(key); }
     }
-
-    for (var idx = 0; idx < revealed.length; idx++) {
-      var p = revealed[idx];
-      var wp = waypoints[idx];
-
-      var circle = document.createElementNS(SVG_NS, 'circle');
+    for (var idx = 0; idx <= revealIndex; idx++) {
+      var p = points[idx];
+      var circle = dotNodes.get(idx);
+      if (!circle) {
+        var wp = waypoints[idx];
+        circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('r', String(WAYPOINT_RADIUS));
+        circle.setAttribute('class', 'sj-waypoint');
+        circle.setAttribute('data-testid', 'ship-journey-waypoint');
+        circle.setAttribute('data-identifier', wp.identifier);
+        circle.setAttribute('data-bearing', wp.bearing);
+        g.appendChild(circle);
+        dotNodes.set(idx, circle);
+      }
       circle.setAttribute('cx', String(p.x));
       circle.setAttribute('cy', String(p.y));
-      circle.setAttribute('r', String(WAYPOINT_RADIUS));
-      circle.setAttribute('class', 'sj-waypoint');
-      circle.setAttribute('data-testid', 'ship-journey-waypoint');
-      circle.setAttribute('data-identifier', wp.identifier);
-      circle.setAttribute('data-bearing', wp.bearing);
-      g.appendChild(circle);
     }
 
-    svg.appendChild(g);
+    // Trail segments — path d's are broken wherever a north-star change falls
+    // between two consecutive revealed waypoints, keyed by segment-start
+    // index so a segment already closed by a break keeps its identity and is
+    // never rebuilt once it stops changing. The trailing (still-open) segment
+    // additionally tracks the ship's own tween point, so the trail's tip
+    // visibly leads into the ship rather than stopping dead at the last dot.
+    var wantedSegs = new Set();
+    var segStart = 0;
+    for (var i2 = 1; i2 <= revealIndex + 1; i2++) {
+      if (i2 === revealIndex + 1 || breakBefore[i2]) {
+        var segPoints = points.slice(segStart, i2);
+        if (i2 === revealIndex + 1 && canTween) segPoints = segPoints.concat([shipPoint]);
+        if (segPoints.length > 1) {
+          wantedSegs.add(segStart);
+          var d = 'M ' + segPoints.map(function (pt) { return pt.x + ',' + pt.y; }).join(' L ');
+          var path = segNodes.get(segStart);
+          if (!path) {
+            path = document.createElementNS(SVG_NS, 'path');
+            path.setAttribute('class', 'sj-trail-segment');
+            g.appendChild(path);
+            segNodes.set(segStart, path);
+          }
+          path.setAttribute('d', d);
+        }
+        segStart = i2;
+      }
+    }
+    for (var segKey of Array.from(segNodes.keys())) {
+      if (!wantedSegs.has(segKey)) { segNodes.get(segKey).remove(); segNodes.delete(segKey); }
+    }
 
+    // ★ star-change marker — deliberately a SIBLING of `g`, not a child: the
+    // dots and trail belong inside the zoomed group (that is what keeps the
+    // mark:step ratio scale-invariant), but the ★ has to stay a constant size
+    // on screen, so it lives in the unscaled outer viewBox. Removed (not
+    // hidden) once a seek un-reveals its star change.
     if (starCount > 0) {
-      // Deliberately a SIBLING of `g`, not a child: the dots and trail belong
-      // inside the zoomed group (that is what keeps the mark:step ratio
-      // scale-invariant), but the ★ has to stay a constant size on screen, so
-      // it lives in the unscaled outer viewBox and takes its font-size in
-      // those units. Do not "tidy" it back into `g` — a counter-scale on a
-      // zoomed child would need a transform-origin correction to match.
-      // Its screen position is zoom*(0,0) + translate, which reduces to the
-      // translate itself.
-      //
-      // Containment, measured rather than estimated (LIN-2089 review). The
-      // margin is computeFitZoom's pad: 10 above — 10 viewBox units between
-      // the fitted box and the ±100 edge. Against that:
-      //   - This marker is '★×N', NOT one glyph: '★×13' measures ~14.4-14.8
-      //     viewBox units (14.42 and 14.79 on two machines — it is font-metric
-      //     dependent), so a ~7.4-unit half-reach. A 5-glyph count (>=100 star
-      //     changes) would reach ~9 units. Still inside pad, but the headroom
-      //     is ~26%, not the "comfortable" margin a single glyph would have.
-      //     Pinned by the ★-collapse e2e case, which asserts this width.
-      //   - The origin's own excursion is bounded: every segment's first
-      //     waypoint is exactly one unit from it, so the origin can never be
-      //     more than 1 CONTENT unit outside the revealed box — at most
-      //     maxZoom * 1 = 4 viewBox units. That is why the union above is
-      //     defensive redundancy and no test pins it: with the union deleted
-      //     the ★ still clears the edge by ~77px on a 34-step outbound walk.
-      // So the binding constraint here is the counter's width, not the origin.
-      // Shrinking pad, or letting this marker grow (a longer prefix, a bigger
-      // font-size), is what would reopen the clip.
-      var flag = document.createElementNS(SVG_NS, 'text');
-      flag.setAttribute('x', String(translateX));
-      flag.setAttribute('y', String(translateY));
-      flag.setAttribute('class', 'sj-star-marker');
-      flag.setAttribute('data-testid', 'ship-journey-star-marker');
-      flag.textContent = starCount === 1 ? '★' : '★×' + starCount;
-      svg.appendChild(flag);
+      if (!starNode) {
+        starNode = document.createElementNS(SVG_NS, 'text');
+        starNode.setAttribute('class', 'sj-star-marker');
+        starNode.setAttribute('data-testid', 'ship-journey-star-marker');
+        svg.appendChild(starNode);
+      }
+      starNode.textContent = starCount === 1 ? '★' : '★×' + starCount;
+      starNode.setAttribute('x', String(translateX));
+      starNode.setAttribute('y', String(translateY));
+    } else if (starNode) {
+      starNode.remove();
+      starNode = null;
     }
+
+    // Ship glyph — same outer-viewBox rationale as the ★. Always present once
+    // playback has anything revealed (P7 / LIN-2067); own additive testid, no
+    // JS-declared stroke (keeps it out of the CSS/JS hand-sync contract).
+    if (!shipNode) {
+      shipNode = document.createElementNS(SVG_NS, 'path');
+      shipNode.setAttribute('class', 'sj-ship-marker');
+      shipNode.setAttribute('data-testid', 'ship-journey-ship');
+      shipNode.setAttribute('d', SHIP_GLYPH_PATH);
+      svg.appendChild(shipNode);
+    }
+    var shipScreenX = translateX + zoom * shipPoint.x;
+    var shipScreenY = translateY + zoom * shipPoint.y;
+    shipNode.setAttribute('transform', 'translate(' + shipScreenX + ',' + shipScreenY + ')');
+  }
+
+  // Advances `position`, keeping `currentIndex` (the reveal-truth int) and
+  // the scrub mirror in step whenever the floor crosses a waypoint boundary,
+  // then repaints. Used by both the rAF loop and the reduced-motion interval.
+  function applyPosition(rawPosition) {
+    position = Math.max(0, Math.min(waypoints.length - 1, rawPosition));
+    var floored = Math.floor(position);
+    if (floored !== currentIndex) {
+      currentIndex = floored;
+      if (scrub) scrub.value = String(currentIndex);
+    }
+    paint(position);
   }
 
   function setIndex(next) {
     currentIndex = Math.max(0, Math.min(waypoints.length - 1, next));
+    position = currentIndex; // every seek snaps the tween — nothing can strand the ship mid-frame
     if (scrub) scrub.value = String(currentIndex);
-    render();
+    paint(position);
   }
 
   function stop() {
+    playing = false;
     if (playTimer) { clearInterval(playTimer); playTimer = null; }
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    lastFrameTime = null;
     if (playBtn) { playBtn.setAttribute('aria-pressed', 'false'); playBtn.textContent = '▶'; }
   }
 
+  function rafStep(now) {
+    if (!playing) return;
+    if (lastFrameTime === null) lastFrameTime = now;
+    var elapsed = now - lastFrameTime;
+    lastFrameTime = now;
+    applyPosition(position + elapsed / 700);
+    if (position >= waypoints.length - 1) { stop(); return; }
+    rafId = requestAnimationFrame(rafStep);
+  }
+
   function play() {
-    if (currentIndex >= waypoints.length - 1) currentIndex = -1; // replay from the start
+    if (currentIndex >= waypoints.length - 1) applyPosition(0); // replay from the start
     if (playBtn) { playBtn.setAttribute('aria-pressed', 'true'); playBtn.textContent = '⏸'; }
-    playTimer = setInterval(function () {
-      if (currentIndex >= waypoints.length - 1) { stop(); return; }
-      setIndex(currentIndex + 1);
-    }, 700);
+    playing = true;
+    if (REDUCED_MOTION) {
+      // Same paint() reconcile as standard motion — only the cadence differs
+      // (discrete +1 per 700ms tick instead of a continuous tween), so any
+      // future focusable per-node identity survives every reduced-motion
+      // step (mirrors public/live-console.js:1089-1093's REDUCED_MOTION
+      // branch: one deterministic paint per tick, no rAF).
+      playTimer = setInterval(function () {
+        if (!playing) return;
+        applyPosition(position + 1);
+        if (position >= waypoints.length - 1) stop();
+      }, 700);
+    } else {
+      lastFrameTime = null;
+      rafId = requestAnimationFrame(rafStep);
+    }
   }
 
   if (playBtn) {
     playBtn.addEventListener('click', function () {
-      if (playTimer) stop(); else play();
+      if (playing) stop(); else play();
     });
   }
   if (stepBackBtn) stepBackBtn.addEventListener('click', function () { stop(); setIndex(currentIndex - 1); });
@@ -267,5 +393,6 @@
     });
   }
 
-  render();
+  ensureStructure();
+  paint(position);
 })();
