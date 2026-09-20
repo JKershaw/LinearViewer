@@ -6,7 +6,7 @@
  */
 
 .sj-page {
-  max-width: 700px;
+  max-width: 900px; /* the house column width — kpis/live-console/session/roadmap */
   margin: 0 auto;
   padding: 0 1rem 3rem;
 }
@@ -68,9 +68,16 @@
 }
 
 /* ── Map ────────────────────────────────────────────────────────────────── */
+/*
+ * The map is square, so its height is its width — bound the width by the
+ * viewport too, or a wide column pushes the playback controls off-screen on a
+ * laptop (LIN-2089). Deliberately NOT a full-bleed breakout past .sj-page:
+ * see public/live-console.css:143 for the three review cycles that pattern
+ * cost on the Live Console timeline.
+ */
 .sj-map-wrap {
-  width: 100%;
-  max-width: 480px;
+  width: min(100%, 82vh);
+  max-width: none;
   margin: 0 auto;
   aspect-ratio: 1;
 }
@@ -81,21 +88,36 @@
   display: block;
 }
 
+/*
+ * Stroke widths are in SVG user units against derivePositions' 1-unit step,
+ * and are declared as constants in public/ship-journey.js (TRAIL_STROKE,
+ * WAYPOINT_HALO) so the ratio invariant can be unit-tested — keep the two
+ * files' numbers in step by hand. The trail must stay THINNER than the
+ * waypoint halo: the halo is what visually cuts the trail where it passes
+ * under a dot, and without that cut the beads dissolve back into one
+ * continuous thread (LIN-2089).
+ */
 .sj-trail-segment {
   fill: none;
   stroke: var(--brand);
-  stroke-width: 1.5;
+  stroke-width: 0.08;
   stroke-linejoin: round;
 }
 
 .sj-waypoint {
   fill: var(--brand);
   stroke: var(--card);
-  stroke-width: 0.75;
+  stroke-width: 0.1;
 }
 
+/*
+ * Rendered outside the zoomed <g> (see render()), so this font-size is in
+ * outer-viewBox units and the glyph stays a constant size on screen whatever
+ * the fit zoom. Centred on the berth origin rather than offset from it.
+ */
 .sj-star-marker {
-  font-size: 8px;
+  font-size: 6px;
   fill: var(--amber);
-  text-anchor: start;
+  text-anchor: middle;
+  dominant-baseline: central;
 }

@@ -12,16 +12,71 @@
  * reversal arcs over several steps instead of flipping across the ship's own
  * wake. A north-star change breaks the trail into a new segment (no
  * connecting line across the change, heading and position reset to a fresh
- * berth) and marks the first waypoint of the new segment with a ★.
+ * berth). Because every fresh berth sits one unit from the same origin, the
+ * ★ markers for those changes are collapsed into a single counted marker at
+ * that origin rather than drawn per segment (LIN-2089).
  *
  * Auto-fit (LIN-1682's window.computeFitZoom, common.js) recomputes on every
  * frame from the bounding box of the currently REVEALED points, so the view
  * zooms out as playback advances and more of the trail comes into frame.
  *
+ * Marker geometry is stated as a ratio against that one-unit step (LIN-2089):
+ * a waypoint's PAINTED mark (2r plus its halo stroke) stays under 80% of the
+ * step, so adjacent waypoints read as beads on a thread rather than merging
+ * into a blob. The ratio is scale-invariant — dots and trail live inside the
+ * zoomed <g>, so they shrink and grow with the fit exactly as the step does.
+ * The ★ deliberately does the opposite (see render()).
+ *
  * No-op when the map mount is absent (the server renders the honest thin-data
  * empty state instead of the map for a below-threshold journey).
  */
 (function () {
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // Marker geometry, in SVG user units against derivePositions' 1-unit step
+  // (LIN-2089). The invariant — 2*RADIUS + HALO <= 0.8 * step, and
+  // TRAIL_STROKE < HALO so the halo visibly cuts the trail where it passes
+  // under a dot — is pinned by tests/unit/ship-journey-geometry.test.js.
+  // HALO and TRAIL_STROKE are declared here and *rendered* from the matching
+  // stroke-width declarations in public/ship-journey.css; keep the two files'
+  // numbers in step by hand (same JS-owns-the-attribute, CSS-owns-the-paint
+  // split this file already uses for the waypoint's fill and testids).
+  var WAYPOINT_RADIUS = 0.32;
+  var WAYPOINT_HALO = 0.1; // .sj-waypoint stroke-width
+  var TRAIL_STROKE = 0.08; // .sj-trail-segment stroke-width
+  // How far a dot actually paints beyond its own centre: the fill radius plus
+  // half its centred halo stroke. Replaces LIN-1675 P3's blanket 6-unit
+  // MARKER_PAD, which padded the content box by six whole steps.
+  var DOT_REACH = WAYPOINT_RADIUS + WAYPOINT_HALO / 2;
+
+  function boundingBox(pts) {
+    if (!pts.length) return { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (var i = 0; i < pts.length; i++) {
+      if (pts[i].x < minX) minX = pts[i].x;
+      if (pts[i].x > maxX) maxX = pts[i].x;
+      if (pts[i].y < minY) minY = pts[i].y;
+      if (pts[i].y > maxY) maxY = pts[i].y;
+    }
+    return { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+  }
+
+  // Test-only seam (inert in the browser, where `module` is undefined): expose
+  // the geometry constants and the pure bounding-box helper so the
+  // ratio-invariant unit test can read the live numbers instead of a copy.
+  // Sits ABOVE the DOM lookups below because those return early when the map
+  // mount is absent — which is exactly the case in a vm sandbox. Same pattern
+  // as public/ship-biscuit.js:211 / public/ship.js.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      WAYPOINT_RADIUS: WAYPOINT_RADIUS,
+      WAYPOINT_HALO: WAYPOINT_HALO,
+      TRAIL_STROKE: TRAIL_STROKE,
+      DOT_REACH: DOT_REACH,
+      boundingBox: boundingBox,
+    };
+  }
+
   var DATA = window.__SHIP_JOURNEY_DATA__ || { waypoints: [], starChanges: [] };
   var svg = document.getElementById('ship-journey-map');
   if (!svg) return;
@@ -29,9 +84,6 @@
   var waypoints = DATA.waypoints || [];
   var starChanges = DATA.starChanges || [];
   if (!waypoints.length) return;
-
-  var SVG_NS = 'http://www.w3.org/2000/svg';
-  var MARKER_PAD = 6; // bounding-box padding for the marker's own radius
 
   // x/y are derived server-side (lib/ship-journey.js's derivePositions) —
   // read directly rather than re-deriving placement client-side.
@@ -58,25 +110,30 @@
   var currentIndex = waypoints.length - 1; // start fully revealed, matching the server-rendered scrub value
   var playTimer = null;
 
-  function boundingBox(pts) {
-    if (!pts.length) return { minX: -1, maxX: 1, minY: -1, maxY: 1 };
-    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (var i = 0; i < pts.length; i++) {
-      if (pts[i].x < minX) minX = pts[i].x;
-      if (pts[i].x > maxX) maxX = pts[i].x;
-      if (pts[i].y < minY) minY = pts[i].y;
-      if (pts[i].y > maxY) maxY = pts[i].y;
-    }
-    return { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
-  }
-
   function render() {
     while (svg.firstChild) svg.removeChild(svg.firstChild);
 
     var revealed = points.slice(0, currentIndex + 1);
-    var box = boundingBox(revealed);
-    var contentWidth = Math.max(1, box.maxX - box.minX + 2 * MARKER_PAD);
-    var contentHeight = Math.max(1, box.maxY - box.minY + 2 * MARKER_PAD);
+
+    // Every segment break resets the walk to a fresh berth one unit from the
+    // shared origin (lib/ship-journey.js's derivePositions), so ★ markers for
+    // *different* star changes land on top of each other rather than merely
+    // near each other — no glyph size can separate them. Collapse them into
+    // one counted marker anchored at that origin instead (LIN-2089).
+    var starCount = 0;
+    for (var b = 0; b < revealed.length; b++) {
+      if (breakBefore[b]) starCount++;
+    }
+
+    // The ★ anchors at the origin, which is never itself a plotted waypoint, so
+    // a walk heading away from the berth fits a box the origin falls outside.
+    // Union it in so the fit is honest about everything it has to contain.
+    // Defensive, not load-bearing — see the containment note at the ★ below for
+    // the measurement that says so.
+    var fitted = starCount > 0 ? revealed.concat([{ x: 0, y: 0 }]) : revealed;
+    var box = boundingBox(fitted);
+    var contentWidth = Math.max(1, box.maxX - box.minX + 2 * DOT_REACH);
+    var contentHeight = Math.max(1, box.maxY - box.minY + 2 * DOT_REACH);
     var zoom = window.computeFitZoom({
       contentWidth: contentWidth,
       contentHeight: contentHeight,
@@ -125,20 +182,10 @@
       var p = revealed[idx];
       var wp = waypoints[idx];
 
-      if (breakBefore[idx]) {
-        var flag = document.createElementNS(SVG_NS, 'text');
-        flag.setAttribute('x', String(p.x + 4));
-        flag.setAttribute('y', String(p.y - 4));
-        flag.setAttribute('class', 'sj-star-marker');
-        flag.setAttribute('data-testid', 'ship-journey-star-marker');
-        flag.textContent = '★';
-        g.appendChild(flag);
-      }
-
       var circle = document.createElementNS(SVG_NS, 'circle');
       circle.setAttribute('cx', String(p.x));
       circle.setAttribute('cy', String(p.y));
-      circle.setAttribute('r', '3');
+      circle.setAttribute('r', String(WAYPOINT_RADIUS));
       circle.setAttribute('class', 'sj-waypoint');
       circle.setAttribute('data-testid', 'ship-journey-waypoint');
       circle.setAttribute('data-identifier', wp.identifier);
@@ -147,6 +194,43 @@
     }
 
     svg.appendChild(g);
+
+    if (starCount > 0) {
+      // Deliberately a SIBLING of `g`, not a child: the dots and trail belong
+      // inside the zoomed group (that is what keeps the mark:step ratio
+      // scale-invariant), but the ★ has to stay a constant size on screen, so
+      // it lives in the unscaled outer viewBox and takes its font-size in
+      // those units. Do not "tidy" it back into `g` — a counter-scale on a
+      // zoomed child would need a transform-origin correction to match.
+      // Its screen position is zoom*(0,0) + translate, which reduces to the
+      // translate itself.
+      //
+      // Containment, measured rather than estimated (LIN-2089 review). The
+      // margin is computeFitZoom's pad: 10 above — 10 viewBox units between
+      // the fitted box and the ±100 edge. Against that:
+      //   - This marker is '★×N', NOT one glyph: '★×13' measures ~14.4-14.8
+      //     viewBox units (14.42 and 14.79 on two machines — it is font-metric
+      //     dependent), so a ~7.4-unit half-reach. A 5-glyph count (>=100 star
+      //     changes) would reach ~9 units. Still inside pad, but the headroom
+      //     is ~26%, not the "comfortable" margin a single glyph would have.
+      //     Pinned by the ★-collapse e2e case, which asserts this width.
+      //   - The origin's own excursion is bounded: every segment's first
+      //     waypoint is exactly one unit from it, so the origin can never be
+      //     more than 1 CONTENT unit outside the revealed box — at most
+      //     maxZoom * 1 = 4 viewBox units. That is why the union above is
+      //     defensive redundancy and no test pins it: with the union deleted
+      //     the ★ still clears the edge by ~77px on a 34-step outbound walk.
+      // So the binding constraint here is the counter's width, not the origin.
+      // Shrinking pad, or letting this marker grow (a longer prefix, a bigger
+      // font-size), is what would reopen the clip.
+      var flag = document.createElementNS(SVG_NS, 'text');
+      flag.setAttribute('x', String(translateX));
+      flag.setAttribute('y', String(translateY));
+      flag.setAttribute('class', 'sj-star-marker');
+      flag.setAttribute('data-testid', 'ship-journey-star-marker');
+      flag.textContent = starCount === 1 ? '★' : '★×' + starCount;
+      svg.appendChild(flag);
+    }
   }
 
   function setIndex(next) {
