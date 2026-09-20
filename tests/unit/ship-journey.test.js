@@ -757,7 +757,7 @@ describe('cumulative-walk placement', () => {
     assert.ok(Math.abs(distance(byId.A, byId.C) - 1) < 1e-9);
   });
 
-  test('a north-star segment break resets both heading and position to a fresh berth', () => {
+  test('a north-star segment break continues the walk from the prior segment\'s final waypoint, not a fresh berth', () => {
     const reports = [
       createReport({ generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: [{ identifier: 'W1', bearing: 'N', reason: '', archived: false }] }),
       createReport({ generatedAt: '2026-01-05T00:00:00Z', northStar: 'Ship B', orientation: [{ identifier: 'W2', bearing: 'S', reason: '', archived: false }] })
@@ -771,12 +771,61 @@ describe('cumulative-walk placement', () => {
     assert.strictEqual(result.starChanges.length, 1, 'sanity: a star change is present between W1 and W2');
 
     const byId = Object.fromEntries(result.waypoints.map(wp => [wp.identifier, wp]));
-    // W2 opens a fresh segment: heading = its own bearing (S, 90°) directly,
-    // position measured from the origin — not a bounded-turn step from W1's
-    // accumulated position/heading.
-    assert.ok(Math.abs(byId.W2.x - 0) < 1e-9, 'a fresh berth starts at x=0');
-    assert.ok(Math.abs(byId.W2.y - 1) < 1e-9, 'a fresh berth steps one unit along its own bearing (S), not a clamped turn from W1');
-    assert.ok(Math.abs(distance({ x: 0, y: 0 }, byId.W2) - 1) < 1e-9);
+
+    // W1 is unaffected by the later break — one unit from the berth along its
+    // own bearing (N, 270°).
+    assert.ok(Math.abs(distance({ x: 0, y: 0 }, byId.W1) - 1) < 1e-9);
+
+    // W2 continues the walk: exactly one unit from W1's position, via a
+    // bounded turn from W1's heading toward S — NOT one unit from the origin
+    // along S directly (the old fresh-berth reset).
+    assert.ok(Math.abs(distance(byId.W1, byId.W2) - 1) < 1e-9,
+      'W2 must be exactly one unit from W1 — the walk continues across the break');
+    assert.ok(distance({ x: 0, y: 0 }, byId.W2) > 1 + 1e-9,
+      'W2 must NOT sit one unit from the origin — that would be the old fresh-berth reset');
+
+    // The break is still an event: reversing straight to S (90°) from W1's
+    // heading (N, 270°) is a direct reversal, so it is bounded by
+    // MAX_TURN_DEGREES like any other step, not snapped straight to S.
+    const dx = byId.W2.x - byId.W1.x;
+    const dy = byId.W2.y - byId.W1.y;
+    let headingAtW2 = (Math.atan2(dy, dx) * 180) / Math.PI;
+    if (headingAtW2 < 0) headingAtW2 += 360;
+    assert.ok(Math.abs(headingAtW2 - 90) > 1e-9, 'heading must not snap straight to S at the break');
+    const turned = Math.abs(((headingAtW2 - 270 + 540) % 360) - 180);
+    assert.ok(turned <= MAX_TURN_DEGREES + 1e-9, 'the turn at the break is bounded like any other step');
+  });
+
+  test('multiple north-star changes chain into one continuous walk — only the very first waypoint sits at the berth distance', () => {
+    const reports = [
+      createReport({ generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: [{ identifier: 'W1', bearing: 'N', reason: '', archived: false }] }),
+      createReport({ generatedAt: '2026-01-05T00:00:00Z', northStar: 'Ship B', orientation: [{ identifier: 'W2', bearing: 'S', reason: '', archived: false }] }),
+      createReport({ generatedAt: '2026-01-12T00:00:00Z', northStar: 'Ship C', orientation: [{ identifier: 'W3', bearing: 'E', reason: '', archived: false }] })
+    ];
+    const issues = [
+      createIssue({ identifier: 'W1', state: { name: 'Done', type: 'completed' }, completedAt: '2026-01-02T00:00:00Z' }),
+      createIssue({ identifier: 'W2', state: { name: 'Done', type: 'completed' }, completedAt: '2026-01-10T00:00:00Z' }),
+      createIssue({ identifier: 'W3', state: { name: 'Done', type: 'completed' }, completedAt: '2026-01-15T00:00:00Z' })
+    ];
+
+    const result = deriveJourney({ reports, issues });
+    assert.strictEqual(result.starChanges.length, 2, 'sanity: two star changes are present');
+
+    const byId = Object.fromEntries(result.waypoints.map(wp => [wp.identifier, wp]));
+    const points = [byId.W1, byId.W2, byId.W3];
+
+    // Every consecutive pair — break or not — is exactly one unit apart.
+    let prev = { x: 0, y: 0 };
+    for (const p of points) {
+      assert.ok(Math.abs(distance(prev, p) - 1) < 1e-9, 'each waypoint continues one unit from the previous');
+      prev = p;
+    }
+
+    // A fresh-berth reset would put W2 AND W3 at the same berth distance as
+    // W1; a continuous walk puts only W1 there.
+    assert.ok(Math.abs(distance({ x: 0, y: 0 }, byId.W1) - 1) < 1e-9, 'W1 is the sole berth-distance waypoint');
+    assert.ok(distance({ x: 0, y: 0 }, byId.W2) > 1 + 1e-9, 'W2 must not sit at the berth distance');
+    assert.ok(distance({ x: 0, y: 0 }, byId.W3) > 1 + 1e-9, 'W3 must not sit at the berth distance');
   });
 
   test('an out-of-vocabulary bearing holds heading steady and does not perturb subsequent valid placements (review F1)', () => {
