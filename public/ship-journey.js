@@ -462,8 +462,14 @@
     // user did not directly request (they clicked a different control), so
     // an unrequested page scroll on top of a culled node would be more
     // disorienting than the focus loss it fixes.
-    if (prevFocusedIdx !== null && prevFocusedIdx > revealIndex) {
-      var leading = dotNodes.get(revealIndex);
+    // Symmetric across both cull edges (LIN-2964): the narrow-viewport
+    // windowFloor can now cull a focused dot from below, not just from above,
+    // so clamp prevFocusedIdx into [windowFloor, revealIndex] rather than
+    // reassigning only against revealIndex. A no-op above the breakpoint
+    // (windowFloor === 0 keeps leadingIdx === revealIndex exactly as before).
+    if (prevFocusedIdx !== null && (prevFocusedIdx > revealIndex || prevFocusedIdx < windowFloor)) {
+      var leadingIdx = Math.max(windowFloor, Math.min(revealIndex, prevFocusedIdx));
+      var leading = dotNodes.get(leadingIdx);
       if (leading) leading.focus({ preventScroll: true });
     }
 
@@ -512,11 +518,15 @@
     // viewBox — positioned via the SAME translate+zoom transform as the ship
     // glyph below, anchored to its own junction point rather than the origin.
     // Culled (not hidden) once a seek un-reveals its star change, same
-    // discipline as dotNodes/segNodes.
+    // discipline as dotNodes/segNodes. AND anything below windowFloor
+    // (LIN-2964, same shape as the dot/label culls above): a break's
+    // junction can fold back inside the current window's fit box once its
+    // own trail segment and dots no longer exist, so the star must be
+    // windowed identically or it paints a marker with nothing under it.
     for (var starKey of Array.from(starNodes.keys())) {
-      if (starKey > revealIndex) { starNodes.get(starKey).remove(); starNodes.delete(starKey); }
+      if (starKey > revealIndex || starKey < windowFloor) { starNodes.get(starKey).remove(); starNodes.delete(starKey); }
     }
-    for (var bi = 1; bi <= revealIndex; bi++) {
+    for (var bi = Math.max(1, windowFloor); bi <= revealIndex; bi++) {
       if (!breakBefore[bi]) continue;
       var star = starNodes.get(bi);
       if (!star) {

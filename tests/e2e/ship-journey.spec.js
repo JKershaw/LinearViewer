@@ -1147,6 +1147,104 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       await page.setViewportSize({ width: 1280, height: 720 });
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
     });
+
+    // LIN-2964 (D1): windowFloor introduced a SECOND cull edge, but the
+    // pre-existing focus-reassignment guard (P8 / LIN-2068) only ever covered
+    // the upper one — a dot culled from below took focus straight to <body>.
+    // Reproduces the ticket's own repro table: focus the oldest in-window
+    // dot, then advance one scrub step so windowFloor culls it.
+    test('scrubbing forward past windowFloor reassigns focus from the culled oldest in-window dot to the new floor dot, never to <body>', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const WAYPOINT_COUNT = 121;
+
+      const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+
+      await page.evaluate(() => {
+        const scrub = document.getElementById('ship-journey-scrub');
+        scrub.value = '100';
+        scrub.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      const dot51 = page.locator('[data-testid="ship-journey-waypoint"][data-idx="51"]');
+      await dot51.focus();
+      await expect(dot51).toBeFocused();
+
+      await page.evaluate(() => {
+        const scrub = document.getElementById('ship-journey-scrub');
+        scrub.value = '101';
+        scrub.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+
+      const focusedIdx = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-idx'));
+      expect(focusedIdx).toBe('52'); // the new floor dot (windowFloor advanced to 52)
+      const focusedIsBody = await page.evaluate(() => document.activeElement === document.body);
+      expect(focusedIsBody).toBe(false);
+    });
+
+    // LIN-2964 (D2): the dot/label/segment loops were all windowed by
+    // windowFloor, but starNodes' cull/create was not — a break below the
+    // floor kept its ★ painted with no trail or waypoint under it, and a real
+    // fold-back walk can land that stale junction inside the current fit box.
+    // Two breaks: one below windowFloor once fully revealed (must be culled)
+    // and one inside it (must still render, at its junction, contained) — so
+    // the assertion proves alignment, not just an incidental zero count.
+    test('windows ★ star markers with the same floor as dots: an off-window junction is culled, an in-window one stays contained', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const WAYPOINT_COUNT = 121;
+      const NARROW_TRAIL_WINDOW = 50;
+
+      const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, (i) => (i < 40 ? 'S' : 'N'));
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(0, 1) },
+        // Break at index 1 — below windowFloor (71) once fully revealed; must be culled.
+        { generatedAt: '2026-01-01T12:00:00Z', northStar: 'Ship B', orientation: orientation.slice(1, 90) },
+        // Break at index 90 — inside the window; must still render and stay contained.
+        { generatedAt: '2026-04-09T12:00:00Z', northStar: 'Ship C', orientation: orientation.slice(90) },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(NARROW_TRAIL_WINDOW);
+
+      // Exactly one star exists: the in-window junction at index 90. If the
+      // off-window junction at index 1 were still painted (pre-fix), this
+      // count would read 2 instead.
+      await expect(page.locator('[data-testid="ship-journey-star-marker"]')).toHaveCount(1);
+
+      const result = await page.evaluate(() => {
+        const g = document.querySelector('[data-testid="ship-journey-trail"]');
+        const m = /translate\(([-\d.eE]+),([-\d.eE]+)\)\s*scale\(([-\d.eE]+)\)/.exec(g.getAttribute('transform'));
+        const translateX = parseFloat(m[1]);
+        const translateY = parseFloat(m[2]);
+        const zoom = parseFloat(m[3]);
+        const junctionDot = document.querySelector('[data-testid="ship-journey-waypoint"][data-idx="90"]');
+        const junctionX = translateX + zoom * parseFloat(junctionDot.getAttribute('cx'));
+        const junctionY = translateY + zoom * parseFloat(junctionDot.getAttribute('cy'));
+        const star = document.querySelector('[data-testid="ship-journey-star-marker"]');
+        const svg = document.getElementById('ship-journey-map');
+        const svgRect = svg.getBoundingClientRect();
+        const starRect = star.getBoundingClientRect();
+        return {
+          starX: parseFloat(star.getAttribute('x')),
+          starY: parseFloat(star.getAttribute('y')),
+          junctionX, junctionY,
+          contained: starRect.left >= svgRect.left - 0.5 && starRect.right <= svgRect.right + 0.5
+            && starRect.top >= svgRect.top - 0.5 && starRect.bottom <= svgRect.bottom + 0.5,
+        };
+      });
+      expect(Math.abs(result.starX - result.junctionX)).toBeLessThan(1e-6);
+      expect(Math.abs(result.starY - result.junctionY)).toBeLessThan(1e-6);
+      expect(result.contained).toBe(true);
+    });
   });
 
   // LIN-2959: desktop regression witness — the narrow-viewport branch must be
