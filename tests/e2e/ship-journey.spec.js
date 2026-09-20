@@ -488,13 +488,18 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       await loadJourney(page, seedLocal, localWorkerUrlKey, 4);
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(4);
 
-      // Tag the group and the two dots that will survive a step back+forward.
+      // Tag the group, the two dots, and the two paired labels (P8 /
+      // LIN-2068's label layer is keyed by the same index as the dots, so
+      // the same two positions survive the same step back+forward cycle).
       await page.evaluate(() => {
         const g = document.querySelector('[data-testid="ship-journey-trail"]');
         g.__probe = true;
         const dots = document.querySelectorAll('[data-testid="ship-journey-waypoint"]');
         dots[0].__probe = 'dot0';
         dots[1].__probe = 'dot1';
+        const labels = document.querySelectorAll('.sj-waypoint-label');
+        labels[0].__probe = 'label0';
+        labels[1].__probe = 'label1';
       });
 
       // P8 / LIN-2068: focus dot1 before stepping — it is retained (not
@@ -521,16 +526,23 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
         scrub.dispatchEvent(new Event('input', { bubbles: true }));
       });
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(3);
+      // P8 / LIN-2068: the label layer is culled in the same revealIndex pass
+      // as the dots, so a backward scrub must never leave an orphaned label
+      // (or a missing one) behind — pin the two counts in lockstep, not just
+      // the dot count, so a broken/missing label-cull loop shows up here.
+      await expect(page.locator('.sj-waypoint-label')).toHaveCount(3);
       await page.evaluate(() => {
         const scrub = document.getElementById('ship-journey-scrub');
         scrub.value = '3';
         scrub.dispatchEvent(new Event('input', { bubbles: true }));
       });
       await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(4);
+      await expect(page.locator('.sj-waypoint-label')).toHaveCount(4);
 
       const survived = await page.evaluate(() => {
         const g = document.querySelector('[data-testid="ship-journey-trail"]');
         const dots = document.querySelectorAll('[data-testid="ship-journey-waypoint"]');
+        const labels = document.querySelectorAll('.sj-waypoint-label');
         return {
           gSurvived: g.__probe === true && g.isConnected,
           dot0Survived: dots[0].__probe === 'dot0' && dots[0].isConnected,
@@ -539,6 +551,13 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
           // on step-forward, not a resurrected one — it never got tagged.
           dot3IsFresh: dots[3].__probe === undefined,
           dot1StillFocused: dots[1] === document.activeElement,
+          // Same identity property as the dots, but for the label layer's
+          // own keyed reconcile (P8 / LIN-2068) — a rebuild-per-frame label
+          // node would lose this tag even though the dot-count assertions
+          // above stay green.
+          label0Survived: labels[0].__probe === 'label0' && labels[0].isConnected,
+          label1Survived: labels[1].__probe === 'label1' && labels[1].isConnected,
+          label3IsFresh: labels[3].__probe === undefined,
         };
       });
       expect(survived.gSurvived).toBe(true);
@@ -546,6 +565,9 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       expect(survived.dot1Survived).toBe(true);
       expect(survived.dot3IsFresh).toBe(true);
       expect(survived.dot1StillFocused).toBe(true);
+      expect(survived.label0Survived).toBe(true);
+      expect(survived.label1Survived).toBe(true);
+      expect(survived.label3IsFresh).toBe(true);
     });
 
     // S3: standard-motion playback genuinely tweens the ship between
@@ -775,6 +797,10 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
 
       await circle.hover();
       await expect(label).toHaveAttribute('data-revealed', 'true');
+      // The reveal must show the waypoint's actual title (identifier
+      // fallback when no title is present) — not just the attribute flip.
+      // identityFixture above set this waypoint's title to 'First'.
+      await expect(label).toHaveText('First');
 
       // Move the pointer well clear of the map to fire pointerout.
       await page.mouse.move(5, 5);
