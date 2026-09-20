@@ -34,6 +34,42 @@ function journeySeed(urlKey) {
   };
 }
 
+/**
+ * A many-waypoint seed plus its matching orientation entries (LIN-2089).
+ *
+ * `bearingAt(i)` picks each waypoint's bearing, which is what decides the
+ * trail's EXTENT: cycling bearings turns the walk back on itself (a compact
+ * rosette), a single bearing spans one unit per waypoint. Callers slice the
+ * returned `orientation` across several reports to place north-star changes.
+ *
+ * completedAt is `2026-<month>-<day>`, one waypoint per day from 2026-01-01,
+ * so a report's generatedAt can be placed between any two of them.
+ */
+function walkFixture(urlKey, count, bearingAt) {
+  const id = (rawId) => localSeedId(urlKey, rawId);
+  const issues = [];
+  const orientation = [];
+  for (let i = 0; i < count; i++) {
+    const identifier = `LOCAL-${i + 1}`;
+    const month = String(Math.floor(i / 27) + 1).padStart(2, '0');
+    const day = String((i % 27) + 1).padStart(2, '0');
+    issues.push({
+      id: id(`sj-issue-${i + 1}`), identifier, title: `Waypoint ${i + 1}`, description: '',
+      projectId: id('sj-proj-1'), sortOrder: i + 1, state: { name: 'Done', type: 'completed' },
+      completedAt: `2026-${month}-${day}T00:00:00Z`,
+      url: `/workspace/${urlKey}/issue/${id(`sj-issue-${i + 1}`)}`,
+    });
+    orientation.push({ identifier, bearing: bearingAt(i), reason: 'r', archived: false });
+  }
+  return {
+    seed: {
+      projects: [{ id: id('sj-proj-1'), name: 'Journey Project', content: '', sortOrder: 1 }],
+      issues,
+    },
+    orientation,
+  };
+}
+
 async function seedReports(page, urlKey, records) {
   const resp = await page.request.post(`/test/seed-report-history?urlKey=${urlKey}`, { data: { records } });
   expect(resp.ok(), `seed-report-history failed: ${await resp.text()}`).toBeTruthy();
@@ -127,13 +163,12 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
     await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(2);
   });
 
-  // LIN-2065 production-scale extent pin: the prior in-viewport case above
-  // exercises only 3 waypoints, well under where clipping actually begins
-  // (n ≈ 85 under the old absolute-polar placement, radius = 12 + index*8,
-  // which pins computeFitZoom at its 0.15 minZoom floor once the trail
-  // outgrows the viewport at that floor). This drives a real production-scale
-  // trail (130 waypoints, cycling all 8 bearings so the heading-inertia walk
-  // turns repeatedly) through the same geometry containment check.
+  // LIN-2065 production-scale COUNT pin — and, per LIN-2089, a count pin only.
+  // Cycling all 8 bearings makes the walk turn back on itself constantly, so
+  // 130 waypoints span an extent of only ≈9.24 units: computeFitZoom's maxZoom
+  // clamp binds and the fit never actually engages. This case therefore cannot
+  // fail for the reason a containment test exists. The max-extent probe below
+  // is the one that exercises the fit; keep both.
   test('a production-scale trail (130 waypoints, cycling bearings) stays fully contained in the map viewport', async ({ page, seedLocal, localWorkerUrlKey }) => {
     const urlKey = localWorkerUrlKey;
     const id = (rawId) => localSeedId(urlKey, rawId);
@@ -188,6 +223,138 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       expect(point.insideX).toBe(true);
       expect(point.insideY).toBe(true);
     }
+  });
+
+  // LIN-2089: the max-extent counterpart to the rosette above. A single
+  // bearing never turns, so 130 waypoints span ≈130 units — the fit is fully
+  // engaged and the marker geometry is under real pressure. This is where the
+  // dot:step ratio is observable: it is scale-invariant (dot and step are both
+  // inside the zoomed group), so measuring it in rendered CSS pixels at this
+  // extent pins the failure John saw — 121 waypoints reading as ~8 blobs.
+  test('a max-extent trail (130 waypoints, one bearing) stays contained and keeps its marks under 80% of a step', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const WAYPOINT_COUNT = 130;
+
+    const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'N');
+    await seedLocal(seed, { features: { shipJourney: true } });
+    await seedReports(page, urlKey, [
+      { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+    ]);
+    await page.request.get('/test/clear-workspace-issues-memo');
+
+    await page.goto(`/workspace/${urlKey}/ship-journey`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+
+    const measured = await page.evaluate(() => {
+      const svg = document.getElementById('ship-journey-map');
+      const svgRect = svg.getBoundingClientRect();
+      const rects = Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]'))
+        .map((el) => el.getBoundingClientRect());
+      const centre = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 });
+      const steps = [];
+      for (let i = 1; i < rects.length; i++) {
+        const a = centre(rects[i - 1]);
+        const b = centre(rects[i]);
+        steps.push(Math.hypot(b.x - a.x, b.y - a.y));
+      }
+      steps.sort((a, b) => a - b);
+      return {
+        outside: rects.filter((r) => (
+          r.left < svgRect.left - 0.5 || r.right > svgRect.right + 0.5
+          || r.top < svgRect.top - 0.5 || r.bottom > svgRect.bottom + 0.5
+        )).length,
+        widestMark: Math.max(...rects.map((r) => r.width)),
+        // Median rather than mean: immune to a single outlier step if the
+        // heading-inertia walk ever varies one.
+        medianStep: steps[Math.floor(steps.length / 2)],
+      };
+    });
+
+    expect(measured.outside).toBe(0);
+    expect(measured.medianStep).toBeGreaterThan(0);
+    // The mark must stay under 80% of the step. Note the client rect reports
+    // the FILL box — it excludes the halo stroke (this assertion measured
+    // exactly 5.99996 against the pre-fix r=3, i.e. 2r/step, not the 6.75
+    // painted figure) — so this is a real but conservative witness. The
+    // painted 2r+halo rule itself is pinned arithmetically in
+    // tests/unit/ship-journey-geometry.test.js.
+    expect(measured.widestMark / measured.medianStep).toBeLessThanOrEqual(0.8);
+  });
+
+  // LIN-2089: a regression witness for a ★-clipping defect that was live on
+  // main before this fix. Every segment break resets the walk to a berth one
+  // unit from the shared origin, so the ★ anchors at an origin that is not
+  // itself a plotted waypoint — a walk heading away from it fits a content box
+  // the origin falls outside, and the marker renders past the SVG's own edge.
+  test('the star marker stays inside the map when the trail walks away from the berth origin', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const WAYPOINT_COUNT = 35;
+
+    // One waypoint under the first north star, then a change, then a long
+    // single-bearing run away from the berth.
+    const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, (i) => (i === 0 ? 'N' : 'S'));
+    await seedLocal(seed, { features: { shipJourney: true } });
+    await seedReports(page, urlKey, [
+      { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(0, 1) },
+      // Lands between waypoint 1's and waypoint 2's completedAt, so the trail
+      // breaks there and the walk restarts at a fresh berth.
+      { generatedAt: '2026-01-01T12:00:00Z', northStar: 'Ship B', orientation: orientation.slice(1) },
+    ]);
+    await page.request.get('/test/clear-workspace-issues-memo');
+
+    await page.goto(`/workspace/${urlKey}/ship-journey`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+
+    const star = await page.evaluate(() => {
+      const svg = document.getElementById('ship-journey-map');
+      const svgRect = svg.getBoundingClientRect();
+      const el = document.querySelector('[data-testid="ship-journey-star-marker"]');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        overflowLeft: svgRect.left - r.left,
+        overflowRight: r.right - svgRect.right,
+        overflowTop: svgRect.top - r.top,
+        overflowBottom: r.bottom - svgRect.bottom,
+      };
+    });
+
+    expect(star).not.toBeNull();
+    expect(star.overflowLeft).toBeLessThanOrEqual(0.5);
+    expect(star.overflowRight).toBeLessThanOrEqual(0.5);
+    expect(star.overflowTop).toBeLessThanOrEqual(0.5);
+    expect(star.overflowBottom).toBeLessThanOrEqual(0.5);
+  });
+
+  // LIN-2089: derivePositions resets every segment to the SAME origin, so
+  // per-segment ★ glyphs render at identical coordinates — a starburst, not
+  // crowding, which no glyph size can separate. They collapse to one counted
+  // marker instead.
+  test('multiple north-star changes collapse to a single counted star marker', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const WAYPOINT_COUNT = 12;
+
+    const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'E');
+    await seedLocal(seed, { features: { shipJourney: true } });
+    // Three changes (A→B, B→C, C→D), each landing between two consecutive
+    // waypoints' completedAt.
+    await seedReports(page, urlKey, [
+      { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation: orientation.slice(0, 3) },
+      { generatedAt: '2026-01-03T12:00:00Z', northStar: 'Ship B', orientation: orientation.slice(3, 6) },
+      { generatedAt: '2026-01-06T12:00:00Z', northStar: 'Ship C', orientation: orientation.slice(6, 9) },
+      { generatedAt: '2026-01-09T12:00:00Z', northStar: 'Ship D', orientation: orientation.slice(9) },
+    ]);
+    await page.request.get('/test/clear-workspace-issues-memo');
+
+    await page.goto(`/workspace/${urlKey}/ship-journey`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+
+    const marker = page.locator('[data-testid="ship-journey-star-marker"]');
+    await expect(marker).toHaveCount(1);
+    await expect(marker).toContainText('×3');
   });
 
   test('redirects to settings when the flag is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
