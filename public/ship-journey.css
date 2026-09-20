@@ -111,6 +111,29 @@
 }
 
 /*
+ * Focus indicator (LIN-2962 F1): the global `:focus-visible` rule
+ * (public/style.css) sets `outline`/`outline-offset`, which resolve in an SVG
+ * shape's own LOCAL user space — inside paint()'s zoomed <g> (scale up to 4x
+ * at production extents), that local outline gets the ancestor CTM applied
+ * to it too, rendering a ring measured at ~13x the dot (LIN-1675 P8 review).
+ * A local `stroke` never has this problem: it paints in that same scaled
+ * space the dot's own fill/stroke already lives in (same as the unfocused
+ * halo above), so it stays proportionate to the dot at any fit zoom.
+ * `outline: none` suppresses the inherited global rule for this one
+ * selector only (`.sj-waypoint` is the repo's only focusable SVG node,
+ * confirmed by grep — public/style.css's own rule and its other consumers
+ * are untouched). stroke-width is a fixed local-unit constant, same order of
+ * magnitude as WAYPOINT_HALO above, not part of that hand-synced ratio
+ * contract itself — this is a focus-only override, the unfocused stroke/
+ * geometry stays exactly as declared above.
+ */
+.sj-waypoint:focus-visible {
+  outline: none;
+  stroke: var(--focus);
+  stroke-width: 0.3;
+}
+
+/*
  * Run provenance (LIN-2068 / P8): a small 4-token cycle keyed by each source
  * run's first-appearance rank (public/ship-journey.js's `runRank`), never a
  * path segmentation — provenance interleaves across waypoints. Rank 0 repeats

@@ -893,5 +893,92 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       expect(attrs[2].rank).toBe(attrs[3].rank);
       expect(attrs[0].rank).not.toBe(attrs[2].rank);
     });
+
+    // 9g: focus-ring bounded size (LIN-2962 F1). The pre-fix global
+    // outline-based :focus-visible rule resolved `outline`/`outline-offset`
+    // in the waypoint's own local SVG user space, which the zoomed <g>'s
+    // scale(...) transform then scaled again — measured at ~13x the dot's
+    // own rendered size (a ~127px ring around a ~9.5px dot), a solid block
+    // covering most of the map. The fixed local-stroke ring must stay
+    // proportionate to the dot instead: assert a hard, bounded ratio rather
+    // than a screenshot, as a direct, named contrast with that measurement.
+    test('focusing a waypoint enlarges its rendered size by a bounded ratio, not the ~13x oversized global outline', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = walkFixture(urlKey, 4, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+
+      const circle = page.locator('[data-testid="ship-journey-waypoint"]').first();
+      const unfocused = await circle.boundingBox();
+
+      await circle.focus();
+      await expect(circle).toBeFocused();
+      const focused = await circle.boundingBox();
+
+      const ratio = focused.width / unfocused.width;
+      expect(ratio).toBeGreaterThan(1); // a focus indicator is actually present
+      expect(ratio).toBeLessThanOrEqual(2); // and stays proportionate to the dot, nowhere near ~13x
+    });
+
+    // 9h: scrub-focus negative witness (LIN-2962 F2). The pre-fix
+    // `lastBlurredWaypointIdx` fallback armed on EVERY waypoint blur,
+    // wherever focus was actually going, one-shot-cleared only by the next
+    // paint() — so a legitimate blur away from a waypoint left it armed for
+    // whatever paint() ran next. Covers both of the ticket's repro paths:
+    // (1) focusing the scrub control and then scrubbing backward must never
+    // pull focus off the scrub and into the map; (2) focusing a waypoint,
+    // then legitimately blurring to <body> (a non-focusable click target),
+    // then clicking step-back must not steal focus into the map either —
+    // the narrowed relatedTarget allowlist only arms for the three playback
+    // buttons themselves.
+    test('the scrub control keeps focus during backward scrubbing, and a later step-back does not steal focus after a legitimate blur elsewhere', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const { seed, orientation } = walkFixture(urlKey, 4, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      const dots = page.locator('[data-testid="ship-journey-waypoint"]');
+      const scrubInput = page.locator('[data-testid="ship-journey-scrub"]');
+      await expect(dots).toHaveCount(4);
+
+      // Repro path 1: focus a waypoint, then focus the scrub (blurring the
+      // circle straight to the scrub, which is never on the allowlist), then
+      // scrub backward — the leading waypoint gets culled, but focus must
+      // stay on the scrub throughout.
+      await dots.nth(3).focus();
+      await expect(dots.nth(3)).toBeFocused();
+
+      await scrubInput.focus();
+      await expect(scrubInput).toBeFocused();
+
+      await scrubInput.press('ArrowLeft'); // native backward scrub, fires `input`
+      await expect(dots).toHaveCount(3); // the leading waypoint was culled
+      await expect(scrubInput).toBeFocused(); // ...but focus never left the scrub
+
+      // Repro path 2: focus a (still-live) waypoint, click a non-focusable
+      // element so focus legitimately rests on <body>, then click step-back
+      // — the cull must not pull focus into the map.
+      await dots.nth(1).focus();
+      await expect(dots.nth(1)).toBeFocused();
+
+      await page.locator('[data-testid="ship-journey-coverage"]').click();
+      const bodyFocused = await page.evaluate(() => document.activeElement === document.body);
+      expect(bodyFocused).toBe(true);
+
+      await page.locator('[data-testid="ship-journey-step-back"]').click();
+      const focusedTestId = await page.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-testid'));
+      expect(focusedTestId).not.toBe('ship-journey-waypoint');
+    });
   });
 });

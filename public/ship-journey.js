@@ -188,16 +188,26 @@
   var labelNodes = new Map();
   var shipNode = null;
 
-  // The idx of the waypoint a `focusout` most recently fired on (P8 /
-  // LIN-2068), consumed exactly once by the next paint() call. A playback
-  // control is a <button>: the browser's mousedown default action moves
-  // focus to it (firing the circle's own blur/focusout) BEFORE the button's
-  // `click` listener runs — so by the time that listener calls paint(),
-  // document.activeElement is already the button, not the waypoint that was
-  // focused a moment ago. The delegated focusout handler below observes the
-  // blur synchronously, in the same task, before paint() runs, so this is
-  // read (and reset) at the top of paint() instead of trusting
-  // document.activeElement alone.
+  // The idx of a waypoint that just blurred straight into one of the three
+  // playback buttons (P8 / LIN-2068, narrowed LIN-2962), consumed exactly
+  // once by the next paint() call. A playback control is a <button>: the
+  // browser's mousedown default action moves focus to it (firing the
+  // circle's own blur/focusout) BEFORE the button's `click` listener runs —
+  // so by the time that listener calls paint(), document.activeElement is
+  // already the button, not the waypoint that was focused a moment ago. The
+  // delegated focusout handler below observes the blur synchronously, in the
+  // same task, before paint() runs, so this is read (and reset) at the top
+  // of paint() instead of trusting document.activeElement alone.
+  //
+  // Narrowed via e.relatedTarget to arm ONLY for that one button-steal case
+  // (LIN-2962 F2): the original shipped version recorded every waypoint
+  // blur, wherever focus was going, cleared only by the next paint() — so a
+  // legitimate blur to the scrub control (or anywhere else) left this idx
+  // armed, and any later paint() with a lower revealIndex yanked focus back
+  // into the map out from under the control the user had actually moved to
+  // (breaking keyboard scrubbing). The read side in paint() is unchanged;
+  // only this write is now conditional on relatedTarget being one of
+  // playBtn/stepBackBtn/stepForwardBtn.
   var lastBlurredWaypointIdx = null;
 
   // Waypoint identity/provenance (P8 / LIN-2068). `runRank` is a plain
@@ -590,13 +600,19 @@
   }
   svg.addEventListener('focusin', function (e) { toggleLabel(e.target, true); });
   svg.addEventListener('focusout', function (e) {
+    // toggleLabel is unconditional — label reveal is a separate concern from
+    // the focus-restoration fallback below and must not be coupled to it.
     toggleLabel(e.target, false);
     // See lastBlurredWaypointIdx's declaration: this fires synchronously,
     // still inside the same task as (and before) a playback button's `click`
     // listener, which is the only way paint() otherwise learns a waypoint
     // was focused right before a button-triggered cull stole its focus.
+    // e.relatedTarget is the native, platform-supplied "where focus is
+    // going" field for a blur/focusout — restricting the write to it (rather
+    // than recording every waypoint blur) is what keeps this fallback from
+    // arming on a legitimate blur to the scrub control or anywhere else.
     var circle = e.target.closest && e.target.closest('[data-testid="ship-journey-waypoint"]');
-    if (circle) {
+    if (circle && (e.relatedTarget === playBtn || e.relatedTarget === stepBackBtn || e.relatedTarget === stepForwardBtn)) {
       var idx = parseInt(circle.getAttribute('data-idx'), 10);
       if (!isNaN(idx)) lastBlurredWaypointIdx = idx;
     }
