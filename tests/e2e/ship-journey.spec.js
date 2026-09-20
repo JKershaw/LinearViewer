@@ -1056,4 +1056,148 @@ test.describe('Ship Journey (LIN-1675 P3)', () => {
       expect(focusedTestId).not.toBe('ship-journey-waypoint');
     });
   });
+
+  // LIN-2959: the max-extent ratio witness above (:282) reads 0.640 on BOTH a
+  // 390px phone and a 1280px desktop — the mark:step ratio is scale-invariant
+  // (LIN-2089), so it passes identically on the broken viewport and cannot be
+  // the mobile witness. medianStep in measured css px is the durable pin
+  // instead: it fails today, pre-window, at ~2.38px on this exact fixture.
+  test.describe('Mobile viewport (390x844) — narrow trail window (LIN-2959)', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test('windows the trail to the most recent 50 waypoints and restores the painted-mark pixel floor', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const WAYPOINT_COUNT = 121;
+      const NARROW_TRAIL_WINDOW = 50;
+
+      // Max-extent, single-bearing fixture (LIN-2070 F1) — never the bearing
+      // cycle, whose extent never engages the fit at all.
+      const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+
+      // Windowed create/cull loops, not just the fit-box input: only the
+      // most recent NARROW_TRAIL_WINDOW waypoints exist in the DOM at all.
+      // If the fit box alone were narrowed, off-window dots would stay in
+      // the DOM — clipped visually but still tabindex="0" and reachable by
+      // keyboard, a silent accessibility regression this assertion catches.
+      const waypoints = page.locator('[data-testid="ship-journey-waypoint"]');
+      await expect(waypoints).toHaveCount(NARROW_TRAIL_WINDOW);
+
+      const measured = await page.evaluate(() => {
+        const svg = document.getElementById('ship-journey-map');
+        const svgRect = svg.getBoundingClientRect();
+        const waypointEls = Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]'));
+        const rects = waypointEls.map((el) => el.getBoundingClientRect());
+        const centre = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 });
+        const steps = [];
+        for (let i = 1; i < rects.length; i++) {
+          const a = centre(rects[i - 1]);
+          const b = centre(rects[i]);
+          steps.push(Math.hypot(b.x - a.x, b.y - a.y));
+        }
+        steps.sort((a, b) => a - b);
+        return {
+          outside: rects.filter((r) => (
+            r.left < svgRect.left - 0.5 || r.right > svgRect.right + 0.5
+            || r.top < svgRect.top - 0.5 || r.bottom > svgRect.bottom + 0.5
+          )).length,
+          medianStep: steps[Math.floor(steps.length / 2)],
+          minDataIdx: Math.min(...waypointEls.map((el) => parseInt(el.getAttribute('data-idx'), 10))),
+          labelCount: document.querySelectorAll('[data-testid="ship-journey-waypoint-label"]').length,
+        };
+      });
+
+      // The pixel-budget pin (research: windowing at K<=~52 restores the
+      // ~4px painted-glyph floor on a 319px-wide phone map; the maxZoom:4
+      // clamp puts the windowed step at 6.38px, comfortably above 4).
+      expect(measured.medianStep).toBeGreaterThanOrEqual(4);
+      expect(measured.outside).toBe(0);
+      // Tab order / accessibility: the window floor for a fully-revealed
+      // 121-waypoint trail is 121 - 50 = 71 — no dot (and no label node,
+      // culled in the same pass) exists below it.
+      expect(measured.minDataIdx).toBe(WAYPOINT_COUNT - NARROW_TRAIL_WINDOW);
+      expect(measured.labelCount).toBe(NARROW_TRAIL_WINDOW);
+    });
+
+    test('crossing the 640px breakpoint on resize repaints the window without a new reveal', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const urlKey = localWorkerUrlKey;
+      const WAYPOINT_COUNT = 121;
+      const NARROW_TRAIL_WINDOW = 50;
+
+      const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'N');
+      await seedLocal(seed, { features: { shipJourney: true } });
+      await seedReports(page, urlKey, [
+        { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+      ]);
+      await page.request.get('/test/clear-workspace-issues-memo');
+
+      await page.goto(`/workspace/${urlKey}/ship-journey`);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(NARROW_TRAIL_WINDOW);
+
+      // No scrub/step/play interaction crosses the breakpoint — the resize
+      // itself, via narrowMq's own change listener, must trigger the repaint.
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+    });
+  });
+
+  // LIN-2959: desktop regression witness — the narrow-viewport branch must be
+  // a no-op above the breakpoint. Same fixture and measurements as the
+  // existing max-extent test above (:234), at the same unset-viewport
+  // (Playwright default 1280x720) so a mobile fix can never quietly become a
+  // desktop regression.
+  test('above the 640px breakpoint, a max-extent trail (121 waypoints) is unwindowed and unchanged', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const WAYPOINT_COUNT = 121;
+
+    const { seed, orientation } = walkFixture(urlKey, WAYPOINT_COUNT, () => 'N');
+    await seedLocal(seed, { features: { shipJourney: true } });
+    await seedReports(page, urlKey, [
+      { generatedAt: '2026-01-01T00:00:00Z', northStar: 'Ship A', orientation },
+    ]);
+    await page.request.get('/test/clear-workspace-issues-memo');
+
+    await page.goto(`/workspace/${urlKey}/ship-journey`);
+    await page.waitForLoadState('networkidle');
+
+    // windowFloor is always 0 above the breakpoint — every waypoint is still
+    // created (not just the most recent 50).
+    await expect(page.locator('[data-testid="ship-journey-waypoint"]')).toHaveCount(WAYPOINT_COUNT);
+
+    const measured = await page.evaluate(() => {
+      const svg = document.getElementById('ship-journey-map');
+      const svgRect = svg.getBoundingClientRect();
+      const rects = Array.from(document.querySelectorAll('[data-testid="ship-journey-waypoint"]'))
+        .map((el) => el.getBoundingClientRect());
+      const centre = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 });
+      const steps = [];
+      for (let i = 1; i < rects.length; i++) {
+        const a = centre(rects[i - 1]);
+        const b = centre(rects[i]);
+        steps.push(Math.hypot(b.x - a.x, b.y - a.y));
+      }
+      steps.sort((a, b) => a - b);
+      return {
+        outside: rects.filter((r) => (
+          r.left < svgRect.left - 0.5 || r.right > svgRect.right + 0.5
+          || r.top < svgRect.top - 0.5 || r.bottom > svgRect.bottom + 0.5
+        )).length,
+        widestMark: Math.max(...rects.map((r) => r.width)),
+        medianStep: steps[Math.floor(steps.length / 2)],
+      };
+    });
+
+    // The LIN-2089 containment/ratio guarantees hold exactly as before —
+    // proof this ticket did not trade desktop legibility away to buy mobile.
+    expect(measured.outside).toBe(0);
+    expect(measured.widestMark / measured.medianStep).toBeLessThanOrEqual(0.8);
+  });
 });
