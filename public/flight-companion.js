@@ -3,10 +3,9 @@
  *
  * Drives the in-page chat thread: renders through the shared `chat.css`/
  * `window.ChatUI` primitives (chat.js loads before this file — see
- * lib/render-flight-companion.js), streams turns over SSE (the fourth
- * per-page fork of the `readSSEStream` idiom — public/app.js, public/
- * roadmap.js, public/task-chat.js already define it), and runs its OWN
- * client wake cadence (never `public/observation.js`'s `POLL_MS = 5000` —
+ * lib/render-flight-companion.js), streams turns over SSE via the shared
+ * `readSSEStream` (public/common.js, LIN-2969), and runs its OWN client
+ * wake cadence (never `public/observation.js`'s `POLL_MS = 5000` —
  * that cadence paints a fast-moving table, this one gates a billable model
  * call). The server's §A.2 gate (`lib/flight-companion-gate.js`) remains
  * the sole spend authority regardless of anything this client sends or
@@ -1510,9 +1509,9 @@
     var endpoint = turnKind === 'boot' ? 'boot' : 'turn';
 
     // Raw fetch carve-out: this response may be a Server-Sent Events stream
-    // consumed via the reader below; window.api() parses the body as JSON
-    // and would break streaming — the non-stream branch reads the body
-    // itself instead.
+    // consumed via readSSEStream (public/common.js); window.api() parses the
+    // body as JSON and would break streaming — the non-stream branch reads
+    // the body itself instead.
     fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/flight-companion/' + endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
@@ -1643,39 +1642,6 @@
       settleFailedThinkingRow(answerEl, answerLi, turnKind, networkMessage);
       finishTurn(turnKind);
     });
-  }
-
-  function readSSEStream(response, onEvent) {
-    var reader = response.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer = '';
-
-    function pump() {
-      return reader.read().then(function (result) {
-        if (result.done) return;
-        buffer += decoder.decode(result.value, { stream: true });
-        var parts = buffer.split('\n\n');
-        buffer = parts.pop();
-        for (var i = 0; i < parts.length; i++) {
-          var part = parts[i];
-          if (!part.trim()) continue;
-          var type = 'message';
-          var eventData = '';
-          var lines = part.split('\n');
-          for (var j = 0; j < lines.length; j++) {
-            var line = lines[j];
-            if (line.indexOf('event: ') === 0) type = line.slice(7);
-            else if (line.indexOf('data: ') === 0) eventData = line.slice(6);
-          }
-          if (eventData) {
-            try { onEvent(type, JSON.parse(eventData)); }
-            catch (e) { onEvent(type, eventData); }
-          }
-        }
-        return pump();
-      });
-    }
-    return pump();
   }
 
   function submitQuestion() {

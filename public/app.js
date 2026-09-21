@@ -1690,50 +1690,6 @@ const PHASE_LABELS = {
 }
 
 /**
- * Read an SSE stream from a fetch response, calling onEvent for each parsed event.
- * @param {Response} response - Fetch response with SSE body
- * @param {Function} onEvent - Callback: (type, data) => void
- * @returns {Promise<void>}
- */
-async function readSSEStream(response, onEvent) {
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    buffer += decoder.decode(value, { stream: true })
-
-    // Split on double newlines (SSE event boundaries)
-    const parts = buffer.split('\n\n')
-    buffer = parts.pop() // Keep incomplete last part
-
-    for (const part of parts) {
-      if (!part.trim()) continue
-
-      let type = 'message'
-      let data = ''
-
-      for (const line of part.split('\n')) {
-        if (line.startsWith(':')) continue // Skip SSE comments
-        if (line.startsWith('event: ')) type = line.slice(7)
-        else if (line.startsWith('data: ')) data = line.slice(6)
-      }
-
-      if (data) {
-        try {
-          onEvent(type, JSON.parse(data))
-        } catch {
-          onEvent(type, data)
-        }
-      }
-    }
-  }
-}
-
-/**
  * Initialize AI recommendation functionality
  * LIN-185: Uses SSE streaming for dynamic suggestion UX
  */
@@ -1826,8 +1782,8 @@ function initRecommendations() {
       const source = recommendContainer.dataset.source
       const sourceQuery = source ? `?source=${encodeURIComponent(source)}` : ''
       // Deliberately raw fetch (NOT window.api): this is an SSE stream read via
-      // response.body.getReader() (readSSEStream below). api() consumes the body
-      // as JSON, so streaming readers stay on raw fetch. (api() carve-out.)
+      // response.body.getReader() (readSSEStream, public/common.js). api() consumes
+      // the body as JSON, so streaming readers stay on raw fetch. (api() carve-out.)
       const response = await fetch(
         `${apiPrefix}/api/recommend/${issueId}/stream${sourceQuery}`,
         { signal: abortController.signal }
