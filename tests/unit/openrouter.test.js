@@ -1369,6 +1369,10 @@ describe('buildMetaPromptTemplate If Blocked / Principle 0 mirror (LIN-2202)', (
       planBullet.includes('GET /api/proxy/autopilot/manual'),
       'Plan-prompts must name the portable endpoint pointer'
     );
+    assert.ok(
+      planBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
+      'Plan-prompts must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
+    );
   });
 
   test('Implementation-prompts rule carries the Principle 0 sentinels and the manual pointer', () => {
@@ -1383,6 +1387,10 @@ describe('buildMetaPromptTemplate If Blocked / Principle 0 mirror (LIN-2202)', (
     assert.ok(
       implBullet.includes('GET /api/proxy/autopilot/manual'),
       'Implementation-prompts must name the portable endpoint pointer'
+    );
+    assert.ok(
+      implBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
+      'Implementation-prompts must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
     );
   });
 
@@ -1410,6 +1418,10 @@ describe('buildMetaPromptTemplate If Blocked / Principle 0 mirror (LIN-2202)', (
     assert.ok(
       blockedBullet.includes('GET /api/proxy/autopilot/manual'),
       'Blocked-prompts must name the portable endpoint pointer'
+    );
+    assert.ok(
+      blockedBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
+      'Blocked-prompts must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
     );
   });
 });

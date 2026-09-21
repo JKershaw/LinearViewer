@@ -4032,6 +4032,13 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
         result.prompt.includes('GET /api/proxy/autopilot/manual'),
         `${kind}: must name the portable endpoint pointer`
       );
+      // LIN-2973: a bare pointer isn't enough — the one-sentence test itself
+      // must reach the worker, not just the manual's name.
+      const flat = result.prompt.replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
+      assert.ok(
+        flat.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
+        `${kind}: must carry the Principle 0 acceptance test sentence itself, not just a pointer to it`
+      );
     }
   });
 
@@ -4107,6 +4114,10 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
         bullet.includes('GET /api/proxy/autopilot/manual'),
         `${label}-prompts bullet must name the portable endpoint pointer`
       );
+      assert.ok(
+        bullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
+        `${label}-prompts bullet must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)`
+      );
     }
   });
 
@@ -4133,6 +4144,13 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
       result.prompt.includes('GET /api/proxy/autopilot/manual'),
       'blocked: must name the portable endpoint pointer'
     );
+    // LIN-2973: the `blocked` template is itself one of the worker paths that used
+    // to strand the consumer with a bare pointer — assert the test sentence lands.
+    const flat = result.prompt.replace(/^>\s?/gm, '').replace(/\s+/g, ' ');
+    assert.ok(
+      flat.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
+      'blocked: must carry the Principle 0 acceptance test sentence itself, not just a pointer to it'
+    );
   });
 
   test('the meta-path Blocked-prompts quality rule mirrors the same Principle 0 gate + manual pointer', () => {
@@ -4158,6 +4176,10 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
     assert.ok(
       blockedBullet.includes('GET /api/proxy/autopilot/manual'),
       'Blocked-prompts bullet must name the portable endpoint pointer'
+    );
+    assert.ok(
+      blockedBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
+      'Blocked-prompts bullet must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
     );
   });
 });

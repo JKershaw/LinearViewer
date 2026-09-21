@@ -5,7 +5,10 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { buildAutopilotManual, extractPrincipleZeroSection } from '../../lib/prompts/autopilot-manual.js';
+import { buildAutopilotManual, extractPrincipleZeroSection, extractPrincipleZeroTest } from '../../lib/prompts/autopilot-manual.js';
+
+const PRINCIPLE_ZERO_TEST_SENTENCE =
+  'Does this genuinely require the human, right now — or is it just something the human might like to see?';
 
 describe('buildAutopilotManual (unchanged)', () => {
   test('still returns the whole manual, starting with the handbook title', () => {
@@ -49,6 +52,51 @@ describe('extractPrincipleZeroSection', () => {
     const manual = buildAutopilotManual();
     const section = extractPrincipleZeroSection();
     assert.ok(manual.includes(section));
+  });
+
+  // LIN-2973 acceptance: "the slice it returns now contains the test sentence" —
+  // the anchor-heading-present half is already pinned above; this is the second half.
+  test('now contains the one-sentence Principle 0 test (LIN-2973)', () => {
+    const section = extractPrincipleZeroSection();
+    const flat = section.replace(/^>\s?/gm, '').replace(/\s+/g, ' ').trim();
+    assert.ok(
+      flat.includes(PRINCIPLE_ZERO_TEST_SENTENCE),
+      'the hand-back section must state the Principle 0 acceptance test inline, not just point at it'
+    );
+  });
+});
+
+describe('extractPrincipleZeroTest (LIN-2973)', () => {
+  test('returns the one-sentence test, non-null', () => {
+    const result = extractPrincipleZeroTest();
+    assert.ok(result !== null, 'the test anchor must be found inside the hand-back section');
+    const flat = result.replace(/^>\s?/gm, '').replace(/\s+/g, ' ').trim();
+    assert.ok(flat.startsWith(PRINCIPLE_ZERO_TEST_SENTENCE));
+  });
+
+  test('carries the positive-half tie-break alongside the test', () => {
+    const flat = extractPrincipleZeroTest().replace(/\s+/g, ' ');
+    assert.ok(
+      flat.includes("it's yours — answer it and record the reasoning"),
+      'the positive tie-break (answerable questions are the worker\'s to answer) must be present'
+    );
+    assert.ok(
+      flat.includes('Escalate only what a person\'s preference alone can settle, or what\'s irreversible'),
+      'the escalate-only clause must be present'
+    );
+  });
+
+  test('is a substring of extractPrincipleZeroSection() — composed, not hand-duplicated', () => {
+    const section = extractPrincipleZeroSection();
+    const test = extractPrincipleZeroTest();
+    assert.ok(section.includes(test), 'the test text must be an exact slice of the section, so it cannot drift from it');
+  });
+
+  test('does NOT carry the orchestrator-only ruling/close-out mechanics from the rest of the section', () => {
+    const test = extractPrincipleZeroTest();
+    assert.ok(!test.includes('DECISION:'), 'must not pull in the DECISION: block shape');
+    assert.ok(!test.includes('Merge sibling blockers before you bubble up'), 'must not pull in sibling-merge mechanics');
+    assert.ok(!test.includes('close-out'), 'must not pull in close-out dispatch mechanics');
   });
 });
 
