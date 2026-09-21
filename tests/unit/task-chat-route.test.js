@@ -8,6 +8,11 @@
  *   1. One quota unit per TURN, never per hop. The whole tool loop lives inside
  *      a single turn, so `freeTierStore.tryUse` must be called exactly once and
  *      must NOT be reachable from a per-hop path (the catalog/executor).
+ *      LIN-2970 moved the `tryUse` call itself into `lib/chat-request.js`'s
+ *      `checkFreeTierGate` (the shared chat-lane free-tier gate) — the route
+ *      now calls THAT exactly once per turn instead, and the invariant is
+ *      pinned across both files so the "once per turn, never per hop"
+ *      guarantee still holds end to end.
  *   2. The route branches on `isToolCapableModel` and offers the read-only
  *      catalog only to a capable model, degrading to plain `streamChat` (tools
  *      off) otherwise — a silent model swap is explicitly rejected.
@@ -23,6 +28,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/task-chat.js'), 'utf8');
 const CATALOG_SRC = readFileSync(join(__dirname, '../../lib/chat-tools.js'), 'utf8');
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+const CHAT_REQUEST_SRC = readFileSync(join(__dirname, '../../lib/chat-request.js'), 'utf8');
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
@@ -44,9 +50,16 @@ function makeRes() {
 }
 
 describe('task-chat route tool-calling wiring (LIN-990)', () => {
-  test('calls freeTierStore.tryUse exactly once — one quota unit per turn, not per hop', () => {
-    const matches = ROUTE_SRC.match(/freeTierStore\.tryUse\s*\(/g) || [];
-    assert.strictEqual(matches.length, 1, 'expected exactly one tryUse call in the route');
+  test('calls the shared free-tier gate exactly once — one quota unit per turn, not per hop', () => {
+    // LIN-2970: the route no longer calls freeTierStore.tryUse directly — it
+    // calls lib/chat-request.js's checkFreeTierGate, which does. Pinning both
+    // ends preserves the original guarantee (once per turn, never per hop)
+    // across the extraction.
+    assert.doesNotMatch(ROUTE_SRC, /freeTierStore\.tryUse\s*\(/, 'the route must not call tryUse directly anymore — it goes through checkFreeTierGate');
+    const routeGateCalls = ROUTE_SRC.match(/checkFreeTierGate\s*\(/g) || [];
+    assert.strictEqual(routeGateCalls.length, 1, 'expected exactly one checkFreeTierGate call in the route');
+    const gateTryUseCalls = CHAT_REQUEST_SRC.match(/freeTierStore\.tryUse\s*\(/g) || [];
+    assert.strictEqual(gateTryUseCalls.length, 1, 'expected exactly one tryUse call inside checkFreeTierGate itself');
   });
 
   test('the tool catalog / executor never calls a quota store (no per-hop tryUse)', () => {

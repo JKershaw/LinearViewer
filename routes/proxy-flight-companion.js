@@ -38,14 +38,15 @@ import { buildCensusSeedText } from './flight-companion.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError } from '../lib/errors.js';
+import { CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 
-// Restated, not imported (lib/agent-turn.js's own house convention
-// for these prefixes/limits): a proxy caller's message body is capped the
-// same as the browser's, so a giant payload cannot inflate the prompt either
-// way. Kept in sync by inspection, not by a shared constant, matching how
-// lib/agent-turn.js restates COMPANION_INSTANCE_PREFIX/
-// SWEEP_INSTANCE_PREFIX rather than importing them.
-const MAX_MESSAGE_LENGTH = 2000;
+// LIN-2970: a proxy caller's message body is capped the same as the
+// browser's, via the shared chat-lane constant — no longer kept in sync by
+// inspection. This file does NOT adopt `lib/chat-request.js`'s credential
+// chain or free-tier gate (see this file's own header): the token creator's
+// key, resolved via `getWorkspaceOpenRouterKey` + `resolveProxyLLM` below,
+// stays its own deliberately separate path.
+const MAX_MESSAGE_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
 // LIN-2620: a message-less (auto-wake-shaped) proxy turn reserves/commits
 // against its OWN companion instance, never the browser's — see this file's

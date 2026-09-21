@@ -42,6 +42,23 @@
  * only the workspace-api.js count moves, and only because a real new site
  * was added in the same shape, not because an existing one changed.
  *
+ * LIN-2970 addendum: the chat lane's own two occurrences of the inline
+ * expression — routes/task-chat.js's single site, and ONE of
+ * routes/workspace-api-roadmap.js's two (its roadmap-CHAT site; roadmap-
+ * GENERATE's own site is untouched, named follow-up, not this ticket) — were
+ * deliberately extracted into `lib/chat-request.js`'s `resolveChatCredential`,
+ * which now carries the ONE canonical copy of the expression those two sites
+ * call instead of inlining. This is the exact `OAuth > paid env key > free
+ * tier` precedence, relocated, not changed — LIN-2970's own acceptance
+ * criterion is "no change to the precedence, only to where it lives". The
+ * counts below move accordingly (task-chat.js 1→0, workspace-api-roadmap.js
+ * 2→1) and a new assertion pins the expression's one remaining definition in
+ * lib/chat-request.js plus both sites' adoption of it, so this census keeps
+ * catching an accidental drift — just against the new shape instead of the
+ * old one. routes/next-run.js, routes/ship-biscuit.js and
+ * routes/workspace-api.js are unaffected by LIN-2970 (named follow-ups, not
+ * done here) and keep their original counts unchanged.
+ *
  * Run with: node --test tests/unit/interactive-openrouter-chain-byte-identity.test.js
  */
 import { test, describe } from 'node:test';
@@ -59,12 +76,12 @@ function read(relPath) {
 const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 
 describe('Interactive OpenRouter chain: byte-identity census (LIN-2412)', () => {
-  test('the shared "sessionApiKey || getPaidEnvKey() || freeTierKey" chain appears in EXACTLY the five expected families, once each except workspace-api-roadmap.js (two)', () => {
+  test('the shared "sessionApiKey || getPaidEnvKey() || freeTierKey" chain appears in EXACTLY the expected families (LIN-2970 moved task-chat.js and roadmap-chat onto lib/chat-request.js)', () => {
     const expectedCounts = {
-      'routes/task-chat.js': 1,
+      'routes/task-chat.js': 0,
       'routes/next-run.js': 1,
       'routes/ship-biscuit.js': 1,
-      'routes/workspace-api-roadmap.js': 2,
+      'routes/workspace-api-roadmap.js': 1,
       'routes/workspace-api.js': 1,
     };
     for (const [relPath, expectedCount] of Object.entries(expectedCounts)) {
@@ -72,6 +89,19 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412)', () => 
       const actualCount = src.split(SHARED_CHAIN_EXPR).length - 1;
       assert.equal(actualCount, expectedCount, `${relPath}: expected ${expectedCount} occurrence(s) of the shared chain expression, found ${actualCount}`);
     }
+  });
+
+  test('LIN-2970: lib/chat-request.js carries the ONE remaining copy of the expression, and task-chat.js + roadmap-chat call it instead of inlining', () => {
+    const chatRequestSrc = read('lib/chat-request.js');
+    const chatRequestCount = chatRequestSrc.split(SHARED_CHAIN_EXPR).length - 1;
+    assert.equal(chatRequestCount, 1, 'lib/chat-request.js should carry exactly one occurrence — the canonical definition');
+
+    const taskChatSrc = read('routes/task-chat.js');
+    assert.match(taskChatSrc, /resolveChatCredential\s*\(/, 'routes/task-chat.js must call the shared resolver');
+
+    const roadmapSrc = read('routes/workspace-api-roadmap.js');
+    const roadmapCallCount = (roadmapSrc.match(/resolveChatCredential\s*\(/g) || []).length;
+    assert.equal(roadmapCallCount, 1, 'routes/workspace-api-roadmap.js should call resolveChatCredential exactly once — the roadmap-chat site only, never roadmap-generate');
   });
 
   test('routes/workspace-api.js: the remaining SIX interactive sites carry the "apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)" shape (LIN-2412 F3 correction; LIN-2650 WS4 adds the retire route as a seventh total site)', () => {
