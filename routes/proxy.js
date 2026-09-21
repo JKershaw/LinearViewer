@@ -1562,7 +1562,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router
   // (routes/proxy-flight-companion.js) built on the extracted turn core
-  // (lib/flight-companion-turn.js, LIN-2631). `read` scope, like every
+  // (lib/agent-turn.js, LIN-2631). `read` scope, like every
   // compute route above — a proposal is not a write.
   // `flightCompanionChatClient`/`flightCompanionCreateToolCatalog` are a
   // TEST-ONLY seam, passed straight through as `chatClient`/

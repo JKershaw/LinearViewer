@@ -52,7 +52,7 @@
  *     clears §A.2's `shouldSpendTurn` gate FIRST — before `tryUse`, before any
  *     model call — against the companion's own `companion:v1:<urlKey>`
  *     `observerStateStore` instance and the sweep's `sweep:v1:<urlKey>` census.
- *     **Since LIN-2631 that happens in `lib/flight-companion-turn.js`, not here.**
+ *     **Since LIN-2631 that happens in `lib/agent-turn.js`, not here.**
  *     This file no longer evaluates the gate, seeds that instance, or writes a
  *     reservation; it supplies the config and quota checks through the core's
  *     `onBeforeSpend` hook, which the core calls at exactly that point in the
@@ -100,7 +100,7 @@ import { sendSSE } from '../lib/sse.js';
 // LIN-2631: the turn itself lives in lib/ now, so the proxy endpoint, the boot
 // turn, the playbook memory and the scheduler tick can each run one without
 // pretending to be an Express handler. This route is the browser's adapter.
-import { runFlightCompanionTurn } from '../lib/flight-companion-turn.js';
+import { runAgentTurn } from '../lib/agent-turn.js';
 
 const MAX_MESSAGE_LENGTH = 2000;
 
@@ -110,16 +110,16 @@ const MAX_MESSAGE_LENGTH = 2000;
 // vocabulary restates it rather than sharing a cross-module import.
 const CENSUS_LANE_KEYS = ['working', 'silent', 'blocked', 'terminal', 'queued', 'resolved', 'unknown'];
 
-// LIN-2625: restated, not imported, from lib/flight-companion-turn.js's own
+// LIN-2625: restated, not imported, from lib/agent-turn.js's own
 // private COMPANION_INSTANCE_PREFIX — same house convention every observer-
 // pipeline-stage consumer of an instance-key prefix follows (see that file's
 // header comment). Deliberately NEVER suffixed here: the playbook is one
-// shared, workspace-scoped record, the same key `lib/flight-companion-turn.js`
+// shared, workspace-scoped record, the same key `lib/agent-turn.js`
 // reads/writes regardless of which (possibly suffixed) reservation instance a
 // given turn is using.
 const COMPANION_INSTANCE_PREFIX = 'companion:v1:';
 
-// LIN-2621: restated, not imported, from lib/flight-companion-turn.js's own
+// LIN-2621: restated, not imported, from lib/agent-turn.js's own
 // private SWEEP_INSTANCE_PREFIX — same house convention as COMPANION_INSTANCE_PREFIX
 // just above. The GET page handler needs its own read of the census doc for the
 // status strip's sweep-liveness/no-census line, independent of the turn endpoint's.
@@ -161,7 +161,7 @@ const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
  * which this ticket forbids — a bad explicit id must 400, never silently
  * degrade to the workspace default or drop to tools-off. This is validation
  * only; it never resolves a final model itself, so the turn core
- * (`lib/flight-companion-turn.js`) stays the single resolution site.
+ * (`lib/agent-turn.js`) stays the single resolution site.
  *
  * @param {*} rawModel - Raw `req.body.model` (untrusted)
  * @returns {{model: string|null, error: string|null}} `model` is the trimmed
@@ -500,7 +500,7 @@ export function createFlightCompanionRoutes({
       // LIN-2623: resolve the model ONCE per page load, via the SAME
       // `resolveAiOperationModel({ opKind: 'flight-companion' })` call (and
       // the SAME free-tier `forceDefault` derivation) the turn core resolves
-      // with (lib/flight-companion-turn.js) — the one-site switch this
+      // with (lib/agent-turn.js) — the one-site switch this
       // ticket's own comment used to defer. Tools-on/off derives from
       // `isToolCapableModel` on this SAME resolved id (via
       // `buildFlightCompanionStripData`), never a second, independent guess.
@@ -603,7 +603,7 @@ export function createFlightCompanionRoutes({
 
     // LIN-2623 beat 2: validate BEFORE the free-tier clamp is even consulted,
     // so an uncurated id 400s the same way on every tier. A curated id is
-    // still threaded through — the turn core (`runFlightCompanionTurn`)
+    // still threaded through — the turn core (`runAgentTurn`)
     // decides whether it actually wins, since free tier must keep clamping to
     // the default regardless of what a valid override asked for.
     const { model: requestedModel, error: modelError } = resolveTurnModelOverride(body.model);
@@ -658,7 +658,7 @@ export function createFlightCompanionRoutes({
     };
 
     try {
-      const outcome = await runFlightCompanionTurn({
+      const outcome = await runAgentTurn({
         workspace,
         turnKind,
         message: hasUserMessage ? rawMessage.trim() : null,
@@ -816,7 +816,7 @@ export function createFlightCompanionRoutes({
     };
 
     try {
-      const outcome = await runFlightCompanionTurn({
+      const outcome = await runAgentTurn({
         workspace,
         turnKind: 'boot',
         // A synthetic, server-authored final turn — the client renders its

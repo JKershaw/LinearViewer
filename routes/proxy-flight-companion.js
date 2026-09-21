@@ -4,7 +4,7 @@
  * POST /api/proxy/flight-companion/turn: the Flight Companion turn, reachable
  * over the workspace API proxy so an agent (not just a human in a browser
  * tab) can drive one. Built entirely on the extracted turn core
- * (`lib/flight-companion-turn.js`, LIN-2631) — this file owns NO copy of the
+ * (`lib/agent-turn.js`, LIN-2631) — this file owns NO copy of the
  * gate/reservation/stream-loop logic, only the HTTP shape: auth, credential
  * resolution, request/response translation.
  *
@@ -30,7 +30,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { sendSSE } from '../lib/sse.js';
-import { runFlightCompanionTurn } from '../lib/flight-companion-turn.js';
+import { runAgentTurn } from '../lib/agent-turn.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog } from '../lib/chat-tools.js';
@@ -39,17 +39,17 @@ import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError } from '../lib/errors.js';
 
-// Restated, not imported (lib/flight-companion-turn.js's own house convention
+// Restated, not imported (lib/agent-turn.js's own house convention
 // for these prefixes/limits): a proxy caller's message body is capped the
 // same as the browser's, so a giant payload cannot inflate the prompt either
 // way. Kept in sync by inspection, not by a shared constant, matching how
-// lib/flight-companion-turn.js restates COMPANION_INSTANCE_PREFIX/
+// lib/agent-turn.js restates COMPANION_INSTANCE_PREFIX/
 // SWEEP_INSTANCE_PREFIX rather than importing them.
 const MAX_MESSAGE_LENGTH = 2000;
 
 // LIN-2620: a message-less (auto-wake-shaped) proxy turn reserves/commits
 // against its OWN companion instance, never the browser's — see this file's
-// header and lib/flight-companion-turn.js's `instanceKeySuffix` doc.
+// header and lib/agent-turn.js's `instanceKeySuffix` doc.
 const PROXY_INSTANCE_SUFFIX = ':proxy';
 
 // Named caps (ticket 2620): a per-token hourly bound and a per-workspace
@@ -228,7 +228,7 @@ export function createProxyFlightCompanionRoutes({
       });
 
       try {
-        const outcome = await runFlightCompanionTurn({
+        const outcome = await runAgentTurn({
           workspace,
           turnKind,
           message: hasUserMessage ? rawMessage.trim() : null,

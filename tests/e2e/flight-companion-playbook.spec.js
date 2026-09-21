@@ -4,7 +4,7 @@ import { test, expect } from '../fixtures/test-base.js';
 // anything. Seeds the companion record's `notes` field via the test-only
 // fixture route (routes/test.js's /test/set-flight-companion-playbook —
 // writes ONLY that fixture path, never the real remember/turn-core write,
-// which is covered by tests/unit/flight-companion-turn-core.test.js) and
+// which is covered by tests/unit/agent-turn-core.test.js) and
 // checks the page's own read-only endpoint (routes/flight-companion.js's
 // GET .../api/flight-companion/playbook) renders it client-side
 // (public/flight-companion.js) with no chat turn involved.
