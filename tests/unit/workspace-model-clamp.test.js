@@ -82,8 +82,8 @@ test('missing urlKey or store still returns DEFAULT_MODEL (unchanged guard)', as
 // resolveAiOperationModel (LIN-1145)
 // =============================================================================
 
-test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion and ship-biscuit (LIN-2623)', () => {
-  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'next-run', 'flight-companion', 'ship-biscuit']);
+test('AI_OPERATION_KINDS covers the scoped operations, including flight-companion, ship-biscuit and task-chat (LIN-2623, LIN-2966)', () => {
+  assert.deepEqual(AI_OPERATION_KINDS, ['recommend', 'recap', 'brief', 'scan', 'run-summary', 'session-summary', 'next-run', 'flight-companion', 'ship-biscuit', 'task-chat']);
 });
 
 // R2 (LIN-2623 review, PR #1442): pins the settings label map to the class rather

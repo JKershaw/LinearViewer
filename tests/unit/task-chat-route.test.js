@@ -1,9 +1,14 @@
 /**
- * Structural guards for routes/task-chat.js tool-calling wiring (LIN-990).
+ * Structural guards for routes/task-chat.js's turn wiring (LIN-990, LIN-2966).
  *
  * The live tool-call round-trip is a close-out gate exercised against a real
- * provider, not in CI (green CI cannot discharge it). These are the cheap,
- * regression-catching invariants CI *can* pin without a network call:
+ * provider, not in CI (green CI cannot discharge it) — the route's own
+ * pre-turn context fetch needs a real issue provider, so even the mocked
+ * (`NODE_ENV=test` + `test-token`) path returns before ever reaching the turn
+ * (see the mockAi branch in routes/task-chat.js). These are the cheap,
+ * regression-catching invariants CI *can* pin without a network call, in this
+ * file's own established idiom of asserting against the route's source text
+ * rather than driving the real handler:
  *
  *   1. One quota unit per TURN, never per hop. The whole tool loop lives inside
  *      a single turn, so `freeTierStore.tryUse` must be called exactly once and
@@ -13,9 +18,16 @@
  *      now calls THAT exactly once per turn instead, and the invariant is
  *      pinned across both files so the "once per turn, never per hop"
  *      guarantee still holds end to end.
- *   2. The route branches on `isToolCapableModel` and offers the read-only
- *      catalog only to a capable model, degrading to plain `streamChat` (tools
- *      off) otherwise — a silent model swap is explicitly rejected.
+ *   2. LIN-2966: the route no longer picks a model, branches on
+ *      `isToolCapableModel`, or calls `streamChat`/`streamChatWithTools`/
+ *      `createChatToolCatalog` itself — it delegates the whole turn to the
+ *      shared agent-turn core (`lib/agent-turn.js`) via `runAgentTurn`,
+ *      exactly as Flight Companion's routes already do. The core's own real,
+ *      executable coverage (model resolution incl. a per-operation override,
+ *      the tool-capable/degrade branch, callMeta attribution) lives in
+ *      tests/unit/agent-turn-core.test.js — this file only pins that Task
+ *      Chat hands the core the RIGHT inputs (`opKind: 'task-chat'`, the row's
+ *      resolved binding, its own prompt).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -67,61 +79,79 @@ describe('task-chat route tool-calling wiring (LIN-990)', () => {
     assert.doesNotMatch(CATALOG_SRC, /freeTier/i);
   });
 
-  test('branches on isToolCapableModel and wires streamChatWithTools + the catalog', () => {
-    assert.match(ROUTE_SRC, /isToolCapableModel\s*\(\s*selectedModel\s*\)/);
-    assert.match(ROUTE_SRC, /streamChatWithTools\s*\(/);
-    assert.match(ROUTE_SRC, /createChatToolCatalog\s*\(/);
+  test('LIN-2966: the route delegates the whole turn to the shared agent-turn core — no inline model pick, branch, or stream call of its own', () => {
+    // The properties LIN-990 used to pin directly on this file (model branch,
+    // streamChatWithTools/streamChat, createChatToolCatalog) now live in the
+    // core and are proven live there (tests/unit/agent-turn-core.test.js).
+    // This route must not re-implement or shadow any of them.
+    assert.doesNotMatch(ROUTE_SRC, /isToolCapableModel\s*\(/,
+      'the tool-capable/degrade branch lives in the core now');
+    assert.doesNotMatch(ROUTE_SRC, /streamChatWithTools\s*\(/,
+      'streamChatWithTools must not be CALLED in the route — only referenced, as deps.chatClient.streamChatWithTools');
+    assert.doesNotMatch(ROUTE_SRC, /\bstreamChat\s*\(/,
+      'streamChat must not be CALLED in the route either');
+    assert.doesNotMatch(ROUTE_SRC, /createChatToolCatalog\s*\(/,
+      'createChatToolCatalog must not be CALLED in the route — only referenced, as deps.createToolCatalog');
+    assert.doesNotMatch(ROUTE_SRC, /resolveWorkspaceModel\s*\(/,
+      'model resolution is the core\'s job now (via opKind), not the route\'s');
+    assert.match(ROUTE_SRC, /runAgentTurn\s*\(/, 'the route must call the shared turn core');
   });
 
-  test('degrades to plain streamChat honoring the user model — no silent swap', () => {
-    // The degrade path still calls streamChat, and every stream call carries the
-    // resolved `selectedModel` (the user's choice) — the model is never reassigned
-    // to a tool-capable one behind the user's back.
-    assert.match(ROUTE_SRC, /streamChat\s*\(/);
-    assert.match(ROUTE_SRC, /model:\s*selectedModel/);
-    // selectedModel is a single `const` — declared once, never reassigned.
-    assert.strictEqual((ROUTE_SRC.match(/selectedModel\s*=/g) || []).length, 1);
-    assert.match(ROUTE_SRC, /const\s+selectedModel\s*=/);
+  test('LIN-2966: the turn core call is given task-chat\'s own opKind, prompt, and stores — never Flight Companion\'s defaults', () => {
+    const start = ROUTE_SRC.indexOf('await runAgentTurn({');
+    assert.ok(start > 0, 'expected the runAgentTurn call site to exist');
+    const end = ROUTE_SRC.indexOf('\n      });', start);
+    assert.ok(end > start, 'expected the runAgentTurn call to close with `});`');
+    const callSrc = ROUTE_SRC.slice(start, end);
+
+    assert.match(callSrc, /turnKind:\s*'user-initiated'/,
+      'Task Chat never has an auto-wake/boot concept — every turn is user-initiated');
+    assert.match(callSrc, /opKind:\s*'task-chat'/,
+      'without its own opKind, a Settings model override would silently fall back to flight-companion\'s');
+    assert.match(callSrc, /allowPlaybookWrite:\s*false/,
+      'Task Chat has never exposed a remember/playbook write tool and must not inherit the core\'s default');
+    assert.match(callSrc, /buildMessages:\s*buildTaskChatTurnMessages/,
+      'the core must be handed Task Chat\'s OWN prompt, not fall through to the Flight Companion brief');
+    // LIN-2966 item 5 (subsumes LIN-2660): the two inputs list_pending_decisions
+    // needs, threaded all the way from server.js into this call.
+    assert.match(callSrc, /taskDecisionsStore\s*,/);
+    assert.match(callSrc, /shelvedRulingsStore\s*,/);
   });
 
-  test('createChatToolCatalog is bound to the row\'s resolved binding, not the workspace-active one (LIN-2047)', () => {
+  test('LIN-2966: the turn core is bound to the row\'s resolved binding, not the workspace-active one (LIN-2047, carried forward)', () => {
     // LIN-1910 threaded resolveIssueBinding into the context fetch but left the
     // tool catalog on the workspace-active provider/scope, so a mid-turn lookup
     // tool for a foreign-source row (e.g. a Jira row in a merged workspace)
     // resolved the WRONG binding — `Task <id> not found`, or worse, a different
-    // issue's content presented as this task's. This pins the fix: the catalog
-    // construction site must be given `issueProvider`/`issueCallScope` (the same
-    // pair resolveIssueBinding produced above, already used by the context
-    // fetch), never `getProviderForWorkspace(workspace)` /
-    // `getWorkspaceCallScope(workspace)`.
+    // issue's content presented as this task's. LIN-2047 fixed the direct
+    // createChatToolCatalog call; LIN-2966 moved that call inside the shared
+    // core, so the pin now targets the `getProvider`/`getScope` closures the
+    // route hands the core instead.
     //
     // Live-invocation arg capture (spying on createChatToolCatalog) isn't
     // available here without opting the whole unit suite into Node's
     // `--experimental-test-module-mocks` flag (mock.module is undefined
     // without it, and no test in this repo currently uses it) — so, matching
     // this file's own established idiom for pinning route wiring facts
-    // cheaply and without a network call (see the tool-calling wiring
-    // tests above), this asserts against the call site's source text
-    // instead. It still fails loud on a revert: reverting the two changed
-    // lines restores `provider,` / `scope: getWorkspaceCallScope(workspace)`,
-    // which trips every assertion below.
-    const start = ROUTE_SRC.indexOf('createChatToolCatalog({');
-    assert.ok(start > 0, 'expected the createChatToolCatalog call site to exist');
-    const end = ROUTE_SRC.indexOf('});', start);
-    assert.ok(end > start, 'expected the createChatToolCatalog call to close with `});`');
+    // cheaply and without a network call, this asserts against the call
+    // site's source text instead.
+    const start = ROUTE_SRC.indexOf('await runAgentTurn({');
+    assert.ok(start > 0, 'expected the runAgentTurn call site to exist');
+    const end = ROUTE_SRC.indexOf('\n      });', start);
+    assert.ok(end > start, 'expected the runAgentTurn call to close with `});`');
     const callSrc = ROUTE_SRC.slice(start, end);
 
-    assert.match(callSrc, /provider:\s*issueProvider\s*,/,
-      'createChatToolCatalog must receive the row\'s resolved provider (issueProvider), not the workspace-active one');
-    assert.match(callSrc, /scope:\s*issueCallScope\s*,/,
-      'createChatToolCatalog must receive the row\'s resolved scope (issueCallScope), not the workspace-active one');
+    assert.match(callSrc, /getProvider:\s*\(\)\s*=>\s*issueProvider\s*,/,
+      'the core must receive the row\'s resolved provider (issueProvider), not the workspace-active one');
+    assert.match(callSrc, /getScope:\s*\(\)\s*=>\s*issueCallScope\s*,/,
+      'the core must receive the row\'s resolved scope (issueCallScope), not the workspace-active one');
     assert.doesNotMatch(callSrc, /getProviderForWorkspace/,
-      'the catalog call must not fall back to the workspace-active provider');
+      'the call must not fall back to the workspace-active provider');
     assert.doesNotMatch(callSrc, /getWorkspaceCallScope/,
-      'the catalog call must not fall back to the workspace-active scope');
+      'the call must not fall back to the workspace-active scope');
   });
 
-  test('getProviderForWorkspace / getWorkspaceCallScope are no longer used in this file (their one call site was the catalog construction)', () => {
+  test('getProviderForWorkspace / getWorkspaceCallScope are not used in this file — the row\'s own binding is used throughout', () => {
     assert.doesNotMatch(ROUTE_SRC, /getProviderForWorkspace/);
     assert.doesNotMatch(ROUTE_SRC, /getWorkspaceCallScope/);
   });

@@ -20,21 +20,18 @@ import { renderTaskChatPage } from '../lib/render-task-chat.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
-import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEnabled } from '../lib/openrouter.js';
-import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
-import { sessionIsTerminal } from './dashboard.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
+import { createChatToolCatalog } from '../lib/chat-tools.js';
+import { runAgentTurn } from '../lib/agent-turn.js';
+import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
+import { sendSSE } from '../lib/sse.js';
 
 const MAX_QUESTION_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
-
-function sendSSE(res, type, data) {
-  res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
-}
 
 /**
  * Sanitize a chat transcript to the durable `{role, content}` shape: only
@@ -182,9 +179,16 @@ function buildMockAnswer(context, question, related) {
  *   broker-dependent (claude-code) session. Absent → provisioning degrades exactly as
  *   `provisionBootstrapToken` specifies (null for prose harnesses; fail-closed throw for
  *   claude-code, surfaced as a tool error rather than a silently credential-less resume)
+ * @param {Object}   [deps.taskDecisionsStore] - LIN-2966 (subsumes LIN-2660): the
+ *   scan-produced decisions input to the `list_pending_decisions` chat tool.
+ *   Absent → that tool fails cleanly as "not configured"; every other tool is
+ *   unaffected.
+ * @param {Object}   [deps.shelvedRulingsStore] - LIN-2966: the shelved-rulings
+ *   input to the same tool, so a deliberately shelved decision does not
+ *   resurface in the chat.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -437,7 +441,6 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         return res.end();
       }
 
-      const selectedModel = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
       // LIN-2371: the DECLARED provider identity for the persona sentence.
       //
       // Row-correct AND fallback-free, which needs both halves (the second was
@@ -468,13 +471,16 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         ? requestedSource
         : workspace.provider;
       const providerDisplayName = getProvider(declaredSource)?.ui?.displayName ?? null;
-      const messages = buildTaskChatMessages(context.issue, context, question.trim(), safeHistory, providerDisplayName);
-      const callMeta = { urlKey: workspace?.urlKey || null, feature: 'task-chat', issueIdentifier: context.issue?.identifier || null };
+      // The core's own seam (`deps.buildMessages`, see lib/agent-turn.js) — it
+      // ignores the Flight-Companion-shaped fields (censusSeedText/turnKind/
+      // playbook) the core passes and uses only `message`/`history`.
+      const buildTaskChatTurnMessages = ({ message, history }) => {
+        return buildTaskChatMessages(context.issue, context, message, history, providerDisplayName);
+      };
 
       // Forward every SSE event through untouched (including `tool` breadcrumbs,
       // which the client renders but never adds to chat history) and close the
-      // stream on the terminal event. Shared by both the tool-calling and the
-      // plain-streaming branches below.
+      // stream on the terminal event.
       const onEvent = (type, data) => {
         sendSSE(res, type, data);
         if (type === 'done' || type === 'error') {
@@ -482,35 +488,53 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         }
       };
 
-      if (isToolCapableModel(selectedModel)) {
-        // Tool-capable model: offer the read-only tool catalog, bound to the
-        // SAME row binding (issueProvider/issueCallScope, resolved above at
-        // :336) the context fetch used above — not the workspace-active
-        // binding — so a lookup tool the model calls mid-turn resolves the
-        // same source the answer is already grounded in (LIN-2047). One
-        // consequence: get_stack (lib/chat-tools.js) is workspace-wide by
-        // nature, not row-scoped, and the catalog takes a single provider/
-        // scope pair for every tool — so this also re-points get_stack's
-        // "current workspace" digest at the row's binding rather than the
-        // active one. That's the same active-vs-row inconsistency this ticket
-        // removes everywhere else, now surfacing on the one tool the catalog
-        // can't scope separately without touching lib/chat-tools.js, which is
-        // outside this ticket's ownership boundary. The whole loop is ONE
-        // turn — the single free-tier tryUse above still covers it; we add no
-        // per-hop quota call.
-        const { tools, executeTool } = createChatToolCatalog({
-          provider: issueProvider,
-          scope: issueCallScope,
+      // LIN-2966: Task Chat drives the shared agent-turn core (lib/agent-turn.js)
+      // instead of its own inline model-pick/tool-catalog/stream loop. The core
+      // now owns model resolution (via `opKind: 'task-chat'`, so a per-operation
+      // Settings override reaches Task Chat the same way it already reaches
+      // Flight Companion), the credential-adjacent free-tier/config posture is
+      // already handled above (checked before the core is ever called, so
+      // `onBeforeSpend` is unneeded here), and the tool-capable/degrade branch.
+      // `turnKind: 'user-initiated'` means the reservation/gate machinery below
+      // (auto-wake/boot only) never engages — this call is model resolution +
+      // catalog + stream, nothing more.
+      await runAgentTurn({
+        workspace,
+        turnKind: 'user-initiated',
+        message: question.trim(),
+        history: safeHistory,
+        apiKey: apiKeyToUse,
+        isFreeTier,
+        opKind: 'task-chat',
+        issueIdentifier: context.issue?.identifier || null,
+        // Task Chat has never exposed a `remember`/playbook write tool — this
+        // keeps it that way rather than inheriting the core's own default.
+        allowPlaybookWrite: false,
+        onEvent,
+        deps: {
+          chatClient: { streamChat, streamChatWithTools },
+          createToolCatalog: createChatToolCatalog,
+          // Bound to the SAME row binding (issueProvider/issueCallScope,
+          // resolved above at :336) the context fetch used above — not the
+          // workspace-active binding — so a lookup tool the model calls
+          // mid-turn resolves the same source the answer is already grounded
+          // in (LIN-2047). `workspace` (the core's own catalog-scope input) is
+          // deliberately ignored by both closures, mirroring
+          // routes/proxy-flight-companion.js's own `getProvider`/`getScope`.
+          getProvider: () => issueProvider,
+          getScope: () => issueCallScope,
           recapCacheStore,
           briefCacheStore,
           urlKey: workspace.urlKey,
-          // LIN-1073: session read-model + the gated follow-up write. This is
-          // the ONE deliberate call site that opts into followUpEnabled.
+          // LIN-1073: session read-model + the gated follow-up write.
           dispatchQueueStore,
           agentStatusStore,
           sessionIsTerminal,
-          followUpEnabled: true,
-          dispatchedBy: req.session?.accountId || null,
+          // LIN-2966 (subsumes LIN-2660): the two inputs `list_pending_decisions`
+          // needs to return the same rows the rulings feed returns.
+          taskDecisionsStore,
+          shelvedRulingsStore,
+          enrichLoop,
           // LIN-1139: thread the workspace prefs store so a tool-driven follow-up
           // resolves model/harness through the shared dispatch factory.
           workspacePreferencesStore,
@@ -519,27 +543,10 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           // a live credential instead of resuming into a dead broker (LIN-1362/1375).
           proxyTokenStore,
           baseUrl: `${req.protocol}://${req.get('host')}`,
-        });
-        await streamChatWithTools(
-          messages,
-          {
-            apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, tools, executeTool, callMeta,
-            // Additive per-tool budget so get_comments can return full comment
-            // bodies while every other tool keeps the 4000-char default (LIN-1065).
-            toolResultMaxCharsByTool: CHAT_TOOL_RESULT_BUDGETS,
-          },
-          onEvent
-        );
-      } else {
-        // Unknown-capability model: degrade to plain streaming with tools OFF.
-        // We do NOT silently swap to a tool-capable model — the user's choice is
-        // honored; free-tier already forces the tool-capable DEFAULT_MODEL.
-        await streamChat(
-          messages,
-          { apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1500, callMeta },
-          onEvent
-        );
-      }
+          dispatchedBy: req.session?.accountId || null,
+          buildMessages: buildTaskChatTurnMessages,
+        },
+      });
     } catch (error) {
       console.error('Task chat stream error:', error);
       sendSSE(res, 'error', { message: 'Failed to generate a response' });

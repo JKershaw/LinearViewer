@@ -2493,7 +2493,11 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore }))
+// LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
+// `list_pending_decisions` chat tool the same way createFlightCompanionRoutes
+// already does below (LIN-2617) — Task Chat now builds its catalog through the
+// same createChatToolCatalog call the turn core makes for every surface.
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore }))
 
 // Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
 // the inline edit form formerly hidden inside a tree row's Details panel. No
@@ -2514,10 +2518,8 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 // it is deliberately not threaded here yet).
 // LIN-2617 adds taskDecisionsStore + shelvedRulingsStore, the two inputs the
 // `list_pending_decisions` chat tool needs to return the same rows the rulings
-// feed returns. NOT threaded into createTaskChatRoutes above: that route file is
-// outside this change's file carve (passage LIN-2636 leg 01), so Task Chat keeps
-// the clean "not configured" degradation for that one tool until a follow-up
-// wires it. Every other tool in the shared catalog is unaffected there.
+// feed returns. LIN-2966 threads the same pair into createTaskChatRoutes above,
+// so both surfaces' catalogs now answer that tool identically.
 app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).

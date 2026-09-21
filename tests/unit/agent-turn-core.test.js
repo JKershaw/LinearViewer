@@ -90,6 +90,38 @@ describe('LIN-2631: the turn core runs without any HTTP at all', () => {
     assert.strictEqual(store.state.advances.length, 0);
   });
 
+  // LIN-2966: `deps.buildMessages` is the additive seam a second surface
+  // (Task Chat) uses to supply its own prompt instead of the Flight Companion
+  // brief. Omitting it (every other test in this file) must still build the
+  // Flight Companion brief exactly as before — that default path is proven
+  // unedited by tests/unit/flight-companion-turn-route.test.js's own source
+  // pin on this exact call site.
+  test('deps.buildMessages, when supplied, replaces the Flight Companion brief — and receives the turn\'s own message/history', async () => {
+    let seenArgs = null;
+    const store = fakeStore({ census: censusDoc() });
+    let capturedMessages = null;
+    const out = await runAgentTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'what is ENG-1 about?',
+      history: [{ role: 'user', content: 'earlier turn' }], apiKey: 'sk-test',
+      onEvent: () => {},
+      deps: {
+        ...baseDeps(store, {
+          async streamChat(messages, _o, onEvent) { capturedMessages = messages; onEvent('done', {}); },
+          async streamChatWithTools(messages, _o, onEvent) { capturedMessages = messages; onEvent('done', {}); },
+        }),
+        buildMessages: (args) => {
+          seenArgs = args;
+          return [{ role: 'user', content: `TASK CHAT: ${args.message}` }];
+        },
+      },
+    });
+    assert.strictEqual(out.spent, true);
+    assert.strictEqual(seenArgs.message, 'what is ENG-1 about?');
+    assert.deepStrictEqual(seenArgs.history, [{ role: 'user', content: 'earlier turn' }]);
+    assert.deepStrictEqual(capturedMessages, [{ role: 'user', content: 'TASK CHAT: what is ENG-1 about?' }],
+      'buildMessages\' own return value — not the Flight Companion brief — must reach the wire');
+  });
+
   test('a gate refusal comes back as a VALUE, never as an event — which is what lets a non-streaming caller exist', async () => {
     const seen = [];
     // No census => the gate's `no-census` branch.
@@ -606,6 +638,61 @@ describe('LIN-2439 ledger item 2: the real provider call shape, proven over a fi
       // provider path, not just be threaded through options unread.
       assert.ok(records.length >= 1);
       assert.ok(records.every(r => r.urlKey === 'acme' && r.feature === 'flight-companion'));
+    } finally {
+      afterEachHook();
+    }
+  });
+
+  // LIN-2966: a second surface's `opKind` reaches BOTH the model resolution
+  // AND the callMeta attribution — a live, real-provider-call discharge of
+  // the ticket's own "asserted, not inspected" acceptance line. Task Chat's
+  // own route (routes/task-chat.js) passes `opKind: 'task-chat'`, pinned as
+  // source text in tests/unit/task-chat-route.test.js (that file's turn
+  // handler cannot be driven live without a real issue provider — see its
+  // own header note); this test discharges the mechanism itself, which is
+  // what makes that source pin trustworthy.
+  test('LIN-2966: a non-default opKind resolves its OWN per-operation Settings override and tags callMeta.feature with it, proven over the real wire', async () => {
+    beforeEachHook();
+    try {
+      global.fetch = mock.fn(async (_url, options) => {
+        const body = JSON.parse(options.body);
+        calls.push(body);
+        return streamResponse(['answer']);
+      });
+      const records = [];
+      setLlmCallRecorder((r) => records.push(r));
+
+      // An UNCURATED override id: isToolCapableModel(...) is false for it, so
+      // the turn takes the plain streamChat degrade path — same as this
+      // block's other test proves for the tool-calling path, just the
+      // simpler branch, which is all this test needs.
+      const workspacePreferencesStore = {
+        async getWorkspacePreferences() {
+          return {
+            modelId: 'openai/gpt-5.5',
+            aiModelOverrides: { byKind: { 'task-chat': { model: 'custom/task-chat-eval-model' } } },
+          };
+        },
+      };
+      const store = fakeStore({ census: censusDoc() });
+      const deps = { ...baseDeps(store, { streamChat, streamChatWithTools }), workspacePreferencesStore };
+
+      const out = await runAgentTurn({
+        workspace: WORKSPACE, turnKind: 'user-initiated', message: 'hello',
+        apiKey: 'sk-test', opKind: 'task-chat', issueIdentifier: 'ENG-1',
+        onEvent: () => {}, deps,
+      });
+      assert.strictEqual(out.spent, true);
+
+      assert.ok(calls.length >= 1);
+      // The task-chat-scoped override — NOT the workspace-wide modelId —
+      // is what reached the wire.
+      assert.ok(calls.every(b => b.model === 'custom/task-chat-eval-model'),
+        'the task-chat per-operation override must be the model actually called');
+
+      assert.ok(records.length >= 1);
+      assert.ok(records.every(r => r.feature === 'task-chat' && r.issueIdentifier === 'ENG-1'),
+        'callMeta must carry the caller\'s opKind as feature, plus its issueIdentifier');
     } finally {
       afterEachHook();
     }
