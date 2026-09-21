@@ -10,7 +10,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, REMEMBER_TOOL_SCHEMA, PLAYBOOK_MAX_CHARS, deriveFollowUpDispatch, projectActiveSession } from '../../lib/chat-tools.js';
+import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_SCOPE_TIERS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, REMEMBER_TOOL_SCHEMA, PLAYBOOK_MAX_CHARS, deriveFollowUpDispatch, projectActiveSession } from '../../lib/chat-tools.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
 import { hashContext } from '../../lib/recap-cache.js';
 import { snapshotFromContext } from '../../lib/task-snapshot-store.js';
@@ -3214,5 +3214,220 @@ describe('pass-4 — review-ledger discharge (LIN-2617)', () => {
     assert.strictEqual(leanFlags.length, 2, 'the loop read for the predicate, and the session read for the index');
     // BOTH reads project prompt away — the index read has no use for it at all.
     assert.deepStrictEqual(leanFlags, [0, 0], 'neither read drags prompt text along');
+  });
+});
+
+// ─── LIN-2967: scope per tier ────────────────────────────────────────────────
+
+describe('LIN-2967: get_stack\'s schema description agrees with its ruled workspace-tier behaviour (D-B, LIN-2085)', () => {
+  test('the description promises the WORKSPACE\'s stack, never the row\'s — the schema\'s own description field, not a comment', () => {
+    const schema = CHAT_TOOL_SCHEMAS.find(t => t.function.name === 'get_stack');
+    assert.ok(schema, 'expected a get_stack schema');
+    assert.match(schema.function.description, /current workspace/i,
+      'get_stack\'s description must describe workspace-wide scope, matching its \'workspace\' tier');
+    assert.doesNotMatch(schema.function.description, /\brow\b/i,
+      'get_stack\'s description must not describe row-scoped behaviour, which it never had');
+  });
+});
+
+describe('LIN-2967: createChatToolCatalog accepts a scope per tier (scopeByTier)', () => {
+  test('a single provider/scope pair, with no scopeByTier, reproduces today\'s catalog exactly — every tier resolves against the SAME pair', async () => {
+    const provider = makeFakeProvider();
+    const { executeTool } = createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY });
+    await executeTool({ name: 'lookup_task', arguments: { issueId: 'LIN-1' } });
+    await executeTool({ name: 'get_stack', arguments: {} });
+    // Both a `row`-tier and a `workspace`-tier call landed on the ONE provider
+    // instance, both carrying the SAME top-level scope — the additive claim,
+    // falsifiable: if `scopeByTier` silently changed default resolution, one
+    // of these would be missing or carry a different scope.
+    const rowCall = provider.calls.find(c => c.method === 'fetchRecommendationContext');
+    const stackCall = provider.calls.find(c => c.method === 'fetchProjects');
+    assert.ok(rowCall && rowCall.scope === SCOPE);
+    assert.ok(stackCall && stackCall.scope === SCOPE);
+  });
+
+  test('get_stack resolves the WORKSPACE-tier pair, never the row\'s, on a foreign-source row (LIN-2967 acceptance)', async () => {
+    const rowProvider = makeFakeProvider({
+      async fetchProjects() {
+        return {
+          projects: [{ id: 'row-proj', name: 'RowProj', sortOrder: 1 }],
+          issues: [{
+            id: 'row-1', identifier: 'ROW-1', title: 'Row-source task', priority: 1,
+            state: { name: 'In Progress', type: 'started' },
+            project: { id: 'row-proj', name: 'RowProj' }, parent: null, labels: { nodes: [] },
+          }],
+        };
+      },
+    });
+    const workspaceProvider = makeFakeProvider({
+      async fetchProjects(scope, teamId, opts) {
+        workspaceProvider.calls.push({ method: 'fetchProjects', scope, teamId, opts });
+        return {
+          projects: [{ id: 'ws-proj', name: 'WSProj', sortOrder: 1 }],
+          issues: [{
+            id: 'ws-1', identifier: 'WS-1', title: 'Workspace task', priority: 1,
+            state: { name: 'In Progress', type: 'started' },
+            project: { id: 'ws-proj', name: 'WSProj' }, parent: null, labels: { nodes: [] },
+          }],
+        };
+      },
+    });
+    const { executeTool } = createChatToolCatalog({
+      provider: rowProvider, scope: 'row-scope',
+      scopeByTier: { workspace: { provider: workspaceProvider, scope: 'workspace-scope' } },
+      urlKey: URL_KEY,
+    });
+
+    const result = await executeTool({ name: 'get_stack', arguments: {} });
+    assert.ok(result.tasks.some(t => t.identifier === 'WS-1'), 'get_stack must answer from the WORKSPACE provider');
+    assert.ok(!result.tasks.some(t => t.identifier === 'ROW-1'), 'the row provider\'s data must never leak into get_stack');
+
+    const wsCall = workspaceProvider.calls.find(c => c.method === 'fetchProjects');
+    assert.ok(wsCall && wsCall.scope === 'workspace-scope', 'get_stack must call fetchProjects with the workspace scope, not the row\'s');
+    assert.strictEqual(rowProvider.calls.length, 0, 'get_stack must never touch the row-tier provider at all');
+  });
+
+  test('row-tier tools are unaffected by a workspace-tier override — lookup_task still resolves the row\'s own pair', async () => {
+    const rowProvider = makeFakeProvider();
+    const workspaceProvider = makeFakeProvider();
+    const { executeTool } = createChatToolCatalog({
+      provider: rowProvider, scope: 'row-scope',
+      scopeByTier: { workspace: { provider: workspaceProvider, scope: 'workspace-scope' } },
+      urlKey: URL_KEY,
+    });
+    await executeTool({ name: 'lookup_task', arguments: { issueId: 'LIN-1' } });
+    assert.strictEqual(rowProvider.calls.length, 1);
+    assert.strictEqual(rowProvider.calls[0].scope, 'row-scope');
+    assert.strictEqual(workspaceProvider.calls.length, 0, 'lookup_task must never touch the workspace-tier override');
+  });
+
+  test('get_pr_status\'s allowlist is the WORKSPACE\'s repo set, never the row\'s, on a foreign-source row (LIN-2967 acceptance)', async () => {
+    // The row's own binding names a DIFFERENT repo than the workspace's.
+    const rowProvider = makeFakeProvider({
+      async fetchProjects() {
+        return { projects: [{ id: 'p', name: 'P', content: 'repo=someoneelse/not-this-workspace' }], issues: [] };
+      },
+    });
+    const workspaceProvider = makeFakeProvider({
+      async fetchProjects(scope, teamId, opts) {
+        workspaceProvider.calls.push({ method: 'fetchProjects', scope, teamId, opts });
+        return { projects: [{ id: 'p', name: 'P', content: 'repo=JKershaw/LinearViewer' }], issues: [] };
+      },
+    });
+    const githubCalls = [];
+    const githubFetch = async (url) => {
+      githubCalls.push(url);
+      if (url === 'https://api.github.com/repos/JKershaw/LinearViewer') {
+        return { ok: true, status: 200, json: async () => ({ private: false }) };
+      }
+      if (url.includes('/pulls/42')) {
+        return {
+          ok: true, status: 200,
+          json: async () => ({ state: 'open', merged: false, mergeable: true, head: { ref: 'x', sha: 'abc1234' }, base: { ref: 'main' } }),
+        };
+      }
+      if (url.includes('/check-runs') || url.includes('/status')) {
+        return { ok: true, status: 200, json: async () => ({ check_runs: [], statuses: [] }) };
+      }
+      return { ok: false, status: 404, json: async () => ({ message: 'Not Found' }) };
+    };
+    const { executeTool } = createChatToolCatalog({
+      provider: rowProvider, scope: 'row-scope',
+      scopeByTier: { workspace: { provider: workspaceProvider, scope: 'workspace-scope' } },
+      urlKey: URL_KEY, githubFetch,
+    });
+
+    // The WORKSPACE's own repo is accepted...
+    const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } });
+    assert.strictEqual(result.readable, true);
+    // ...but the ROW's own repo is REJECTED — proving the allowlist never
+    // consulted the row's binding at all, not merely that it also has the
+    // workspace's.
+    await assert.rejects(
+      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'someoneelse/not-this-workspace', number: 1 } }),
+      /not in this workspace's allowed repo list/,
+    );
+    const wsCall = workspaceProvider.calls.find(c => c.method === 'fetchProjects');
+    assert.ok(wsCall && wsCall.scope === 'workspace-scope');
+    assert.strictEqual(rowProvider.calls.length, 0, 'the allowlist read must never touch the row-tier provider');
+  });
+});
+
+// ─── LIN-2967: the tool "subset" seam (includeTiers / includeTools) ─────────
+
+describe('LIN-2967: createChatToolCatalog subset seam (includeTiers / includeTools)', () => {
+  test('neither filter supplied → every existing caller\'s full catalog, unchanged', () => {
+    const provider = makeFakeProvider();
+    const { tools } = createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY });
+    // decisionsConfigured is false here (no taskDecisionsStore/shelvedRulingsStore),
+    // so list_pending_decisions is withheld — same base every other describe
+    // block in this file already exercises.
+    const expected = CHAT_TOOL_SCHEMAS.filter(t => t.function.name !== 'list_pending_decisions').length;
+    assert.strictEqual(tools.length, expected);
+  });
+
+  test('includeTools: a named subset is returned, and an excluded tool refuses at executeTool too — not just omitted from `tools`', async () => {
+    const provider = makeFakeProvider();
+    const { tools, executeTool } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      includeTools: ['lookup_task', 'get_stack'],
+    });
+    assert.deepStrictEqual(tools.map(t => t.function.name).sort(), ['get_stack', 'lookup_task']);
+    // The executor for search_tasks still EXISTS (it's a real, configured
+    // tool) — the point is that the subset boundary is real, not merely the
+    // schema list a well-behaved model would respect.
+    await assert.rejects(
+      () => executeTool({ name: 'search_tasks', arguments: { query: 'x' } }),
+      /not available in this call's subset/,
+    );
+    // An included tool still works normally.
+    const stack = await executeTool({ name: 'get_stack', arguments: {} });
+    assert.ok(Array.isArray(stack.tasks));
+  });
+
+  test('includeTiers: every tool in the named tier(s), and none from any other tier', () => {
+    const provider = makeFakeProvider();
+    const { tools } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      includeTiers: ['fleet'],
+      dispatchQueueStore: {}, agentStatusStore: {}, // present so fleet tools aren't ALSO withheld for being unconfigured
+    });
+    const names = tools.map(t => t.function.name);
+    for (const n of names) {
+      assert.strictEqual(CHAT_TOOL_SCOPE_TIERS[n], 'fleet', `${n} is not a fleet-tier tool`);
+    }
+    // Every fleet-tier schema tool made it in (list_pending_decisions excluded
+    // separately, for being unconfigured — same as every other test here).
+    const expectedFleet = Object.entries(CHAT_TOOL_SCOPE_TIERS)
+      .filter(([n, tier]) => tier === 'fleet' && n !== 'list_pending_decisions' && n !== 'send_follow_up')
+      .map(([n]) => n)
+      .sort();
+    assert.deepStrictEqual(names.sort(), expectedFleet);
+  });
+
+  test('includeTiers + includeTools combine as a UNION — everything in the tier, plus the named extra', () => {
+    const provider = makeFakeProvider();
+    const { tools } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      includeTiers: ['row'],
+      includeTools: ['get_stack'],
+    });
+    const names = tools.map(t => t.function.name).sort();
+    assert.ok(names.includes('get_stack'), 'the explicit extra tool must be included even though its tier was not named');
+    for (const n of names) {
+      if (n === 'get_stack') continue;
+      assert.strictEqual(CHAT_TOOL_SCOPE_TIERS[n], 'row', `${n} is neither the named extra nor a row-tier tool`);
+    }
+  });
+
+  test('the subset can only NARROW what followUpEnabled/playbookEnabled/decisionsConfigured already produced, never re-add a withheld tool', () => {
+    const provider = makeFakeProvider();
+    // list_pending_decisions is unconfigured (no stores) AND explicitly requested —
+    // the subset alone cannot make it appear.
+    const { tools } = createChatToolCatalog({
+      provider, scope: SCOPE, urlKey: URL_KEY,
+      includeTools: ['list_pending_decisions'],
+    });
+    assert.deepStrictEqual(tools, []);
   });
 });

@@ -24,8 +24,8 @@ import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib
 import { createChatToolCatalog } from '../lib/chat-tools.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
-import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
-import { getProvider } from '../lib/providers/registry.js';
+import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
+import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
@@ -523,6 +523,20 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           // routes/proxy-flight-companion.js's own `getProvider`/`getScope`.
           getProvider: () => issueProvider,
           getScope: () => issueCallScope,
+          // LIN-2967: the `row`-tier pair above is what LIN-2047 deliberately
+          // re-pointed at the row's own binding — correct for a row-scoped
+          // read, wrong for a workspace-wide one. `get_stack` and
+          // `get_pr_status` are declared `workspace`-tier
+          // (lib/chat-tools.js's `CHAT_TOOL_SCOPE_TIERS`), so this override is
+          // what stops them from silently inheriting the row's binding on a
+          // foreign-source row — the exact bug this route's own prior comment
+          // here used to document as a known limitation.
+          scopeByTier: {
+            workspace: {
+              provider: getProviderForWorkspace(workspace),
+              scope: getWorkspaceCallScope(workspace),
+            },
+          },
           recapCacheStore,
           briefCacheStore,
           urlKey: workspace.urlKey,
