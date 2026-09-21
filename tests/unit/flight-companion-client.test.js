@@ -119,6 +119,12 @@ class FakeElement {
     this.hidden = false;
     this.scrollTop = 0;
     this.scrollHeight = 0;
+    // LIN-2811: plain field, matching the real hidden/unlaid-out convention
+    // (clientHeight reads 0 before layout). Deliberately NOT wired through
+    // _useLayout() below — that method models a write-then-read-back reflow
+    // for the composer specifically; a scroll-gate predicate needs a static,
+    // test-set value instead.
+    this.clientHeight = 0;
   }
   get disabled() { return this._disabled; }
   set disabled(v) {
@@ -2504,6 +2510,14 @@ function loadChatUI(doc) {
   // reachable through the stubbed renderMarkdown above, so the sandbox has
   // to carry one. Never called — renderMarkdown is stubbed.
   sandbox.marked = { parse: () => { throw new Error('marked.parse must not be reached — renderMarkdown is stubbed'); } };
+  // LIN-2811: cheap, content-agnostic stubs so the REAL appendMessage/
+  // appendNote (needed for the scroll-gate tests below) can run at all —
+  // mirroring the renderMarkdown/DOMPurify/marked stub pattern above. The
+  // scroll-gate tests assert on scrollTop/hidden/child order, never on pill
+  // or body markup, so fidelity to real common.js output is not needed.
+  sandbox.window.renderStatusPill = function () { return '<span class="chat-msg__who"></span>'; };
+  sandbox.window.renderSurface = function () { return '<div class="chat-msg__body"></div>'; };
+  sandbox.window.escapeHtml = function (s) { return s == null ? '' : String(s); };
   vm.createContext(sandbox);
   vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
   return sandbox.window.ChatUI;
@@ -2644,6 +2658,155 @@ describe('window.ChatUI.toolBreadcrumbLabel (LIN-2632) — lifted from task-chat
     assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'cap', name: 'get_stack' }), 'reached the tool-lookup limit');
     assert.equal(ChatUI.toolBreadcrumbLabel({ phase: 'result', name: 'get_stack' }), '');
     assert.equal(ChatUI.toolBreadcrumbLabel(null), '');
+  });
+});
+
+// ─── LIN-2811: reveal() gated on isPinnedToBottom + explicit force path ────
+//
+// F5/F6 finding (plan-review pass 2): a scrolled-up-only fixture cannot
+// catch a sample-after-insert regression. Insertion only ever GROWS
+// scrollHeight while scrollTop stays put, so a post-insert sample can only
+// read a thread as LESS pinned, never more — the real defect is a pinned
+// reader silently ceasing to be followed once the appended row's height
+// clears the 60px threshold, and a scrolled-up fixture can't observe that at
+// any row height. FakeElement's own scrollHeight (above) is a static field
+// untouched by appendChild/insertBefore, so a dedicated thread fake grows it
+// by rowHeight (default 80, > 60) on every insertion — for these tests
+// only; every other suite in this file keeps FakeElement's static behavior.
+function makeScrollThread({ scrollHeight = 0, clientHeight = 0, scrollTop = 0, hidden = false, rowHeight = 80 } = {}) {
+  const thread = new FakeElement('ul');
+  thread.scrollHeight = scrollHeight;
+  thread.clientHeight = clientHeight;
+  thread.scrollTop = scrollTop;
+  thread.hidden = hidden;
+  const baseAppendChild = FakeElement.prototype.appendChild.bind(thread);
+  const baseInsertBefore = FakeElement.prototype.insertBefore.bind(thread);
+  thread.appendChild = function (child) {
+    const result = baseAppendChild(child);
+    thread.scrollHeight += rowHeight;
+    return result;
+  };
+  thread.insertBefore = function (child, ref) {
+    const result = baseInsertBefore(child, ref);
+    thread.scrollHeight += rowHeight;
+    return result;
+  };
+  return thread;
+}
+
+describe('window.ChatUI reveal()/appendMessage()/appendNote() — scroll gate (LIN-2811)', () => {
+  test('7a: a scrolled-up thread does not get scrollTop rewritten by a plain appendMessage', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 0 });
+    ChatUI.appendMessage(thread, { who: 'agent', text: 'hi' });
+    assert.strictEqual(thread.scrollTop, 0);
+  });
+
+  test('7a: a scrolled-up thread does not get scrollTop rewritten by a plain appendNote', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 0 });
+    ChatUI.appendNote(thread, 'note text');
+    assert.strictEqual(thread.scrollTop, 0);
+  });
+
+  // The catching case: sample-BEFORE-insert reads this thread as pinned
+  // (500-300-200=0, <60); a sample-AFTER-insert would read the grown
+  // 580-300-200=80 (not <60) and wrongly stop following the reader.
+  test('7b: a pinned reader IS followed by appendMessage after the append grows the thread past threshold', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 300, rowHeight: 80 });
+    ChatUI.appendMessage(thread, { who: 'agent', text: 'hi' });
+    assert.strictEqual(thread.scrollHeight, 580);
+    assert.strictEqual(thread.scrollTop, 580);
+  });
+
+  test('7b: a pinned reader IS followed by appendNote after the append grows the thread past threshold', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 300, rowHeight: 80 });
+    ChatUI.appendNote(thread, 'note text');
+    assert.strictEqual(thread.scrollHeight, 580);
+    assert.strictEqual(thread.scrollTop, 580);
+  });
+
+  test('7c: self:true always scrolls regardless of prior scrollTop (force path — session.js:24, flight-companion.js:778)', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 0, rowHeight: 80 });
+    ChatUI.appendMessage(thread, { who: 'you', self: true, text: 'hi' });
+    assert.strictEqual(thread.scrollHeight, 580);
+    assert.strictEqual(thread.scrollTop, 580);
+  });
+
+  test('7d: an unlaid-out thread (clientHeight 0) reads as pinned and scrolls on first append', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 0, clientHeight: 0, scrollTop: 0, rowHeight: 80 });
+    ChatUI.appendMessage(thread, { who: 'agent', text: 'hi' });
+    assert.strictEqual(thread.scrollHeight, 80);
+    assert.strictEqual(thread.scrollTop, 80);
+  });
+
+  test('7d: a hidden thread reads as pinned, scrolls on first append, and hidden flips to false', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 0, clientHeight: 0, scrollTop: 0, hidden: true, rowHeight: 80 });
+    ChatUI.appendMessage(thread, { who: 'agent', text: 'hi' });
+    assert.strictEqual(thread.scrollTop, 80);
+    assert.strictEqual(thread.hidden, false);
+  });
+
+  test('8a: appendNote\'s before/insertBefore ordering is unchanged by the gate', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 0, clientHeight: 200, scrollTop: 0 });
+    const first = ChatUI.appendNote(thread, 'first');
+    const second = ChatUI.appendNote(thread, 'second', { before: first });
+    assert.deepStrictEqual(thread.children, [second, first]);
+  });
+
+  test('8b: reveal:false skips the whole gate when scrolled up — no scroll write, hidden untouched', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 0, hidden: true });
+    ChatUI.appendMessage(thread, { who: 'agent', text: 'hi', reveal: false });
+    assert.strictEqual(thread.scrollTop, 0);
+    assert.strictEqual(thread.hidden, true);
+  });
+
+  test('8b: reveal:false skips the whole gate when pinned — no scroll write, hidden untouched', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 300, hidden: true });
+    ChatUI.appendMessage(thread, { who: 'agent', text: 'hi', reveal: false });
+    assert.strictEqual(thread.scrollTop, 300);
+    assert.strictEqual(thread.hidden, true);
+  });
+
+  test('8b: reveal:false skips appendNote\'s gate too, whether scrolled up or pinned', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const scrolledUp = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 0, hidden: true });
+    ChatUI.appendNote(scrolledUp, 'note', { reveal: false });
+    assert.strictEqual(scrolledUp.scrollTop, 0);
+    assert.strictEqual(scrolledUp.hidden, true);
+
+    const pinned = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 300, hidden: true });
+    ChatUI.appendNote(pinned, 'note', { reveal: false });
+    assert.strictEqual(pinned.scrollTop, 300);
+    assert.strictEqual(pinned.hidden, true);
+  });
+
+  test('8c: no path writes document.body.scrollTop or calls window.scrollTo — only thread.scrollTop', () => {
+    const doc = makeDocument();
+    const ChatUI = loadChatUI(doc);
+    assert.strictEqual(doc.body, undefined);
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 300, rowHeight: 80 });
+    // doc has no .body and the sandbox window has no scrollTo — a
+    // regression reaching either would throw a TypeError here rather than
+    // silently pass.
+    assert.doesNotThrow(() => ChatUI.appendMessage(thread, { who: 'you', self: true, text: 'hi' }));
+    assert.strictEqual(thread.scrollTop, thread.scrollHeight);
+  });
+
+  test('G: thread.hidden = false stays unconditional even when scrolled up and no scroll happens', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const thread = makeScrollThread({ scrollHeight: 500, clientHeight: 200, scrollTop: 0, hidden: true });
+    ChatUI.appendMessage(thread, { who: 'agent', text: 'hi' });
+    assert.strictEqual(thread.scrollTop, 0);
+    assert.strictEqual(thread.hidden, false);
   });
 });
 
