@@ -423,12 +423,21 @@ Some moments are the human's, and there your job is to hand over cleanly. What's
 where you sit**. In those, re-dispatching blindly risks a collision with a half-finished state; flag it
 and let the human supply the missing piece.
 
-**Gate on Principle 0 first.** Before you park BLOCKED, ask: does this genuinely require the human,
-right now — or is it something you (or the layer above you) can still resolve? Attempt local
-resolution first. If what's actually missing is your parent/orchestrator's next step rather than a
-human decision, that's a wait on the layer above you, not a hand-back to the human — emit
-`PENDING-EXTERNAL`, not `BLOCKED`. Reserve `BLOCKED` for the case that will not clear without a
-person.
+**Gate on Principle 0 first.** The full argument lives at `docs/escalation-philosophy.md:50`; the test
+itself is one sentence:
+
+> Does this genuinely require the human, right now — or is it just something the human might like to
+> see?
+
+Its positive half is what makes it actionable: if a question can be answered by asking what's best for
+the quality of the code and the coherence of the system, it's yours — answer it and record the
+reasoning. Escalate only what a person's preference alone can settle, or what's irreversible.
+
+Before you park BLOCKED, apply it operationally: does this genuinely require the human, right now — or
+is it something you (or the layer above you) can still resolve? Attempt local resolution first. If
+what's actually missing is your parent/orchestrator's next step rather than a human decision, that's a
+wait on the layer above you, not a hand-back to the human — emit `PENDING-EXTERNAL`, not `BLOCKED`.
+Reserve `BLOCKED` for the case that will not clear without a person.
 
 A hand-back costs attention, so spend it well, two ways:
 
