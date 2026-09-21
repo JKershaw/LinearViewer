@@ -562,6 +562,72 @@ window.api = async function api(url, opts = {}) {
 };
 
 // =============================================================================
+// SSE Streaming
+// =============================================================================
+
+/**
+ * Read a server-sent-events stream from a fetch Response, invoking onEvent
+ * for each parsed frame (LIN-2969).
+ *
+ * Consolidates four identical page-local forks (public/app.js,
+ * public/roadmap.js, public/task-chat.js, public/flight-companion.js) into
+ * one. Lives here rather than in public/chat.js: chat.js's own header states
+ * it "owns no fetch/transport/state" and leaves poll/stream/echo logic to
+ * each page, so a transport-level reader belongs beside window.api() instead
+ * — the shared, always-loaded fetch layer, which already carves out SSE
+ * reading as deliberately NOT going through api() (see its docstring above).
+ *
+ * Every event type is passed to onEvent unfiltered, including ones this file
+ * knows nothing about — e.g. roadmap.js's `layer-start` / `layer-done` /
+ * `layer-error` / `orientation` frames, which only roadmap.js understands.
+ * Callers decide what an unrecognized type means; this reader never assumes
+ * a closed set.
+ *
+ * @global
+ * @param {Response} response - Fetch response with an SSE body.
+ * @param {Function} onEvent - Callback: (type, data) => void. `data` is
+ *   JSON-parsed when possible, else the raw string.
+ * @returns {Promise<void>}
+ */
+window.readSSEStream = async function readSSEStream(response, onEvent) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Split on double newlines (SSE event boundaries)
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop(); // Keep incomplete last part
+
+    for (const part of parts) {
+      if (!part.trim()) continue;
+
+      let type = 'message';
+      let data = '';
+
+      for (const line of part.split('\n')) {
+        if (line.startsWith(':')) continue; // Skip SSE comments
+        if (line.startsWith('event: ')) type = line.slice(7);
+        else if (line.startsWith('data: ')) data = line.slice(6);
+      }
+
+      if (data) {
+        try {
+          onEvent(type, JSON.parse(data));
+        } catch {
+          onEvent(type, data);
+        }
+      }
+    }
+  }
+};
+
+// =============================================================================
 // Dispatch
 // =============================================================================
 

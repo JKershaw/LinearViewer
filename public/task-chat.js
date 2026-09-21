@@ -3,8 +3,8 @@
  *
  * Drives the "talk to a task" page: enter a task identifier, ask it questions,
  * and stream its first-person answers. History lives here in the browser and is
- * replayed to the server on each turn (ephemeral — a reload starts fresh). The
- * SSE reader mirrors the roadmap chat consumer.
+ * replayed to the server on each turn (ephemeral — a reload starts fresh). SSE
+ * frames are read via the shared readSSEStream (public/common.js, LIN-2969).
  */
 (function () {
   'use strict';
@@ -36,39 +36,6 @@
   var chatHistory = [];   // [{ role, content }] for the active task
   var activeTask = '';     // the task identifier chatHistory belongs to
   var streaming = false;
-
-  function readSSEStream(response, onEvent) {
-    var reader = response.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer = '';
-
-    function pump() {
-      return reader.read().then(function (result) {
-        if (result.done) return;
-        buffer += decoder.decode(result.value, { stream: true });
-        var parts = buffer.split('\n\n');
-        buffer = parts.pop();
-        for (var i = 0; i < parts.length; i++) {
-          var part = parts[i];
-          if (!part.trim()) continue;
-          var type = 'message';
-          var eventData = '';
-          var lines = part.split('\n');
-          for (var j = 0; j < lines.length; j++) {
-            var line = lines[j];
-            if (line.indexOf('event: ') === 0) type = line.slice(7);
-            else if (line.indexOf('data: ') === 0) eventData = line.slice(6);
-          }
-          if (eventData) {
-            try { onEvent(type, JSON.parse(eventData)); }
-            catch (e) { onEvent(type, eventData); }
-          }
-        }
-        return pump();
-      });
-    }
-    return pump();
-  }
 
   function setEmptyVisible(visible) {
     if (emptyState) emptyState.classList.toggle('hidden', !visible);
@@ -363,9 +330,9 @@
     var sourceHint = (taskId === prefillTask) ? prefillSource : '';
     var sourceQuery = sourceHint ? ('?source=' + encodeURIComponent(sourceHint)) : '';
 
-    // Raw fetch carve-out: Server-Sent Events stream consumed via the reader
-    // below; window.api() parses the body as JSON and would break the stream,
-    // so the SSE reader keeps its own response handling.
+    // Raw fetch carve-out: Server-Sent Events stream consumed via readSSEStream
+    // (public/common.js); window.api() parses the body as JSON and would break
+    // the stream, so the SSE reader keeps its own response handling.
     fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId) + sourceQuery, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },

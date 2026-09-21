@@ -30,54 +30,6 @@
   // =========================================================================
 
   /**
-   * Read an SSE stream from a fetch response, calling onEvent for each event.
-   */
-  function readSSEStream(response, onEvent) {
-    var reader = response.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer = '';
-
-    function pump() {
-      return reader.read().then(function(result) {
-        if (result.done) return;
-
-        buffer += decoder.decode(result.value, { stream: true });
-
-        var parts = buffer.split('\n\n');
-        buffer = parts.pop();
-
-        for (var i = 0; i < parts.length; i++) {
-          var part = parts[i];
-          if (!part.trim()) continue;
-
-          var type = 'message';
-          var eventData = '';
-          var lines = part.split('\n');
-
-          for (var j = 0; j < lines.length; j++) {
-            var line = lines[j];
-            if (line.charAt(0) === ':') continue;
-            if (line.indexOf('event: ') === 0) type = line.slice(7);
-            else if (line.indexOf('data: ') === 0) eventData = line.slice(6);
-          }
-
-          if (eventData) {
-            try {
-              onEvent(type, JSON.parse(eventData));
-            } catch (e) {
-              onEvent(type, eventData);
-            }
-          }
-        }
-
-        return pump();
-      });
-    }
-
-    return pump();
-  }
-
-  /**
    * Build the roadmap model payload for API requests.
    * Strips the executionQueue to keep the payload small.
    */
@@ -353,8 +305,9 @@
     if (modelSelect && modelSelect.value) body.model = modelSelect.value;
 
     // Raw fetch carve-out: this is a Server-Sent Events stream consumed via
-    // readSSEStream(response, …). window.api() parses the body as JSON and would
-    // swallow the stream, so the SSE reader keeps its own response handling.
+    // readSSEStream(response, …) (public/common.js). window.api() parses the body
+    // as JSON and would swallow the stream, so the SSE reader keeps its own
+    // response handling.
     return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
@@ -744,8 +697,9 @@
       historyEl.scrollTop = historyEl.scrollHeight;
 
       // Raw fetch carve-out: Server-Sent Events stream consumed via
-      // readSSEStream(response, …); window.api() would parse the body as JSON
-      // and break the stream, so the SSE reader keeps its own response handling.
+      // readSSEStream(response, …) (public/common.js); window.api() would parse
+      // the body as JSON and break the stream, so the SSE reader keeps its own
+      // response handling.
       fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/roadmap/chat', {
         method: 'POST',
         headers: {

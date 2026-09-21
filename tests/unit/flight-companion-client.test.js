@@ -38,6 +38,33 @@ const CLIENT_CODE_ONLY = CLIENT_SRC
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '');
 
+// LIN-2969: readSSEStream moved out of this file into the shared
+// public/common.js. common.js is a plain browser script (assigns to
+// `window`, not an ES module) and is not import-safe as a whole — same
+// documented constraint as fetch-autopilot-kickoff-url.test.js — so it's
+// sliced by pinned markers, sourcing the REAL shipped implementation rather
+// than a hand-rolled fake (same as loadChatUI below for chat.js). The slice
+// is run into the SAME vm context as flight-companion.js itself (see
+// loadClient below), not a separate context, mirroring production loading
+// common.js and flight-companion.js as two scripts in one browser realm.
+const COMMON_JS_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
+function sliceReadSSEStreamSource() {
+  const startMarker = 'window.readSSEStream = async function readSSEStream(';
+  const startIdx = COMMON_JS_SRC.indexOf(startMarker);
+  assert.ok(startIdx !== -1, 'readSSEStream marker not found in public/common.js — has it moved/been renamed?');
+  const endMarker = '\n};';
+  const endIdx = COMMON_JS_SRC.indexOf(endMarker, startIdx);
+  assert.ok(endIdx !== -1, 'closing `};` for readSSEStream not found');
+  const slice = COMMON_JS_SRC.slice(startIdx, endIdx + endMarker.length);
+  // Rebind `window.readSSEStream = ...` to `var readSSEStream = ...` — this
+  // sandbox's `window` is a plain data shim (windowShim below), not the vm
+  // global, so flight-companion.js's bare `readSSEStream(...)` calls need a
+  // top-level binding, same as production gets from common.js loading first
+  // as a classic script.
+  return slice.replace('window.readSSEStream', 'var readSSEStream');
+}
+const READ_SSE_STREAM_SRC = sliceReadSSEStreamSource();
+
 // ─── Minimal DOM shim ───────────────────────────────────────────────────────
 
 class FakeClassList {
@@ -489,6 +516,9 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
     sessionStorage: storage,
   };
   vm.createContext(sandbox);
+  // readSSEStream first, same context — mirrors production's script order
+  // (common.js, then flight-companion.js) so both share one realm.
+  vm.runInContext(READ_SSE_STREAM_SRC, sandbox, { filename: 'common.js (readSSEStream slice)' });
   vm.runInContext(CLIENT_SRC, sandbox, { filename: 'flight-companion.js' });
 
   return {
@@ -677,7 +707,10 @@ describe('flight-companion.js — pure helpers (no DOM/timers)', () => {
 describe('flight-companion.js — source-text constraints', () => {
   test('the SSE reader uses raw fetch, never window.api() — window.api() parses JSON and would break streaming', () => {
     const start = CLIENT_CODE_ONLY.indexOf('function sendTurn(');
-    const end = CLIENT_CODE_ONLY.indexOf('function readSSEStream(', start);
+    // readSSEStream itself now lives in public/common.js (LIN-2969), shared
+    // across every SSE caller — submitQuestion is the next function literally
+    // declared after sendTurn's body in this file.
+    const end = CLIENT_CODE_ONLY.indexOf('function submitQuestion(', start);
     assert.ok(start > -1 && end > start, 'expected to find sendTurn\'s own body');
     const body = CLIENT_CODE_ONLY.slice(start, end);
     assert.match(body, /fetch\(/);
@@ -3556,7 +3589,12 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
     });
     questionInput.value = 'is there a proposal?';
     m.submitQuestion();
-    await flush();
+    // LIN-2969: readSSEStream is now a while/await loop (public/common.js)
+    // rather than this file's old recursive `.then()` pump — the rejected
+    // second read now costs one more microtask hop to surface through
+    // sendTurn's outer `.catch`, so the default flush()'s 8 ticks fall one
+    // short here. 10 leaves headroom without masking a real regression.
+    await flush(10);
 
     // The network-failure exit must clear BOTH the rendered proposal and the
     // unanswered user message — from memory AND from the stored session the next
