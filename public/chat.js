@@ -22,10 +22,25 @@
 (function () {
   'use strict';
 
-  function reveal(thread) {
+  function reveal(thread, opts) {
     if (!thread) return;
+    opts = opts || {};
     thread.hidden = false;
-    thread.scrollTop = thread.scrollHeight;
+    if (opts.force || opts.wasPinned) {
+      thread.scrollTop = thread.scrollHeight;
+    }
+  }
+
+  /**
+   * Pure predicate: is `el` scrolled at (or within 60px of) its own bottom?
+   * A null/hidden/unlaid-out element (`clientHeight` reading 0) reads as
+   * pinned — the gate fails toward following, not toward stranding a reader
+   * mid-scroll on first render.
+   * @param {Element} el
+   * @returns {boolean}
+   */
+  function isPinnedToBottom(el) {
+    return !el || (el.scrollHeight - el.scrollTop - (el.clientHeight || 0)) < 60;
   }
 
   /**
@@ -80,9 +95,11 @@
     li.className = liClasses.join(' ');
     if (opts.testId) li.setAttribute('data-testid', opts.testId);
     li.innerHTML = whoPill + bodySurface + timeHtml;
-    thread.appendChild(li);
 
-    if (opts.reveal !== false) reveal(thread);
+    var doReveal = opts.reveal !== false;
+    var wasPinned = doReveal ? isPinnedToBottom(thread) : false;
+    thread.appendChild(li);
+    if (doReveal) reveal(thread, { wasPinned: wasPinned, force: !!opts.self });
     return li;
   }
 
@@ -103,12 +120,14 @@
     var li = document.createElement('li');
     li.className = 'chat-note' + (opts.liClass ? ' ' + opts.liClass : '');
     li.textContent = text;
+    var doReveal = opts.reveal !== false;
+    var wasPinned = doReveal ? isPinnedToBottom(thread) : false;
     if (opts.before && opts.before.parentNode === thread) {
       thread.insertBefore(li, opts.before);
     } else {
       thread.appendChild(li);
     }
-    if (opts.reveal !== false) reveal(thread);
+    if (doReveal) reveal(thread, { wasPinned: wasPinned, force: !!opts.self });
     return li;
   }
 
@@ -371,6 +390,7 @@
     appendMessage: appendMessage,
     appendNote: appendNote,
     appendOptions: appendOptions,
+    isPinnedToBottom: isPinnedToBottom,
     resolveCaption: resolveCaption,
     renderMarkdownText: renderMarkdownText,
     toolBreadcrumbLabel: toolBreadcrumbLabel
