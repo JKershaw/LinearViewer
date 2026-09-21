@@ -1495,7 +1495,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // page's empty state renders a fixture playbook's open promises without
   // driving a real chat turn. Writes ONLY this test-only fixture path — never
   // a stand-in for the real `remember` tool / turn-core write, which stays
-  // exercised by the unit suite (tests/unit/flight-companion-turn-core.test.js).
+  // exercised by the unit suite (tests/unit/agent-turn-core.test.js).
   router.post('/test/set-flight-companion-playbook', async (req, res) => {
     try {
       if (!observerStateStore) throw new Error('observerStateStore not configured');

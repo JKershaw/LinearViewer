@@ -86,7 +86,7 @@ const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/flight-companion.js
 // LIN-2631: the turn body moved to lib/. Structural pins that are about the
 // TURN read this; pins that are about the ROUTE (its handler shape, its
 // dashboard abstinence) keep reading ROUTE_SRC.
-const CORE_SRC = readFileSync(join(__dirname, '../../lib/flight-companion-turn.js'), 'utf8');
+const CORE_SRC = readFileSync(join(__dirname, '../../lib/agent-turn.js'), 'utf8');
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 // Set/restore env vars around one async body — mirrors
@@ -949,7 +949,7 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.4) — the `phase: \'prop
 
 describe('Flight Companion turn endpoint — source-text wiring (structural pins, see file header)', () => {
   // LIN-2631 item 6: these pins MOVE with the code they pin. The turn body now
-  // lives in lib/flight-companion-turn.js, so they read CORE_SRC; the ones that
+  // lives in lib/agent-turn.js, so they read CORE_SRC; the ones that
   // are genuinely about the ROUTE (its own handler body, its dashboard
   // abstinence) still read ROUTE_SRC. A pin left pointing at the file the code
   // used to be in is not a weaker pin, it is a vacuous one.
@@ -2119,7 +2119,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
   // contract, and the comment above routes/flight-companion.js's GET handler
   // said explicitly why. LIN-2623 IS the one-site switch that comment deferred:
   // the page now resolves via the SAME resolveAiOperationModel({opKind:
-  // 'flight-companion'}) call the turn core uses (lib/flight-companion-turn.js),
+  // 'flight-companion'}) call the turn core uses (lib/agent-turn.js),
   // so the two can never diverge. This test still only proves the read count is
   // exactly one per page load (resolveWorkspaceModel and resolveAiOperationModel
   // both back onto the identical getWorkspacePreferences call, so this alone

@@ -23,7 +23,7 @@
  *    (`companion:v1:<urlKey>:proxy`), never the browser's
  *    (`companion:v1:<urlKey>`) — proven by sharing one fake
  *    observerStateStore between an HTTP proxy call and a direct
- *    `runFlightCompanionTurn` call standing in for the browser
+ *    `runAgentTurn` call standing in for the browser
  *  - a message-less proxy turn that loses its own reservation CAS race
  *    returns `{ spent: false, reason: 'lost-race' }` with no model call
  *  - no response body or frame ever contains the caller's bearer token or
@@ -37,7 +37,7 @@ import { ACME, BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 import { sendSSE } from '../../lib/sse.js';
 import { COMPANION_SEED_STATE } from '../../lib/flight-companion-gate.js';
-import { runFlightCompanionTurn } from '../../lib/flight-companion-turn.js';
+import { runAgentTurn } from '../../lib/agent-turn.js';
 
 const OPENROUTER_KEY = 'sk-secret-openrouter-key-abc';
 const BEARER = 'sekret-proxy-token-xyz';
@@ -248,7 +248,7 @@ describe('LIN-2620: reservation isolation — a message-less proxy turn touches 
     // SAME store, must still see the delta as spendable — the proxy call
     // did not consume it.
     const browserSeen = [];
-    const outcome = await runFlightCompanionTurn({
+    const outcome = await runAgentTurn({
       workspace: { urlKey: ACME }, turnKind: 'auto-wake', apiKey: 'sk-test',
       onEvent: (t, d) => browserSeen.push([t, d]),
       deps: {
