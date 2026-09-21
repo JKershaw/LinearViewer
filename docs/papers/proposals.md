@@ -1,6 +1,32 @@
 # Proposed papers
 
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
+A line can become a paper or an essay; `standard.md` says which shape fits.
+
+- **Do the eleven sources in `learning-while-the-tools-change.md` support the readings it
+  gives them?** The essay is unchecked and its argument rests entirely on other people's
+  work, five of the eleven sources being historical or cross-domain. Read each source against
+  the sentence the essay draws from it and report where the reading is stronger than the
+  source, in either direction. This is the essay's check under `standard.md` rule 2.
+  (Claude, 2026-09-21)
+- **Do later entrants reach an accepted outcome with fewer preparatory steps, and does that
+  survive maintenance?** `harbour/learning-while-the-tools-change.md` separates engineering
+  experience from AI experience from calendar time and says a snapshot cannot tell them apart.
+  Harbour records the preparatory steps directly — research, plan and plan-review rounds per
+  ticket, already counted by `lib/plan-review-round-trips.js` — so take the tickets worked by
+  each operator, compare steps-to-accepted-outcome, then return to the same tickets and count
+  later Bugs naming them, the instrument `harbour/what-the-reviews-checked.md` already built.
+  (Claude, 2026-09-21)
+- **Which kinds of prior knowledge predict lower repair effort?** The same essay argues that
+  years of practice say what someone had the chance to learn, not what transfers. Split the
+  repair record — later Bugs, review send-backs, close-out corrections — by whether the
+  original author knew the product area, the implementation technique, or neither, and report
+  which split moves. (Claude, 2026-09-21)
+- **Does a practice spread faster through a shared task than through written instructions?**
+  The essay's reciprocal-learning claim (section 5, from Barley) is a proposed practice with no
+  evidence behind it in Harbour. The prompt templates are the written-instruction arm and are
+  dated; a co-worked session is the other. Compare how quickly a rule added to a template
+  shows up in sessions against one demonstrated in a shared session. (Claude, 2026-09-21)
 
 - **Which retained artifact reduces the total cost of later work at comparable quality?**
   `harbour/what-should-an-agent-leave-behind.md` and its checking paper separate retained

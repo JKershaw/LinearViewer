@@ -1,9 +1,12 @@
 # Papers
 
-Short studies of Harbour, one question each, with the evidence. `standard.md` says how one
-is written. `proposals.md` lists the questions waiting for a paper.
+Short documents, each carrying what it rests on. A **paper** answers one question with the
+evidence; an **essay** argues a position from sources. `standard.md` says how each is written.
+`proposals.md` lists the questions waiting for one.
 
 ## About Harbour
+
+### Papers
 
 | Paper | Question | Finding |
 |---|---|---|
@@ -30,6 +33,12 @@ is written. `proposals.md` lists the questions waiting for a paper.
 | [what-a-run-must-show](harbour/what-a-run-must-show.md) | What does a person expect while one task runs, and what must a checking surface show for an informed merge? | No display promises cheaper checking — provenance is the one candidate with a controlled positive result, and no study shows a verified artifact changes supervision. Today's Observation/session pages serve one of the four "at every moment" needs, only partly, and are shaped for the operator; the reader this paper is about cannot reach them signed out at all, so a share link is a new, deliberate boundary crossing, not an extension of `/kpis`. The three candidate run shapes are scored, not chosen; the observation-rung ruling stays open; twelve questions go to the LIN-2947 sketches sitting. |
 | [what-should-an-agent-leave-behind](harbour/what-should-an-agent-leave-behind.md) | What should an agent leave behind? | Retaining an artifact, having it consumed and improving later work are separate achievements. The reviewed projects support testing evidence-linked handoffs; they do not yet establish maintained-wiki economics or a general graph advantage. [Evidence register](harbour/what-should-an-agent-leave-behind-evidence.md). |
 | [what-should-an-agent-leave-behind-check](harbour/what-should-an-agent-leave-behind-check.md) | Does the evidence support the agent-retention paper's conclusions? | A separate source and arithmetic check of the retrospective, with its own scope and limits. |
+
+### Essays
+
+| Essay | Argument |
+|---|---|
+| [learning-while-the-tools-change](harbour/learning-while-the-tools-change.md) | Engineering experience, experience using AI and the capability of the available tools run on three separate clocks, so a developer's position cannot be read off any one of them — and an adoption cohort is not a career cohort. Leapfrogging, factory electrification, the typesetter incumbents, Einstellung in chess masters and Barley's CT scanners supply the mechanisms; the Trio study and Anthropic's autonomy telemetry supply the contemporary edges. Unchecked, and deliberately not a measurement: what it asks Harbour to do is follow the same people through comparable work rather than compare this year's newcomers with last year's. |
 
 ## About the process
 

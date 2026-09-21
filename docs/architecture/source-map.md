@@ -229,11 +229,16 @@ docs/
                                location-agnostic and does not encode this path). A trend-aware periodical reads
                                its own prior editions from this directory before writing a new one.
   archive/                     Numbered standalone HTML documents served verbatim at /archive/:n, public. The numbering is a sequence of DOCUMENTS, not of Harbour Archive editions: #1–#2 are the first and second editions of "The Harbour Archive" museum page (Jan–Jul 2026), #3 is the 2026-08-03 project brief (companion to docs/reviews/recent-headwinds-review-2026-08-03.md). #4 is the August Wing of the Harbour Archive (28 July – 23 August 2026), #5 is the essay "The Cheap Ships" (2026-09-05: five cost levers, what each unlocks, and the exchange rate at which the subscription becomes optional), #6 is "Harbour from the Bridge" (2026-09-12: a project manager's briefing written by an outside session over the read-scope proxy — what Harbour is, how work is organised, the portfolio as of that day, what the papers say, and nine decisions for the operator). The landing page links the Harbour Archive specifically via a hard-coded /archive/2 (lib/render-landing.js), so adding a non-Archive document does not move it — tests/e2e/archive.spec.js pins that. #3 LINKS its faces from /fonts/*.woff2 (same origin) rather than inlining base64, which is why it is ~77KB rather than ~198KB
-  papers/                      Papers: short studies answering one question each, with the evidence.
-                               `README.md` is the index, `standard.md` the header and body shape, `proposals.md`
-                               the questions waiting for a paper. `harbour/` holds papers about Harbour;
-                               `process/` holds papers about how papers are written. A paper is revised by
-                               rewriting it (git holds every earlier version), never by appending a correction
+  papers/                      The paper archive. Two kinds, declared by a `kind:` header line, each carrying
+                               what it rests on: a PAPER answers one question with the evidence (the default —
+                               a file with no `kind:` line is one), an ESSAY argues a position from sources and
+                               carries an annotated reading list where a paper carries Method and Limits.
+                               `README.md` is the index and lists the two kinds separately, `standard.md` gives
+                               the header and body shape of each, `proposals.md` holds the questions waiting for
+                               one. Directories are by SUBJECT, not by kind — `harbour/` holds documents about
+                               Harbour, `process/` documents about how papers are written — so an essay sits
+                               beside the papers on its subject. A document is revised by rewriting it (git
+                               holds every earlier version), never by appending a correction to the body.
   dispatch-integration.md      Dispatch consumer integration guide
   proxy-integration.md         Linear API proxy consumer integration guide
   prompt-change-validation.md  Prompt-behavior change validation process
