@@ -145,15 +145,32 @@ describe('task-chat route tool-calling wiring (LIN-990)', () => {
       'the core must receive the row\'s resolved provider (issueProvider), not the workspace-active one');
     assert.match(callSrc, /getScope:\s*\(\)\s*=>\s*issueCallScope\s*,/,
       'the core must receive the row\'s resolved scope (issueCallScope), not the workspace-active one');
-    assert.doesNotMatch(callSrc, /getProviderForWorkspace/,
-      'the call must not fall back to the workspace-active provider');
-    assert.doesNotMatch(callSrc, /getWorkspaceCallScope/,
-      'the call must not fall back to the workspace-active scope');
+    // LIN-2967 gives `get_stack`/`get_pr_status` a DELIBERATE workspace-active
+    // override via `scopeByTier.workspace` — the more precise test below pins
+    // that it never leaks into these row-tier `getProvider`/`getScope`
+    // closures, rather than asserting workspace-active helpers are absent
+    // from the whole call (which is no longer true).
   });
 
-  test('getProviderForWorkspace / getWorkspaceCallScope are not used in this file — the row\'s own binding is used throughout', () => {
-    assert.doesNotMatch(ROUTE_SRC, /getProviderForWorkspace/);
-    assert.doesNotMatch(ROUTE_SRC, /getWorkspaceCallScope/);
+  test('LIN-2967: getProviderForWorkspace / getWorkspaceCallScope are used ONLY for the workspace-tier override, never for the row-tier pair', () => {
+    // LIN-2047's fix (the row-tier pair) must still never read the
+    // workspace-active binding — only the NEW workspace-tier override may.
+    const runAgentTurnStart = ROUTE_SRC.indexOf('await runAgentTurn({');
+    const runAgentTurnEnd = ROUTE_SRC.indexOf('\n      });', runAgentTurnStart);
+    const callSrc = ROUTE_SRC.slice(runAgentTurnStart, runAgentTurnEnd);
+    assert.match(callSrc, /getProviderForWorkspace\(workspace\)/,
+      'the workspace-tier override must resolve the workspace-active provider');
+    assert.match(callSrc, /getWorkspaceCallScope\(workspace\)/,
+      'the workspace-tier override must resolve the workspace-active scope');
+    // Both calls must live inside `scopeByTier.workspace`, not `getProvider`/
+    // `getScope` (the row-tier closures) — a regex over the FULL call would
+    // pass even if they leaked into the row-tier pair, so isolate the
+    // `scopeByTier` block specifically.
+    const scopeByTierStart = callSrc.indexOf('scopeByTier:');
+    assert.ok(scopeByTierStart > 0, 'expected a scopeByTier block in the runAgentTurn call');
+    const beforeScopeByTier = callSrc.slice(0, scopeByTierStart);
+    assert.doesNotMatch(beforeScopeByTier, /getProviderForWorkspace|getWorkspaceCallScope/,
+      'the row-tier getProvider/getScope closures (declared before scopeByTier) must stay on issueProvider/issueCallScope');
   });
 });
 
