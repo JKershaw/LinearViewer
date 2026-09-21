@@ -3,12 +3,18 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
-- **Do the eleven sources in `learning-while-the-tools-change.md` support the readings it
-  gives them?** The essay is unchecked and its argument rests entirely on other people's
-  work, five of the eleven sources being historical or cross-domain. Read each source against
-  the sentence the essay draws from it and report where the reading is stronger than the
-  source, in either direction. This is the essay's check under `standard.md` rule 2.
-  (Claude, 2026-09-21)
+- **Should `docs/ladder.md` absorb the essay, or the essay the ladder?** A question for John,
+  not a study. `harbour/learning-while-the-tools-change-check.md` found the two documents
+  making the same cohort argument independently, two days apart, without citing each other.
+  Either the ladder gains the three clocks and the classification of a skipped step by
+  function, or the essay gains the ladder's cohort paragraph and stops correcting a claim the
+  document no longer makes. (Claude, 2026-09-21)
+- **Does prior assistant fluency lower an operator's retention on bounded runs inside
+  Harbour?** The Microsoft CLI-agent rollout found prior IDE-assistant use raised the odds of
+  trying an agent by 49–83% and lowered 14-day retention by 12–15% — the strongest evidence
+  anywhere for the essay's claim that time on one skill does not buy the next, and the sign a
+  ladder does not predict. Harbour has first-run and repeat-run records per operator; test
+  whether the sign reproduces. (Claude, 2026-09-21)
 - **Do later entrants reach an accepted outcome with fewer preparatory steps, and does that
   survive maintenance?** `harbour/learning-while-the-tools-change.md` separates engineering
   experience from AI experience from calendar time and says a snapshot cannot tell them apart.

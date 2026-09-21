@@ -7,7 +7,7 @@ date: 2026-09-21
 authors: [Astra 6]
 model: "Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. No Harbour dispatch lineage. Filed into the archive unchanged apart from the header and the Next section."
 sources:
-  - "Cui et al., The Effects of Generative AI on High Skilled Work — https://www.microsoft.com/en-us/research/publication/the-effects-of-generative-ai-on-high-skilled-work-evidence-from-three-field-experiments-with-software-developers/"
+  - "Cui et al., The Effects of Generative AI on High-Skilled Work, Management Science, 2026 — https://doi.org/10.1287/mnsc.2025.00535"
   - "docs/papers/harbour/developer-adoption-ladder.md@0d652fbc0f2fef12bf063f047d855c346b337595"
   - "docs/papers/harbour/developer-adoption-ladder-earlier-dates.md@0d652fbc0f2fef12bf063f047d855c346b337595"
   - "docs/papers/harbour/where-harbour-joins.md@0d652fbc0f2fef12bf063f047d855c346b337595"
@@ -370,14 +370,15 @@ in the text identify the relevant source.
 ### 1 AI assistance and developer productivity
 
 Cui, K. Z., Demirer, M., Jaffe, S., Musolff, L., Peng, S. and Salz, T. *The Effects of Generative AI on
-High Skilled Work: Evidence from Three Field Experiments with Software Developers.* Microsoft Research
+High-Skilled Work: Evidence from Three Field Experiments with Software Developers.* Microsoft Research
 summary, June 2025; subsequently published in Management Science, 2026.
 
 Three company field experiments. Useful evidence that less-experienced developers can obtain larger
 productivity gains. The intervention supplied code completions, so the results should not be applied
 unchanged to autonomous agents or broader engineering responsibility.
 
-[Read the source](https://www.microsoft.com/en-us/research/publication/the-effects-of-generative-ai-on-high-skilled-work-evidence-from-three-field-experiments-with-software-developers/)
+[Read the source](https://doi.org/10.1287/mnsc.2025.00535) ·
+[Microsoft Research summary](https://www.microsoft.com/en-us/research/publication/the-effects-of-generative-ai-on-high-skilled-work-evidence-from-three-field-experiments-with-software-developers/)
 
 ### 2 The Harbour adoption papers
 
@@ -394,7 +395,7 @@ their rung mappings are not independently validated population categories.
 
 ### 3 Technological leapfrogging
 
-Lee, K. and Lim, C. *Technological regimes, catching up and leapfrogging: Findings from the Korean
+Lee, K. and Lim, C. *Technological regimes, catching-up and leapfrogging: Findings from the Korean
 industries.* Research Policy, 30, 459–483, 2001.
 
 A comparative industry study distinguishing path following, stage skipping and path creation. Read for
@@ -417,7 +418,7 @@ supplies an analogy for AI workflows, not a timetable for their development.
 ### 5 Expertise that survives technical change
 
 Tripsas, M. *Unraveling the process of creative destruction: Complementary assets and incumbent survival
-in the typesetter industry.* Strategic Management Journal, 18, 119–142, 1997.
+in the typesetter industry.* Strategic Management Journal, 18 (Summer Special Issue), 119–142, 1997.
 
 A historical study combining quantitative and qualitative evidence. It explains why losing a technical
 advantage need not erase every advantage an incumbent holds. The connection to a developer's transferable
