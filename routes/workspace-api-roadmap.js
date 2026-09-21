@@ -23,6 +23,7 @@ import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
+import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 
 /**
  * Whether the AI layer should be mocked for this request (LIN-388). Mirrors
@@ -821,28 +822,23 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
       return jsonError(res, 403, 'Roadmap feature is not enabled');
     }
 
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     if (!apiKeyToUse) {
       return jsonError(res, 503, 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }
 
     // Atomically check rate limits for free tier users
-    if (isFreeTier) {
-      const check = await freeTierStore.tryUse(req.workspace.urlKey);
-      if (!check.allowed) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
-      }
+    const gate = await checkFreeTierGate({ isFreeTier, urlKey: req.workspace.urlKey, freeTierStore });
+    if (gate) {
+      return jsonError(res, 429, gate.reason, { freeTier: { used: true, remaining: gate.remaining, limit: gate.limit, resetsAt: gate.resetsAt } });
     }
 
     const { question, roadmapModel, history } = req.body;
     if (!question || typeof question !== 'string' || !question.trim()) {
       return badRequest.json(res, 'question is required and must be a non-empty string');
     }
-    if (question.length > 2000) {
-      return badRequest.json(res, 'question must be 2000 characters or fewer');
+    if (question.length > CHAT_MESSAGE_MAX_LENGTH) {
+      return badRequest.json(res, `question must be ${CHAT_MESSAGE_MAX_LENGTH} characters or fewer`);
     }
     if (!roadmapModel) {
       return badRequest.json(res, 'question and roadmapModel are required');

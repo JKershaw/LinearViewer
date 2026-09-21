@@ -81,7 +81,7 @@ import { buildFlightCompanionKickoff } from '../lib/prompts/flight-companion-kic
 import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, getPaidEnvKey, hasPaidEnvKey, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
+import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
 import { buildModelOptions } from '../lib/openrouter-catalog.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
@@ -101,8 +101,9 @@ import { sendSSE } from '../lib/sse.js';
 // turn, the playbook memory and the scheduler tick can each run one without
 // pretending to be an Express handler. This route is the browser's adapter.
 import { runAgentTurn } from '../lib/agent-turn.js';
+import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 
-const MAX_MESSAGE_LENGTH = 2000;
+const MAX_MESSAGE_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
 // Restated, not imported, from lib/flight-companion-gate.js's own private
 // LANE_KEYS (which itself restates lib/observer-sweep.js's LANE_KEYS) — same
@@ -504,9 +505,7 @@ export function createFlightCompanionRoutes({
       // ticket's own comment used to defer. Tools-on/off derives from
       // `isToolCapableModel` on this SAME resolved id (via
       // `buildFlightCompanionStripData`), never a second, independent guess.
-      const sessionApiKey = req.session.openRouterApiKey;
-      const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-      const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+      const { apiKey: resolvedApiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
       const model = await resolveAiOperationModel({
         urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier, opKind: 'flight-companion',
       });
@@ -517,7 +516,7 @@ export function createFlightCompanionRoutes({
       // `ai-not-configured` stop reason can still hold. The page renders
       // regardless of this (only the flag gates the page), which is exactly
       // why the attribute is needed.
-      const aiConfigured = !!(sessionApiKey || getPaidEnvKey() || freeTierKey);
+      const aiConfigured = !!resolvedApiKey;
       // Read-only, same discipline as observerReportDoc above: readCurrent
       // ONLY, feeding the strip's last-check-in / sweep-liveness / no-census
       // lines (see buildFlightCompanionStripData's own doc comment).
@@ -613,10 +612,7 @@ export function createFlightCompanionRoutes({
 
     const safeHistory = filterChatTurns(body.history);
 
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     // The "AI is not configured" 503 is NOT checked here, even though the key is
     // resolved here. §A.2 requires the gate to be cleared before anything else
     // is touched, and the gate lives in the core — so this check rides in
@@ -683,10 +679,9 @@ export function createFlightCompanionRoutes({
         // WHAT a config or quota failure is.
         onBeforeSpend: async () => {
           if (!apiKeyToUse) return { reason: 'not-configured' };
-          if (!isFreeTier) return null;
-          const check = await freeTierStore.tryUse(workspace.urlKey);
-          if (check.allowed) return null;
-          return { reason: 'free-tier', freeTierCheck: check };
+          const gate = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+          if (!gate) return null;
+          return { reason: 'free-tier', freeTierCheck: gate };
         },
         deps: {
           observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
@@ -788,10 +783,7 @@ export function createFlightCompanionRoutes({
     const body = req.body || {};
     const safeHistory = filterChatTurns(body.history);
 
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     // LIN-2449: same disconnect handling as `/turn` — the reservation is
     // deliberately NOT released here; it self-expires via the lease.
@@ -837,10 +829,9 @@ export function createFlightCompanionRoutes({
         isClientGone: () => clientGone,
         onBeforeSpend: async () => {
           if (!apiKeyToUse) return { reason: 'not-configured' };
-          if (!isFreeTier) return null;
-          const check = await freeTierStore.tryUse(workspace.urlKey);
-          if (check.allowed) return null;
-          return { reason: 'free-tier', freeTierCheck: check };
+          const gate = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+          if (!gate) return null;
+          return { reason: 'free-tier', freeTierCheck: gate };
         },
         deps: {
           observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,

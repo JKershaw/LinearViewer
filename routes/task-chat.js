@@ -20,7 +20,7 @@ import { renderTaskChatPage } from '../lib/render-task-chat.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
-import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { streamChat, streamChatWithTools, isToolCapableModel, isRecommendationEnabled } from '../lib/openrouter.js';
 import { createChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { sessionIsTerminal } from './dashboard.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
@@ -28,8 +28,9 @@ import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
+import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 
-const MAX_QUESTION_LENGTH = 2000;
+const MAX_QUESTION_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
 function sendSSE(res, type, data) {
   res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -365,25 +366,22 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     // `mockAi` so a mocked session isn't 503'd for lacking an OpenRouter key.
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!mockAi && !apiKeyToUse) {
       return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
-    if (!mockAi && isFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+    if (!mockAi) {
+      const gate = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (gate) {
         return res.status(429).json({
-          error: check.reason,
+          error: gate.reason,
           freeTier: {
             used: true,
-            remaining: check.remaining,
-            limit: check.limit,
-            resetsAt: check.resetsAt
+            remaining: gate.remaining,
+            limit: gate.limit,
+            resetsAt: gate.resetsAt
           }
         });
       }
