@@ -2810,6 +2810,102 @@ describe('window.ChatUI reveal()/appendMessage()/appendNote() — scroll gate (L
   });
 });
 
+// ─── LIN-2811 close-out: direct isPinnedToBottom export + boundary ────────
+//
+// Review ledger items 1 and 2 ("What CI Did Not Prove"). The block above
+// exercises the predicate only INDIRECTLY, through appendMessage/appendNote,
+// and pins the threshold only as "non-zero" (mutant M7 flipped < 60 to < 0).
+// LIN-2808 is specified to consume `window.ChatUI.isPinnedToBottom` directly,
+// so the export contract itself is the seam that needs a witness here.
+//
+// These drive the predicate on BARE elements — no makeScrollThread, no
+// append at all — so they fail if the export is dropped from the ChatUI
+// surface even while every indirect test above still passes.
+
+describe('window.ChatUI.isPinnedToBottom — direct export contract (LIN-2811 ledger item 1)', () => {
+  test('is reachable as a function on the window.ChatUI export surface', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    assert.strictEqual(typeof ChatUI.isPinnedToBottom, 'function');
+  });
+
+  test('reads a null/undefined element as pinned (fails toward following)', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    assert.strictEqual(ChatUI.isPinnedToBottom(null), true);
+    assert.strictEqual(ChatUI.isPinnedToBottom(undefined), true);
+  });
+
+  test('reads a bare element sitting at its own bottom as pinned', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const el = new FakeElement('ul');
+    el.scrollHeight = 500;
+    el.clientHeight = 200;
+    el.scrollTop = 300; // gap 0
+    assert.strictEqual(ChatUI.isPinnedToBottom(el), true);
+  });
+
+  test('reads a bare element scrolled well up as not pinned', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const el = new FakeElement('ul');
+    el.scrollHeight = 500;
+    el.clientHeight = 200;
+    el.scrollTop = 0; // gap 300
+    assert.strictEqual(ChatUI.isPinnedToBottom(el), false);
+  });
+
+  test('treats an unlaid-out element (clientHeight 0 or absent) as pinned', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const unlaidOut = new FakeElement('ul'); // clientHeight defaults to 0
+    unlaidOut.scrollHeight = 0;
+    unlaidOut.scrollTop = 0;
+    assert.strictEqual(ChatUI.isPinnedToBottom(unlaidOut), true);
+    // `clientHeight || 0` must also absorb an element that has no such
+    // property at all, not just one reading 0.
+    assert.strictEqual(ChatUI.isPinnedToBottom({ scrollHeight: 40, scrollTop: 0 }), true);
+  });
+
+  test('does not mutate the element it measures — the predicate is pure', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    const el = new FakeElement('ul');
+    el.scrollHeight = 500;
+    el.clientHeight = 200;
+    el.scrollTop = 0;
+    el.hidden = true;
+    ChatUI.isPinnedToBottom(el);
+    assert.strictEqual(el.scrollTop, 0);
+    assert.strictEqual(el.scrollHeight, 500);
+    assert.strictEqual(el.hidden, true);
+  });
+});
+
+describe('window.ChatUI.isPinnedToBottom — the 60px boundary (LIN-2811 ledger item 2)', () => {
+  // Pins the constant itself AND its comparison direction. M7 (< 60 -> < 0)
+  // proved only that the threshold is non-zero; nothing distinguished `< 60`
+  // from `<= 60`, nor 60 from any other positive value. The exactly-60 case
+  // is the one that separates them: strict `<` excludes it.
+  const atGap = (gap) => {
+    const el = new FakeElement('ul');
+    el.scrollHeight = 500;
+    el.clientHeight = 200;
+    el.scrollTop = 300 - gap;
+    return el;
+  };
+
+  test('a gap of exactly 60px is NOT pinned (strict <, not <=)', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    assert.strictEqual(ChatUI.isPinnedToBottom(atGap(60)), false);
+  });
+
+  test('a gap of 59px IS pinned — the boundary sits between 59 and 60', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    assert.strictEqual(ChatUI.isPinnedToBottom(atGap(59)), true);
+  });
+
+  test('a gap of 61px is NOT pinned', () => {
+    const ChatUI = loadChatUI(makeDocument());
+    assert.strictEqual(ChatUI.isPinnedToBottom(atGap(61)), false);
+  });
+});
+
 // ─── LIN-2622: the boot turn — start button / re-orient affordance ─────────
 
 describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the start/reorient pair', () => {
