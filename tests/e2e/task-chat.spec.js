@@ -340,9 +340,28 @@ test.describe('Task Chat Page (experimental)', () => {
       // MID_MARKER's frame alone grows the transcript by more than 60px
       // (routes/task-chat.js's buildMockSlowStreamFrames) — this is the exact
       // hop that stranded a pinned reader when the predicate was sampled
-      // AFTER the DOM mutation (review finding F1 on PR #1541). Assert the
-      // gate holds right here, not just once the whole stream has settled.
-      await expect(answer).toContainText('MID_MARKER', { timeout: 8000 });
+      // AFTER the DOM mutation (review finding F1 on PR #1541). Land on that
+      // frame via page.waitForFunction's rAF-paced polling, NOT an
+      // expect().toContainText() web-first assertion — that assertion's
+      // polling interval backs off to ~1s by this point in the stream, so it
+      // is structurally guaranteed to resolve only after the stream has
+      // already finished, which would measure the post-settle gap below
+      // instead of the live mid-stream one (the vacuous-assertion root cause
+      // F2 fixed in the scrolled-up test above: LIN-2812 review comment
+      // 2026-09-22T08:50Z).
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.task-chat-msg-assistant .task-chat-msg-body');
+        return !!el && el.textContent.includes('MID_MARKER');
+      }, null, { polling: 'raf', timeout: 8000 });
+
+      // Prove the stream is genuinely still live at the instant of this
+      // measurement — more frames, including END_MARKER, must not have
+      // landed yet. If this ever fails, the timing assumption above has
+      // broken and the test must fail loudly rather than measure a gap that
+      // has already settled.
+      await expect(pill).not.toHaveClass(/status-pill--done/);
+      await expect(answer).not.toContainText('END_MARKER');
+
       const midGap = await transcript.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
       expect(midGap).toBeLessThan(60);
 
