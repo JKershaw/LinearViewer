@@ -28,7 +28,8 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
-import { DEFAULT_MODEL, streamChat, resolveReasoningBudget, isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { DEFAULT_MODEL, streamChat, resolveReasoningBudget, isRecommendationEnabled } from '../lib/openrouter.js';
+import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 
@@ -134,10 +135,7 @@ export function createShipBiscuitRoutes({
     }
 
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!mockAi && !apiKeyToUse) {
       return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
@@ -193,8 +191,8 @@ export function createShipBiscuitRoutes({
       } else {
         // Real editor-in-chief call. Charge the free tier only here (the one paid call).
         if (isFreeTier) {
-          const check = await freeTierStore.tryUse(workspace.urlKey);
-          if (!check.allowed) {
+          const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+          if (check) {
             keepalive.stop();
             return keepalive.send(429, {
               error: check.reason,

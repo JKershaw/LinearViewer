@@ -23,7 +23,8 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles, resolveDirections } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
-import { isRecommendationEnabled, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { isRecommendationEnabled } from '../lib/openrouter.js';
+import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
@@ -183,18 +184,15 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
 
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-    const apiKeyToUse = sessionApiKey || getPaidEnvKey() || freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!mockAi && !apiKeyToUse) {
       return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
     }
 
     if (!mockAi && isFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return res.status(429).json({
           error: check.reason,
           freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
