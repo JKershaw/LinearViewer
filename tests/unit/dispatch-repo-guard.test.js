@@ -9,7 +9,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractRepoBasename, resolveKnownRepo, validateDispatchRepo } from '../../lib/dispatch-repo-guard.js';
+import { extractRepoBasename, resolveKnownRepo, validateDispatchRepo, fetchKnownRepos } from '../../lib/dispatch-repo-guard.js';
 
 describe('extractRepoBasename (LIN-2886)', () => {
   test('a bare basename passes through unchanged', () => {
@@ -130,5 +130,57 @@ describe('validateDispatchRepo (LIN-2886)', () => {
     };
     await validateDispatchRepo({ repo: 'LinearViewer', provider, scope: 'the-scope-token' });
     assert.equal(receivedScope, 'the-scope-token');
+  });
+});
+
+describe('fetchKnownRepos (LIN-2974)', () => {
+  const projectsWithRepos = [
+    { name: 'A', content: 'repo=LinearViewer' },
+    { name: 'B', content: 'repo=simple-dispatcher' },
+  ];
+
+  test('a provider that can answer returns the deduped, non-null repo list', async () => {
+    const provider = { supports: () => true, fetchProjects: async () => ({ projects: projectsWithRepos }) };
+    const result = await fetchKnownRepos({ provider, scope: 'tok' });
+    assert.deepEqual(result, { ok: true, knownRepos: ['LinearViewer', 'simple-dispatcher'] });
+  });
+
+  test('a provider that answers with zero repo= lines returns ok:true with an EMPTY list — distinct from an unavailable inventory', async () => {
+    const provider = { supports: () => true, fetchProjects: async () => ({ projects: [{ name: 'A', content: 'no repo line here' }] }) };
+    const result = await fetchKnownRepos({ provider, scope: 'tok' });
+    assert.deepEqual(result, { ok: true, knownRepos: [] });
+  });
+
+  test('no provider at all: ok:false, never a silent empty-list pass', async () => {
+    const result = await fetchKnownRepos({ provider: null, scope: null });
+    assert.deepEqual(result, { ok: false, reason: 'no-provider' });
+  });
+
+  test('provider does not support fetchProjects: ok:false', async () => {
+    const provider = { supports: () => false };
+    const result = await fetchKnownRepos({ provider, scope: null });
+    assert.deepEqual(result, { ok: false, reason: 'unsupported' });
+  });
+
+  test('fetchProjects throws: ok:false', async () => {
+    const provider = { supports: () => true, fetchProjects: async () => { throw new Error('upstream down'); } };
+    const result = await fetchKnownRepos({ provider, scope: null });
+    assert.deepEqual(result, { ok: false, reason: 'fetch-failed' });
+  });
+
+  test('fetchProjects never settles, bounded by timeoutMs (test-injected, no dangling timer): ok:false', async () => {
+    const provider = { supports: () => true, fetchProjects: () => new Promise(() => {}) };
+    const start = Date.now();
+    const result = await fetchKnownRepos({ provider, scope: null, timeoutMs: 20 });
+    assert.deepEqual(result, { ok: false, reason: 'fetch-failed' });
+    assert.ok(Date.now() - start < 1000, 'must resolve promptly once the injected short timeout fires');
+  });
+
+  test('validateDispatchRepo and fetchKnownRepos agree on the same inventory (single source of truth)', async () => {
+    const provider = { supports: () => true, fetchProjects: async () => ({ projects: projectsWithRepos }) };
+    const inventory = await fetchKnownRepos({ provider, scope: 'tok' });
+    const refusal = await validateDispatchRepo({ repo: 'totally-unknown', provider, scope: 'tok' });
+    assert.equal(refusal.ok, false);
+    assert.deepEqual(refusal.knownRepos.sort(), inventory.knownRepos.sort());
   });
 });

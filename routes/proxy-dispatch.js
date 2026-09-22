@@ -395,11 +395,15 @@ export function createDispatchRoutes({
       // reach the runner as a wasted dispatch + confusing terminal failure +
       // five-minute duplicate-guard wait (LIN-2872). Fails OPEN when the
       // capability isn't there to check with (see
-      // lib/dispatch-repo-guard.js) — the runner's own reject
-      // (simple-dispatcher's admission.js) remains the second line of
-      // defense for exactly that case. `resolvedRepo` (normalized to the
-      // basename on a URL/owner-name match) replaces the raw `repo` on the
-      // item; a validated repo is never stored in its unnormalized form.
+      // lib/dispatch-repo-guard.js). Passing this check is not a guarantee
+      // the runner can resolve the value (LIN-2974): this validates against
+      // the TRACKER's namespace (project `repo=` lines), while the runner
+      // (simple-dispatcher's admission.js) matches against its HOST's
+      // namespace (folder basenames in `workspaces.json`) — a separate
+      // check against a different list, not a narrower net behind this one.
+      // `resolvedRepo` (normalized to the basename on a URL/owner-name
+      // match) replaces the raw `repo` on the item; a validated repo is
+      // never stored in its unnormalized form.
       let resolvedRepo = repo || null;
       if (!isAbort && repo) {
         // LIN-1880 hermetic guard: `test-token` is this codebase's established
