@@ -191,3 +191,50 @@ describe('LIN-2353 — enqueueFeedbackTriage (workspace-api.js:2862) threads pro
     assert.notStrictEqual(github, fallback, 'if these matched, the parity assertion would prove nothing');
   });
 });
+
+// --- LIN-2981 pin: the feedback-title mock gate must actually fire, not just
+// exist. This file's `buildApp` already fixtures `accessToken: 'test-token'`
+// so `shouldMockAi(workspace)` is true for every submit() above — that is
+// what lets this test set a dummy, never-valid `OPENROUTER_API_KEY` in-process
+// without ever spending it. Without the mock gate (routes/workspace-api.js's
+// `if (mockAi || aiApiKey)` branch), this key would reach `generateFeedbackTitle`
+// -> `streamChat`, a real network call to OpenRouter, and CI has no key to
+// reproduce that with — the review on PR #1543 confirmed CI stays green with
+// the fix reverted, which is the exact blind spot this test closes.
+describe('LIN-2981 — feedback-title generation stays deterministic when OPENROUTER_API_KEY is set', () => {
+  test('a dummy in-process OPENROUTER_API_KEY never reaches generateFeedbackTitle: the mock title is what createIssue receives', async () => {
+    // Env isolation: save/restore around the single assertion so a failure
+    // (or a parallel test elsewhere in this same worker) can't leak the
+    // dummy key past this test.
+    const hadKey = Object.prototype.hasOwnProperty.call(process.env, 'OPENROUTER_API_KEY');
+    const originalKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = 'sk-or-v1-lin2981-dummy-never-valid';
+    try {
+      const capturedTitles = [];
+      const provider = {
+        name: 'lin2981-feedback-title-pin-fake',
+        supports: () => true,
+        apiWriteFields: () => ['title', 'description', 'projectId'],
+        async fetchTeams() { return [{ id: 'team-default', name: 'Default' }]; },
+        async createIssue(token, input) {
+          capturedTitles.push(input.title);
+          return { success: true, issue: { id: 'iss-1', identifier: 'GH-900', title: input.title, url: 'https://github.com/acme/repo/issues/900', state: { name: 'Todo', type: 'unstarted' } } };
+        }
+      };
+      const dispatch = capturingDispatchStore();
+      const app = buildApp({ provider, dispatchQueueStore: dispatch, features: {} });
+
+      const { status } = await submit(app, 'acme', { message: 'Something is broken' });
+
+      assert.strictEqual(status, 201);
+      // The deterministic mock title (routes/workspace-api.js's
+      // buildMockFeedbackTitle: `Triage: <first line>`) — NOT a live-generated
+      // title, and NOT the plain `Feedback: ...` fallback a 401'd live call
+      // would fall back to. Either of those would mean the mock gate didn't fire.
+      assert.deepStrictEqual(capturedTitles, ['Triage: Something is broken']);
+    } finally {
+      if (hadKey) process.env.OPENROUTER_API_KEY = originalKey;
+      else delete process.env.OPENROUTER_API_KEY;
+    }
+  });
+});
