@@ -133,6 +133,39 @@ function buildMockFollowUpTrigger(question) {
 }
 
 /**
+ * LIN-2812: a mock-only trigger so e2e can witness the per-token scroll gate
+ * (public/task-chat.js) across REAL, separately-flushed SSE frames — the
+ * normal single-frame mock answer completes in one write and can't exercise
+ * a reader scrolling away mid-stream. Each frame adds only a few words (a
+ * small, realistic per-token/per-message delta) so a single frame never jumps
+ * the transcript past isPinnedToBottom's 60px threshold in one hop — a large
+ * single-frame jump isn't representative of a live LLM's token cadence and
+ * would make a pinned reader spuriously fall off the gate. `MID_MARKER`/
+ * `END_MARKER` give the e2e witness fixed points to synchronize on. Frames
+ * are separated by a real delay so the browser's fetch reader genuinely
+ * yields between them.
+ */
+function buildMockSlowStreamTrigger(question) {
+  return /stream slowly/i.test(String(question || ''));
+}
+
+function buildMockSlowStreamFrames() {
+  const words = [];
+  for (let i = 1; i <= 140; i++) words.push(`filler-word-${i}`);
+  words.splice(100, 0, 'MID_MARKER');
+  words.push('END_MARKER');
+  // Group a few words per frame: keeps each frame's height delta small (so a
+  // pinned reader never falls past the 60px threshold in one hop) while
+  // keeping the total frame count — and therefore total stream duration —
+  // reasonable for a real per-frame delay to still separate reliably.
+  const frames = [];
+  for (let i = 0; i < words.length; i += 4) {
+    frames.push(words.slice(i, i + 4).join(' ') + ' ');
+  }
+  return frames;
+}
+
+/**
  * A deterministic, first-person mock answer so e2e can exercise the full
  * round-trip (gate → fetch → stream → render) without calling an LLM. Grounded
  * in the resolved context, in the spirit of the real prompt. When a `related`
@@ -434,6 +467,14 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         } else if (related) {
           sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'lookup_task', arguments: { issueId: related.identifier } });
           sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'lookup_task', result: `${related.identifier} — ${related.title}` });
+        }
+        if (buildMockSlowStreamTrigger(question)) {
+          for (const frame of buildMockSlowStreamFrames()) {
+            sendSSE(res, 'token', { token: frame });
+            await new Promise((resolve) => setTimeout(resolve, 120));
+          }
+          sendSSE(res, 'done', {});
+          return res.end();
         }
         const answer = buildMockAnswer(context, question, related);
         sendSSE(res, 'token', { token: answer });

@@ -258,6 +258,67 @@ test.describe('Task Chat Page (experimental)', () => {
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
     });
 
+    // === LIN-2812 ===
+    // public/task-chat.js:365 wrote `transcript.scrollTop = transcript.scrollHeight`
+    // unconditionally on every streamed token/message frame, yanking a reader who
+    // had scrolled up mid-answer back to the bottom on the very next frame. The
+    // real AI mock answers in a single SSE frame, which can't exercise "mid-stream"
+    // at all, so these two tests drive the "stream slowly" mock trigger
+    // (routes/task-chat.js) — ~36 small-delta, REAL, separately-flushed SSE
+    // frames ~120ms apart — to get a genuine runtime witness rather than a
+    // fake-DOM unit test standing in for one. A small viewport keeps the
+    // transcript's overflow comfortably past isPinnedToBottom's 60px threshold
+    // once scrolled to the top (confirmed to fail against the pre-fix
+    // unconditional write: scrollTop landed back at 328/369, not 0, before this
+    // gate existed). MID_MARKER lands after the transcript has already
+    // overflowed its capped viewport, with more frames still to arrive;
+    // END_MARKER is the last frame before `done`.
+    test('a reader scrolled up mid-stream is not pulled back down by later token frames (LIN-2812)', async ({ page }) => {
+      await page.setViewportSize({ width: 900, height: 300 });
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('please stream slowly so I can scroll away');
+      await page.locator('#task-chat-send').click();
+
+      const transcript = page.locator('#task-chat-transcript');
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+
+      // The transcript is already overflowing its capped height by MID_MARKER —
+      // scroll the reader away from the bottom here; more frames are still coming.
+      await expect(answer).toContainText('MID_MARKER', { timeout: 8000 });
+      await transcript.evaluate((el) => { el.scrollTop = 0; });
+      expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
+
+      // Let the rest of the stream land, then settle.
+      await expect(answer).toContainText('END_MARKER', { timeout: 8000 });
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+      await expect(pill).toHaveClass(/status-pill--done/, { timeout: 8000 });
+
+      // The scrolled-away reader must not have been yanked back down by ANY of
+      // the later per-token writes — the gate holds on every frame, not just
+      // the one that happened to fire right after the scroll.
+      expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
+    });
+
+    test('a reader pinned to the bottom keeps following streamed tokens (LIN-2812)', async ({ page }) => {
+      await page.setViewportSize({ width: 900, height: 300 });
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('please stream slowly so I can scroll away');
+      await page.locator('#task-chat-send').click();
+
+      const transcript = page.locator('#task-chat-transcript');
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+
+      // Never scroll away — the reader stays pinned to the bottom throughout.
+      await expect(answer).toContainText('END_MARKER', { timeout: 8000 });
+      await expect(pill).toHaveClass(/status-pill--done/, { timeout: 8000 });
+
+      const { scrollTop, scrollHeight, clientHeight } = await transcript.evaluate((el) => ({
+        scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight,
+      }));
+      expect(scrollHeight - scrollTop - clientHeight).toBeLessThan(60);
+    });
+
     // LIN-2670: the ticket's own headline acceptance criterion. The AI mock's
     // real answers are plain prose with no Markdown syntax (buildMockAnswer,
     // routes/task-chat.js), so — like the empty-answer test above — this

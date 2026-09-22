@@ -362,7 +362,12 @@
           var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
           answerText += text;
           answerEl.textContent = answerText;
-          transcript.scrollTop = transcript.scrollHeight;
+          // LIN-2812: only follow the stream down when the reader is already
+          // pinned near the bottom — a reader who scrolled up to re-read
+          // earlier context must not be yanked back on every later frame.
+          if (window.ChatUI.isPinnedToBottom(transcript)) {
+            transcript.scrollTop = transcript.scrollHeight;
+          }
         } else if (type === 'done') {
           answerEl.classList.remove('chat-cursor');
           if (answerText) {
