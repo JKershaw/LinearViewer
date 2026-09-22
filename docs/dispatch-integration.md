@@ -892,7 +892,7 @@ value the consumer was always going to reject anyway, just later and less legibl
 A workspace's known repos are its own known-repos inventory (`lib/workspace-repos.js`'s
 `knownWorkspaceRepos` — the `repo=` lines on the workspace's Linear projects, plus the
 default) — the same source the periodical target-repo picker uses. Matching is
-**case-sensitive**, mirroring the consumer's own case-sensitive folder-basename match.
+**case-sensitive**.
 
 An unrecognized value — one that matches no known basename in any accepted form — is
 refused with `422`:
@@ -908,10 +908,28 @@ refused with `422`:
 **Fails open, never closed, when the check itself can't run.** If the workspace's
 provider doesn't support listing projects, or the check times out or errors, the `repo`
 value is forwarded unvalidated rather than blocking the dispatch — a capability gap
-must never become a dispatch outage. **The consumer's own reject remains the second
-line of defense** for exactly that case (and for any other integration that bypasses
-this proxy seam): simple-dispatcher's admission check still terminally rejects an
-unmatched `repo` with a `[failed]` marker naming it, unchanged.
+must never become a dispatch outage. In that case, and for any integration that
+bypasses this proxy seam (the autopilot kickoff and the session-authenticated UI
+dispatch do not run this check), simple-dispatcher's admission check still terminally
+rejects a `repo` it cannot resolve, with a `[failed]` marker naming it.
+
+**Accepted here does not mean resolvable by the consumer (LIN-2974).** Harbour and the
+consumer check `repo` against two *different* namespaces, and nothing keeps them in
+sync:
+
+| Layer | Namespace | Source of truth |
+|-------|-----------|-----------------|
+| Harbour (this check) | the tracker's `repo=` project lines | the workspace's project descriptions |
+| simple-dispatcher (admission) | folder basenames of configured workspaces | the runner host's `workspaces.json` |
+
+The consumer's reject is therefore a separate check against a different list, not a
+narrower net behind this one. A value can pass here, return `201 queued`, and still
+fail terminally at admission (`[failed] Unknown repo "…": no configured workspace has
+a matching folder basename`). Keeping the two in agreement is a host-configuration
+obligation: every name a project's `repo=` line can emit needs a matching
+`workspaces.json` entry on each runner host (see simple-dispatcher's
+`docs/dispatching-into-a-repo.md`). When in doubt, omit `repo`. `null` runs in the
+workspace's default folder.
 
 ## Task Kind
 

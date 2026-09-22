@@ -2083,7 +2083,7 @@ Returns `422` — **unknown repo** (LIN-2886). Unlike the poll-recency warning a
 { "error": "Unknown repo \"some-typo\"", "code": "UNKNOWN_REPO", "knownRepos": ["LinearViewer", "simple-dispatcher"] }
 ```
 
-A URL or `owner/name` form of a *known* repo is accepted and silently normalized — the item is stored with the basename, never the raw value. This check fails **open** (skips validation, forwards `repo` unchanged) when the workspace's provider can't answer at all — never a reason to retry; the consumer's own reject remains the fallback for that case.
+A URL or `owner/name` form of a *known* repo is accepted and silently normalized — the item is stored with the basename, never the raw value. This check fails **open** (skips validation, forwards `repo` unchanged) when the workspace's provider can't answer at all, so it is never a reason to retry. **Passing this check does not guarantee the runner can resolve the value** (LIN-2974). `knownRepos` is the tracker's namespace, but the runner matches `repo` against the folder basenames in its host's `workspaces.json`. A value accepted here can still return `201` and then fail terminally with `[failed] Unknown repo "…"`. See [Repo Override Validation](dispatch-integration.md#repo-override-validation).
 
 Returns `409` — **duplicate dispatch** (LIN-1656). A *fresh* dispatch for an `issueIdentifier` + `kind` this workspace already dispatched within the last **5 minutes** is refused, because two independent orchestrators (an autopilot run and a human on the board) can otherwise start the same step minutes apart and duplicate the work:
 
@@ -2195,7 +2195,7 @@ With a `kind` override the response also carries `"override": true` and omits th
 
 `/recommend` can be slow (provider fetch + OpenRouter); the same whitespace-keepalive behaviour as `GET /recommend` applies, so don't set a client timeout below ~60s. Watch the returned `id` with `GET /api/proxy/dispatch/{id}` exactly as for a plain dispatch.
 
-Returns `422` — **unknown repo** (LIN-2886), same shape and same fail-open-on-capability-gap behavior as `POST /api/proxy/dispatch` above. Validated against whichever repo value this call resolves to after `repoInherited` precedence (a purely project-derived repo is already known-good by construction; this guard's practical bite is on a caller-supplied `repo`):
+Returns `422` — **unknown repo** (LIN-2886), same shape and same fail-open-on-capability-gap behavior as `POST /api/proxy/dispatch` above. Validated against whichever repo value this call resolves to after `repoInherited` precedence (a purely project-derived repo always passes, because it comes from the same inventory; this guard's practical bite is on a caller-supplied `repo`). Passing still does not guarantee the runner can resolve it (LIN-2974, see above):
 
 ```json
 { "error": "Unknown repo \"some-typo\"", "code": "UNKNOWN_REPO", "knownRepos": ["LinearViewer", "simple-dispatcher"] }
