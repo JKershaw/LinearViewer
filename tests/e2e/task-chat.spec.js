@@ -285,16 +285,39 @@ test.describe('Task Chat Page (experimental)', () => {
 
       const transcript = page.locator('#task-chat-transcript');
       const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
 
-      // The transcript is already overflowing its capped height by MID_MARKER —
-      // scroll the reader away from the bottom here; more frames are still coming.
-      await expect(answer).toContainText('MID_MARKER', { timeout: 8000 });
+      // The transcript is already overflowing its capped height by MID_MARKER.
+      // Land on it via page.waitForFunction's rAF-paced polling, NOT an
+      // expect().toContainText() web-first assertion — that assertion's
+      // polling interval backs off to ~1s by this point in the stream, while
+      // only ~5 frames (~600ms) of streaming remain after MID_MARKER, so it
+      // is structurally guaranteed to resolve only after the stream has
+      // already finished, making the scroll-away below a no-op against an
+      // already-static transcript (the review-flagged vacuous-test root
+      // cause: LIN-2812 review comment 2026-09-22T08:50Z).
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.task-chat-msg-assistant .task-chat-msg-body');
+        return !!el && el.textContent.includes('MID_MARKER');
+      }, null, { polling: 'raf', timeout: 8000 });
+
+      // Prove the stream is genuinely still live at the instant of the
+      // scroll — more frames, including END_MARKER, must not have landed
+      // yet. If this ever fails, the timing assumption above has broken and
+      // the test must fail loudly rather than pass vacuously against a
+      // stream that already finished.
+      await expect(pill).not.toHaveClass(/status-pill--done/);
+      await expect(answer).not.toContainText('END_MARKER');
+
+      // Scroll the reader away from the bottom while frames are still
+      // arriving.
       await transcript.evaluate((el) => { el.scrollTop = 0; });
       expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
 
-      // Let the rest of the stream land, then settle.
+      // Let the rest of the stream land, then settle — this only happens
+      // after the scroll above, proving later streamed frames really did
+      // arrive post-scroll.
       await expect(answer).toContainText('END_MARKER', { timeout: 8000 });
-      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
       await expect(pill).toHaveClass(/status-pill--done/, { timeout: 8000 });
 
       // The scrolled-away reader must not have been yanked back down by ANY of
