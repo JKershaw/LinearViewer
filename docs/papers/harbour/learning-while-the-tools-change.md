@@ -1,13 +1,14 @@
 ---
 title: Learning While the Tools Change
 kind: essay
-argument: Engineering experience, AI experience and tool capability move on separate clocks, so a developer's position cannot be read off any one of them.
-version: 1
-date: 2026-09-21
-authors: [Astra 6]
-model: "Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. No Harbour dispatch lineage. Filed into the archive unchanged apart from the header and the Next section."
+argument: Engineering experience, AI experience and tool capability run on separate clocks, and better tools slow the second by absorbing the mistakes that used to teach — so what a team most needs to grow is calibrated distrust, which no snapshot of speed or seniority can see.
+version: 2
+date: 2026-09-22
+authors: [Astra 6, Claude]
+model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. No Harbour dispatch lineage for either."
 sources:
   - "Cui et al., The Effects of Generative AI on High-Skilled Work, Management Science, 2026 — https://doi.org/10.1287/mnsc.2025.00535"
+  - "docs/ladder.md@0d652fbc0f2fef12bf063f047d855c346b337595"
   - "docs/papers/harbour/developer-adoption-ladder.md@0d652fbc0f2fef12bf063f047d855c346b337595"
   - "docs/papers/harbour/developer-adoption-ladder-earlier-dates.md@0d652fbc0f2fef12bf063f047d855c346b337595"
   - "docs/papers/harbour/where-harbour-joins.md@0d652fbc0f2fef12bf063f047d855c346b337595"
@@ -20,6 +21,7 @@ sources:
   - "Shen and Tamkin, How AI Impacts Skill Formation, arXiv 2601.20245, 2026 — https://www.anthropic.com/research/AI-assistance-coding-skills"
   - "Anthropic, Measuring AI agent autonomy in practice, 2026-02-18 — https://www.anthropic.com/research/measuring-agent-autonomy"
   - "Dhanorkar, Passi and Vorvoreanu, arXiv 2606.05391, 2026 — https://arxiv.org/abs/2606.05391"
+  - "Murphy-Hill, Butler and Savelieva, arXiv 2607.01418, 2026 — https://arxiv.org/abs/2607.01418 (figures read at https://arxiv.org/html/2607.01418, 2026-09-22)"
 ---
 
 # Learning While the Tools Change
@@ -40,6 +42,13 @@ experience using AI and the capabilities of the available tools must be consider
 separately. A developer's path reflects their interaction, within a particular team and kind
 of work. History supplies useful mechanisms for understanding those paths, although it does
 not establish a universal sequence or determine who will eventually lead.
+
+The separation has a sharper consequence than it first appears. Better tools do not only let
+newcomers start further along; they also absorb the mistakes that used to do the teaching, so
+the second clock can run slower for someone whose first year is smoother. That makes the
+capability a team most needs to grow neither fluency with the tools nor years in the
+profession, but calibrated distrust: knowing which output to check, and how hard. Section 7
+commits to that reading and says what would show it wrong.
 
 ## 1 The puzzle inside the engineering team
 
@@ -65,13 +74,16 @@ that form of assistance rather than every contemporary agent workflow. They neve
 why unexpectedly strong performance by a newcomer should be taken seriously.
 [[1]](#1-ai-assistance-and-developer-productivity)
 
-The original Harbour adoption ladder captures a recognisable personal journey: asking
-questions, directing sessions, saving repeatable prompts, delegating bounded tasks, and
-eventually organising continuing work. Its research papers also expose the limits of treating
-that journey as a population model. They found no reliable population count for saved-prompt
-use, and the survey categories do not directly measure Harbour's later stages. The ladder is a
-useful vocabulary for practices; a claim that everyone passes through those practices in order
-requires further evidence. [[2]](#2-the-harbour-adoption-papers)
+Harbour's adoption ladder captures a recognisable personal journey: asking questions,
+directing sessions, saving repeatable prompts, delegating bounded tasks, and eventually
+organising continuing work. Its research papers exposed the limits of reading that journey as a
+population model — they found no reliable population count for saved-prompt use, and the survey
+categories do not directly measure Harbour's later stages — and the ladder has since absorbed
+the point. It now describes "a distribution over cohorts, not a queue", with each cohort
+starting on a higher rung because the tools moved between their start dates. This essay starts
+from that revision rather than against it. What it adds is an account of why that distribution
+cannot be measured by any single survey, and of what the tools moving does to learning as well
+as to entry. [[2]](#2-the-harbour-adoption-papers)
 
 ## 2 Three clocks running at once
 
@@ -102,17 +114,24 @@ different from a career cohort. A senior engineer and a graduate can join the sa
 cohort, bringing very different knowledge with them. Conversely, two developers of similar
 seniority may have learned AI work under different technical conditions.
 
-This distinction matters when interpreting apparent progress. Comparing this year's newcomers
-with last year's newcomers mixes a change in people with a change in tools. Following one
-person over a year also mixes learning with improvements in their environment. The three clocks
-are a way to ask better questions; they do not, by themselves, separate these effects
-statistically.
+This is the essay's most practical claim, and it is a claim about measurement. Comparing this
+year's newcomers with last year's newcomers mixes a change in people with a change in tools.
+Following one person over a year mixes learning with improvements in their environment. Neither
+design can separate the clocks however large the sample, because every clock moves in both. That
+is why a survey asking developers where they stand can describe a population but never explain
+it, and why the only instrument that can is the same people doing comparable work at more than
+one date. The three clocks do not, by themselves, separate these effects statistically; they say
+which comparisons never will.
 
 An everyday example makes the distinction concrete. One developer once needed a carefully
 staged sequence to make an agent inspect a repository and implement a change. A newcomer may
 receive an effective version of that sequence as a built-in workflow. The newcomer has acquired
 access to its results immediately. Whether they have also acquired the judgement needed to
 recognise its limits is a separate question.
+
+The clocks are also not independent. The calendar clock sets the exchange rate for the other
+two: when a tool absorbs a class of mistake, it removes the mistake and the lesson together.
+Section 6 returns to what that costs.
 
 ## 3 What newcomers inherit and what they can skip
 
@@ -179,15 +198,31 @@ possibilities should be tested against work rather than inferred from seniority.
 Psychology supplies a mechanism for the friction of established habits. Bilalić, McLeod and
 Gobet gave chess players problems containing a familiar but inferior solution and a better
 alternative. The familiar solution could prevent experts from finding the better one, an effect
-known as Einstellung. However, stronger experts were less susceptible. The findings support both
-the possibility of fixation and the capacity of deeper expertise to overcome it.
+known as Einstellung. Stronger experts were less susceptible — the grandmasters found the better
+solution on the problems used — but they fixated in turn when the better solution was made
+harder to see. The authors' own summary is that the inflexibility of experts is "both reality
+and myth". Expertise raises the difficulty at which fixation appears; it does not remove it.
 [[6]](#6-familiar-solutions-and-flexible-expertise)
 
 An engineering interpretation is that procedural familiarity and understanding of purpose can
 adapt differently. Someone who knows a reliable sequence may keep applying it after the tool
 changes. Someone who understands why each step was necessary may be better placed to simplify
-the sequence. This is a hypothesis about transfer, not a diagnosis that can be made from a
-person's age or preferences.
+the sequence — though by the chess result only up to a point, since the same person can fixate
+again once the better alternative is less obvious. That is the case for revisiting procedures
+on a schedule rather than trusting the expert to notice. This is a hypothesis about transfer,
+not a diagnosis that can be made from a person's age or preferences.
+
+A large 2026 study of this transition in software engineering found a sign that should give any
+ladder pause. In Microsoft's early-2026 rollout of command-line agents, across tens of thousands
+of engineers, prior use of the IDE assistant raised the odds of trying GitHub Copilot CLI — by
+49% for engineers with one to fourteen days of prior use, up to 83% for those with sixty or
+more — and lowered retention, defined as use on at least five of the fourteen days from first
+use, by 12 to 15%. The authors explain it as substitution rather than lost skill: an engineer who already
+trusts an assistant in the editor has "a familiar alternative to fall back on", and the new
+habit never forms. Either reading breaks the assumption that time on one practice buys the next,
+and the authors' reading is itself a calendar-clock effect: what a person goes on to learn
+depends on which tools are already to hand.
+[[12]](#12-adoption-and-retention-in-a-large-engineering-organisation)
 
 That distinction also makes caution easier to evaluate. A request to review generated code could
 be an inherited habit or a response to observed defects. Asking what the review protects, what
@@ -214,6 +249,14 @@ arrangements through patterns of interaction, despite using the same machinery. 
 explanations and exchanges helped affirm both parties' knowledge; the study shows how technical
 change and everyday relationships shaped one another.
 [[7]](#7-technology-and-professional-relationships)
+
+The Microsoft rollout gives the mechanism a contemporary number. First use spread through
+colleagues: an engineer whose skip-level peers were largely using the command-line agent — more
+than a quarter of them — had 216% higher odds of trying it, and one whose manager used it had
+82% higher odds. Tenure barely mattered. These are associations — teams that work together may
+also adopt together for reasons of their own — but Barley's two departments suggest a mechanism,
+and the rollout shows the pattern at scale.
+[[12]](#12-adoption-and-retention-in-a-large-engineering-organisation)
 
 For an engineering lead, this suggests that an experienced colleague and a developer fluent with
 agents may need a reciprocal learning relationship. The first can explain why a proposed change
@@ -261,6 +304,11 @@ significant. Within the assisted group, explanation-seeking and conceptual inqui
 with stronger understanding, but those interaction patterns were not randomly assigned. The study
 does not establish a long-term effect on expertise. [[9]](#9-ai-assistance-and-learning)
 
+This is the cost section 2 promised. Each improvement on the calendar clock removes
+some mistakes before a person makes them, and the lessons with them, so a newcomer can deliver
+more in their first year while accumulating less of the judgement that comes from being wrong.
+Nothing in the output shows the difference.
+
 The practical question is what replaces the learning opportunities removed by automation. Debugging
 one's own mistake can expose a mistaken assumption. Reading a colleague's reasoning can reveal a
 constraint. If an agent handles those steps, another activity may need to make the relevant
@@ -293,12 +341,32 @@ eventually overtake newcomers assumes that their knowledge remains valuable and 
 the new methods. A claim that newcomers will preserve their lead assumes that their learning keeps
 pace with the responsibility of their work. Neither outcome follows from entry date alone.
 
+If the essay has to commit to one reading — and an essay should — it is this. The capability that
+decides who can be trusted with more is neither fluency with the tools nor years in the
+profession but calibrated distrust: knowing which output to check, and how hard, in a domain one
+understands well enough to be surprised by it. It is learned mostly from consequence, which is
+why it accrues to experience, and why a tool that absorbs mistakes can slow its growth even as it
+speeds delivery. The reading is consistent with the contemporary results in this essay. The Trio
+learners with assistance understood less, and fewer of their errors were theirs to meet. The
+experienced Claude Code users approved less up front and interrupted more, which is what
+calibration looks like from outside. Dhanorkar's developers, below, varied their oversight with
+the consequences of a mistake rather than with the tool. And most people who use an agent still
+do not let it run unattended: of the agent users in Stack Overflow's April 2026 pulse, 63% rarely
+or never do. [[2]](#2-the-harbour-adoption-papers)
+
+The reading would be wrong if calibration transferred freely between domains, so that a developer
+fluent with agents on one codebase supervised as well on an unfamiliar one; or if the people who
+best handled later changes to their generated work were simply the fastest, with no relationship
+to how often they had been caught out. Both are observable in an ordinary team.
+
 Task context can change the comparison immediately. Dhanorkar, Passi and Vorvoreanu interviewed 17
 experienced developers about oversight of software agents. Their accounts distinguished relatively
 permissive use in prototypes from stricter review of changes to interconnected existing systems. The
-study identified several forms of oversight, including preparation, co-planning, monitoring and
-review. It offers qualitative evidence about practice, without establishing the population size or
-performance advantage of each pattern. [[11]](#11-oversight-in-actual-development-work)
+study identified four forms of oversight: a priori control, co-planning, real-time monitoring and
+post hoc review. The first is control set before any work is delegated — which settings the agent
+runs under, what it may touch — and it is where much of the difference between a prototype and a
+migration lives. The study offers qualitative evidence about practice, without establishing the
+population size or performance advantage of each pattern. [[11]](#11-oversight-in-actual-development-work)
 
 A plausible prediction is therefore that capability will remain uneven across tasks. A developer who
 delegates a prototype effectively may choose close supervision for a migration. That change need not
@@ -332,6 +400,12 @@ Time to a first plausible answer is useful but incomplete. Consider the effort r
 accepted result, including review and repair by other people. Return to a few changes later to see
 whether their authors can explain, extend or diagnose them. A delayed observation can reveal something
 that a successful demonstration cannot.
+
+If calibrated distrust is learned from consequence, the most useful thing a delivery system can give a
+developer is cheap, visible wrongness: a record of where an agent's claims failed, surfaced early
+enough that the lesson lands before the habit sets. A review ledger, a provenance trail and a failing
+test all do this. A run of green merges does not, however reassuring, because it shows where the work
+ended and hides where it went wrong on the way.
 
 These observations should support development conversations. If review effort is rising, investigate
 whether task scope, generated volume, missing context or weak checks explain it. If a developer obtains
@@ -389,6 +463,10 @@ The starting point for the cohort question. These exploratory syntheses map exis
 product-specific ladder. Their distinctions between population evidence and interpretation are useful;
 their rung mappings are not independently validated population categories.
 
+The ladder itself, revised from those papers, is the better starting point for the cohort argument
+than any one of them: its paragraph on cohorts makes the essay's opening move in John Kershaw's words.
+
+[docs/ladder.md](../../ladder.md) ·
 [developer-adoption-ladder.md](developer-adoption-ladder.md) ·
 [developer-adoption-ladder-earlier-dates.md](developer-adoption-ladder-earlier-dates.md) ·
 [where-harbour-joins.md](where-harbour-joins.md)
@@ -491,9 +569,24 @@ rather than measuring their prevalence or causal effects on software quality.
 
 [Read the source](https://arxiv.org/abs/2606.05391)
 
+### 12 Adoption and retention in a large engineering organisation
+
+Murphy-Hill, E., Butler, J. and Savelieva, A. *Adoption and Impact of Command-Line AI Coding Agents: A
+Study of Microsoft's Early 2026 Rollout of Claude Code and GitHub Copilot CLI.* arXiv 2607.01418, 2026.
+
+An observational study of tens of thousands of engineers over the first four months of a rollout, with
+individual-level adoption and retention. The closest thing in this list to a direct measurement of the
+essay's claims about social transmission and about one practice failing to carry into the next. It is
+one organisation; its effects are associations rather than experiments; and its explanation of the
+negative retention effect — a familiar alternative to fall back on — is the authors' reading, not a
+tested mechanism.
+
+[Read the source](https://arxiv.org/abs/2607.01418)
+
 For a short reading route, begin with Barley for team relationships, Bainbridge for supervision and
 learning, and David for changes in the organisation of work. Lee and Lim then provide the vocabulary for
-comparing different routes through technological change.
+comparing different routes through technological change, and Murphy-Hill, Butler and Savelieva show the
+same questions measured in 2026.
 
 ## Next
 
@@ -511,5 +604,14 @@ mixes a change in people with a change in tools. `what-lowers-the-verification-c
 showing a verified artifact changes supervision; the reciprocal-learning claim in section 5 is a second
 route to the same outcome and is equally unmeasured.
 
-The essay is unchecked. A checking document against its eleven sources — what each one actually supports,
-and whether the essay's reading of it holds — is the other line added to `proposals.md`.
+Section 7's commitment adds one more, because it names what would refute it: does calibration transfer
+between domains? Harbour's operators review agent work in more than one repository, some of which they
+know far better than others. Whether their review catches the same share of an agent's mistakes in both
+is a direct test of whether the scarce thing is domain-bound, as this essay argues, or portable.
+
+**This version is unchecked.** Version 1 was checked against its eleven sources in
+`learning-while-the-tools-change-check.md`, and version 2 was revised from that check's findings by the
+check's own author, who is now this essay's second author. Under `standard.md` rule 2 that check
+therefore covers version 1 only, and cannot cover this one. The new material — the rollout's figures,
+the chess boundary condition, the reading in section 7 and its refutation conditions — needs a check by
+someone who wrote neither, and that line goes to `proposals.md` with this change.

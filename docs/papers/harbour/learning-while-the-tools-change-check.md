@@ -1,10 +1,10 @@
 ---
 title: Do the eleven sources in "Learning While the Tools Change" support the readings it gives them?
 kind: paper
-version: 1
-date: 2026-09-21
+version: 2
+date: 2026-09-22
 authors: [Claude]
-model: "Claude Code CLI, web session, effort default; no Harbour dispatch lineage — run directly from John Kershaw's request in the session that filed the essay. The exact model identifier is not written into repository artifacts in this session; John can add it."
+model: "Version 1 by claude-opus-5, version 2 by claude-opus-5-5 (Claude Opus 5.5), both in one Claude Code CLI web session, effort high as the session reports it; no Harbour dispatch lineage — run directly from John Kershaw's request in the session that filed the essay. Version 2 corrects this check's own reading of the Microsoft rollout after reading that paper at the source."
 grounded_at: b4610b0 (LinearViewer), the commit that filed the essay
 cites:
   - "docs/papers/harbour/learning-while-the-tools-change.md@b4610b0"
@@ -16,11 +16,12 @@ cites:
   - "arxiv.org/abs/2606.05391 (read 2026-09-21)"
   - "Bilalić, McLeod and Gobet 2008, via the Cognitive Psychology record and the authors' 2010 summary (read 2026-09-21)"
   - "Lee and Lim 2001, Tripsas 1997, Barley 1986, Bainbridge 1983, David 1990 — publisher records and secondary summaries (read 2026-09-21); see Limits"
+  - "arxiv.org/html/2607.01418, Murphy-Hill, Butler and Savelieva (read 2026-09-22, for version 2)"
 ---
 
 # Do the eleven sources in "Learning While the Tools Change" support the readings it gives them?
 
-Yes, on every claim that can be checked against a number or an attribution: all seven of the
+For version 1 of the essay, as filed at `b4610b0`: yes, on every claim that can be checked against a number or an attribution: all seven of the
 essay's quantitative statements are exact, and no source is made to say something it does not
 say. The failures are of reach and of position, not of fact. One reading runs past its source's
 own boundary condition (the chess result). One source is renamed in a way that loses what it
@@ -102,9 +103,11 @@ essay's load-bearing claims directly, on the essay's own population:
   CLI agent by 49–83% and **lowered 14-day retention by 12–15%**.
 
 An essay is entitled to prefer a mechanism to a correlation, and Barley explains *why* while the
-rollout only shows *that*. But the rollout is about software engineers, in 2026, at scale, and its
-retention result is the strongest evidence anywhere for the essay's own thesis that time on one
-skill does not buy the next. Leaving it out costs the argument more than it saves it.
+rollout only shows *that*. But the rollout is about software engineers, in 2026, at scale. Its
+retention result needs care: the authors read it as substitution — an engineer with a working IDE
+habit has "a familiar alternative to fall back on", so the new habit never forms — not as skill
+failing to transfer. It supports the essay's claim that time on one practice does not simply buy
+the next, without settling why. Leaving it out still costs the argument more than it saves it.
 
 **What the essay has that Harbour does not.** Three things, and they are why it is worth filing
 rather than folding into the ladder. First, the three clocks as a *measurement* claim rather than
@@ -123,9 +126,9 @@ proposed Harbour analogue of Anthropic's auto-approve curve is permission mode b
 version's title punctuation is the transcriber's, and two words were wrong with it: Cui et al. is
 "High-Skilled", Lee and Lim is "catching-up", and Tripsas 1997 is the Summer Special Issue of
 volume 18. The Management Science DOI is added now that the Cui paper is published, so that entry
-lands on the published article rather than only the 2025 summary. No argument text was touched:
-the essay is Astra 6's, and the standard's rule 2 makes a second document the checker, not the
-editor.
+lands on the published article rather than only the 2025 summary. This check touched no argument
+text: the checker is not the editor under rule 2. When John later invited the checker to revise the
+essay as its second author, that made version 2 a document this check cannot cover.
 
 ## Method
 
@@ -138,7 +141,10 @@ authors' own 2010 restatement), Lee and Lim, Tripsas. Four could not be read as 
 returned unparseable binary, one returned HTTP 503, one is behind a cookie wall — and were checked
 against indexed bibliographic records and secondary summaries instead: David 1990, Barley 1986,
 Bainbridge 1983, and Tripsas's body text. The Harbour claims in §1 were checked against
-`developer-adoption-ladder.md` and `docs/ladder.md` in the working tree.
+`developer-adoption-ladder.md` and `docs/ladder.md` in the working tree. Version 1 of this check
+took the Microsoft rollout's figures second-hand from `developer-adoption-ladder.md`; version 2 read
+them at arxiv.org/html/2607.01418 on 2026-09-22. Every figure held. The reading did not: see the
+rollout finding above.
 
 ## Limits
 

@@ -3,18 +3,31 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
-- **Should `docs/ladder.md` absorb the essay, or the essay the ladder?** A question for John,
-  not a study. `harbour/learning-while-the-tools-change-check.md` found the two documents
-  making the same cohort argument independently, two days apart, without citing each other.
-  Either the ladder gains the three clocks and the classification of a skipped step by
-  function, or the essay gains the ladder's cohort paragraph and stops correcting a claim the
-  document no longer makes. (Claude, 2026-09-21)
+- **Does version 2 of `harbour/learning-while-the-tools-change.md` hold up?** Rule 2. The
+  essay's check covers version 1 only: version 2 was revised from the check's findings by the
+  check's own author, now the essay's second author. A check by someone who wrote neither should
+  read the new material — the Microsoft rollout's figures and the authors' substitution reading,
+  the chess boundary condition, and section 7's calibrated-distrust reading and the two
+  conditions it names as refuting it. (Claude, 2026-09-22)
+- **Does calibration transfer between domains?** The same essay's section 7 argues the scarce
+  capability is calibrated distrust, learned from consequence and bound to a domain, and names
+  this as what would refute it. Harbour's operators review agent work in more than one
+  repository; compare the share of an agent's later-found mistakes their reviews caught in a
+  repository they know well against one they know less. (Claude, 2026-09-22)
+- **Should `docs/ladder.md` take the essay's three clocks and its step classification?** A
+  question for John, not a study. `harbour/learning-while-the-tools-change-check.md` found the
+  two documents making the same cohort argument independently, two days apart, without citing
+  each other. Version 2 of the essay now starts from the ladder's cohort paragraph; the open
+  half is whether the ladder gains the identification argument (why no single survey can
+  measure the distribution) and the classification of a skipped step by function. (Claude,
+  2026-09-21, narrowed 2026-09-22)
 - **Does prior assistant fluency lower an operator's retention on bounded runs inside
   Harbour?** The Microsoft CLI-agent rollout found prior IDE-assistant use raised the odds of
-  trying an agent by 49–83% and lowered 14-day retention by 12–15% — the strongest evidence
-  anywhere for the essay's claim that time on one skill does not buy the next, and the sign a
-  ladder does not predict. Harbour has first-run and repeat-run records per operator; test
-  whether the sign reproduces. (Claude, 2026-09-21)
+  trying an agent by 49–83% and lowered 14-day retention by 12–15% — a sign a ladder of
+  accumulating practices does not predict, which the authors read as substitution (a familiar
+  fallback) rather than lost skill. Harbour has first-run and repeat-run records per operator;
+  test whether the sign reproduces, and whether operators with a fallback tool to hand show it
+  more. (Claude, 2026-09-21, corrected 2026-09-22)
 - **Do later entrants reach an accepted outcome with fewer preparatory steps, and does that
   survive maintenance?** `harbour/learning-while-the-tools-change.md` separates engineering
   experience from AI experience from calendar time and says a snapshot cannot tell them apart.
