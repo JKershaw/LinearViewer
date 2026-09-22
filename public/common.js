@@ -583,11 +583,19 @@ window.api = async function api(url, opts = {}) {
  * Callers decide what an unrecognized type means; this reader never assumes
  * a closed set.
  *
+ * The JSON-parse fallback covers the PAYLOAD only: a `data:` line that is not
+ * valid JSON is handed to `onEvent` as a raw string. It does NOT cover
+ * `onEvent` itself — an exception thrown by the handler propagates out of
+ * `readSSEStream` (rejecting the returned promise and ending the read loop)
+ * rather than being caught and retried with the raw string. Callers own their
+ * handler's failures; this reader never re-dispatches a frame (LIN-2980).
+ *
  * @global
  * @param {Response} response - Fetch response with an SSE body.
  * @param {Function} onEvent - Callback: (type, data) => void. `data` is
- *   JSON-parsed when possible, else the raw string.
- * @returns {Promise<void>}
+ *   JSON-parsed when possible, else the raw string. Called exactly ONCE per
+ *   frame; if it throws, the exception propagates and the stream stops.
+ * @returns {Promise<void>} Rejects if `onEvent` throws.
  */
 window.readSSEStream = async function readSSEStream(response, onEvent) {
   const reader = response.body.getReader();
@@ -617,11 +625,13 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
       }
 
       if (data) {
+        let payload;
         try {
-          onEvent(type, JSON.parse(data));
+          payload = JSON.parse(data);
         } catch {
-          onEvent(type, data);
+          payload = data;
         }
+        onEvent(type, payload);
       }
     }
   }
