@@ -173,7 +173,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    * of it), but takes no `repo` and enqueues nothing — it exists so an
    * operator-run drift check can compare this namespace against a runner's
    * `workspaces.json` without a probe dispatch or a write-scoped token
-   * (see simple-dispatcher's `scripts/repo-namespace-drift.mjs`).
+   * (see simple-dispatcher's `scripts/repo-namespace-drift.js`).
    *
    * Never fails open into `{ knownRepos: [] }`: an inability to determine the
    * inventory (no provider, an unsupported provider, a throwing/timing-out

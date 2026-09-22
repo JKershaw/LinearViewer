@@ -40,16 +40,19 @@ function fakeProvider({ projects = [], supportsFetchProjects = true, throws = fa
   };
 }
 
-function buildApp({ provider, token = KNOWN_REPOS_TEST_SCOPE, resolveWorkspaceAccess } = {}) {
+function buildApp({ provider, token = KNOWN_REPOS_TEST_SCOPE, resolveWorkspaceAccess, validateToken, tokenScope = 'readWrite' } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
     provider,
     proxyTokenStore: {
       createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
-      validateToken: async () => ({
-        tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
-      })
+      validateToken: validateToken ?? (async () => ({
+        tokenId: 't1', urlKey: 'acme', label: 'test', scope: tokenScope, createdBy: 'u1'
+      })),
+      // LIN-1938 S2/S3: a token nothing recognizes has no descriptor to
+      // return — mirrors the default in tests/unit/lin-1985-401-stage-discriminator.test.js.
+      describeRejectionCause: async () => null
     },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: resolveWorkspaceAccess || (async () => ({ token, reason: 'ok' })),
@@ -157,5 +160,32 @@ describe('LIN-2974 — GET /api/proxy/known-repos', () => {
 
     assert.equal(first.status, 200);
     assert.equal(second.status, 200, 'a second immediate call must not 409 — this read has no duplicate-guard interaction');
+  });
+
+  test('AUTH: an invalid/rejected bearer token is refused 401 PROXY_TOKEN_INVALID before any inventory work', async () => {
+    const provider = fakeProvider({ projects: [{ content: 'repo=LinearViewer' }] });
+    const app = buildApp({ provider, validateToken: async () => null });
+    const res = await call(app, '/api/proxy/known-repos', { Authorization: 'Bearer not-a-real-token' });
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.code, 'PROXY_TOKEN_INVALID');
+  });
+
+  test('AUTH: a read-scoped token gets 200 — this route needs no write scope', async () => {
+    const provider = fakeProvider({ projects: [{ content: 'repo=LinearViewer' }] });
+    const app = buildApp({ provider, tokenScope: 'read' });
+    const res = await call(app, '/api/proxy/known-repos');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.knownRepos, ['LinearViewer']);
+  });
+
+  test('UNAVAILABLE: fetchProjects never settles — the route\'s own 8s timeout still resolves 503 REPO_INVENTORY_UNAVAILABLE, not a hang', async () => {
+    const provider = fakeProvider({ hang: true });
+    const app = buildApp({ provider });
+    const res = await call(app, '/api/proxy/known-repos');
+
+    assert.equal(res.status, 503);
+    assert.equal(res.body.code, 'REPO_INVENTORY_UNAVAILABLE');
   });
 });

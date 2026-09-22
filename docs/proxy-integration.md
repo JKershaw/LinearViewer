@@ -426,6 +426,49 @@ Response:
 }
 ```
 
+#### List Known Repos (LIN-2974)
+
+Read-only exposure of this workspace's own known-repos inventory — the exact
+`repo=` project-line computation the dispatch-time [Repo Override
+Validation](dispatch-integration.md#repo-override-validation) check runs
+before enqueueing, reachable directly instead of only via that check's `422`
+body. Takes no `repo` input, creates no dispatch item, and has no
+interaction with the duplicate-dispatch guard. A plain read-scoped token is
+sufficient — this route requires no write scope.
+
+```
+GET /api/proxy/known-repos
+```
+
+Response (`200`):
+```json
+{ "knownRepos": ["LinearViewer", "simple-dispatcher"] }
+```
+
+Unavailable inventory (the provider can't answer — no provider, unsupported,
+or a throwing/timing-out fetch) is a distinct non-`200` `503`, **never** a
+fail-open `{ "knownRepos": [] }` — a silent empty list here would read as
+"this workspace has no repos" rather than "could not check", which is
+exactly the false signal an operator-run drift check must not see:
+
+```json
+{
+  "error": "Could not determine this workspace's known-repos inventory",
+  "code": "REPO_INVENTORY_UNAVAILABLE",
+  "reason": "no-provider" | "unsupported" | "fetch-failed"
+}
+```
+
+**Accepted here ≠ resolvable by the consumer (LIN-2974).** `knownRepos` is
+the TRACKER's namespace — the same one [Repo Override
+Validation](dispatch-integration.md#repo-override-validation) validates
+against. The consumer (e.g. simple-dispatcher) resolves a dispatch's `repo`
+against its own, separate namespace (its host's `workspaces.json` folder
+basenames), and nothing keeps the two in sync automatically — a value listed
+here can still be refused by the consumer's own admission check. See
+[dispatch-integration.md](dispatch-integration.md#repo-override-validation)
+for the full namespace-mismatch note.
+
 #### List Issues
 
 ```
