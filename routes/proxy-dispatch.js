@@ -85,6 +85,7 @@ function formatDispatchWatch(item, meta = null) {
     // other stored field, so a caller inspecting its own run can see the
     // declared budget without guessing. null ⇒ unbounded.
     maxTasks: item.maxTasks ?? null,
+    repo: item.repo || null,
     dispatchedAt: item.dispatchedAt,
     // Attribution (LIN-1948, fix 3b): the detail/watch read is where a human
     // asking "who dispatched this?" actually looks. Paired with the
@@ -219,7 +220,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -299,6 +300,19 @@ export function createDispatchRoutes({
       if (subscription !== undefined && !isValidSubscription(subscription)) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
+      }
+      // Task budget (LIN-1751/LIN-1737, LIN-2975): a SCOPE bound on the run — up to
+      // this many distinct tasks — enforced deterministically at the dispatch-factory
+      // seam. Validated here inline, matching routes/dispatch.js's rule and error text
+      // exactly, so a run declared through either seam rejects an invalid budget
+      // identically. Optional; absent/null ⇒ no budget, byte-identical to today.
+      // Placed before any store write or async guard runs (matches every other inline
+      // check on this route).
+      if (maxTasks !== undefined && maxTasks !== null) {
+        if (!Number.isInteger(maxTasks) || maxTasks < 1) {
+          logEvent(req, '/api/proxy/dispatch', 400);
+          return badRequest.json(res, 'maxTasks must be an integer >= 1');
+        }
       }
 
       // Shared payload validation for the two main handlers (LIN-1139): length
@@ -542,7 +556,10 @@ export function createDispatchRoutes({
           periodicalId: periodicalId || null,
           waitForFollowUps: waitForFollowUps === true,
           queueIfBusy: queueIfBusy === true,
-          subscription: subscriptionResolved
+          subscription: subscriptionResolved,
+          // LIN-2975: scope bound (LIN-1751), parity with routes/dispatch.js —
+          // absent/null stores as unbounded, byte-identical to today.
+          maxTasks: maxTasks ?? null
         }
       });
 
@@ -564,6 +581,7 @@ export function createDispatchRoutes({
         abortTo: item.abortTo || null,
         cascade: item.cascade === true,
         sessionId: item.sessionId || null,
+        maxTasks: item.maxTasks ?? null,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
         consumerLastSeenAt: item.consumerLastSeenAt || null,
         ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
@@ -1498,6 +1516,12 @@ export function createDispatchRoutes({
         issueIdentifier: i.issueIdentifier,
         issueUrl: i.issueUrl,
         target: i.target,
+        // LIN-2975: budget/lineage fields (present on the detail/watch read
+        // above) so a list reader can confirm sessionId/maxTasks stamping
+        // without a per-row GET. Explicit allow-list keys, not a spread of
+        // `i` — see the bootstrapToken caveat below.
+        sessionId: i.sessionId || null,
+        maxTasks: i.maxTasks ?? null,
         dispatchedAt: i.dispatchedAt,
         // resolvedAt = take/archive time; completedAt = real completion (null until terminal).
         resolvedAt: i.resolvedAt || null,
