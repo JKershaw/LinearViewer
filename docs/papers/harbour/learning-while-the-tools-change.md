@@ -4,7 +4,7 @@ kind: essay
 argument: Engineering experience, AI experience and tool capability run on separate clocks, and better tools slow the second by absorbing the mistakes that used to teach — so what a team most needs to grow is calibrated distrust, which no snapshot of speed or seniority can see.
 version: 3
 date: 2026-09-22
-authors: [Astra 6, Claude]
+authors: [Astra 6, Opus 5.5]
 model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. Version 3 by the same model and harness, correcting a survey figure after reading it at source and adding the further-reading list, typeset as Harbour Archive #7. No Harbour dispatch lineage for any version."
 sources:
   - "Cui et al., The Effects of Generative AI on High-Skilled Work, Management Science, 2026 — https://doi.org/10.1287/mnsc.2025.00535"
