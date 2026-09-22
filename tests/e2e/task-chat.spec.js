@@ -258,6 +258,122 @@ test.describe('Task Chat Page (experimental)', () => {
       await expect(pill).not.toHaveClass(/status-pill--in-progress/);
     });
 
+    // === LIN-2812 ===
+    // public/task-chat.js:365 wrote `transcript.scrollTop = transcript.scrollHeight`
+    // unconditionally on every streamed token/message frame, yanking a reader who
+    // had scrolled up mid-answer back to the bottom on the very next frame. The
+    // real AI mock answers in a single SSE frame, which can't exercise "mid-stream"
+    // at all, so these two tests drive the "stream slowly" mock trigger
+    // (routes/task-chat.js) — REAL, separately-flushed SSE frames ~120ms apart,
+    // with the frame carrying MID_MARKER deliberately grouped large enough to
+    // grow the transcript by more than isPinnedToBottom's 60px threshold in a
+    // single hop — to get a genuine runtime witness rather than a fake-DOM unit
+    // test standing in for one. A small viewport keeps the transcript's
+    // overflow comfortably past the threshold once scrolled to the top
+    // (confirmed to fail against the pre-fix unconditional write: scrollTop
+    // landed back at 328/369, not 0, before this gate existed; and confirmed to
+    // fail again against the post-mutate ordering bug F1 flagged in review: the
+    // pinned reader fell off the gate right after the big MID_MARKER frame).
+    // MID_MARKER lands after the transcript has already overflowed its capped
+    // viewport, with more frames still to arrive; END_MARKER is the last frame
+    // before `done`.
+    test('a reader scrolled up mid-stream is not pulled back down by later token frames (LIN-2812)', async ({ page }) => {
+      await page.setViewportSize({ width: 900, height: 300 });
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('please stream slowly so I can scroll away');
+      await page.locator('#task-chat-send').click();
+
+      const transcript = page.locator('#task-chat-transcript');
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+
+      // The transcript is already overflowing its capped height by MID_MARKER.
+      // Land on it via page.waitForFunction's rAF-paced polling, NOT an
+      // expect().toContainText() web-first assertion — that assertion's
+      // polling interval backs off to ~1s by this point in the stream, while
+      // only ~5 frames (~600ms) of streaming remain after MID_MARKER, so it
+      // is structurally guaranteed to resolve only after the stream has
+      // already finished, making the scroll-away below a no-op against an
+      // already-static transcript (the review-flagged vacuous-test root
+      // cause: LIN-2812 review comment 2026-09-22T08:50Z).
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.task-chat-msg-assistant .task-chat-msg-body');
+        return !!el && el.textContent.includes('MID_MARKER');
+      }, null, { polling: 'raf', timeout: 8000 });
+
+      // Prove the stream is genuinely still live at the instant of the
+      // scroll — more frames, including END_MARKER, must not have landed
+      // yet. If this ever fails, the timing assumption above has broken and
+      // the test must fail loudly rather than pass vacuously against a
+      // stream that already finished.
+      await expect(pill).not.toHaveClass(/status-pill--done/);
+      await expect(answer).not.toContainText('END_MARKER');
+
+      // Scroll the reader away from the bottom while frames are still
+      // arriving.
+      await transcript.evaluate((el) => { el.scrollTop = 0; });
+      expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
+
+      // Let the rest of the stream land, then settle — this only happens
+      // after the scroll above, proving later streamed frames really did
+      // arrive post-scroll.
+      await expect(answer).toContainText('END_MARKER', { timeout: 8000 });
+      await expect(pill).toHaveClass(/status-pill--done/, { timeout: 8000 });
+
+      // The scrolled-away reader must not have been yanked back down by ANY of
+      // the later per-token writes — the gate holds on every frame, not just
+      // the one that happened to fire right after the scroll.
+      expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
+    });
+
+    test('a reader pinned to the bottom keeps following streamed tokens, including a frame whose growth alone exceeds the 60px threshold (LIN-2812)', async ({ page }) => {
+      await page.setViewportSize({ width: 900, height: 300 });
+      await page.locator('#task-chat-id').fill('TEST-1');
+      await page.locator('#task-chat-question').fill('please stream slowly so I can scroll away');
+      await page.locator('#task-chat-send').click();
+
+      const transcript = page.locator('#task-chat-transcript');
+      const answer = page.locator('.task-chat-msg-assistant .task-chat-msg-body');
+      const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
+
+      // Never scroll away — the reader stays pinned to the bottom throughout.
+      // MID_MARKER's frame alone grows the transcript by more than 60px
+      // (routes/task-chat.js's buildMockSlowStreamFrames) — this is the exact
+      // hop that stranded a pinned reader when the predicate was sampled
+      // AFTER the DOM mutation (review finding F1 on PR #1541). Land on that
+      // frame via page.waitForFunction's rAF-paced polling, NOT an
+      // expect().toContainText() web-first assertion — that assertion's
+      // polling interval backs off to ~1s by this point in the stream, so it
+      // is structurally guaranteed to resolve only after the stream has
+      // already finished, which would measure the post-settle gap below
+      // instead of the live mid-stream one (the vacuous-assertion root cause
+      // F2 fixed in the scrolled-up test above: LIN-2812 review comment
+      // 2026-09-22T08:50Z).
+      await page.waitForFunction(() => {
+        const el = document.querySelector('.task-chat-msg-assistant .task-chat-msg-body');
+        return !!el && el.textContent.includes('MID_MARKER');
+      }, null, { polling: 'raf', timeout: 8000 });
+
+      // Prove the stream is genuinely still live at the instant of this
+      // measurement — more frames, including END_MARKER, must not have
+      // landed yet. If this ever fails, the timing assumption above has
+      // broken and the test must fail loudly rather than measure a gap that
+      // has already settled.
+      await expect(pill).not.toHaveClass(/status-pill--done/);
+      await expect(answer).not.toContainText('END_MARKER');
+
+      const midGap = await transcript.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+      expect(midGap).toBeLessThan(60);
+
+      await expect(answer).toContainText('END_MARKER', { timeout: 8000 });
+      await expect(pill).toHaveClass(/status-pill--done/, { timeout: 8000 });
+
+      const { scrollTop, scrollHeight, clientHeight } = await transcript.evaluate((el) => ({
+        scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight,
+      }));
+      expect(scrollHeight - scrollTop - clientHeight).toBeLessThan(60);
+    });
+
     // LIN-2670: the ticket's own headline acceptance criterion. The AI mock's
     // real answers are plain prose with no Markdown syntax (buildMockAnswer,
     // routes/task-chat.js), so — like the empty-answer test above — this

@@ -133,6 +133,52 @@ function buildMockFollowUpTrigger(question) {
 }
 
 /**
+ * LIN-2812: a mock-only trigger so e2e can witness the per-token scroll gate
+ * (public/task-chat.js) across REAL, separately-flushed SSE frames — the
+ * normal single-frame mock answer completes in one write and can't exercise
+ * a reader scrolling away mid-stream. Most frames add only a few words (a
+ * small, realistic per-token/per-message delta), but the frame carrying
+ * `MID_MARKER` is deliberately grouped much larger so it alone pushes the
+ * transcript's height past isPinnedToBottom's 60px threshold in one hop —
+ * matching the shape of the production single-frame answer path
+ * (lib/openrouter.js's short-circuit and non-streaming paths, which emit an
+ * entire answer as one `token` frame). An earlier version of this fixture
+ * kept every frame under the threshold, which is exactly what let LIN-2812's
+ * first implementation ship with the predicate sampled after the DOM
+ * mutation: no fixture frame was ever big enough to expose the ordering bug.
+ * `MID_MARKER`/`END_MARKER` give the e2e witness fixed points to synchronize
+ * on. Frames are separated by a real delay so the browser's fetch reader
+ * genuinely yields between them.
+ */
+function buildMockSlowStreamTrigger(question) {
+  return /stream slowly/i.test(String(question || ''));
+}
+
+function buildMockSlowStreamFrames() {
+  const words = [];
+  for (let i = 1; i <= 140; i++) words.push(`filler-word-${i}`);
+  const midIndex = 100;
+  words.splice(midIndex, 0, 'MID_MARKER');
+  words.push('END_MARKER');
+  // Group most words a few per frame so cadence still resembles real
+  // per-token deltas, except the frame that starts at MID_MARKER: that one
+  // is grouped as ~24 words in a single frame, big enough at the 900x300
+  // e2e viewport to grow the transcript by more than 60px in one hop.
+  const frames = [];
+  let i = 0;
+  while (i < words.length) {
+    if (words[i] === 'MID_MARKER') {
+      frames.push(words.slice(i, i + 24).join(' ') + ' ');
+      i += 24;
+    } else {
+      frames.push(words.slice(i, i + 4).join(' ') + ' ');
+      i += 4;
+    }
+  }
+  return frames;
+}
+
+/**
  * A deterministic, first-person mock answer so e2e can exercise the full
  * round-trip (gate → fetch → stream → render) without calling an LLM. Grounded
  * in the resolved context, in the spirit of the real prompt. When a `related`
@@ -434,6 +480,14 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         } else if (related) {
           sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'lookup_task', arguments: { issueId: related.identifier } });
           sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'lookup_task', result: `${related.identifier} — ${related.title}` });
+        }
+        if (buildMockSlowStreamTrigger(question)) {
+          for (const frame of buildMockSlowStreamFrames()) {
+            sendSSE(res, 'token', { token: frame });
+            await new Promise((resolve) => setTimeout(resolve, 120));
+          }
+          sendSSE(res, 'done', {});
+          return res.end();
         }
         const answer = buildMockAnswer(context, question, related);
         sendSSE(res, 'token', { token: answer });
