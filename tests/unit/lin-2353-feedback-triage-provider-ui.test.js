@@ -71,7 +71,11 @@ function buildApp({ provider, dispatchQueueStore, features = {} }) {
   app.use(express.json({ limit: '250kb' }));
   const router = createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey, provider: provider.name, accessToken: 'ws-token' };
+      // 'test-token' (not the arbitrary 'ws-token') so shouldMockAi(workspace)
+      // fires for every submit() here — this file's title-generation call
+      // site would otherwise make a live OpenRouter call whenever
+      // OPENROUTER_API_KEY is set locally (LIN-2981).
+      req.workspace = { urlKey: req.params.urlKey, provider: provider.name, accessToken: 'test-token' };
       req.session = { linearUserId: 'user-1', features };
       next();
     },
