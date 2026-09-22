@@ -3328,6 +3328,7 @@ ${goal}`
   const MAX_FEEDBACK_IMAGE_BYTES = 10 * 1024 * 1024; // matches the image-proxy ceiling
   const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
   const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
+  const MAX_FEEDBACK_MOCK_TITLE_LENGTH = 120; // mirrors lib/feedback-title.js's MAX_TITLE_LENGTH
   const feedbackBodyParser = json({ type: () => true, limit: FEEDBACK_BODY_LIMIT });
 
   // The three explicit post-create actions the feedback widget can request
@@ -3561,6 +3562,20 @@ ${goal}`
   }
 
   /**
+   * A small deterministic mock feedback-ticket title for test mode, mirroring
+   * buildMockScanText/buildMockRecap's "derive from input, no LLM" convention.
+   * Intercepts BEFORE generateFeedbackTitle so a test-mode (shouldMockAi)
+   * session never opens the live streamChat socket that function wraps
+   * (LIN-2981) — the real non-test path is untouched.
+   * @param {string} message - The raw feedback message text.
+   * @returns {string} A short, deterministic title derived from the message.
+   */
+  function buildMockFeedbackTitle(message) {
+    const firstLine = message.trim().split('\n')[0];
+    return `Triage: ${firstLine}`.slice(0, MAX_FEEDBACK_MOCK_TITLE_LENGTH);
+  }
+
+  /**
    * Submit feedback as a new ticket, optionally with an embedded screenshot,
    * then run the widget's chosen post-create action (save / triage / autopilot).
    * @route POST /workspace/:urlKey/api/feedback
@@ -3692,12 +3707,20 @@ ${goal}`
         // free-tier. When only the shared free-tier key is available the model
         // is clamped to DEFAULT (forceDefault: isFreeTier), matching every other
         // billed call site (the LIN-513 wiring invariant).
+        const mockAi = shouldMockAi(workspace);
         const { apiKey: aiApiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
-        if (aiApiKey) {
+        if (mockAi || aiApiKey) {
           try {
-            const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-            const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
-            if (generated) ticketTitle = generated;
+            if (mockAi) {
+              // LIN-2981: a test-mode/local session never reaches the live
+              // streamChat call this wraps, matching the other 6 AI call
+              // sites in this file that already branch on shouldMockAi.
+              ticketTitle = buildMockFeedbackTitle(message);
+            } else {
+              const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+              const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
+              if (generated) ticketTitle = generated;
+            }
           } catch (error) {
             // Best-effort: never block ticket creation on title generation.
             console.error('Feedback AI title generation failed, using fallback:', error.message);

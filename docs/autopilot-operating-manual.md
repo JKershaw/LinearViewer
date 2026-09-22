@@ -95,6 +95,11 @@ of step tell you which: a plan in the description, a findings comment, a commit 
 wasn't there before, a state transition. Check for the *right* one, not a fixed list. Unchanged,
 missing, or contradicting → *claimed, not verified* → flag it, don't advance.
 
+A property to check on any completion that touches tests: a pre-existing test's assertions
+and body are not weakened to make new work pass. Adding cases, fixtures, or stubs is not a
+weakening; changing or deleting what an existing case already proved is — that turns a red
+signal green by removing the thing that was red, not by fixing it.
+
 Heavy looking is itself work you can hand down. Most completions are a glance. But some mean *wading*
 — a CI trace read end to end, diffs compared across runs, a pile of logs to sift. Send that down: a
 sub-agent does the reading and comes back with the one thing you needed — the verdict and the evidence
@@ -121,6 +126,12 @@ proceeding on something you can no longer check — the silent reconciliation th
 not you. A retry or two is fine; if it stays broken, **stop, say what failed and where the loop
 stands, and wait.** (Your briefing lists the specific instruments and their known quirks — a named
 quirk costs you a second to recognise; the halt is for the breakage that *isn't* on that list.)
+
+The same failure has a quieter form: an instrument that can't distinguish *the answer is no* from
+*I couldn't determine the answer* will report the first when it means the second — a rate-limited
+call read as an empty result, a field a projection never returns read as `null`. Before treating an
+empty or negative reading as fact, confirm the source actually answered: check the status before the
+payload, and confirm a field is actually returned before trusting its absence.
 
 ## When the worker isn't cutting it
 

@@ -1678,6 +1678,8 @@ GET /api/proxy/passage-runner/prompt
 
 Returns the **Passage Runner kickoff prompt** as **plain text** (`text/plain`) — the pasteable body of `docs/passage-runner-prompt.md` (preamble stripped). This is the same text a fresh Passage Runner session starts from; fetch here to re-read a part mid-run. `read`-scope is sufficient.
 
+**Declaring the runner's task pool (LIN-2975).** This endpoint only returns the kickoff prose — there is no dedicated launch route. A passage runner is launched as a plain `POST /api/proxy/dispatch`, and the ratified pool size is whatever `maxTasks` the launcher passes on **that** call; the runner has no seam to declare it on itself after the fact. Pass `maxTasks` when dispatching the runner, or its own `GET /dispatch/{id}` will read `maxTasks: null` and the runner will (correctly) report its pool as undeclared.
+
 ### Write Endpoints
 
 All write endpoints require a `readWrite` scoped token. Read-only tokens receive `403`.
@@ -2088,7 +2090,7 @@ The runner reports progress back as **free-form feedback entries** (it owns the 
 POST /api/proxy/dispatch
 Content-Type: application/json
 
-{ "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "followUpTo": "...", "force": false, "sessionId": "...", "appendProxyContext": true }
+{ "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "followUpTo": "...", "force": false, "sessionId": "...", "maxTasks": 50, "appendProxyContext": true }
 ```
 
 | Field | Type | Required | Description |
@@ -2104,12 +2106,13 @@ Content-Type: application/json
 | `abort` / `abortTo` | bool / string (UUID) | No | Cancel/close an existing session instead of running a prompt: `abort: true` + `abortTo` = the `id` of the session to cancel (no `prompt` needed). See the dispatch guide's [Aborting a session](dispatch-integration.md#aborting-a-session) |
 | `cascade` | bool | No | Default `false`. A modifier on an `abort`: when `true`, `abortTo` names a subtree **root** and Harbour expands the call into one plain abort per descendant session, returning `{ success, cascade: true, closed: [...], count }`. Requires `abort`; mutually exclusive with `force`. The runner skips human-continued sessions with a terminal-benign `[skipped]` marker. See the dispatch guide's [Cascade close](dispatch-integration.md#cascade-close-closing-a-session-subtree) and LIN-946/LIN-951 |
 | `sessionId` | string (opaque) | No | The autopilot dispatch id that spawned this worker. Stamp it on every worker an autopilot run fans out so the whole run (incl. epic descent / `breakdown` spin-offs) reconstructs as one session. An **opaque grouping key, not a UUID** (LIN-1118): non-empty, ≤128 chars, no control characters, `__meta__` reserved — so a readable id like `LIN-1117-autopilot-standalone-2026-07-07` works, and existing UUIDs stay valid. Stored and forwarded verbatim; unlike `followUpTo` it carries **no target restriction**. See LIN-591 |
+| `maxTasks` | integer | No | Declares **this** dispatch as a budgeted run: up to this many distinct tasks (LIN-2975). Workers must carry this dispatch's `id` as their own `sessionId` for the bound to apply — see the task-budget-exhausted response below. Must be an integer ≥ 1 or omitted/`null` (unbounded, today's default behavior) — anything else is rejected `400 "maxTasks must be an integer >= 1"`. Echoed on the `201` response |
 | `periodicalId` | string | No | The periodical-template join key: the id of a periodicals-registry template (e.g. `documentation-review`) this dispatch was minted from. Stamped once at dispatch time, never maintained, and does **not** propagate to a `followUpTo` beat or a wake. Validated against the live registry — an unknown/typo id is rejected `400`. Stored and forwarded verbatim; inert to execution. See LIN-1825 |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits workspace access via this proxy. Set `false` to send the prompt verbatim. **Exception (LIN-805):** when `followUpTo` is set the block is **not** appended by default — a follow-up beat resumes a warm session that already received the proxy context on its first beat, so re-appending it is redundant. Pass `appendProxyContext: true` to force it back on for a follow-up |
 
 Returns `201`:
 ```json
-{ "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "consumerLastSeenAt": "2026-06-06T09:10:00.000Z" }
+{ "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "maxTasks": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "consumerLastSeenAt": "2026-06-06T09:10:00.000Z" }
 ```
 
 **Consumer poll-recency warning (LIN-2885).** `consumerLastSeenAt` is the most recent `lastUsedAt` across the workspace's non-revoked consumer tokens, stamped once at enqueue time — `null` means no consumer token has ever polled/taken in this workspace ("never", not merely "not recently"). When that stamp is `null` or older than the staleness threshold (default 1 hour, configurable via the `CONSUMER_POLL_WARNING_THRESHOLD_MS` env var), the response also carries a top-level `warning` string naming the last poll time or "never":
@@ -2289,6 +2292,8 @@ Notes:
   "followUpTo": null,
   "force": false,
   "sessionId": null,
+  "maxTasks": null,
+  "repo": null,
   "dispatchedAt": "...",
   "resolvedAt": "...",
   "completedAt": "...",
@@ -2309,6 +2314,8 @@ Notes:
 **Timestamps — don't mistake `resolvedAt` for completion.** `resolvedAt` is stamped when the runner *claims* the item (take/archive time); it lands seconds after `dispatchedAt` no matter how long the task runs, so it is **not** a completion signal. The truthful completion time is **`completedAt`** — the timestamp of the terminal `[done]`/`[failed]`/`[aborted]` feedback marker, `null` until that marker exists. `status` remains the authoritative completion *signal*; `completedAt` is the completion *time*.
 
 **`consumerLastSeenAt` / `consumerPollWarning` (LIN-2885).** `consumerLastSeenAt` is the poll-recency stamp taken once when this item was enqueued — the most recent `lastUsedAt` across the workspace's consumer tokens at that moment, or `null` for "never." `consumerPollWarning` is re-derived from that same stamp against the **current** clock on every read, so a queued item that grows stale while sitting unpolled will start showing a warning here even if the workspace looked fine at dispatch time; it goes back to `null` once a consumer actually polls/takes. Same threshold as the enqueue-time `warning` above (default 1h, `CONSUMER_POLL_WARNING_THRESHOLD_MS`).
+
+**`maxTasks` / `repo` (LIN-2975).** `maxTasks` is the scope bound this dispatch declared, `null` when unbounded — see the task-budget-exhausted response under [Enqueue a Dispatch](#enqueue-a-dispatch). It lives on the run row only: nothing copies it onto the workers a budgeted run fans out, so a worker's own row reads `maxTasks: null` regardless of its run's budget — to find the bound a worker is running against, read the worker's `sessionId` and then `GET /api/proxy/dispatch/{that id}`. `repo` is the validated/normalized repo basename this item was queued against, `null` for the workspace's default folder. `maxTasks` is also on `GET /api/proxy/dispatch` (list) below, so verifying a run's own budget stamping doesn't require a per-row detail read; `repo` is not on the list — **verify stamping with this endpoint, never assume a field is `null` because you didn't check it.**
 
 #### Read a Dispatch's Prompt
 
@@ -2350,10 +2357,12 @@ All query params optional. Merges the live queue and recent history, newest firs
 **Filter semantics (LIN-2079):** the filter runs on the **derived** status, so `status=taken` no longer returns rows that derive to `blocked` — query `status=blocked` for those. `total` follows the same filter. This is deliberate: it is what separates rows still being worked from rows parked waiting on a human. An unfiltered list returns the same rows as before; only the reported `status` string changes for the affected rows.
 
 ```json
-{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10, "consumerLastSeenAt": "2026-06-06T09:10:00.000Z", "consumerPollWarning": null } ], "total": 1, "truncated": false }
+{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "sessionId": null, "maxTasks": null, "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10, "consumerLastSeenAt": "2026-06-06T09:10:00.000Z", "consumerPollWarning": null } ], "total": 1, "truncated": false }
 ```
 
 **`consumerLastSeenAt` / `consumerPollWarning` (LIN-2885)** — same fields, same meaning as on `GET /api/proxy/dispatch/{id}` above: the enqueue-time poll-recency stamp, and a warning re-derived against the current clock on every read. Lets you spot a stale queued row directly from the list, without a per-item watch call.
+
+**`sessionId` / `maxTasks` (LIN-2975)** — same fields, same meaning as on `GET /api/proxy/dispatch/{id}` above, now on the list too: a reader can confirm a run's `sessionId`/`maxTasks` budget stamping across every worker it fanned out without a per-row detail read. `null` means the row carries no session/budget — verify stamping by reading this field, never by assuming absence from an older client that hadn't seen it yet. `repo` is **not** on the list (kept lean by design) — read `GET /api/proxy/dispatch/{id}` for that.
 
 **`total` / `truncated` semantics (LIN-1494).** The read merges the live queue with the *newest 200* history rows. For an unfiltered or `?issueIdentifier=`-scoped read, `total` is the **exact full matching count** — queued items plus the store's pre-window history count — so it can exceed the number of rows the window (and therefore `items`) covers. For a `?status=` read, `total` remains the count of matching rows **within that window** (status is derived from feedback at read time, so an exact per-status total is not knowable without reading the whole history). `truncated: true` discloses that the 200-row window did not cover the whole history — in that case older rows exist that this response's `items` (and the lineage join's anchor seeding) never saw, so page by `issueIdentifier` or treat window-derived aggregates as recent-window signals, not a census.
 
