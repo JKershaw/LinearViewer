@@ -150,17 +150,29 @@ budget claim from this runner — never as a flat, shape-independent rule:
   but nothing refuses it at dispatch time the way the factory guard refuses a fresh single-anchor
   dispatch. Don't report a lane leg's budget as bounded the way a single-anchor leg's is.
 - Net: your declared `maxTasks` is a real (if partial) bound on the sum of single-anchor legs, a
-  self-governed-only bound on lane legs, and no bound at all on multi-anchor legs. Still declare
-  your own `maxTasks` for honest bookkeeping (it matches the ratified pool size), but never claim
+  self-governed-only bound on lane legs, and no bound at all on multi-anchor legs. Never claim
   it "bounds nothing on its own" — say what it actually bounds, and for a lane leg say plainly
   that the bound is voluntary, not enforced.
+
+**You don't declare your own `maxTasks` — whoever launches you does (LIN-2975).** The ratified
+pool size is `maxTasks` on the `POST /dispatch` (or equivalent) call that launched this passage
+run; there is no seam for you to set it retroactively on yourself. Read your own bound with
+`GET /dispatch/{your own dispatch id}` → `maxTasks`. If that reads `null`, the pool was never
+declared — say so plainly in the landing report rather than restating the ratified figure as if
+it were enforced; a `maxTasks` your launcher forgot to pass is genuinely undeclared, not a
+reporting gap on your end.
 
 There is **no voyage-level cost roll-up**: `GET /cost/{identifier}` is per-issue-identifier
 only. When you write the landing report (Step 7), sum per-anchor `/cost` reads and state the
 coverage gaps verbatim — the 30-day app-call retention window, and any unpriced models or
-sessions — rather than presenting a total as if it were complete. `GET /dispatch` cannot be
-filtered or grouped by `sessionId`; reconstructing which dispatches belonged to this voyage is an
-N+1 of per-id reads — say so rather than assume a filter exists.
+sessions — rather than presenting a total as if it were complete. `GET /dispatch` (list) now
+carries `sessionId`/`maxTasks` on every row (LIN-2975), so you CAN group the newest-200-row
+window client-side by `sessionId` — but it still cannot be *filtered* by `sessionId` server-side,
+and a voyage that spans more than that window still needs per-id reads for the older rows
+(`truncated: true` on the list response discloses when that's the case). Verify stamping by
+reading the field on the row itself (`GET /dispatch/{id}`, or the list), never by assuming a
+field is absent/null because you didn't check it — that exact misread is why this ticket
+(LIN-2975) exists.
 
 ## Step 5 — Keep the voyage log
 

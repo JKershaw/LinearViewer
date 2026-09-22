@@ -83,13 +83,15 @@ function literalKeys(literalText) {
 }
 
 describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinned separately', () => {
-  // GET /api/proxy/dispatch (list) intentionally omits sessionId — see the
-  // comment on formatDispatchWatch's own dispatchedBy field ("this list
-  // response ... re-projects through its own explicit field allow-list").
-  // Scoped to the list-item map literal so a whole-file token search can't
-  // pass by finding sessionId elsewhere on the route (it appears 5x
-  // byte-identical across routes/proxy.js — see assertion 2 below).
-  test('/dispatch list item is an exact field set that excludes sessionId', () => {
+  // GET /api/proxy/dispatch (list) now carries sessionId and maxTasks
+  // (LIN-2975) — a list reader can confirm budget stamping without a
+  // per-row detail GET. What stays true is the ALLOW-LIST shape: this is
+  // still an explicit field set, never a spread of the stored item (that
+  // would leak `bootstrapToken`). Scoped to the list-item map literal so a
+  // whole-file token search can't pass by finding sessionId elsewhere on
+  // the route (it appears byte-identical in formatDispatchWatch too — see
+  // assertion 2 below).
+  test('/dispatch list item is an exact field set that includes sessionId and maxTasks', () => {
     const itemsLiteral = sliceBetween(
       proxyDispatchSource,
       'const items = filtered.slice(0, limit).map(i => ({',
@@ -100,12 +102,15 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
       new Set(keys),
       // LIN-2885: consumerLastSeenAt/consumerPollWarning added deliberately
       // (the consumer poll-recency stamp + derived warning) — not a leak.
+      // LIN-2975: sessionId/maxTasks added deliberately, closing the read
+      // artifact that misled a passage runner into reporting budget
+      // stamping as absent when it was only unread.
       new Set(['id', 'status', 'promptName', 'kind', 'issueIdentifier', 'issueUrl', 'target',
-        'dispatchedAt', 'resolvedAt', 'completedAt', 'feedbackCount',
+        'sessionId', 'maxTasks', 'dispatchedAt', 'resolvedAt', 'completedAt', 'feedbackCount',
         'consumerLastSeenAt', 'consumerPollWarning']),
-      'list item field set drifted — check whether sessionId was added (voyage reconstruction leak) or a field was silently dropped'
+      'list item field set drifted — check whether sessionId/maxTasks was silently dropped, or a bootstrapToken-shaped leak was added'
     );
-    assert.ok(!keys.includes('sessionId'), 'sessionId must not appear on the list item');
+    assert.ok(keys.includes('sessionId'), 'sessionId must appear on the list item');
   });
 
   // The other side of the asymmetry: formatDispatchWatch (the watch/detail
