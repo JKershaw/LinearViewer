@@ -43,6 +43,30 @@ test.describe('Archive Pages', () => {
     await expect(page).toHaveTitle(/Harbour from the Bridge/);
   });
 
+  test('serves archive #7 (the second essay) without authentication', async ({ page }) => {
+    const response = await page.goto('/archive/7');
+    expect(response.status()).toBe(200);
+    await expect(page).toHaveTitle(/Learning While the Tools Change/);
+  });
+
+  test('archive #7 loads its faces and every in-page link lands', async ({ page }) => {
+    // Its superscript citations, back-links and section cross-references are
+    // all fragment links; a renumbered entry would strand one silently.
+    await page.goto('/archive/7');
+    const result = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return {
+        loaded: [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family),
+        stranded: [...document.querySelectorAll('a[href^="#"]')]
+          .map((a) => a.getAttribute('href'))
+          .filter((href) => !document.getElementById(href.slice(1))),
+      };
+    });
+    expect(result.loaded).toContain('Inter');
+    expect(result.loaded).toContain('JetBrains Mono');
+    expect(result.stranded).toEqual([]);
+  });
+
   test('archive #3 loads its self-hosted faces from public/fonts', async ({ page }) => {
     // It links /fonts/*.woff2 rather than inlining them as base64 (same origin,
     // unlike the published artifact). A moved or renamed face would silently
