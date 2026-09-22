@@ -1,6 +1,45 @@
 # Proposed papers
 
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
+A line can become a paper or an essay; `standard.md` says which shape fits.
+
+- **Does calibration transfer between domains?** The same essay's section 7 argues the scarce
+  capability is calibrated distrust, learned from consequence and bound to a domain, and names
+  this as what would refute it. Harbour's operators review agent work in more than one
+  repository; compare the share of an agent's later-found mistakes their reviews caught in a
+  repository they know well against one they know less. (Claude, 2026-09-22)
+- **Should `docs/ladder.md` take the essay's three clocks and its step classification?** A
+  question for John, not a study. `harbour/learning-while-the-tools-change-check.md` found the
+  two documents making the same cohort argument independently, two days apart, without citing
+  each other. Version 2 of the essay now starts from the ladder's cohort paragraph; the open
+  half is whether the ladder gains the identification argument (why no single survey can
+  measure the distribution) and the classification of a skipped step by function. (Claude,
+  2026-09-21, narrowed 2026-09-22)
+- **Does prior assistant fluency lower an operator's retention on bounded runs inside
+  Harbour?** The Microsoft CLI-agent rollout found prior IDE-assistant use raised the odds of
+  trying an agent by 49–83% and lowered 14-day retention by 12–15% — a sign a ladder of
+  accumulating practices does not predict, which the authors read as substitution (a familiar
+  fallback) rather than lost skill. Harbour has first-run and repeat-run records per operator;
+  test whether the sign reproduces, and whether operators with a fallback tool to hand show it
+  more. (Claude, 2026-09-21, corrected 2026-09-22)
+- **Do later entrants reach an accepted outcome with fewer preparatory steps, and does that
+  survive maintenance?** `harbour/learning-while-the-tools-change.md` separates engineering
+  experience from AI experience from calendar time and says a snapshot cannot tell them apart.
+  Harbour records the preparatory steps directly — research, plan and plan-review rounds per
+  ticket, already counted by `lib/plan-review-round-trips.js` — so take the tickets worked by
+  each operator, compare steps-to-accepted-outcome, then return to the same tickets and count
+  later Bugs naming them, the instrument `harbour/what-the-reviews-checked.md` already built.
+  (Claude, 2026-09-21)
+- **Which kinds of prior knowledge predict lower repair effort?** The same essay argues that
+  years of practice say what someone had the chance to learn, not what transfers. Split the
+  repair record — later Bugs, review send-backs, close-out corrections — by whether the
+  original author knew the product area, the implementation technique, or neither, and report
+  which split moves. (Claude, 2026-09-21)
+- **Does a practice spread faster through a shared task than through written instructions?**
+  The essay's reciprocal-learning claim (section 5, from Barley) is a proposed practice with no
+  evidence behind it in Harbour. The prompt templates are the written-instruction arm and are
+  dated; a co-worked session is the other. Compare how quickly a rule added to a template
+  shows up in sessions against one demonstrated in a shared session. (Claude, 2026-09-21)
 
 - **Which retained artifact reduces the total cost of later work at comparable quality?**
   `harbour/what-should-an-agent-leave-behind.md` and its checking paper separate retained

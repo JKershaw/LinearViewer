@@ -1,9 +1,12 @@
 # Papers
 
-Short studies of Harbour, one question each, with the evidence. `standard.md` says how one
-is written. `proposals.md` lists the questions waiting for a paper.
+Short documents, each carrying what it rests on. A **paper** answers one question with the
+evidence; an **essay** argues a position from sources. `standard.md` says how each is written.
+`proposals.md` lists the questions waiting for one.
 
 ## About Harbour
+
+### Papers
 
 | Paper | Question | Finding |
 |---|---|---|
@@ -30,6 +33,13 @@ is written. `proposals.md` lists the questions waiting for a paper.
 | [what-a-run-must-show](harbour/what-a-run-must-show.md) | What does a person expect while one task runs, and what must a checking surface show for an informed merge? | No display promises cheaper checking — provenance is the one candidate with a controlled positive result, and no study shows a verified artifact changes supervision. Today's Observation/session pages serve one of the four "at every moment" needs, only partly, and are shaped for the operator; the reader this paper is about cannot reach them signed out at all, so a share link is a new, deliberate boundary crossing, not an extension of `/kpis`. The three candidate run shapes are scored, not chosen; the observation-rung ruling stays open; twelve questions go to the LIN-2947 sketches sitting. |
 | [what-should-an-agent-leave-behind](harbour/what-should-an-agent-leave-behind.md) | What should an agent leave behind? | Retaining an artifact, having it consumed and improving later work are separate achievements. The reviewed projects support testing evidence-linked handoffs; they do not yet establish maintained-wiki economics or a general graph advantage. [Evidence register](harbour/what-should-an-agent-leave-behind-evidence.md). |
 | [what-should-an-agent-leave-behind-check](harbour/what-should-an-agent-leave-behind-check.md) | Does the evidence support the agent-retention paper's conclusions? | A separate source and arithmetic check of the retrospective, with its own scope and limits. |
+| [learning-while-the-tools-change-check](harbour/learning-while-the-tools-change-check.md) | Do the eleven sources in "Learning While the Tools Change" support the readings it gives them? | For the essay's version 1: yes on every number — all seven quantitative claims are exact — and no source is made to say what it does not. The failures are of reach: the chess result is read past its own boundary condition, Dhanorkar's "a priori control" is renamed "preparation", the essay's cohort distinction is already in `docs/ladder.md` two days earlier and uncited, and twice a historical analogy stands where the Microsoft CLI-agent rollout (+216% odds beside adopting peers; prior IDE-assistant use lowering retention 12–15%, which its authors read as substitution rather than lost skill) measures the same claim directly. Four historical sources could not be read as text, and that is where the check is weakest. Covers version 1 only: its author co-wrote version 2. |
+
+### Essays
+
+| Essay | Argument |
+|---|---|
+| [learning-while-the-tools-change](harbour/learning-while-the-tools-change.md) | Astra 6 and Claude, version 2. Engineering experience, experience using AI and the capability of the available tools run on three separate clocks, and better tools slow the second by absorbing the mistakes that used to teach — so the capability a team most needs to grow is calibrated distrust, which no snapshot of speed or seniority can see. No cross-section can separate the clocks, however large; only the same people doing comparable work at more than one date can. Leapfrogging, factory electrification, the typesetter incumbents, Einstellung in chess masters and Barley's CT scanners supply the mechanisms; the Trio study, Anthropic's autonomy telemetry and Microsoft's 2026 agent rollout supply the contemporary edges. Version 2 is unchecked. |
 
 ## About the process
 
