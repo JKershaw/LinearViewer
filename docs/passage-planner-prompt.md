@@ -157,6 +157,13 @@ Creating the passage task needs its own explicit yes, after ratification. On tha
     `**Budget:**`, `**Making port:**`, and `**Wind down if:**`.
   If any block deviates, correct it before calling the write endpoint. The Passage Runner
   parses this block strictly and will park BLOCKED on any deviation.
+- **Making port and Wind down if state a property, not a proxy.** Each line names what must
+  remain true (or become true) about the work — never a command to run, a grep, a filename,
+  or a line reference. State the property; let the child choose how to verify it. A trigger
+  or criterion written as a grep, a path, or a line number is a stand-in for the property it
+  protects, and stand-ins drift out of step with what they stood for — a check that passes
+  against a broken system, or fails against a correct one. Rules that hold repo-wide, such as
+  test integrity, live once in the operating manual; a leg does not restate them.
 - The leg↔anchor mapping lives **inline in the description text** (relations carry no
   label, so the text is the only place it survives).
 - Anchor each leg's tasks with relations of type **`related`** — never `blocks`/
