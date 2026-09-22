@@ -348,3 +348,106 @@ test.describe('KPIs page', () => {
     await expect(page.locator('a[href="/kpis"]')).toHaveCount(0);
   });
 });
+
+// LIN-3002: /kpis must never fall back to a whole-collection read when a KPI
+// aggregation fails — it must propagate the error so the route's EXISTING
+// warm-stale-serve / cold-500 handling (server.js app.get('/kpis'), untouched
+// by this ticket) is what actually runs. These cases use the /test/kpis-fail-
+// next-aggregate + /test/clear-kpi-cache seam (routes/test.js) to make one
+// real collection's aggregate() reject for exactly one call, rather than
+// mocking anything — server.js and lib/kpi-stats.js run for real throughout.
+//
+// Seam choice, recorded per the assignment: server.js does not export `app`/
+// `kpiCache`/its DB collections, and is a single top-level script that binds
+// a real port and DB connection on import — there is no existing precedent in
+// this repo for importing it into a `node --test` unit file, and doing so
+// here would be a much larger, riskier seam than reusing the E2E boot this
+// file already relies on. The established, already-proven pattern for
+// exactly this class of problem (injecting server-side test state Playwright
+// specs can't reach any other way) is the NODE_ENV=test-gated `/test/*` route
+// family in routes/test.js — session/state seeding, provider faking, etc.
+// already work this way. So the seam here is two small additive routes in
+// that same family: one arms a one-shot rejecting aggregate() on the named
+// collection (self-restoring after exactly one call) plus a one-shot
+// console.error capture for the loader-failure log line; the other resets the
+// process-wide kpiCache singleton to cold or warm-but-stale. `/kpis`'s own
+// route body (server.js:1931-1954) is untouched by any of this.
+//
+// Dependents identified before touching the shared kpiCache/collection seam:
+// kpiCache/kpiInflight have exactly one reader/writer in server.js — the
+// `/kpis` route itself (confirmed by grep; nothing else in server.js
+// references either binding) — so resetting it here cannot desync any other
+// route's state. `.aggregate()` has exactly two call sites in the whole repo
+// (both in lib/kpi-stats.js, per the ticket's own grep), so patching it on
+// dispatchHistoryCollection/proxyEventsCollection cannot affect any other
+// consumer of those collections (which all use `.find()`/`.countDocuments()`,
+// left untouched). This file's OWN earlier tests (and any other E2E spec)
+// share the same process-wide kpiCache/collections; running concurrently with
+// this block is the same pre-existing worker-isolation class CLAUDE.md
+// already calls out for free-tier.spec.js/proxy-local.spec.js, not a new risk
+// this ticket introduces — mitigated here the same way, by never raising
+// `workers` and keeping this block's own tests sequential (fullyParallel is
+// already false repo-wide).
+//
+// Expected to be RED against today's (unfixed) lib/kpi-stats.js: both loaders
+// currently swallow the injected aggregate() rejection and fall back to a
+// real find({}) read, which succeeds — so neither case below can observe the
+// bug the ticket describes yet. See the beat-1 report for the captured
+// pre-fix failure output.
+test.describe('KPIs page — aggregation-failure propagation (LIN-3002)', () => {
+  async function pollForKpiRefreshError(request, { attempts = 15, intervalMs = 200 } = {}) {
+    for (let i = 0; i < attempts; i++) {
+      const res = await request.get('/test/last-kpi-refresh-error');
+      const { message } = await res.json();
+      if (message) return message;
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    return null;
+  }
+
+  test('warm cache: a rejecting background refresh still serves the last good snapshot and logs the failure', async ({ request }) => {
+    // Establish a real, good snapshot (no fault armed yet).
+    await request.get('/test/clear-kpi-cache');
+    const goodResponse = await request.get('/kpis');
+    expect(goodResponse.status()).toBe(200);
+    const goodBody = await goodResponse.text();
+
+    // Keep that snapshot but make it stale, so the next request takes the
+    // warm-but-stale branch (serve now, refresh in the background) instead
+    // of the fresh (no-refresh) branch.
+    await request.get('/test/clear-kpi-cache?mode=stale');
+
+    // Arm a one-shot rejecting aggregate() on proxyEvents for the background
+    // refresh this next request triggers.
+    await request.get('/test/kpis-fail-next-aggregate?collection=proxyEvents');
+
+    const staleServeResponse = await request.get('/kpis');
+    expect(staleServeResponse.status()).toBe(200);
+    // Still the last good snapshot — the request must not block on, or be
+    // affected by, the background refresh it kicks off.
+    expect(await staleServeResponse.text()).toBe(goodBody);
+
+    // The background refresh's rejection must be logged (server.js:1938),
+    // never silent. This is the acceptance witness: today, the aggregation
+    // failure is swallowed inside the loader and the background refresh
+    // resolves via the find({}) fallback instead of rejecting, so this
+    // never fires and the poll below times out.
+    const message = await pollForKpiRefreshError(request);
+    expect(message).toBeTruthy();
+    expect(message).toContain('KPI background refresh failed');
+  });
+
+  test('cold cache: a rejecting refresh returns the existing 500 error page, never a whole-collection fallback read', async ({ request }) => {
+    await request.get('/test/clear-kpi-cache'); // cold: no prior snapshot
+    await request.get('/test/kpis-fail-next-aggregate?collection=dispatchHistory');
+
+    const response = await request.get('/kpis');
+    // Acceptance witness: today, loadDispatchHistory's catch falls back to
+    // dispatchHistory.find({}).toArray(), which succeeds, so
+    // collectKpiStats resolves and this returns 200 with a real (if
+    // fallback-sourced) page instead of the 500 below — the exact
+    // unbounded-read-masks-the-error bug LIN-3002 exists to fix.
+    expect(response.status()).toBe(500);
+    expect(await response.text()).toContain('Could not load instance KPIs');
+  });
+});

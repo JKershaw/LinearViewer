@@ -44,9 +44,12 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
  * @param {Object} options.agentStatusStore - Agent status store
  * @param {Object} options.localStore - Local provider's issue/project store (LIN-356)
  * @param {Function} options.getWorkspaceAccessToken - Function to look up workspace access token
+ * @param {Object} options.dispatchHistoryCollection - Raw dispatch-history collection (LIN-3002: /kpis aggregation-failure fault injection)
+ * @param {Object} options.proxyEventsCollection - Raw proxy-events collection (LIN-3002: /kpis aggregation-failure fault injection)
+ * @param {Function} options.resetKpiCache - Resets server.js's kpiCache to cold (LIN-3002)
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -700,6 +703,72 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/clear-proxy-events', async (req, res) => {
     try {
       await proxyEventStore.clear(req.query.urlKey || 'test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // LIN-3002: fault-injection + observation seam for /kpis' aggregation-failure
+  // propagation fix, added ahead of the fix (TDD). Scoped to `aggregate()`
+  // specifically — the ticket's own grep bounds exactly two call sites in the
+  // whole repo (lib/kpi-stats.js loadProxyBins/loadDispatchHistory), so
+  // patching it here cannot affect any other route or collection consumer.
+  // `find` is left untouched, so today's (pre-fix) silent fallback still runs
+  // for real, which is what lets a route-level spec observe the bug directly
+  // rather than assert around it.
+  const originalConsoleError = console.error
+  let lastKpiRefreshError = null
+
+  // Makes the named collection's NEXT aggregate() call reject once, restoring
+  // the real aggregate() immediately after that one call. Also installs a
+  // one-shot console.error capture for the loader-failure log line the fix
+  // adds, restored by /test/last-kpi-refresh-error below (or on the next
+  // matching call, whichever comes first) so it never lingers across specs.
+  router.get('/test/kpis-fail-next-aggregate', (req, res) => {
+    try {
+      const target = req.query.collection === 'dispatchHistory' ? dispatchHistoryCollection : proxyEventsCollection
+      if (!target) throw new Error(`no collection wired for kpis-fail-next-aggregate (got "${req.query.collection}")`)
+      const originalAggregate = target.aggregate.bind(target)
+      // Cursor-shaped, like the real driver: loadProxyBins/loadDispatchHistory
+      // both `await collection.aggregate([...]).toArray()`, so the rejection
+      // must surface at .toArray() — a bare rejected Promise here would make
+      // `.toArray` undefined instead (a different, unrealistic failure mode,
+      // and one that leaves this Promise's rejection unobserved).
+      target.aggregate = (...args) => {
+        target.aggregate = originalAggregate
+        return { toArray: () => Promise.reject(new Error('LIN-3002 test: injected aggregation failure')) }
+      }
+      console.error = (...args) => {
+        originalConsoleError(...args)
+        if (String(args[0]).includes('KPI background refresh failed')) {
+          lastKpiRefreshError = args.map(String).join(' ')
+          console.error = originalConsoleError
+        }
+      }
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Reads (and clears) the last captured loader/route KPI-refresh-failure log
+  // line, restoring console.error if a spec reads this before any matching
+  // call ever landed.
+  router.get('/test/last-kpi-refresh-error', (req, res) => {
+    const message = lastKpiRefreshError
+    lastKpiRefreshError = null
+    console.error = originalConsoleError
+    res.json({ message })
+  })
+
+  // Resets server.js's process-wide KPI cache, so a spec can force either
+  // /kpis path on demand: ?mode=stale keeps the current snapshot but backdates
+  // its timestamp past KPI_CACHE_MS (warm-but-stale, no 60s real wait needed);
+  // the default clears the snapshot entirely (cold boot).
+  router.get('/test/clear-kpi-cache', (req, res) => {
+    try {
+      resetKpiCache(req.query.mode)
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
