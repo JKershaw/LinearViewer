@@ -3,9 +3,9 @@
  * routes/proxy.js, byte-identical handler bodies).
  *
  * Consumer-API GET endpoints: /me, /credential-health, /teams, /projects,
- * /issues, /issues/:issueId, /search, /states/:teamId, /labels, /cycles,
- * /cycles|cycle/:cycleId, /issues/:issueId/relations|/relations/:issueId,
- * /attachments/:id.
+ * /known-repos, /issues, /issues/:issueId, /search, /states/:teamId,
+ * /labels, /cycles, /cycles|cycle/:cycleId,
+ * /issues/:issueId/relations|/relations/:issueId, /attachments/:id.
  */
 import { Router } from 'express';
 import { applyTrashedSignal, isTrashed } from '../lib/trashed-signal.js';
@@ -23,6 +23,7 @@ import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { UUID_REGEX, isValidIssueId, requireTeamMembership, TeamNotFoundError } from '../lib/workspace.js';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
+import { fetchKnownRepos } from '../lib/dispatch-repo-guard.js';
 
 // D's only consumer of this cap (routes/proxy.js:1745/:1747 before the move).
 // Unlike MAX_ATTACHMENT_BYTES this has no group-E consumer, so it moves with D
@@ -158,6 +159,50 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
       logEvent(req, '/api/proxy/projects', status);
       console.error('Proxy /projects error:', err.message);
       jsonError(res, status, 'Failed to fetch projects', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
+    }
+  });
+
+  /**
+   * GET /api/proxy/known-repos (LIN-2974)
+   *
+   * Read-only exposure of Harbour's own known-repos inventory — the tracker
+   * namespace `POST /api/proxy/dispatch`'s repo guard (LIN-2886,
+   * `lib/dispatch-repo-guard.js`) validates a `repo` override against. This
+   * endpoint runs the identical `fetchProjects` -> `knownWorkspaceRepos`
+   * computation (via the guard's own `fetchKnownRepos`, not a re-derivation
+   * of it), but takes no `repo` and enqueues nothing — it exists so an
+   * operator-run drift check can compare this namespace against a runner's
+   * `workspaces.json` without a probe dispatch or a write-scoped token
+   * (see simple-dispatcher's `scripts/repo-namespace-drift.mjs`).
+   *
+   * Never fails open into `{ knownRepos: [] }`: an inability to determine the
+   * inventory (no provider, an unsupported provider, a throwing/timing-out
+   * fetch) is a distinct non-200 `REPO_INVENTORY_UNAVAILABLE`, so a caller
+   * can't mistake "couldn't check" for "checked, and there's nothing here".
+   */
+  router.get('/api/proxy/known-repos', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      if (!token) {
+        return workspaceUnavailable(req, res, '/api/proxy/known-repos', reason);
+      }
+
+      const inventory = await fetchKnownRepos({ provider, scope: token });
+      if (!inventory.ok) {
+        logEvent(req, '/api/proxy/known-repos', 503, `REPO_INVENTORY_UNAVAILABLE ${inventory.reason}`);
+        return jsonError(res, 503, "Could not determine this workspace's known-repos inventory", {
+          code: 'REPO_INVENTORY_UNAVAILABLE',
+          reason: inventory.reason,
+        });
+      }
+
+      logEvent(req, '/api/proxy/known-repos', 200);
+      res.json({ knownRepos: inventory.knownRepos });
+    } catch (err) {
+      const status = graphqlErrorStatus(err, req);
+      logEvent(req, '/api/proxy/known-repos', status);
+      console.error('Proxy /known-repos error:', err.message);
+      jsonError(res, status, 'Failed to fetch known repos', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
     }
   });
 
