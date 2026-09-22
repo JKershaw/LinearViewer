@@ -86,14 +86,24 @@ describe('readSSEStream handler-exception behavior (LIN-2980)', () => {
     const readSSEStream = loadReadSSEStream();
     const calls = [];
     let firstCall = true;
+    const thrown = new Error('boom on first call');
     const onEvent = (type, data) => {
       calls.push({ type, data });
       if (firstCall) {
         firstCall = false;
-        throw new Error('boom on first call');
+        throw thrown;
       }
     };
-    await readSSEStream(sseResponse([sseFrame('message', { ok: true })]), onEvent);
+    // LIN-2980: under the settled propagate-on-throw contract, ANY handler
+    // throw ends the stream immediately (same as A2/D/Case C below) — so
+    // this call now rejects instead of resolving. At unfixed HEAD it
+    // resolved (the retry swallowed the error), which is what let this
+    // await go unguarded when the test was first written; that was a gap in
+    // the test's own harness, not evidence the fix is wrong.
+    await assert.rejects(
+      readSSEStream(sseResponse([sseFrame('message', { ok: true })]), onEvent),
+      (err) => { assert.equal(err, thrown); return true; }
+    );
     assert.equal(calls.length, 1, `onEvent should be called exactly once per frame; was called ${calls.length} times: ${JSON.stringify(calls)}`);
   });
 
