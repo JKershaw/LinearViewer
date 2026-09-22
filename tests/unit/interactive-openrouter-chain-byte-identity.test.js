@@ -203,6 +203,7 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
       'routes/ship-biscuit.js': 1,
       'routes/workspace-api.js': 6,
       'routes/dashboard.js': 2,
+      'routes/workspace-api-roadmap.js': 1,
     };
     for (const [relPath, expected] of Object.entries(expectedGateCalls)) {
       const src = read(relPath);
