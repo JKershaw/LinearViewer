@@ -45,53 +45,122 @@
  * LIN-2970 addendum: the chat lane's own two occurrences of the inline
  * expression — routes/task-chat.js's single site, and ONE of
  * routes/workspace-api-roadmap.js's two (its roadmap-CHAT site; roadmap-
- * GENERATE's own site is untouched, named follow-up, not this ticket) — were
+ * GENERATE's own site was untouched at the time, named follow-up) — were
  * deliberately extracted into `lib/chat-request.js`'s `resolveChatCredential`,
  * which now carries the ONE canonical copy of the expression those two sites
  * call instead of inlining. This is the exact `OAuth > paid env key > free
  * tier` precedence, relocated, not changed — LIN-2970's own acceptance
- * criterion is "no change to the precedence, only to where it lives". The
- * counts below move accordingly (task-chat.js 1→0, workspace-api-roadmap.js
- * 2→1) and a new assertion pins the expression's one remaining definition in
- * lib/chat-request.js plus both sites' adoption of it, so this census keeps
- * catching an accidental drift — just against the new shape instead of the
- * old one. routes/next-run.js, routes/ship-biscuit.js and
- * routes/workspace-api.js are unaffected by LIN-2970 (named follow-ups, not
- * done here) and keep their original counts unchanged.
+ * criterion is "no change to the precedence, only to where it lives".
+ *
+ * LIN-2978 addendum: the follow-up sweep LIN-2970 deferred lands here. Every
+ * site this file used to pin by its OLD hand-derived shape now calls the
+ * shared helper instead, so the census below is rewritten rather than just
+ * re-numbered:
+ *
+ *   - Mechanism 1 (the five-file byte-count allow-list) is replaced by a
+ *     repo-wide sweep: `SHARED_CHAIN_EXPR` must occur EXACTLY ONCE across
+ *     `routes/`, `lib/`, and `server.js` — in `lib/chat-request.js`, its one
+ *     canonical definition. A hard-coded five-file list can't catch a new
+ *     inline copy appearing anywhere else in the tree; a repo-wide sweep can.
+ *   - `routes/workspace-api-roadmap.js` now calls `resolveChatCredential`
+ *     TWICE, not once — roadmap-chat (adopted under LIN-2970) AND roadmap-
+ *     generate/`resolveRoadmapLLM` (adopted under LIN-2978, credential only;
+ *     `chargeRoadmapLayer`'s own per-layer charge is untouched and stays
+ *     outside this module). The old assertion encoded LIN-2970's deferral —
+ *     "never roadmap-generate" — as a permanent invariant; that was always
+ *     scope, not a structural guarantee, and this ticket is what retires it.
+ *   - `routes/workspace-api.js`'s old duplicated-ternary shape
+ *     (`apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)`)
+ *     is gone from the file entirely (six sites adopted the helper, deleting
+ *     it outright); the six full-adopt sites plus the pre-existing
+ *     credential-only feedback-title site now show up as SEVEN
+ *     `resolveChatCredential` calls in the file — a positive pin on adoption
+ *     replaces a negative pin on a duplicate.
+ *   - `routes/dashboard.js`'s old three-term degrade guard
+ *     (`if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey)`) is gone;
+ *     both call sites now read `if (!apiKey)`, proven behaviour-identical by
+ *     plan-review (`hasPaidEnvKey()` is literally `!!getPaidEnvKey()`, so
+ *     `!apiKey` is true in exactly the rows the old guard refused).
+ *     `resolveChatCredential` is now called exactly twice in the file, and
+ *     `hasPaidEnvKey` is fully dead there (dropped from the import).
+ *   - `routes/next-run.js` and `routes/ship-biscuit.js` also adopted (full
+ *     adopt, gate stays exactly where each site's own guard already put it)
+ *     — their old counts of the shared inline expression (1 each) now fold
+ *     into the repo-wide sweep above rather than a per-file allow-list entry.
+ *   - `routes/proxy.js` is explicitly OUT of this sweep (struck pending
+ *     human confirmation — its `resolveProxyLLM` resolves the TOKEN
+ *     CREATOR's key via `getWorkspaceOpenRouterKey`, a different mechanism,
+ *     not a session field). A new pin below asserts it never imports from
+ *     `lib/chat-request.js`, so that scope line is enforced, not just
+ *     remembered.
+ *   - A new pin (research's recommendation, `tests/unit/task-chat-route.test.js`'s
+ *     existing "once per turn, never per hop" idiom) asserts `checkFreeTierGate`
+ *     is called exactly once per full-adopt site across this sweep's files —
+ *     the runtime property a source census CAN still catch cheaply, even
+ *     though the 429/503 body SHAPE itself is only provable by the e2e specs
+ *     (tests/e2e/free-tier.spec.js, roadmap.spec.js, streaming.spec.js,
+ *     observation-scan-due.spec.js), never by this file.
+ *
+ * server.js's getOpenRouterSource pins are untouched — out of scope for both
+ * LIN-2970 and LIN-2978.
  *
  * Run with: node --test tests/unit/interactive-openrouter-chain-byte-identity.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { join, relative } from 'node:path';
+
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 function read(relPath) {
-  return readFileSync(fileURLToPath(new URL(`../../${relPath}`, import.meta.url)), 'utf8');
+  return readFileSync(join(ROOT, relPath), 'utf8');
 }
 
-// The exact shared chain expression the five `apiKeyToUse`/`apiKey`-shaped
-// families use. Counting occurrences (not just presence) catches both a
+// Repo-wide sweep helper (same walk idiom as
+// tests/unit/lin-688-undici-not-a-dependency.test.js): every .js file under a
+// directory, recursively, skipping nothing special here since routes/ and
+// lib/ are both first-party source with no generated subtrees.
+function walk(dir, out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walk(full, out);
+    } else if (entry.isFile() && entry.name.endsWith('.js')) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+// The exact shared chain expression the interactive-resolution families used
+// to inline by hand. Counting occurrences (not just presence) catches both a
 // removed site and an accidental duplicate/new site.
 const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 
-describe('Interactive OpenRouter chain: byte-identity census (LIN-2412)', () => {
-  test('the shared "sessionApiKey || getPaidEnvKey() || freeTierKey" chain appears in EXACTLY the expected families (LIN-2970 moved task-chat.js and roadmap-chat onto lib/chat-request.js)', () => {
-    const expectedCounts = {
-      'routes/task-chat.js': 0,
-      'routes/next-run.js': 1,
-      'routes/ship-biscuit.js': 1,
-      'routes/workspace-api-roadmap.js': 1,
-      'routes/workspace-api.js': 1,
-    };
-    for (const [relPath, expectedCount] of Object.entries(expectedCounts)) {
-      const src = read(relPath);
-      const actualCount = src.split(SHARED_CHAIN_EXPR).length - 1;
-      assert.equal(actualCount, expectedCount, `${relPath}: expected ${expectedCount} occurrence(s) of the shared chain expression, found ${actualCount}`);
+describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-2970 / LIN-2978)', () => {
+  test('SHARED_CHAIN_EXPR occurs EXACTLY ONCE across routes/, lib/, and server.js — lib/chat-request.js\'s one canonical definition', () => {
+    const files = [
+      ...walk(join(ROOT, 'routes')),
+      ...walk(join(ROOT, 'lib')),
+      join(ROOT, 'server.js'),
+    ];
+    let total = 0;
+    const hits = [];
+    for (const file of files) {
+      const src = readFileSync(file, 'utf8');
+      const count = src.split(SHARED_CHAIN_EXPR).length - 1;
+      if (count > 0) {
+        total += count;
+        hits.push(`${relative(ROOT, file)} (${count})`);
+      }
     }
+    assert.equal(total, 1, `expected exactly one occurrence of the shared chain expression across routes/, lib/, and server.js; found ${total} — at: ${hits.join(', ') || 'nowhere'}`);
+    assert.deepEqual(hits, ['lib/chat-request.js (1)'], 'the one occurrence must be lib/chat-request.js\'s own canonical definition, not a stray inline copy elsewhere');
   });
 
-  test('LIN-2970: lib/chat-request.js carries the ONE remaining copy of the expression, and task-chat.js + roadmap-chat call it instead of inlining', () => {
+  test('LIN-2970/LIN-2978: lib/chat-request.js carries the ONE remaining copy of the expression, and every adopted site calls it instead of inlining', () => {
     const chatRequestSrc = read('lib/chat-request.js');
     const chatRequestCount = chatRequestSrc.split(SHARED_CHAIN_EXPR).length - 1;
     assert.equal(chatRequestCount, 1, 'lib/chat-request.js should carry exactly one occurrence — the canonical definition');
@@ -101,29 +170,45 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412)', () => 
 
     const roadmapSrc = read('routes/workspace-api-roadmap.js');
     const roadmapCallCount = (roadmapSrc.match(/resolveChatCredential\s*\(/g) || []).length;
-    assert.equal(roadmapCallCount, 1, 'routes/workspace-api-roadmap.js should call resolveChatCredential exactly once — the roadmap-chat site only, never roadmap-generate');
+    assert.equal(roadmapCallCount, 2, 'routes/workspace-api-roadmap.js should call resolveChatCredential exactly TWICE — roadmap-chat (LIN-2970) and roadmap-generate/resolveRoadmapLLM (LIN-2978, credential only; chargeRoadmapLayer stays its own per-layer charge, outside this module)');
   });
 
-  test('routes/workspace-api.js: the remaining SIX interactive sites carry the "apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)" shape (LIN-2412 F3 correction; LIN-2650 WS4 adds the retire route as a seventh total site)', () => {
+  test('routes/workspace-api.js: resolveChatCredential is called exactly 7 times, and the old duplicated ternary shape is gone entirely (LIN-2978)', () => {
     const src = read('routes/workspace-api.js');
-    const SITE_SHAPE = 'apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)';
-    const actualCount = src.split(SITE_SHAPE).length - 1;
-    assert.equal(actualCount, 6, `expected exactly 6 occurrence(s) of the apiKeyToUse shape (recommend/recommend-stream/recap/brief/scan/scan-retire), found ${actualCount} — routes/workspace-api.js therefore carries 7 total interactive resolution sites (1 pinned above + these 6), not the 1 this census originally over-claimed as the whole file`);
+    const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
+    assert.equal(callCount, 7, `expected exactly 7 resolveChatCredential calls in routes/workspace-api.js (the six full-adopt sites — recommend/recommend-stream/recap/brief/scan/scan-retire — plus the credential-only feedback-title site), found ${callCount}`);
+    assert.doesNotMatch(src, /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/, 'the old per-site duplicated ternary must be gone — resolveChatCredential now supplies apiKeyToUse directly at each site');
   });
 
-  test('routes/dashboard.js carries its own distinct shape at BOTH call sites (run-summary + session-summary), untouched', () => {
+  test('routes/dashboard.js: resolveChatCredential is called exactly twice, and the degrade guard at both sites is now `if (!apiKey)` (LIN-2978)', () => {
     const src = read('routes/dashboard.js');
-    const dashboardShape = [
-      "const sessionApiKey = req.session.openRouterApiKey;",
-      "const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;",
-      "const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;",
-    ].join('\n    ');
-    const occurrences = src.split(dashboardShape).length - 1;
-    assert.equal(occurrences, 2, 'expected exactly two call sites (run-summary, session-summary) carrying this exact shape');
+    const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
+    assert.equal(callCount, 2, `expected exactly 2 resolveChatCredential calls in routes/dashboard.js (run-summary + session-summary), found ${callCount}`);
+    const guardCount = (src.match(/if \(!apiKey\) \{/g) || []).length;
+    assert.equal(guardCount, 2, `expected exactly 2 "if (!apiKey) {" degrade guards in routes/dashboard.js, found ${guardCount}`);
+    assert.doesNotMatch(src, /hasPaidEnvKey/, 'hasPaidEnvKey must be fully dead in routes/dashboard.js — its only calls were inside the code this sweep replaced');
+  });
 
-    const guardShape = 'if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey) {';
-    const guardOccurrences = src.split(guardShape).length - 1;
-    assert.equal(guardOccurrences, 2, 'expected exactly two matching degrade guards');
+  test('routes/proxy.js never imports from lib/chat-request.js — the struck-scope line stays enforced, not just remembered', () => {
+    const src = read('routes/proxy.js');
+    assert.doesNotMatch(src, /from\s+['"][^'"]*chat-request(?:\.js)?['"]/, 'routes/proxy.js must not import from lib/chat-request.js — its credential chain resolves the token creator\'s key via getWorkspaceOpenRouterKey + resolveProxyLLM, a deliberately separate mechanism');
+  });
+
+  test('checkFreeTierGate is called exactly once per full-adopt site (one quota unit per request, LIN-2978)', () => {
+    // The ten full-adopt sites this sweep landed. Each is one call site except
+    // routes/workspace-api.js, which carries six (recommend GET/SSE, recap,
+    // brief, scan, scan-retire) in one file.
+    const expectedGateCalls = {
+      'routes/next-run.js': 1,
+      'routes/ship-biscuit.js': 1,
+      'routes/workspace-api.js': 6,
+      'routes/dashboard.js': 2,
+    };
+    for (const [relPath, expected] of Object.entries(expectedGateCalls)) {
+      const src = read(relPath);
+      const actual = (src.match(/checkFreeTierGate\s*\(/g) || []).length;
+      assert.equal(actual, expected, `${relPath}: expected ${expected} checkFreeTierGate call(s), found ${actual}`);
+    }
   });
 
   test('server.js getOpenRouterSource (the priority predicate behind the footer/settings status) is byte-identical to its pinned shape', () => {

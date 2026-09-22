@@ -59,7 +59,7 @@ import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
-import { hasPaidEnvKey } from '../lib/openrouter.js';
+import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import {
   generateRunSummary,
@@ -2144,23 +2144,20 @@ export function createDashboardRoutes({
     }
 
     // Resolve the OpenRouter key: user OAuth → env (via streamChat default) → free tier.
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const { apiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
-    if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey) {
+    if (!apiKey) {
       return res.status(503).json({ error: 'AI summaries are not configured' });
     }
 
     if (isFreeTier && freeTierStore) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return res.status(429).json({ error: check.reason, freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
     try {
-      const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
       const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'run-summary', forceDefault: isFreeTier });
       const { summary, model } = await generateRunSummary(loop, { apiKey, model: selectedModel });
       await runSummaryCacheStore.put(workspace.urlKey, loopId, { inputHash, summary, model });
@@ -2333,23 +2330,20 @@ export function createDashboardRoutes({
     }
 
     // Resolve the OpenRouter key: user OAuth → env (via streamChat default) → free tier.
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const { apiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
-    if (!sessionApiKey && !hasPaidEnvKey() && !freeTierKey) {
+    if (!apiKey) {
       return res.status(503).json({ error: 'AI summaries are not configured' });
     }
 
     if (isFreeTier && freeTierStore) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return res.status(429).json({ error: check.reason, freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
     try {
-      const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
       const childOutcomes = await gatherChildOutcomes(session, workspace.urlKey);
       const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'session-summary', forceDefault: isFreeTier });
       const { summary, model } = await generateSessionSummary(session, { apiKey, model: selectedModel, childOutcomes });

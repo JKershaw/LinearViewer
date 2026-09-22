@@ -20,7 +20,8 @@ import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, getPaidEnvKey, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
+import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -822,7 +823,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const mockAi = shouldMockAi(workspace)
     const sessionApiKey = req.session.openRouterApiKey
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey })
     // Free-tier on the AI-mock path is the session flag (CI sets no env key, so
     // `isFreeTier` is always false there); the test-token DATA mock charges its
     // own inside the isTestMode block below, so this is scoped to !isTestMode.
@@ -834,8 +835,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     // Atomically check rate limits and record usage before proceeding
     if (surfaceFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey)
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier: surfaceFreeTier, urlKey: workspace.urlKey, freeTierStore })
+      if (check) {
         return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } })
       }
     }
@@ -935,7 +936,6 @@ ${goal}`
       // descent breadcrumb returned. Free-tier usage is charged once per request
       // (above, before this point), not per hop.
       const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier })
-      const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined)
       const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
         startIdentifier: issueId,
         deadline: Date.now() + RECOMMEND_DESCENT_BUDGET_MS,
@@ -1065,7 +1065,7 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
     const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !hasPaidEnvKey();
     const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier);
 
@@ -1091,8 +1091,8 @@ ${goal}`
 
     // Rate limiting (before streaming starts)
     if (surfaceFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier: surfaceFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
@@ -1240,7 +1240,6 @@ ${goal}`
       if (closed) return;
 
       const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
-      const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
 
       // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
       // which can't be token-streamed. We resolve the descent and surface it LIVE —
@@ -1888,15 +1887,15 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
     if (!mockAi && isFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
@@ -1926,7 +1925,6 @@ ${goal}`
         recap = mocked;
         modelUsed = selectedModel;
       } else {
-        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
         const result = await generateRecap(
           context.issue,
           context,
@@ -2130,15 +2128,15 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
     if (!mockAi && isFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
@@ -2167,7 +2165,6 @@ ${goal}`
         brief = buildMockBrief(context);
         modelUsed = selectedModel;
       } else {
-        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
         const result = await generateBrief(
           context.issue,
           context,
@@ -2487,15 +2484,15 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
     if (!mockAi && isFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
@@ -2536,7 +2533,6 @@ ${goal}`
         scanResult = parseScanResponse(buildMockScanText(context), { issueId: canonicalId, inputHash });
         modelUsed = selectedModel;
       } else {
-        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
         const generated = await generateScan(
           context.issue,
           context,
@@ -2812,14 +2808,14 @@ ${goal}`
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
     const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
+    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
 
     if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
       return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
     if (!mockAi && isFreeTier) {
-      const check = await freeTierStore.tryUse(workspace.urlKey);
-      if (!check.allowed) {
+      const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+      if (check) {
         return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
@@ -2865,7 +2861,6 @@ ${goal}`
             code: 'PRINCIPLE_ZERO_UNAVAILABLE'
           });
         }
-        const apiKeyToUse = sessionApiKey || (isFreeTier ? freeTierKey : undefined);
         let buffer = '';
         await streamChat(
           messages,
@@ -3697,10 +3692,7 @@ ${goal}`
         // free-tier. When only the shared free-tier key is available the model
         // is clamped to DEFAULT (forceDefault: isFreeTier), matching every other
         // billed call site (the LIN-513 wiring invariant).
-        const sessionApiKey = req.session?.openRouterApiKey;
-        const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-        const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-        const aiApiKey = sessionApiKey || getPaidEnvKey() || freeTierKey || null;
+        const { apiKey: aiApiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
         if (aiApiKey) {
           try {
             const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });

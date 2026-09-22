@@ -18,7 +18,7 @@ import { buildRoadmapNorthStarMessages } from '../lib/prompts/roadmap-north-star
 import { buildRoadmapGapMessages } from '../lib/prompts/roadmap-gap-template.js';
 import { buildRoadmapDigestMessages } from '../lib/prompts/roadmap-digest-template.js';
 import { buildRoadmapOrientationMessages, serializeOrientationCandidates, countOrientationCandidates, parseOrientationLines, ORIENTATION_BEARINGS } from '../lib/prompts/roadmap-orientation-template.js';
-import { resolveReasoningBudget, streamChat, AVAILABLE_MODELS, getPaidEnvKey, hasPaidEnvKey } from '../lib/openrouter.js';
+import { resolveReasoningBudget, streamChat, AVAILABLE_MODELS } from '../lib/openrouter.js';
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
@@ -306,10 +306,7 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
       return null;
     }
 
-    const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const isFreeTier = !sessionApiKey && !hasPaidEnvKey() && !!freeTierKey;
-    const apiKey = sessionApiKey || getPaidEnvKey() || freeTierKey;
+    const { apiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     if (!apiKey) {
       jsonError(res, 503, 'AI not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
       return null;
