@@ -360,12 +360,17 @@
           appendToolBreadcrumb(window.ChatUI.toolBreadcrumbLabel(eventData), answerLi);
         } else if (type === 'token' || type === 'message') {
           var text = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
+          // LIN-2812: sample pinned state BEFORE the DOM mutation below — a
+          // frame that grows the transcript by more than the predicate's 60px
+          // threshold would otherwise read a pinned reader as scrolled-away
+          // once measured after their own frame's growth.
+          var wasPinned = window.ChatUI.isPinnedToBottom(transcript);
           answerText += text;
           answerEl.textContent = answerText;
-          // LIN-2812: only follow the stream down when the reader is already
-          // pinned near the bottom — a reader who scrolled up to re-read
-          // earlier context must not be yanked back on every later frame.
-          if (window.ChatUI.isPinnedToBottom(transcript)) {
+          // Only follow the stream down when the reader was already pinned
+          // near the bottom — a reader who scrolled up to re-read earlier
+          // context must not be yanked back on every later frame.
+          if (wasPinned) {
             transcript.scrollTop = transcript.scrollHeight;
           }
         } else if (type === 'done') {

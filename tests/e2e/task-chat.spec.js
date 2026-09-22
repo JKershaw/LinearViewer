@@ -264,15 +264,19 @@ test.describe('Task Chat Page (experimental)', () => {
     // had scrolled up mid-answer back to the bottom on the very next frame. The
     // real AI mock answers in a single SSE frame, which can't exercise "mid-stream"
     // at all, so these two tests drive the "stream slowly" mock trigger
-    // (routes/task-chat.js) — ~36 small-delta, REAL, separately-flushed SSE
-    // frames ~120ms apart — to get a genuine runtime witness rather than a
-    // fake-DOM unit test standing in for one. A small viewport keeps the
-    // transcript's overflow comfortably past isPinnedToBottom's 60px threshold
-    // once scrolled to the top (confirmed to fail against the pre-fix
-    // unconditional write: scrollTop landed back at 328/369, not 0, before this
-    // gate existed). MID_MARKER lands after the transcript has already
-    // overflowed its capped viewport, with more frames still to arrive;
-    // END_MARKER is the last frame before `done`.
+    // (routes/task-chat.js) — REAL, separately-flushed SSE frames ~120ms apart,
+    // with the frame carrying MID_MARKER deliberately grouped large enough to
+    // grow the transcript by more than isPinnedToBottom's 60px threshold in a
+    // single hop — to get a genuine runtime witness rather than a fake-DOM unit
+    // test standing in for one. A small viewport keeps the transcript's
+    // overflow comfortably past the threshold once scrolled to the top
+    // (confirmed to fail against the pre-fix unconditional write: scrollTop
+    // landed back at 328/369, not 0, before this gate existed; and confirmed to
+    // fail again against the post-mutate ordering bug F1 flagged in review: the
+    // pinned reader fell off the gate right after the big MID_MARKER frame).
+    // MID_MARKER lands after the transcript has already overflowed its capped
+    // viewport, with more frames still to arrive; END_MARKER is the last frame
+    // before `done`.
     test('a reader scrolled up mid-stream is not pulled back down by later token frames (LIN-2812)', async ({ page }) => {
       await page.setViewportSize({ width: 900, height: 300 });
       await page.locator('#task-chat-id').fill('TEST-1');
@@ -299,7 +303,7 @@ test.describe('Task Chat Page (experimental)', () => {
       expect(await transcript.evaluate((el) => el.scrollTop)).toBe(0);
     });
 
-    test('a reader pinned to the bottom keeps following streamed tokens (LIN-2812)', async ({ page }) => {
+    test('a reader pinned to the bottom keeps following streamed tokens, including a frame whose growth alone exceeds the 60px threshold (LIN-2812)', async ({ page }) => {
       await page.setViewportSize({ width: 900, height: 300 });
       await page.locator('#task-chat-id').fill('TEST-1');
       await page.locator('#task-chat-question').fill('please stream slowly so I can scroll away');
@@ -310,6 +314,15 @@ test.describe('Task Chat Page (experimental)', () => {
       const pill = page.locator('.task-chat-msg-assistant .task-chat-msg-who');
 
       // Never scroll away — the reader stays pinned to the bottom throughout.
+      // MID_MARKER's frame alone grows the transcript by more than 60px
+      // (routes/task-chat.js's buildMockSlowStreamFrames) — this is the exact
+      // hop that stranded a pinned reader when the predicate was sampled
+      // AFTER the DOM mutation (review finding F1 on PR #1541). Assert the
+      // gate holds right here, not just once the whole stream has settled.
+      await expect(answer).toContainText('MID_MARKER', { timeout: 8000 });
+      const midGap = await transcript.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+      expect(midGap).toBeLessThan(60);
+
       await expect(answer).toContainText('END_MARKER', { timeout: 8000 });
       await expect(pill).toHaveClass(/status-pill--done/, { timeout: 8000 });
 
