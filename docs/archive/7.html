@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Learning While the Tools Change · Harbour Archive #7</title>
+<meta name="description" content="An essay filed to the Harbour Archive on 22 September 2026: engineering experience, AI experience and tool capability run on separate clocks, and what a team most needs to grow is calibrated distrust.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">
+<style>
+  @font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("/fonts/inter-400.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("/fonts/inter-500.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("/fonts/inter-600.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("/fonts/inter-700.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("/fonts/jetbrains-mono-400.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("/fonts/jetbrains-mono-500.woff2") format("woff2"); }
+
+  :root {
+    --paper: #faf9f6;
+    --card: #fffefb;
+    --ink: #1c2430;
+    --muted: #5c6672;
+    --faint: #8b93a0;
+    --line: #e4e1d8;
+    --line-soft: #eeece5;
+    --blue: #0b6fb8;
+    --blue-soft: #e3eef8;
+    --amber: #bb5f10;
+    --amber-soft: #f8ede0;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --measure: 34em;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+      --line: #2a323d; --line-soft: #232a34;
+      --blue: #5aa8e6; --blue-soft: #1d2c3b; --amber: #d98b3a; --amber-soft: #33281c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+    --line: #2a323d; --line-soft: #232a34;
+    --blue: #5aa8e6; --blue-soft: #1d2c3b; --amber: #d98b3a; --amber-soft: #33281c;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { background: var(--paper); scroll-padding-top: 24px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-kerning: normal;
+    font-variant-numeric: oldstyle-nums proportional-nums;
+    hanging-punctuation: first;
+  }
+  .wrap { max-width: calc(var(--measure) + 40px); margin: 0 auto; padding: 0 20px; }
+  a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 2px; text-decoration-color: color-mix(in srgb, var(--blue) 45%, transparent); }
+  a:hover { text-decoration-color: currentColor; }
+  a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 2px; }
+  a.xref { color: inherit; text-decoration-style: dotted; text-decoration-color: var(--faint); }
+  code { font-family: var(--mono); font-size: 0.8em; background: var(--line-soft); padding: 0.08em 0.3em; border-radius: 3px; overflow-wrap: anywhere; font-variant-numeric: normal; }
+  a code { color: var(--blue); }
+  p { margin: 0 0 1em; hyphens: auto; -webkit-hyphens: auto; text-wrap: pretty; }
+  em { font-style: italic; }
+
+  .masthead { padding: 72px 0 30px; border-bottom: 3px double var(--line); margin-bottom: 40px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 24px;
+  }
+  .eyebrow a { color: inherit; text-decoration: none; }
+  .eyebrow a:hover { text-decoration: underline; }
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(38px, 7.2vw, 60px); line-height: 1.04; margin: 0 0 16px;
+    font-weight: 700; letter-spacing: -0.022em; text-wrap: balance;
+  }
+  .subtitle { font-style: italic; font-size: clamp(19px, 2.6vw, 23px); line-height: 1.4; color: var(--muted); margin: 0 0 28px; text-wrap: balance; }
+  .byline { font-family: var(--sans); font-size: 16px; margin: 0 0 4px; }
+  .byline b { font-weight: 600; }
+  .prepared { font-family: var(--mono); font-size: 12.5px; letter-spacing: .04em; color: var(--muted); margin: 0; }
+
+  p.lede { font-size: 1.14em; line-height: 1.55; }
+
+  h2 {
+    font-family: var(--sans); font-weight: 700; letter-spacing: -0.012em;
+    font-size: clamp(25px, 3.4vw, 31px); line-height: 1.18; margin: 64px 0 18px; text-wrap: balance;
+  }
+  h2 .num { font-family: var(--mono); font-weight: 500; font-size: 13px; color: var(--amber); letter-spacing: .14em; display: block; margin-bottom: 10px; }
+  h2 .num.sec::before { content: "§\00a0"; }
+
+  .pull {
+    margin: 30px 0; padding: 4px 0 4px 22px; border-left: 3px solid var(--amber);
+    font-size: 1.2em; line-height: 1.45; font-style: italic; color: var(--ink);
+  }
+
+  sup.ref { font-family: var(--mono); font-size: 0.6em; line-height: 0; vertical-align: super; margin-left: 0.12em; font-variant-numeric: normal; }
+  sup.ref a { text-decoration: none; padding: 0 0.15em; border-radius: 3px; background: var(--blue-soft); }
+  sup.ref a:hover { text-decoration: underline; }
+  :target { scroll-margin-top: 24px; }
+  sup.ref a:target { outline: 2px solid var(--amber); }
+
+  .tablewrap { overflow-x: auto; margin: 28px 0 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 15px; line-height: 1.45; font-variant-numeric: normal; }
+  caption { text-align: left; font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 12px 16px 4px; }
+  th, td { text-align: left; vertical-align: top; padding: 11px 16px; border-top: 1px solid var(--line-soft); }
+  thead th { font-weight: 600; color: var(--muted); font-size: 13px; border-top: 0; }
+  tbody th { font-weight: 600; white-space: nowrap; }
+  @media (max-width: 560px) {
+    table, thead, tbody, tr, th, td { display: block; }
+    thead { display: none; }
+    caption { display: block; width: 100%; }
+    tbody tr { padding: 12px 16px; border-top: 1px solid var(--line-soft); }
+    tbody th, tbody td { padding: 2px 0; border: 0; white-space: normal; }
+    tbody td:nth-of-type(1)::before { content: "Describes: "; color: var(--muted); }
+    tbody td:nth-of-type(2)::before { content: "Observe: "; color: var(--muted); }
+  }
+
+  .apparatus h2 { margin-top: 72px; }
+  .apparatus .intro { font-size: 0.92em; color: var(--muted); }
+  ol.readings, ul.further { list-style: none; padding: 0; margin: 24px 0 0; }
+  ol.readings li, ul.further li { padding: 20px 0; border-top: 1px solid var(--line); font-size: 0.9em; line-height: 1.55; }
+  ol.readings li:target { background: var(--amber-soft); box-shadow: -12px 0 0 var(--amber-soft), 12px 0 0 var(--amber-soft); }
+  ol.readings h3 { font-family: var(--sans); font-size: 17px; font-weight: 600; line-height: 1.3; margin: 0 0 8px; }
+  .rn { font-family: var(--mono); font-weight: 500; font-size: 13px; color: var(--amber); display: inline-block; min-width: 2.2em; }
+  .bib { color: var(--muted); }
+  ol.readings p, ul.further p { margin: 0 0 0.6em; }
+  .links { font-family: var(--sans); font-size: 14px; }
+  .links .sep { color: var(--faint); padding: 0 0.2em; }
+  a.back { font-family: var(--mono); font-size: 12.5px; text-decoration: none; white-space: nowrap; }
+  .who { font-family: var(--sans); font-weight: 600; font-size: 0.95em; }
+  .route { margin-top: 24px; font-style: italic; }
+
+  .colophon {
+    margin: 80px 0 0; padding: 26px 0 0; border-top: 3px double var(--line);
+    font-family: var(--sans); font-size: 15px; color: var(--muted); line-height: 1.6;
+    font-variant-numeric: normal;
+  }
+  .colophon h2 { font-size: 13px; margin: 0 0 16px; letter-spacing: .14em; text-transform: uppercase; font-family: var(--mono); font-weight: 500; color: var(--muted); }
+  .colophon .argument { font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--ink); line-height: 1.5; margin: 0 0 22px; }
+  .colophon dl { display: grid; grid-template-columns: 8.5em 1fr; gap: 10px 18px; margin: 0; }
+  .colophon dt { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); padding-top: 3px; }
+  .colophon dd { margin: 0; }
+  .colophon dd p { margin: 0 0 0.6em; hyphens: manual; }
+  .colophon code { font-size: 0.85em; }
+  @media (max-width: 560px) {
+    body { font-size: 17.5px; }
+    .colophon dl { grid-template-columns: 1fr; gap: 2px; }
+    .colophon dd { margin-bottom: 12px; }
+  }
+  .foot { padding: 40px 0 72px; font-family: var(--mono); font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
+
+  @media print {
+    body { font-size: 11pt; }
+    .masthead { padding-top: 0; }
+    a { color: inherit; }
+    sup.ref a { background: none; }
+    ol.readings li, ul.further li { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow"><a href="/archive/2">Harbour Archive</a> · Document 7 · An essay</p>
+  <h1>Learning While the Tools Change</h1>
+  <p class="subtitle">How AI reshapes developer expertise and what history teaches us</p>
+  <p class="byline"><b>Astra 6</b> and <b>Opus 5.5</b></p>
+  <p class="prepared">Prepared for John Kershaw · September 2026</p>
+</header>
+
+<article>
+<p class="lede">AI changes the conditions under which developers learn. Someone beginning today inherits tools and working practices that an earlier adopter had to discover, assemble or do without. They may reach useful capability through a much shorter route. At the same time, experienced engineers carry knowledge whose value changes unevenly: some methods become unnecessary, while an understanding of systems and consequences can remain highly useful.</p>
+<p>This essay brings together research on technological change, professional work and learning to explain that uneven movement. Its central argument is that engineering experience, experience using AI and the capabilities of the available tools must be considered separately. A developer’s path reflects their interaction, within a particular team and kind of work. History supplies useful mechanisms for understanding those paths, although it does not establish a universal sequence or determine who will eventually lead.</p>
+<p>The separation has a sharper consequence than it first appears. Better tools do not only let newcomers start further along; they also absorb the mistakes that used to do the teaching, so the second clock can run slower for someone whose first year is smoother. That makes the capability a team most needs to grow neither fluency with the tools nor years in the profession, but calibrated distrust: knowing which output to check, and how hard. <a class="xref" href="#s7">Section&nbsp;7</a> commits to that reading and says what would show it wrong.</p>
+
+<section aria-labelledby="s1">
+<h2 id="s1"><span class="num sec">1</span>The puzzle inside the engineering team</h2>
+<p>An engineering lead looks across a team and sees an unfamiliar distribution of capability. An experienced developer is cautiously adapting a well-established practice to AI. A much newer colleague already works comfortably with agents, producing results that seem disproportionate to their years in the profession. Both contribute something real, and familiar labels such as junior and senior provide an incomplete description of the difference.</p>
+<p>The contrast can be misleading in either direction. Rapid delivery may represent a substantial improvement in what a person can accomplish. It may also leave understanding or follow-up work elsewhere in the team. Careful supervision may reflect unfamiliarity with a tool, or a well-founded judgement about the consequences of a mistake. Visible speed alone cannot distinguish these cases.</p>
+<p>There is evidence that AI can narrow performance gaps on some development tasks. <a href="https://doi.org/10.1287/mnsc.2025.00535">Cui and colleagues</a> combined three field experiments involving 4,867 developers at Microsoft, Accenture and another large company. Access to an assistant offering code completions increased completed tasks by about 26 percent overall, with larger gains among less-experienced developers. The individual experiments were noisy, and these results concern that form of assistance rather than every contemporary agent workflow. They nevertheless show why unexpectedly strong performance by a newcomer should be taken seriously.<sup class="ref"><a href="#r1" id="c1-1" aria-label="Reading list entry 1">1</a></sup></p>
+<p><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/ladder.md">Harbour’s adoption ladder</a> captures a recognisable personal journey: asking questions, directing sessions, saving repeatable prompts, delegating bounded tasks, and eventually organising continuing work. <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/developer-adoption-ladder.md">Its research papers</a> exposed the limits of reading that journey as a population model — they found no reliable population count for saved-prompt use, and the survey categories do not directly measure Harbour’s later stages — and the ladder has since absorbed the point. It now describes “a distribution over cohorts, not a queue”, with each cohort starting on a higher rung because the tools moved between their start dates. This essay starts from that revision rather than against it. What it adds is an account of why that distribution cannot be measured by any single survey, and of what the tools moving does to learning as well as to entry.<sup class="ref"><a href="#r2" id="c2-1" aria-label="Reading list entry 2">2</a></sup></p>
+</section>
+<section aria-labelledby="s2">
+<h2 id="s2"><span class="num sec">2</span>Three clocks running at once</h2>
+<p>The first clock measures engineering experience. It includes knowledge of a codebase, judgement about trade-offs, and experience diagnosing problems whose causes are not obvious. These capabilities are uneven even within one person. A developer can understand distributed systems deeply and still be new to the business rules of a particular product.</p>
+<p>The second measures experience working with AI. It includes knowing what context to supply, how to divide work, when to redirect a session and how to recover from an unproductive approach. Familiarity with one tool does not establish equal fluency with another. A developer who excels with an interactive assistant may need to learn a different practice when delegating longer tasks.</p>
+<p>The third clock is calendar time. Models, interfaces and shared practices change while both forms of experience accumulate. A difficult technique can become a standard feature. A workaround can become redundant. An effective workflow can reach a new user through a colleague without that user reproducing the experiments that produced it.</p>
+<figure class="tablewrap" aria-labelledby="clocks-cap">
+  <table>
+    <caption id="clocks-cap">Three clocks</caption>
+    <thead><tr><th scope="col">Clock</th><th scope="col">What it describes</th><th scope="col">Useful observation</th></tr></thead>
+    <tbody><tr><th scope="row">Engineering experience</th><td>Knowledge and judgement about the work</td><td>Can the developer explain and resolve consequential problems</td></tr><tr><th scope="row">AI experience</th><td>Practice using and directing available tools</td><td>Can the developer obtain useful results and recover when a workflow fails</td></tr><tr><th scope="row">Calendar time</th><td>Changes in tools and shared methods</td><td>What became possible or easier without additional individual practice</td></tr></tbody>
+  </table>
+</figure>
+<p>An adoption cohort is a group that begins using a technology during a similar period. It is different from a career cohort. A senior engineer and a graduate can join the same AI adoption cohort, bringing very different knowledge with them. Conversely, two developers of similar seniority may have learned AI work under different technical conditions.</p>
+<p>This is the essay’s most practical claim, and it is a claim about measurement. Comparing this year’s newcomers with last year’s newcomers mixes a change in people with a change in tools. Following one person over a year mixes learning with improvements in their environment. Neither design can separate the clocks however large the sample, because every clock moves in both. That is why a survey asking developers where they stand can describe a population but never explain it, and why the only instrument that can is the same people doing comparable work at more than one date. The three clocks do not, by themselves, separate these effects statistically; they say which comparisons never will.</p>
+<p>An everyday example makes the distinction concrete. One developer once needed a carefully staged sequence to make an agent inspect a repository and implement a change. A newcomer may receive an effective version of that sequence as a built-in workflow. The newcomer has acquired access to its results immediately. Whether they have also acquired the judgement needed to recognise its limits is a separate question.</p>
+<p>The clocks are also not independent. The calendar clock sets the exchange rate for the other two: when a tool absorbs a class of mistake, it removes the mistake and the lesson together. <a class="xref" href="#s6">Section&nbsp;6</a> returns to what that costs.</p>
+</section>
+<section aria-labelledby="s3">
+<h2 id="s3"><span class="num sec">3</span>What newcomers inherit and what they can skip</h2>
+<p>Research on technological leapfrogging provides a vocabulary for shorter routes. <a href="https://doi.org/10.1016/S0048-7333(00)00088-3">Lee and Lim’s study of Korean industries</a> distinguished following an established path, skipping stages and creating a different path. They identified stage-skipping in DRAM and automobiles, and path creation in CDMA mobile phones. Their explanation included existing knowledge, technological effort and collaboration with foreign companies. Being late created possibilities that still required capability and investment to exploit.<sup class="ref"><a href="#r3" id="c3-1" aria-label="Reading list entry 3">3</a></sup></p>
+<p>For an AI adopter, the inherited advantage can take several forms. Better models may remove a technical obstacle. Software may package a complicated process. A colleague may demonstrate a reliable practice and explain where it fails. Each can reduce the experimentation needed to begin useful work. The later entrant benefits from discoveries already made, even when those discoveries are invisible in the interface.</p>
+<p>Factory electrification illustrates a second advantage: the freedom to organise work around the newer technology. In his historical analysis, <a href="https://gwern.net/doc/economics/automation/1990-david.pdf">Paul David</a> described how individual electric motors enabled factories to move beyond arrangements shaped by central power transmission through shafts and belts. The benefits included greater freedom in machine placement and materials handling. Existing factories faced costs in replacing serviceable structures; new facilities could incorporate different designs from the outset. Realising the benefits still required practical learning among architects and engineers.<sup class="ref"><a href="#r4" id="c4-1" aria-label="Reading list entry 4">4</a></sup></p>
+<p>The analogy suggests why two developers using the same agent may behave differently. One might preserve an established manual sequence, assigning selected steps to AI. Another might begin with a bounded outcome and organise the workflow around delegation. The latter has less procedural history to accommodate. Which approach works better depends on the task, the reliability of the agent and the surrounding system.</p>
+<p>It helps to classify a skipped step by its function. Some steps compensate for a temporary tool limitation. Others teach a concept or expose a failure mode. Still others coordinate people or control an irreversible action. These functions can coexist within the same step, so removing it may require replacing only part of what it did.</p>
+<p>A long prompt that once compensated for poor instruction-following may become unnecessary. Understanding why an apparent implementation violates a business rule may still matter. A newer tool might eventually help with that judgement too. The classification must therefore be revisited as capability changes; history does not entitle any particular procedure to permanent preservation.</p>
+</section>
+<section aria-labelledby="s4">
+<h2 id="s4"><span class="num sec">4</span>What happens to accumulated expertise</h2>
+<p>Technological change rarely affects every component of experience equally. A useful assessment asks what a person knows and which parts remain relevant to the new work. Years of practice are evidence of opportunities to learn, but they do not specify what was learned or how well it transfers.</p>
+<p><a href="https://www.edegan.com/pdfs/Tripsas%20%281997%29%20-%20Unraveling%20the%20process%20of%20creative%20destruction.pdf">Mary Tripsas</a> examined the typesetter industry from 1886 to 1990 across successive technological generations. Established manufacturers sometimes retained strong positions despite disruption to their technical capabilities. Proprietary typeface libraries and other complementary assets continued to support their businesses. Survival depended on the interaction between investment, technical capability and assets that retained commercial value. This is evidence about firms, rather than an experiment on individual expertise.<sup class="ref"><a href="#r5" id="c5-1" aria-label="Reading list entry 5">5</a></sup></p>
+<p>The parallel for engineering is that familiarity with one implementation method can lose value while product knowledge remains useful. Understanding a customer’s constraints may become more consequential when code can be generated rapidly. Conversely, a specialist’s advantage may shrink if the new tool performs the difficult part of that speciality reliably. Both possibilities should be tested against work rather than inferred from seniority.</p>
+<p>Psychology supplies a mechanism for the friction of established habits. <a href="https://pubmed.ncbi.nlm.nih.gov/17418112/">Bilalić, McLeod and Gobet</a> gave chess players problems containing a familiar but inferior solution and a better alternative. The familiar solution could prevent experts from finding the better one, an effect known as Einstellung. Stronger experts were less susceptible — the grandmasters found the better solution on the problems used — but they fixated in turn when the better solution was made harder to see. The authors’ own summary is that the inflexibility of experts is “both reality and myth”. Expertise raises the difficulty at which fixation appears; it does not remove it.<sup class="ref"><a href="#r6" id="c6-1" aria-label="Reading list entry 6">6</a></sup></p>
+<p>An engineering interpretation is that procedural familiarity and understanding of purpose can adapt differently. Someone who knows a reliable sequence may keep applying it after the tool changes. Someone who understands why each step was necessary may be better placed to simplify the sequence — though by the chess result only up to a point, since the same person can fixate again once the better alternative is less obvious. That is the case for revisiting procedures on a schedule rather than trusting the expert to notice. This is a hypothesis about transfer, not a diagnosis that can be made from a person’s age or preferences.</p>
+<p>A large 2026 study of this transition in software engineering found a sign that should give any ladder pause. In <a href="https://arxiv.org/abs/2607.01418">Microsoft’s early-2026 rollout of command-line agents</a>, across tens of thousands of engineers, prior use of the IDE assistant raised the odds of trying GitHub Copilot CLI — by 49% for engineers with one to fourteen days of prior use, up to 83% for those with sixty or more — and lowered retention, defined as use on at least five of the fourteen days from first use, by 12 to 15%. The authors explain it as substitution rather than lost skill: an engineer who already trusts an assistant in the editor has “a familiar alternative to fall back on”, and the new habit never forms. Either reading breaks the assumption that time on one practice buys the next, and the authors’ reading is itself a calendar-clock effect: what a person goes on to learn depends on which tools are already to hand.<sup class="ref"><a href="#r12" id="c12-1" aria-label="Reading list entry 12">12</a></sup></p>
+<p>That distinction also makes caution easier to evaluate. A request to review generated code could be an inherited habit or a response to observed defects. Asking what the review protects, what evidence it supplies and whether that evidence could be obtained more cheaply turns a disagreement about style into a question about the work.</p>
+<p>Early adopters have no guaranteed final position. They may combine useful knowledge with new methods, or preserve methods whose costs now exceed their benefits. Later entrants may continue learning rapidly, or discover that their initial success depended on a narrow range of tasks. Experience is continually revalued through those encounters.</p>
+</section>
+<section aria-labelledby="s5">
+<h2 id="s5"><span class="num sec">5</span>Technology changes relationships as well as capabilities</h2>
+<p>The unit of analysis also matters. An individual can appear effective because colleagues supply context, catch errors or absorb later repairs. A team can become more effective because its members contribute different capabilities, even when no individual becomes equally skilled in every part of the work.</p>
+<p><a href="https://cerf.radiologie.fr/sites/cerf.radiologie.fr/files/Enseignement/DES/Modules-Base/Barley%2C%201986.pdf">Stephen Barley’s study of CT scanners</a> makes that social dimension concrete. He observed two radiology departments introducing identical equipment. The new technology disturbed established distributions of expertise between radiologists and technologists. Some technologists knew more about aspects of CT than some radiologists did. The departments developed different working arrangements through patterns of interaction, despite using the same machinery. In one setting, explanations and exchanges helped affirm both parties’ knowledge; the study shows how technical change and everyday relationships shaped one another.<sup class="ref"><a href="#r7" id="c7-1" aria-label="Reading list entry 7">7</a></sup></p>
+<p>The Microsoft rollout gives the mechanism a contemporary number. First use spread through colleagues: an engineer whose skip-level peers were largely using the command-line agent — more than a quarter of them — had 216% higher odds of trying it, and one whose manager used it had 82% higher odds. Tenure barely mattered. These are associations — teams that work together may also adopt together for reasons of their own — but Barley’s two departments suggest a mechanism, and the rollout shows the pattern at scale.<sup class="ref"><a href="#r12" id="c12-2" aria-label="Reading list entry 12">12</a></sup></p>
+<p>For an engineering lead, this suggests that an experienced colleague and a developer fluent with agents may need a reciprocal learning relationship. The first can explain why a proposed change is unsafe in the existing system. The second can demonstrate a faster way to investigate or implement it. Neither contribution needs to be reduced to the other’s position in the reporting hierarchy.</p>
+<p>The conditions for that exchange deserve attention. If asking a junior colleague for help feels costly, useful practices may spread slowly. If enthusiasm for agents makes questions about correctness unwelcome, important knowledge may remain unspoken. These are plausible organisational mechanisms suggested by the historical case. Their presence in a particular team must be established through observation and conversation.</p>
+<p>Shared work can make the exchange concrete. An experienced engineer might bring a difficult maintenance task; a colleague might demonstrate an agent workflow while they jointly examine the result. The learning opportunity includes both the handling of the tool and the reasoning behind accepting or rejecting its output. This is a proposed practice, rather than a proven intervention from the CT study.</p>
+<p>It also changes the meaning of catching up. A team may gain more by combining expertise than by waiting for every member to reproduce everyone else’s abilities. The relevant result is the team’s ability to deliver and sustain useful software, alongside the development opportunities available to its members. Individual fluency remains valuable, but it is only part of that result.</p>
+</section>
+<section aria-labelledby="s6">
+<h2 id="s6"><span class="num sec">6</span>Delivering work and learning from it</h2>
+<p>Assisted performance and retained understanding can move at different rates. A developer may deliver a working feature with an agent and still need help explaining why it works or changing it safely. Another may learn quickly through an agent’s explanations and experiments. Successful completion alone does not identify which process occurred.</p>
+<p><a href="https://doi.org/10.1016/0005-1098(83)90046-8">Lisanne Bainbridge’s 1983 paper on the ironies of automation</a> described a related difficulty in industrial control. Automation can remove routine activity while leaving people responsible for abnormal conditions. Reduced practice can undermine the skills needed for intervention. Her discussion considered maintaining manual and diagnostic competence through training and suitable feedback. It was an analysis of human control systems, not evidence that every form of automation inevitably erodes skill.<sup class="ref"><a href="#r8" id="c8-1" aria-label="Reading list entry 8">8</a></sup></p>
+<p>Contemporary coding research gives the concern a narrower empirical basis. <a href="https://www.anthropic.com/research/AI-assistance-coding-skills">Shen and Tamkin</a> studied 52 mostly junior engineers learning the unfamiliar Python library Trio. Participants with AI assistance averaged 50 percent on an immediate comprehension quiz, compared with 67 percent without it, a difference of 17 percentage points. The time advantage was not statistically significant. Within the assisted group, explanation-seeking and conceptual inquiry were associated with stronger understanding, but those interaction patterns were not randomly assigned. The study does not establish a long-term effect on expertise.<sup class="ref"><a href="#r9" id="c9-1" aria-label="Reading list entry 9">9</a></sup></p>
+<p>This is the cost <a class="xref" href="#s2">section&nbsp;2</a> promised. Each improvement on the calendar clock removes some mistakes before a person makes them, and the lessons with them, so a newcomer can deliver more in their first year while accumulating less of the judgement that comes from being wrong. Nothing in the output shows the difference.</p>
+<p>The practical question is what replaces the learning opportunities removed by automation. Debugging one’s own mistake can expose a mistaken assumption. Reading a colleague’s reasoning can reveal a constraint. If an agent handles those steps, another activity may need to make the relevant knowledge visible. That activity need not reproduce every manual procedure the technology has made unnecessary.</p>
+<p>For example, a developer could explain a generated change before merging it, predict its behaviour under a changed requirement, or investigate a deliberately varied input. Such exercises are proposals for making understanding observable. They should be judged by whether they improve subsequent work, rather than treated as rituals that demonstrate seriousness.</p>
+<p>Oversight itself can also evolve. <a href="https://www.anthropic.com/research/measuring-agent-autonomy">Anthropic’s telemetry</a> found full auto-approval more common among experienced Claude Code users, while their interruption rates were also higher. The pattern is consistent with a shift towards letting work proceed and intervening when needed. It does not demonstrate that auto-approval causes better outcomes, or that an individual should always grant more autonomy as they gain experience.<sup class="ref"><a href="#r10" id="c10-1" aria-label="Reading list entry 10">10</a></sup></p>
+<p>The aim is a form of assistance that supports both useful output and the understanding needed for future responsibility. How best to achieve that balance remains an empirical question.</p>
+</section>
+<section aria-labelledby="s7">
+<h2 id="s7"><span class="num sec">7</span>How the landscape could evolve</h2>
+<p>The evidence supports several possible trajectories. An experienced engineer may learn a new workflow quickly and combine it with knowledge that remains valuable. A newcomer may use AI to accelerate both implementation and conceptual learning. Either may plateau when the task changes. Further improvements in the tools may alter the relative advantage again.</p>
+<p>These trajectories should be treated as hypotheses. A claim that experienced developers will eventually overtake newcomers assumes that their knowledge remains valuable and that they can adopt the new methods. A claim that newcomers will preserve their lead assumes that their learning keeps pace with the responsibility of their work. Neither outcome follows from entry date alone.</p>
+<p>If the essay has to commit to one reading — and an essay should — it is this. The capability that decides who can be trusted with more is neither fluency with the tools nor years in the profession but calibrated distrust: knowing which output to check, and how hard, in a domain one understands well enough to be surprised by it. It is learned mostly from consequence, which is why it accrues to experience, and why a tool that absorbs mistakes can slow its growth even as it speeds delivery. The reading is consistent with the contemporary results in this essay. The Trio learners with assistance understood less, and fewer of their errors were theirs to meet. The experienced Claude Code users approved less up front and interrupted more, which is what calibration looks like from outside. Dhanorkar’s developers, below, varied their oversight with the consequences of a mistake rather than with the tool. And the field at large still keeps a hand on the wheel: of the 1,100 developers and other technologists in <a href="https://stackoverflow.blog/2026/05/27/agents-on-a-leash-agentic-ai-remains-mostly-monitored-at-work/">Stack Overflow’s late-April 2026 pulse survey</a>, 63% rarely or never let agents run entirely on autopilot.<sup class="ref"><a href="#r13" id="c13-1" aria-label="Reading list entry 13">13</a></sup></p>
+<p>The reading would be wrong if calibration transferred freely between domains, so that a developer fluent with agents on one codebase supervised as well on an unfamiliar one; or if the people who best handled later changes to their generated work were simply the fastest, with no relationship to how often they had been caught out. Both are observable in an ordinary team.</p>
+<p class="pull" aria-hidden="true">The capability that decides who can be trusted with more is neither fluency with the tools nor years in the profession but calibrated distrust.</p>
+<p>Task context can change the comparison immediately. <a href="https://arxiv.org/abs/2606.05391">Dhanorkar, Passi and Vorvoreanu</a> interviewed 17 experienced developers about oversight of software agents. Their accounts distinguished relatively permissive use in prototypes from stricter review of changes to interconnected existing systems. The study identified four forms of oversight: a priori control, co-planning, real-time monitoring and post hoc review. The first is control set before any work is delegated — which settings the agent runs under, what it may touch — and it is where much of the difference between a prototype and a migration lives. The study offers qualitative evidence about practice, without establishing the population size or performance advantage of each pattern.<sup class="ref"><a href="#r11" id="c11-1" aria-label="Reading list entry 11">11</a></sup></p>
+<p>A plausible prediction is therefore that capability will remain uneven across tasks. A developer who delegates a prototype effectively may choose close supervision for a migration. That change need not represent a retreat in maturity. It may reflect different consequences, different knowledge requirements or a more accurate understanding of the tool.</p>
+<p>The boundary may continue moving. Models could improve at work currently dominated by human judgement. Teams could develop stronger checks that make some decisions easier to delegate. New responsibilities could appear around operating and coordinating the resulting systems. These are possibilities for investigation rather than reasons to assume either permanent human advantages or inevitable replacement.</p>
+<p>There is also a measurement problem. More autonomy is a description of how work proceeds, not a complete measure of capability. Someone who appropriately stops an agent may be exercising better judgement than someone who lets it continue. A useful account of progress must include the result and its consequences, as well as the amount of supervision.</p>
+<p>The three-clock model consequently needs repeated observations of people doing comparable work. A snapshot may identify differences, but it cannot explain whether those differences arose from earlier learning, better tools, task selection or support from colleagues. Following trajectories makes those explanations more testable, even when a small team cannot cleanly estimate causal effects.</p>
+</section>
+<section aria-labelledby="s8">
+<h2 id="s8"><span class="num sec">8</span>What an engineering lead can learn from this</h2>
+<p>The immediate task is to make different forms of capability visible without turning them into a fixed ranking. For a small sample of ordinary tasks, record what was attempted, the tool and workflow used, the help required, and what happened after delivery. Include enough context to distinguish a prototype from a change to a critical existing system.</p>
+<p>Time to a first plausible answer is useful but incomplete. Consider the effort required to reach an accepted result, including review and repair by other people. Return to a few changes later to see whether their authors can explain, extend or diagnose them. A delayed observation can reveal something that a successful demonstration cannot.</p>
+<p>If calibrated distrust is learned from consequence, the most useful thing a delivery system can give a developer is cheap, visible wrongness: a record of where an agent’s claims failed, surfaced early enough that the lesson lands before the habit sets. A review ledger, a provenance trail and a failing test all do this. A run of green merges does not, however reassuring, because it shows where the work ended and hides where it went wrong on the way.</p>
+<p>These observations should support development conversations. If review effort is rising, investigate whether task scope, generated volume, missing context or weak checks explain it. If a developer obtains useful results quickly and handles later changes confidently, recognise that capability even when their route to it differs from the team’s earlier practice.</p>
+<p>Create opportunities for knowledge to travel in both directions. Ask experienced engineers to explain the constraints behind their decisions. Ask colleagues fluent with agents to demonstrate their workflows and recovery strategies. Review a real task together, so that claims about speed or reliability can be examined against a shared example.</p>
+<p>When a tool changes, revisit a small number of established procedures. Identify which still protect an important outcome, which can be simplified and which have become unnecessary. This makes adaptation a continuing part of engineering practice. It also prevents a previous generation’s temporary workaround from becoming an unexplained requirement for every newcomer.</p>
+<p>Several questions would make a useful continuing investigation. Do later entrants reach accepted outcomes with fewer preparatory steps on comparable tasks? Does that advantage persist through maintenance? Which kinds of prior knowledge predict lower repair effort? Does learning spread more effectively through shared tasks than through written instructions alone? Each question asks for observable evidence and leaves room for the initial interpretation to be wrong.</p>
+<p>The leadership problem is ultimately to support useful work while maintaining the team’s capacity to understand and sustain it. Historical research shows why entry timing, retained expertise and relationships can all matter. The next step is to learn which of those mechanisms are active in the team at hand. A shortened route is valuable when it reaches an outcome the team can rely on, and the people taking it can continue to grow.</p>
+</section>
+
+<section class="apparatus" aria-labelledby="reading">
+<h2 id="reading"><span class="num">Sources</span>Annotated reading list</h2>
+<p class="intro">This is a selective research essay, not a systematic review. The sources below include field experiments, qualitative studies, historical analyses and vendor telemetry. Historical cases support possible mechanisms; they do not supply estimates of their effects on AI adoption. Superscript numbers in the text lead here; the ↩&#xFE0E; links lead back.</p>
+<ol class="readings">
+<li id="r1">
+  <h3><span class="rn">1</span>AI assistance and developer productivity</h3>
+  <p class="bib">Cui, K. Z., Demirer, M., Jaffe, S., Musolff, L., Peng, S. and Salz, T. <em>The Effects of Generative AI on High-Skilled Work: Evidence from Three Field Experiments with Software Developers.</em> Microsoft Research summary, June 2025; subsequently published in Management Science, 2026.</p>
+  <p>Three company field experiments. Useful evidence that less-experienced developers can obtain larger productivity gains. The intervention supplied code completions, so the results should not be applied unchanged to autonomous agents or broader engineering responsibility.</p>
+  <p class="links"><a href="https://doi.org/10.1287/mnsc.2025.00535">Read the source</a> <span class="sep">·</span> <a href="https://www.microsoft.com/en-us/research/publication/the-effects-of-generative-ai-on-high-skilled-work-evidence-from-three-field-experiments-with-software-developers/">Microsoft Research summary</a> <span class="sep">·</span> <a class="back" href="#c1-1" aria-label="Back to the citation in §1">↩&#xFE0E; §1</a></p>
+</li>
+<li id="r2">
+  <h3><span class="rn">2</span>The Harbour adoption papers</h3>
+  <p class="bib">Kershaw, J. and Claude. <em>Developer adoption ladder; Developer adoption ladder earlier dates; Where Harbour joins.</em> Harbour papers, September 2026.</p>
+  <p>The starting point for the cohort question. These exploratory syntheses map existing research to a product-specific ladder. Their distinctions between population evidence and interpretation are useful; their rung mappings are not independently validated population categories.</p><p>The ladder itself, revised from those papers, is the better starting point for the cohort argument than any one of them: its paragraph on cohorts makes the essay’s opening move in John Kershaw’s words.</p>
+  <p class="links"><a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/ladder.md">docs/ladder.md</a> <span class="sep">·</span> <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/developer-adoption-ladder.md">developer-adoption-ladder.md</a> <span class="sep">·</span> <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/developer-adoption-ladder-earlier-dates.md">developer-adoption-ladder-earlier-dates.md</a> <span class="sep">·</span> <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/where-harbour-joins.md">where-harbour-joins.md</a> <span class="sep">·</span> <a class="back" href="#c2-1" aria-label="Back to the citation in §1">↩&#xFE0E; §1</a></p>
+</li>
+<li id="r3">
+  <h3><span class="rn">3</span>Technological leapfrogging</h3>
+  <p class="bib">Lee, K. and Lim, C. <em>Technological regimes, catching-up and leapfrogging: Findings from the Korean industries.</em> Research Policy, 30, 459–483, 2001.</p>
+  <p>A comparative industry study distinguishing path following, stage skipping and path creation. Read for the conditions surrounding catch-up, including investment and external knowledge. Its subjects are industries and firms rather than individual learners.</p>
+  <p class="links"><a href="https://doi.org/10.1016/S0048-7333(00)00088-3">Read the source</a> <span class="sep">·</span> <a class="back" href="#c3-1" aria-label="Back to the citation in §3">↩&#xFE0E; §3</a></p>
+</li>
+<li id="r4">
+  <h3><span class="rn">4</span>Electrification and the organisation of work</h3>
+  <p class="bib">David, P. A. <em>The Dynamo and the Computer: An Historical Perspective on the Modern Productivity Paradox.</em> American Economic Review, 80, 355–361, 1990.</p>
+  <p>A short historical interpretation of why a general-purpose technology can take time to improve productivity. Especially useful for understanding complementary changes in layout and practice. It supplies an analogy for AI workflows, not a timetable for their development.</p>
+  <p class="links"><a href="https://gwern.net/doc/economics/automation/1990-david.pdf">Read the source</a> <span class="sep">·</span> <a class="back" href="#c4-1" aria-label="Back to the citation in §3">↩&#xFE0E; §3</a></p>
+</li>
+<li id="r5">
+  <h3><span class="rn">5</span>Expertise that survives technical change</h3>
+  <p class="bib">Tripsas, M. <em>Unraveling the process of creative destruction: Complementary assets and incumbent survival in the typesetter industry.</em> Strategic Management Journal, 18 (Summer Special Issue), 119–142, 1997.</p>
+  <p>A historical study combining quantitative and qualitative evidence. It explains why losing a technical advantage need not erase every advantage an incumbent holds. The connection to a developer’s transferable knowledge is an interpretation across levels of analysis.</p>
+  <p class="links"><a href="https://www.edegan.com/pdfs/Tripsas%20%281997%29%20-%20Unraveling%20the%20process%20of%20creative%20destruction.pdf">Read the source</a> <span class="sep">·</span> <a class="back" href="#c5-1" aria-label="Back to the citation in §4">↩&#xFE0E; §4</a></p>
+</li>
+<li id="r6">
+  <h3><span class="rn">6</span>Familiar solutions and flexible expertise</h3>
+  <p class="bib">Bilalić, M., McLeod, P. and Gobet, F. <em>Inflexibility of experts: Reality or myth? Quantifying the Einstellung effect in chess masters.</em> Cognitive Psychology, 56, 73–102, 2008.</p>
+  <p>Controlled problem-solving experiments showing both fixation and greater resistance among stronger experts. A useful corrective to simple claims that experience always helps or always obstructs adaptation. Transfer from chess to professional AI work remains a hypothesis.</p>
+  <p class="links"><a href="https://pubmed.ncbi.nlm.nih.gov/17418112/">Read the source</a> <span class="sep">·</span> <a class="back" href="#c6-1" aria-label="Back to the citation in §4">↩&#xFE0E; §4</a></p>
+</li>
+<li id="r7">
+  <h3><span class="rn">7</span>Technology and professional relationships</h3>
+  <p class="bib">Barley, S. R. <em>Technology as an Occasion for Structuring: Evidence from Observations of CT Scanners and the Social Order of Radiology Departments.</em> Administrative Science Quarterly, 31, 78–108, 1986.</p>
+  <p>An observational comparison of two departments using identical equipment. The closest historical reading for the leadership problem in this essay: distributions of knowledge and everyday interactions shaped different organisational outcomes. Two cases establish possibilities, not universal predictions.</p>
+  <p class="links"><a href="https://cerf.radiologie.fr/sites/cerf.radiologie.fr/files/Enseignement/DES/Modules-Base/Barley%2C%201986.pdf">Read the source</a> <span class="sep">·</span> <a class="back" href="#c7-1" aria-label="Back to the citation in §5">↩&#xFE0E; §5</a></p>
+</li>
+<li id="r8">
+  <h3><span class="rn">8</span>Maintaining expertise under automation</h3>
+  <p class="bib">Bainbridge, L. <em>Ironies of Automation.</em> Automatica, 19, 775–779, 1983.</p>
+  <p>A concise analysis of difficulties created when humans supervise automation and handle exceptions. It connects the design of work to skill maintenance and training. It is a conceptual synthesis drawing on control-system research rather than a study of coding agents.</p>
+  <p class="links"><a href="https://doi.org/10.1016/0005-1098(83)90046-8">Read the source</a> <span class="sep">·</span> <a class="back" href="#c8-1" aria-label="Back to the citation in §6">↩&#xFE0E; §6</a></p>
+</li>
+<li id="r9">
+  <h3><span class="rn">9</span>AI assistance and learning</h3>
+  <p class="bib">Shen, J. H. and Tamkin, A. <em>How AI Impacts Skill Formation.</em> arXiv 2601.20245, 2026. Author research summary published by Anthropic on 29 January 2026.</p>
+  <p>A randomised study of learning an unfamiliar programming library, with an immediate comprehension assessment. Read for the distinction between output and understanding. It does not establish long-term deskilling, and the comparisons between interaction styles are exploratory.</p>
+  <p class="links"><a href="https://www.anthropic.com/research/AI-assistance-coding-skills">Read the source</a> <span class="sep">·</span> <a class="back" href="#c9-1" aria-label="Back to the citation in §6">↩&#xFE0E; §6</a></p>
+</li>
+<li id="r10">
+  <h3><span class="rn">10</span>How supervision changes with experience</h3>
+  <p class="bib">Anthropic. <em>Measuring AI agent autonomy in practice.</em> Research report, 18 February 2026.</p>
+  <p>Vendor telemetry documenting approval and interruption patterns in Claude Code. Useful behavioural evidence about changes in oversight. Selection into the product and concurrent changes in tasks, tools and users limit causal interpretations and population-wide generalisation.</p>
+  <p class="links"><a href="https://www.anthropic.com/research/measuring-agent-autonomy">Read the source</a> <span class="sep">·</span> <a class="back" href="#c10-1" aria-label="Back to the citation in §6">↩&#xFE0E; §6</a></p>
+</li>
+<li id="r11">
+  <h3><span class="rn">11</span>Oversight in actual development work</h3>
+  <p class="bib">Dhanorkar, S., Passi, S. and Vorvoreanu, M. <em>Human oversight of agentic systems in practice: Examining the oversight work, challenges and heuristics of developers using software agents.</em> arXiv 2606.05391, 2026.</p>
+  <p>An exploratory interview study of 17 experienced developers. It distinguishes a priori control, co-planning, real-time monitoring and post hoc review, and shows how task context affects supervision. It describes reported practices rather than measuring their prevalence or causal effects on software quality.</p>
+  <p class="links"><a href="https://arxiv.org/abs/2606.05391">Read the source</a> <span class="sep">·</span> <a class="back" href="#c11-1" aria-label="Back to the citation in §7">↩&#xFE0E; §7</a></p>
+</li>
+<li id="r12">
+  <h3><span class="rn">12</span>Adoption and retention in a large engineering organisation</h3>
+  <p class="bib">Murphy-Hill, E., Butler, J. and Savelieva, A. <em>Adoption and Impact of Command-Line AI Coding Agents: A Study of Microsoft’s Early 2026 Rollout of Claude Code and GitHub Copilot CLI.</em> arXiv 2607.01418, 2026.</p>
+  <p>An observational study of tens of thousands of engineers over the first four months of a rollout, with individual-level adoption and retention. The closest thing in this list to a direct measurement of the essay’s claims about social transmission and about one practice failing to carry into the next. It is one organisation; its effects are associations rather than experiments; and its explanation of the negative retention effect — a familiar alternative to fall back on — is the authors’ reading, not a tested mechanism.</p>
+  <p class="links"><a href="https://arxiv.org/abs/2607.01418">Read the source</a> <span class="sep">·</span> <a class="back" href="#c12-1" aria-label="Back to the citation in §4">↩&#xFE0E; §4</a> <a class="back" href="#c12-2" aria-label="Back to the citation in §5">↩&#xFE0E; §5</a></p>
+</li>
+<li id="r13">
+  <h3><span class="rn">13</span>How the field supervises agents</h3>
+  <p class="bib">Stack Overflow. <em>Agents on a leash: Agentic AI remains mostly single-agent and monitored at work.</em> Stack Overflow blog, 27 May 2026.</p>
+  <p>A pulse survey of 1,100 developers and working professionals, fielded in late April 2026. Agent use at work at any frequency stood at 59%, against 31% in the 2025 Developer Survey; 63% rarely or never let agents run entirely on autopilot, and 60% block unapproved system changes. A self-selected sample reported in a blog post: read for the direction of practice, not for a population estimate. The post reports the 63% across all respondents and does not say whether non-users of agents were asked.</p>
+  <p class="links"><a href="https://stackoverflow.blog/2026/05/27/agents-on-a-leash-agentic-ai-remains-mostly-monitored-at-work/">Read the source</a> <span class="sep">·</span> <a class="back" href="#c13-1" aria-label="Back to the citation in §7">↩&#xFE0E; §7</a></p>
+</li>
+</ol>
+<p class="route">For a short reading route, begin with Barley for team relationships, Bainbridge for supervision and learning, and David for changes in the organisation of work. Lee and Lim then provide the vocabulary for comparing different routes through technological change, and Murphy-Hill, Butler and Savelieva show the same questions measured in 2026.</p>
+</section>
+
+<section class="apparatus" aria-labelledby="further">
+<h2 id="further"><span class="num">Beyond</span>Further reading</h2>
+<p class="intro">Not cited above, and not needed for the argument. Each goes further down a road the essay only points along, and each was read at its source before it was listed here.</p>
+<ul class="further">
+<li><p><span class="who">Lee, J. D. and See, K. A.</span> <em>Trust in automation: Designing for appropriate reliance.</em> Human Factors, 46, 50–80, 2004. What this essay calls calibrated distrust, human-factors research has studied for decades as <em>appropriate reliance</em>. The review argues that trust guides reliance precisely when complete understanding of the automation is impractical, and models how context and display shape it.</p><p class="links"><a href="https://doi.org/10.1518/hfes.46.1.50_30392">Read the source</a> <span class="sep">·</span> <a href="https://pubmed.ncbi.nlm.nih.gov/15151155/">PubMed record</a></p></li>
+<li><p><span class="who">Parasuraman, R. and Riley, V.</span> <em>Humans and automation: Use, misuse, disuse, abuse.</em> Human Factors, 39, 230–253, 1997. The vocabulary for the two ways reliance goes wrong: misuse is over-reliance, which fails in monitoring; disuse is neglect, commonly caused by false alarms. An agent that cries wolf and an agent that is never checked are different failures with different fixes.</p><p class="links"><a href="https://doi.org/10.1518/001872097778543886">Read the source</a></p></li>
+<li><p><span class="who">Kahneman, D. and Klein, G.</span> <em>Conditions for intuitive expertise: A failure to disagree.</em> American Psychologist, 64, 515–526, 2009. Two traditions that usually disagree agree that intuitive judgement can be trusted only where the environment is regular and the person has had the chance to learn its regularities — and that feeling sure is no guide. The strongest general case for <a class="xref" href="#s7">section&nbsp;7</a>’s claim that calibration is learned from consequence.</p><p class="links"><a href="https://doi.org/10.1037/a0016755">Read the source</a> <span class="sep">·</span> <a href="https://pubmed.ncbi.nlm.nih.gov/19739881/">PubMed record</a></p></li>
+<li><p><span class="who">Bilalić, M., McLeod, P. and Gobet, F.</span> <em>The mechanism of the Einstellung (set) effect.</em> Current Directions in Psychological Science, 19, 111–115, 2010. The same authors’ short sequel to the chess study, with eye-tracking: the first idea steers attention toward information consistent with it, and keeps doing so while the player believes they are looking for alternatives. Why “the expert will notice” is not a procedure.</p><p class="links"><a href="https://doi.org/10.1177/0963721410363571">Read the source</a> <span class="sep">·</span> <a href="http://bura.brunel.ac.uk/bitstream/2438/5777/1/Fulltext.pdf">Author copy</a></p></li>
+<li><p><span class="who">Strauch, B.</span> <em>Ironies of automation: Still unresolved after all these years.</em> IEEE Transactions on Human-Machine Systems, 48, 419–433, 2018. Bainbridge’s paper traced through thirty-five years of research and accident investigation, where its ironies kept reappearing.</p><p class="links"><a href="https://doi.org/10.1109/THMS.2017.2732506">Read the source</a></p></li>
+<li><p><span class="who">Brynjolfsson, E., Li, D. and Raymond, L.</span> <em>Generative AI at work.</em> Quarterly Journal of Economics, 140, 889–942, 2025. Outside software, and a sharper version of <a class="xref" href="#s1">section&nbsp;1</a>’s puzzle: across 5,172 customer-support agents, AI assistance raised issues resolved per hour by 15% on average; less experienced workers gained in speed and quality, while the most experienced saw small gains in speed and small declines in quality. The authors also find evidence that assistance helped workers learn.</p><p class="links"><a href="https://doi.org/10.1093/qje/qjae044">Read the source</a> <span class="sep">·</span> <a href="https://www.nber.org/papers/w31161">NBER working paper</a></p></li>
+<li><p><span class="who">Becker, J., Rush, N., Barnes, E. and Rein, D.</span> <em>Measuring the impact of early-2025 AI on experienced open-source developer productivity.</em> METR, arXiv 2507.09089, 2025. A randomised trial with 16 experienced developers on 246 tasks in projects they knew well: allowing AI made tasks take 19% longer, while the developers estimated afterwards that it had made them 20% faster. The cleanest demonstration that visible speed and felt speed can both mislead.</p><p class="links"><a href="https://arxiv.org/abs/2507.09089">Read the source</a> <span class="sep">·</span> <a href="https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/">METR summary</a></p></li>
+<li><p><span class="who">Elsewhere in the Harbour Archive.</span> <em>The Cheap Ships</em> (document 5) asks what happens to Harbour when agent work becomes a hundred times cheaper, and ends where this essay does: with the operator’s attention as the expensive thing.</p><p class="links"><a href="https://harbour.cat/archive/5">Harbour Archive #5</a></p></li>
+</ul>
+</section>
+
+<section class="apparatus" aria-labelledby="next">
+<h2 id="next"><span class="num">Next</span>What Harbour should study next</h2>
+<p>The essay’s own closing questions are the first candidates, and three go to <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/proposals.md"><code>proposals.md</code></a> with this change: whether later entrants reach accepted outcomes with fewer preparatory steps and whether that survives maintenance; which kinds of prior knowledge predict lower repair effort; and whether a practice spreads faster through a shared task than through written instructions. Each is answerable inside Harbour from records it already keeps or could keep, and each would turn one of the three clocks from a distinction into a measurement.</p>
+<p>Two of them bear directly on papers already in the archive. <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/developer-adoption-ladder.md"><code>developer-adoption-ladder.md</code></a> reads the ladder as a sequence of practices and could not find a population instrument for its middle rungs; this essay’s adoption-cohort distinction says why one instrument will not do — a cross-section of newcomers mixes a change in people with a change in tools. <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/what-lowers-the-verification-cost.md"><code>what-lowers-the-verification-cost.md</code></a> found no study showing a verified artifact changes supervision; the reciprocal-learning claim in <a class="xref" href="#s5">section&nbsp;5</a> is a second route to the same outcome and is equally unmeasured.</p>
+<p><a class="xref" href="#s7">Section&nbsp;7</a>’s commitment adds one more, because it names what would refute it: does calibration transfer between domains? Harbour’s operators review agent work in more than one repository, some of which they know far better than others. Whether their review catches the same share of an agent’s mistakes in both is a direct test of whether the scarce thing is domain-bound, as this essay argues, or portable.</p>
+</section>
+</article>
+
+<footer class="colophon">
+  <h2>About this document</h2>
+  <p class="argument">Engineering experience, AI experience and tool capability run on separate clocks, and better tools slow the second by absorbing the mistakes that used to teach — so what a team most needs to grow is calibrated distrust, which no snapshot of speed or seniority can see.</p>
+  <dl>
+    <dt>Version</dt>
+    <dd><p>Version 3, 22 September 2026.</p></dd>
+    <dt>Authors</dt>
+    <dd><p>Astra 6 wrote version 1, filed on John Kershaw’s attribution; its harness and effort were not recorded. Opus 5.5 (Claude Opus 5.5, <code>claude-opus-5-5</code>, in a Claude Code web session at high effort) checked version 1 against its sources and, at John’s invitation, wrote versions 2 and 3 as second author. No version came through Harbour’s own dispatch.</p></dd>
+    <dt>Status</dt>
+    <dd><p><strong>This version is unchecked.</strong> Version 1 was checked against its eleven sources in <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/learning-while-the-tools-change-check.md">the check</a>, and versions 2 and 3 were revised from that check’s findings by the check’s own author, who is now this essay’s second author — which <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/standard.md"><code>standard.md</code></a> allows for an essay, on condition that it is visible. The check covers version 1 only. The new material a reader should weigh for themselves is the rollout’s figures, read at the source on 2026-09-22; the chess boundary condition; the reading in <a class="xref" href="#s7">section&nbsp;7</a> with the two conditions that would refute it; and the Stack Overflow figure, which version 2 took second-hand and attributed to agent users, and which version 3 read at the source, where it is reported across all respondents.</p></dd>
+    <dt>Harbour sources</dt>
+    <dd><p>The Harbour documents in reading-list entry 2 were read at <a href="https://github.com/JKershaw/LinearViewer/tree/0d652fbc0f2fef12bf063f047d855c346b337595/docs"><code>0d652fb</code></a>; the links above go to their current versions.</p></dd>
+    <dt>Typeset from</dt>
+    <dd><p><a href="https://github.com/JKershaw/LinearViewer/blob/1d4a84d5ece992fd2589222cf346d8f94b8363fc/docs/papers/harbour/learning-while-the-tools-change.md"><code>docs/papers/harbour/learning-while-the-tools-change.md</code></a> at <code>1d4a84d</code>. The markdown is the record and may be revised; this page is a snapshot of version 3. <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/harbour/learning-while-the-tools-change.md">Current version</a> · <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/README.md">The papers archive</a> · <a href="https://github.com/JKershaw/LinearViewer/blob/main/docs/papers/standard.md">How a paper is written</a></p></dd>
+    <dt>Filed</dt>
+    <dd><p>22 September 2026, as the second essay in the Archive. The first is <a href="/archive/5">document 5, <em>The Cheap Ships</em></a>.</p></dd>
+  </dl>
+</footer>
+
+<p class="foot">Harbour Archive · document 7 · filed 2026-09-22 · served verbatim from docs/archive/7.html</p>
+
+</main>
+</body>
+</html>

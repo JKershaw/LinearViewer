@@ -2,10 +2,10 @@
 title: Learning While the Tools Change
 kind: essay
 argument: Engineering experience, AI experience and tool capability run on separate clocks, and better tools slow the second by absorbing the mistakes that used to teach — so what a team most needs to grow is calibrated distrust, which no snapshot of speed or seniority can see.
-version: 2
+version: 3
 date: 2026-09-22
-authors: [Astra 6, Claude]
-model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. No Harbour dispatch lineage for either."
+authors: [Astra 6, Opus 5.5]
+model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. Version 3 by the same model and harness, correcting a survey figure after reading it at source and adding the further-reading list, typeset as Harbour Archive #7. No Harbour dispatch lineage for any version."
 sources:
   - "Cui et al., The Effects of Generative AI on High-Skilled Work, Management Science, 2026 — https://doi.org/10.1287/mnsc.2025.00535"
   - "docs/ladder.md@0d652fbc0f2fef12bf063f047d855c346b337595"
@@ -22,6 +22,7 @@ sources:
   - "Anthropic, Measuring AI agent autonomy in practice, 2026-02-18 — https://www.anthropic.com/research/measuring-agent-autonomy"
   - "Dhanorkar, Passi and Vorvoreanu, arXiv 2606.05391, 2026 — https://arxiv.org/abs/2606.05391"
   - "Murphy-Hill, Butler and Savelieva, arXiv 2607.01418, 2026 — https://arxiv.org/abs/2607.01418 (figures read at https://arxiv.org/html/2607.01418, 2026-09-22)"
+  - "Stack Overflow, Agents on a leash, 2026-05-27 — https://stackoverflow.blog/2026/05/27/agents-on-a-leash-agentic-ai-remains-mostly-monitored-at-work/ (read 2026-09-22)"
 ---
 
 # Learning While the Tools Change
@@ -350,9 +351,10 @@ speeds delivery. The reading is consistent with the contemporary results in this
 learners with assistance understood less, and fewer of their errors were theirs to meet. The
 experienced Claude Code users approved less up front and interrupted more, which is what
 calibration looks like from outside. Dhanorkar's developers, below, varied their oversight with
-the consequences of a mistake rather than with the tool. And most people who use an agent still
-do not let it run unattended: of the agent users in Stack Overflow's April 2026 pulse, 63% rarely
-or never do. [[2]](#2-the-harbour-adoption-papers)
+the consequences of a mistake rather than with the tool. And the field at large still keeps a hand
+on the wheel: of the 1,100 developers and other technologists in Stack Overflow's late-April 2026
+pulse survey, 63% rarely or never let agents run entirely on autopilot.
+[[13]](#13-how-the-field-supervises-agents)
 
 The reading would be wrong if calibration transferred freely between domains, so that a developer
 fluent with agents on one codebase supervised as well on an unfamiliar one; or if the people who
@@ -563,8 +565,8 @@ Dhanorkar, S., Passi, S. and Vorvoreanu, M. *Human oversight of agentic systems 
 the oversight work, challenges and heuristics of developers using software agents.* arXiv 2606.05391,
 2026.
 
-An exploratory interview study of 17 experienced developers. It distinguishes preparation, co-planning,
-monitoring and review, and shows how task context affects supervision. It describes reported practices
+An exploratory interview study of 17 experienced developers. It distinguishes a priori control,
+co-planning, real-time monitoring and post hoc review, and shows how task context affects supervision. It describes reported practices
 rather than measuring their prevalence or causal effects on software quality.
 
 [Read the source](https://arxiv.org/abs/2606.05391)
@@ -583,10 +585,82 @@ tested mechanism.
 
 [Read the source](https://arxiv.org/abs/2607.01418)
 
+### 13 How the field supervises agents
+
+Stack Overflow. *Agents on a leash: Agentic AI remains mostly single-agent and monitored at work.*
+Stack Overflow blog, 27 May 2026.
+
+A pulse survey of 1,100 developers and working professionals, fielded in late April 2026. Agent use at
+work at any frequency stood at 59%, against 31% in the 2025 Developer Survey; 63% rarely or never let
+agents run entirely on autopilot, and 60% block unapproved system changes. A self-selected sample
+reported in a blog post: read for the direction of practice, not for a population estimate. The post
+reports the 63% across all respondents and does not say whether non-users of agents were asked.
+
+[Read the source](https://stackoverflow.blog/2026/05/27/agents-on-a-leash-agentic-ai-remains-mostly-monitored-at-work/)
+
 For a short reading route, begin with Barley for team relationships, Bainbridge for supervision and
 learning, and David for changes in the organisation of work. Lee and Lim then provide the vocabulary for
 comparing different routes through technological change, and Murphy-Hill, Butler and Savelieva show the
 same questions measured in 2026.
+
+## Further reading
+
+Not cited above, and not needed for the argument. Each goes further down a road the essay only points
+along, and each was read at its source before it was listed here.
+
+**Lee, J. D. and See, K. A.** *Trust in automation: Designing for appropriate reliance.* Human Factors,
+46, 50–80, 2004. What this essay calls calibrated distrust, human-factors research has studied for
+decades as *appropriate reliance*. The review argues that trust guides reliance precisely when complete
+understanding of the automation is impractical, and models how context and display shape it.
+[Read the source](https://doi.org/10.1518/hfes.46.1.50_30392) ·
+[PubMed record](https://pubmed.ncbi.nlm.nih.gov/15151155/)
+
+**Parasuraman, R. and Riley, V.** *Humans and automation: Use, misuse, disuse, abuse.* Human Factors, 39,
+230–253, 1997. The vocabulary for the two ways reliance goes wrong: misuse is over-reliance, which fails
+in monitoring; disuse is neglect, commonly caused by false alarms. An agent that cries wolf and an agent
+that is never checked are different failures with different fixes.
+[Read the source](https://doi.org/10.1518/001872097778543886)
+
+**Kahneman, D. and Klein, G.** *Conditions for intuitive expertise: A failure to disagree.* American
+Psychologist, 64, 515–526, 2009. Two traditions that usually disagree agree that intuitive judgement can
+be trusted only where the environment is regular and the person has had the chance to learn its
+regularities — and that feeling sure is no guide. The strongest general case for section 7's claim that
+calibration is learned from consequence.
+[Read the source](https://doi.org/10.1037/a0016755) ·
+[PubMed record](https://pubmed.ncbi.nlm.nih.gov/19739881/)
+
+**Bilalić, M., McLeod, P. and Gobet, F.** *The mechanism of the Einstellung (set) effect.* Current
+Directions in Psychological Science, 19, 111–115, 2010. The same
+authors' short sequel to the chess study, with eye-tracking: the first idea steers attention toward
+information consistent with it, and keeps doing so while the player believes they are looking for
+alternatives. Why "the expert will notice" is not a procedure.
+[Read the source](https://doi.org/10.1177/0963721410363571) ·
+[Author copy](http://bura.brunel.ac.uk/bitstream/2438/5777/1/Fulltext.pdf)
+
+**Strauch, B.** *Ironies of automation: Still unresolved after all these years.* IEEE Transactions on
+Human-Machine Systems, 48, 419–433, 2018. Bainbridge's paper traced through thirty-five years of
+research and accident investigation, where its ironies kept reappearing.
+[Read the source](https://doi.org/10.1109/THMS.2017.2732506)
+
+**Brynjolfsson, E., Li, D. and Raymond, L.** *Generative AI at work.* Quarterly Journal of Economics,
+140, 889–942, 2025. Outside software, and a sharper version of section 1's puzzle: across 5,172
+customer-support agents, AI assistance raised issues resolved per hour by 15% on average; less
+experienced workers gained in speed and quality, while the most experienced saw small gains in speed and
+small declines in quality. The authors also find evidence that assistance helped workers learn.
+[Read the source](https://doi.org/10.1093/qje/qjae044) ·
+[NBER working paper](https://www.nber.org/papers/w31161)
+
+**Becker, J., Rush, N., Barnes, E. and Rein, D.** *Measuring the impact of early-2025 AI on experienced
+open-source developer productivity.* METR, arXiv 2507.09089, 2025. A randomised trial with 16
+experienced developers on 246 tasks in projects they knew well: allowing AI made tasks take 19% longer,
+while the developers estimated afterwards that it had made them 20% faster. The cleanest demonstration
+that visible speed and felt speed can both mislead.
+[Read the source](https://arxiv.org/abs/2507.09089) ·
+[METR summary](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/)
+
+**Elsewhere in the Harbour Archive.** *The Cheap Ships* (document 5) asks what happens to Harbour when
+agent work becomes a hundred times cheaper, and ends where this essay does: with the operator's
+attention as the expensive thing. [Harbour Archive #5](https://harbour.cat/archive/5)
 
 ## Next
 
@@ -610,8 +684,10 @@ know far better than others. Whether their review catches the same share of an a
 is a direct test of whether the scarce thing is domain-bound, as this essay argues, or portable.
 
 **This version is unchecked.** Version 1 was checked against its eleven sources in
-`learning-while-the-tools-change-check.md`, and version 2 was revised from that check's findings by the
-check's own author, who is now this essay's second author — which `standard.md` allows for an essay,
-on condition that it is visible. The check covers version 1 only. The new material a reader should weigh
-for themselves is the rollout's figures, read at the source on 2026-09-22; the chess boundary condition;
-and the reading in section 7 with the two conditions that would refute it.
+`learning-while-the-tools-change-check.md`, and versions 2 and 3 were revised from that check's findings
+by the check's own author, who is now this essay's second author — which `standard.md` allows for an
+essay, on condition that it is visible. The check covers version 1 only. The new material a reader should
+weigh for themselves is the rollout's figures, read at the source on 2026-09-22; the chess boundary
+condition; the reading in section 7 with the two conditions that would refute it; and the Stack Overflow
+figure, which version 2 took second-hand and attributed to agent users, and which version 3 read at the
+source, where it is reported across all respondents.
