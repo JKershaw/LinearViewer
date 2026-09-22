@@ -127,8 +127,8 @@ version's title punctuation is the transcriber's, and two words were wrong with 
 "High-Skilled", Lee and Lim is "catching-up", and Tripsas 1997 is the Summer Special Issue of
 volume 18. The Management Science DOI is added now that the Cui paper is published, so that entry
 lands on the published article rather than only the 2025 summary. This check touched no argument
-text: the checker is not the editor under rule 2. When John later invited the checker to revise the
-essay as its second author, that made version 2 a document this check cannot cover.
+text. John later invited the checker to revise the essay as its second author, which the standard
+allows for an essay; version 2 is therefore a document this check does not cover.
 
 ## Method
 

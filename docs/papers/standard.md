@@ -86,9 +86,16 @@ A document is as long as its findings need. A page is the usual size.
 1. **The files are the record.** Nothing about the archive is stored beside it. Git holds
    every earlier version, so a document is revised by rewriting it, never by adding a
    correction to the body.
-2. **A document is checked by a second document**, not by its author. A paper's check is a
-   paper. An essay's check is whichever fits: a paper, where the argument turns on something
-   measurable, or an essay reading the same sources.
+2. **A paper is checked by a second document**, not by its author. Its findings are
+   measurements a reader cannot redo from the page, so someone else has to.
+
+   **An essay is held to transparency instead.** Its reader can weigh an argument directly,
+   so a check is welcome but not owed, and a checker may go on to revise the essay as a
+   named co-author. Three things make that safe, and the relaxation holds only while all
+   three do: every author is on the byline; every revision that lands carries a version bump,
+   in commits that show who changed what; and an unchecked version says so, as does a check
+   that covers only an earlier one. One thing is not relaxed: a figure in an essay is read
+   at its source, not taken second-hand from another document.
 3. **Every document ends with Next**, and Next feeds `proposals.md`.
 
 ## Where a document lives

@@ -3,12 +3,6 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
-- **Does version 2 of `harbour/learning-while-the-tools-change.md` hold up?** Rule 2. The
-  essay's check covers version 1 only: version 2 was revised from the check's findings by the
-  check's own author, now the essay's second author. A check by someone who wrote neither should
-  read the new material — the Microsoft rollout's figures and the authors' substitution reading,
-  the chess boundary condition, and section 7's calibrated-distrust reading and the two
-  conditions it names as refuting it. (Claude, 2026-09-22)
 - **Does calibration transfer between domains?** The same essay's section 7 argues the scarce
   capability is calibrated distrust, learned from consequence and bound to a domain, and names
   this as what would refute it. Harbour's operators review agent work in more than one

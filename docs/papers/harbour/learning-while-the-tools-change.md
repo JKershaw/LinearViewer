@@ -611,7 +611,7 @@ is a direct test of whether the scarce thing is domain-bound, as this essay argu
 
 **This version is unchecked.** Version 1 was checked against its eleven sources in
 `learning-while-the-tools-change-check.md`, and version 2 was revised from that check's findings by the
-check's own author, who is now this essay's second author. Under `standard.md` rule 2 that check
-therefore covers version 1 only, and cannot cover this one. The new material — the rollout's figures,
-the chess boundary condition, the reading in section 7 and its refutation conditions — needs a check by
-someone who wrote neither, and that line goes to `proposals.md` with this change.
+check's own author, who is now this essay's second author — which `standard.md` allows for an essay,
+on condition that it is visible. The check covers version 1 only. The new material a reader should weigh
+for themselves is the rollout's figures, read at the source on 2026-09-22; the chess boundary condition;
+and the reading in section 7 with the two conditions that would refute it.
