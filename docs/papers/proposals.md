@@ -3,9 +3,9 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
-- **Does calibration transfer between domains?** The same essay's section 7 argues the scarce
-  capability is calibrated distrust, learned from consequence and bound to a domain, and names
-  this as what would refute it. Harbour's operators review agent work in more than one
+- **Does calibration transfer between domains?** `harbour/learning-while-the-tools-change.md`
+  argues in section 7 that the scarce capability is calibrated distrust, learned from
+  consequence and bound to a domain, and its Next names this as what would refute it. Harbour's operators review agent work in more than one
   repository; compare the share of an agent's later-found mistakes their reviews caught in a
   repository they know well against one they know less. (Claude, 2026-09-22)
 - **Should `docs/ladder.md` take the essay's three clocks and its step classification?** A
