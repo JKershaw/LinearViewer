@@ -851,6 +851,59 @@ describe('harnessOf/usageOf/evidenceCountOf (LIN-1957)', () => {
   });
 });
 
+// LIN-3002 (beat 1, TDD): today, both loaders' `catch` swallows an
+// aggregation failure and falls back to an unbounded find({}) read — the
+// exact bug this ticket fixes. These acceptance cases use one-off mock
+// collections (per the ticket's own constraint: do NOT add `aggregate` to
+// the shared createMockCollection() helper above, since that helper's
+// whole purpose is to model the has-no-aggregate() mock branch every other
+// test in this file relies on — adding aggregate() to it would silently move
+// those tests onto a different branch than the one they're meant to cover).
+// Written and run against the UNFIXED code first; see the beat-1 report for
+// the captured pre-fix failure output.
+describe('loadDispatchHistory — aggregation failure propagates, never falls back to find (LIN-3002)', () => {
+  test('rejects when aggregate() rejects, and find is never called', async () => {
+    let findCalls = 0;
+    // Shaped like the real driver: aggregate(pipeline) returns a
+    // cursor-like object; the rejection surfaces at .toArray(), matching
+    // where loadDispatchHistory's own `await ...aggregate([...]).toArray()`
+    // actually awaits.
+    const collection = {
+      aggregate() { return { toArray: () => Promise.reject(new Error('boom')) }; },
+      find() { findCalls++; return { toArray: async () => [] }; }
+    };
+    await assert.rejects(() => loadDispatchHistory(collection), /boom/);
+    assert.strictEqual(findCalls, 0, 'find({}) must never be called after an aggregation failure');
+  });
+});
+
+// loadProxyBins has no exported seam of its own (unlike loadDispatchHistory,
+// which is exported) — confirmed by grep: `export` appears on
+// loadDispatchHistory (kpi-stats.js:298) but not on loadProxyBins
+// (kpi-stats.js:226), and nothing re-exports it. That is a real gap between
+// this ticket's plan (which frames both loaders as symmetric, directly
+// testable units) and the code as it stands — flagged rather than silently
+// resolved. Beat 1 may not change lib/kpi-stats.js, so exporting it is not
+// an option here (and doing so as part of beat 2's fix would violate the
+// ticket's own "touch only the catch bodies" scope constraint). Its only
+// current entry point is collectKpiStats (exported, already imported above),
+// which awaits loadProxyBins(proxyEvents) inside its own Promise.all — a
+// rejection there necessarily rejects collectKpiStats too, so asserting
+// through that seam still pins loadProxyBins's own reject/never-find
+// behavior, just one level up.
+describe('loadProxyBins (via collectKpiStats — no direct export exists) — aggregation failure propagates, never falls back to find (LIN-3002)', () => {
+  test('collectKpiStats rejects when proxyEvents.aggregate() rejects, and proxyEvents.find is never called', async () => {
+    let findCalls = 0;
+    const proxyEvents = {
+      aggregate() { return { toArray: () => Promise.reject(new Error('boom')) }; },
+      find() { findCalls++; return { toArray: async () => [] }; }
+    };
+    const collections = buildCollections({ proxyEvents });
+    await assert.rejects(() => collectKpiStats(collections, { now: NOW }), /boom/);
+    assert.strictEqual(findCalls, 0, 'proxyEvents.find({}) must never be called after an aggregation failure');
+  });
+});
+
 describe('groupDispatchLineages (LIN-1957) — the shared extraction', () => {
   const usageMarker = (costUsd, days) => ({
     kind: 'usage', message: `[usage] {"costUsd":${costUsd}}`,
