@@ -1,18 +1,25 @@
 # Incident — harbour.cat database-backed reads hang on a degraded cross-region link
 
 **Date:** 2026-09-22
-**Duration:** onset ~19:15Z, recovering by ~19:47–19:52Z, structurally resolved ~20:35Z
-after MongoDB-harbour moved to the app's own EU region (LIN-3000 comment `4a531223`)
+**Duration:** onset ~19:15Z, recovering by ~19:47–19:52Z, structurally resolved by
+20:16:41Z after MongoDB-harbour moved to the app's own EU region (LIN-3000 comment
+`4a531223`, `createdAt`; the comment's own text self-labels this "~20:35Z" — see the
+clock-provenance note below)
 **Severity:** Degraded — database-backed reads (proxy dispatch list, rulings, `/kpis`,
 the live and observation views) hung 27–595 s. Static pages, small-document reads
-(poll/take/feedback) and CPU on both sides were unaffected. No data loss.
+(poll/take/feedback) and CPU on both sides were unaffected.
 **Status:** Resolved (LIN-2993 comments `cfc1d6bd`, `1bff86f8`). Root cause mechanism at
 **medium-high** confidence; why the link degraded is **low-medium**, not established.
 
-> **All times UTC.** Clock provenance is called out per row below: Railway's dashboard
-> screenshots were read in GMT+1, and deploy markers on Railway's graphs are *creation*
-> times, not go-live times (LIN-2993 comment `7905184c`) — misreading either one points
-> suspicion at the wrong deploy.
+> **All times UTC.** Clock provenance is called out per row below — Railway logs, a
+> dispatch record's `dispatchedAt`, a Linear comment's `createdAt`, or a con self-label —
+> because these disagree: Railway's dashboard screenshots were read in GMT+1; deploy
+> markers on Railway's graphs are *creation* times, not go-live times (LIN-2993 comment
+> `7905184c`); and several con-authored comments self-label a rounded time in their own
+> text that runs 3–19 minutes ahead of that comment's actual Linear `createdAt` (e.g.
+> `9459e3d2` says "~19:40Z", posted 19:37:07Z; `1df2ffb0` says "~19:55Z", posted
+> 19:42:53Z; `4a531223` says "~20:35Z", posted 20:16:41Z). Rows below cite the underlying
+> clock, not the self-label.
 
 ---
 
@@ -40,16 +47,16 @@ crossing a degraded EU West ↔ US East network link between the app and its dat
 | 19:25:38 | system | `#1547` (`a5f4383`) container `68d764ab` goes live and serves cleanly for the rest of the incident (`7905184c`) |
 | ~19:30 | operator instruction | LIN-2974 autopilot tree **cascade-aborted** on John's instruction as a precaution; the con's own polling stopped at the same time (LIN-2993 description) |
 | 19:33:34 | system (`railway logs -s MongoDB-harbour`) | Only slow query in the whole window: a 262 ms full scan. Mongo itself stayed healthy throughout (LIN-2993 comment `8d05d859`) |
-| 19:35–19:37 | session feedback | The cascade abort's batch of newly-errored sessions is picked up by the observation feed's per-session Linear error lookups (LIN-2993 comment `1fbe8f73`; LIN-2994) |
+| 19:35–19:37 | system (`railway logs`, per `ba819bcd`) | The cascade abort's batch of newly-errored sessions adds a burst of observation-feed Linear error lookups — an amplifier, not the trigger, of the holds below (LIN-2993 comment `ba819bcd`; LIN-2994, LIN-2998) |
+| 19:36:53 | dispatch record (`dispatchedAt`) | Read-only host investigator dispatched with no `repo` (dispatch `10022ce7`). A `repo=LinearViewer` attempt had already been refused `422 UNKNOWN_REPO`, `knownRepos: []` just before this dispatch, not concurrently with it (LIN-2993 comment `9459e3d2`, self-labelled "~19:40Z", posted 19:37:07Z) |
 | ~19:40:51 | system | Two observation `sessions` requests, held 546–573 s, released together right after a Linear `AbortError timedOut` (LIN-2993 comment `825a549b`) |
 | 19:41–19:47 | system | Recovering — proxy calls down to 0.3–1.8 s (`825a549b`) |
-| ~19:42 | dispatch record | Read-only host investigator dispatched with no `repo` (dispatch `10022ce7`); a concurrent `repo=LinearViewer` dispatch was refused `422 UNKNOWN_REPO`, `knownRepos: []` (LIN-2993 comment `9459e3d2`) |
-| 19:42:53 | session feedback | Con's follow-up (`3fc09da4`) requests read-only `mongosh` via `railway run`, relaxing the investigator's original "no `railway run`" limit (LIN-2993 comment `1df2ffb0`) |
+| 19:42:53 | Linear comment (`createdAt`) | Con requests read-only `mongosh` via `railway run`, relaxing the investigator's original "no `railway run`" limit (LIN-2993 comment `1df2ffb0`, self-labelled "~19:55Z"); delivered to the investigator via follow-up dispatch `3fc09da4`, dispatched 19:43:05Z (dispatch record) |
 | 19:51:24 | session feedback | **Discriminating test:** `mongosh` shows Mongo healthy (no long ops, no queued locks); the feed's history read executes in 29 ms on the server but returns a 32 MB payload (LIN-2993 comment `8b2bcfa4`) |
 | 19:51:54 | session feedback | Authoritative root cause posted (LIN-2993 comment `9e91955a`), superseding the earlier, wrong-lead findings (`ba819bcd`) |
 | 19:52–~20:04 | probe | A 12-minute probe's worst read is 2 s (LIN-2993 comment `cfc1d6bd`) |
 | 20:07:58 | session feedback | Incident **effectively resolved**; follow-ups filed (`cfc1d6bd`) |
-| ~20:35 | verification (LIN-3000 comment `4a531223`) | MongoDB-harbour moved to the EU region and verified: dispatch list 1.2–1.5 s, rulings 0.7–1.0 s, `/kpis` 0.24–0.32 s |
+| 20:16:41 | Linear comment (`createdAt`; self-labelled "~20:35Z") | MongoDB-harbour moved to the EU region and verified: dispatch list 1.2–1.5 s, rulings 0.7–1.0 s, `/kpis` 0.24–0.32 s (LIN-3000 comment `4a531223`) |
 
 ## Root cause
 
@@ -83,11 +90,12 @@ only Linear wait in the affected surfaces — the observation feed's error looku
 
 ## Amplifiers
 
-The cascade abort issued as a precaution at ~19:30Z made the incident worse, not better:
-it queued **19 aborts when only 2 sessions were still running**, and every aborted
-session was counted as errored, so the observation feed then ran a Linear lookup for
-each one — the exact call chain that produced the 546–573 s holds noted above (LIN-2994;
-LIN-2993 comment `1fbe8f73`).
+The cascade abort issued as a precaution at ~19:30Z queued **19 aborts when only 2
+sessions were still running**, and every aborted session was counted as errored. The
+resulting errored sessions added a burst of observation-feed Linear error lookups at
+19:35–19:37Z, on top of the feed request that was already hanging on the degraded Mongo
+link — an **amplifier, not the trigger**, of the 546–573 s holds noted above (LIN-2993
+comments `ba819bcd`, `825a549b`; LIN-2994, LIN-2998).
 
 This incident contradicts the "harmless"/"safe no-op" framing that currently appears in
 three places in this repo's own contract text — `docs/dispatch-integration.md:591`,
@@ -98,7 +106,8 @@ silently rewording.
 
 ## What worked
 
-- **Stopping the con's own polling** as soon as the failures were noticed (LIN-2993
+- **Stopping the con's own polling**, together with the cascade abort, at ~19:30Z —
+  about 10–15 minutes after the first failures were noticed at ~19:15–19:20Z (LIN-2993
   description).
 - **Dispatching a read-only host investigator** (`10022ce7`, followed up `3fc09da4`),
   which posted findings to the ticket as it worked and delivered the discriminating
@@ -119,9 +128,9 @@ silently rewording.
 - **Why the EU↔US-East link degraded.** Confidence low-medium; Harbour's own outbound
   Linear resets over the same window are a clue, not a confirmed cause (LIN-2993 comment
   `9e91955a`).
-- **The `422 UNKNOWN_REPO`, `knownRepos: []` refusal at ~19:42Z** (LIN-2993 comment
-  `9459e3d2`). This record does **not** attribute it to Linear slowness. A related but
-  distinct question — why the known-repos inventory stayed empty *after* recovery — was
+- **The `422 UNKNOWN_REPO`, `knownRepos: []` refusal, shortly before 19:36:53Z** (LIN-2993
+  comment `9459e3d2`). This record does **not** attribute it to Linear slowness. A related
+  but distinct question — why the known-repos inventory stayed empty *after* recovery — was
   investigated separately under LIN-3003 and closed as not-a-bug: John had deliberately
   removed the `repo=` lines from the Linear project descriptions, unrelated to this
   incident (LIN-3003, resolution comment `bf03d89f`). That closure explains the
@@ -129,7 +138,7 @@ silently rewording.
   above.
 - **Per-route behaviour before 19:25Z.** Railway returns no HTTP logs for removed
   deploys, so there is no way to see how individual routes behaved at the ~19:15Z onset
-  (LIN-2993 comment `9e91955a`, "What I couldn't establish").
+  (LIN-2993 comment `ba819bcd`, "What I couldn't establish").
 
 ## Follow-ups
 

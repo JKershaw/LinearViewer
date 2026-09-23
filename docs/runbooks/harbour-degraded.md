@@ -11,14 +11,15 @@ placeholder until its ticket lands.
 1. **Stop your own polling first.** Whatever loop or script is watching Harbour, stop it
    before doing anything else (LIN-2993 description).
 2. **Do not cascade-abort as a first move.** On 2026-09-22 a precautionary cascade abort
-   queued 19 aborts for 2 running sessions and made the incident *worse*: each aborted
-   session was counted as errored, and the observation feed's per-session Linear lookup
-   for each one produced 546–573 s holds (LIN-2994; LIN-2993 comment `1fbe8f73`). This
-   contradicts the "harmless"/"safe no-op" wording still live in
-   `docs/dispatch-integration.md:591`, `docs/dispatch-integration.md:592` and
-   `lib/proxy-instructions.js:710` — that correction belongs to **LIN-2998** and is not
-   made here; treat a cascade abort as **not safe** while Harbour is degraded, whatever
-   those three say.
+   queued 19 aborts for 2 running sessions; each aborted session was counted as errored,
+   and the observation feed's resulting per-session Linear lookups added a burst of load
+   on top of the feed request that was already hanging on the degraded Mongo link — an
+   **amplifier, not the trigger**, of the 546–573 s holds (LIN-2994, LIN-2998; LIN-2993
+   comments `ba819bcd`, `825a549b`). This contradicts the "harmless"/"safe no-op" wording
+   still live in `docs/dispatch-integration.md:591`, `docs/dispatch-integration.md:592`
+   and `lib/proxy-instructions.js:710` — that correction belongs to **LIN-2998** and is
+   not made here; treat a cascade abort as **not safe** while Harbour is degraded,
+   whatever those three say.
 3. **Pause/halt is [unbuilt: LIN-2994, LIN-2995].** There is no in-system way to pause a
    workspace or a runner today. The only way to stop the runner right now is **on the
    host** (stop or kill the dispatcher process directly).
@@ -32,7 +33,7 @@ Railway CLI** — the agent environment carries no `RAILWAY_TOKEN` or Railway AP
 mechanically** — there is no code-level guard preventing a write command.
 
 **Allowed (read-only):**
-- `railway deployment list`, `railway deployment status <id>`
+- `railway deployment list`
 - `railway logs`, `railway logs --http`, `railway logs -s <service>`
 - `railway metrics --raw`
 - Read-only `mongosh` via `railway run -s MongoDB-harbour -- mongosh "$MONGO_URL" --quiet --eval "..."`,
@@ -48,14 +49,15 @@ mechanically** — there is no code-level guard preventing a write command.
   `8b2bcfa4`). The relaxation is bounded to those specific reads; it does not extend to
   any other `railway run` use.
 
-**Forbidden:** restart, redeploy, rollback, scale, variable changes, DB writes, index
-builds, `railway up`, any other `railway run` invocation, printing secrets, opening PRs
-or making edits. Minimise probes against harbour.cat itself. End with a **Findings**
-comment on the incident ticket.
+**Forbidden:** restart, redeploy, rollback, scale, variable changes, `railway variables`
+output, DB writes, index builds, `railway up`, any other `railway run` invocation,
+printing secrets or connection strings, opening PRs or making edits. Minimise probes
+against harbour.cat itself. End with a **Findings** comment on the incident ticket.
 
 **Getting a second pass:** a dispatch with `followUpTo` set to the investigator's own
-dispatch id resumes that same session with a new instruction, delivered at its next
-poll — this is how the 2026-09-22 investigator got the `mongosh` follow-up mid-incident.
+dispatch id resumes that same session with a new instruction, delivered via the Stop
+hook at the session's next stop — this is how the 2026-09-22 investigator got the
+`mongosh` follow-up mid-incident.
 
 ## Logs and metrics
 
@@ -65,14 +67,14 @@ poll — this is how the 2026-09-22 investigator got the `mongosh` follow-up mid
 - **Caveat:** Railway drops log lines above 500/s, which can destroy the exact evidence
   an incident needs (LIN-2232).
 - **Caveat:** Railway serves no HTTP logs for a deploy that has since been removed, so
-  per-route behaviour from before the most recent couple of deploys is not recoverable
-  (LIN-2993 comment `7905184c`).
+  per-route behaviour from before the incident's onset is not recoverable (LIN-2993
+  comment `ba819bcd`, "What I couldn't establish").
 
 ## Reading Railway's graphs
 
 | What you see | What it actually means |
 |---|---|
-| A deploy marker on the graph | The container's **creation** time, not go-live — the container typically serves ~8 minutes later. Use `railway deployment status <id>` / `railway logs <id>` for real start/stop times (LIN-2993 comment `7905184c`) |
+| A deploy marker on the graph | The container's **creation** time, not go-live — the container typically serves ~8 minutes later. Use `railway deployment list` / `railway logs <id>` for real start/stop times (LIN-2993 comment `7905184c`) |
 | A step up in the memory graph | Can be two containers **overlapping during a deploy handover**, not a leak — the graph sums both (LIN-2993 comment `1fbe8f73`) |
 | p99 latency capped at ~30 s | Railway's own edge cap, not the true hold time — real holds reached 595 s on 2026-09-22. Use `railway logs --http` for actual request duration (`1fbe8f73`) |
 | Requests graph drops to ~0 | Can be a partial final bucket, not a real collapse — check per-minute `railway metrics --raw` before calling it a drop (`1fbe8f73`) |
@@ -90,12 +92,13 @@ Quoted as written, from the incident's authoritative remedy (LIN-2993 comment
 
 That remedy doesn't state a general rollback rule. **The following is this runbook's own
 inference**, not a direct quote, drawn from `9e91955a`'s Evidence 1 (the failures began
-on the *previous* container; the new deploy's go-live came after onset) and LIN-2993
-comment `7905184c` (deploy markers lag go-live by ~8 minutes): if a deploy's actual
-go-live time is *before* the onset of the degradation, it's unlikely to be the cause, so
-restarting the current service is more likely to help than rolling back to the one
-before it. Check go-live via `railway deployment status`/`railway logs <id>`, not the
-graph marker.
+on the *previous* container; `a5f4383`'s go-live at 19:25:38Z came *after* the ~19:15Z
+onset, which is why it was ruled out) and LIN-2993 comment `7905184c` (deploy markers lag
+go-live by ~8 minutes): a deploy whose actual go-live time comes *after* onset is ruled
+out as the cause, the way `a5f4383` was. Only a deploy whose go-live *precedes* onset is
+a rollback candidate — restart the current service rather than rolling back unless you
+can show the deploy before it actually predates onset. Check go-live via `railway
+deployment list`/`railway logs <id>`, not the graph marker.
 
 **Both restart and rollback are John's call** (LIN-2993 description: "Restart, redeploy,
 rollback, variable changes and database writes are John's call. The agent recommends; it
