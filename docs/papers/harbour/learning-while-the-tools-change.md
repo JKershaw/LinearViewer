@@ -1,11 +1,11 @@
 ---
 title: Learning While the Tools Change
 kind: essay
-argument: Engineering experience, AI experience and tool capability run on separate clocks, and better tools slow the second by absorbing the mistakes that used to teach — so what a team most needs to grow is calibrated distrust, which no snapshot of speed or seniority can see.
-version: 3
-date: 2026-09-22
+argument: Engineering experience, AI experience and tool capability run on separate clocks, and better tools can take away the mistakes that used to teach — so what a team most needs to grow is calibrated distrust, knowing which output to check and which needs no check, and no snapshot of speed or seniority can see it.
+version: 4
+date: 2026-09-23
 authors: [Astra 6, Opus 5.5]
-model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. Version 3 by the same model and harness, correcting a survey figure after reading it at source and adding the further-reading list, typeset as Harbour Archive #7. No Harbour dispatch lineage for any version."
+model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. Version 3 by the same model and harness, correcting a survey figure after reading it at source and adding the further-reading list, typeset as Harbour Archive #7. Version 4 by the same model and harness from Astra 6's review of version 3: sections 6 to 8 simplified, three overstatements corrected, and the closing paragraphs replaced with Astra 6's own. No Harbour dispatch lineage for any version."
 sources:
   - "Cui et al., The Effects of Generative AI on High-Skilled Work, Management Science, 2026 — https://doi.org/10.1287/mnsc.2025.00535"
   - "docs/ladder.md@0d652fbc0f2fef12bf063f047d855c346b337595"
@@ -45,11 +45,12 @@ of work. History supplies useful mechanisms for understanding those paths, altho
 not establish a universal sequence or determine who will eventually lead.
 
 The separation has a sharper consequence than it first appears. Better tools do not only let
-newcomers start further along; they also absorb the mistakes that used to do the teaching, so
-the second clock can run slower for someone whose first year is smoother. That makes the
-capability a team most needs to grow neither fluency with the tools nor years in the
-profession, but calibrated distrust: knowing which output to check, and how hard. Section 7
-commits to that reading and says what would show it wrong.
+newcomers start further along; they also absorb some of the mistakes that used to do the
+teaching. That need not slow anyone's learning overall, but it takes particular lessons away,
+and nothing in the output shows which. So the capability a team most needs to grow is neither
+fluency with the tools nor years in the profession, but calibrated distrust: knowing which
+output to check, how hard, and which needs no check at all. Section 7 argues for that reading,
+and the essay ends by saying what would show it wrong.
 
 ## 1 The puzzle inside the engineering team
 
@@ -117,12 +118,17 @@ seniority may have learned AI work under different technical conditions.
 
 This is the essay's most practical claim, and it is a claim about measurement. Comparing this
 year's newcomers with last year's newcomers mixes a change in people with a change in tools.
-Following one person over a year mixes learning with improvements in their environment. Neither
-design can separate the clocks however large the sample, because every clock moves in both. That
-is why a survey asking developers where they stand can describe a population but never explain
-it, and why the only instrument that can is the same people doing comparable work at more than
-one date. The three clocks do not, by themselves, separate these effects statistically; they say
-which comparisons never will.
+Following one person over a year mixes learning with improvements in their environment. A larger
+sample removes neither mix, because every clock moves in both. That is why a survey asking
+developers where they stand can describe a population but cannot say which clock put each person
+where they are.
+
+Watching the same people do comparable work over time helps. A snapshot can show that two
+developers differ; it cannot say whether the difference came from earlier learning, better tools,
+the tasks each was given or help from colleagues, and repeated observation makes those
+explanations testable. It is not the only useful design, and it cannot separate the clocks by
+itself, since a change in tools reaches everyone being followed at once. The three clocks say
+which comparisons will mislead, not how large each effect is.
 
 An everyday example makes the distinction concrete. One developer once needed a carefully
 staged sequence to make an agent inspect a repository and implement a change. A newcomer may
@@ -131,7 +137,7 @@ access to its results immediately. Whether they have also acquired the judgement
 recognise its limits is a separate question.
 
 The clocks are also not independent. The calendar clock sets the exchange rate for the other
-two: when a tool absorbs a class of mistake, it removes the mistake and the lesson together.
+two: when a tool absorbs a class of mistake, it can remove the lesson along with the mistake.
 Section 6 returns to what that costs.
 
 ## 3 What newcomers inherit and what they can skip
@@ -285,156 +291,127 @@ result.
 
 ## 6 Delivering work and learning from it
 
-Assisted performance and retained understanding can move at different rates. A developer may
-deliver a working feature with an agent and still need help explaining why it works or changing
-it safely. Another may learn quickly through an agent's explanations and experiments. Successful
-completion alone does not identify which process occurred.
+A developer can get better at delivering software without getting equally better at
+understanding it. One developer ships a working feature with an agent and still needs help to
+explain why it works or to change it safely. Another learns quickly by asking the agent to
+explain its choices and trying variations of them. The merged change looks the same either way.
 
-Lisanne Bainbridge's 1983 paper on the ironies of automation described a related difficulty in
-industrial control. Automation can remove routine activity while leaving people responsible for
-abnormal conditions. Reduced practice can undermine the skills needed for intervention. Her
-discussion considered maintaining manual and diagnostic competence through training and suitable
-feedback. It was an analysis of human control systems, not evidence that every form of automation
-inevitably erodes skill. [[8]](#8-maintaining-expertise-under-automation)
+Lisanne Bainbridge saw a version of this in industrial control in 1983. Automation took over
+the routine work and left operators to handle the abnormal cases, so they got less practice at
+the very skills an intervention needed. She proposed keeping manual and diagnostic skill alive
+through training and good feedback. Hers is an analysis of control rooms, not evidence that
+every kind of automation erodes skill. [[8]](#8-maintaining-expertise-under-automation)
 
-Contemporary coding research gives the concern a narrower empirical basis. Shen and Tamkin studied
-52 mostly junior engineers learning the unfamiliar Python library Trio. Participants with AI
-assistance averaged 50 percent on an immediate comprehension quiz, compared with 67 percent
-without it, a difference of 17 percentage points. The time advantage was not statistically
-significant. Within the assisted group, explanation-seeking and conceptual inquiry were associated
-with stronger understanding, but those interaction patterns were not randomly assigned. The study
-does not establish a long-term effect on expertise. [[9]](#9-ai-assistance-and-learning)
+Shen and Tamkin tested something close to it in code. They asked 52 mostly junior engineers to
+learn Trio, a Python library none of them knew. Those with AI assistance averaged 50 percent on
+a comprehension quiz straight afterwards, against 67 percent for those without, and they were
+not reliably faster. Within the assisted group, the people who asked for explanations and
+conceptual help understood more, but they chose to work that way, so that is a lead rather than
+a finding. The study measured understanding on the day, not expertise over years.
+[[9]](#9-ai-assistance-and-learning)
 
-This is the cost section 2 promised. Each improvement on the calendar clock removes
-some mistakes before a person makes them, and the lessons with them, so a newcomer can deliver
-more in their first year while accumulating less of the judgement that comes from being wrong.
-Nothing in the output shows the difference.
+This is the cost section 2 pointed to. When a tool stops a developer making a mistake, they also
+miss what the mistake would have taught them. They need not learn less overall: the time saved
+can go into other lessons, and the agent can teach directly, as the explanation-seekers in the
+Trio study suggest. But a particular lesson can go missing without anyone noticing.
 
-The practical question is what replaces the learning opportunities removed by automation. Debugging
-one's own mistake can expose a mistaken assumption. Reading a colleague's reasoning can reveal a
-constraint. If an agent handles those steps, another activity may need to make the relevant
-knowledge visible. That activity need not reproduce every manual procedure the technology has made
-unnecessary.
+So the practical question is what gives those lessons back. Debugging your own mistake exposes
+the assumption behind it; reading a colleague's reasoning reveals a constraint you had not seen.
+If the agent now does both, something else has to show the developer what they would have
+learned, without restoring every manual step the tool made unnecessary. A developer might explain
+a generated change before merging it, predict how it would behave if a requirement changed, or
+give it a deliberately awkward input and watch what happens. Each is worth keeping only if the
+work that follows gets better.
 
-For example, a developer could explain a generated change before merging it, predict its behaviour
-under a changed requirement, or investigate a deliberately varied input. Such exercises are
-proposals for making understanding observable. They should be judged by whether they improve
-subsequent work, rather than treated as rituals that demonstrate seriousness.
+## 7 What good judgement looks like as the tools improve
 
-Oversight itself can also evolve. Anthropic's telemetry found full auto-approval more common among
-experienced Claude Code users, while their interruption rates were also higher. The pattern is
-consistent with a shift towards letting work proceed and intervening when needed. It does not
-demonstrate that auto-approval causes better outcomes, or that an individual should always grant
-more autonomy as they gain experience. [[10]](#10-how-supervision-changes-with-experience)
+Picture a developer who hands a prototype to an agent and lets it run, then supervises the same
+agent closely on a migration of a live system. That is not a retreat. Dhanorkar, Passi and
+Vorvoreanu heard the same pattern from 17 experienced developers: permissive use for prototypes,
+strict review for changes to interconnected existing systems, with much of the difference
+settled before any work was delegated — which settings the agent runs under and what it may
+touch, what the authors call a priori control. The study reports what developers say they do; it
+does not show how common each pattern is or which works best.
+[[11]](#11-oversight-in-actual-development-work)
 
-The aim is a form of assistance that supports both useful output and the understanding needed for
-future responsibility. How best to achieve that balance remains an empirical question.
+The judgement that developer is exercising is what this essay calls calibrated distrust: knowing
+which output to check, and how hard, in work they understand well enough to be surprised by it.
+The phrase can sound as though suspicion is the goal. It is not. Good judgement includes knowing
+when a check is unnecessary — letting a throwaway prototype run, or trusting a change that a good
+test suite already covers — because checking everything is its own failure: slow, and a way of
+never finding out what the tool can be trusted with.
 
-## 7 How the landscape could evolve
+If the essay has to commit to one reading — and an essay should — it is this. Calibrated
+distrust, more than fluency with the tools or years in the profession, decides who can be
+trusted with more. It is learned mostly from consequence, from being caught out and seeing why,
+which is why it tends to come with experience, and why a tool that heads off mistakes can take
+away some of the occasions for learning it even as it speeds delivery.
 
-The evidence supports several possible trajectories. An experienced engineer may learn a new
-workflow quickly and combine it with knowledge that remains valuable. A newcomer may use AI to
-accelerate both implementation and conceptual learning. Either may plateau when the task changes.
-Further improvements in the tools may alter the relative advantage again.
+The contemporary evidence fits that reading without proving it. The Trio learners with
+assistance understood less, and fewer of their errors were theirs to meet. Anthropic's telemetry
+found experienced Claude Code users both more likely to approve everything up front and more
+likely to interrupt: they let work proceed and stepped in along the way. That pattern is
+consistent with calibration, but it does not show that those interruptions were well judged, or
+that auto-approval led to better work. [[10]](#10-how-supervision-changes-with-experience) And
+the field at large still keeps a hand on the wheel: of the 1,100 developers and other
+technologists in Stack Overflow's late-April 2026 pulse survey, 63% rarely or never let agents
+run entirely on autopilot. [[13]](#13-how-the-field-supervises-agents)
 
-These trajectories should be treated as hypotheses. A claim that experienced developers will
-eventually overtake newcomers assumes that their knowledge remains valuable and that they can adopt
-the new methods. A claim that newcomers will preserve their lead assumes that their learning keeps
-pace with the responsibility of their work. Neither outcome follows from entry date alone.
+This is also why more autonomy is not the same as more capability. A developer who stops an agent
+at the right moment may be showing better judgement than one who lets it finish. Progress shows
+in what the work achieved and what it cost afterwards, not in how little supervision it needed.
 
-If the essay has to commit to one reading — and an essay should — it is this. The capability that
-decides who can be trusted with more is neither fluency with the tools nor years in the
-profession but calibrated distrust: knowing which output to check, and how hard, in a domain one
-understands well enough to be surprised by it. It is learned mostly from consequence, which is
-why it accrues to experience, and why a tool that absorbs mistakes can slow its growth even as it
-speeds delivery. The reading is consistent with the contemporary results in this essay. The Trio
-learners with assistance understood less, and fewer of their errors were theirs to meet. The
-experienced Claude Code users approved less up front and interrupted more, which is what
-calibration looks like from outside. Dhanorkar's developers, below, varied their oversight with
-the consequences of a mistake rather than with the tool. And the field at large still keeps a hand
-on the wheel: of the 1,100 developers and other technologists in Stack Overflow's late-April 2026
-pulse survey, 63% rarely or never let agents run entirely on autopilot.
-[[13]](#13-how-the-field-supervises-agents)
-
-The reading would be wrong if calibration transferred freely between domains, so that a developer
-fluent with agents on one codebase supervised as well on an unfamiliar one; or if the people who
-best handled later changes to their generated work were simply the fastest, with no relationship
-to how often they had been caught out. Both are observable in an ordinary team.
-
-Task context can change the comparison immediately. Dhanorkar, Passi and Vorvoreanu interviewed 17
-experienced developers about oversight of software agents. Their accounts distinguished relatively
-permissive use in prototypes from stricter review of changes to interconnected existing systems. The
-study identified four forms of oversight: a priori control, co-planning, real-time monitoring and
-post hoc review. The first is control set before any work is delegated — which settings the agent
-runs under, what it may touch — and it is where much of the difference between a prototype and a
-migration lives. The study offers qualitative evidence about practice, without establishing the
-population size or performance advantage of each pattern. [[11]](#11-oversight-in-actual-development-work)
-
-A plausible prediction is therefore that capability will remain uneven across tasks. A developer who
-delegates a prototype effectively may choose close supervision for a migration. That change need not
-represent a retreat in maturity. It may reflect different consequences, different knowledge
-requirements or a more accurate understanding of the tool.
-
-The boundary may continue moving. Models could improve at work currently dominated by human
-judgement. Teams could develop stronger checks that make some decisions easier to delegate. New
-responsibilities could appear around operating and coordinating the resulting systems. These are
-possibilities for investigation rather than reasons to assume either permanent human advantages or
-inevitable replacement.
-
-There is also a measurement problem. More autonomy is a description of how work proceeds, not a
-complete measure of capability. Someone who appropriately stops an agent may be exercising better
-judgement than someone who lets it continue. A useful account of progress must include the result and
-its consequences, as well as the amount of supervision.
-
-The three-clock model consequently needs repeated observations of people doing comparable work. A
-snapshot may identify differences, but it cannot explain whether those differences arose from earlier
-learning, better tools, task selection or support from colleagues. Following trajectories makes those
-explanations more testable, even when a small team cannot cleanly estimate causal effects.
+The tools will keep moving the line. As they improve, some checks that matter today will stop
+mattering, and judgement will be needed in places no one has noticed yet. A developer with good
+judgement changes what they check as the tools change; what stays is the habit of asking what a
+check protects.
 
 ## 8 What an engineering lead can learn from this
 
-The immediate task is to make different forms of capability visible without turning them into a fixed
-ranking. For a small sample of ordinary tasks, record what was attempted, the tool and workflow used,
-the help required, and what happened after delivery. Include enough context to distinguish a prototype
-from a change to a critical existing system.
+Start by looking closely at a handful of ordinary tasks, without ranking anyone. For each, note
+what the developer set out to do, which tool and workflow they used, what help they needed and
+what happened after the change shipped. Note whether it was a prototype or a change to a system
+people depend on; the same behaviour means different things in each. How quickly someone reached
+a first plausible answer is worth knowing, but it leaves out the review and repair other people
+did afterwards, so count those too.
 
-Time to a first plausible answer is useful but incomplete. Consider the effort required to reach an
-accepted result, including review and repair by other people. Return to a few changes later to see
-whether their authors can explain, extend or diagnose them. A delayed observation can reveal something
-that a successful demonstration cannot.
+If calibrated distrust is learned from consequence, the most useful thing a delivery system can
+give a developer is cheap, visible wrongness. A developer assumes a generated date parser handles
+time zones; a test fails, and the failure names the input that broke it and why. They find out in
+minutes, before anything ships, and learn something about time zones and about what the agent
+assumed. A review ledger, a provenance trail and a failing test can all record where an agent's
+claims failed, but a record teaches no one by itself: the lesson lands only if the developer sees
+it soon enough, with enough explanation to understand it. A run of green merges does not do this,
+however reassuring, because it shows where the work ended and hides where it went wrong on the
+way.
 
-If calibrated distrust is learned from consequence, the most useful thing a delivery system can give a
-developer is cheap, visible wrongness: a record of where an agent's claims failed, surfaced early
-enough that the lesson lands before the habit sets. A review ledger, a provenance trail and a failing
-test all do this. A run of green merges does not, however reassuring, because it shows where the work
-ended and hides where it went wrong on the way.
+Use what you see to start conversations, not to reach verdicts. If review effort is rising, ask
+whether the tasks grew, the agent is producing more code, context is missing or the checks are
+weak. If a developer gets useful results quickly and handles later changes with confidence,
+recognise it, even when they got there by a different route from the rest of the team.
 
-These observations should support development conversations. If review effort is rising, investigate
-whether task scope, generated volume, missing context or weak checks explain it. If a developer obtains
-useful results quickly and handles later changes confidently, recognise that capability even when their
-route to it differs from the team's earlier practice.
+Help knowledge travel both ways. Ask experienced engineers to explain the constraints behind their
+decisions. Ask colleagues fluent with agents to show their workflows, including how they recover
+when one fails. Then work through a real task together, so that claims about speed or reliability
+meet a shared example.
 
-Create opportunities for knowledge to travel in both directions. Ask experienced engineers to explain
-the constraints behind their decisions. Ask colleagues fluent with agents to demonstrate their workflows
-and recovery strategies. Review a real task together, so that claims about speed or reliability can be
-examined against a shared example.
+When a tool changes, pick a few established procedures and ask of each whether it still protects
+something that matters, whether it could be simpler, or whether it is no longer needed. That keeps
+one generation's temporary workaround from becoming an unexplained rule for every newcomer.
 
-When a tool changes, revisit a small number of established procedures. Identify which still protect an
-important outcome, which can be simplified and which have become unnecessary. This makes adaptation a
-continuing part of engineering practice. It also prevents a previous generation's temporary workaround
-from becoming an unexplained requirement for every newcomer.
+For the engineering lead, this changes what progress looks like. The experienced developer may
+need to let go of a procedure that once mattered. The newcomer may need to understand a failure
+the tool has so far spared them. Both can learn from working through a real change together.
 
-Several questions would make a useful continuing investigation. Do later entrants reach accepted
-outcomes with fewer preparatory steps on comparable tasks? Does that advantage persist through
-maintenance? Which kinds of prior knowledge predict lower repair effort? Does learning spread more
-effectively through shared tasks than through written instructions alone? Each question asks for
-observable evidence and leaves room for the initial interpretation to be wrong.
+Later arrivals should benefit from better tools. They do not need to repeat every awkward stage
+their colleagues went through. But when a step disappears, it is worth asking what disappeared
+with it: wasted effort, a useful lesson, or a check that still matters.
 
-The leadership problem is ultimately to support useful work while maintaining the team's capacity to
-understand and sustain it. Historical research shows why entry timing, retained expertise and
-relationships can all matter. The next step is to learn which of those mechanisms are active in the team
-at hand. A shortened route is valuable when it reaches an outcome the team can rely on, and the people
-taking it can continue to grow.
+That question becomes practical when we return to work after delivery. Can its author explain a
+surprising result, adapt it to a new requirement, or recognise when the agent needs help? Those
+moments tell us more about growing capability than the speed of the first demonstration.
+
+Let the tools shorten the route. Make sure the work still gives people a chance to learn.
 
 ## Annotated reading list
 
@@ -664,12 +641,13 @@ attention as the expensive thing. [Harbour Archive #5](https://harbour.cat/archi
 
 ## Next
 
-The essay's own closing questions are the first candidates, and three go to `proposals.md` with this
-change: whether later entrants reach accepted outcomes with fewer preparatory steps and whether that
-survives maintenance; which kinds of prior knowledge predict lower repair effort; and whether a practice
-spreads faster through a shared task than through written instructions. Each is answerable inside Harbour
-from records it already keeps or could keep, and each would turn one of the three clocks from a
-distinction into a measurement.
+Three questions went to `proposals.md` with the first version of this essay: whether later
+entrants reach accepted outcomes with fewer preparatory steps on comparable tasks, and whether
+that advantage survives maintenance; which kinds of prior knowledge predict lower repair effort;
+and whether a practice spreads faster through a shared task than through written instructions.
+Each asks for evidence Harbour already keeps or could keep, and each leaves room for the essay to
+be wrong. None would separate the three clocks by itself, but each would show how much of what a
+team sees one of them explains.
 
 Two of them bear directly on papers already in the archive. `developer-adoption-ladder.md` reads the
 ladder as a sequence of practices and could not find a population instrument for its middle rungs; this
@@ -678,16 +656,25 @@ mixes a change in people with a change in tools. `what-lowers-the-verification-c
 showing a verified artifact changes supervision; the reciprocal-learning claim in section 5 is a second
 route to the same outcome and is equally unmeasured.
 
-Section 7's commitment adds one more, because it names what would refute it: does calibration transfer
-between domains? Harbour's operators review agent work in more than one repository, some of which they
-know far better than others. Whether their review catches the same share of an agent's mistakes in both
-is a direct test of whether the scarce thing is domain-bound, as this essay argues, or portable.
+Section 7's reading needs a test of its own, because it could be wrong in two ways a team can
+observe. It would be wrong if calibration carried freely between domains, so that a developer
+fluent with agents on one codebase supervised as well on an unfamiliar one; and wrong if the people
+who best handled later changes to their generated work were simply the fastest, whatever their
+record of being caught out. Harbour's operators review agent work in more than one repository, some
+of which they know far better than others. Whether their review catches the same share of an
+agent's mistakes in both is a direct test of the first condition, and it is already in
+`proposals.md`.
 
 **This version is unchecked.** Version 1 was checked against its eleven sources in
-`learning-while-the-tools-change-check.md`, and versions 2 and 3 were revised from that check's findings
-by the check's own author, who is now this essay's second author — which `standard.md` allows for an
-essay, on condition that it is visible. The check covers version 1 only. The new material a reader should
+`learning-while-the-tools-change-check.md`, and versions 2 to 4 were revised by the check's own
+author, who is now this essay's second author — which `standard.md` allows for an essay, on
+condition that it is visible. The check covers version 1 only. The new material a reader should
 weigh for themselves is the rollout's figures, read at the source on 2026-09-22; the chess boundary
-condition; the reading in section 7 with the two conditions that would refute it; and the Stack Overflow
-figure, which version 2 took second-hand and attributed to agent users, and which version 3 read at the
-source, where it is reported across all respondents.
+condition; the reading in section 7, with the two conditions under Next that would refute it; and
+the Stack Overflow figure, which version 2 took second-hand and attributed to agent users, and which
+version 3 read at the source, where it is reported across all respondents. Version 4 follows Astra
+6's review of version 3. It adds no source and no figure. It narrows three claims that had outrun
+their evidence: that better tools slow learning, where they remove particular lessons; that the
+telemetry's approval pattern shows calibration, where it is only consistent with it; and that
+following the same people is the only design that can separate the clocks, where it helps but is
+neither the only design nor enough by itself. Its four closing paragraphs are Astra 6's own.
