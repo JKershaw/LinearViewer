@@ -76,9 +76,9 @@ out({ label: 'HISTORICAL baseline (LIN-2996 803151fa, 2026-09-22, linearviewer, 
 const before = measureFind('BEFORE (reconstructed pre-digest shape) {prompt:0,feedbackDigest:0,feedbackVersion:0}', H, Q, { prompt: 0, feedbackDigest: 0, feedbackVersion: 0 });
 measureFind('NOT a baseline: {prompt:0} as of today (includes persisted digests the old app never read)', H, Q, { prompt: 0 });
 const after = measureFind('AFTER {prompt:0,feedback:0} (pipeline-loops.js:1358; includes feedbackDigest)', H, Q, { prompt: 0, feedback: 0 });
-classify(before, after);
+out(classify(before, after));
 const swipeBefore = measureFind('swipe BEFORE (reconstructed) = non-lean read minus digest fields (server.js:2748 pre-LIN-3013)', H, Q, { feedbackDigest: 0, feedbackVersion: 0 });
-classify(swipeBefore, after);
+out(classify(swipeBefore, after));
 const staleIds = H.aggregate([{ $match: Q }, { $match: { $expr: { $not: [FRESH] } } }, { $project: { _id: 1 } }]).toArray().map(x => x._id);
 measureFind(`one-time heal re-read {_id:$in(${staleIds.length})} {prompt:0} (pipeline-loops.js:1432-1434)`, H, { _id: { $in: staleIds } }, { prompt: 0 });
 const dg = H.aggregate([{ $match: Q }, { $group: { _id: null, withDigest: { $sum: { $cond: [{ $eq: [{ $type: '$feedbackDigest' }, 'object'] }, 1, 0] } },
@@ -90,5 +90,5 @@ measureAgg('/kpis proxy $group (kpi-stats.js:229-242)', d.getCollection('proxy-e
 measureFind('/kpis report-history find({}) (kpi-stats.js:916)', d.getCollection('report-history'), KPIS.reportHistory.filter, KPIS.reportHistory.projection);
 if (process.env.PLANT_ROW_LOSS === '1') { // local-only self-test of the classifier
   const planted = measureFind('PLANTED: after-projection with a hidden row filter', H, { ...Q, issueIdentifier: { $ne: null } }, { prompt: 0, feedback: 0 });
-  classify(before, planted);
+  out(classify(before, planted));
 }

@@ -55,6 +55,23 @@ test('LIN-3014 buildMeasureScript: throws if the template is missing the KPIS pl
   );
 });
 
+// LIN-3014 beat 3 production-run finding: classify() was changed to RETURN its
+// result (for unit-testability) rather than print it, but measure.template.js
+// still called it as a bare statement (`classify(before, after);`), so every
+// compare line was silently dropped from the production run's output — a real
+// mongosh script never throws on a discarded return value, so this shipped
+// past `npm run test:hermetic` (which never runs the generated script) and
+// was only caught by the actual production run producing no "compare" lines.
+test('LIN-3014 measure.template.js: every classify(...) call is wrapped in out(...), so its result is actually printed', () => {
+  const templateSource = readFileSync(join(repoRoot, 'scripts', 'lin3014', 'measure.template.js'), 'utf8');
+  // classify() RETURNS its result (that's what makes it unit-testable in
+  // isolation) — a bare `classify(a, b);` statement silently discards that
+  // return value in a real mongosh script (no throw, no lint, nothing).
+  // Every call site must read `out(classify(a, b));` instead.
+  const bareCallLines = templateSource.split('\n').filter((line) => /^\s*classify\(/.test(line));
+  assert.deepStrictEqual(bareCallLines, [], `found classify(...) call(s) not wrapped in out(...): ${JSON.stringify(bareCallLines)}`);
+});
+
 test('LIN-3014 build-measure end-to-end: the real measure.template.js accepts the real classify() splice cleanly', () => {
   const classifySource = readFileSync(join(repoRoot, 'scripts', 'lin3014', 'lib', 'classify.mjs'), 'utf8');
   const templateSource = readFileSync(join(repoRoot, 'scripts', 'lin3014', 'measure.template.js'), 'utf8');
