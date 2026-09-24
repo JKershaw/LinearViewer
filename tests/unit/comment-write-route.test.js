@@ -20,6 +20,9 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { createDashboardRoutes } from '../../routes/dashboard.js';
@@ -27,6 +30,8 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PROVIDER_NAME = 'comment-write-fake';
 const ISSUE_ID = 'LIN-901';
@@ -77,6 +82,65 @@ function makeFakeTaskDecisionsStore(overrides = {}) {
   return { store, calls };
 }
 
+// =============================================================================
+// LIN-2933: session-lane one-shot auth-recovery fixtures.
+// =============================================================================
+//
+// Credential-keyed (not count-keyed — see the ticket's research comment
+// `22a3db2b`, which found a count-keyed stub goes green on a client-only
+// retry that would have failed 5/5 on the real 2026-09-23 incident). Rejects
+// `createComment` for exactly the tokens named `rejectedTokens`, accepting
+// every other token. `issueWriteGuard` never rejects on credential grounds —
+// it exists so the route's two-call recovery shape (guard, then create) is
+// exercised without making guard a second independent credential gate; this
+// is what makes the plan's own call-count assertions ("issueWriteGuard/
+// createComment each called exactly twice") land exactly.
+function makeCredentialKeyedProvider({ name = 'linear', displayName = 'Linear', rejectedTokens = [] } = {}) {
+  const calls = { createComment: [], issueWriteGuard: [] };
+  const rejects = (token) => rejectedTokens.includes(token);
+  const authError = () => {
+    const err = new Error('Authentication required, not authenticated');
+    err.status = 401;
+    return err;
+  };
+  const provider = {
+    name,
+    ui: { displayName },
+    supports: (cap) => cap === 'createComment',
+    async issueWriteGuard(token) {
+      calls.issueWriteGuard.push(token);
+      return { id: 'iss-1', trashed: false, team: { id: 'team-x' } };
+    },
+    async createComment(token, issueId, body) {
+      calls.createComment.push(token);
+      if (rejects(token)) throw authError();
+      return { success: true, comment: { id: `c-${calls.createComment.length}`, body, createdAt: new Date().toISOString(), user: { name: displayName } } };
+    },
+  };
+  return { provider, calls };
+}
+
+// A fake `ownerCredentialStore`: `.get` always returns the same fixed
+// `record` (or `null`), regardless of how many times it's called — the
+// caller asserts the CALL COUNT itself to pin one-shot behavior (plan-review
+// R1's case (d): call-count-on-guard/create alone can't distinguish "no
+// loop" from "a loop that happened to stop here", but `store.get`'s count
+// can).
+function makeFakeOwnerCredentialStore(record) {
+  const calls = [];
+  const store = {
+    async get(accountId, urlKey, provider) {
+      calls.push({ accountId, urlKey, provider });
+      return record;
+    },
+  };
+  return { store, calls };
+}
+
+function makeRecoverySession({ accountId = 'acct-1', saveError = null } = {}) {
+  return { accountId, save: (cb) => cb(saveError) };
+}
+
 // LIN-2664 F2: the ORIGINAL create's ledger write fails once, then heals on
 // any later attempt — models a transient harbour-comments ledger outage that
 // has cleared by the time a dedupe-hit resubmission re-attempts the record.
@@ -94,14 +158,29 @@ function makeFlakyHarbourCommentsStore() {
   };
 }
 
-function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache } = {}) {
+// A plain (never-fails) harbour-comments ledger spy — LIN-2933 L2, close-out
+// ledger item `b1ab28d5`: used to prove a RECOVERED retry still runs the
+// shared success tail's ledger write exactly once, carrying the retry's own
+// comment id (never the original, failed attempt's).
+function makeSpyHarbourCommentsStore() {
+  const calls = [];
+  return {
+    calls,
+    async record({ urlKey, commentId }) {
+      calls.push({ urlKey, commentId });
+      return { urlKey, commentId, recordedAt: new Date().toISOString() };
+    },
+  };
+}
+
+function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, workspaceOverrides } = {}) {
   registerProvider(provider);
   const app = express();
   app.use(express.json());
 
   const workspaceRouter = createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: 'ws-token' };
+      req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: 'ws-token', ...workspaceOverrides };
       req.session = session || { accountId: 'acct-1' };
       next();
     },
@@ -116,6 +195,11 @@ function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, h
     // ready for beat 3 to wire it in; today it is silently ignored by the
     // destructure, which is exactly why those tests are red.
     sessionsFeedCache,
+    // LIN-2933: the session-lane one-shot auth-recovery store. null by
+    // default (every existing test above is unaffected — recovery is simply
+    // never eligible without one), injected explicitly by the recovery
+    // describe block below.
+    ownerCredentialStore,
   });
   app.use(workspaceRouter);
 
@@ -762,5 +846,244 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
 
     const afterWriteAgain = await getRulings(app);
     assert.equal(historyReads, 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
+  });
+});
+
+// =============================================================================
+// LIN-2933: session-lane one-shot auth-recovery, wired into this route's
+// catch. Approved plan (revision 3, comment `13cc8aaf`), folding in R1
+// (error boundary), R2 (production wiring pin) and R3 (provider attribution)
+// from the second plan-review verdict (comment `d3075231`).
+// =============================================================================
+describe('POST /workspace/:urlKey/api/comments/:issueId — session-lane auth recovery (LIN-2933)', () => {
+  const REJECTED_TOKEN = 'session-token-dead';
+  const FRESH_TOKEN = 'durable-token-fresh';
+
+  test('(a) a different durable credential exists → adopt, mirror, retry once, 201', async () => {
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'LIN-2933 recovery success' });
+
+    assert.strictEqual(status, 201);
+    assert.strictEqual(body.success, true);
+    assert.deepStrictEqual(calls.issueWriteGuard, [REJECTED_TOKEN, FRESH_TOKEN], 'guard runs on the original attempt and again on the retry');
+    assert.deepStrictEqual(calls.createComment, [REJECTED_TOKEN, FRESH_TOKEN], 'create runs on the original attempt and again on the retry');
+    assert.strictEqual(storeCalls.length, 1, 'exactly one durable point-read');
+  });
+
+  // LIN-2933 close-out ledger L2 (review `b1ab28d5`): a RECOVERED retry must
+  // run the SAME shared success tail (`finishCommentSuccess`) the original
+  // attempt would have — dedupe write, ledger record, and decision/task
+  // stamp — exactly once, keyed on the retry's own comment id. Mutation M10
+  // (the retry returning 201 directly, bypassing the tail) survives every
+  // other case in this file without this one.
+  test('(a2) L2: a recovered retry runs the shared success tail exactly once — ledger record (retry\'s comment id), one stamp, and dedupe on an identical re-press with no third createComment', async () => {
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const { store: dispatchQueueStore, calls: stampCalls } = makeFakeDispatchQueueStore();
+    const harbourCommentsStore = makeSpyHarbourCommentsStore();
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      dispatchQueueStore, harbourCommentsStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+    const payload = { body: 'LIN-2933 L2 recovered success tail', decisionLoopId: 'loop-l2', decisionId: 'd-l2' };
+
+    const first = await postComment(app, ISSUE_ID, payload);
+
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(first.body.success, true);
+    assert.deepStrictEqual(calls.createComment, [REJECTED_TOKEN, FRESH_TOKEN], 'the original attempt fails; the recovered retry is what actually creates the comment');
+    const retryCommentId = first.body.comment.id;
+
+    assert.strictEqual(harbourCommentsStore.calls.length, 1, 'exactly one ledger record for the recovered write');
+    assert.strictEqual(harbourCommentsStore.calls[0].commentId, retryCommentId, 'the ledger record must carry the RETRY\'s comment id, never a stale/absent original-attempt id');
+
+    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'exactly one decision stamp for the recovered write');
+    assert.deepStrictEqual(stampCalls.markDecisionAnswered[0], { itemId: 'loop-l2', urlKey: 'acme', decisionId: 'd-l2' });
+
+    // An identical resubmission must hit the dedupe cache the recovered
+    // retry just populated — 200/deduped:true, no third provider write, and
+    // no second recovery attempt (no second durable point-read either).
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true);
+    assert.strictEqual(second.body.comment.id, retryCommentId);
+    assert.strictEqual(calls.createComment.length, 2, 'the identical resubmission must not mint a third comment');
+    assert.strictEqual(storeCalls.length, 1, 'the dedupe hit must not attempt a second durable-credential read');
+    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'a deduped resubmission must not re-stamp — the recovered write already stamped it');
+  });
+
+  test('(b) the durable store holds the SAME dead credential → no recovery, classified 500, retryable:false', async () => {
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: REJECTED_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'LIN-2933 persistent auth failure' });
+
+    assert.strictEqual(status, 500);
+    assert.strictEqual(body.error, 'Failed to create comment');
+    assert.strictEqual(body.code, 'LINEAR_AUTH');
+    assert.strictEqual(body.category, 'auth');
+    assert.strictEqual(body.retryable, false, 'a final auth failure must never read as retryable — the client must not auto-resend it');
+    assert.match(body.detail, /Linear/);
+    assert.ok(!('message' in body), 'the raw upstream err.message must never be exposed');
+    assert.strictEqual(calls.issueWriteGuard.length, 1);
+    assert.strictEqual(calls.createComment.length, 1);
+    assert.strictEqual(storeCalls.length, 1, 'adopt was attempted — it just found nothing different');
+  });
+
+  test('(c) a `?source=` query param excludes recovery even when a different durable credential exists', async () => {
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+
+    const { status, body } = await call(app, 'POST', `/workspace/acme/api/comments/${ISSUE_ID}?source=linear`, { body: 'LIN-2933 source exclusion' });
+
+    assert.strictEqual(status, 500);
+    assert.strictEqual(body.code, 'LINEAR_AUTH');
+    assert.strictEqual(calls.issueWriteGuard.length, 1);
+    assert.strictEqual(calls.createComment.length, 1);
+    assert.strictEqual(storeCalls.length, 0, 'a `?source`-bound request never attempts recovery, regardless of what the durable store holds');
+  });
+
+  test('(d) the durable store holds a DIFFERENT credential that is ALSO rejected → one-shot recovery, classified 500, store.get called exactly once', async () => {
+    const ALSO_DEAD_TOKEN = 'durable-token-also-dead';
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN, ALSO_DEAD_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: ALSO_DEAD_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'LIN-2933 different-but-still-rejected' });
+
+    assert.strictEqual(status, 500);
+    assert.strictEqual(body.code, 'LINEAR_AUTH');
+    assert.strictEqual(body.retryable, false);
+    assert.deepStrictEqual(calls.issueWriteGuard, [REJECTED_TOKEN, ALSO_DEAD_TOKEN]);
+    assert.deepStrictEqual(calls.createComment, [REJECTED_TOKEN, ALSO_DEAD_TOKEN]);
+    assert.strictEqual(storeCalls.length, 1, 'a second rejection must not trigger a second adopt attempt — one-shot is structural, not counted on the retry');
+  });
+
+  test('(e) a failing session.save aborts the retry → classified 500, not a hang; guard/create called once (original only)', async () => {
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const app = buildApp({
+      provider,
+      session: makeRecoverySession({ saveError: new Error('session store down') }),
+      ownerCredentialStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'LIN-2933 failed session save' });
+
+    assert.strictEqual(status, 500);
+    assert.strictEqual(body.error, 'Failed to create comment');
+    // Not necessarily LINEAR_AUTH — a session-store failure is not an
+    // upstream-auth shape. classifyUpstreamError's INTERNAL_ERROR/internal/
+    // retryable:false fallback is expected and acceptable here (plan-review
+    // case (e)); the load-bearing assertion is that a response is sent at
+    // all, never a hang.
+    assert.strictEqual(body.category, 'internal');
+    assert.strictEqual(body.retryable, false);
+    assert.strictEqual(calls.issueWriteGuard.length, 1, 'the retry never runs — the save that must precede it failed');
+    assert.strictEqual(calls.createComment.length, 1);
+    assert.strictEqual(storeCalls.length, 1);
+  });
+
+  test("(f) a non-Linear provider's 401 names its own provider, never Linear, and recovery is skipped", async () => {
+    const JIRA_TOKEN = 'jira-token-dead';
+    const { provider, calls } = makeCredentialKeyedProvider({ name: 'comment-write-fake-jira', displayName: 'Jira', rejectedTokens: [JIRA_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: 'jira-token-fresh', tokenExpiresAt: Date.now() + 3600_000, provider: 'comment-write-fake-jira',
+    });
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      workspaceOverrides: { provider: 'comment-write-fake-jira', accessToken: JIRA_TOKEN },
+    });
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'LIN-2933 non-Linear provider attribution' });
+
+    assert.strictEqual(status, 500);
+    assert.strictEqual(body.code, 'LINEAR_AUTH', 'the code vocabulary is provider-agnostic by design — only the human string varies');
+    assert.match(body.detail, /Jira/);
+    assert.doesNotMatch(body.detail, /Linear/);
+    assert.strictEqual(calls.issueWriteGuard.length, 1);
+    assert.strictEqual(calls.createComment.length, 1);
+    assert.strictEqual(storeCalls.length, 0, 'recovery is gated to provider.name === "linear" — never attempted for a non-Linear provider');
+  });
+
+  // Plan-review implementation note 4 (not blocking, folded in anyway): a
+  // retried guard that reports the issue trashed gets the same 409 the main
+  // path gives, not a classified 500.
+  test('a retry whose guard reports the issue trashed gets the same 409 as the main path', async () => {
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+    provider.issueWriteGuard = async (token) => {
+      calls.issueWriteGuard.push(token);
+      return { id: 'iss-1', trashed: true, team: { id: 'team-x' } };
+    };
+    const { store: ownerCredentialStore } = makeFakeOwnerCredentialStore({
+      token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+
+    // The original attempt's guard reports trashed too — a direct 409, no
+    // provider auth rejection, so recovery is never even reached. Route the
+    // ORIGINAL attempt's failure through createComment instead, so recovery
+    // is entered, and only the RETRY's guard reports trashed.
+    let guardCalls = 0;
+    provider.issueWriteGuard = async (token) => {
+      guardCalls += 1;
+      calls.issueWriteGuard.push(token);
+      return guardCalls === 1
+        ? { id: 'iss-1', trashed: false, team: { id: 'team-x' } }
+        : { id: 'iss-1', trashed: true, team: { id: 'team-x' } };
+    };
+
+    const { status, body } = await postComment(app, ISSUE_ID, { body: 'LIN-2933 retried guard trashed' });
+
+    assert.strictEqual(status, 409);
+    assert.match(body.error, /trashed/i);
+    assert.strictEqual(guardCalls, 2);
+    assert.strictEqual(calls.createComment.length, 1, 'the retry never reaches createComment — the retried guard already terminated it');
+  });
+});
+
+describe('server.js production wiring pin (LIN-2933, plan-review R2)', () => {
+  const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+
+  test('server.js must wire ownerCredentialStore into createWorkspaceApiRoutes — otherwise recovery ships fully tested and permanently inert in production', () => {
+    assert.match(
+      SERVER_SRC,
+      /app\.use\(createWorkspaceApiRoutes\(\{[^}]*\bownerCredentialStore\b[^}]*\}\)\)/,
+      'server.js must wire ownerCredentialStore into createWorkspaceApiRoutes'
+    );
   });
 });

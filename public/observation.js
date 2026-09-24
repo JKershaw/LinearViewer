@@ -3169,6 +3169,25 @@ function composeDispatchPrompt(row, chosenAnswer) {
 // never-rejecting promise; the `gone`/`task-bound` branches return their own
 // hand-rolled `.then`/`.catch` chains, each of which already terminates in a
 // state mutation rather than a rethrow.
+//
+// LIN-2933: the message shown for a COMMENT-producing failure (the four
+// sites below that call this — NOT the issueless `onDispatchFailed` branch,
+// which never writes a comment and can never carry `err.code`). A
+// `LINEAR_AUTH` classification (workspace-api.js's comment route, since
+// LIN-2933) names the real cause and the action instead of the bare
+// "Failed to create comment" the route used to return; `err.detail` is
+// already provider-attributed at the source, so this never hardcodes
+// "Linear" and never regresses to naming the wrong backend for a Jira/GitHub
+// workspace. Every other failure keeps its existing generic text —
+// `session.js`/`scan.js`/Flight Companion are untouched by this change and
+// keep theirs too (this helper is only ever called from observation.js).
+function rulingReplyFailureMessage(err) {
+  if (err && err.code === 'LINEAR_AUTH' && err.detail) {
+    return err.detail + ' Sign in again and press once more.';
+  }
+  return 'reply failed: ' + err.message;
+}
+
 function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {}) {
   const { decision, anchor, disposition } = row || {};
   const pageUrlKey = observationData?.urlKey;
@@ -3324,7 +3343,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       },
       prompt,
       {
-        onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); },
+        onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
         onDispatchFailed: (err) => { console.error('Ruling reply (dispatch) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); },
         onPartialFailure: makePartialFailureHandler('resume the session'),
         onDispatchOk: onDelivered
@@ -3392,7 +3411,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
               onDelivered([downgradeNote, recordOnNote].filter(Boolean).join('; ') || null);
             });
         })
-        .catch((err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+        .catch((err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); });
     };
 
     if (effectiveEffect === 'record') {
@@ -3475,7 +3494,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
             });
             return startRun().then(onDelivered, (dispatchErr) => makePartialFailureHandler('start a run')(dispatchErr, startRun));
           })
-          .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+          .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); });
       });
   }
 
@@ -3509,7 +3528,7 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
         if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
         onDelivered();
       })
-      .catch((err) => { console.error('Ruling reply (task-bound comment) failed:', err); restore(); setFeedback('reply failed: ' + err.message, true); });
+      .catch((err) => { console.error('Ruling reply (task-bound comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); });
   }
 }
 

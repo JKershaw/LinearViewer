@@ -9,7 +9,7 @@
  * - Images: Proxy Linear-hosted images with auth
  */
 import { Router, json } from 'express';
-import { badRequest, jsonError, notFound, unauthorized } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, unauthorized, classifyUpstreamError } from '../lib/errors.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { createRoadmapRoutes } from './workspace-api-roadmap.js';
@@ -59,7 +59,9 @@ import { settleWithConcurrency } from './dashboard.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding, isActiveProviderLinear } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
+import { adoptDurableCredentialIfDifferent } from '../lib/suspect-credential-refresh.js';
+import { fingerprintCredential } from '../lib/credential-diagnostics.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
 // detector, and the shared issue-write validator — no rules re-inlined here.
@@ -307,9 +309,10 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
  * @param {Function} options.getOpenRouterSource - Helper to determine OpenRouter source
  * @param {Object} [options.taskDecisionsStore] - Task-keyed scan-decision store (LIN-2197)
  * @param {Object} [options.sessionsFeedCache] - Shared SWR cache for the rulings/sessions feed (LIN-2755); null → uncached deployment, invalidation is a no-op
+ * @param {Object} [options.ownerCredentialStore] - Durable owner-credential store (LIN-2933); null → the comment route's one-shot auth-recovery is disabled, not a hard dependency
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -1528,17 +1531,66 @@ ${goal}`
       return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`)
     }
 
-    try {
-      // test-token/testMockData branch (matches the codebase-wide `isTestMode`
-      // convention, e.g. fetchWorkspaceIssues above): a `/test/set-session`
-      // workspace carries no real provider binding, so the session-page e2e
-      // coupling specs (tests/e2e/session-page.spec.js) need a write double
-      // here rather than a live Linear GraphQL call — including no real
-      // `issueWriteGuard` to check trashed-ness against, so this mode skips
-      // that step entirely. Real (local/Linear-bound) workspaces are
-      // unaffected and keep the full guard below.
-      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
+    // test-token/testMockData branch (matches the codebase-wide `isTestMode`
+    // convention, e.g. fetchWorkspaceIssues above): a `/test/set-session`
+    // workspace carries no real provider binding, so the session-page e2e
+    // coupling specs (tests/e2e/session-page.spec.js) need a write double
+    // here rather than a live Linear GraphQL call — including no real
+    // `issueWriteGuard` to check trashed-ness against, so this mode skips
+    // that step entirely. Real (local/Linear-bound) workspaces are
+    // unaffected and keep the full guard below.
+    //
+    // Hoisted above the `try` (LIN-2933 plan-review implementation note 1):
+    // the recovery branch below runs from the outer `catch`, which cannot see
+    // a `const` declared inside the `try` — a bare read from there would
+    // throw a ReferenceError outside the inner error boundary and hang the
+    // request exactly the way an unguarded failed retry would.
+    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
 
+    // Dedupe key and attribution are pure — neither calls the provider — so
+    // both are computed once, up front, and reused unchanged by a recovered
+    // retry (LIN-2933): an identical resubmission must still hit the same
+    // dedupe entry, and the written body must not diverge between attempts.
+    const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment')
+    const attributedBody = `${body}\n\n— Ruling recorded via Harbour`
+
+    // Shared success tail (dedupe write + best-effort ledger + best-effort
+    // stamp + the 201 response). Used by both the original attempt and a
+    // LIN-2933 recovered retry, so a successful write reaches this exactly
+    // once per request, on whichever attempt produced it — never duplicated.
+    const finishCommentSuccess = async (commentCreate) => {
+      commentDedupe.set(key, commentCreate)
+
+      // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
+      // mirrors the stampDecisionAnswers discipline immediately below — a single
+      // attempt, caught and logged, never propagated, never retried. The comment
+      // already succeeded and is the durable half of this write; a ledger-write
+      // failure must never fail it.
+      if (harbourCommentsStore) {
+        try {
+          const newCommentId = commentCreate.comment?.id
+          if (newCommentId) {
+            await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId: newCommentId })
+          }
+        } catch (ledgerErr) {
+          console.error('Harbour-comments ledger record failed:', ledgerErr.message)
+        }
+      }
+
+      // Best-effort answer stamp(s) (LIN-1728 decision 1 / LIN-2197 Phase 5;
+      // factored into stampDecisionAnswers, shared with the dedupe-hit retry
+      // path above — LIN-2208). Failure is logged only: the comment already
+      // succeeded and is the durable half of this write; the stamp is a
+      // secondary annotation the rulings predicate tolerates missing (the
+      // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
+      // above is what makes an identical-text retry one such later attempt).
+      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache })
+      if (stampOk) decisionStampDedupe.set(key, true)
+
+      return res.status(201).json(commentCreate)
+    }
+
+    try {
       if (!isTestMode) {
         // Two-step trashed guard (LIN-1559): the capability check above cannot
         // speak for this route-internal read, so a provider that implements
@@ -1560,7 +1612,6 @@ ${goal}`
       // RAW, pre-attribution operator text (not the final attributed body,
       // composed below): an identical resubmission must hit the same cache
       // entry even though attribution makes the two *written* bodies diverge.
-      const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment')
       const prior = commentDedupe.get(key)
       if (prior) {
         // LIN-2208: the dedupe cache protects the COMMENT WRITE (never mint a
@@ -1600,8 +1651,7 @@ ${goal}`
       // Attribution (OQ2): a static fallback line, not a `provider.fetchViewer`
       // round-trip — see the plan's Attribution note for why. Reversible,
       // revisit as its own follow-up if the fallback proves unsatisfying.
-      const attributedBody = `${body}\n\n— Ruling recorded via Harbour`
-
+      //
       // Deliberately identifier-agnostic in test mode — it echoes whichever
       // :issueId the caller sent, so every spec's own seeded issueIdentifier
       // is accepted, not one hardcoded fixture.
@@ -1613,38 +1663,113 @@ ${goal}`
         return jsonError(res, 502, 'Comment was not created', { detail: commentCreate || null })
       }
 
-      commentDedupe.set(key, commentCreate)
+      return await finishCommentSuccess(commentCreate)
+    } catch (err) {
+      // LIN-2933: one-shot, server-side adopt-first recovery for a provider
+      // auth rejection. Bounded to the comment route's single consumer — see
+      // lib/suspect-credential-refresh.js's adoptDurableCredentialIfDifferent
+      // for what this can and cannot recover (a session copy superseded by a
+      // DIFFERENT durable credential, not a dead/byte-identical one; the
+      // latter is LIN-3018).
+      let errorToClassify = err
 
-      // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
-      // mirrors the stampDecisionAnswers discipline immediately below — a single
-      // attempt, caught and logged, never propagated, never retried. The comment
-      // already succeeded and is the durable half of this write; a ledger-write
-      // failure must never fail it.
-      if (harbourCommentsStore) {
-        try {
-          const newCommentId = commentCreate.comment?.id
-          if (newCommentId) {
-            await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId: newCommentId })
+      // Eligibility, all of which must hold before attempting recovery:
+      // - only ever a provider-auth rejection, never any other failure shape
+      // - never in test mode (no real credential store to recover from)
+      // - only when a store is actually wired in (production, or a test that
+      //   injects one — see server.js's production wiring below)
+      // - only for the workspace's own ACTIVE Linear binding: a `?source`-
+      //   bound request resolves a possibly-foreign binding's callScope, and
+      //   applyAccessTokenToWorkspace always mirrors onto the active slot —
+      //   mirroring a "different" credential found under a foreign binding's
+      //   identity onto the active slot would misauthenticate future
+      //   active-binding calls.
+      // - only Linear: the adopt arm only ever returns a credential for a
+      //   bare-token (Linear) provider (isBareTokenCredentialProvider).
+      const classification = classifyUpstreamError(err, provider.ui?.displayName ?? null)
+      const recoveryEligible = classification.category === 'auth'
+        && !isTestMode
+        && Boolean(ownerCredentialStore)
+        && !requestedSource
+        && provider.name === 'linear'
+
+      if (recoveryEligible) {
+        const adopted = await adoptDurableCredentialIfDifferent({
+          fingerprint: fingerprintCredential(token),
+          urlKey: workspace.urlKey,
+          ownerAccountId: req.session.accountId,
+          provider: provider.name,
+          store: ownerCredentialStore,
+        })
+
+        if (adopted) {
+          // Inner error boundary (plan-review R1): the route's outer `catch`
+          // is not itself inside a `try` from Express's point of view (a bare
+          // async handler, no `.catch(next)`), so a throw from mirror → save
+          // → retry would otherwise have no home but the logging-only
+          // `unhandledRejection` handler — no response sent, `restore()`
+          // never runs client-side, and a bulk Agree row hangs forever. Every
+          // throw in this inner sequence is caught here and reassigned to
+          // errorToClassify; it is NEVER re-thrown, so nothing below this
+          // point can escape the handler unresolved.
+          try {
+            applyAccessTokenToWorkspace(workspace, adopted.token, adopted.expiresAt)
+            await saveSession(req.session)
+
+            // Re-resolve the binding to pick up the freshly-mirrored token.
+            // `requestedSource` is null here (the eligibility check above),
+            // so this re-read is guaranteed to land on the same active
+            // binding `applyAccessTokenToWorkspace` just mirrored into.
+            const retried = resolveIssueBinding(workspace, requestedSource)
+
+            if (!isTestMode) {
+              const retryGuard = await retried.provider.issueWriteGuard(retried.callScope, issueId)
+              if (isTrashed(retryGuard)) {
+                // Same terminal outcome the main path gives a trashed issue —
+                // plan-review implementation note 4.
+                return jsonError(res, 409, 'Issue is trashed; refusing to comment on a deleted issue')
+              }
+            }
+
+            const retryCommentCreate = isTestMode
+              ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } }
+              : normalizeCommentWrite(await retried.provider.createComment(retried.callScope, issueId, attributedBody))
+
+            if (!retryCommentCreate.success || !retryCommentCreate.comment) {
+              // Unlike the main path's direct 502, a non-success shape here is
+              // treated as a thrown synthetic error so there is exactly one
+              // exit from this catch block downstream of it: the classified
+              // 500 below.
+              throw new Error('Comment was not created on retry')
+            }
+
+            return await finishCommentSuccess(retryCommentCreate)
+          } catch (recoveryErr) {
+            errorToClassify = recoveryErr
           }
-        } catch (ledgerErr) {
-          console.error('Harbour-comments ledger record failed:', ledgerErr.message)
         }
       }
 
-      // Best-effort answer stamp(s) (LIN-1728 decision 1 / LIN-2197 Phase 5;
-      // factored into stampDecisionAnswers, shared with the dedupe-hit retry
-      // path above — LIN-2208). Failure is logged only: the comment already
-      // succeeded and is the durable half of this write; the stamp is a
-      // secondary annotation the rulings predicate tolerates missing (the
-      // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
-      // above is what makes an identical-text retry one such later attempt).
-      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache })
-      if (stampOk) decisionStampDedupe.set(key, true)
+      // Credential fingerprint digest only (never token bytes), matching the
+      // proxy lane's `[credential-rejected]` logging convention. Logs
+      // errorToClassify, not the original err, so the log reflects what
+      // actually produced the response when recovery was attempted.
+      const loggedClassification = errorToClassify === err ? classification : classifyUpstreamError(errorToClassify, provider.ui?.displayName ?? null)
+      console.error('Workspace-api create comment error:', errorToClassify.message, {
+        code: loggedClassification.code,
+        category: loggedClassification.category,
+        credentialFingerprint: fingerprintCredential(token),
+      })
 
-      return res.status(201).json(commentCreate)
-    } catch (err) {
-      console.error('Workspace-api create comment error:', err.message)
-      return jsonError(res, 500, 'Failed to create comment')
+      // Never the raw upstream message (LIN-1511/LIN-2260): `detail`/`code`/
+      // `category`/`retryable` come from the classifier alone, attributed to
+      // the actual provider that rejected the write (plan-review R3) so a
+      // Jira/GitHub auth failure never reads as a Linear one. `retryable` is
+      // never locally overridden — `classifyUpstreamError` already returns
+      // `false` for an auth rejection, matching docs/proxy-integration.md's
+      // contract, whether recovery was skipped, found nothing, or was
+      // attempted and the retry (or the session save) itself failed.
+      return jsonError(res, 500, 'Failed to create comment', loggedClassification)
     }
   })
 

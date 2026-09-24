@@ -851,8 +851,19 @@ window.ReplyDelivery = (function () {
     });
   }
 
+  // LIN-2933: additively carries the route's classified error fields
+  // (`code`/`detail`/`category`/`retryable`, when the server sent them) onto
+  // the constructed Error, without changing `.message` — every existing
+  // caller that reads only `.message` is unaffected, and `session.js`/
+  // `scan.js` inherit the new fields for free.
   function errorFromResult(result) {
-    return new Error((result.data && result.data.error) || ('HTTP ' + result.status));
+    var data = result.data || {};
+    var err = new Error(data.error || ('HTTP ' + result.status));
+    if (data.code !== undefined) err.code = data.code;
+    if (data.detail !== undefined) err.detail = data.detail;
+    if (data.category !== undefined) err.category = data.category;
+    if (data.retryable !== undefined) err.retryable = data.retryable;
+    return err;
   }
 
   function doDispatch(opts, prompt) {
