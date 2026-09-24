@@ -1406,6 +1406,40 @@ describe(
         const [actual] = await loadDispatchHistory(collection);
         assert.deepStrictEqual(actual.terminalEntry, digestTerminal, 'a null feedbackVersion must normalize like a missing one (both -> 0), matching digest.version:0 as fresh');
       });
+
+      // LIN-3012 beat 4: closes the $type:'object' guard's coverage gap
+      // flagged in beat 3's mutation table. Dropping that guard is only
+      // BEHAVIOURALLY reachable when a non-object feedbackDigest could
+      // otherwise compare fresh on the version check alone: feedbackVersion
+      // is -1 (so $ifNull(feedbackVersion,0) normalizes to -1, since -1 is
+      // neither missing nor null) and feedbackDigest is a scalar (here the
+      // string 'x') whose dotted `.version` path resolves to missing, which
+      // $ifNull also normalizes to -1. -1 === -1, so WITHOUT the $type guard
+      // this row would be misread as fresh; WITH it, $type('$feedbackDigest')
+      // is 'string', not 'object', so FRESH_DIGEST is false and the row
+      // falls back to today's expression, same as every other non-fresh row.
+      test('$type guard: a non-object feedbackDigest whose version-only comparison would otherwise read fresh must still fall back', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('done', '[done] real answer (scalar digest must not shadow this)', new Date('2026-06-08T10:00:00.000Z'))
+        ];
+        await collection.insertOne({
+          _id: id,
+          feedback: rawFeedback,
+          feedbackVersion: -1, // normalizes to -1 via $ifNull (present, not null)
+          feedbackDigest: 'x' // scalar, not an object; .version path resolves missing -> -1 via $ifNull
+        });
+
+        const expected = await expectedTodayOutput(collection, id);
+        const [actual] = await loadDispatchHistory(collection);
+        assert.deepStrictEqual(
+          actual.terminalEntry,
+          expected.terminalEntry,
+          'a scalar feedbackDigest must never be read as fresh just because its (missing) .version happens to normalize equal to feedbackVersion'
+        );
+        assert.strictEqual(actual.feedbackCount, expected.feedbackCount);
+      });
     });
   }
 );
