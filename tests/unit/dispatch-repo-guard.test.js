@@ -85,20 +85,20 @@ describe('validateDispatchRepo (LIN-2886)', () => {
     assert.deepEqual(result, { ok: true, repo: 'anything', validated: false });
   });
 
-  test('fails OPEN when the provider does not support fetchProjects', async () => {
+  test('fails OPEN when the provider does not support fetchProjectsList', async () => {
     const provider = { supports: () => false };
     const result = await validateDispatchRepo({ repo: 'anything', provider, scope: null });
     assert.deepEqual(result, { ok: true, repo: 'anything', validated: false });
   });
 
-  test('fails OPEN when fetchProjects throws', async () => {
-    const provider = { supports: () => true, fetchProjects: async () => { throw new Error('upstream down'); } };
+  test('fails OPEN when fetchProjectsList throws', async () => {
+    const provider = { supports: () => true, fetchProjectsList: async () => { throw new Error('upstream down'); } };
     const result = await validateDispatchRepo({ repo: 'anything', provider, scope: null });
     assert.deepEqual(result, { ok: true, repo: 'anything', validated: false });
   });
 
-  test('fails OPEN when fetchProjects never settles, bounded by timeoutMs (test-injected, no dangling timer)', async () => {
-    const provider = { supports: () => true, fetchProjects: () => new Promise(() => {}) };
+  test('fails OPEN when fetchProjectsList never settles, bounded by timeoutMs (test-injected, no dangling timer)', async () => {
+    const provider = { supports: () => true, fetchProjectsList: () => new Promise(() => {}) };
     const start = Date.now();
     const result = await validateDispatchRepo({ repo: 'anything', provider, scope: null, timeoutMs: 20 });
     assert.deepEqual(result, { ok: true, repo: 'anything', validated: false });
@@ -106,7 +106,7 @@ describe('validateDispatchRepo (LIN-2886)', () => {
   });
 
   test('accepts and normalizes a URL form of a known repo, marking it validated', async () => {
-    const provider = { supports: () => true, fetchProjects: async () => ({ projects: projectsWithRepos }) };
+    const provider = { supports: () => true, fetchProjectsList: async () => projectsWithRepos };
     const result = await validateDispatchRepo({
       repo: 'https://github.com/JKershaw/LinearViewer.git',
       provider,
@@ -116,17 +116,17 @@ describe('validateDispatchRepo (LIN-2886)', () => {
   });
 
   test('refuses an unknown repo with the known-repos list, when the provider COULD answer', async () => {
-    const provider = { supports: () => true, fetchProjects: async () => ({ projects: projectsWithRepos }) };
+    const provider = { supports: () => true, fetchProjectsList: async () => projectsWithRepos };
     const result = await validateDispatchRepo({ repo: 'totally-unknown', provider, scope: 'tok' });
     assert.equal(result.ok, false);
     assert.deepEqual(result.knownRepos, ['LinearViewer']);
   });
 
-  test('passes the resolved scope/token through to fetchProjects', async () => {
+  test('passes the resolved scope/token through to fetchProjectsList', async () => {
     let receivedScope;
     const provider = {
       supports: () => true,
-      fetchProjects: async (scope) => { receivedScope = scope; return { projects: projectsWithRepos }; }
+      fetchProjectsList: async (scope) => { receivedScope = scope; return projectsWithRepos; }
     };
     await validateDispatchRepo({ repo: 'LinearViewer', provider, scope: 'the-scope-token' });
     assert.equal(receivedScope, 'the-scope-token');
@@ -140,13 +140,27 @@ describe('fetchKnownRepos (LIN-2974)', () => {
   ];
 
   test('a provider that can answer returns the deduped, non-null repo list', async () => {
-    const provider = { supports: () => true, fetchProjects: async () => ({ projects: projectsWithRepos }) };
+    const provider = { supports: () => true, fetchProjectsList: async () => projectsWithRepos };
     const result = await fetchKnownRepos({ provider, scope: 'tok' });
     assert.deepEqual(result, { ok: true, knownRepos: ['LinearViewer', 'simple-dispatcher'] });
   });
 
+  test('calls fetchProjectsList, never fetchProjects (LIN-2974: the whole point of the switch is dodging fetchProjects\' slow issue walk)', async () => {
+    let fetchProjectsListCalls = 0;
+    const provider = {
+      supports: (method) => method === 'fetchProjectsList',
+      fetchProjectsList: async () => { fetchProjectsListCalls++; return projectsWithRepos; },
+      // If fetchKnownRepos ever called this instead, it would hang the test
+      // (no timeoutMs override here) rather than merely giving a wrong answer.
+      fetchProjects: () => new Promise(() => {}),
+    };
+    const result = await fetchKnownRepos({ provider, scope: 'tok' });
+    assert.deepEqual(result, { ok: true, knownRepos: ['LinearViewer', 'simple-dispatcher'] });
+    assert.equal(fetchProjectsListCalls, 1);
+  });
+
   test('a provider that answers with zero repo= lines returns ok:true with an EMPTY list — distinct from an unavailable inventory', async () => {
-    const provider = { supports: () => true, fetchProjects: async () => ({ projects: [{ name: 'A', content: 'no repo line here' }] }) };
+    const provider = { supports: () => true, fetchProjectsList: async () => [{ name: 'A', content: 'no repo line here' }] };
     const result = await fetchKnownRepos({ provider, scope: 'tok' });
     assert.deepEqual(result, { ok: true, knownRepos: [] });
   });
@@ -156,20 +170,20 @@ describe('fetchKnownRepos (LIN-2974)', () => {
     assert.deepEqual(result, { ok: false, reason: 'no-provider' });
   });
 
-  test('provider does not support fetchProjects: ok:false', async () => {
+  test('provider does not support fetchProjectsList: ok:false', async () => {
     const provider = { supports: () => false };
     const result = await fetchKnownRepos({ provider, scope: null });
     assert.deepEqual(result, { ok: false, reason: 'unsupported' });
   });
 
-  test('fetchProjects throws: ok:false', async () => {
-    const provider = { supports: () => true, fetchProjects: async () => { throw new Error('upstream down'); } };
+  test('fetchProjectsList throws: ok:false', async () => {
+    const provider = { supports: () => true, fetchProjectsList: async () => { throw new Error('upstream down'); } };
     const result = await fetchKnownRepos({ provider, scope: null });
     assert.deepEqual(result, { ok: false, reason: 'fetch-failed' });
   });
 
-  test('fetchProjects never settles, bounded by timeoutMs (test-injected, no dangling timer): ok:false', async () => {
-    const provider = { supports: () => true, fetchProjects: () => new Promise(() => {}) };
+  test('fetchProjectsList never settles, bounded by timeoutMs (test-injected, no dangling timer): ok:false', async () => {
+    const provider = { supports: () => true, fetchProjectsList: () => new Promise(() => {}) };
     const start = Date.now();
     const result = await fetchKnownRepos({ provider, scope: null, timeoutMs: 20 });
     assert.deepEqual(result, { ok: false, reason: 'fetch-failed' });
@@ -177,7 +191,7 @@ describe('fetchKnownRepos (LIN-2974)', () => {
   });
 
   test('validateDispatchRepo and fetchKnownRepos agree on the same inventory (single source of truth)', async () => {
-    const provider = { supports: () => true, fetchProjects: async () => ({ projects: projectsWithRepos }) };
+    const provider = { supports: () => true, fetchProjectsList: async () => projectsWithRepos };
     const inventory = await fetchKnownRepos({ provider, scope: 'tok' });
     const refusal = await validateDispatchRepo({ repo: 'totally-unknown', provider, scope: 'tok' });
     assert.equal(refusal.ok, false);

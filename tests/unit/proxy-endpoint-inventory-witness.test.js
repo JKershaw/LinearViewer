@@ -152,7 +152,7 @@ const ROWS = [
   },
   {
     // LIN-2974: the shared fake provider's supports() always answers true,
-    // but it has no real fetchKnownRepos-reached fetchProjects() method, so
+    // but it has no real fetchKnownRepos-reached fetchProjectsList() method, so
     // the call throws synchronously and this route reports the inventory as
     // unavailable rather than 200 — a deterministic, offline probe of the
     // "can't determine" branch, not the happy path (that's pinned by

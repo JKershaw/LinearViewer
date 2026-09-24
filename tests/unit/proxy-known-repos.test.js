@@ -31,11 +31,11 @@ const KNOWN_REPOS_TEST_SCOPE = 'known-repos-test-scope';
 function fakeProvider({ projects = [], supportsFetchProjects = true, throws = false, hang = false } = {}) {
   return {
     name: 'linear',
-    supports: (method) => (method === 'fetchProjects' ? supportsFetchProjects : true),
-    fetchProjects: async () => {
+    supports: (method) => (method === 'fetchProjectsList' ? supportsFetchProjects : true),
+    fetchProjectsList: async () => {
       if (hang) return new Promise(() => {});
       if (throws) throw new Error('provider outage');
-      return { projects };
+      return projects;
     },
   };
 }
@@ -102,7 +102,7 @@ describe('LIN-2974 — GET /api/proxy/known-repos', () => {
     assert.deepEqual(res.body.knownRepos, []);
   });
 
-  test('UNAVAILABLE: provider does not support fetchProjects — 503 REPO_INVENTORY_UNAVAILABLE, never a fail-open empty list', async () => {
+  test('UNAVAILABLE: provider does not support fetchProjectsList — 503 REPO_INVENTORY_UNAVAILABLE, never a fail-open empty list', async () => {
     const provider = fakeProvider({ supportsFetchProjects: false });
     const app = buildApp({ provider });
     const res = await call(app, '/api/proxy/known-repos');
@@ -112,7 +112,7 @@ describe('LIN-2974 — GET /api/proxy/known-repos', () => {
     assert.equal(res.body.knownRepos, undefined, 'an unavailable inventory must not carry a knownRepos field at all');
   });
 
-  test('UNAVAILABLE: fetchProjects throws — 503 REPO_INVENTORY_UNAVAILABLE', async () => {
+  test('UNAVAILABLE: fetchProjectsList throws — 503 REPO_INVENTORY_UNAVAILABLE', async () => {
     const provider = fakeProvider({ throws: true });
     const app = buildApp({ provider });
     const res = await call(app, '/api/proxy/known-repos');
@@ -180,7 +180,7 @@ describe('LIN-2974 — GET /api/proxy/known-repos', () => {
     assert.deepEqual(res.body.knownRepos, ['LinearViewer']);
   });
 
-  test('UNAVAILABLE: fetchProjects never settles — the route\'s own 8s timeout still resolves 503 REPO_INVENTORY_UNAVAILABLE, not a hang', async () => {
+  test('UNAVAILABLE: fetchProjectsList never settles — the route\'s own 8s timeout still resolves 503 REPO_INVENTORY_UNAVAILABLE, not a hang', async () => {
     const provider = fakeProvider({ hang: true });
     const app = buildApp({ provider });
     const res = await call(app, '/api/proxy/known-repos');
