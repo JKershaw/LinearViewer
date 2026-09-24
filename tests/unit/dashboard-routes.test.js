@@ -1779,6 +1779,38 @@ describe('GET /api/dashboard/sessions', () => {
     assert.strictEqual(live.sessionPosition, null);
   });
 
+  // LIN-2934 R1: a GENERAL (goal-only) autopilot kickoff — its own anchor row
+  // carries NO issueIdentifier at all. Before R1 that row was dropped as
+  // "malformed" by pipeline-loops.js's `_buildLoops`, so this session never
+  // had an anchor loop to read its declared bounds off, and the dashboard
+  // feed chip stayed null for every general run regardless of what was
+  // declared at kickoff. `autopilotLiveItem(id, null)` builds exactly that
+  // anchorless-by-design row.
+  test('LIN-2934 R1: taskPosition/sessionPosition surface for a GENERAL (goal-only) run too, not only a scoped one', async () => {
+    const perWorkspace = {
+      'ws-g': {
+        live: [
+          { ...autopilotLiveItem('sess-g', null), maxTasks: 3, maxSessionsPerTask: 5 },
+          workerLiveItem('w-g', 'LIN-500', 'sess-g')
+        ],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-g', name: 'Goal-only' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-g');
+    assert.ok(live, 'expected the general (seedIssue-less) run to surface on the payload at all');
+    assert.strictEqual(live.seedIssue, null, 'sanity: this really is the unscoped shape, not a scoped run in disguise');
+    assert.deepEqual(live.taskPosition, { count: 1, maxTasks: 3 });
+    assert.deepEqual(live.sessionPosition, { count: 1, maxSessionsPerTask: 5, issueIdentifier: 'LIN-500' });
+  });
+
   test('each run carries its Level-3 drill-down payload (telemetry + recap), Mongo-only', async () => {
     // A worker whose feedback carries a heartbeat (metrics) and an [evidence]
     // marker (produced artifact) — the read-only telemetry the drill-down renders.

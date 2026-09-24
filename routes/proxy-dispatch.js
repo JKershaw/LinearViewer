@@ -1019,6 +1019,13 @@ export function createDispatchRoutes({
               issueIdentifier: item.issueIdentifier,
               target: item.target,
               sessionId: item.sessionId || null,
+              // LIN-2934 (R3): parity with this file's own plain POST /dispatch
+              // 201 above — the kickoff prose names this fused verb the
+              // orchestrator's MAIN path, so it must see "n of N" too, not just
+              // the /dispatch handler.
+              maxTasks: item.maxTasks ?? null,
+              maxSessionsPerTask: item.maxSessionsPerTask ?? null,
+              ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
               dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
               consumerLastSeenAt: item.consumerLastSeenAt || null,
               ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
@@ -1292,6 +1299,12 @@ export function createDispatchRoutes({
           issueIdentifier: item.issueIdentifier,
           target: item.target,
           sessionId: item.sessionId || null,
+          // LIN-2934 (R3): parity with this file's own plain POST /dispatch 201
+          // and the override arm just above — the LLM-driven path is the same
+          // fused verb, so it must see "n of N" too.
+          maxTasks: item.maxTasks ?? null,
+          maxSessionsPerTask: item.maxSessionsPerTask ?? null,
+          ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
           dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
           consumerLastSeenAt: item.consumerLastSeenAt || null,
           ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),

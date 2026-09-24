@@ -128,6 +128,39 @@ describe('maxTasks field threading (LIN-1751)', () => {
     assert.equal(watch.status, 'taken', 'sanity: resolved via the history branch');
     assert.equal(watch.maxTasks, taken.maxTasks);
   });
+
+  // LIN-2934 R2: the sibling of the `maxTasks` LOAD-BEARING archive-hop test
+  // above, for `maxSessionsPerTask`. Review found this leg untested — a
+  // mutation dropping `maxSessionsPerTask` from `_archiveItem`'s allowlist
+  // survived the full 19-file budget suite (M11) even though the identical
+  // mutation on `maxTasks` fails 3 tests, including the one right above this.
+  test('maxSessionsPerTask is carried into history — the LOAD-BEARING leg (LIN-1698 failure class)', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 4 });
+
+    // takeItem archives the doc to history — a kickoff row is typically
+    // archived within seconds of a real run starting, so the budget guard's
+    // anchor read (getItemStatus) must resolve maxSessionsPerTask through the
+    // ARCHIVED branch (_formatHistoryItem), not only the still-queued branch.
+    await store.takeItem(created._id, 'acme');
+
+    const status = await store.getItemStatus('acme', created._id);
+    assert.equal(status.status, 'taken', 'sanity: resolved via the history branch, not the active queue');
+    assert.equal(status.maxSessionsPerTask, 4, 'a missing field here makes the sessions-per-task guard silently stop enforcing');
+
+    const { items } = await store.listHistory('acme');
+    assert.equal(items.length, 1);
+    assert.equal(items[0].maxSessionsPerTask, 4);
+  });
+
+  test('echo honesty: getItemStatus and _formatItem agree on maxSessionsPerTask — once archived', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 6 });
+    const taken = await store.takeItem(created._id, 'acme');
+    const watch = await store.getItemStatus('acme', created._id);
+    assert.equal(watch.status, 'taken', 'sanity: resolved via the history branch');
+    assert.equal(watch.maxSessionsPerTask, taken.maxSessionsPerTask);
+  });
 });
 
 describe('countDistinctTasksForSession (LIN-1751)', () => {

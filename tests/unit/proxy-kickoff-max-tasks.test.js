@@ -273,3 +273,44 @@ describe('LIN-2934 — a scoped one-task kickoff bounded by maxSessionsPerTask, 
     assert.equal(t3.body.bound, 'sessionsPerTask');
   });
 });
+
+describe('LIN-2934 R4 (M9) — a CHILD kickoff dispatched under a budgeted coordinator echoes budgetPosition too', () => {
+  // The route's own comment (routes/proxy-kickoff.js) is explicit: "a kickoff
+  // itself is never budget-refused ... but a child-autopilot kickoff
+  // dispatched with sessionId set to a coordinator's budgeted run can be."
+  // Every OTHER test in this file dispatches the kickoff's own row unbudgeted
+  // (no incoming sessionId), so `item.budgetPosition` was never populated on
+  // any kickoff 201 anywhere in this suite — a mutation dropping the echo
+  // from that response would fail nothing (M9), even though the field is
+  // reachable in production via exactly this child-kickoff shape.
+  test('a child kickoff scoped under a budgeted parent run gets a real budgetPosition on its own 201, and can be refused', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const parent = await call(app, 'post', KICKOFF, { goal: 'coordinate the epic', target: 'cli', maxSessionsPerTask: 1 });
+    assert.equal(parent.status, 201, JSON.stringify(parent.body));
+    const parentSessionId = parent.body.id;
+
+    // A child autopilot kickoff, scoped to one task under the coordinator's
+    // budgeted run (LIN-813's up-chain edge: sessionId targets the parent).
+    // TEST-1 (not LIN-1): an issue-scoped kickoff resolves the real issue for
+    // its prompt, so it must be a real identifier from the hermetic fixture.
+    const child = await call(app, 'post', KICKOFF, {
+      goal: 'ship TEST-1', issueIdentifier: 'TEST-1', target: 'cli', sessionId: parentSessionId
+    });
+    assert.equal(child.status, 201, JSON.stringify(child.body));
+    assert.deepEqual(child.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 1 });
+
+    // The parent's per-task session bound is now spent for TEST-1 — an
+    // ordinary worker dispatch to the SAME task under the SAME parent session
+    // is refused. (A second kickoff to the same issue would collide with the
+    // unrelated same-issue-same-kind DUPLICATE_DISPATCH cooldown first, which
+    // would prove nothing about the budget bound specifically.)
+    const worker = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'TEST-1', target: 'cli', sessionId: parentSessionId
+    });
+    assert.equal(worker.status, 409, JSON.stringify(worker.body));
+    assert.equal(worker.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(worker.body.bound, 'sessionsPerTask');
+  });
+});

@@ -180,6 +180,60 @@ test('LIN-2934 (F2): a materialized session doc carries sessionPosition, matchin
   assert.deepEqual(point.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-700' });
 });
 
+// LIN-2934 R1: a GENERAL (goal-only) autopilot kickoff — its own row carries
+// NO issueIdentifier at all (that's the whole point of "general"). Before the
+// R1 fix this anchor was dropped by `_buildLoops` as "malformed" (so the pure
+// build never saw it either), AND even once retained, the materialized
+// incremental rebuild (`getSessionsForIssues`, issue-scoped by construction)
+// could never discover it — no issue in its closure is ever this anchor's own
+// id. Both halves are exercised here.
+function seedGeneralBudgetedFixture({ historyCollection, statusCollection }) {
+  archive(historyCollection, { id: 'SG', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(80), resolvedAtMs: min(81), maxTasks: 3, maxSessionsPerTask: 5 });
+  archive(historyCollection, { id: 'WG1', issueIdentifier: 'LIN-800', sessionId: 'SG', dispatchedAtMs: min(82), resolvedAtMs: min(85), feedback: [{ message: '[done] shipped WG1', tsMs: min(85) }] });
+  archive(historyCollection, { id: 'WG2', issueIdentifier: 'LIN-800', sessionId: 'SG', dispatchedAtMs: min(86), resolvedAtMs: min(89), feedback: [{ message: '[done] shipped WG2', tsMs: min(89) }] });
+
+  status(statusCollection, { id: 'AS-sg-w1', taskIdentifier: 'LIN-800', tsMs: min(83) });
+  status(statusCollection, { id: 'AS-sg-w2', taskIdentifier: 'LIN-800', tsMs: min(87) });
+}
+
+test('LIN-2934 R1: a GENERAL (goal-only) run\'s materialized session doc carries taskPosition/sessionPosition too, byte-identical to the pure build', async () => {
+  const ctx = setup();
+  seedGeneralBudgetedFixture(ctx);
+  const { agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
+  const fullSG = full.find(s => s.sessionId === 'SG');
+  assert.ok(fullSG, 'sanity: the pure build must find the general run\'s session at all — this is exactly the gap R1 closes');
+  assert.deepEqual(fullSG.taskPosition, { count: 1, maxTasks: 3 });
+  assert.deepEqual(fullSG.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-800' });
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg = sessions.find(s => s.sessionId === 'SG');
+  assert.ok(sg, 'the materialized (incremental, per-issue-scoped) rebuild must find this session too — not only a full workspace build');
+  assert.deepEqual(sg, fullSG, 'byte-identical to the pure build');
+  assert.deepEqual(sg.taskPosition, { count: 1, maxTasks: 3 });
+  assert.deepEqual(sg.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-800' });
+
+  // Confirmed reachable through the point read too.
+  const point = await observationSessionsStore.getSession(URL_KEY, 'SG');
+  assert.deepEqual(point.taskPosition, { count: 1, maxTasks: 3 });
+});
+
+test('LIN-2934 R1: a GENERAL run with zero workers dispatched yet still materializes an anchor-only session (parity with a scoped run)', async () => {
+  const ctx = setup();
+  archive(ctx.historyCollection, { id: 'SG0', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(90), resolvedAtMs: min(91), maxTasks: 3 });
+
+  await ctx.materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG0' });
+
+  const { sessions } = await ctx.observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg0 = sessions.find(s => s.sessionId === 'SG0');
+  assert.ok(sg0, 'an anchor-only general run must still materialize a session doc, matching a scoped run\'s zero-worker behavior');
+  assert.deepEqual(sg0.taskPosition, { count: 0, maxTasks: 3 });
+  assert.strictEqual(sg0.sessionPosition, null, 'no maxSessionsPerTask declared on this fixture');
+});
+
 // LIN-1307: autopilot session S, worker W (sessionId: S), and a reply-box
 // follow-up F that resumes W (followUpTo: W, sessionId: null, kind: 'custom',
 // target: 'cli') on its OWN distinct issue — the shape a human follow-up reply

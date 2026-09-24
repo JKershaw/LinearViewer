@@ -245,3 +245,125 @@ describe('LIN-2934 — end-to-end: a scoped one-task run bounded by maxSessionsP
     assert.equal(other.status, 201, JSON.stringify(other.body));
   });
 });
+
+describe('LIN-2934 R2 — maxSessionsPerTask survives the queue→history archive hop, end to end', () => {
+  test('a run whose kickoff row was taken (archived to history) before its bounded dispatches still enforces maxSessionsPerTask', async () => {
+    const recordedEvents = [];
+    const { store } = makeSpiedStore();
+    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
+
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
+    assert.equal(run.status, 201, JSON.stringify(run.body));
+    const sessionId = run.body.id;
+
+    // Simulate the real lifecycle every other e2e case here skips: a real
+    // run's kickoff row is typically TAKEN (and so archived to history) by
+    // the runner within seconds of dispatch, well before its bounded worker
+    // dispatches land. The guard's anchor read (getItemStatus, inside
+    // dispatch-factory.js) must resolve maxSessionsPerTask through the
+    // ARCHIVED branch (_formatHistoryItem), not only the still-queued branch
+    // every other case in this file exercises.
+    const taken = await store.takeItem(sessionId, 'acme');
+    assert.ok(taken, 'sanity: the kickoff row was actually taken');
+    const anchorStatus = await store.getItemStatus('acme', sessionId);
+    assert.equal(anchorStatus.status, 'taken', 'sanity: resolved via the history branch, not the active queue');
+    assert.equal(anchorStatus.maxSessionsPerTask, 2, 'sanity: the archived anchor still carries the bound');
+
+    const t1 = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t1.status, 201, JSON.stringify(t1.body));
+    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
+
+    const t2 = await call(app, 'post', DISPATCH, {
+      prompt: 'review it', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t2.status, 201, JSON.stringify(t2.body));
+    assert.deepEqual(t2.body.budgetPosition.sessionsPerTask, { count: 2, maxSessionsPerTask: 2 });
+
+    const t3 = await call(app, 'post', DISPATCH, {
+      prompt: 'close it out', promptName: 'close-out', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t3.status, 409, JSON.stringify(t3.body));
+    assert.equal(t3.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(t3.body.bound, 'sessionsPerTask');
+    assert.equal(t3.body.taskDispatches, 2);
+    assert.equal(t3.body.maxSessionsPerTask, 2);
+    assert.equal(t3.body.sessionId, sessionId);
+
+    const refusalEvent = recordedEvents.find(e => e.status === 409);
+    assert.ok(refusalEvent);
+    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED sessionsPerTask ${sessionId}`);
+  });
+});
+
+// LIN-2934 R4: the fail-closed path (a REAL countDistinctTasksForSession read
+// error, N3) was only proven at the dispatch-factory unit level
+// (tests/unit/dispatch-factory.test.js) — never at the route level, where the
+// durable proxy-event note is actually written (routes/proxy.js's
+// refuseIfBudgetExhausted -> logEvent). The 409 body's `bound` is pinned
+// there, so the note's own `bound` interpolation was only pinned indirectly.
+function makeBudgetReadFailureStore() {
+  const collection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const originalFind = collection.find.bind(collection);
+  // Target ONLY countDistinctTasksForSession's own query shape (dispatch-store.js:
+  // `issueIdentifier: { $ne: null }`) — never findRecentFreshDispatch's (the
+  // unrelated duplicate-dispatch guard, `issueIdentifier: <string>`, no `$ne`),
+  // which also reads via collection.find and must keep working normally.
+  collection.find = (query, opts) => {
+    if (query && query.followUpTo === null && query.abort && query.abort.$ne === true
+      && query.issueIdentifier && query.issueIdentifier.$ne === null) {
+      throw new Error('simulated budget-count read failure');
+    }
+    return originalFind(query, opts);
+  };
+  return new DispatchQueueStore({ collection, historyCollection });
+}
+
+describe('LIN-2934 R4 — fail-closed budget-read failure, end to end (N3)', () => {
+  test('a real count-read error fails CLOSED with bound: sessionsPerTask, and the durable note names it (single bound declared)', async () => {
+    const recordedEvents = [];
+    const store = makeBudgetReadFailureStore();
+    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
+
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
+    assert.equal(run.status, 201, JSON.stringify(run.body));
+    const sessionId = run.body.id;
+
+    const t1 = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t1.status, 409, JSON.stringify(t1.body));
+    assert.equal(t1.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(t1.body.bound, 'sessionsPerTask', 'fails closed — never admits when the read itself is unverifiable');
+    assert.strictEqual(t1.body.count, null);
+
+    const refusalEvent = recordedEvents.find(e => e.status === 409);
+    assert.ok(refusalEvent, 'the fail-closed refusal must still write a durable proxy-event note');
+    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED sessionsPerTask ${sessionId}`,
+      'the note must name the single declared bound, never interpolate undefined');
+  });
+
+  test('a real count-read error with BOTH bounds declared fails CLOSED with bound: unverified, and the durable note names it', async () => {
+    const recordedEvents = [];
+    const store = makeBudgetReadFailureStore();
+    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
+
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxTasks: 3, maxSessionsPerTask: 2 });
+    assert.equal(run.status, 201, JSON.stringify(run.body));
+    const sessionId = run.body.id;
+
+    const t1 = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t1.status, 409, JSON.stringify(t1.body));
+    assert.equal(t1.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(t1.body.bound, 'unverified', 'the read failed before either bound could be evaluated — neither can be misattributed as "the one that fired"');
+    assert.equal(t1.body.maxSessionsPerTask, 2, 'the fail-closed body still names maxSessionsPerTask when it is declared');
+
+    const refusalEvent = recordedEvents.find(e => e.status === 409);
+    assert.ok(refusalEvent);
+    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED unverified ${sessionId}`);
+  });
+});

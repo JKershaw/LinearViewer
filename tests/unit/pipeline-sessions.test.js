@@ -281,6 +281,24 @@ describe('taskPosition/sessionPosition (LIN-2934)', () => {
     assert.deepStrictEqual(s.sessionPosition, { count: 1, maxSessionsPerTask: 10, issueIdentifier: SPAWNED });
   });
 
+  test('sessionPosition on an A→B→A run reflects A (the LAST dispatch by time), not B (R5 — "last first-seen" is not "most recently dispatched")', () => {
+    const loops = loopsFrom([
+      orchestrator({ maxSessionsPerTask: 10 }),
+      // CHILD dispatched first...
+      worker('w1', CHILD, '2026-06-22T10:00:00.000Z', { sessionId: SESSION_ID }),
+      // ...then the run moves to SPAWNED once...
+      worker('w2', SPAWNED, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      // ...then back to CHILD, which is actually in flight now.
+      worker('w3', CHILD, '2026-06-22T11:00:00.000Z', { sessionId: SESSION_ID })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+
+    // Before the R5 fix this read `{count: 1, issueIdentifier: SPAWNED}` — the
+    // last task to be FIRST seen — even though CHILD (2 dispatches) is the one
+    // the seam most recently admitted a row for.
+    assert.deepStrictEqual(s.sessionPosition, { count: 2, maxSessionsPerTask: 10, issueIdentifier: CHILD });
+  });
+
   test('both taskPosition and sessionPosition are null when neither bound is declared', () => {
     const loops = loopsFrom([
       orchestrator(),
