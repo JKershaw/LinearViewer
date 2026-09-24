@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { buildDeletionRecord, replayProjection, replayWindowQuery } from '../../scripts/lin3014/lib/replay-core.mjs';
+import { copyProductionWindow } from '../../scripts/lin3014/replay.mjs';
 
 test('LIN-3014 replayProjection: excludes prompt and nothing else', () => {
   assert.deepStrictEqual(replayProjection(), { prompt: 0 });
@@ -45,4 +46,34 @@ test('LIN-3014 buildDeletionRecord: records path, command and row count, fit to 
 test('LIN-3014 buildDeletionRecord: requires dbPath and command — a deletion record with no path/command is not evidence', () => {
   assert.throws(() => buildDeletionRecord({ collectionName: 'x', rowsDeleted: 0, command: 'drop' }), /dbPath/);
   assert.throws(() => buildDeletionRecord({ dbPath: 'mongodb://127.0.0.1:1/x', collectionName: 'x', rowsDeleted: 0 }), /command/);
+});
+
+// LIN-3014 beat 3 production-run finding: copyProductionWindow originally
+// called `prodCollection.find(query, projection)` — the mongosh SHELL's
+// 2-arg form. The MongoDB NODE DRIVER's find(filter, options) takes the
+// projection under `options.projection`; passed bare, it's silently treated
+// as an unrecognised options object and EVERY field comes back, including
+// `prompt` — exactly what ruling `16c2be3e` forbids the replay copy from
+// ever carrying. Caught only by the actual production run (a local replica
+// full of `prompt` text), never by a test that mocks `.find` as a no-op.
+test('LIN-3014 copyProductionWindow: calls find() with the projection under options.projection (the Node driver shape), not as a bare 2nd arg', async () => {
+  let capturedArgs = null;
+  const stubCollection = {
+    find(filter, options) {
+      capturedArgs = [filter, options];
+      return { toArray: async () => [] };
+    }
+  };
+  await copyProductionWindow(stubCollection, { urlKey: 'linearviewer', sinceMs: Date.parse('2026-08-25T00:00:00.000Z') });
+  assert.ok(capturedArgs, 'find() must have been called');
+  const [filter, options] = capturedArgs;
+  assert.strictEqual(filter.urlKey, 'linearviewer');
+  assert.deepStrictEqual(options, { projection: { prompt: 0 } }, 'the projection must be nested under options.projection (Node driver), not passed bare as the 2nd argument (mongosh shell shape)');
+});
+
+test('LIN-3014 copyProductionWindow: returns exactly what find().toArray() yields', async () => {
+  const docs = [{ _id: 'a' }, { _id: 'b' }];
+  const stubCollection = { find: () => ({ toArray: async () => docs }) };
+  const result = await copyProductionWindow(stubCollection, { urlKey: 'linearviewer', sinceMs: Date.now() });
+  assert.deepStrictEqual(result, docs);
 });

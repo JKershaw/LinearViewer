@@ -25,6 +25,26 @@ import { MongoClient } from 'mongodb';
 import { assertSafeConnection, isLoopbackHost } from './lib/guard.mjs';
 import { replayProjection, replayWindowQuery, buildDeletionRecord } from './lib/replay-core.mjs';
 
+/**
+ * Reads the replay window from a production collection. Pulled out of
+ * `copy()` so it's testable against a stub collection: the MongoDB NODE
+ * DRIVER's `find(filter, options)` takes the projection under
+ * `options.projection`, NOT as the bare second positional argument — that
+ * shape is mongosh's `find(query, projection)`, a different API. Passing
+ * `replayProjection()` directly as the second arg (the original bug here)
+ * silently becomes an ignored `options` object and every field, including
+ * `prompt`, comes back — exactly what ruling `16c2be3e` forbids.
+ *
+ * @param {Object} prodCollection - a collection with a `.find(filter, options)` method
+ * @param {Object} opts
+ * @param {string} opts.urlKey
+ * @param {number} opts.sinceMs
+ */
+export async function copyProductionWindow(prodCollection, { urlKey, sinceMs }) {
+  const query = replayWindowQuery({ urlKey, sinceMs });
+  return prodCollection.find(query, { projection: replayProjection() }).toArray();
+}
+
 function parseArgs(argv) {
   const args = { urlKey: 'linearviewer', sinceDays: 30, localCollection: 'dispatch-history' };
   for (let i = 0; i < argv.length; i++) {
@@ -54,10 +74,7 @@ async function copy(args) {
     assertSafeConnection(connectionStatus, { isLocalReplayTarget: false }); // the SOURCE must be the read-only user
 
     const sinceMs = Date.now() - args.sinceDays * 24 * 3600e3;
-    const query = replayWindowQuery({ urlKey: args.urlKey, sinceMs });
-    const projection = replayProjection();
-
-    const docs = await prodDb.collection('dispatch-history').find(query, projection).toArray();
+    const docs = await copyProductionWindow(prodDb.collection('dispatch-history'), { urlKey: args.urlKey, sinceMs });
     console.log(`replay copy: read ${docs.length} row(s) from production (urlKey=${args.urlKey}, prompt excluded)`);
 
     const localDb = localClient.db();
