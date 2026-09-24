@@ -22,7 +22,10 @@ import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
-import { loadDispatchHistory } from '../../lib/kpi-stats.js';
+import {
+  loadDispatchHistory, collectKpiStats, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages
+} from '../../lib/kpi-stats.js';
+import { digestFeedback } from '../../lib/digest-feedback.js';
 import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
 import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
 import { WorkspaceStore } from '../../lib/workspace-store.js';
@@ -1440,6 +1443,163 @@ describe(
         );
         assert.strictEqual(actual.feedbackCount, expected.feedbackCount);
       });
+    });
+
+    // -----------------------------------------------------------------------
+    // LIN-3012 close-out ledger L1/L2 (review comment `92446c4b`, close-out
+    // `99939471`): the digest-read tests above hand-build fresh-digest
+    // fixtures with non-null kpi* values. None of them exercises Phase 0's
+    // OWN absence convention — a REAL `digestFeedback()` output, whose kpi*
+    // fields are `null` (or carry `timestamp: null`) when a row has no
+    // matching entry. Literal `$project` equality can't hold for those rows
+    // (a fresh row legitimately yields `terminalEntry: null` where the
+    // fallback omits the field entirely) — the invariant that DOES hold, and
+    // that this test proves, is DOWNSTREAM equivalence: the accessors,
+    // `groupDispatchLineages`, and the full `/kpis` `collectKpiStats` output
+    // must agree between a fresh twin (real `digestFeedback()` digest,
+    // `version` stamped to `feedbackVersion`) and a legacy twin (same raw
+    // feedback, no digest at all) across each of the review's five N4
+    // shapes. This also discharges L2 (a fixture `/kpis` identity check),
+    // now proven on a real engine rather than beat 4's MangoDB-only fixture.
+    // -----------------------------------------------------------------------
+    function buildKpiStatsCollections(dispatchHistoryCollection) {
+      return {
+        sessions: freshCollection('l1-sessions'),
+        userPreferences: freshCollection('l1-user-prefs'),
+        workspacePreferences: freshCollection('l1-workspace-prefs'),
+        customPrompts: freshCollection('l1-custom-prompts'),
+        localIssues: freshCollection('l1-local-issues'),
+        dispatchQueue: freshCollection('l1-dispatch-queue'),
+        dispatchHistory: dispatchHistoryCollection,
+        dispatchTokens: freshCollection('l1-dispatch-tokens'),
+        proxyTokens: freshCollection('l1-proxy-tokens'),
+        proxyEvents: freshCollection('l1-proxy-events'),
+        agentStatus: freshCollection('l1-agent-status'),
+        freeTier: freshCollection('l1-free-tier'),
+        recapCache: freshCollection('l1-recap-cache'),
+        briefCache: freshCollection('l1-brief-cache'),
+        reportHistory: freshCollection('l1-report-history')
+      };
+    }
+
+    // The ONLY reviewed exception: a fresh digest's ticket-marker entry
+    // carries an explicit `timestamp: null` (Phase 0's absence convention),
+    // while the fallback's $map, applied to a raw entry with no `timestamp`
+    // key, omits the key entirely from its projected output. Everything else
+    // — message, entry count and order — must match exactly.
+    function assertTicketMarkerEquivalence(freshEntries, legacyEntries, label) {
+      assert.strictEqual(freshEntries.length, legacyEntries.length, `${label}: same number of ticket-marker entries`);
+      for (let i = 0; i < freshEntries.length; i++) {
+        const fresh = freshEntries[i];
+        const legacy = legacyEntries[i];
+        assert.strictEqual(fresh.message, legacy.message, `${label}[${i}]: message must match`);
+        if ('timestamp' in legacy) {
+          assert.deepStrictEqual(fresh.timestamp, legacy.timestamp, `${label}[${i}]: timestamp must match when the fallback carries one`);
+        } else {
+          assert.strictEqual(fresh.timestamp, null, `${label}[${i}]: the ONLY allowed divergence is fresh:null vs fallback:absent`);
+        }
+      }
+    }
+
+    describe('LIN-3012 close-out L1/L2: real digestFeedback() fresh vs legacy twins (N4 downstream equivalence)', () => {
+      const NOW = new Date('2026-07-01T12:00:00.000Z');
+      const DISPATCHED_AT = new Date('2026-06-28T09:00:00.000Z');
+
+      const SHAPES = [
+        {
+          name: 'empty feedback',
+          feedback: []
+        },
+        {
+          name: 'no markers',
+          feedback: [
+            { kind: 'assistant-text', message: 'thinking about the approach', timestamp: new Date('2026-06-28T09:01:00.000Z') },
+            { kind: 'heartbeat', message: '[heartbeat] still going', timestamp: new Date('2026-06-28T09:02:00.000Z') }
+          ]
+        },
+        {
+          name: 'timestamp-less terminal entry',
+          feedback: [
+            { kind: 'assistant-text', message: 'wrapping up', timestamp: new Date('2026-06-28T09:01:00.000Z') },
+            { kind: 'done', message: '[done] all set' } // deliberately no `timestamp` key
+          ]
+        },
+        {
+          name: 'timestamp-less ticket marker',
+          feedback: [
+            { kind: 'custom', message: '[ticket] LIN-4242 started' }, // deliberately no `timestamp` key
+            { kind: 'done', message: '[done] all set', timestamp: new Date('2026-06-28T09:03:00.000Z') }
+          ]
+        },
+        {
+          name: 'full mix',
+          feedback: [
+            { kind: 'assistant-text', message: 'working', timestamp: new Date('2026-06-28T09:01:00.000Z') },
+            { kind: 'usage', message: '[usage] {"costUsd":2}', timestamp: new Date('2026-06-28T09:02:00.000Z') },
+            { kind: 'evidence', message: 'proof A', timestamp: new Date('2026-06-28T09:03:00.000Z') },
+            { kind: 'evidence', message: 'proof B', timestamp: new Date('2026-06-28T09:04:00.000Z') },
+            { kind: 'custom', message: '[ticket] LIN-4243 started', timestamp: new Date('2026-06-28T09:05:00.000Z') },
+            { kind: 'done', message: '[done] shipped', timestamp: new Date('2026-06-28T09:06:00.000Z') }
+          ]
+        }
+      ];
+
+      for (const shape of SHAPES) {
+        test(`N4 shape "${shape.name}": fresh (real digestFeedback()) and legacy twins agree downstream`, async () => {
+          const rootItemId = `l1-root-${randomUUID()}`;
+          const baseDoc = {
+            urlKey: 'l1-workspace',
+            status: 'done',
+            dispatchedAt: DISPATCHED_AT,
+            resolvedAt: new Date(DISPATCHED_AT.getTime() + 10 * 60 * 1000),
+            kind: 'implementation',
+            rootItemId,
+            followUpTo: null,
+            abort: false,
+            abortTo: null,
+            issueIdentifier: 'LIN-9000',
+            harness: 'claude-code',
+            feedback: shape.feedback
+          };
+
+          // Real Phase 0 extraction — not a hand-built stand-in — so the
+          // fresh twin's digest carries Phase 0's actual null convention.
+          const digest = digestFeedback(baseDoc, { now: NOW.getTime() });
+          digest.version = 1; // Phase 1's write path stamps this from feedbackVersion
+
+          const freshDoc = { ...baseDoc, _id: `l1-fresh-${randomUUID()}`, feedbackVersion: 1, feedbackDigest: digest };
+          const legacyDoc = { ...baseDoc, _id: `l1-legacy-${randomUUID()}` }; // no feedbackVersion/feedbackDigest at all
+
+          // --- accessor + lineage equivalence: both rows through one real aggregation ---
+          const pairCollection = freshCollection('lin3012-l1-pair');
+          await pairCollection.insertMany([freshDoc, legacyDoc]);
+          const rows = await loadDispatchHistory(pairCollection);
+          const freshRow = rows.find(r => r._id === freshDoc._id);
+          const legacyRow = rows.find(r => r._id === legacyDoc._id);
+          assert.ok(freshRow && legacyRow, `${shape.name}: both rows must be present in the aggregation output`);
+
+          assert.deepStrictEqual(usageOf(freshRow), usageOf(legacyRow), `${shape.name}: usageOf must agree`);
+          assert.strictEqual(evidenceCountOf(freshRow), evidenceCountOf(legacyRow), `${shape.name}: evidenceCountOf must agree`);
+          assertTicketMarkerEquivalence(ticketMarkerEntriesOf(freshRow), ticketMarkerEntriesOf(legacyRow), `${shape.name} ticketMarkerEntriesOf`);
+
+          const freshLineage = [...groupDispatchLineages([freshRow]).values()][0];
+          const legacyLineage = [...groupDispatchLineages([legacyRow]).values()][0];
+          assert.deepStrictEqual(freshLineage, legacyLineage, `${shape.name}: groupDispatchLineages output must agree`);
+
+          // --- full /kpis output, ONE row per side, so the equality below is non-vacuous ---
+          const freshOnlyCollection = freshCollection('lin3012-l1-fresh-only');
+          await freshOnlyCollection.insertOne(freshDoc);
+          const freshStats = await collectKpiStats(buildKpiStatsCollections(freshOnlyCollection), { now: NOW });
+
+          const legacyOnlyCollection = freshCollection('lin3012-l1-legacy-only');
+          await legacyOnlyCollection.insertOne(legacyDoc);
+          const legacyStats = await collectKpiStats(buildKpiStatsCollections(legacyOnlyCollection), { now: NOW });
+
+          assert.strictEqual(freshStats.totals.dispatches, 1, `${shape.name}: fresh-only run must be non-vacuous (1 dispatch)`);
+          assert.strictEqual(legacyStats.totals.dispatches, 1, `${shape.name}: legacy-only run must be non-vacuous (1 dispatch)`);
+          assert.deepStrictEqual(freshStats, legacyStats, `${shape.name}: full collectKpiStats output must be identical between the fresh and legacy twin`);
+        });
+      }
     });
   }
 );
