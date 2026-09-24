@@ -2,8 +2,8 @@
  * Minimal in-memory mock of the MongoDB/MangoDB collection surface, shared by
  * store unit tests. Supports the operators the local-store relies on:
  * insertOne, findOne, find().toArray(), updateOne ($set + $push + $addToSet +
- * upsert), findOneAndUpdate ($push + returnDocument), deleteOne, deleteMany,
- * findOneAndDelete, countDocuments. Query matching is top-level field equality,
+ * $inc + upsert), findOneAndUpdate ($push + $inc + returnDocument), deleteOne,
+ * deleteMany, findOneAndDelete, countDocuments. Query matching is top-level field equality,
  * plus `{ $gt/$gte/$lt/$lte: value }` and `{ $ne: value }` operators (used by
  * the dispatch store's expiresAt filter and LIN-1357's terminalWakeItems
  * per-item once-only guard) — enough for the scope/kind/_id/identifier/parentId
@@ -97,6 +97,16 @@ export function createMockCollection() {
       for (const [field, value] of Object.entries(update.$addToSet)) {
         const existing = Array.isArray(next[field]) ? next[field] : [];
         next[field] = existing.includes(value) ? existing : [...existing, value];
+      }
+    }
+    // $inc: mirrors Mongo — a missing field starts from 0 before the delta is
+    // applied (LIN-3009's feedbackVersion guard counter relies on this: a
+    // legacy row with no feedbackVersion field must become 1 on its first
+    // $inc, not throw or stay absent).
+    if (update.$inc) {
+      next = { ...next };
+      for (const [field, delta] of Object.entries(update.$inc)) {
+        next[field] = (typeof next[field] === 'number' ? next[field] : 0) + delta;
       }
     }
     return next;

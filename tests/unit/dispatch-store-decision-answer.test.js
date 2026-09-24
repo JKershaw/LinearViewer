@@ -11,13 +11,18 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { DispatchQueueStore, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
+import { digestFeedback } from '../../lib/digest-feedback.js';
 
 const URL_KEY = 'acme';
 
@@ -35,6 +40,18 @@ async function takenItem(store, urlKey = URL_KEY) {
   });
   await store.takeItem(item._id, urlKey, 'token-a');
   return item;
+}
+
+// LIN-3009: recursively asserts no `undefined` value anywhere in an object —
+// the N4 convention pins absence as `null`, never `undefined`.
+function assertNoUndefined(value, path = 'digest') {
+  if (value === undefined) {
+    assert.fail(`${path} must not be undefined (N4: use null for an absent field)`);
+  }
+  if (value === null || typeof value !== 'object' || value instanceof Date) return;
+  for (const [key, child] of Object.entries(value)) {
+    assertNoUndefined(child, `${path}.${key}`);
+  }
 }
 
 describe('markDecisionAnswered (LIN-1728)', () => {
@@ -219,5 +236,240 @@ describe('LIN-1728: runner feedback route rejects kind:"decision-answer"', () =>
     assert.equal(res.status, 200, JSON.stringify(res.body));
     const doc = [...collection._docs, ...historyCollection._docs].find(d => d._id === item._id);
     assert.ok(!('kind' in doc.feedback[0]), 'a runner token must never be able to write a decision-answer stamp via the feedback route');
+  });
+});
+
+// ── LIN-3009: markDecisionAnswered keeps feedbackVersion/feedbackDigest current ──
+//
+// Same Phase 1 contract as addFeedback: `$inc: { feedbackVersion: 1 }` in the
+// SAME atomic findOneAndUpdate as the feedback $push, then a best-effort
+// guarded feedbackDigest persist before `_notifyWriteForDoc`, never rethrown,
+// never affecting the return value. Not implemented yet — every test below
+// must fail against the current writer for the RIGHT reason.
+
+describe('markDecisionAnswered: feedbackVersion + feedbackDigest happy path (LIN-3009)', () => {
+  test('the atomic findOneAndUpdate increments feedbackVersion by exactly 1, leaving feedbackCount (array length) unchanged', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    const res = await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+
+    assert.ok(res && res.success);
+    assert.equal(res.feedbackCount, 1, 'feedbackCount is still the raw array length, never the version counter');
+    const stored = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(stored.feedbackVersion, 1, 'feedbackVersion must be incremented atomically alongside the append');
+  });
+
+  test('a second stamp increments feedbackVersion to 2, independent of feedbackCount growing to 2 as well (never conflated)', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+    const res = await store.markDecisionAnswered(item._id, URL_KEY, 'd-2');
+
+    assert.equal(res.feedbackCount, 2);
+    const stored = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(stored.feedbackVersion, 2);
+  });
+
+  test('the persisted feedbackDigest equals digestFeedback(postWriteDoc) with .version stamped to the post-write feedbackVersion', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+
+    const stored = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.ok(stored.feedbackDigest, 'feedbackDigest must be persisted on a successful write');
+    const expected = digestFeedback({ feedback: stored.feedback, dispatchedAt: stored.dispatchedAt }, { now: Date.now() });
+    expected.version = stored.feedbackVersion;
+    assert.deepStrictEqual(stored.feedbackDigest, expected);
+  });
+});
+
+describe('markDecisionAnswered: feedbackDigest is best-effort — injected failures never break the writer (LIN-3009)', () => {
+  test('digestFeedback throwing on a malformed pre-existing feedback entry leaves success, feedbackCount and the append unaffected', async () => {
+    const store = makeStore();
+    const item = await takenItem(store);
+    // Seed a malformed pre-existing entry directly (bypassing markDecisionAnswered)
+    // — formatFeedbackEntries reads `f.message` on every entry, so a `null`
+    // entry throws inside digestFeedback exactly as a corrupted/legacy row
+    // would in production. This is a REAL throw path, not a mocked internal.
+    const seeded = store.historyCollection._docs.find(d => d._id === item._id);
+    seeded.feedback = [null];
+
+    const res = await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+
+    assert.ok(res && res.success, 'markDecisionAnswered must still report success when digest generation throws');
+    assert.equal(res.feedbackCount, 2, 'feedbackCount (array length) is unaffected by a digest failure');
+    const stored = store.historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(stored.feedbackVersion, 1, 'feedbackVersion still increments — only the digest write is guarded/best-effort');
+    assert.equal(stored.feedback[0], null, 'the append itself must land unaffected by the digest failure');
+    assert.equal(stored.feedback[1].kind, 'decision-answer');
+    assert.ok(!('feedbackDigest' in stored) || stored.feedbackDigest == null, 'a thrown digest generation must never partially persist a digest');
+  });
+
+  test('a rejecting guarded digest update (historyCollection.updateOne throws) leaves success and the append unaffected, and _notifyWriteForDoc still runs', async () => {
+    const historyCollection = createMockCollection();
+    historyCollection.updateOne = async () => { throw new Error('simulated digest persistence failure'); };
+    const collection = createMockCollection();
+    let notified = false;
+    const store = new DispatchQueueStore({
+      collection,
+      historyCollection,
+      onWrite: () => { notified = true; }
+    });
+    const item = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42', sessionId: 'S1'
+    });
+    await store.takeItem(item._id, URL_KEY, 'token-a');
+
+    const res = await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+
+    assert.ok(res && res.success, 'markDecisionAnswered must still report success when the guarded digest updateOne rejects');
+    assert.equal(res.feedbackCount, 1);
+    const stored = historyCollection._docs.find(d => d._id === item._id);
+    assert.equal(stored.feedbackVersion, 1, 'append + version bump land even though the guarded digest updateOne rejects');
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.ok(notified, '_notifyWriteForDoc must still run after a digest persistence failure (fire-and-forget onWrite hook)');
+  });
+
+  test('ordering: the digest write settles before _notifyWriteForDoc\'s onWrite hook fires, even when digest persistence is slow', async () => {
+    // A same-tick mock (no real I/O latency) can't discriminate call ORDER
+    // from call ORDER-OF-COMPLETION — its updateOne mutates synchronously
+    // regardless of where it's placed relative to a fire-and-forget notify.
+    // A real setTimeout delay on the digest updateOne forces a genuine
+    // suspension, so if the digest write happens to be called AFTER notify
+    // (wrong order), notify's onWrite fires first for real, not just in
+    // appearance.
+    const collection = createMockCollection();
+    const historyCollection = createMockCollection();
+    const order = [];
+    const realUpdateOne = historyCollection.updateOne.bind(historyCollection);
+    historyCollection.updateOne = async (...args) => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      const result = await realUpdateOne(...args);
+      order.push('digest-write-settled');
+      return result;
+    };
+    const store = new DispatchQueueStore({
+      collection,
+      historyCollection,
+      onWrite: () => { order.push('notify-fired'); }
+    });
+    const item = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42', sessionId: 'S1'
+    });
+    await store.takeItem(item._id, URL_KEY, 'token-a');
+    // addItem/takeItem themselves fire their own notify(s) — let those settle
+    // and reset the log so only the write under test is observed.
+    await new Promise(resolve => setTimeout(resolve, 30));
+    order.length = 0;
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    assert.deepEqual(order, ['digest-write-settled', 'notify-fired'], 'the digest write must fully settle BEFORE the notify hook fires — never the reverse');
+  });
+});
+
+describe('markDecisionAnswered: feedbackVersion/feedbackDigest under real concurrency (real MangoDB tmpdir, LIN-3009)', () => {
+  let dbDir;
+  let client;
+  let counter = 0;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'dispatch-store-decision-version-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+  });
+
+  after(async () => {
+    if (client?.close) await client.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  function freshStore() {
+    const db = client.db(`decision_version_${counter++}`);
+    return new DispatchQueueStore({
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history')
+    });
+  }
+
+  test('N concurrent markDecisionAnswered calls: feedbackVersion equals N, and the settled feedbackDigest exists and matches the final version', async () => {
+    const store = freshStore();
+    const item = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42'
+    });
+    await store.takeItem(item._id, URL_KEY, 'token-a');
+
+    const N = 20;
+    const results = await Promise.all(
+      Array.from({ length: N }, (_, i) =>
+        store.markDecisionAnswered(item._id, URL_KEY, `d-${i}`)
+      )
+    );
+
+    assert.ok(results.every(r => r && r.success), 'every concurrent caller still reports success');
+    const stored = await store.historyCollection.findOne({ _id: item._id });
+    assert.equal(stored.feedback.length, N, 'the atomic append contract is unchanged');
+    assert.equal(stored.feedbackVersion, N, `feedbackVersion must equal the number of concurrent writers (${N}), each incrementing atomically in the same findOneAndUpdate as its append`);
+    assert.ok(stored.feedbackDigest, 'a feedbackDigest must exist once all concurrent writers have settled');
+    assert.equal(stored.feedbackDigest.version, stored.feedbackVersion, 'the settled digest must match the final feedbackVersion — never a stale, lower one');
+    assert.equal(stored.feedbackDigest.count, stored.feedback.length);
+  });
+
+  test('a deterministic race: writer B fully lands (append + version bump + its own digest persist) between writer A\'s append and A\'s guarded digest persist — A\'s stale digest must lose the CAS, not overwrite B\'s newer one', async () => {
+    const db = client.db(`decision_version_deterministic_race_${counter++}`);
+    const collection = db.collection('dispatch-queue');
+    const historyCollection = db.collection('dispatch-history');
+    const storeA = new DispatchQueueStore({ collection, historyCollection });
+    const storeB = new DispatchQueueStore({ collection, historyCollection });
+
+    const item = await storeA.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42'
+    });
+    await storeA.takeItem(item._id, URL_KEY, 'token-a');
+
+    let intercepted = false;
+    const realUpdateOne = historyCollection.updateOne.bind(historyCollection);
+    historyCollection.updateOne = async (...args) => {
+      if (!intercepted) {
+        intercepted = true;
+        const resB = await storeB.markDecisionAnswered(item._id, URL_KEY, 'd-B');
+        assert.ok(resB && resB.success, 'writer B must land cleanly inside the interception window');
+      }
+      return realUpdateOne(...args);
+    };
+
+    const resA = await storeA.markDecisionAnswered(item._id, URL_KEY, 'd-A');
+    assert.ok(resA && resA.success);
+
+    assert.ok(intercepted, 'the interception point (historyCollection.updateOne, writer A\'s guarded digest persist) must actually be reached — otherwise this test cannot prove anything about the race');
+    const stored = await historyCollection.findOne({ _id: item._id });
+    assert.equal(stored.feedback.length, 2, 'both writers\' entries land — the atomic append contract is unaffected by the race');
+    assert.equal(stored.feedbackVersion, 2, 'both atomic increments land');
+    assert.ok(stored.feedbackDigest, 'B\'s guarded write (matching the CURRENT version at the time it ran) must have persisted a digest');
+    assert.equal(stored.feedbackDigest.version, 2, 'the persisted digest must reflect the CURRENT version — never A\'s stale captured version (1)');
+    assert.equal(stored.feedbackDigest.count, 2, 'the persisted digest must reflect BOTH entries — proof A\'s stale, 1-entry digest lost the CAS and did not overwrite B\'s newer one');
+  });
+
+  test('a real persistence round trip: no digest field is undefined, and the digest reflects the decision-answer stamp (N4, W1)', async () => {
+    const store = freshStore();
+    const item = await store.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42'
+    });
+    await store.takeItem(item._id, URL_KEY, 'token-a');
+
+    await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
+
+    // A FRESH read — a new query against the real engine, not the in-memory
+    // object findOneAndUpdate handed back — so this actually proves the
+    // digest round-trips through storage, not just through memory.
+    const stored = await store.historyCollection.findOne({ _id: item._id });
+    assert.ok(stored.feedbackDigest, 'feedbackDigest must be persisted and survive a fresh read');
+    assert.equal(stored.feedbackDigest.answeredDecisionId, 'd-1', 'the digest must reflect the decision-answer stamp just written');
+    assertNoUndefined(stored.feedbackDigest);
   });
 });
