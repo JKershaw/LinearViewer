@@ -26,7 +26,7 @@ import { UNKNOWN_REPO_CODE } from '../../lib/dispatch-repo-guard.js';
 // Deliberately NOT 'test-token': the routes' own `isTestMode` sentinel
 // (`process.env.NODE_ENV === 'test' && accessToken === 'test-token'`) makes
 // LIN-2886's repo-validation call skip its provider entirely (LIN-1880's
-// hermetic no-live-network CI guard — a real `provider.fetchProjects` call
+// hermetic no-live-network CI guard — a real `provider.fetchProjectsList` call
 // under the shared `test-token` scope would reach the live Linear API from
 // every OTHER pre-existing test that dispatches with a `repo`). These tests
 // exist specifically to exercise that validation, so they use a distinct
@@ -38,10 +38,10 @@ const REPO_GUARD_TEST_SCOPE = 'repo-guard-test-scope';
 function fakeProvider({ projects = [], supportsFetchProjects = true, throws = false } = {}) {
   return {
     name: 'linear',
-    supports: (method) => (method === 'fetchProjects' ? supportsFetchProjects : true),
-    fetchProjects: async () => {
+    supports: (method) => (method === 'fetchProjectsList' ? supportsFetchProjects : true),
+    fetchProjectsList: async () => {
       if (throws) throw new Error('provider outage');
-      return { projects };
+      return projects;
     },
     // Only reached by the recommend-and-dispatch verb-override branch, since
     // isTestMode is false for this scope — a minimal happy-path issue context.
@@ -140,21 +140,21 @@ describe('LIN-2886 — POST /api/proxy/dispatch repo validation', () => {
     assert.equal(captured.item.repo, 'LinearViewer');
   });
 
-  test('no repo supplied: unaffected, no fetchProjects call at all', async () => {
+  test('no repo supplied: unaffected, no fetchProjectsList call at all', async () => {
     const captured = {};
-    let fetchProjectsCalls = 0;
+    let fetchProjectsListCalls = 0;
     const provider = fakeProvider({ projects: [] });
-    const realFetchProjects = provider.fetchProjects;
-    provider.fetchProjects = async (...args) => { fetchProjectsCalls++; return realFetchProjects(...args); };
+    const realFetchProjectsList = provider.fetchProjectsList;
+    provider.fetchProjectsList = async (...args) => { fetchProjectsListCalls++; return realFetchProjectsList(...args); };
     const app = buildApp(captured, { provider });
     const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'do the thing' });
 
     assert.equal(res.status, 201);
     assert.equal(captured.item.repo, null);
-    assert.equal(fetchProjectsCalls, 0, 'validation must not run when no repo was supplied');
+    assert.equal(fetchProjectsListCalls, 0, 'validation must not run when no repo was supplied');
   });
 
-  test('FAIL-OPEN: provider does not support fetchProjects — the dispatch still succeeds, repo forwarded unvalidated', async () => {
+  test('FAIL-OPEN: provider does not support fetchProjectsList — the dispatch still succeeds, repo forwarded unvalidated', async () => {
     const captured = {};
     const provider = fakeProvider({ supportsFetchProjects: false });
     const app = buildApp(captured, { provider });
@@ -164,7 +164,7 @@ describe('LIN-2886 — POST /api/proxy/dispatch repo validation', () => {
     assert.equal(captured.item.repo, 'whatever-value', 'unvalidated repo is forwarded verbatim, never rejected');
   });
 
-  test('FAIL-OPEN: fetchProjects throws — the dispatch still succeeds, repo forwarded unvalidated', async () => {
+  test('FAIL-OPEN: fetchProjectsList throws — the dispatch still succeeds, repo forwarded unvalidated', async () => {
     const captured = {};
     const provider = fakeProvider({ throws: true });
     const app = buildApp(captured, { provider });
@@ -201,7 +201,7 @@ describe('LIN-2886 — POST /api/proxy/recommend-and-dispatch repo validation (v
   // LIN-1880 hermetic guard, this route's own angle: under the app's
   // `isTestMode` sentinel (accessToken === 'test-token'), the repo-validation
   // call site passes `provider: null` (see routes/proxy-dispatch.js), so a
-  // repo is forwarded UNVALIDATED and the injected provider's `fetchProjects`
+  // repo is forwarded UNVALIDATED and the injected provider's `fetchProjectsList`
   // is never invoked — proving this route doesn't reach real network under
   // test-mode dispatches, the exact class of regression that broke CI once
   // already in this ticket's own history. Deliberately the ONLY test on this
@@ -211,12 +211,12 @@ describe('LIN-2886 — POST /api/proxy/recommend-and-dispatch repo validation (v
   // identical `validateDispatchRepo` wiring already proven on plain
   // POST /api/proxy/dispatch, so this suite doesn't pay for a second slow
   // live-mode issue-context round trip through a route-level test here.
-  test('isTestMode: repo is forwarded unvalidated, fetchProjects never called', async () => {
+  test('isTestMode: repo is forwarded unvalidated, fetchProjectsList never called', async () => {
     const captured = {};
-    let fetchProjectsCalls = 0;
+    let fetchProjectsListCalls = 0;
     const provider = fakeProvider({ projects: [{ content: 'repo=LinearViewer' }] });
-    const realFetchProjects = provider.fetchProjects;
-    provider.fetchProjects = async (...args) => { fetchProjectsCalls++; return realFetchProjects(...args); };
+    const realFetchProjectsList = provider.fetchProjectsList;
+    provider.fetchProjectsList = async (...args) => { fetchProjectsListCalls++; return realFetchProjectsList(...args); };
     const app = buildApp(captured, { provider, token: 'test-token' });
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
       issueIdentifier: 'TEST-1', kind: 'review', repo: 'not-a-known-repo-at-all'
@@ -224,6 +224,6 @@ describe('LIN-2886 — POST /api/proxy/recommend-and-dispatch repo validation (v
 
     assert.equal(res.status, 201);
     assert.equal(captured.item.repo, 'not-a-known-repo-at-all');
-    assert.equal(fetchProjectsCalls, 0, 'validation must not touch the provider under isTestMode');
+    assert.equal(fetchProjectsListCalls, 0, 'validation must not touch the provider under isTestMode');
   });
 });

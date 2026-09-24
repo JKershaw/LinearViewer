@@ -168,7 +168,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    * Read-only exposure of Harbour's own known-repos inventory — the tracker
    * namespace `POST /api/proxy/dispatch`'s repo guard (LIN-2886,
    * `lib/dispatch-repo-guard.js`) validates a `repo` override against. This
-   * endpoint runs the identical `fetchProjects` -> `knownWorkspaceRepos`
+   * endpoint runs the identical `fetchProjectsList` -> `knownWorkspaceRepos`
    * computation (via the guard's own `fetchKnownRepos`, not a re-derivation
    * of it), but takes no `repo` and enqueues nothing — it exists so an
    * operator-run drift check can compare this namespace against a runner's
