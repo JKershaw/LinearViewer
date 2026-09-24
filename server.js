@@ -33,6 +33,7 @@ import { CREDENTIAL_SOURCES, fingerprintCredential } from './lib/credential-diag
 import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
 import { createRefreshOnResolveGate } from './lib/refresh-on-resolve-gate.js'
 import { WorkspacePreferencesStore } from './lib/workspace-preferences.js'
+import { WorkspaceHaltStore } from './lib/workspace-halt.js'
 import { DispatchQueueStore } from './lib/dispatch-store.js'
 import { CustomPromptsStore } from './lib/custom-prompts-store.js'
 import { CollectiveCharactersStore } from './lib/collective-characters-store.js'
@@ -266,6 +267,12 @@ const workspacePreferencesStore = new WorkspacePreferencesStore({
 const customPromptsCollection = db.collection('custom-prompts')
 const customPromptsStore = new CustomPromptsStore({
   collection: customPromptsCollection
+})
+
+// Workspace halt (LIN-2994/LIN-3023): operator pause/stop, unindexed _id-only lookup.
+const workspaceHaltCollection = db.collection('workspace-halt')
+const workspaceHaltStore = new WorkspaceHaltStore({
+  collection: workspaceHaltCollection
 })
 
 // Collective characters (personas the user picks for the experimental Collective
@@ -2008,7 +2015,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, getWorkspaceAccessToken, fetchIssueContext }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore }))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions
@@ -2481,7 +2488,7 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
   return resolveNorthStarDocVersion(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry, observerStateStore, savedChatStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore }))
