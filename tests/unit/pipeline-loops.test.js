@@ -22,9 +22,9 @@ import {
   firstRaisedAt,
   __internal
 } from '../../lib/pipeline-loops.js';
-import { parseDecisions, parseHeartbeat } from '../../lib/session-telemetry.js';
+import { parseDecisions, parseHeartbeat, deriveRuntime } from '../../lib/session-telemetry.js';
 import { loopLastActivityMs, isFreshlyActive, isLoopActive } from '../../lib/live-console.js';
-import { digestFeedback } from '../../lib/digest-feedback.js';
+import { digestFeedback, deriveLoopFacingFacts } from '../../lib/digest-feedback.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const {
@@ -1205,7 +1205,7 @@ function rawCollectionDoc(overrides = {}) {
   };
 }
 
-function makeLeanDigestStores({ items = [], collectionDocs = [], findError = null, updateError = null, findSpy = null, updateSpy = null } = {}) {
+function makeLeanDigestStores({ items = [], liveItems = [], collectionDocs = [], findError = null, updateError = null, findSpy = null, updateSpy = null } = {}) {
   const collection = createMockCollection();
   for (const d of collectionDocs) collection._docs.push({ ...d });
   const historyCollection = {
@@ -1227,7 +1227,7 @@ function makeLeanDigestStores({ items = [], collectionDocs = [], findError = nul
     _collection: collection,
     dispatchStore: {
       historyCollection,
-      async listItems() { return []; },
+      async listItems() { return liveItems; },
       async listHistory() { return { items, total: items.length }; }
     },
     agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } }
@@ -1374,6 +1374,34 @@ describe('self-heal (LIN-3011): missing/stale feedbackDigest re-reads by _id, gu
     assert.strictEqual(findCalls.length, 1);
     assert.deepStrictEqual(findCalls[0].o?.projection, { prompt: 0 });
   });
+
+  // Review ledger L5 (PR #1560): decides what `_selfHealLeanHistory`'s
+  // `if (!raw) return item` branch should do when the `_id $in` re-read
+  // finds nothing for a row `listHistory` DID return moments earlier — a
+  // narrow TTL-expiry/delete race. DECISION: serve the row exactly as
+  // `listHistory` returned it (stale-but-not-invented, never dropped),
+  // logged — never throw and fail the WHOLE fill for one benign, self-
+  // resolving row vanishing. See the code comment at the branch for the
+  // full reasoning (blast-radius disproportion vs. every other caller's own
+  // characterized degradation semantics).
+  test('L5: self-heal "re-read found nothing" (a vanished/expired row) is served stale-but-unchanged, never dropped, never throws, and is logged', async () => {
+    const originalError = console.error;
+    const logged = [];
+    console.error = (...args) => logged.push(args);
+    try {
+      const stores = makeLeanDigestStores({
+        items: [leanDigestItem({ id: 'vanished-1', feedbackVersion: 0, feedbackDigest: null })],
+        collectionDocs: [] // the re-read finds NOTHING for this id — simulates a TTL/delete race
+      });
+      const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+      assert.strictEqual(loops.length, 1, 'the row is NOT dropped — M28 would have dropped it');
+      assert.strictEqual(loops[0].loopId, 'vanished-1');
+      assert.strictEqual(loops[0].terminalStatus, null, 'no fact is invented — served with its stale (here: absent) digest, unchanged');
+      assert.ok(logged.some(a => a.join(' ').match(/vanished/i)), 'the vanished-row race is logged, never silent');
+    } finally {
+      console.error = originalError;
+    }
+  });
 });
 
 // Helper for the convergence test above: read back the mock historyCollection's
@@ -1473,6 +1501,30 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
     const loops = await getLoopsForWorkspace('ws', stores); // no lean: true
     assert.strictEqual(loops[0].terminalStatus, 'done', 'non-lean derives from raw feedback, not the (deliberately wrong) digest');
   });
+
+  // Review ledger L1 (PR #1560, independent review comment 14:22): the
+  // no-digest default runtime in `_loopFactsFromDigest` hard-coded
+  // `dispatchedAt: null`, but a queued LIVE item never carries a digest at
+  // all (it hasn't been archived yet) — so on the lean path every live loop
+  // regressed from reporting its own dispatchedAt to reporting null, a
+  // silent drift in `telemetry.runtime.dispatchedAt` the reviewer's
+  // differential probe (main vs PR, same raw rows) caught but no committed
+  // test guarded.
+  test('L1: a queued live item (no digest at all) still reports its own dispatchedAt in telemetry.runtime, matching deriveLoopFacingFacts([], dispatchedAt)', async () => {
+    // Relative to test-run time, not a fixed calendar date — this goes
+    // through the PUBLIC getLoopsForWorkspace API (real `now`), so a fixed
+    // past date risks silently ageing out of the 30-day lookback.
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const stores = makeLeanDigestStores({
+      liveItems: [liveItem({ id: 'live-l1', dispatchedAt })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const loop = loops.find(l => l.loopId === 'live-l1');
+    assert.ok(loop, 'the live loop is present');
+    const expected = deriveLoopFacingFacts([], dispatchedAt);
+    assert.deepStrictEqual(loop.telemetry, expected.telemetry,
+      'a digest-less live item must still carry its own dispatchedAt in telemetry.runtime — never a hard-coded null');
+  });
 });
 
 describe("abort harvest sourced from the abort row's own feedbackDigest.terminal (LIN-3011)", () => {
@@ -1565,6 +1617,68 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
     assert.strictEqual(target.terminalCompletedAt, digestIso(HOUR + 900));
   });
 
+  // Review ledger L2 (PR #1560): acceptance case 5 ("crossCheck when the
+  // target had a pre-abort duration tail") had no witness asserting
+  // `crossCheck` itself, and the F1 equal-millisecond boundary was untested.
+  test("L2: crossCheck reflects deriveRuntime(dispatchedAt, abortEntry.timestamp, [abortEntry]) after the harvest, not the target's own pre-abort duration tail", async () => {
+    // The abort entry's OWN message carries a duration ("in 5m") so this test
+    // can actually distinguish "derived from [abortEntry]" (crossCheck: 5m)
+    // from "derived from []" (crossCheck: null) — the same-looking null
+    // result either way would otherwise let a broken derivation pass.
+    const abortEntry = { message: '[aborted] cancelled in 5m', timestamp: digestIso(HOUR + 900) };
+    const stores = makeLeanDigestStores({
+      items: [
+        abortRow({
+          feedbackDigest: {
+            version: 1,
+            terminal: { status: 'aborted', entry: abortEntry },
+            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            telemetry: { runtime: {}, metrics: [], toolPeak: null }
+          }
+        }),
+        targetRow({
+          terminal: { status: 'failed', entry: { message: '[failed] ... in 3m', timestamp: digestIso(HOUR + 200) } },
+          telemetry: {
+            // The target's OWN pre-abort crossCheck ("3m") — must NOT survive
+            // the harvest; the abort recomputes runtime (incl. crossCheck)
+            // from scratch via deriveRuntime(dispatchedAt, abortEntry.timestamp, [abortEntry]).
+            runtime: { ms: null, dispatchedAt: digestIso(0), completedAt: null, crossCheck: { seconds: 180, ms: 180000, raw: '3m' } },
+            metrics: [], toolPeak: null
+          }
+        })
+      ],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    const expectedRuntime = deriveRuntime(digestIso(0), abortEntry.timestamp, [abortEntry]);
+    assert.deepStrictEqual(target.telemetry.runtime.crossCheck, expectedRuntime.crossCheck);
+    assert.deepStrictEqual(target.telemetry.runtime.crossCheck, { seconds: 300, ms: 300000, raw: '5m' },
+      'crossCheck must come from the harvested abort entry\'s own "in 5m", never the target\'s own pre-abort "3m" tail nor null (an empty-array derivation)');
+  });
+
+  test("L2: an abort at the SAME millisecond as the target's own genuine terminal does NOT win under the F1 guard (strict >, not >=)", async () => {
+    const equalMs = digestIso(HOUR + 200);
+    const stores = makeLeanDigestStores({
+      items: [
+        abortRow({
+          feedbackDigest: {
+            version: 1,
+            terminal: { status: 'aborted', entry: { message: '[aborted] cancelled', timestamp: equalMs } },
+            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            telemetry: { runtime: {}, metrics: [], toolPeak: null }
+          }
+        }),
+        targetRow({ terminal: { status: 'failed', entry: { message: '[failed] ... in 3m', timestamp: equalMs } } })
+      ],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.strictEqual(target.terminalStatus, 'failed', 'an EQUAL-millisecond abort must not override a genuine terminal — F1 is strictly-later-only');
+    assert.strictEqual(target.terminalCompletedAt, equalMs);
+  });
+
   test('decision fields are unaffected by the harvested abort', async () => {
     const decision = { decision_id: 'd-9', question: 'proceed?' };
     const stores = makeLeanDigestStores({
@@ -1576,6 +1690,34 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
     assert.deepStrictEqual(target.decision, decision);
     assert.deepStrictEqual(target.decisionCase, ['case text']);
     assert.strictEqual(target.answeredDecisionId, 'd-8');
+  });
+
+  // Review ledger L3 (PR #1560): LIN-1261's exclusion — a `[skipped]` row
+  // (the runner refused the cancel; a human is still continuing the
+  // session) must never be harvested as an abort, since nothing actually
+  // ended there. `_harvestAbortedTargetsFromDigests` already checks
+  // `terminal.status === 'aborted'`, but no committed test pinned it on the
+  // lean, digest-backed path.
+  test("L3: a [skipped]-terminal abort row must NOT mark the target aborted on the lean path", async () => {
+    const stores = makeLeanDigestStores({
+      items: [
+        abortRow({
+          feedbackDigest: {
+            version: 1,
+            terminal: { status: 'skipped', entry: { message: '[skipped] human-continued session', timestamp: digestIso(HOUR + 900) } },
+            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            telemetry: { runtime: {}, metrics: [], toolPeak: null }
+          }
+        }),
+        targetRow()
+      ],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.ok(target, 'target loop survives');
+    assert.strictEqual(target.terminalStatus, null, 'a [skipped] abort row must never be harvested — nothing actually ended, so the target stays un-terminal');
+    assert.strictEqual(target.wakeMarker, 'blocked', "the target's own digest facts (unrelated to any abort) are untouched");
   });
 });
 

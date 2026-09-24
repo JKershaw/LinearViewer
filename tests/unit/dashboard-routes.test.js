@@ -1925,6 +1925,51 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(run.toolPeak, 10, 'peak tool count precomputed across ALL heartbeats');
   });
 
+  // Review ledger L4 (PR #1560): the test above can't distinguish "reads the
+  // digest's toolPeak" from "recomputes peakToolCount(metrics)", because all
+  // 10 heartbeats share one timestamp close to "now" — R4 retention (last-6
+  // OR within-6h) keeps every one of them, so the retained `metrics` list is
+  // never actually trimmed below the true peak. This test forces a REAL
+  // trim: an old (7h-ago) heartbeat carries the true peak (50 tools) and
+  // falls outside both "last 6" and the 6h window, while nine recent,
+  // lower-count heartbeats survive retention. `routes/dashboard.js:720` must
+  // still report the true peak — only reachable by reading `l.toolPeak`
+  // (the digest's own, always-full-window figure), never by recomputing
+  // `peakToolCount` over the (now genuinely trimmed) `metrics` list.
+  test('L4: runs[].toolPeak reads the digest peak even when it falls outside the retained metrics window (routes/dashboard.js:720)', async () => {
+    const oldPeakBeat = { message: '[working] 50 tools/1s · alive', timestamp: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString() };
+    const recentBeats = [];
+    for (let i = 1; i <= 9; i++) {
+      recentBeats.push({ message: `[working] ${i} tools/${i}s · alive`, timestamp: new Date(Date.now() - i * 1000).toISOString() });
+    }
+    const trimmedWorker = {
+      id: 'w-trimmed', sessionId: 'sess-trimmed', issueIdentifier: 'LIN-832', issueTitle: 'Trimmed worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [oldPeakBeat, ...recentBeats, { message: '[done] shipped it', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-trimmed', 'LIN-833'), trimmedWorker],
+        agentStatus: [agentStatusDone('sess-trimmed', 'LIN-833'), agentStatusDone('w-trimmed', 'LIN-832')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-trimmed');
+    const run = sess.runs.find(r => r.loopId === 'w-trimmed');
+    assert.ok(run, 'worker run present');
+    // Sanity: prove retention genuinely trimmed the old peak beat out of the
+    // served metrics tail, so a pass below can't come from "nothing was
+    // actually trimmed" (the failure mode of the sibling test above).
+    assert.ok(run.metrics.every(m => (m.total ?? m.toolCount) < 50), 'sanity: the 50-tool beat is genuinely absent from the retained/served metrics');
+    assert.equal(run.toolPeak, 50, 'toolPeak must still be exact — read from the digest, not recomputed over the (now-trimmed) metrics list');
+  });
+
   // ─── Lineage identity survives into the runs[] projection (LIN-1487, T1) ─────
   // LIN-1477 pins `lineageId` DERIVATION (lib/pipeline-loops.js). This pins the
   // one novel thing S2c adds: the derived id reaches the FEED's runs[] projection

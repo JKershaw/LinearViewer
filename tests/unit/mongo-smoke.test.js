@@ -1619,16 +1619,31 @@ describe(
     // above needs — see its own comment for why that shape is the one that
     // could reveal a real divergence: a non-object `feedbackDigest` whose
     // missing `.version` happens to normalize equal to `feedbackVersion`).
-    test('LIN-3011 ledger L3: isFreshDigest (JS) and the real, imported FRESH_DIGEST $cond agree on all 7 row shapes', async () => {
+    test('LIN-3011 ledger L3: isFreshDigest (JS) and the real, imported FRESH_DIGEST $cond agree on all 8 row shapes', async () => {
       const collection = freshCollection('lin3011-freshness-l3');
       const shapes = [
         { _id: 'fresh', label: 'fresh (digest.version === feedbackVersion)', doc: { feedbackVersion: 3, feedbackDigest: { version: 3 } } },
         { _id: 'legacy', label: 'legacy (both fields absent)', doc: {} },
         { _id: 'seeded-empty', label: 'seeded-empty (feedbackVersion:0, feedbackDigest:null)', doc: { feedbackVersion: 0, feedbackDigest: null } },
         { _id: 'stale', label: 'stale (digest.version !== feedbackVersion)', doc: { feedbackVersion: 5, feedbackDigest: { version: 3 } } },
-        { _id: 'digest-no-version', label: 'digest-without-version (present but missing .version)', doc: { feedbackVersion: 2, feedbackDigest: { count: 999 } } },
+        // Review ledger L7 (PR #1560): `feedbackVersion: 0` here (not 2, as
+        // the rebase had it) is load-bearing — it's what makes THIS test
+        // itself catch a `$ifNull` sentinel regression (M29: the Mongo
+        // sentinel for a missing `.version` flipped from -1 to 0). At
+        // feedbackVersion 2, both the correct sentinel (-1) and a mutated
+        // one (0) already differ from 2, so the mutation would silently
+        // survive; only at feedbackVersion 0 does the mutated sentinel (0)
+        // collide with the (also 0) feedbackVersion side and read wrongly
+        // fresh, which this test must catch.
+        { _id: 'digest-no-version', label: 'digest-without-version (present but missing .version) at feedbackVersion:0', doc: { feedbackVersion: 0, feedbackDigest: { count: 999 } } },
         { _id: 'null-feedback-version', label: 'null-feedbackVersion (normalizes like missing -> 0, digest.version:0 IS fresh)', doc: { feedbackVersion: null, feedbackDigest: { version: 0 } } },
-        { _id: 'non-object-digest', label: 'non-object digest (scalar string; $type guard case)', doc: { feedbackVersion: -1, feedbackDigest: 'x' } }
+        { _id: 'non-object-digest', label: 'non-object digest (scalar string; $type guard case)', doc: { feedbackVersion: -1, feedbackDigest: 'x' } },
+        // Restored (review ledger L7): dropped by the rebase that introduced
+        // the 7-shape array — a legacy row healed exactly once, converging
+        // to version 0 on both sides via the SAME `feedbackVersion` absence
+        // (not an explicit 0), the shape self-heal's write-back actually
+        // produces in production.
+        { _id: 'healed-legacy', label: 'healed-legacy (feedbackVersion absent, digest {version:0})', doc: { feedbackDigest: { version: 0 } } }
       ];
       await collection.insertMany(shapes.map((s) => ({ _id: s._id, ...s.doc })));
 
@@ -1648,7 +1663,21 @@ describe(
     // parkedWait+runtime+model+usage+resources+ticketWalk) — never raw
     // `feedback`/`promptText`, which legitimately differ between the lean and
     // non-lean shapes for reasons unrelated to this equivalence (LIN-622).
+    // Review ledger L6 (PR #1560): the original version of this helper
+    // coalesced every telemetry sub-field with `?? null`/`?? []`, so an
+    // omitted-vs-explicitly-absent divergence between the lean (digest-
+    // backed) and non-lean (baseline) paths could never surface here — both
+    // sides normalize to the SAME coalesced value regardless of whether the
+    // key was genuinely present. N4 (omitted vs null must be preserved,
+    // never normalized) is exactly the class this witness exists to guard.
+    // Compares `loop.telemetry` AS-IS (destructuring only `metrics` out,
+    // R4's one accepted exemption — it's deliberately retention-trimmed on
+    // lean, full on non-lean, a real and intended difference) so a missing
+    // key on one side and a present key on the other is a genuine mismatch,
+    // and adds `producedArtifacts`, which the original version omitted
+    // entirely.
     function pickLoopFacingFacts(loop) {
+      const { metrics, ...telemetryRest } = loop.telemetry || {};
       return {
         terminalStatus: loop.terminalStatus,
         terminalCompletedAt: loop.terminalCompletedAt,
@@ -1657,14 +1686,7 @@ describe(
         decision: loop.decision,
         decisionCase: loop.decisionCase,
         answeredDecisionId: loop.answeredDecisionId,
-        telemetry: {
-          parkedWait: loop.telemetry?.parkedWait ?? null,
-          runtime: loop.telemetry?.runtime ?? null,
-          model: loop.telemetry?.model ?? null,
-          usage: loop.telemetry?.usage ?? null,
-          resources: loop.telemetry?.resources ?? null,
-          ticketWalk: loop.telemetry?.ticketWalk ?? []
-        }
+        telemetry: telemetryRest
       };
     }
 
