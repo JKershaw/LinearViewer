@@ -1,0 +1,137 @@
+/**
+ * scripts/lin3014/lib/equivalence-core.mjs (LIN-3014)
+ *
+ * The output-equivalence comparator: `deepStrictEqual` with NO normalisation
+ * (research beat 3, `299efc16`, step 7 A — a JSON round-trip would pass a
+ * Date-vs-ISO-string divergence and an omitted-vs-undefined key, both of
+ * which must fail here), the row-classification predicates the sample
+ * selection needs to name its abort-harvest/lineage/legacy/healed cases, and
+ * the `lineageLastActivityMs` non-decreasing-timestamp screen.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert';
+import {
+  classifyRow,
+  compareLoops,
+  compareSessionCounts,
+  hasNonDecreasingTimestamps,
+  selectSample
+} from '../../scripts/lin3014/lib/equivalence-core.mjs';
+
+function baseLoop(overrides = {}) {
+  return {
+    loopId: 'l1',
+    terminalStatus: 'completed',
+    terminalCompletedAt: new Date('2026-09-24T15:49:07.209Z'),
+    wakeMarker: null,
+    promptText: 'irrelevant (exempt)',
+    feedback: [],
+    toolPeak: 3,
+    telemetry: { metrics: [{ ts: 1 }], runtime: { model: 'x' } },
+    lineageMetrics: [{ ts: 1 }],
+    ...overrides
+  };
+}
+
+test('LIN-3014 compareLoops: identical loops (after exemptions) PASS', () => {
+  const lean = baseLoop();
+  const baseline = baseLoop();
+  const result = compareLoops(lean, baseline);
+  assert.strictEqual(result.equal, true);
+});
+
+test('LIN-3014 compareLoops: exempt-only differences (promptText/feedback/toolPeak/telemetry.metrics/lineageMetrics) still PASS', () => {
+  const lean = baseLoop({ promptText: undefined, feedback: [], toolPeak: 7, telemetry: { metrics: [{ ts: 99 }], runtime: { model: 'x' } }, lineageMetrics: [{ ts: 99 }] });
+  const baseline = baseLoop({ promptText: 'full prompt text', feedback: [{ kind: 'status' }], toolPeak: null, telemetry: { metrics: [{ ts: 1 }, { ts: 2 }], runtime: { model: 'x' } }, lineageMetrics: [{ ts: 1 }] });
+  const result = compareLoops(lean, baseline);
+  assert.strictEqual(result.equal, true, `exempt-only differences must not fail: ${result.message}`);
+});
+
+test('LIN-3014 compareLoops PLANTED DIFFERENCE: a Date vs its own ISO string is caught (a JSON round-trip would call it equal)', () => {
+  const d = new Date('2026-09-24T15:49:07.209Z');
+  const lean = baseLoop({ terminalCompletedAt: d });
+  const baseline = baseLoop({ terminalCompletedAt: d.toISOString() });
+  // Sanity: a JSON-normalised comparison WOULD treat these as equal.
+  assert.strictEqual(JSON.stringify(lean.terminalCompletedAt), JSON.stringify(baseline.terminalCompletedAt));
+  const result = compareLoops(lean, baseline);
+  assert.strictEqual(result.equal, false, 'deepStrictEqual must distinguish a Date from an ISO string, unlike JSON normalisation');
+});
+
+test('LIN-3014 compareLoops PLANTED DIFFERENCE: an omitted key vs an explicit undefined is caught', () => {
+  const lean = baseLoop({ wakeMarker: undefined });
+  delete lean.wakeMarker; // genuinely omitted
+  const baseline = baseLoop({ wakeMarker: undefined }); // explicitly present, value undefined
+  assert.strictEqual('wakeMarker' in lean, false);
+  assert.strictEqual('wakeMarker' in baseline, true);
+  const result = compareLoops(lean, baseline);
+  assert.strictEqual(result.equal, false, 'deepStrictEqual must distinguish an omitted key from an explicit undefined, unlike JSON normalisation (which drops both)');
+});
+
+test('LIN-3014 compareLoops PLANTED DIFFERENCE: a changed non-exempt scalar is caught', () => {
+  const lean = baseLoop({ terminalStatus: 'completed' });
+  const baseline = baseLoop({ terminalStatus: 'failed' });
+  const result = compareLoops(lean, baseline);
+  assert.strictEqual(result.equal, false);
+  assert.match(result.message, /terminalStatus/);
+});
+
+test('LIN-3014 compareSessionCounts: equal count maps PASS, a changed count FAILS', () => {
+  assert.strictEqual(compareSessionCounts({ 'LIN-1': 2 }, { 'LIN-1': 2 }).equal, true);
+  assert.strictEqual(compareSessionCounts({ 'LIN-1': 2 }, { 'LIN-1': 3 }).equal, false);
+});
+
+test('LIN-3014 hasNonDecreasingTimestamps: true for non-decreasing, empty, or single-entry feedback', () => {
+  assert.strictEqual(hasNonDecreasingTimestamps([]), true);
+  assert.strictEqual(hasNonDecreasingTimestamps(undefined), true);
+  assert.strictEqual(hasNonDecreasingTimestamps([{ timestamp: new Date(1000) }]), true);
+  assert.strictEqual(hasNonDecreasingTimestamps([{ timestamp: new Date(1000) }, { timestamp: new Date(2000) }, { timestamp: new Date(2000) }]), true);
+});
+
+test('LIN-3014 hasNonDecreasingTimestamps: false for the counterexample shape (a late-position, earlier-timestamped beat)', () => {
+  // research beat 3, step 7 C: the counterexample that refutes "lineageLastActivityMs identical in principle"
+  const feedback = [
+    { timestamp: new Date('2026-09-24T09:13:06.309Z') },
+    { timestamp: new Date('2026-09-24T01:13:06.309Z') } // out of order
+  ];
+  assert.strictEqual(hasNonDecreasingTimestamps(feedback), false);
+});
+
+test('LIN-3014 classifyRow: distinguishes legacy-unhealed, heal-written, healed-legacy, abort, lineage, stale', () => {
+  assert.deepStrictEqual(
+    classifyRow({}),
+    { legacyUnhealed: true, healWritten: false, healedLegacy: false, abortSource: false, lineageMember: false, stale: true }
+  );
+  assert.strictEqual(classifyRow({ feedbackDigest: { version: 0 } }).healWritten, true);
+  assert.strictEqual(classifyRow({ feedbackDigest: { version: 0 } }).healedLegacy, true, 'feedbackVersion absent + digest object = healed-legacy');
+  assert.strictEqual(classifyRow({ feedbackVersion: 0, feedbackDigest: null }).legacyUnhealed, false, 'seeded-empty (feedbackVersion:0, digest:null) is not legacy-unhealed');
+  assert.strictEqual(classifyRow({ abort: true }).abortSource, true);
+  assert.strictEqual(classifyRow({ rootItemId: 'root-1' }).lineageMember, true);
+  assert.strictEqual(classifyRow({ feedbackVersion: 2, feedbackDigest: { version: 2 } }).stale, false);
+});
+
+test('LIN-3014 selectSample: covers each named class when present, and reports what is missing rather than guessing', () => {
+  const docs = [
+    { _id: 'legacy-1' }, // legacyUnhealed
+    { _id: 'healed-1', feedbackDigest: { version: 0 } }, // healWritten
+    { _id: 'abort-1', abort: true },
+    { _id: 'lineage-1', rootItemId: 'root-1' },
+    { _id: 'plain-1', feedbackVersion: 3, feedbackDigest: { version: 3 } }
+  ];
+  const { sample, coverage, missing } = selectSample(docs, { targetSize: 20 });
+  assert.strictEqual(coverage.legacyUnhealed, true);
+  assert.strictEqual(coverage.healWritten, true);
+  assert.strictEqual(coverage.abortSource, true);
+  assert.strictEqual(coverage.lineageMember, true);
+  assert.deepStrictEqual(missing, []);
+  assert.strictEqual(sample.length, docs.length);
+});
+
+test('LIN-3014 selectSample: a class with no population is reported MISSING, not silently skipped', () => {
+  const docs = [{ _id: 'plain-1', feedbackVersion: 1, feedbackDigest: { version: 1 } }];
+  const { coverage, missing } = selectSample(docs);
+  assert.strictEqual(coverage.legacyUnhealed, false);
+  assert.ok(missing.includes('legacy row'));
+  assert.ok(missing.includes('just-healed row'));
+  assert.ok(missing.includes('abort-harvest source'));
+  assert.ok(missing.includes('lineage member'));
+});
