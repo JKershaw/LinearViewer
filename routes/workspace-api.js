@@ -280,11 +280,17 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
 
   if (taskDecisionsStore && typeof taskDecisionId === 'string' && taskDecisionId && typeof taskDecisionIssueId === 'string' && taskDecisionIssueId) {
     try {
-      const stamped = await taskDecisionsStore.markOutcome({
-        urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId, outcome: 'answered'
+      // LIN-2889/LIN-2724: the shared answer() op un-retires a self-resolved
+      // row before re-stamping it, and firstStampWins comes from a
+      // conditional write (matchedCount), not from markOutcome's earlier
+      // read — a truthy return here is not itself proof this call's own
+      // write landed.
+      const { record, firstStampWins } = await taskDecisionsStore.answer({
+        urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId
       });
-      if (!stamped) {
-        console.error(`Task-decision answer stamp not applied: no matching row ${taskDecisionId} for issue ${taskDecisionIssueId} in workspace ${workspace.urlKey}`);
+      const success = !!record && (firstStampWins || record.outcome === 'answered' || record.outcome === 'dismissed');
+      if (!success) {
+        console.error(`Task-decision answer stamp not applied: no matching row ${taskDecisionId} for issue ${taskDecisionIssueId} in workspace ${workspace.urlKey} (outcome=${record?.outcome ?? 'none'})`);
         ok = false;
       } else if (sessionsFeedCache) {
         // LIN-2755: uniform invalidation, per the ticket's Proposal — this

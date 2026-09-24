@@ -1636,19 +1636,16 @@ export function createDashboardRoutes({
   // route); re-deriving it needs a read this route does not otherwise take,
   // for a value sourced from an already-validated standing suggestion.
   //
-  // The 409 detection compares `record.outcomeAt` (always a string —
-  // `toRecord` stringifies it) against `requestStartedAt`, both converted via
-  // `new Date(...).getTime()`. A bare `<` between a string and a `Date`
-  // coerces the `Date` to `NaN` and is unconditionally `false`, silently
-  // disabling this guard for every input — do not simplify it back to that.
-  // `markOutcome`'s write branch always sets `outcomeAt` strictly after this
-  // call's own `requestStartedAt` (its `findOne` observed no existing outcome
-  // first), so this call's own successful write always falls through to 200;
-  // any genuinely pre-existing outcome — including an earlier, already-
-  // completed `answered` stamp — predates it and 409s instead. The `outcome`
-  // string alone cannot distinguish those two cases, since both are
-  // `'answered'` (unlike the retire route's `'self-resolved'` lookalike,
-  // which nothing else ever writes).
+  // This route and `stampDecisionAnswers`'s task half (routes/workspace-api.js)
+  // both call the shared `TaskDecisionsStore.answer()` (LIN-2889), which
+  // un-retires a self-resolved row before re-stamping it — a human answer
+  // always outranks the model's earlier self-resolve guess — and reports
+  // `firstStampWins` from a conditional write (`matchedCount`), never from a
+  // read. Success requires `firstStampWins === true`; anything else is an
+  // explicit non-success, never an implicit 200 (plan-review F1). This
+  // replaces the earlier `outcomeAt`/`requestStartedAt` timestamp check
+  // (LIN-2791), which could not tell a self-resolved row apart from a
+  // genuine already-answered race.
   router.post('/workspace/:urlKey/api/dashboard/rulings/answer', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
     const { taskDecisionId, taskDecisionIssueId, optionId } = req.body || {};
@@ -1663,22 +1660,31 @@ export function createDashboardRoutes({
       return jsonError(res, 503, 'Scan store not configured');
     }
     try {
-      const requestStartedAt = new Date();
-      const record = await taskDecisionsStore.markOutcome({
-        urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId,
-        outcome: 'answered', optionId
+      const { record, firstStampWins } = await taskDecisionsStore.answer({
+        urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId, optionId
       });
       if (!record) {
         return jsonError(res, 404, 'No matching ruling to answer');
       }
-      if (new Date(record.outcomeAt).getTime() < requestStartedAt.getTime()) {
-        return jsonError(res, 409, 'This ruling was already answered', { code: 'ALREADY_TERMINAL' });
+      if (firstStampWins) {
+        // LIN-2755: see the dismiss route's identical comment above — one
+        // clear() after a genuinely successful write (never on either 409
+        // branch below, which changed nothing this call can claim).
+        sessionsFeedCache.clear(workspace.urlKey);
+        return res.json({ success: true });
       }
-      // LIN-2755: see the dismiss route's identical comment above — one
-      // clear() after a genuinely successful write (never on the 409
-      // first-stamp-wins path, which changed nothing this call can claim).
-      sessionsFeedCache.clear(workspace.urlKey);
-      res.json({ success: true });
+      if (record.outcome === 'answered' || record.outcome === 'dismissed') {
+        const label = record.outcome === 'dismissed' ? 'dismissed' : 'answered';
+        return jsonError(res, 409, `This ruling was already ${label}`, { code: 'ALREADY_TERMINAL' });
+      }
+      // Leftover self-resolved state: reachable only through the genuinely
+      // rare case answer()'s narrowed catch still lets through — a second,
+      // independent retire landing in the sub-millisecond window between
+      // this call's own un-retire and re-stamp. Never an implicit 200: the
+      // client's un-retire-then-answer request is itself safe to resubmit
+      // (answer() is idempotent from the caller's perspective), so ask for
+      // a retry rather than guessing.
+      return jsonError(res, 409, 'Could not confirm the answer — please retry', { code: 'RETRY_REQUIRED' });
     } catch (error) {
       console.error('Ruling answer error:', error);
       jsonError(res, 500, 'Failed to answer ruling');

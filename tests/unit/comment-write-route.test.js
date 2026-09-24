@@ -72,12 +72,21 @@ function makeFakeDispatchQueueStore(overrides = {}) {
 }
 
 function makeFakeTaskDecisionsStore(overrides = {}) {
-  const calls = { markOutcome: [] };
+  const calls = { markOutcome: [], answer: [] };
   const store = {
     async markOutcome({ urlKey, issueId, id, outcome }) {
       calls.markOutcome.push({ urlKey, issueId, id, outcome });
       if (overrides.markOutcome) return overrides.markOutcome({ urlKey, issueId, id, outcome });
       return { id, urlKey, issueId, outcome, outcomeAt: new Date().toISOString() };
+    },
+    // LIN-2889: default delegates to this same store's markOutcome (so
+    // calls.markOutcome is still recorded and every override above keeps
+    // working unchanged) rather than adding a second, independent call shape.
+    async answer({ urlKey, issueId, id, optionId }) {
+      calls.answer.push({ urlKey, issueId, id, optionId });
+      if (overrides.answer) return overrides.answer({ urlKey, issueId, id, optionId });
+      const record = await store.markOutcome({ urlKey, issueId, id, outcome: 'answered' });
+      return { record, firstStampWins: !!record && record.firstStampWins !== false, unretried: false };
     },
   };
   return { store, calls };
@@ -721,12 +730,21 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
 
   function makeSharedTaskDecisionsStore() {
     const calls = [];
-    return {
+    const store = {
       calls,
       async listUnansweredForWorkspaces() { return []; }, // this half's write is exercised in isolation below
       async listNewestScanPerTask() { return {}; },
       async markOutcome(args) { calls.push(args); return { ...args, outcomeAt: new Date().toISOString() }; },
+      // LIN-2889: stampDecisionAnswers now calls answer(), not markOutcome()
+      // directly — delegate so `calls` still records the underlying stamp
+      // attempt, keeping this witness's "the write actually reached the
+      // store" assertion meaningful.
+      async answer({ urlKey, issueId, id, optionId }) {
+        const record = await store.markOutcome({ urlKey, issueId, id, outcome: 'answered', optionId });
+        return { record, firstStampWins: true, unretried: false };
+      },
     };
+    return store;
   }
 
   // Mounts the SAME workspace-api app `buildApp` builds, plus a

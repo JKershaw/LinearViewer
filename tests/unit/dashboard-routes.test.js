@@ -803,12 +803,12 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
   const ANSWER_PATH = '/workspace/:urlKey/api/dashboard/rulings/answer';
   const VALID_BODY = { taskDecisionId: 'scan_1', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555', optionId: 'opt-a' };
 
-  test('stamps markOutcome with outcome "answered" and the given optionId, on the ruling\'s own workspace; posts no comment', async () => {
+  test('calls answer() with the given optionId, on the ruling\'s own workspace, and reports success on firstStampWins; posts no comment', async () => {
     const calls = [];
     const router = makeAnswerRouter({
-      async markOutcome(args) {
+      async answer(args) {
         calls.push(args);
-        return { outcomeAt: new Date(Date.now() + 60000).toISOString() };
+        return { record: { outcome: 'answered' }, firstStampWins: true, unretried: false };
       }
     });
     const handler = getHandler(router, 'post', ANSWER_PATH);
@@ -821,13 +821,13 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
     assert.equal(calls.length, 1);
     assert.deepEqual(calls[0], {
       urlKey: 'ws-a', issueId: VALID_BODY.taskDecisionIssueId, id: VALID_BODY.taskDecisionId,
-      outcome: 'answered', optionId: 'opt-a'
+      optionId: 'opt-a'
     });
   });
 
-  test('400 when taskDecisionId, taskDecisionIssueId or optionId is missing or blank — markOutcome is never called', async () => {
+  test('400 when taskDecisionId, taskDecisionIssueId or optionId is missing or blank — answer() is never called', async () => {
     let called = false;
-    const router = makeAnswerRouter({ async markOutcome() { called = true; return null; } });
+    const router = makeAnswerRouter({ async answer() { called = true; return { record: null, firstStampWins: false }; } });
     const handler = getHandler(router, 'post', ANSWER_PATH);
 
     for (const omit of ['taskDecisionId', 'taskDecisionIssueId', 'optionId']) {
@@ -843,11 +843,11 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
     await handler(req, res);
     assert.equal(res.statusCode, 400, 'a blank optionId should 400');
 
-    assert.equal(called, false, 'markOutcome must never be called on a partial/blank payload');
+    assert.equal(called, false, 'answer() must never be called on a partial/blank payload');
   });
 
-  test('404 when markOutcome finds no matching scan record', async () => {
-    const router = makeAnswerRouter({ async markOutcome() { return null; } });
+  test('404 when answer() finds no matching scan record', async () => {
+    const router = makeAnswerRouter({ async answer() { return { record: null, firstStampWins: false }; } });
     const handler = getHandler(router, 'post', ANSWER_PATH);
     const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
     req.body = { ...VALID_BODY };
@@ -856,17 +856,15 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
   });
 
   // Witness 14: a second Agree on an already-answered task-bound row (a
-  // double-click, or a duplicate bulk press) — markOutcome's first-stamp-wins
-  // returns the SAME shape a fresh success does (an 'answered' record), so the
-  // route must distinguish "my own write" from "an earlier, already-completed
-  // write" via the outcomeAt/requestStartedAt timestamp comparison, not the
-  // outcome string.
-  test('Witness 14: an outcomeAt predating the request (an earlier, already-completed answer) 409s ALREADY_TERMINAL and does not report success', async () => {
+  // double-click, or a duplicate bulk press) — the route must distinguish
+  // "my own write" (firstStampWins: true, from answer()'s own conditional
+  // write) from "an earlier, already-completed write" (firstStampWins:
+  // false, record.outcome === 'answered'), never from the outcome string or
+  // a timestamp comparison alone (LIN-2889 F1).
+  test('Witness 14: firstStampWins: false with outcome "answered" (an earlier, already-completed answer) 409s ALREADY_TERMINAL and does not report success', async () => {
     const router = makeAnswerRouter({
-      async markOutcome() {
-        // Simulates first-stamp-wins: markOutcome returns the PRE-EXISTING
-        // terminal record, stamped well before this call started.
-        return { outcomeAt: new Date(Date.now() - 60000).toISOString() };
+      async answer() {
+        return { record: { outcome: 'answered' }, firstStampWins: false, unretried: false };
       }
     });
     const handler = getHandler(router, 'post', ANSWER_PATH);
@@ -876,8 +874,47 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
 
     assert.equal(res.statusCode, 409);
     assert.equal(res.jsonBody.code, 'ALREADY_TERMINAL');
+    assert.equal(res.jsonBody.error, 'This ruling was already answered');
     assert.notEqual(res.statusCode, 200);
     assert.notDeepEqual(res.jsonBody, { success: true });
+  });
+
+  // C2: the 409 wording names the actual terminal outcome instead of always
+  // claiming "already answered" on a dismissed row.
+  test('firstStampWins: false with outcome "dismissed" 409s ALREADY_TERMINAL, worded "already dismissed"', async () => {
+    const router = makeAnswerRouter({
+      async answer() {
+        return { record: { outcome: 'dismissed' }, firstStampWins: false, unretried: false };
+      }
+    });
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.jsonBody.code, 'ALREADY_TERMINAL');
+    assert.equal(res.jsonBody.error, 'This ruling was already dismissed');
+  });
+
+  // F1's required test: a leftover self-resolved record (the rare stacked-
+  // retire race that answer()'s narrowed catch still lets through) must
+  // never fall through to an implicit 200 — it gets an explicit retry-me 409.
+  test('leftover self-resolved record (firstStampWins: false, outcome "self-resolved") 409s RETRY_REQUIRED, never 200', async () => {
+    const router = makeAnswerRouter({
+      async answer() {
+        return { record: { outcome: 'self-resolved' }, firstStampWins: false, unretried: true };
+      }
+    });
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { ...VALID_BODY };
+    await handler(req, res);
+
+    assert.notEqual(res.statusCode, 200);
+    assert.notDeepEqual(res.jsonBody, { success: true });
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.jsonBody.code, 'RETRY_REQUIRED');
   });
 
   test('503 when taskDecisionsStore is not configured', async () => {
@@ -890,7 +927,7 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
   });
 
   test('500 when the store throws, never propagates the raw error', async () => {
-    const router = makeAnswerRouter({ async markOutcome() { throw new Error('store down'); } });
+    const router = makeAnswerRouter({ async answer() { throw new Error('store down'); } });
     const handler = getHandler(router, 'post', ANSWER_PATH);
     const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
     req.body = { ...VALID_BODY };
@@ -939,6 +976,56 @@ describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
     const status = await taskDecisionsStore.getStatus('ws-a', issueId);
     assert.equal(status.outcome, 'answered');
     assert.equal(status.optionId, 'opt-a');
+  });
+
+  // LIN-2889/LIN-2724 real-store acceptance: a self-resolved row un-retires
+  // then answers through this route — the fix's own headline behavior,
+  // exercised against the real TaskDecisionsStore rather than a route-level
+  // fake, so the conditional-write + un-retire-then-answer sequence is
+  // proven end to end, not just at the route's call-shape level.
+  test('a self-resolved row un-retires then answers via /rulings/answer (real store, LIN-2889/LIN-2724)', async () => {
+    const collection = (() => {
+      const docs = [];
+      function matches(doc, query) {
+        return Object.entries(query).every(([k, v]) => doc[k] === v);
+      }
+      return {
+        _docs: docs,
+        async findOne(query) { return docs.find(d => matches(d, query)) || null; },
+        async updateOne(query, update, opts = {}) {
+          const idx = docs.findIndex(d => matches(d, query));
+          if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
+          if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0, upsertedId: true }; }
+          return { matchedCount: 0 };
+        },
+        find(query = {}) { return { async toArray() { return docs.filter(d => matches(d, query)); } }; }
+      };
+    })();
+    const taskDecisionsStore = new TaskDecisionsStore({ collection });
+    const issueId = '11111111-2222-3333-4444-555555555555';
+    const scanned = await taskDecisionsStore.recordScan({
+      urlKey: 'ws-a', issueId, issueIdentifier: 'LIN-30', inputHash: 'a'.repeat(64),
+      decision: { decision_id: 'd-1', question: 'Proceed?', options: [{ id: 'opt-a', label: 'Yes' }] }
+    });
+    await taskDecisionsStore.markOutcome({
+      urlKey: 'ws-a', issueId, id: scanned.id, outcome: 'self-resolved',
+      outcomeReason: 'Retired automatically: a rescan found no pending decision.', outcomeBasisHash: 'basis-xyz'
+    });
+
+    const router = makeAnswerRouter(taskDecisionsStore);
+    const handler = getHandler(router, 'post', ANSWER_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { taskDecisionId: scanned.id, taskDecisionIssueId: issueId, optionId: 'opt-a' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { success: true });
+
+    const status = await taskDecisionsStore.getStatus('ws-a', issueId);
+    assert.equal(status.outcome, 'answered', 'a human answer outranks the earlier self-resolve guess');
+    assert.equal(status.optionId, 'opt-a');
+    assert.equal(status.outcomeReason, null, 'the self-resolved outcomeReason/outcomeBasisHash do not survive the un-retire');
+    assert.equal(status.outcomeBasisHash, null);
   });
 });
 
@@ -4891,7 +4978,11 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       taskDecisionsStore: {
         async listUnansweredForWorkspaces() { return []; },
         async listNewestScanPerTask() { return {}; },
-        async markOutcome() { return { outcomeAt: new Date(Date.now() + 60000).toISOString() }; }
+        // LIN-2889 plan-review F2′: the route now calls answer(), not
+        // markOutcome() directly — a stale markOutcome-shaped fake here
+        // throws TypeError and silently stops exercising the write path
+        // this witness exists to prove clears the cache.
+        async answer() { return { record: { outcome: 'answered' }, firstStampWins: true, unretried: false }; }
       }
     });
     await assertInvalidatesAndBounded({

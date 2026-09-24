@@ -196,7 +196,11 @@ async function startApp({ provider, ownerCredentialStore, accessToken }) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
     reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {},
-    taskDecisionsStore: { markOutcome: async () => ({ outcome: 'answered' }) },
+    // LIN-2889: stampDecisionAnswers now calls the shared answer() op, not
+    // markOutcome() directly — this witness's task stamp must actually land
+    // (rather than throwing a logged TypeError) for the recovery-tail
+    // fidelity it exists to check.
+    taskDecisionsStore: { answer: async () => ({ record: { outcome: 'answered' }, firstStampWins: true, unretried: false }) },
     harbourCommentsStore: null,
     sessionsFeedCache: null,
     ownerCredentialStore,
