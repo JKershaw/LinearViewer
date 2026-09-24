@@ -26,6 +26,7 @@ import { parseDecisions, parseHeartbeat, deriveRuntime } from '../../lib/session
 import { loopLastActivityMs, isFreshlyActive, isLoopActive } from '../../lib/live-console.js';
 import { digestFeedback, deriveLoopFacingFacts } from '../../lib/digest-feedback.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+import { buildSessionCounts } from '../../lib/sessions-view.js';
 
 const {
   _toDate,
@@ -2401,5 +2402,139 @@ describe('_buildLoops: answeredDecisionId derivation end-to-end (LIN-1728)', () 
     const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
     assert.strictEqual(lean.answeredDecisionId, full.answeredDecisionId);
     assert.strictEqual(lean.answeredDecisionId, 'd-1');
+  });
+});
+
+// ─── LIN-3013: swipe page session-count read goes lean ─────────────────────
+//
+// The swipe page's session-count read (server.js:2748) feeds ONLY
+// `buildSessionCounts(allLoops)` (lib/sessions-view.js), which reads exactly
+// one field per loop — `issueIdentifier` — set at the row-normalization step
+// in `_buildLoops` (see the `issueIdentifier: item.issueIdentifier` pushes
+// above), entirely upstream of and independent from the lean/non-lean
+// feedback-digest split. This is the runtime witness for that: a
+// representative fixture — a normal terminal row, a decision row, a
+// self-terminal aborted row, an abort-HARVESTED row (cross-row, via the
+// LIN-1257/LIN-3011 abortTo mechanism), and a parked row, across two
+// distinct issues — run through the real `getLoopsForWorkspace` both ways,
+// asserting `buildSessionCounts` is identical either way AND matches an
+// explicit expected object (so the test cannot pass vacuously on two equal
+// empty results).
+describe('LIN-3013 — buildSessionCounts is identical for lean and non-lean loops (aborted/harvested/parked/decision rows)', () => {
+  const T0 = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(); // 6h ago: well inside the 30d lookback
+  function minutesAfter(iso, mins) {
+    return new Date(Date.parse(iso) + mins * 60 * 1000).toISOString();
+  }
+
+  function buildFixtureHistory() {
+    return [
+      // ISSUE_A, row 1: a normal terminal row.
+      historyItem({
+        id: 'a-normal',
+        issueIdentifier: ISSUE_A,
+        dispatchedAt: T0,
+        resolvedAt: minutesAfter(T0, 5),
+        feedback: [
+          textEntry('working on it', minutesAfter(T0, 1)),
+          { message: '[done] finished in 5m', timestamp: minutesAfter(T0, 5) }
+        ]
+      }),
+      // ISSUE_A, row 2: a decision row.
+      historyItem({
+        id: 'a-decision',
+        issueIdentifier: ISSUE_A,
+        dispatchedAt: minutesAfter(T0, 10),
+        resolvedAt: null,
+        status: 'taken',
+        feedback: [
+          textEntry('weighing the options', minutesAfter(T0, 11)),
+          decisionEntry(FULL_DECISION_PAYLOAD, minutesAfter(T0, 12))
+        ]
+      }),
+      // ISSUE_B, row 1: a self-terminal aborted row — its OWN feedback ends
+      // [aborted], no cross-row harvest involved.
+      historyItem({
+        id: 'b-aborted',
+        issueIdentifier: ISSUE_B,
+        dispatchedAt: T0,
+        resolvedAt: minutesAfter(T0, 3),
+        feedback: [{ message: '[aborted] cancelled by operator', timestamp: minutesAfter(T0, 3) }]
+      }),
+      // ISSUE_B, row 2: a HARVEST TARGET — its own feedback carries no
+      // terminal marker. The abort row below (issueIdentifier: null,
+      // abort: true, abortTo: this id) harvests an [aborted] terminal onto
+      // it via the LIN-1257/LIN-3011 abortTo mechanism.
+      historyItem({
+        id: 'b-harvest-target',
+        issueIdentifier: ISSUE_B,
+        dispatchedAt: minutesAfter(T0, 20),
+        resolvedAt: null,
+        status: 'taken',
+        feedback: [{ message: '[working] 2 tools/40s · alive', timestamp: minutesAfter(T0, 21) }]
+      }),
+      // The abort row itself. `issueIdentifier: null` matches real production
+      // shape (pipeline-loops.js's own comment on the abort item's own
+      // dispatch row) — it must be dropped from `getLoopsForWorkspace`'s
+      // output on BOTH paths and never contribute a stray count.
+      historyItem({
+        id: 'b-abort-row',
+        issueIdentifier: null,
+        abort: true,
+        abortTo: 'b-harvest-target',
+        dispatchedAt: minutesAfter(T0, 22),
+        resolvedAt: minutesAfter(T0, 23),
+        feedback: [{ message: '[aborted] cancelled by operator', timestamp: minutesAfter(T0, 23) }]
+      }),
+      // ISSUE_B, row 3: a parked row (last feedback entry hints a scheduled
+      // wakeup — lib/session-telemetry.js's parseParkedWait).
+      historyItem({
+        id: 'b-parked',
+        issueIdentifier: ISSUE_B,
+        dispatchedAt: minutesAfter(T0, 30),
+        resolvedAt: null,
+        status: 'taken',
+        feedback: [{ message: '[working] confirming a scheduled wakeup', timestamp: minutesAfter(T0, 31) }]
+      })
+    ];
+  }
+
+  test('buildSessionCounts(nonLean) deep-equals buildSessionCounts(lean) and both equal the explicit expected counts', async () => {
+    const nonLeanStores = makeMockStores({ history: buildFixtureHistory() });
+    const leanStores = makeMockStores({ history: buildFixtureHistory() });
+
+    const nonLeanLoops = await getLoopsForWorkspace('ws', nonLeanStores);
+    const leanLoops = await getLoopsForWorkspace('ws', { ...leanStores, lean: true });
+
+    // Guard against the fixture silently not exercising what it claims to,
+    // on BOTH paths: every named row category must actually land in the
+    // state its name promises, not merely exist. Without these, a fixture
+    // row that quietly fails to trip its detector (e.g. the wrong message
+    // format) would still pass the count-only assertions below vacuously.
+    for (const [label, loops] of [['non-lean', nonLeanLoops], ['lean', leanLoops]]) {
+      assert.ok(!loops.some(l => l.loopId === 'b-abort-row'), `${label}: the identifier-less abort row must never become a loop`);
+
+      const target = loops.find(l => l.loopId === 'b-harvest-target');
+      assert.ok(target, `${label}: the harvest target loop must survive`);
+      assert.strictEqual(target.terminalStatus, 'aborted', `${label}: the abort harvest must have actually landed on the target`);
+
+      const decisionLoop = loops.find(l => l.loopId === 'a-decision');
+      assert.ok(decisionLoop, `${label}: the decision loop must survive`);
+      assert.strictEqual(decisionLoop.decision?.decision_id, FULL_DECISION_PAYLOAD.decision_id, `${label}: the decision must actually be carried on the loop`);
+
+      const abortedLoop = loops.find(l => l.loopId === 'b-aborted');
+      assert.ok(abortedLoop, `${label}: the self-terminal aborted loop must survive`);
+      assert.strictEqual(abortedLoop.terminalStatus, 'aborted', `${label}: the self-terminal abort must actually be detected`);
+
+      const parkedLoop = loops.find(l => l.loopId === 'b-parked');
+      assert.ok(parkedLoop, `${label}: the parked loop must survive`);
+      assert.ok(parkedLoop.telemetry?.parkedWait, `${label}: the parked-wait state must actually be detected (parseParkedWait), not just present as a row`);
+    }
+
+    const expected = { [ISSUE_A]: 2, [ISSUE_B]: 3 };
+    const nonLeanCounts = buildSessionCounts(nonLeanLoops);
+    const leanCounts = buildSessionCounts(leanLoops);
+    assert.deepStrictEqual(nonLeanCounts, expected, 'non-lean counts must match the explicit expected object');
+    assert.deepStrictEqual(leanCounts, expected, 'lean counts must match the explicit expected object, not merely equal non-lean');
+    assert.deepStrictEqual(leanCounts, nonLeanCounts, 'lean and non-lean session counts must be identical');
   });
 });
