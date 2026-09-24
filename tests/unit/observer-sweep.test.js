@@ -1159,6 +1159,23 @@ describe('observer-sweep: negative capability — no automated-intervention path
           const value = Reflect.get(obj, prop, receiver);
           return typeof value === 'function' ? value.bind(obj) : value;
         }
+        // LIN-3011 (LIN-2996 Phase 3): the lean read's self-heal needs a
+        // READ-ONLY re-read of `dispatchStore.historyCollection` when a row's
+        // feedbackDigest is missing/stale — `_fetchWorkspaceData` reads it
+        // directly (lib/pipeline-loops.js `_selfHealLeanHistory`), so it can't
+        // go through the `listHistory` allowlist entry above. Granting it here
+        // is deliberately NARROWER than an all-or-nothing property gate: only
+        // `find`/`findOne`/`countDocuments` are reachable on the nested
+        // collection, so the guarantee this whole describe block exists to
+        // prove — no dispatch WRITE reaches the real store — is unweakened.
+        // Self-heal's own write-back (`updateOne`) stays unreachable here and
+        // is caught by its own try/catch (logged only, per the R5 contract),
+        // never by this Proxy rethrowing past it.
+        if (prop === 'historyCollection') {
+          const raw = Reflect.get(obj, prop, receiver);
+          if (raw == null) return raw;
+          return forbiddenProxy(raw, ['find', 'findOne', 'countDocuments'], `${label}.historyCollection`);
+        }
         throw new Error(`forbidden intervention path: ${label}.${String(prop)}`);
       }
     });

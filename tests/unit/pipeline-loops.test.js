@@ -1203,6 +1203,10 @@ function makeLeanDigestStores({ items = [], collectionDocs = [], findError = nul
     }
   };
   return {
+    // `_collection` is the raw, UNSPIED mock — tests that need to read back
+    // written state (e.g. "did the write-back land") use this directly so
+    // that diagnostic read doesn't itself inflate `findSpy`'s call count.
+    _collection: collection,
     dispatchStore: {
       historyCollection,
       async listItems() { return []; },
@@ -1358,7 +1362,11 @@ describe('self-heal (LIN-3011): missing/stale feedbackDigest re-reads by _id, gu
 // current documents via its own `find` (not `_docs` directly), so the test
 // exercises the same interface production code uses.
 async function collectionArray(stores) {
-  return stores.dispatchStore.historyCollection.find({}, {}).toArray();
+  // Reads the raw, UNSPIED collection directly — going through
+  // `historyCollection.find` here would itself count as a self-heal read and
+  // inflate `findSpy`'s call count, contaminating the very thing this helper
+  // exists to verify.
+  return stores._collection.find({}, {}).toArray();
 }
 
 describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDigest (LIN-3011)', () => {
