@@ -36,6 +36,7 @@ import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
+import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -1600,6 +1601,142 @@ describe(
           assert.deepStrictEqual(freshStats, legacyStats, `${shape.name}: full collectKpiStats output must be identical between the fresh and legacy twin`);
         });
       }
+    });
+    // -------------------------------------------------------------------------
+    // LIN-3011 (LIN-2996 Phase 3): freshness agreement + W1 persist-and-read
+    // deep equality, the two real-mongod witnesses this phase's plan names.
+    // -------------------------------------------------------------------------
+
+    // `isFreshDigest` does not exist at HEAD yet (LIN-3008/Phase 0 landed
+    // `digestFeedback` but not this predicate) — imported dynamically so a
+    // missing named export degrades to `undefined` (asserted below) rather than
+    // crashing this whole file's import and hiding the other real-mongod tests.
+    test('LIN-3011: isFreshDigest (JS) and an equivalent Mongo $cond agree on six row shapes', async () => {
+      const digestModule = await import('../../lib/digest-feedback.js');
+      assert.strictEqual(typeof digestModule.isFreshDigest, 'function',
+        'lib/digest-feedback.js must export isFreshDigest(doc) (LIN-3011)');
+      const { isFreshDigest } = digestModule;
+
+      const collection = freshCollection('lin3011-freshness');
+      const shapes = [
+        { _id: 'legacy', label: 'legacy (both fields absent)', doc: {} },
+        { _id: 'seeded-empty', label: 'seeded-empty (feedbackVersion:0, feedbackDigest:null)', doc: { feedbackVersion: 0, feedbackDigest: null } },
+        { _id: 'fresh', label: 'fresh (digest.version === feedbackVersion)', doc: { feedbackVersion: 3, feedbackDigest: { version: 3 } } },
+        { _id: 'stale', label: 'stale (digest.version !== feedbackVersion)', doc: { feedbackVersion: 3, feedbackDigest: { version: 2 } } },
+        { _id: 'healed-at-0', label: 'healed-at-0 (a legacy row healed once)', doc: { feedbackVersion: 0, feedbackDigest: { version: 0 } } },
+        { _id: 'digest-no-version', label: 'digest present but missing .version', doc: { feedbackVersion: 0, feedbackDigest: { terminal: null } } }
+      ];
+      await collection.insertMany(shapes.map((s) => ({ _id: s._id, ...s.doc })));
+
+      // The target Mongo-side mirror of isFreshDigest: v(doc) = feedbackVersion
+      // ?? 0; fresh iff feedbackDigest is a non-null object AND
+      // feedbackDigest.version === v(doc). This is the expression LIN-3011 (or
+      // its Phase 4 sibling, LIN-3012) is expected to expose as a shared
+      // FRESH_DIGEST constant; inlined here so this test is runnable today
+      // against the JS half alone.
+      const freshCondExpr = {
+        $and: [
+          { $ne: ['$feedbackDigest', null] },
+          { $eq: [{ $ifNull: ['$feedbackDigest.version', null] }, { $ifNull: ['$feedbackVersion', 0] }] }
+        ]
+      };
+      const mongoResults = await collection.aggregate([{ $project: { isFresh: freshCondExpr } }]).toArray();
+      const mongoById = new Map(mongoResults.map((r) => [r._id, r.isFresh]));
+
+      for (const s of shapes) {
+        const jsResult = isFreshDigest(s.doc);
+        const mongoResult = mongoById.get(s._id);
+        assert.strictEqual(jsResult, mongoResult,
+          `isFreshDigest (JS) and the Mongo $cond disagree on the "${s.label}" shape: JS=${jsResult}, Mongo=${mongoResult}`);
+      }
+    });
+
+    // Extracts only the loop-facing facts the digest is responsible for
+    // (terminal/wake/decision/decisionCase/answeredDecisionId/telemetry's
+    // parkedWait+runtime+model+usage+resources+ticketWalk) — never raw
+    // `feedback`/`promptText`, which legitimately differ between the lean and
+    // non-lean shapes for reasons unrelated to this equivalence (LIN-622).
+    function pickLoopFacingFacts(loop) {
+      return {
+        terminalStatus: loop.terminalStatus,
+        terminalCompletedAt: loop.terminalCompletedAt,
+        wakeMarker: loop.wakeMarker,
+        waitingMessage: loop.waitingMessage,
+        decision: loop.decision,
+        decisionCase: loop.decisionCase,
+        answeredDecisionId: loop.answeredDecisionId,
+        telemetry: {
+          parkedWait: loop.telemetry?.parkedWait ?? null,
+          runtime: loop.telemetry?.runtime ?? null,
+          model: loop.telemetry?.model ?? null,
+          usage: loop.telemetry?.usage ?? null,
+          resources: loop.telemetry?.resources ?? null,
+          ticketWalk: loop.telemetry?.ticketWalk ?? []
+        }
+      };
+    }
+
+    test('LIN-3011 (W1): a persisted-and-read row builds identically via the digest-backed lean path and the N2 formatted-history baseline (deep equality, no JSON normalization)', async () => {
+      const historyCollection = freshCollection('lin3011-w1-history');
+      const store = new DispatchQueueStore({ collection: freshCollection('lin3011-w1-queue'), historyCollection });
+      const urlKey = 'w1-ws';
+      const targetId = randomUUID();
+      const abortId = randomUUID();
+      const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000);
+      const t0 = dispatchedAt.getTime();
+
+      const baseDoc = (id, overrides = {}) => ({
+        _id: id, urlKey, issueIdentifier: 'LIN-100', issueId: 'uuid-100', issueTitle: 'Issue A',
+        issueUrl: 'https://linear.app/x/issue/LIN-100', promptName: 'implementation', dispatchedAt,
+        dispatchedBy: 'user-1', target: 'cli', repo: null, status: 'taken', takenByTokenLabel: 'consumer-1',
+        resolvedAt: new Date(t0 + 2000), feedback: [], feedbackVersion: 0, feedbackDigest: null,
+        ...overrides
+      });
+      await historyCollection.insertOne(baseDoc(targetId));
+      await historyCollection.insertOne(baseDoc(abortId, { abort: true, abortTo: targetId, issueIdentifier: null }));
+
+      // Write through the REAL Phase 1 path so feedbackDigest is computed and
+      // persisted exactly as production would (LIN-3009). addFeedback stamps
+      // its own `timestamp: new Date()`; the sub-second ordering this case
+      // needs (target's genuine terminal at T+200ms, superseded by an abort
+      // 700ms LATER at T+900ms — the plan's W1 reproduction) is pinned by
+      // patching each entry's timestamp immediately after, then recomputing +
+      // persisting the digest against the corrected timestamps.
+      await store.addFeedback(targetId, urlKey, { message: '[failed] step one in 3m', kind: 'status' }, 'consumer-1');
+      await historyCollection.updateOne({ _id: targetId }, { $set: { 'feedback.0.timestamp': new Date(t0 + 200) } });
+      await store.addFeedback(abortId, urlKey, { message: '[aborted] cancelled', kind: 'status' }, 'consumer-1');
+      await historyCollection.updateOne({ _id: abortId }, { $set: { 'feedback.0.timestamp': new Date(t0 + 900) } });
+
+      for (const id of [targetId, abortId]) {
+        const raw = await historyCollection.findOne({ _id: id });
+        const feedbackDigest = digestFeedback(raw, { now: Date.now() });
+        feedbackDigest.version = raw.feedbackVersion;
+        await historyCollection.updateOne({ _id: id }, { $set: { feedbackDigest } });
+      }
+
+      // N2 baseline: the FORMATTED history path — {prompt:0} projection, then
+      // listHistory -> _formatHistoryItem, then today's _buildLoops derivation
+      // over the un-digested feedback plus the harvested abort. NOT a raw
+      // Date-typed array; _buildLoops drops raw docs that lack `id` anyway.
+      const { items: baselineItems } = await store.listHistory(urlKey, { projection: { prompt: 0 } });
+      const baselineLoops = pipelineInternal._buildLoops({ historyItems: baselineItems, lean: false });
+      const baseline = pickLoopFacingFacts(baselineLoops.find((l) => l.loopId === targetId));
+
+      // Digest-backed (LIN-3011): a lean read that ALSO excludes feedback,
+      // forcing derivation off feedbackDigest (with self-heal) alone.
+      const { items: leanItems } = await store.listHistory(urlKey, { projection: { prompt: 0, feedback: 0 } });
+      const digestBackedLoops = pipelineInternal._buildLoops({ historyItems: leanItems, lean: true });
+      const digestBacked = pickLoopFacingFacts(digestBackedLoops.find((l) => l.loopId === targetId));
+
+      // Absolute anchors on BOTH sides, asserted as strings (N2) — two sides
+      // fed the same wrong input could still agree without these.
+      assert.strictEqual(baseline.terminalStatus, 'aborted', 'baseline: the later abort wins the F1 guard');
+      assert.strictEqual(baseline.terminalCompletedAt, new Date(t0 + 900).toISOString());
+      assert.strictEqual(digestBacked.terminalStatus, 'aborted', 'digest-backed: same outcome, sourced from feedbackDigest');
+      assert.strictEqual(digestBacked.terminalCompletedAt, new Date(t0 + 900).toISOString());
+
+      assert.deepStrictEqual(digestBacked, baseline,
+        'no JSON normalization: a lingering Date-vs-ISO-string divergence must fail this, not be silently coerced to matching strings');
     });
   }
 );

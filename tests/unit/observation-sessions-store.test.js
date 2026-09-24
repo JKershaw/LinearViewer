@@ -311,3 +311,24 @@ test('a v8 doc (pre-LIN-2182) read-misses on both list and point reads so it reb
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v8 doc');
   assert.equal(await store.getSession(URL_KEY, 'S-decision'), null, 'point read misses the v8 doc → route reconstructs');
 });
+
+// LIN-3011 (LIN-2996 Phase 3): the v11 -> v12 bump exists because the lean
+// loop's terminal/wake/decision/decisionCase/answeredDecisionId/parkedWait/
+// telemetry/toolPeak now derive from a self-healed `feedbackDigest` instead of
+// a raw-feedback re-scan — a v11 doc was built the old way, so without the
+// bump it would keep serving pre-digest-backed values for up to
+// DEFAULT_HISTORY_TTL (30 days). Pinning the v11 doc as the target set is what
+// makes this bump load-bearing rather than cosmetic.
+test('BUILDER_VERSION is 12 (LIN-3011), and a v11 doc (pre-digest-backed loops) read-misses on both list and point reads', async () => {
+  assert.equal(BUILDER_VERSION, 12, 'LIN-3011 bumps 11 -> 12 for digest-backed lean loop derivation');
+
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 11;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v11 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v11 doc -> route reconstructs');
+});
