@@ -7,7 +7,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered, buildRulingRef } from '../../lib/unanswered-decisions.js';
 
 const NOW = new Date('2026-08-22T12:00:00.000Z');
 const REAP_INACTIVITY_MS = 21600000; // 6h, mirrors simple-dispatcher's config.js
@@ -754,5 +754,75 @@ describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
     );
     assert.strictEqual(rows.length, 1, "the row's own loop-scoped shelf wins precedence over the legacy one, and it has lapsed, so the row surfaces even though a still-active legacy shelf also exists");
     assert.strictEqual(rows[0].shelvedLapseCount, 3, 'the lapse count comes from the loop-scoped shelf that actually won precedence');
+  });
+});
+
+describe('buildRulingRef (LIN-3021: extracted from the inline shelfByKey/shelfGate + dismissal-suggestions-store key construction)', () => {
+  test('loop-only (urlKey + loopId + decisionId) → 3-part loop ref', () => {
+    assert.strictEqual(
+      buildRulingRef({ urlKey: 'acme', loopId: 'loop-1', decisionId: 'd-1' }),
+      'acme::loop-1::d-1'
+    );
+  });
+
+  test('task-only (urlKey + taskDecisionId + decisionId) → 3-part task ref', () => {
+    assert.strictEqual(
+      buildRulingRef({ urlKey: 'acme', taskDecisionId: 'td-1', decisionId: 'd-1' }),
+      'acme::td-1::d-1'
+    );
+  });
+
+  test('both loopId and taskDecisionId given → null (ambiguous scope)', () => {
+    assert.strictEqual(
+      buildRulingRef({ urlKey: 'acme', loopId: 'loop-1', taskDecisionId: 'td-1', decisionId: 'd-1' }),
+      null
+    );
+  });
+
+  test('neither loopId nor taskDecisionId given → null (no scope)', () => {
+    assert.strictEqual(buildRulingRef({ urlKey: 'acme', decisionId: 'd-1' }), null);
+  });
+
+  test('an empty-string scope id counts as absent, same as omitted', () => {
+    assert.strictEqual(
+      buildRulingRef({ urlKey: 'acme', loopId: '', decisionId: 'd-1' }),
+      null,
+      'loopId: "" has no scope, same as neither given'
+    );
+    assert.strictEqual(
+      buildRulingRef({ urlKey: 'acme', loopId: '', taskDecisionId: 'td-1', decisionId: 'd-1' }),
+      'acme::td-1::d-1',
+      'loopId: "" alongside a real taskDecisionId resolves to task-only, not "both"'
+    );
+  });
+
+  test('missing urlKey → null', () => {
+    assert.strictEqual(buildRulingRef({ loopId: 'loop-1', decisionId: 'd-1' }), null);
+  });
+
+  test('missing decisionId → null', () => {
+    assert.strictEqual(buildRulingRef({ urlKey: 'acme', loopId: 'loop-1' }), null);
+  });
+
+  test('never emits a bare decisionId or a two-part fallback key — every non-null result has exactly 3 non-empty `::` segments, every null case is exactly null', () => {
+    const nonNullCases = [
+      buildRulingRef({ urlKey: 'acme', loopId: 'loop-1', decisionId: 'd-1' }),
+      buildRulingRef({ urlKey: 'acme', taskDecisionId: 'td-1', decisionId: 'd-1' })
+    ];
+    for (const ref of nonNullCases) {
+      const segments = ref.split('::');
+      assert.strictEqual(segments.length, 3, `expected exactly 3 segments, got ${segments.length} for "${ref}"`);
+      assert.ok(segments.every(s => s.length > 0), `expected every segment non-empty in "${ref}"`);
+    }
+
+    const nullCases = [
+      buildRulingRef({ urlKey: 'acme', loopId: 'loop-1', taskDecisionId: 'td-1', decisionId: 'd-1' }), // both
+      buildRulingRef({ urlKey: 'acme', decisionId: 'd-1' }), // neither
+      buildRulingRef({ loopId: 'loop-1', decisionId: 'd-1' }), // missing urlKey
+      buildRulingRef({ urlKey: 'acme', loopId: 'loop-1' }) // missing decisionId
+    ];
+    for (const ref of nullCases) {
+      assert.strictEqual(ref, null, 'no partial/bare/two-part string is ever returned — only null');
+    }
   });
 });
