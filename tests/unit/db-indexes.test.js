@@ -36,7 +36,14 @@ const EXCLUDED_COLLECTIONS = [
   // enforcement for that decision: it relies on THIS test staying red until
   // the exclusion lands, not on manual review, to catch a future contributor
   // adding an INDEX_SPECS entry here.
-  'harbour-comments'
+  'harbour-comments',
+  // workspace-halt (LIN-2994/LIN-3023): get/set/clear all filter on the bare
+  // `_id: urlKey`, served by the automatic `_id_` index — deliberately NOT
+  // indexed via INDEX_SPECS. This entry is the enforcement for that decision:
+  // it relies on THIS test staying red until the exclusion lands, not on
+  // manual review, to catch a future contributor adding an INDEX_SPECS entry
+  // here.
+  'workspace-halt'
 ];
 
 // MangoDB serialises an index key into a name; compare by key spec instead.
