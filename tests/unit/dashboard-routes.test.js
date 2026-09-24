@@ -1208,6 +1208,39 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     assert.equal(res.jsonBody.unansweredAge.count, 1, 'a shelved-but-unanswered decision must still count toward the KPI');
   });
 
+  // LIN-2991/LIN-3022 §4: a decision raised on a non-root (wake) loop, whose
+  // root carries no decision of its own, must still be found and counted —
+  // looking up `row.anchor?.loopId` alone (the root) finds no matching
+  // feedback and silently drops the row from unansweredAge.
+  test('§4: unansweredAge does not drop a grouped, wake-raised decision whose root carries no decision of its own', async () => {
+    const rootMs = Date.now() - 6 * 60 * 60 * 1000;
+    const wakeMs = Date.now() - 3 * 60 * 60 * 1000;
+    const root = {
+      id: 'root-wake', issueIdentifier: 'LIN-6', issueTitle: 'root', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: new Date(rootMs).toISOString(), resolvedAt: new Date(rootMs).toISOString(), status: 'taken',
+      feedback: [{ message: '[working] dispatched a wake follow-up', timestamp: new Date(rootMs).toISOString() }]
+    };
+    const wakeChild = {
+      id: 'child-wake', rootItemId: 'root-wake', issueIdentifier: 'LIN-6', issueTitle: 'child', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: new Date(wakeMs).toISOString(), resolvedAt: new Date(wakeMs).toISOString(), status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: new Date(wakeMs).toISOString() },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-wake', question: 'Proceed?' }), timestamp: new Date(wakeMs).toISOString() }
+      ]
+    };
+    const perWorkspace = { 'ws-a': { live: [], history: [root, wakeChild], agentStatus: [] } };
+    const router = makeKpiRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(
+      res.jsonBody.unansweredAge.count, 1,
+      'the row is anchored on the root (no decision of its own), but its raisedAt must come from the CONTENT loop (child-wake) that actually raised it'
+    );
+  });
+
   test('computes time-to-response and false-escalation from a resolved loop-backed decision, and counts an unresolved one as unanswered', async () => {
     const raisedMs = Date.now() - 5 * 24 * 60 * 60 * 1000; // 5 days ago
     const resolvedMs = raisedMs + 24 * 60 * 60 * 1000; // 1 day to resolve

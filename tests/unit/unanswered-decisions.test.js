@@ -786,6 +786,25 @@ describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2
     assert.deepStrictEqual(rows, [], 'x (answered elsewhere in the lineage) and y (answered on its own raising loop) must both discharge');
   });
 
+  // D1's includeResolved leg (§3): the same two independently-answered
+  // decisions must BOTH surface, each with its own resolution, when
+  // includeResolved is requested — not just both correctly hidden by default.
+  test('D1 (includeResolved): x and y both show up independently, each with its own resolution', () => {
+    const loopX = loop({ loopId: 'x-loop', lineageId: 'lineage-d1', wakeMarker: 'blocked', decision: decision('x') });
+    const loopY = loop({
+      loopId: 'y-loop', lineageId: 'lineage-d1', wakeMarker: 'blocked', decision: decision('y'),
+      answeredDecisions: answered('x', 'y')
+    });
+    const rows = collectUnansweredDecisions({ loops: [loopX, loopY] }, { now: NOW, includeResolved: true });
+    assert.strictEqual(rows.length, 2, 'both groups must surface under includeResolved');
+    const xRow = rows.find(r => r.decision.decision_id === 'x');
+    const yRow = rows.find(r => r.decision.decision_id === 'y');
+    assert.ok(xRow, 'x row present');
+    assert.ok(yRow, 'y row present');
+    assert.strictEqual(xRow.resolution.decisionId, 'x');
+    assert.strictEqual(yRow.resolution.decisionId, 'y', 'y’s own resolution must not be shadowed by x’s (no last-stamp-wins collision under includeResolved either)');
+  });
+
   test('duplicate carriers (the live LIN-2996/LIN-3002 shape): 4 members raising the same decision in one lineage collapse into exactly one row, anchored on the root, stamped on the content loop', () => {
     const root = loop({ loopId: 'root-1', wakeMarker: null, decision: null, dispatchedAt: '2026-08-19T00:00:00.000Z' });
     const wake1 = loop({ loopId: 'wake-1', lineageId: 'root-1', wakeMarker: 'blocked', decision: decision('dup-x'), dispatchedAt: '2026-08-20T00:00:00.000Z' });

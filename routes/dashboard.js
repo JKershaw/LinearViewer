@@ -1896,7 +1896,13 @@ export function createDashboardRoutes({
           : null;
         return { decisionId: row.decision?.decision_id, raisedAt: match?.scannedAt || null };
       }
-      const loop = loops.find(l => l.loopId === row.anchor?.loopId);
+      // LIN-2991/LIN-3022 §4: the loop that actually raised (and carries the
+      // feedback for) the CURRENT decision is the content loop
+      // (`row.stampLoopId`), never the anchor alone — they diverge for any
+      // decision raised on a non-root turn, which a grouped/wake-raised
+      // decision always is. `firstRaisedAt` on the wrong (anchor's) feedback
+      // would find no match and silently drop the row from `unansweredAge`.
+      const loop = loops.find(l => l.loopId === (row.stampLoopId ?? row.anchor?.loopId));
       return { decisionId: row.decision?.decision_id, raisedAt: firstRaisedAt(loop?.feedback, row.decision?.decision_id) };
     });
 

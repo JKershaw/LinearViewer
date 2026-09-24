@@ -2315,7 +2315,7 @@ function rulingRowControls(li) {
 // (routes/dashboard.js), which tags the same decision-answer stamp
 // `outcome: 'dismissed'`. Neither path posts a comment. Returns the pending
 // request promise; the caller owns the pending-guard/restore/feedback wiring.
-function issueDismissRequest(anchor, decisionId) {
+function issueDismissRequest(anchor, decisionId, stampLoopId) {
   const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
   return isTaskBound
     ? window.api(`/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`, {
@@ -2328,7 +2328,9 @@ function issueDismissRequest(anchor, decisionId) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         on401: false,
-        body: JSON.stringify({ decisionLoopId: anchor.loopId, decisionId })
+        // LIN-2991/LIN-3022 §4/D3: the STAMP target, never the reply target
+        // alone — see deliverRulingReply's own note on the same distinction.
+        body: JSON.stringify({ decisionLoopId: stampLoopId ?? anchor.loopId, decisionId })
       });
 }
 
@@ -2359,7 +2361,7 @@ function dismissRulingRow(row, li) {
   };
   const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-  issueDismissRequest(anchor, decisionId).then(() => {
+  issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
     restore();
     setFeedback('dismissed', false);
     // Same class as F6/F7 (review): the selection seam #1432 ships is what
@@ -2432,7 +2434,7 @@ function agreeRulingRow(row, li) {
     };
     const refreshBadge = () => { if (pageUrlKey && typeof window.updateRulingsBadge === 'function') window.updateRulingsBadge(pageUrlKey); };
 
-    return issueDismissRequest(anchor, decisionId).then(() => {
+    return issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
       rulingsPending.delete(key);
       setFeedback('dismissed as proposed', false);
       // Review F6: clear selection at the moment of success, exactly as
@@ -2861,7 +2863,7 @@ function bulkAgreeRow(key, row, li) {
       feedback.classList.toggle('obs-ruling-feedback--error', !!isError);
     };
 
-    return issueDismissRequest(anchor, decisionId).then(() => {
+    return issueDismissRequest(anchor, decisionId, row?.stampLoopId).then(() => {
       rulingsPending.delete(key);
       setFeedback('dismissed as proposed', false);
       rulingsSelected.delete(key);
@@ -3194,7 +3196,14 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
   const targetUrlKey = anchor?.workspaceUrlKey;
   const decisionId = decision?.decision_id;
   const key = rulingKey(targetUrlKey, anchor, decisionId);
-  const decisionLoopId = anchor?.loopId;
+  // LIN-2991/LIN-3022 §4/D3: the STAMP target (where markDecisionAnswered
+  // writes), never the reply target alone — they diverge whenever the
+  // decision was raised on a non-root turn of a session. `row.stampLoopId`
+  // is absent on a task-bound row, where `anchor.loopId` is null anyway and
+  // the guard below admits `disposition === 'task-bound'` as the alternative.
+  // The RESUME target (`followUpTo`, below) stays `anchor.loopId` — the loop
+  // a reply is actually delivered to is unchanged by this.
+  const decisionLoopId = row?.stampLoopId ?? anchor?.loopId;
   const feedback = li.querySelector('.obs-ruling-feedback');
   // A task-bound row (LIN-2197 Phase 3) has no dispatch item behind it, so
   // `anchor.loopId`/`decisionLoopId` is always null by design — admit
@@ -3334,7 +3343,10 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
         urlKey: targetUrlKey,
         issueId: anchor.issueId || anchor.issueIdentifier,
         issueless: !anchor.issueIdentifier,
-        followUpTo: decisionLoopId,
+        // The RESUME target is the anchor's own loop, never the stamp target
+        // — a resumed session picks up where the anchor left off, regardless
+        // of which loop the answer stamp itself lands on.
+        followUpTo: anchor?.loopId,
         force: false,
         target: anchor.target || 'cli',
         decisionLoopId,

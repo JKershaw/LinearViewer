@@ -2531,6 +2531,36 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
     // Control: the loop-backed row is untouched by this task-only fix.
     assert.strictEqual(result.decisions.some(d => d.decisionId === 'dec-loop'), true);
   });
+
+  // LIN-2991/LIN-3022 §4: loopId/since must report the CONTENT loop
+  // (stampLoopId), not the anchor — they diverge for any decision raised on
+  // a non-root turn, which a grouped/duplicate-carrier decision always is.
+  test('§4: a grouped decision reports the content loop, not the anchor, for loopId/since', async () => {
+    const history = [
+      sessionHistoryItem({
+        id: 'sess-grouped', kind: 'autopilot', issueIdentifier: 'LIN-810', target: 'cli',
+        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: '[blocked] waiting on a ruling', timestamp: T_FLEET_OLD },
+          decisionEntry('dec-grouped', 'Proceed?', T_FLEET_OLD),
+        ],
+      }),
+      sessionHistoryItem({
+        id: 'child-grouped', sessionId: 'sess-grouped', issueIdentifier: 'LIN-810', target: 'cli',
+        rootItemId: 'sess-grouped', dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: '[blocked] re-asked', timestamp: T_FLEET_FRESH },
+          decisionEntry('dec-grouped', 'Proceed?', T_FLEET_FRESH),
+        ],
+      }),
+    ];
+    const { executeTool } = makeDecisionsCatalog({ history, taskDecisions: [], shelvedRulings: [] });
+    const result = await executeTool({ name: 'list_pending_decisions', arguments: {} });
+    const row = result.decisions.find(d => d.decisionId === 'dec-grouped');
+    assert.ok(row, 'the grouped decision must appear exactly once, not once per carrier');
+    assert.strictEqual(row.loopId, 'child-grouped', 'loopId must be the CONTENT loop (stampLoopId), not the anchor (sess-grouped)');
+    assert.strictEqual(row.sessionId, 'sess-grouped', 'sessionId still resolves correctly off the content loop');
+  });
 });
 
 // LIN-2704: the pending-set exit is the acceptance criterion, not "a tap

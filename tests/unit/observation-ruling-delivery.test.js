@@ -281,6 +281,33 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     assert.equal(capturedUrlKey, 'the-ruling-workspace');
   });
 
+  // LIN-2991/LIN-3022 D3: gone/dispatch — the comment posted before the
+  // fresh dispatch must stamp the CONTENT loop (stampLoopId), never the
+  // anchor alone, when they diverge.
+  test('D3: gone/dispatch — the pre-dispatch comment carries stampLoopId as decisionLoopId, distinct from the anchor', async () => {
+    let capturedExtra = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: nonTerminalHydrateApi()
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-gone-stamp-1' }, stampLoopId: 'content-loop-77' }),
+      'Approve',
+      li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedExtra, 'expected postComment to have been called');
+    assert.equal(capturedExtra.decisionLoopId, 'content-loop-77', 'decisionLoopId must be the CONTENT loop, not the anchor');
+    assert.notEqual(capturedExtra.decisionLoopId, ANCHOR.loopId, 'sanity: the fixture actually exercises two distinct values');
+  });
+
   test('F1: the fresh dispatch also targets anchor.workspaceUrlKey', async () => {
     let capturedOpts = null;
     const { module } = makeSandbox({
@@ -570,6 +597,32 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     assert.equal(dispatchCalls, 0, 'a record delivery must never dispatch');
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /recorded ✓/);
+  });
+
+  // LIN-2991/LIN-3022 D3: gone/record — same distinction, the OTHER postComment
+  // call site (deliverAsRecord).
+  test('D3: gone/record — decisionLoopId carries stampLoopId, distinct from the anchor', async () => {
+    let capturedExtra = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-stamp-1' }, effect: 'record', alternate: null, stampLoopId: 'content-loop-88' }),
+      'Approve',
+      li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedExtra, 'expected postComment to have been called');
+    assert.equal(capturedExtra.decisionLoopId, 'content-loop-88', 'decisionLoopId must be the CONTENT loop, not the anchor');
+    assert.notEqual(capturedExtra.decisionLoopId, ANCHOR.loopId, 'sanity: the fixture actually exercises two distinct values');
   });
 
   // LIN-2933 close-out ledger L1 (review `b1ab28d5`): the gone+record
@@ -969,6 +1022,32 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
 
     assert.equal(capturedOpts.issueless, false);
     assert.equal(capturedOpts.issueId, 'real-issue-id');
+  });
+
+  // LIN-2991/LIN-3022 D3: stampLoopId (the stamp target) and anchor.loopId
+  // (the reply/resume target) must diverge cleanly — followUpTo resumes the
+  // ANCHOR's own session; decisionLoopId (what markDecisionAnswered keys on)
+  // is the CONTENT loop. A collapsed implementation (either always equal to
+  // the other) is caught because the fixture below gives them different
+  // values on purpose.
+  test('D3: stampLoopId ≠ anchor.loopId — followUpTo resumes the anchor, decisionLoopId stamps the content loop', async () => {
+    let capturedOpts = null;
+    const { module } = makeSandbox({
+      deliverReply: (opts, prompt, handlers) => { capturedOpts = opts; handlers.onDispatchOk(); }
+    });
+    const { deliverRulingReply } = module.exports;
+    const li = makeLi();
+
+    deliverRulingReply(
+      makeResumableRow({ decision: { decision_id: 'd-stamp-1' }, stampLoopId: 'content-loop-99' }),
+      'Approve',
+      li
+    );
+
+    assert.ok(capturedOpts, 'expected deliverReply to be called');
+    assert.equal(capturedOpts.followUpTo, ANCHOR.loopId, 'followUpTo must resume the ANCHOR loop, never the stamp target');
+    assert.equal(capturedOpts.decisionLoopId, 'content-loop-99', 'decisionLoopId must be the CONTENT loop (stampLoopId), not the anchor');
+    assert.notEqual(capturedOpts.followUpTo, capturedOpts.decisionLoopId, 'sanity: the fixture actually exercises two distinct values');
   });
 
   // LIN-2933 close-out ledger L1 (review `b1ab28d5`): `onCommentFailed`
@@ -2928,6 +3007,62 @@ describe('bulk-agree / single-agree — same-workspace, different-loop decision_
       [CLOSEOUT_LOOP, REVIEW_LOOP].sort(),
       'the close-out loop’s row must be independently agreeable — it must not be silently swallowed by rulingsSettled just because it shares decision_id with the already-agreed review loop'
     );
+  });
+});
+
+// LIN-2991/LIN-3022 D3: issueDismissRequest's `decisionLoopId` must be the
+// CONTENT loop (row.stampLoopId), not the anchor alone, from all three
+// callers — dismissRulingRow, agreeRulingRow (dismiss branch) and
+// bulkAgreeRow (dismiss branch). Each fixture gives stampLoopId a value
+// distinct from anchor.loopId so a caller that dropped the plumbing (still
+// sending anchor.loopId) is caught.
+describe('issueDismissRequest carries stampLoopId from all three callers (LIN-2991/LIN-3022 D3)', () => {
+  const SUGGESTION = { reason: 'shipped', suggestedBy: 'lane-e', suggestedAt: '2026-09-05T00:00:00.000Z' };
+
+  test('dismissRulingRow', async () => {
+    let capturedBody = null;
+    const api = async (url, opts) => { capturedBody = JSON.parse(opts.body); return { success: true }; };
+    const { module } = makeSandbox({ api });
+    const { dismissRulingRow } = module.exports;
+    const li = makeLi();
+
+    dismissRulingRow(makeRow({ suggestedDismissal: SUGGESTION, stampLoopId: 'content-loop-d1' }), li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.ok(capturedBody, 'expected the dismiss request to have been issued');
+    assert.equal(capturedBody.decisionLoopId, 'content-loop-d1');
+    assert.notEqual(capturedBody.decisionLoopId, ANCHOR.loopId, 'sanity: the fixture actually exercises two distinct values');
+  });
+
+  test('agreeRulingRow (dismiss branch)', async () => {
+    let capturedBody = null;
+    const api = async (url, opts) => { capturedBody = JSON.parse(opts.body); return { success: true }; };
+    const { module } = makeSandbox({ api });
+    const { agreeRulingRow } = module.exports;
+    const li = makeLi();
+
+    await agreeRulingRow(makeRow({ suggestedDismissal: SUGGESTION, stampLoopId: 'content-loop-d2' }), li);
+
+    assert.ok(capturedBody, 'expected the dismiss request to have been issued');
+    assert.equal(capturedBody.decisionLoopId, 'content-loop-d2');
+    assert.notEqual(capturedBody.decisionLoopId, ANCHOR.loopId, 'sanity: the fixture actually exercises two distinct values');
+  });
+
+  test('bulkAgreeRow (dismiss branch)', async () => {
+    let capturedBody = null;
+    const api = async (url, opts) => { capturedBody = JSON.parse(opts.body); return { success: true }; };
+    const { module } = makeSandbox({ api });
+    const { bulkAgreeRow, rulingKey } = module.exports;
+    const li = makeLi();
+    const row = makeRow({ suggestedDismissal: SUGGESTION, stampLoopId: 'content-loop-d3' });
+    const key = rulingKey('the-ruling-workspace', ANCHOR, row.decision.decision_id);
+
+    await bulkAgreeRow(key, row, li);
+
+    assert.ok(capturedBody, 'expected the dismiss request to have been issued');
+    assert.equal(capturedBody.decisionLoopId, 'content-loop-d3');
+    assert.notEqual(capturedBody.decisionLoopId, ANCHOR.loopId, 'sanity: the fixture actually exercises two distinct values');
   });
 });
 

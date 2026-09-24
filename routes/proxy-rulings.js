@@ -100,7 +100,7 @@ export function createRulingsRoutes({
    * full reconstruction. A distinct `view` namespace keeps this payload from
    * colliding with the dashboard's on the same workspace key.
    */
-  async function readRulings(urlKey) {
+  async function readRulings(urlKey, { includeResolved = false } = {}) {
     const loadLoops = async () => {
       const rawLoops = await getLoopsForWorkspace(urlKey, {
         dispatchStore: dispatchQueueStore,
@@ -155,7 +155,8 @@ export function createRulingsRoutes({
     return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings, newestScanByTask }, {
       now: new Date(),
       liveDispatchOnAnchor: (issueIdentifier) =>
-        loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
+        loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l)),
+      includeResolved
     });
   }
 
@@ -219,22 +220,48 @@ export function createRulingsRoutes({
    * single-workspace credential a cross-workspace view — the isolation
    * property the whole proxy token model rests on.
    *
+   * Two additive query params (LIN-2991/LIN-3022 §3):
+   *   `issueIdentifier` — filters the returned rows by `row.anchor.issueIdentifier`
+   *     AFTER grouping (never a pre-filter on the input loops — that would
+   *     silently break both the lineage-answered union and `includeResolved`
+   *     for a cross-issue-tagged group member).
+   *   `includeResolved=true` — keeps answered LOOP groups too (each carrying a
+   *     `resolution`), instead of dropping them. Task-bound rows never appear
+   *     under this: `collectUnansweredDecisions`'s task-decision branch has no
+   *     `includeResolved` behaviour of its own.
+   * The default read (neither param) is unchanged in row COUNT — set-preserving,
+   * not byte-identical: every row now also carries `stampLoopId`, and a
+   * non-root carrier's `anchor` names the root instead of itself.
+   *
    * @route GET /api/proxy/rulings
    */
   router.get('/api/proxy/rulings', proxyLimiter, authenticateProxyToken, async (req, res) => {
     const urlKey = req.proxyUrlKey;
+    const includeResolved = req.query.includeResolved === 'true';
+    const { issueIdentifier } = req.query;
     try {
       const [rulings, suggestions] = await Promise.all([
-        readRulings(urlKey),
+        readRulings(urlKey, { includeResolved }),
         dismissalSuggestionsStore ? dismissalSuggestionsStore.listForWorkspaces([urlKey]) : Promise.resolve([])
       ]);
 
       // LIN-2756: loop-aware join, shared with routes/dashboard.js's own GET
       // — see attachStandingSuggestions' own doc for the two-tier match.
+      const joined = attachStandingSuggestions(rulings, suggestions);
+      // Post-grouping filter (§3): `readRulings` above already grouped the
+      // FULL, unfiltered workspace loop set, so a sibling tagged under a
+      // different issueIdentifier still contributed to the lineage-answered
+      // union and to `includeResolved`'s resolution scan before this filter
+      // ever runs. Filtering the loops themselves, earlier, would silently
+      // break both.
+      const filtered = issueIdentifier
+        ? joined.filter(row => row.anchor?.issueIdentifier === issueIdentifier)
+        : joined;
+
       logEvent(req, '/api/proxy/rulings', 200);
       res.json({
-        count: rulings.length,
-        rulings: attachStandingSuggestions(rulings, suggestions),
+        count: filtered.length,
+        rulings: filtered,
         generatedAt: new Date().toISOString()
       });
     } catch (error) {
