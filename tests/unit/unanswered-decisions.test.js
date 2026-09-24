@@ -30,30 +30,37 @@ function loop(overrides = {}) {
     agentState: null,
     decision: null,
     decisionCase: [],
-    answeredDecisionId: null,
+    answeredDecisions: [],
     ...overrides
   };
 }
 
-describe('isDecisionAnswered (LIN-2671: the one exported predicate)', () => {
+// Builds the `answeredDecisions` set shape (lib/digest-feedback.js's
+// `resolvedDecisionEvents`) for one or more decisionIds, defaulting the
+// fields no fixture in this file needs to distinguish.
+function answered(...decisionIds) {
+  return decisionIds.map(decisionId => ({ decisionId, raisedAt: null, resolvedAt: null, outcome: 'answered' }));
+}
+
+describe('isDecisionAnswered (LIN-2671: the one exported predicate, LIN-3022: set membership over answeredDecisions)', () => {
   test('the answer id matching the current decision id → true', () => {
-    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-1'), answeredDecisionId: 'd-1' })), true);
+    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-1'), answeredDecisions: answered('d-1') })), true);
   });
 
   test('a mismatched answer id (a newer decision after an older answer) → false', () => {
-    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-2'), answeredDecisionId: 'd-1' })), false);
+    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-2'), answeredDecisions: answered('d-1') })), false);
   });
 
   test('no decision at all is never answered — even with a stray answer id', () => {
-    assert.strictEqual(isDecisionAnswered(loop({ decision: null, answeredDecisionId: 'd-1' })), false);
+    assert.strictEqual(isDecisionAnswered(loop({ decision: null, answeredDecisions: answered('d-1') })), false);
   });
 
   test('no answer stamps is never answered', () => {
-    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-1'), answeredDecisionId: null })), false);
+    assert.strictEqual(isDecisionAnswered(loop({ decision: decision('d-1'), answeredDecisions: [] })), false);
   });
 
   test('a malformed null decision_id cannot match a null answer', () => {
-    assert.strictEqual(isDecisionAnswered(loop({ decision: { question: 'q?' }, answeredDecisionId: null })), false);
+    assert.strictEqual(isDecisionAnswered(loop({ decision: { question: 'q?' }, answeredDecisions: [] })), false);
   });
 
   test('null/undefined loops are tolerated, never throw', () => {
@@ -265,8 +272,7 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
       terminalStatus: 'done',
       terminalCompletedAt: NOW.toISOString(),
       wakeMarker: null,
-      decision: decision('d-1'),
-      answeredDecisionId: null
+      decision: decision('d-1')
     });
     const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
     assert.strictEqual(rows.length, 1);
@@ -282,13 +288,13 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
     assert.deepStrictEqual(rows, [], 'the superseded original must not surface as a ruling row');
   });
 
-  test('comment-only Save leak (the original research gap): an answered decision with NO superseding follow-up is excluded via answeredDecisionId, not supersession', () => {
+  test('comment-only Save leak (the original research gap): an answered decision with NO superseding follow-up is excluded via answeredDecisions, not supersession', () => {
     // Save (comment-only) never creates a follow-up loop — computeSupersededLoopIds
-    // alone would leak this forever. answeredDecisionId is what closes it.
+    // alone would leak this forever. answeredDecisions (LIN-3022) is what closes it.
     const l = loop({
       wakeMarker: 'blocked',
       decision: decision('d-1'),
-      answeredDecisionId: 'd-1'
+      answeredDecisions: answered('d-1')
     });
     const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
     assert.deepStrictEqual(rows, []);
@@ -298,7 +304,7 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
     const l = loop({
       wakeMarker: 'blocked',
       decision: decision('d-2'),
-      answeredDecisionId: 'd-1' // stale answer, does not match the current decision
+      answeredDecisions: answered('d-1') // stale answer, does not match the current decision
     });
     const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
     assert.strictEqual(rows.length, 1);
@@ -333,6 +339,7 @@ describe('collectUnansweredDecisions (LIN-1728)', () => {
         target: 'cli',
         followUpTo: 'prior-loop'
       },
+      stampLoopId: 'loop-a',
       disposition: 'resumable',
       canReply: true,
       shelvedLapseCount: 0,
@@ -754,6 +761,101 @@ describe('collectUnansweredDecisions — shelving (LIN-1727)', () => {
     );
     assert.strictEqual(rows.length, 1, "the row's own loop-scoped shelf wins precedence over the legacy one, and it has lapsed, so the row surfaces even though a still-active legacy shelf also exists");
     assert.strictEqual(rows[0].shelvedLapseCount, 3, 'the lapse count comes from the loop-scoped shelf that actually won precedence');
+  });
+});
+
+describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2)', () => {
+  function groupedShelf(decisionId, overrides = {}) {
+    return { decisionId, urlKey: 'acme', reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z', resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0, ...overrides };
+  }
+
+  // D1 (the C1/D1/Revision-3 bug this plan exists to fix): a lineage where
+  // one decision (x) was answered on one loop and a LATER, DIFFERENT
+  // decision (y) was raised and answered on the lineage's other loop must
+  // discharge BOTH independently. The pre-this-plan scalar `answeredDecisionId`
+  // is single-valued PER LOOP, so a per-loop-only check (no lineage union)
+  // sees x's own raising loop as never individually stamped and wrongly
+  // reinstates it — exactly the mutation below demonstrates.
+  test('D1: two decisions answered on different loops in the same lineage are BOTH discharged independently', () => {
+    const loopX = loop({ loopId: 'x-loop', lineageId: 'lineage-d1', wakeMarker: 'blocked', decision: decision('x') });
+    const loopY = loop({
+      loopId: 'y-loop', lineageId: 'lineage-d1', wakeMarker: 'blocked', decision: decision('y'),
+      answeredDecisions: answered('x', 'y') // the content loop stamped x, then raised+stamped y itself
+    });
+    const rows = collectUnansweredDecisions({ loops: [loopX, loopY] }, { now: NOW });
+    assert.deepStrictEqual(rows, [], 'x (answered elsewhere in the lineage) and y (answered on its own raising loop) must both discharge');
+  });
+
+  test('duplicate carriers (the live LIN-2996/LIN-3002 shape): 4 members raising the same decision in one lineage collapse into exactly one row, anchored on the root, stamped on the content loop', () => {
+    const root = loop({ loopId: 'root-1', wakeMarker: null, decision: null, dispatchedAt: '2026-08-19T00:00:00.000Z' });
+    const wake1 = loop({ loopId: 'wake-1', lineageId: 'root-1', wakeMarker: 'blocked', decision: decision('dup-x'), dispatchedAt: '2026-08-20T00:00:00.000Z' });
+    const wake2 = loop({ loopId: 'wake-2', lineageId: 'root-1', wakeMarker: 'blocked', decision: decision('dup-x'), dispatchedAt: '2026-08-21T00:00:00.000Z' });
+    const wake3 = loop({ loopId: 'wake-3', lineageId: 'root-1', wakeMarker: 'blocked', decision: decision('dup-x'), dispatchedAt: '2026-08-22T00:00:00.000Z' });
+    const rows = collectUnansweredDecisions({ loops: [root, wake1, wake2, wake3] }, { now: NOW });
+    assert.strictEqual(rows.length, 1, 'four re-raised carriers of the same lineage+decision collapse into exactly one row');
+    assert.strictEqual(rows[0].anchor.loopId, 'root-1', 'anchored on the root, found in the whole fetched set');
+    assert.strictEqual(rows[0].stampLoopId, 'wake-3', 'stamped on the content loop — the latest-dispatched member carrying this decision');
+  });
+
+  test('duplicate carriers: answering the group (a stamp on any one member) clears the row', () => {
+    const root = loop({ loopId: 'root-2', wakeMarker: null, decision: null });
+    const wake1 = loop({ loopId: 'wake-4', lineageId: 'root-2', wakeMarker: 'blocked', decision: decision('dup-y'), dispatchedAt: '2026-08-20T00:00:00.000Z' });
+    const wake2 = loop({
+      loopId: 'wake-5', lineageId: 'root-2', wakeMarker: 'blocked', decision: decision('dup-y'),
+      dispatchedAt: '2026-08-21T00:00:00.000Z', answeredDecisions: answered('dup-y')
+    });
+    const rows = collectUnansweredDecisions({ loops: [root, wake1, wake2] }, { now: NOW });
+    assert.deepStrictEqual(rows, [], 'the group is discharged the moment ANY member records the answer');
+  });
+
+  // R2 (wake-first/root-absent fallback): the root can be outside the
+  // fetched set entirely (aged out of the 30-day window, or a wake-first
+  // fetch that never pulled it) — anchorLoop must fall back to contentLoop,
+  // never throw or drop the row.
+  test('duplicate carriers: a wake-first fetch with the root absent falls back to the content loop as its own anchor', () => {
+    const wake1 = loop({ loopId: 'wake-6', lineageId: 'root-absent', wakeMarker: 'blocked', decision: decision('dup-z'), dispatchedAt: '2026-08-20T00:00:00.000Z' });
+    const wake2 = loop({ loopId: 'wake-7', lineageId: 'root-absent', wakeMarker: 'blocked', decision: decision('dup-z'), dispatchedAt: '2026-08-21T00:00:00.000Z' });
+    const rows = collectUnansweredDecisions({ loops: [wake1, wake2] }, { now: NOW });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].anchor.loopId, 'wake-7', 'no root in this fetched set — falls back to the content loop itself');
+    assert.strictEqual(rows[0].stampLoopId, 'wake-7');
+  });
+
+  // D2: a single-member NON-root carrier (lineageId names a root that is not
+  // in this fetched set, so anchor falls back to the carrier itself) whose
+  // answer stamp never lands (the "failed best-effort stamp" accepted
+  // residual risk) must stay visible — never silently dropped — so the
+  // operator can still see and retry it.
+  test('D2: a single-member non-root carrier stays visible when its answer stamp never lands', () => {
+    const l = loop({ loopId: 'follow-1', lineageId: 'root-9', wakeMarker: 'blocked', decision: decision('d-1') });
+    const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
+    assert.strictEqual(rows.length, 1, 'a failed/never-landed stamp must never silently drop the row');
+    assert.strictEqual(rows[0].anchor.loopId, 'follow-1', 'root (root-9) absent from the fetched set — falls back to the carrier itself');
+    assert.strictEqual(rows[0].stampLoopId, 'follow-1');
+  });
+
+  test('dismissal on a grouped decision discharges the group just like an answer', () => {
+    const loopA = loop({ loopId: 'dismiss-a', lineageId: 'lineage-dismiss', wakeMarker: 'blocked', decision: decision('d-1') });
+    const loopB = loop({
+      loopId: 'dismiss-b', lineageId: 'lineage-dismiss', wakeMarker: 'blocked', decision: decision('d-2'),
+      answeredDecisions: [{ decisionId: 'd-1', raisedAt: null, resolvedAt: null, outcome: 'dismissed' }]
+    });
+    const rows = collectUnansweredDecisions({ loops: [loopA, loopB] }, { now: NOW });
+    assert.strictEqual(rows.length, 1, 'only d-2 (still open) remains — d-1 is discharged by the dismissal, same as an answer');
+    assert.strictEqual(rows[0].decision.decision_id, 'd-2');
+  });
+
+  test('a shelve persists across a content-loop shift — it is keyed on group identity (the anchor), not on whichever member is currently latest', () => {
+    const root = loop({ loopId: 'root-5', wakeMarker: null, decision: null });
+    const member1 = loop({ loopId: 'member-1', lineageId: 'root-5', wakeMarker: 'blocked', decision: decision('d-1'), dispatchedAt: '2026-08-20T00:00:00.000Z' });
+    const shelvedRulings = [groupedShelf('d-1', { decisionLoopId: 'root-5', resurfaceAt: '2026-08-23T00:00:00.000Z' })];
+
+    let rows = collectUnansweredDecisions({ loops: [root, member1], shelvedRulings }, { now: NOW });
+    assert.deepStrictEqual(rows, [], 'shelved via the anchor (root) while member-1 is the (only, hence current) content loop');
+
+    const member2 = loop({ loopId: 'member-2', lineageId: 'root-5', wakeMarker: 'blocked', decision: decision('d-1'), dispatchedAt: '2026-08-21T00:00:00.000Z' });
+    rows = collectUnansweredDecisions({ loops: [root, member1, member2], shelvedRulings }, { now: NOW });
+    assert.deepStrictEqual(rows, [], 'the SAME shelf (keyed on the anchor/root, unchanged) still suppresses the row once the content loop shifts to member-2');
   });
 });
 

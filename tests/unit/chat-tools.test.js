@@ -19,7 +19,7 @@ import { classifyLoop } from '../../lib/observer-sweep.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
 import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
-import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, answeredDecisionIdsByLineage } from '../../lib/unanswered-decisions.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
@@ -2070,15 +2070,20 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     ]);
     const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
 
-    // Re-derive the expectation through the IMPORTED classifier with the same
-    // two inputs the sweep passes it, INCLUDING the superseded set — dropping
-    // either input, or hand-rolling the rule, diverges from this.
+    // Re-derive the expectation through the IMPORTED classifier with the SAME
+    // inputs production's `list_active_sessions` handler passes it, including
+    // `answeredByLineage` (LIN-2991) — dropping any input, or hand-rolling the
+    // rule, diverges from this. This fixture carries no answered decision, so
+    // threading the map is a hygiene fix restoring genuine (not accidental)
+    // parity, not a red-first case.
     const sessions = await getSessionsForWorkspace(URL_KEY, {
       dispatchStore: stores.dispatchQueueStore, agentStatusStore: stores.agentStatusStore,
     });
-    const superseded = computeSupersededLoopIds(sessions.flatMap(s => s.loops || []));
+    const allLoops = sessions.flatMap(s => s.loops || []);
+    const superseded = computeSupersededLoopIds(allLoops);
+    const answeredByLineage = answeredDecisionIdsByLineage(allLoops);
     const now = Date.now();
-    const laneOf = (loop) => classifyLoop(loop, { superseded, now, staleMs: DEFAULT_LANE_STALE_MS });
+    const laneOf = (loop) => classifyLoop(loop, { superseded, now, staleMs: DEFAULT_LANE_STALE_MS, answeredByLineage });
 
     assert.ok(superseded.size > 0, 'the fixture must actually exercise supersession');
     let sawMultiLoop = false;
@@ -2275,6 +2280,48 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     );
     assert.strictEqual(stamped.lifecycle, 'resolved');
     assert.strictEqual(stamped.waitingOnHuman, false);
+  });
+
+  // LIN-2991 F2 (plan-review 18a547e2): projectActiveSession's classifyLoop
+  // call must thread answeredByLineage exactly like the census does, so a
+  // decision answered on a SIBLING loop in the lineage discharges too — not
+  // just a decision answered on the very loop that's the lineage tail.
+  test('F2: a decision answered on a SIBLING loop in the lineage resolves the session via the tail', () => {
+    const answeringSibling = {
+      loopId: 'g-root', kind: 'implementation', dispatchedAt: T_FLEET_OLD, lineageId: 'g-lineage',
+      terminalStatus: 'done', wakeMarker: null, agentState: null, decision: null,
+      answeredDecisions: [{ decisionId: 'dec-g', raisedAt: null, resolvedAt: null, outcome: 'answered' }],
+      feedback: [{ message: '[done] answered on this loop', timestamp: T_FLEET_OLD }],
+    };
+    const tailWithDecision = {
+      loopId: 'g-tail', kind: 'implementation', dispatchedAt: T_FLEET_FRESH, lineageId: 'g-lineage',
+      terminalStatus: null, wakeMarker: 'blocked', agentState: null, decision: { decision_id: 'dec-g' },
+      answeredDecisions: [],
+      feedback: [{ message: '[blocked] which option?', timestamp: T_FLEET_FRESH }],
+    };
+    const session = { sessionId: 'g-root', seedIssue: 'LIN-741', tasksTouched: [], dispatchedAt: T_FLEET_OLD, loops: [answeringSibling, tailWithDecision] };
+    const superseded = new Set();
+    const answeredByLineage = answeredDecisionIdsByLineage(session.loops);
+
+    const row = projectActiveSession(session, { superseded, now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS, answeredByLineage });
+    assert.strictEqual(row.lifecycle, 'resolved', 'the lineage tail’s own decision, answered on a sibling loop, must discharge the session');
+    assert.strictEqual(row.waitingOnHuman, false);
+  });
+
+  test('F2 pin: a single-loop answered decision (no grouping at all) still resolves — the map-threading must not regress it', () => {
+    const solo = {
+      loopId: 'solo-1', kind: 'autopilot', dispatchedAt: T_FLEET_OLD,
+      terminalStatus: null, wakeMarker: 'blocked', agentState: null, decision: { decision_id: 'dec-solo' },
+      answeredDecisions: [{ decisionId: 'dec-solo', raisedAt: null, resolvedAt: null, outcome: 'answered' }],
+      feedback: [{ message: '[blocked] which option?', timestamp: T_FLEET_OLD }],
+    };
+    const session = { sessionId: 'solo-1', seedIssue: 'LIN-742', tasksTouched: [], dispatchedAt: T_FLEET_OLD, loops: [solo] };
+    const superseded = new Set();
+    const answeredByLineage = answeredDecisionIdsByLineage(session.loops);
+
+    const row = projectActiveSession(session, { superseded, now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS, answeredByLineage });
+    assert.strictEqual(row.lifecycle, 'resolved');
+    assert.strictEqual(row.waitingOnHuman, false);
   });
 });
 

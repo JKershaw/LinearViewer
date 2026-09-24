@@ -23,10 +23,12 @@ import {
   __internal
 } from '../../lib/pipeline-loops.js';
 import { parseDecisions, parseHeartbeat, deriveRuntime } from '../../lib/session-telemetry.js';
-import { loopLastActivityMs, isFreshlyActive, isLoopActive } from '../../lib/live-console.js';
+import { loopLastActivityMs, isFreshlyActive, isLoopActive, DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { digestFeedback, deriveLoopFacingFacts } from '../../lib/digest-feedback.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { buildSessionCounts } from '../../lib/sessions-view.js';
+import { classifyLoop } from '../../lib/observer-sweep.js';
+import { isDecisionAnsweredInLineage } from '../../lib/unanswered-decisions.js';
 
 const {
   _toDate,
@@ -1565,6 +1567,37 @@ describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2,
     const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
     assert.deepStrictEqual(loops[0].answeredDecisions, [],
       'a post-change digest with a genuine empty set must stay empty, never fall back to the scalar (there is none here)');
+  });
+
+  // LIN-3022 beat 2: the mapping alone (pinned above, beat 1) is not enough —
+  // §2's admit/discharge predicates must ALSO treat a legacy-fallback-derived
+  // loop as answered, both standalone (isDecisionAnsweredInLineage with no
+  // map) and through the census (classifyLoop).
+  test('a legacy digest loop resolves through classifyLoop/isDecisionAnsweredInLineage, exactly like a native answeredDecisions loop', async () => {
+    const legacyDigest = {
+      version: 5,
+      terminal: null,
+      wake: { marker: 'blocked', waitingMessage: 'need a ruling' },
+      decision: { decision_id: 'x', question: 'ship?' }, decisionEntryIndex: 0, decisionCase: [],
+      answeredDecisionId: 'x',
+      // No `answeredDecisions` key at all — the pre-this-change shape.
+      parkedWait: null,
+      telemetry: { runtime: {}, metrics: [], toolPeak: null }
+    };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: legacyDigest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker derives from the digest');
+
+    assert.strictEqual(
+      isDecisionAnsweredInLineage(loop, undefined), true,
+      'no answeredByLineage map (the fossil-script shape) falls back to isDecisionAnswered, which must read the synthesized legacy set'
+    );
+    const lane = classifyLoop(loop, { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS });
+    assert.strictEqual(lane, 'resolved', 'the census must discharge a legacy-digest loop exactly like a native answeredDecisions one');
   });
 });
 
