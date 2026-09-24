@@ -139,6 +139,19 @@ function walk(dir, out = []) {
 // removed site and an accidental duplicate/new site.
 const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 
+// The ten full-adopt sites this sweep landed. Each is one call site except
+// routes/workspace-api.js, which carries six (recommend GET/SSE, recap,
+// brief, scan, scan-retire) in one file.
+const expectedGateCalls = {
+  'routes/next-run.js': 1,
+  'routes/ship-biscuit.js': 1,
+  'routes/workspace-api.js': 6,
+  'routes/dashboard.js': 2,
+  'routes/workspace-api-roadmap.js': 1,
+  'routes/flight-companion.js': 2,
+  'routes/task-chat.js': 1,
+};
+
 describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-2970 / LIN-2978)', () => {
   test('SHARED_CHAIN_EXPR occurs EXACTLY ONCE across routes/, lib/, and server.js — lib/chat-request.js\'s one canonical definition', () => {
     const files = [
@@ -195,21 +208,22 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
   });
 
   test('checkFreeTierGate is called exactly once per full-adopt site (one quota unit per request, LIN-2978)', () => {
-    // The ten full-adopt sites this sweep landed. Each is one call site except
-    // routes/workspace-api.js, which carries six (recommend GET/SSE, recap,
-    // brief, scan, scan-retire) in one file.
-    const expectedGateCalls = {
-      'routes/next-run.js': 1,
-      'routes/ship-biscuit.js': 1,
-      'routes/workspace-api.js': 6,
-      'routes/dashboard.js': 2,
-      'routes/workspace-api-roadmap.js': 1,
-    };
     for (const [relPath, expected] of Object.entries(expectedGateCalls)) {
       const src = read(relPath);
       const actual = (src.match(/checkFreeTierGate\s*\(/g) || []).length;
       assert.equal(actual, expected, `${relPath}: expected ${expected} checkFreeTierGate call(s), found ${actual}`);
     }
+  });
+
+  test('expectedGateCalls is exhaustive — every routes/ or lib/ file calling checkFreeTierGate( is pinned', () => {
+    const chatRequestPath = join(ROOT, 'lib/chat-request.js'); // definition, not a call site
+    const files = [...walk(join(ROOT, 'routes')), ...walk(join(ROOT, 'lib'))];
+    const filesWithCalls = files
+      .filter(f => f !== chatRequestPath)
+      .filter(f => /checkFreeTierGate\s*\(/.test(readFileSync(f, 'utf8')))
+      .map(f => relative(ROOT, f));
+    assert.deepEqual(filesWithCalls.sort(), Object.keys(expectedGateCalls).sort(),
+      'every routes/ or lib/ file calling checkFreeTierGate( must be a key in expectedGateCalls');
   });
 
   test('server.js getOpenRouterSource (the priority predicate behind the footer/settings status) is byte-identical to its pinned shape', () => {
