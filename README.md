@@ -164,7 +164,7 @@ OAuth sessions last 24 hours (with automatic refresh); PAT sessions re-create au
 npm test        # Run unit tests + Playwright E2E tests
 npm run test:unit # Run unit tests only
 npm run test:hermetic # Same unit suite + fails if any test opens a non-loopback socket (what CI runs)
-npm run test:hermetic:proxy # Same, with proxy env set — native fetch ignores it, so both arms are checked
+npm run test:hermetic:proxy # Same, with proxy env set — a connect to the proxy endpoint itself now counts as an escape too
 npm run test:ui   # Run E2E tests with the Playwright UI
 ```
 
