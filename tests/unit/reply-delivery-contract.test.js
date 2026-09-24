@@ -586,6 +586,28 @@ test('errorFromResult is exported standalone and matches the server error messag
   assert.equal(withoutMessage.message, 'HTTP 500');
 });
 
+test('errorFromResult (LIN-2933) additively attaches code/detail/category/retryable from a rich error body, without changing .message', () => {
+  const { window } = makeSandbox(() => { throw new Error('no fetch expected'); });
+
+  const rich = window.ReplyDelivery.errorFromResult({
+    status: 500,
+    data: { error: 'Failed to create comment', detail: 'Linear rejected the request as unauthenticated.', code: 'LINEAR_AUTH', category: 'auth', retryable: false },
+  });
+  assert.equal(rich.message, 'Failed to create comment', '.message is untouched — every existing caller that reads only .message is unaffected');
+  assert.equal(rich.code, 'LINEAR_AUTH');
+  assert.equal(rich.detail, 'Linear rejected the request as unauthenticated.');
+  assert.equal(rich.category, 'auth');
+  assert.equal(rich.retryable, false);
+
+  // A plain (pre-LIN-2933-shaped) error body carries none of the new fields —
+  // never fabricated, never defaulted to a truthy/falsy placeholder.
+  const plain = window.ReplyDelivery.errorFromResult({ status: 502, data: { error: 'upstream down' } });
+  assert.equal('code' in plain, false);
+  assert.equal('detail' in plain, false);
+  assert.equal('category' in plain, false);
+  assert.equal('retryable' in plain, false);
+});
+
 test('the helper block is DOM-free — no document.* or window.ChatUI reference, by contract (LIN-2200/LIN-1728: every caller supplies its own UI)', () => {
   const start = COMMON_JS_SRC.indexOf('window.ReplyDelivery = (function');
   assert.notEqual(start, -1, 'window.ReplyDelivery banner section found in common.js');
