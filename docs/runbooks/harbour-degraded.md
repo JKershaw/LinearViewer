@@ -36,7 +36,10 @@ mechanically** — there is no code-level guard preventing a write command.
 - `railway deployment list`
 - `railway logs`, `railway logs --http`, `railway logs -s <service>`
 - `railway metrics --raw`
-- Read-only `mongosh` via `railway run -s MongoDB-harbour -- mongosh "$MONGO_URL" --quiet --eval "..."`,
+- Read-only `mongosh` via `railway run -s MongoDB-harbour -- sh -c 'mongosh "$MONGO_PUBLIC_URL" --quiet --eval "…"'`
+  (the `sh -c` wrapper matters: expanding `$MONGO_PUBLIC_URL` in the operator's own shell
+  finds it unset, since `railway run` injects service variables into the subshell, not the
+  host — LIN-2993 comment `8b2bcfa4`),
   restricted to: `db.currentOp({active:true, secs_running:{$gt:5}})`,
   `db.serverStatus()` (connections, globalLock, WiredTiger cache, opcounters), and
   `db.stats()`. Never print the connection string — pass it through the environment.
@@ -105,8 +108,8 @@ on the *previous* container; `a5f4383`'s go-live at 19:25:38Z came *after* the ~
 onset, which is why it was ruled out) and LIN-2993 comment `7905184c` (deploy markers lag
 go-live by ~8 minutes): a deploy whose actual go-live time comes *after* onset is ruled
 out as the cause, the way `a5f4383` was. Only a deploy whose go-live *precedes* onset is
-a rollback candidate — restart the current service rather than rolling back unless you
-can show the deploy before it actually predates onset. Check go-live via `railway
+a rollback candidate — restart the current service rather than rolling back, unless you
+can show the current deploy's go-live precedes onset. Check go-live via `railway
 deployment list`/`railway logs <id>`, not the graph marker.
 
 **Both restart and rollback are John's call** (LIN-2993 description: "Restart, redeploy,
