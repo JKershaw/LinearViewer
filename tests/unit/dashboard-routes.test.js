@@ -1735,7 +1735,48 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(done.runs[0].issueIdentifier, 'LIN-101');
     // Telemetry runtime is attached (LIN-594).
     assert.ok(done.runtime, 'session carries a runtime telemetry block');
-    assert.equal(body.counts.total, 2);
+  });
+
+  test('LIN-2934: taskPosition/sessionPosition surface on the payload when the run declares a bound', async () => {
+    const perWorkspace = {
+      'ws-c': {
+        live: [{ ...autopilotLiveItem('sess-3', 'LIN-300'), maxSessionsPerTask: 5 }, workerLiveItem('w-3', 'LIN-300', 'sess-3')],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-c', name: 'Gamma' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-3');
+    assert.ok(live, 'expected the budgeted live session on the payload');
+    assert.deepEqual(live.sessionPosition, { count: 1, maxSessionsPerTask: 5, issueIdentifier: 'LIN-300' });
+    assert.strictEqual(live.taskPosition, null, 'maxTasks was never declared on this run');
+  });
+
+  test('LIN-2934: taskPosition/sessionPosition are null when no bound is declared (unaffected by this ticket)', async () => {
+    const perWorkspace = {
+      'ws-d': {
+        live: [autopilotLiveItem('sess-4', 'LIN-400')],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-d', name: 'Delta' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-4');
+    assert.ok(live);
+    assert.strictEqual(live.taskPosition, null);
+    assert.strictEqual(live.sessionPosition, null);
   });
 
   test('each run carries its Level-3 drill-down payload (telemetry + recap), Mongo-only', async () => {

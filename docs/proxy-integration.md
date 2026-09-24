@@ -1636,12 +1636,13 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 | `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint, and the received length when the length cap is the cause. `null`/omitted are both accepted as absent, falling back to the project-derived `repo=`. See LIN-2075. |
 | `appendProxyContext` | `true` | Append the Linear-access + token + reporting block so the run inherits proxy access. |
 | `maxTasks` | _(none)_ | Optional integer ≥ 1 — a **scope** bound, not a cost control: this run covers up to that many **distinct** tasks, enforced server-side (see below). Omit for an unbounded run (today's behavior, byte-identical). See LIN-1751. |
+| `maxSessionsPerTask` | _(none)_ | Optional integer ≥ 1 (LIN-2934) — a **sibling** scope bound: caps fresh **worker-session** dispatches to a single task, independent of `maxTasks`. This is the bound a *scoped one-task run* actually needs, since `maxTasks` cannot bind a run whose whole job is one task. Either, both, or neither bound may be declared. Omit for a run unbounded per-task (today's behavior, byte-identical). |
 
 Dispatched as `kind:"autopilot"`, so the server appends the session-id self-reference block to the prompt and the returned `id` is this run's session id. Pass that id as `sessionId` on every worker dispatch the run fans out (`POST /dispatch`, `POST /recommend-and-dispatch`) so all the work reconstructs as one session.
 
 An **issue-scoped** kickoff can be refused `409 DUPLICATE_DISPATCH` by the [duplicate guard](#enqueue-a-dispatch) — its kind is `autopilot`, so a second scoped run launched for the same task within 5 minutes hits it. Adopt the returned `id` and watch that run rather than starting a rival one. A **general** (stack-walk) kickoff carries no `issueIdentifier` and can never be refused.
 
-When `maxTasks` is set, every worker dispatch stamped with this run's `sessionId` is refused `409 BUDGET_EXHAUSTED` once it would be the run's `maxTasks + 1`th **distinct** task — a dispatch continuing a task already inside the budget (its review, its close-out, a corrective follow-up) is never refused, so nothing is stranded half-done. This is an orderly, expected finish, not a failure. Unlike the duplicate guard, `force: true` does **not** bypass it. The enforcement key is `sessionId` itself, which is optional, caller-supplied, and format-validated only (never tied to a real dispatch) — this bound holds only for a cooperating orchestrator that stamps its own `sessionId` on every worker dispatch, per the kickoff prose; a dispatch under a budgeted run carrying no `sessionId` is **admitted**, the same as an unresolvable run. As with the duplicate guard, there is no atomic reserve-then-insert, so the bound is "at most `maxTasks` distinct tasks, modulo in-flight concurrency," not a transactional cap. See LIN-1751.
+When `maxTasks` is set, every worker dispatch stamped with this run's `sessionId` is refused `409 BUDGET_EXHAUSTED` (`bound: "tasks"`) once it would be the run's `maxTasks + 1`th **distinct** task — a dispatch continuing a task already inside the budget (its review, its close-out, a corrective follow-up) is never refused, so nothing is stranded half-done. When `maxSessionsPerTask` is set, a fresh worker dispatch to a SINGLE task is refused `409 BUDGET_EXHAUSTED` (`bound: "sessionsPerTask"`) once that task's own fresh-dispatch count reaches the bound — unlike `maxTasks`, there is **no** already-counted exemption here, since this bound counts dispatches to that task, not distinct tasks. Either refusal is an orderly, expected finish, not a failure. Unlike the duplicate guard, `force: true` does **not** bypass either bound. The enforcement key is `sessionId` itself, which is optional, caller-supplied, and format-validated only (never tied to a real dispatch) — either bound holds only for a cooperating orchestrator that stamps its own `sessionId` on every worker dispatch, per the kickoff prose; a dispatch under a budgeted run carrying no `sessionId` is **admitted**, the same as an unresolvable run. As with the duplicate guard, there is no atomic reserve-then-insert, so either bound is "at most N, modulo in-flight concurrency," not a transactional cap. See LIN-1751 / LIN-2934.
 
 ```json
 {
@@ -1678,7 +1679,7 @@ GET /api/proxy/passage-runner/prompt
 
 Returns the **Passage Runner kickoff prompt** as **plain text** (`text/plain`) — the pasteable body of `docs/passage-runner-prompt.md` (preamble stripped). This is the same text a fresh Passage Runner session starts from; fetch here to re-read a part mid-run. `read`-scope is sufficient.
 
-**Declaring the runner's task pool (LIN-2975).** This endpoint only returns the kickoff prose — there is no dedicated launch route. A passage runner is launched as a plain `POST /api/proxy/dispatch`, and the ratified pool size is whatever `maxTasks` the launcher passes on **that** call; the runner has no seam to declare it on itself after the fact. Pass `maxTasks` when dispatching the runner, or its own `GET /dispatch/{id}` will read `maxTasks: null` and the runner will (correctly) report its pool as undeclared.
+**Declaring the runner's task pool (LIN-2975).** This endpoint only returns the kickoff prose — there is no dedicated launch route. A passage runner is launched as a plain `POST /api/proxy/dispatch`, and the ratified pool size is whatever `maxTasks` the launcher passes on **that** call; the runner has no seam to declare it on itself after the fact. Pass `maxTasks` when dispatching the runner, or its own `GET /dispatch/{id}` will read `maxTasks: null` and the runner will (correctly) report its pool as undeclared. The same applies to `maxSessionsPerTask` (LIN-2934) for a scoped one-task runner.
 
 ### Write Endpoints
 
@@ -2090,7 +2091,7 @@ The runner reports progress back as **free-form feedback entries** (it owns the 
 POST /api/proxy/dispatch
 Content-Type: application/json
 
-{ "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "followUpTo": "...", "force": false, "sessionId": "...", "maxTasks": 50, "appendProxyContext": true }
+{ "prompt": "...", "promptName": "...", "kind": "implementation", "issueId": "...", "issueIdentifier": "LIN-42", "issueTitle": "...", "issueUrl": "...", "target": "cli", "repo": "...", "followUpTo": "...", "force": false, "sessionId": "...", "maxTasks": 50, "maxSessionsPerTask": 10, "appendProxyContext": true }
 ```
 
 | Field | Type | Required | Description |
@@ -2107,12 +2108,13 @@ Content-Type: application/json
 | `cascade` | bool | No | Default `false`. A modifier on an `abort`: when `true`, `abortTo` names a subtree **root** and Harbour expands the call into one plain abort per descendant session, returning `{ success, cascade: true, closed: [...], count }`. Requires `abort`; mutually exclusive with `force`. The runner skips human-continued sessions with a terminal-benign `[skipped]` marker. See the dispatch guide's [Cascade close](dispatch-integration.md#cascade-close-closing-a-session-subtree) and LIN-946/LIN-951 |
 | `sessionId` | string (opaque) | No | The autopilot dispatch id that spawned this worker. Stamp it on every worker an autopilot run fans out so the whole run (incl. epic descent / `breakdown` spin-offs) reconstructs as one session. An **opaque grouping key, not a UUID** (LIN-1118): non-empty, ≤128 chars, no control characters, `__meta__` reserved — so a readable id like `LIN-1117-autopilot-standalone-2026-07-07` works, and existing UUIDs stay valid. Stored and forwarded verbatim; unlike `followUpTo` it carries **no target restriction**. See LIN-591 |
 | `maxTasks` | integer | No | Declares **this** dispatch as a budgeted run: up to this many distinct tasks (LIN-2975). Workers must carry this dispatch's `id` as their own `sessionId` for the bound to apply — see the task-budget-exhausted response below. Must be an integer ≥ 1 or omitted/`null` (unbounded, today's default behavior) — anything else is rejected `400 "maxTasks must be an integer >= 1"`. Echoed on the `201` response |
+| `maxSessionsPerTask` | integer | No | Sibling per-task bound (LIN-2934): caps fresh worker-session dispatches to a SINGLE task under this run, independent of `maxTasks`. Same validation rule/error text (`400 "maxSessionsPerTask must be an integer >= 1"`), same `sessionId` enforcement key. Echoed on the `201` response, alongside a non-persisted `budgetPosition` snapshot when either bound is declared and the dispatch is admitted |
 | `periodicalId` | string | No | The periodical-template join key: the id of a periodicals-registry template (e.g. `documentation-review`) this dispatch was minted from. Stamped once at dispatch time, never maintained, and does **not** propagate to a `followUpTo` beat or a wake. Validated against the live registry — an unknown/typo id is rejected `400`. Stored and forwarded verbatim; inert to execution. See LIN-1825 |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block to the prompt so the worker inherits workspace access via this proxy. Set `false` to send the prompt verbatim. **Exception (LIN-805):** when `followUpTo` is set the block is **not** appended by default — a follow-up beat resumes a warm session that already received the proxy context on its first beat, so re-appending it is redundant. Pass `appendProxyContext: true` to force it back on for a follow-up |
 
 Returns `201`:
 ```json
-{ "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "maxTasks": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "consumerLastSeenAt": "2026-06-06T09:10:00.000Z" }
+{ "id": "uuid", "status": "queued", "promptName": "...", "kind": "implementation", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "maxTasks": null, "maxSessionsPerTask": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "consumerLastSeenAt": "2026-06-06T09:10:00.000Z" }
 ```
 
 **Consumer poll-recency warning (LIN-2885).** `consumerLastSeenAt` is the most recent `lastUsedAt` across the workspace's non-revoked consumer tokens, stamped once at enqueue time — `null` means no consumer token has ever polled/taken in this workspace ("never", not merely "not recently"). When that stamp is `null` or older than the staleness threshold (default 1 hour, configurable via the `CONSUMER_POLL_WARNING_THRESHOLD_MS` env var), the response also carries a top-level `warning` string naming the last poll time or "never":
@@ -2155,11 +2157,27 @@ Returns `409` — **task budget exhausted** (LIN-1751). A dispatch stamped with 
 {
   "error": "This run's task budget (50) has been reached",
   "code": "BUDGET_EXHAUSTED",
+  "bound": "tasks",
   "count": 50,
   "maxTasks": 50,
   "sessionId": "the-run's-own-dispatch-id"
 }
 ```
+
+Returns `409` — **per-task session budget exhausted** (LIN-2934). A dispatch stamped with a `maxSessionsPerTask`-budgeted run's `sessionId` is refused once its OWN task's fresh-dispatch count would reach the bound — unlike the task budget above, there is **no** exemption for a task already inside `maxTasks`, since this bound counts dispatches to that one task, not distinct tasks:
+
+```json
+{
+  "error": "This task's session budget (10) has been reached",
+  "code": "BUDGET_EXHAUSTED",
+  "bound": "sessionsPerTask",
+  "taskDispatches": 10,
+  "maxSessionsPerTask": 10,
+  "sessionId": "the-run's-own-dispatch-id"
+}
+```
+
+Both refusals share the same `code` (`BUDGET_EXHAUSTED`) — **match on `bound`, not `code` alone**, to tell them apart (and to tell either apart from a fail-closed read error, which reports `bound: "unverified"` when both bounds are declared and the underlying count could not be read).
 
 **This is also not a failure — it means the run reached its declared scope bound.** Wind down any other in-flight work and report where the run stands; do not retry, work around it, or treat it as an instrument breakage. A dispatch continuing a task already inside the budget (its review, its close-out, a corrective follow-up) is never refused, so nothing already underway is stranded half-done. There is no `retryAfter` — the budget doesn't clear on a timer, and `force: true` does not bypass it (unlike the duplicate guard above). A dispatch carrying no `sessionId`, or whose `sessionId` doesn't resolve to a budgeted run, is admitted, not refused — the bound only holds for a caller that follows the kickoff prose's instruction to stamp its own `sessionId` on every worker dispatch.
 
@@ -2293,6 +2311,7 @@ Notes:
   "force": false,
   "sessionId": null,
   "maxTasks": null,
+  "maxSessionsPerTask": null,
   "repo": null,
   "dispatchedAt": "...",
   "resolvedAt": "...",
@@ -2315,7 +2334,7 @@ Notes:
 
 **`consumerLastSeenAt` / `consumerPollWarning` (LIN-2885).** `consumerLastSeenAt` is the poll-recency stamp taken once when this item was enqueued — the most recent `lastUsedAt` across the workspace's consumer tokens at that moment, or `null` for "never." `consumerPollWarning` is re-derived from that same stamp against the **current** clock on every read, so a queued item that grows stale while sitting unpolled will start showing a warning here even if the workspace looked fine at dispatch time; it goes back to `null` once a consumer actually polls/takes. Same threshold as the enqueue-time `warning` above (default 1h, `CONSUMER_POLL_WARNING_THRESHOLD_MS`).
 
-**`maxTasks` / `repo` (LIN-2975).** `maxTasks` is the scope bound this dispatch declared, `null` when unbounded — see the task-budget-exhausted response under [Enqueue a Dispatch](#enqueue-a-dispatch). It lives on the run row only: nothing copies it onto the workers a budgeted run fans out, so a worker's own row reads `maxTasks: null` regardless of its run's budget — to find the bound a worker is running against, read the worker's `sessionId` and then `GET /api/proxy/dispatch/{that id}`. `repo` is the validated/normalized repo basename this item was queued against, `null` for the workspace's default folder. `maxTasks` is also on `GET /api/proxy/dispatch` (list) below, so verifying a run's own budget stamping doesn't require a per-row detail read; `repo` is not on the list — **verify stamping with this endpoint, never assume a field is `null` because you didn't check it.**
+**`maxTasks` / `maxSessionsPerTask` / `repo` (LIN-2975 / LIN-2934).** `maxTasks` and its sibling `maxSessionsPerTask` are the scope bounds this dispatch declared, `null` when unbounded — see the task-budget-exhausted responses under [Enqueue a Dispatch](#enqueue-a-dispatch). Both live on the run row only: nothing copies them onto the workers a budgeted run fans out, so a worker's own row reads `maxTasks: null`/`maxSessionsPerTask: null` regardless of its run's budget — to find the bound a worker is running against, read the worker's `sessionId` and then `GET /api/proxy/dispatch/{that id}`. `repo` is the validated/normalized repo basename this item was queued against, `null` for the workspace's default folder. `maxTasks`/`maxSessionsPerTask` are also on `GET /api/proxy/dispatch` (list) below, so verifying a run's own budget stamping doesn't require a per-row detail read; `repo` is not on the list — **verify stamping with this endpoint, never assume a field is `null` because you didn't check it.**
 
 #### Read a Dispatch's Prompt
 
@@ -2357,12 +2376,12 @@ All query params optional. Merges the live queue and recent history, newest firs
 **Filter semantics (LIN-2079):** the filter runs on the **derived** status, so `status=taken` no longer returns rows that derive to `blocked` — query `status=blocked` for those. `total` follows the same filter. This is deliberate: it is what separates rows still being worked from rows parked waiting on a human. An unfiltered list returns the same rows as before; only the reported `status` string changes for the affected rows.
 
 ```json
-{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "sessionId": null, "maxTasks": null, "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10, "consumerLastSeenAt": "2026-06-06T09:10:00.000Z", "consumerPollWarning": null } ], "total": 1, "truncated": false }
+{ "items": [ { "id": "uuid", "status": "done", "promptName": "...", "issueIdentifier": "LIN-42", "issueUrl": "...", "target": "cli", "sessionId": null, "maxTasks": null, "maxSessionsPerTask": null, "dispatchedAt": "...", "resolvedAt": "...", "completedAt": "...", "feedbackCount": 10, "consumerLastSeenAt": "2026-06-06T09:10:00.000Z", "consumerPollWarning": null } ], "total": 1, "truncated": false }
 ```
 
 **`consumerLastSeenAt` / `consumerPollWarning` (LIN-2885)** — same fields, same meaning as on `GET /api/proxy/dispatch/{id}` above: the enqueue-time poll-recency stamp, and a warning re-derived against the current clock on every read. Lets you spot a stale queued row directly from the list, without a per-item watch call.
 
-**`sessionId` / `maxTasks` (LIN-2975)** — same fields, same meaning as on `GET /api/proxy/dispatch/{id}` above, now on the list too: a reader can confirm a run's `sessionId`/`maxTasks` budget stamping across every worker it fanned out without a per-row detail read. `null` means the row carries no session/budget — verify stamping by reading this field, never by assuming absence from an older client that hadn't seen it yet. `repo` is **not** on the list (kept lean by design) — read `GET /api/proxy/dispatch/{id}` for that.
+**`sessionId` / `maxTasks` / `maxSessionsPerTask` (LIN-2975 / LIN-2934)** — same fields, same meaning as on `GET /api/proxy/dispatch/{id}` above, now on the list too: a reader can confirm a run's `sessionId`/`maxTasks`/`maxSessionsPerTask` budget stamping across every worker it fanned out without a per-row detail read. `null` means the row carries no session/budget — verify stamping by reading this field, never by assuming absence from an older client that hadn't seen it yet. `repo` is **not** on the list (kept lean by design) — read `GET /api/proxy/dispatch/{id}` for that.
 
 **`total` / `truncated` semantics (LIN-1494).** The read merges the live queue with the *newest 200* history rows. For an unfiltered or `?issueIdentifier=`-scoped read, `total` is the **exact full matching count** — queued items plus the store's pre-window history count — so it can exceed the number of rows the window (and therefore `items`) covers. For a `?status=` read, `total` remains the count of matching rows **within that window** (status is derived from feedback at read time, so an exact per-status total is not knowable without reading the whole history). `truncated: true` discloses that the 200-row window did not cover the whole history — in that case older rows exist that this response's `items` (and the lineage join's anchor seeding) never saw, so page by `issueIdentifier` or treat window-derived aggregates as recent-window signals, not a census.
 
@@ -2390,7 +2409,8 @@ Note for aggregating consumers: `feedbackCount` is no longer additive across row
 | 404 | `Team not found: <teamId>` (`code: TEAM_NOT_FOUND`) | A well-formed `teamId` filter on `GET /issues`/`/labels`/`/cycles` did not match any team in this workspace. The body also carries `truncated: <boolean>` (LIN-2033) — `true` means the team list this was checked against was itself capped (e.g. Jira's project-listing cap), so the id may be real and simply beyond where the provider stopped looking, not genuinely absent. |
 | 409 | `Issue is trashed; refusing to modify a deleted issue` | Write target is a trashed (soft-deleted) issue |
 | 409 | `A dispatch for this issue and kind was created moments ago` (`code: DUPLICATE_DISPATCH`) | A fresh dispatch for this `issueIdentifier` + `kind` already exists from the last 5 minutes (creation endpoints only: `/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`). **Retryable after `retryAfter` seconds**, but usually you should not: the body's `id` is the live dispatch — adopt and watch it instead. Branch on `code`, since 409 is shared with the trashed-issue refusal. Follow-ups, aborts, other kinds, and other workspaces are never refused. See LIN-1656. |
-| 409 | `This run's task budget (N) has been reached` (`code: BUDGET_EXHAUSTED`) | A dispatch stamped with a budgeted run's `sessionId` would be that run's `maxTasks + 1`th **distinct** task (creation endpoints only, same set as above). **Not retryable** — no `retryAfter`, the budget doesn't clear on a timer. Wind down in-flight work and report where the run stands. A dispatch continuing a task already inside the budget is never refused; unlike `DUPLICATE_DISPATCH`, `force: true` does not bypass it; a dispatch with no resolvable `sessionId` is admitted, not refused. See LIN-1751. |
+| 409 | `This run's task budget (N) has been reached` (`code: BUDGET_EXHAUSTED`, `bound: "tasks"`) | A dispatch stamped with a budgeted run's `sessionId` would be that run's `maxTasks + 1`th **distinct** task (creation endpoints only, same set as above). **Not retryable** — no `retryAfter`, the budget doesn't clear on a timer. Wind down in-flight work and report where the run stands. A dispatch continuing a task already inside the budget is never refused; unlike `DUPLICATE_DISPATCH`, `force: true` does not bypass it; a dispatch with no resolvable `sessionId` is admitted, not refused. See LIN-1751. |
+| 409 | `This task's session budget (N) has been reached` (`code: BUDGET_EXHAUSTED`, `bound: "sessionsPerTask"`) | A dispatch stamped with a `maxSessionsPerTask`-budgeted run's `sessionId` would push that ONE task's fresh-dispatch count past the bound (creation endpoints only). **Not retryable.** Unlike the task-budget refusal above, there is **no** already-counted exemption — this bound counts dispatches to the task, not distinct tasks, so it can refuse even a review/close-out of an in-flight task. Comment on the ticket naming the bound and the ledger, then stop. See LIN-2934. |
 | 422 | `This workspace's provider does not support this` (`code: CAPABILITY_NOT_SUPPORTED`) | The workspace's backend cannot perform this operation. `capability` names the specific provider operation that is missing — sometimes the write itself (`createRelation`, `uploadFile`), sometimes an internal read the write depends on, sometimes a read a `GET` directly asked for (`viewer`, `issueDetail`, `projects`, `issues`, `search`, `states`, `labels`, `cycles`, `cycleDetail`, `relations`). **Never retryable, and never a 500** — branch on `code`, not on the `capability` value, and treat any value as "this backend can't do this". |
 | 422 | `Cannot resolve <kind> '<ref>'` | A symbolic reference (state / label / project / team) could not be resolved against this workspace's backend; `candidates` lists the accepted values when the ref was ambiguous or the vocabulary is small. **Never retryable** — fix the reference. |
 | 429 | `Too many proxy requests` | Rate limit exceeded (60/minute) |

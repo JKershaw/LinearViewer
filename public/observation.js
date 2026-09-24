@@ -724,6 +724,14 @@ function fillSessionHead(li, s) {
   if (s.model) metaBits.push(`<span class="obs-meta"><span class="obs-meta-k">model</span> <span class="obs-meta-v">${escapeHtml(String(s.model))}</span></span>`);
   if (s.workspaceName) metaBits.push(`<span class="obs-meta obs-meta-ws">${escapeHtml(s.workspaceName)}</span>`);
   if (s.tasksTouched.length > 1) metaBits.push(`<span class="obs-meta">${s.tasksTouched.length} tasks</span>`);
+  // Budget "n of N" (LIN-2934): task position and/or per-task session position,
+  // whichever bound(s) this run declared — matches the research's own example
+  // format ("task 1 of 8 · session 4 of 10"). Omitted entirely when the run
+  // declared neither bound, same additive-chip convention as ticketWalk below.
+  const budgetBits = [];
+  if (s.taskPosition) budgetBits.push(`task ${s.taskPosition.count} of ${s.taskPosition.maxTasks}`);
+  if (s.sessionPosition) budgetBits.push(`session ${s.sessionPosition.count} of ${s.sessionPosition.maxSessionsPerTask}`);
+  if (budgetBits.length) metaBits.push(`<span class="obs-meta obs-meta-budget">${escapeHtml(budgetBits.join(' · '))}</span>`);
   const ticketWalk = laneTicketWalk(s);
   if (ticketWalk) metaBits.push(`<span class="obs-meta obs-meta-tickets">${escapeHtml(ticketProgressText(ticketWalk))}</span>`);
 

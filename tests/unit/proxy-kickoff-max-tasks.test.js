@@ -209,3 +209,67 @@ describe('LIN-1751 — end-to-end budget enforcement at the dispatch seam', () =
     }
   });
 });
+
+describe('LIN-2934 — POST /api/proxy/autopilot/kickoff maxSessionsPerTask validation', () => {
+  test('no maxSessionsPerTask at all: byte-identical, unbounded', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(res.body.maxSessionsPerTask, null);
+  });
+
+  test('a valid maxSessionsPerTask is accepted, stored, and echoed on the response, independent of maxTasks', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', maxSessionsPerTask: 10 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.maxSessionsPerTask, 10);
+    assert.strictEqual(res.body.maxTasks, null, 'declaring the sibling bound must not synthesize maxTasks');
+  });
+
+  test('both bounds may be declared together', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', maxTasks: 8, maxSessionsPerTask: 10 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.maxTasks, 8);
+    assert.equal(res.body.maxSessionsPerTask, 10);
+  });
+
+  for (const bad of [0, -1, 1.5, 'ten', true, {}, []]) {
+    test(`maxSessionsPerTask: ${JSON.stringify(bad)} is rejected 400`, async () => {
+      const app = buildApp({ dispatchQueueStore: makeStore() });
+      const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', maxSessionsPerTask: bad });
+      assert.equal(res.status, 400, JSON.stringify(res.body));
+      assert.ok(res.body.error);
+    });
+  }
+});
+
+describe('LIN-2934 — a scoped one-task kickoff bounded by maxSessionsPerTask, end-to-end', () => {
+  test('the run refuses the (bound+1)th fresh dispatch to its own single task, with a usable budgetPosition on admitted dispatches', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const kickoff = await call(app, 'post', KICKOFF, { goal: 'ship LIN-1', target: 'cli', maxSessionsPerTask: 2 });
+    assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
+    const sessionId = kickoff.body.id;
+
+    const t1 = await call(app, 'post', DISPATCH, {
+      prompt: 'implement', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t1.status, 201, JSON.stringify(t1.body));
+    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
+
+    const t2 = await call(app, 'post', DISPATCH, {
+      prompt: 'review', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t2.status, 201, JSON.stringify(t2.body));
+    assert.deepEqual(t2.body.budgetPosition.sessionsPerTask, { count: 2, maxSessionsPerTask: 2 });
+
+    const t3 = await call(app, 'post', DISPATCH, {
+      prompt: 'close out', promptName: 'close-out', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t3.status, 409, JSON.stringify(t3.body));
+    assert.equal(t3.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(t3.body.bound, 'sessionsPerTask');
+  });
+});

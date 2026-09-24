@@ -91,7 +91,7 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   // whole-file token search can't pass by finding sessionId elsewhere on
   // the route (it appears byte-identical in formatDispatchWatch too — see
   // assertion 2 below).
-  test('/dispatch list item is an exact field set that includes sessionId and maxTasks', () => {
+  test('/dispatch list item is an exact field set that includes sessionId, maxTasks, and maxSessionsPerTask', () => {
     const itemsLiteral = sliceBetween(
       proxyDispatchSource,
       'const items = filtered.slice(0, limit).map(i => ({',
@@ -105,10 +105,13 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
       // LIN-2975: sessionId/maxTasks added deliberately, closing the read
       // artifact that misled a passage runner into reporting budget
       // stamping as absent when it was only unread.
+      // LIN-2934: maxSessionsPerTask added deliberately — the sibling
+      // per-task bound, same list-read visibility rationale as maxTasks.
+      // This is an intended contract change, not silent drift.
       new Set(['id', 'status', 'promptName', 'kind', 'issueIdentifier', 'issueUrl', 'target',
-        'sessionId', 'maxTasks', 'dispatchedAt', 'resolvedAt', 'completedAt', 'feedbackCount',
-        'consumerLastSeenAt', 'consumerPollWarning']),
-      'list item field set drifted — check whether sessionId/maxTasks was silently dropped, or a bootstrapToken-shaped leak was added'
+        'sessionId', 'maxTasks', 'maxSessionsPerTask', 'dispatchedAt', 'resolvedAt', 'completedAt',
+        'feedbackCount', 'consumerLastSeenAt', 'consumerPollWarning']),
+      'list item field set drifted — check whether sessionId/maxTasks/maxSessionsPerTask was silently dropped, or a bootstrapToken-shaped leak was added'
     );
     assert.ok(keys.includes('sessionId'), 'sessionId must appear on the list item');
   });

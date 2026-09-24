@@ -116,3 +116,55 @@ describe('LIN-1737 Beat 1 — POST /workspace/:urlKey/api/dispatch maxTasks', ()
     assert.strictEqual(captured.item.maxTasks, null);
   });
 });
+
+describe('LIN-2934 — POST /workspace/:urlKey/api/dispatch maxSessionsPerTask', () => {
+  test('no maxSessionsPerTask at all: byte-identical (defaults to null)', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(captured.item.maxSessionsPerTask, null);
+    assert.strictEqual(res.body.item.maxSessionsPerTask, null);
+  });
+
+  test('a valid maxSessionsPerTask is persisted onto the fields block and echoed on the 201', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 10 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(captured.item.maxSessionsPerTask, 10);
+    assert.strictEqual(res.body.item.maxSessionsPerTask, 10);
+  });
+
+  test('maxSessionsPerTask: 0 is rejected 400 with the exact error text', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 0 });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'maxSessionsPerTask must be an integer >= 1');
+  });
+
+  test('a non-integer maxSessionsPerTask is rejected 400', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 5.5 });
+    assert.equal(res.status, 400);
+  });
+
+  test('maxSessionsPerTask: null is explicitly accepted as "no bound"', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation', maxSessionsPerTask: null });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(captured.item.maxSessionsPerTask, null);
+  });
+
+  test('both bounds may be declared together, independently', async () => {
+    const captured = {};
+    const app = buildApp(captured);
+    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxTasks: 8, maxSessionsPerTask: 10 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(captured.item.maxTasks, 8);
+    assert.strictEqual(captured.item.maxSessionsPerTask, 10);
+  });
+});

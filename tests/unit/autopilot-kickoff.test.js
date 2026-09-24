@@ -635,11 +635,25 @@ describe('buildAutopilotKickoff (maxTasks budget, LIN-1751)', () => {
     assert.ok(!unbudgeted.includes(QUIRK_BULLET));
 
     const budgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 50 });
-    assert.ok(budgeted.includes('A `409 BUDGET_EXHAUSTED` means this run reached its task budget'));
-    assert.ok(budgeted.includes('it is not a failure and not a\n  broken instrument'),
+    // LIN-2934: the bullet now names its bound discriminator explicitly.
+    assert.ok(budgeted.includes("A `409 BUDGET_EXHAUSTED` with `bound: 'tasks'` means this run reached its task budget"));
+    assert.ok(budgeted.includes('not a\n  failure and not a broken instrument'),
       'must be framed as an orderly finish, matching the DUPLICATE_DISPATCH quirk\'s framing');
     // Sits in the same quirks list as the existing DUPLICATE_DISPATCH entry.
     assert.ok(budgeted.indexOf('DUPLICATE_DISPATCH') < budgeted.indexOf(QUIRK_BULLET));
+  });
+
+  test('the BUDGET_EXHAUSTED sessionsPerTask quirk-list bullet appears only when that sibling bound is declared (LIN-2934)', () => {
+    const QUIRK_BULLET = "reached its\n  per-task session budget";
+    const unbudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(!unbudgeted.includes(QUIRK_BULLET));
+
+    const sessionBudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, maxSessionsPerTask: 10 });
+    assert.ok(sessionBudgeted.includes("A `409 BUDGET_EXHAUSTED` with `bound: 'sessionsPerTask'` means the CURRENT task"));
+    assert.ok(sessionBudgeted.includes('Comment on the ticket naming the bound that was hit and the ledger'));
+    // The task-budget bullet is independent — declaring only the sibling
+    // bound must not synthesize the tasks-bound bullet.
+    assert.ok(!sessionBudgeted.includes("bound: 'tasks'` means this run reached its task budget"));
   });
 
   test('a budgeted scoped run still pins the goal and names the task, unaffected by the budget block', () => {

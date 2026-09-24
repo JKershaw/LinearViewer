@@ -103,3 +103,54 @@ test('?maxTasks=abc (not a number) is rejected 400', async () => {
   const { status } = await get(buildApp(), `${PATH}?maxTasks=abc`);
   assert.equal(status, 400);
 });
+
+// LIN-2934 (F4): the sibling per-task bound, same query-param entry point,
+// same blank-is-absent / integer>=1 rule as maxTasks above.
+
+test('no maxSessionsPerTask: byte-identical — no per-task budget statement', async () => {
+  const { status, body } = await get(buildApp(), PATH);
+  assert.equal(status, 200);
+  assert.doesNotMatch(body.prompt, /Per-task session budget/);
+});
+
+test('?maxSessionsPerTask=10 states the sibling bound in the kickoff prose, independent of maxTasks', async () => {
+  const { status, body } = await get(buildApp(), `${PATH}?maxSessionsPerTask=10`);
+  assert.equal(status, 200);
+  assert.match(body.prompt, /Per-task session budget \(LIN-2934\): at most 10 worker sessions/);
+  assert.doesNotMatch(body.prompt, /Task budget: up to/, 'declaring only the sibling bound must not synthesize the maxTasks statement');
+});
+
+test('both ?maxTasks= and ?maxSessionsPerTask= may be declared together', async () => {
+  const { status, body } = await get(buildApp(), `${PATH}?maxTasks=8&maxSessionsPerTask=10`);
+  assert.equal(status, 200);
+  assert.match(body.prompt, /Task budget: up to 8 distinct tasks/);
+  assert.match(body.prompt, /Per-task session budget \(LIN-2934\): at most 10 worker sessions/);
+});
+
+test('blank ?maxSessionsPerTask= is treated as ABSENT, not an error', async () => {
+  const { status, body } = await get(buildApp(), `${PATH}?maxSessionsPerTask=`);
+  assert.equal(status, 200);
+  assert.doesNotMatch(body.prompt, /Per-task session budget/);
+});
+
+test('whitespace-only ?maxSessionsPerTask= is treated as ABSENT, not an error', async () => {
+  const { status, body } = await get(buildApp(), `${PATH}?maxSessionsPerTask=${encodeURIComponent('   ')}`);
+  assert.equal(status, 200);
+  assert.doesNotMatch(body.prompt, /Per-task session budget/);
+});
+
+test('?maxSessionsPerTask=0 is rejected 400 with the exact shared error text', async () => {
+  const { status, body } = await get(buildApp(), `${PATH}?maxSessionsPerTask=0`);
+  assert.equal(status, 400);
+  assert.equal(body.error, 'maxSessionsPerTask must be an integer >= 1');
+});
+
+test('?maxSessionsPerTask=5.5 (non-integer) is rejected 400', async () => {
+  const { status } = await get(buildApp(), `${PATH}?maxSessionsPerTask=5.5`);
+  assert.equal(status, 400);
+});
+
+test('?maxSessionsPerTask=abc (not a number) is rejected 400', async () => {
+  const { status } = await get(buildApp(), `${PATH}?maxSessionsPerTask=abc`);
+  assert.equal(status, 400);
+});

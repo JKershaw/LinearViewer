@@ -695,13 +695,14 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {boolean} [opts.force]                    Whether to force-follow-up even into a terminal session
  * @param {string} [opts.presetId]                  Selected dispatch preset id (LIN-1391); blank/omitted sends no presetId, so the consumer's own default resolution applies unchanged (LIN-1094/1390)
  * @param {number} [opts.maxTasks]                  Task-budget scope bound (LIN-1737/LIN-1751); blank/omitted sends no maxTasks, so the run stays unbounded exactly as before this field existed
+ * @param {number} [opts.maxSessionsPerTask]         Sibling per-task session bound (LIN-2934); blank/omitted sends nothing, same optional pass-through as maxTasks
  * @param {string} [opts.composedRunMarker]         LIN-2775 Area 8: the scoped structural marker for a composed-run dispatch (a real agent brief, not a raw pressed-option label) — activates routes/dispatch.js's terminal-anchor guard server-side. Blank/omitted sends nothing, so an ordinary dispatch is completely unaffected.
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, composedRunMarker } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -747,6 +748,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   if (force !== undefined) payload.force = force;
   if (presetId) payload.presetId = presetId;
   if (maxTasks !== undefined && maxTasks !== null) payload.maxTasks = maxTasks;
+  if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) payload.maxSessionsPerTask = maxSessionsPerTask;
   // LIN-2775 Area 8: truthy gate, like presetId/kind — only a composed-run
   // dispatch (today: a ruling reply's real agent brief) sets this; every
   // other dispatch surface sends nothing and is unaffected.
@@ -1468,11 +1470,13 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {number} [opts.maxTasks]              Optional task-budget scope bound (LIN-1737/LIN-1751):
  *   `?maxTasks=<n>` query param on the general (goal-scoped) kickoff only — the
  *   issue-scoped kickoff has no budget concept, so this is a no-op there.
+ * @param {number} [opts.maxSessionsPerTask]    Sibling per-task session bound (LIN-2934):
+ *   `?maxSessionsPerTask=<n>` query param, same goal-scoped-only pass-through as maxTasks.
  * @param {AbortSignal} [opts.signal]           Passed through to the fetch
  * @param {boolean} [opts.on401=false]          Passed through to window.api
  * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
  */
-window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, maxTasks, signal, on401 = false } = {}) {
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, maxTasks, maxSessionsPerTask, signal, on401 = false } = {}) {
   if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
 
   let url;
@@ -1490,6 +1494,7 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
     if (goal) params.set('goal', goal);
     if (variant) params.set('variant', variant);
     if (maxTasks !== undefined && maxTasks !== null) params.set('maxTasks', String(maxTasks));
+    if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) params.set('maxSessionsPerTask', String(maxSessionsPerTask));
     const query = params.toString() ? `?${params.toString()}` : '';
     url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`;
   }

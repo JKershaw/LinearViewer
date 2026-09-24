@@ -27,7 +27,7 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
-function buildApp({ dispatchQueueStore }) {
+function buildApp({ dispatchQueueStore, recordedEvents = null }) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -35,7 +35,7 @@ function buildApp({ dispatchQueueStore }) {
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
       createToken: async () => ({ token: 'bootstrap-xyz', kind: 'bootstrap', scope: 'readWrite' })
     },
-    proxyEventStore: { recordEvent: async () => {} },
+    proxyEventStore: { recordEvent: async (evt) => { if (recordedEvents) recordedEvents.push(evt); } },
     resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'test-token',
     getWorkspaceOpenRouterKey: async () => null,
@@ -127,8 +127,9 @@ describe('LIN-2975 — POST /api/proxy/dispatch maxTasks validation', () => {
 
 describe('LIN-2975 — end-to-end: a custom run declares a pool through the proxy', () => {
   test('a custom run with maxTasks: 2 admits two distinct sessionId-stamped workers, then refuses a third', async () => {
+    const recordedEvents = [];
     const { store } = makeSpiedStore();
-    const app = buildApp({ dispatchQueueStore: store });
+    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
 
     // The launcher declares the pool on a plain custom dispatch — exactly the
     // passage-runner launch shape this ticket was filed over (no kickoff verb
@@ -153,7 +154,94 @@ describe('LIN-2975 — end-to-end: a custom run declares a pool through the prox
     });
     assert.equal(t3.status, 409, JSON.stringify(t3.body));
     assert.equal(t3.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(t3.body.bound, 'tasks', 'LIN-2934: the refusal body now names which bound fired');
     assert.equal(t3.body.maxTasks, 2);
     assert.equal(t3.body.sessionId, sessionId);
+
+    // LIN-2934 (F1): the durable proxy-event note carries the bound
+    // discriminator too, independent of the 409 body itself.
+    const refusalEvent = recordedEvents.find(e => e.status === 409);
+    assert.ok(refusalEvent, 'expected a durable proxy-event record for the refusal');
+    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED tasks ${sessionId}`);
+  });
+});
+
+describe('LIN-2934 — POST /api/proxy/dispatch maxSessionsPerTask validation', () => {
+  test('no maxSessionsPerTask at all: stored null, byte-identical to today', async () => {
+    const { store } = makeSpiedStore();
+    const app = buildApp({ dispatchQueueStore: store });
+    const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(res.body.maxSessionsPerTask, null);
+  });
+
+  test('a valid integer maxSessionsPerTask is accepted, stored, and echoed on the 201', async () => {
+    const { store } = makeSpiedStore();
+    const app = buildApp({ dispatchQueueStore: store });
+    const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli', maxSessionsPerTask: 5 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.maxSessionsPerTask, 5);
+
+    const stored = await store.getItemStatus('acme', res.body.id);
+    assert.equal(stored.maxSessionsPerTask, 5);
+  });
+
+  for (const bad of [0, -1, 1.5, '5', true, {}, []]) {
+    test(`maxSessionsPerTask: ${JSON.stringify(bad)} is rejected 400 with the exact text, and addItem never runs`, async () => {
+      const { store, getInsertCount } = makeSpiedStore();
+      const app = buildApp({ dispatchQueueStore: store });
+      const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli', maxSessionsPerTask: bad });
+      assert.equal(res.status, 400, JSON.stringify(res.body));
+      assert.equal(res.body.error, 'maxSessionsPerTask must be an integer >= 1');
+      assert.equal(getInsertCount(), 0, 'addItem must not write on a rejected maxSessionsPerTask');
+    });
+  }
+});
+
+describe('LIN-2934 — end-to-end: a scoped one-task run bounded by maxSessionsPerTask', () => {
+  test('a run with maxSessionsPerTask: 2 admits two fresh dispatches to ONE task, then refuses a third to that same task', async () => {
+    const recordedEvents = [];
+    const { store } = makeSpiedStore();
+    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
+
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
+    assert.equal(run.status, 201, JSON.stringify(run.body));
+    assert.equal(run.body.maxSessionsPerTask, 2);
+    const sessionId = run.body.id;
+
+    const t1 = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t1.status, 201, JSON.stringify(t1.body));
+    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
+
+    const t2 = await call(app, 'post', DISPATCH, {
+      prompt: 'review it', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t2.status, 201, JSON.stringify(t2.body));
+    assert.deepEqual(t2.body.budgetPosition.sessionsPerTask, { count: 2, maxSessionsPerTask: 2 });
+
+    // A THIRD dispatch to the SAME task is refused — unlike maxTasks, there is
+    // no already-counted exemption, since this bound counts dispatches.
+    const t3 = await call(app, 'post', DISPATCH, {
+      prompt: 'close it out', promptName: 'close-out', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t3.status, 409, JSON.stringify(t3.body));
+    assert.equal(t3.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(t3.body.bound, 'sessionsPerTask');
+    assert.equal(t3.body.taskDispatches, 2);
+    assert.equal(t3.body.maxSessionsPerTask, 2);
+    assert.equal(t3.body.sessionId, sessionId);
+
+    const refusalEvent = recordedEvents.find(e => e.status === 409);
+    assert.ok(refusalEvent);
+    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED sessionsPerTask ${sessionId}`);
+
+    // A dispatch to a DIFFERENT task under the same run is unaffected — the
+    // bound is per-task, not run-wide.
+    const other = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-2', target: 'cli', sessionId
+    });
+    assert.equal(other.status, 201, JSON.stringify(other.body));
   });
 });

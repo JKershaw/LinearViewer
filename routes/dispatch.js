@@ -273,7 +273,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, composedRunMarker } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -385,6 +385,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (maxTasks !== undefined && maxTasks !== null) {
         if (!Number.isInteger(maxTasks) || maxTasks < 1) {
           return badRequest.json(res, 'maxTasks must be an integer >= 1');
+        }
+      }
+      // Sibling per-task bound (LIN-2934): same rule/error text as maxTasks.
+      if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) {
+        if (!Number.isInteger(maxSessionsPerTask) || maxSessionsPerTask < 1) {
+          return badRequest.json(res, 'maxSessionsPerTask must be an integer >= 1');
         }
       }
 
@@ -609,7 +615,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           waitForFollowUps: waitForFollowUps === true,
           queueIfBusy: queueIfBusy === true,
           subscription: subscription ?? DEFAULT_SUBSCRIPTION,
-          maxTasks: maxTasks ?? null
+          maxTasks: maxTasks ?? null,
+          // Sibling per-task bound (LIN-2934): same rationale as maxTasks.
+          maxSessionsPerTask: maxSessionsPerTask ?? null
         }
       });
 
@@ -681,7 +689,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           issueIdentifier: item.issueIdentifier,
           target: item.target,
           dispatchedAt: item.dispatchedAt,
-          consumerLastSeenAt: item.consumerLastSeenAt
+          consumerLastSeenAt: item.consumerLastSeenAt,
+          maxSessionsPerTask: item.maxSessionsPerTask ?? null,
+          ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {})
         },
         ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
         ...(spawn ? { spawn } : {})
@@ -1022,18 +1032,24 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   router.patch('/workspace/:urlKey/api/dispatch/:sessionId/trim', workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
     const { sessionId } = req.params;
-    const { maxTasks } = req.body || {};
+    const { maxTasks, maxSessionsPerTask } = req.body || {};
 
     if (!UUID_REGEX.test(sessionId)) {
       return badRequest.json(res, 'Invalid session ID format');
     }
-    if (!Number.isInteger(maxTasks) || maxTasks < 1) {
-      return badRequest.json(res, 'maxTasks is required and must be a positive integer');
+    if (maxTasks === undefined && maxSessionsPerTask === undefined) {
+      return badRequest.json(res, 'At least one of maxTasks or maxSessionsPerTask is required');
+    }
+    if (maxTasks !== undefined && (!Number.isInteger(maxTasks) || maxTasks < 1)) {
+      return badRequest.json(res, 'maxTasks must be a positive integer');
+    }
+    if (maxSessionsPerTask !== undefined && (!Number.isInteger(maxSessionsPerTask) || maxSessionsPerTask < 1)) {
+      return badRequest.json(res, 'maxSessionsPerTask must be a positive integer');
     }
 
     try {
       const result = await dispatchQueueStore.trimSessionBudget(
-        workspace.urlKey, sessionId, maxTasks, { by: req.session?.accountId || null }
+        workspace.urlKey, sessionId, { maxTasks, maxSessionsPerTask }, { by: req.session?.accountId || null }
       );
 
       if (result.ok) {

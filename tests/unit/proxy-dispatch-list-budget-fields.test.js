@@ -125,3 +125,45 @@ describe('LIN-2975 — /dispatch list carries sessionId/maxTasks', () => {
     assert.ok(!('bootstrapToken' in item), 'bootstrapToken must not appear on the list row');
   });
 });
+
+describe('LIN-2934 — /dispatch list carries maxSessionsPerTask', () => {
+  test('a row with maxSessionsPerTask set comes back on the list with the field', async () => {
+    const dispatchQueueStore = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection()
+    });
+    const app = buildApp({ dispatchQueueStore });
+
+    const created = await dispatchQueueStore.addItem('acme', {
+      prompt: 'run me', kind: 'implementation', issueIdentifier: 'LIN-1',
+      sessionId: 'run-1', maxSessionsPerTask: 10
+    });
+
+    const res = await call(app, '/api/proxy/dispatch');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+
+    const item = res.body.items.find(i => i.id === created._id);
+    assert.ok(item);
+    assert.equal(item.maxSessionsPerTask, 10);
+  });
+
+  test('a row without maxSessionsPerTask comes back with the KEY PRESENT and null, not absent', async () => {
+    const dispatchQueueStore = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection()
+    });
+    const app = buildApp({ dispatchQueueStore });
+
+    const created = await dispatchQueueStore.addItem('acme', {
+      prompt: 'run me too', kind: 'implementation', issueIdentifier: 'LIN-2'
+    });
+
+    const res = await call(app, '/api/proxy/dispatch');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+
+    const item = res.body.items.find(i => i.id === created._id);
+    assert.ok(item);
+    assert.ok('maxSessionsPerTask' in item, 'maxSessionsPerTask key must be present even when unset');
+    assert.strictEqual(item.maxSessionsPerTask, null);
+  });
+});

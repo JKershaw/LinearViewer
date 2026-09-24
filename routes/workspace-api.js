@@ -738,9 +738,20 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       maxTasks = parsedMaxTasks
     }
 
+    // Sibling per-task bound (LIN-2934): same blank-is-absent query-param rule
+    // as maxTasks just above.
+    let maxSessionsPerTask = null
+    if (typeof req.query.maxSessionsPerTask === 'string' && req.query.maxSessionsPerTask.trim() !== '') {
+      const parsedMaxSessionsPerTask = Number(req.query.maxSessionsPerTask.trim())
+      if (!Number.isInteger(parsedMaxSessionsPerTask) || parsedMaxSessionsPerTask < 1) {
+        return badRequest.json(res, 'maxSessionsPerTask must be an integer >= 1')
+      }
+      maxSessionsPerTask = parsedMaxSessionsPerTask
+    }
+
     try {
       // LIN-2804: mirrors the identical generatePrompt pattern at lines 439/3415.
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks, providerUi: getProviderForWorkspace(req.workspace)?.ui || null })
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks, maxSessionsPerTask, providerUi: getProviderForWorkspace(req.workspace)?.ui || null })
       sendPromptResult(req, res, {
         identifier: '',
         downloadName: stepper ? 'autopilot-stepper' : 'autopilot',

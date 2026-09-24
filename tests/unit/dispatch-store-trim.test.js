@@ -28,29 +28,29 @@ function makeStore() {
 describe('trimSessionBudget — validation', () => {
   test('rejects a non-integer maxTasks', async () => {
     const store = makeStore();
-    const result = await store.trimSessionBudget('acme', 'run-1', 2.5);
+    const result = await store.trimSessionBudget('acme', 'run-1', { maxTasks: 2.5 });
     assert.equal(result.ok, false);
     assert.equal(result.reason, 'invalid-input');
   });
 
   test('rejects maxTasks < 1', async () => {
     const store = makeStore();
-    const result = await store.trimSessionBudget('acme', 'run-1', 0);
+    const result = await store.trimSessionBudget('acme', 'run-1', { maxTasks: 0 });
     assert.equal(result.ok, false);
     assert.equal(result.reason, 'invalid-input');
   });
 
   test('rejects a missing urlKey/sessionId', async () => {
     const store = makeStore();
-    assert.equal((await store.trimSessionBudget(null, 'run-1', 3)).reason, 'invalid-input');
-    assert.equal((await store.trimSessionBudget('acme', null, 3)).reason, 'invalid-input');
+    assert.equal((await store.trimSessionBudget(null, 'run-1', { maxTasks: 3 })).reason, 'invalid-input');
+    assert.equal((await store.trimSessionBudget('acme', null, { maxTasks: 3 })).reason, 'invalid-input');
   });
 });
 
 describe('trimSessionBudget — not-found / not-downward', () => {
   test('an unknown run is not-found', async () => {
     const store = makeStore();
-    const result = await store.trimSessionBudget('acme', 'nonexistent', 2);
+    const result = await store.trimSessionBudget('acme', 'nonexistent', { maxTasks: 2 });
     assert.equal(result.ok, false);
     assert.equal(result.reason, 'not-found');
   });
@@ -61,11 +61,11 @@ describe('trimSessionBudget — not-found / not-downward', () => {
     const items = await store.pollAvailable('acme');
     const runId = items[0].id;
 
-    const same = await store.trimSessionBudget('acme', runId, 5);
+    const same = await store.trimSessionBudget('acme', runId, { maxTasks: 5 });
     assert.equal(same.ok, false);
     assert.equal(same.reason, 'not-downward', 'trimming to the SAME value does not tighten the bound');
 
-    const wider = await store.trimSessionBudget('acme', runId, 8);
+    const wider = await store.trimSessionBudget('acme', runId, { maxTasks: 8 });
     assert.equal(wider.ok, false);
     assert.equal(wider.reason, 'not-downward', 'trim is amend-DOWNWARD only');
   });
@@ -77,7 +77,7 @@ describe('trimSessionBudget — successful trims', () => {
     await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxTasks: 10 });
     const runId = (await store.pollAvailable('acme'))[0].id;
 
-    const result = await store.trimSessionBudget('acme', runId, 3, { by: 'user-1' });
+    const result = await store.trimSessionBudget('acme', runId, { maxTasks: 3 }, { by: 'user-1' });
     assert.equal(result.ok, true);
     assert.equal(result.item.maxTasks, 3);
 
@@ -90,7 +90,7 @@ describe('trimSessionBudget — successful trims', () => {
     await store.addItem('acme', { prompt: 'run me', kind: 'autopilot' }); // no maxTasks
     const runId = (await store.pollAvailable('acme'))[0].id;
 
-    const result = await store.trimSessionBudget('acme', runId, 4);
+    const result = await store.trimSessionBudget('acme', runId, { maxTasks: 4 });
     assert.equal(result.ok, true);
     assert.equal(result.item.maxTasks, 4);
   });
@@ -100,7 +100,7 @@ describe('trimSessionBudget — successful trims', () => {
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxTasks: 10 });
     await store.takeItem(created._id, 'acme');
 
-    const result = await store.trimSessionBudget('acme', created._id, 2);
+    const result = await store.trimSessionBudget('acme', created._id, { maxTasks: 2 });
     assert.equal(result.ok, true);
     assert.equal(result.item.maxTasks, 2);
 
@@ -113,14 +113,14 @@ describe('trimSessionBudget — successful trims', () => {
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxTasks: 10 });
     await store.takeItem(created._id, 'acme');
 
-    const first = await store.trimSessionBudget('acme', created._id, 3);
+    const first = await store.trimSessionBudget('acme', created._id, { maxTasks: 3 });
     assert.equal(first.ok, true);
 
     // A SECOND call with the same value is a not-downward refusal (3 >= 3),
     // not a crash or a duplicate mutation — the state (maxTasks: 3) is
     // unchanged either way, which is what "idempotent" means for an
     // absolute-set operation.
-    const second = await store.trimSessionBudget('acme', created._id, 3);
+    const second = await store.trimSessionBudget('acme', created._id, { maxTasks: 3 });
     assert.equal(second.ok, false);
     assert.equal(second.reason, 'not-downward');
 
@@ -133,8 +133,8 @@ describe('trimSessionBudget — successful trims', () => {
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxTasks: 10 });
     await store.takeItem(created._id, 'acme');
 
-    await store.trimSessionBudget('acme', created._id, 5);
-    const second = await store.trimSessionBudget('acme', created._id, 2);
+    await store.trimSessionBudget('acme', created._id, { maxTasks: 5 });
+    const second = await store.trimSessionBudget('acme', created._id, { maxTasks: 2 });
     assert.equal(second.ok, true);
     assert.equal(second.item.maxTasks, 2);
   });
@@ -147,7 +147,7 @@ describe('trimSessionBudget — auditable (who/when/what)', () => {
     await store.takeItem(created._id, 'acme');
 
     const before = Date.now();
-    const result = await store.trimSessionBudget('acme', created._id, 4, { by: 'account-42' });
+    const result = await store.trimSessionBudget('acme', created._id, { maxTasks: 4 }, { by: 'account-42' });
     assert.equal(result.ok, true);
     assert.equal(result.item.trimHistory.length, 1);
     const entry = result.item.trimHistory[0];
@@ -166,7 +166,7 @@ describe('trimSessionBudget — auditable (who/when/what)', () => {
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxTasks: 10 });
     await store.takeItem(created._id, 'acme');
 
-    const result = await store.trimSessionBudget('acme', created._id, 3);
+    const result = await store.trimSessionBudget('acme', created._id, { maxTasks: 3 });
     assert.strictEqual(result.item.trimHistory[0].by, null);
   });
 
@@ -175,8 +175,8 @@ describe('trimSessionBudget — auditable (who/when/what)', () => {
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxTasks: 20 });
     await store.takeItem(created._id, 'acme');
 
-    await store.trimSessionBudget('acme', created._id, 10, { by: 'a' });
-    const second = await store.trimSessionBudget('acme', created._id, 5, { by: 'b' });
+    await store.trimSessionBudget('acme', created._id, { maxTasks: 10 }, { by: 'a' });
+    const second = await store.trimSessionBudget('acme', created._id, { maxTasks: 5 }, { by: 'b' });
     assert.equal(second.item.trimHistory.length, 2);
     assert.equal(second.item.trimHistory[0].maxTasks, 10);
     assert.equal(second.item.trimHistory[1].maxTasks, 5);
@@ -196,7 +196,7 @@ describe('trimSessionBudget — auditable (who/when/what)', () => {
   test('trimHistory survives the queue→history archive hop (trimmed while still queued, then taken)', async () => {
     const store = makeStore();
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxTasks: 10 });
-    await store.trimSessionBudget('acme', created._id, 4, { by: 'account-1' }); // still queued at this point
+    await store.trimSessionBudget('acme', created._id, { maxTasks: 4 }, { by: 'account-1' }); // still queued at this point
     await store.takeItem(created._id, 'acme'); // archives to history
 
     const status = await store.getItemStatus('acme', created._id);
@@ -224,7 +224,7 @@ describe('trim + the LIN-1751 guard, end-to-end', () => {
 
     // Trim to 0 remaining (per the acceptance sketch): the current count IS
     // the new bound, so no further NEW task can be admitted.
-    const trim = await store.trimSessionBudget('acme', sessionId, 2, { by: 'operator' });
+    const trim = await store.trimSessionBudget('acme', sessionId, { maxTasks: 2 }, { by: 'operator' });
     assert.equal(trim.ok, true);
 
     // A genuinely NEW task (LIN-3) is refused.
