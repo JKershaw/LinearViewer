@@ -23,9 +23,10 @@ import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
 import {
-  loadDispatchHistory, collectKpiStats, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages
+  loadDispatchHistory, collectKpiStats, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages,
+  __internal as KPI_INTERNAL
 } from '../../lib/kpi-stats.js';
-import { digestFeedback } from '../../lib/digest-feedback.js';
+import { digestFeedback, isFreshDigest } from '../../lib/digest-feedback.js';
 import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
 import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
 import { WorkspaceStore } from '../../lib/workspace-store.js';
@@ -1607,47 +1608,38 @@ describe(
     // deep equality, the two real-mongod witnesses this phase's plan names.
     // -------------------------------------------------------------------------
 
-    // `isFreshDigest` does not exist at HEAD yet (LIN-3008/Phase 0 landed
-    // `digestFeedback` but not this predicate) — imported dynamically so a
-    // missing named export degrades to `undefined` (asserted below) rather than
-    // crashing this whole file's import and hiding the other real-mongod tests.
-    test('LIN-3011: isFreshDigest (JS) and an equivalent Mongo $cond agree on six row shapes', async () => {
-      const digestModule = await import('../../lib/digest-feedback.js');
-      assert.strictEqual(typeof digestModule.isFreshDigest, 'function',
-        'lib/digest-feedback.js must export isFreshDigest(doc) (LIN-3011)');
-      const { isFreshDigest } = digestModule;
-
-      const collection = freshCollection('lin3011-freshness');
+    // Ledger L3 (carried from the LIN-3012 review, comment `92446c4b`, to this
+    // ticket — see the LIN-3011 comment thread): proves Phase 3's JS
+    // `isFreshDigest` and Phase 4's real, IMPORTED `FRESH_DIGEST` `$cond`
+    // (lib/kpi-stats.js, via its `__internal` export — not a hand-copied
+    // approximation) agree on real mongod, over the SAME 7 row shapes the
+    // `loadDispatchHistory digest read` suite above already exercises: fresh,
+    // legacy, seeded-empty, stale, digest-without-version, null-feedbackVersion,
+    // and non-object digest (the scalar-string shape the `$type` guard test
+    // above needs — see its own comment for why that shape is the one that
+    // could reveal a real divergence: a non-object `feedbackDigest` whose
+    // missing `.version` happens to normalize equal to `feedbackVersion`).
+    test('LIN-3011 ledger L3: isFreshDigest (JS) and the real, imported FRESH_DIGEST $cond agree on all 7 row shapes', async () => {
+      const collection = freshCollection('lin3011-freshness-l3');
       const shapes = [
+        { _id: 'fresh', label: 'fresh (digest.version === feedbackVersion)', doc: { feedbackVersion: 3, feedbackDigest: { version: 3 } } },
         { _id: 'legacy', label: 'legacy (both fields absent)', doc: {} },
         { _id: 'seeded-empty', label: 'seeded-empty (feedbackVersion:0, feedbackDigest:null)', doc: { feedbackVersion: 0, feedbackDigest: null } },
-        { _id: 'fresh', label: 'fresh (digest.version === feedbackVersion)', doc: { feedbackVersion: 3, feedbackDigest: { version: 3 } } },
-        { _id: 'stale', label: 'stale (digest.version !== feedbackVersion)', doc: { feedbackVersion: 3, feedbackDigest: { version: 2 } } },
-        { _id: 'healed-at-0', label: 'healed-at-0 (a legacy row healed once)', doc: { feedbackVersion: 0, feedbackDigest: { version: 0 } } },
-        { _id: 'digest-no-version', label: 'digest present but missing .version', doc: { feedbackVersion: 0, feedbackDigest: { terminal: null } } }
+        { _id: 'stale', label: 'stale (digest.version !== feedbackVersion)', doc: { feedbackVersion: 5, feedbackDigest: { version: 3 } } },
+        { _id: 'digest-no-version', label: 'digest-without-version (present but missing .version)', doc: { feedbackVersion: 2, feedbackDigest: { count: 999 } } },
+        { _id: 'null-feedback-version', label: 'null-feedbackVersion (normalizes like missing -> 0, digest.version:0 IS fresh)', doc: { feedbackVersion: null, feedbackDigest: { version: 0 } } },
+        { _id: 'non-object-digest', label: 'non-object digest (scalar string; $type guard case)', doc: { feedbackVersion: -1, feedbackDigest: 'x' } }
       ];
       await collection.insertMany(shapes.map((s) => ({ _id: s._id, ...s.doc })));
 
-      // The target Mongo-side mirror of isFreshDigest: v(doc) = feedbackVersion
-      // ?? 0; fresh iff feedbackDigest is a non-null object AND
-      // feedbackDigest.version === v(doc). This is the expression LIN-3011 (or
-      // its Phase 4 sibling, LIN-3012) is expected to expose as a shared
-      // FRESH_DIGEST constant; inlined here so this test is runnable today
-      // against the JS half alone.
-      const freshCondExpr = {
-        $and: [
-          { $ne: ['$feedbackDigest', null] },
-          { $eq: [{ $ifNull: ['$feedbackDigest.version', null] }, { $ifNull: ['$feedbackVersion', 0] }] }
-        ]
-      };
-      const mongoResults = await collection.aggregate([{ $project: { isFresh: freshCondExpr } }]).toArray();
+      const mongoResults = await collection.aggregate([{ $project: { isFresh: KPI_INTERNAL.FRESH_DIGEST } }]).toArray();
       const mongoById = new Map(mongoResults.map((r) => [r._id, r.isFresh]));
 
       for (const s of shapes) {
         const jsResult = isFreshDigest(s.doc);
         const mongoResult = mongoById.get(s._id);
         assert.strictEqual(jsResult, mongoResult,
-          `isFreshDigest (JS) and the Mongo $cond disagree on the "${s.label}" shape: JS=${jsResult}, Mongo=${mongoResult}`);
+          `isFreshDigest (JS) and the real FRESH_DIGEST $cond disagree on the "${s.label}" shape: JS=${jsResult}, Mongo=${mongoResult}`);
       }
     });
 
