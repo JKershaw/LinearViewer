@@ -4997,6 +4997,53 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
     });
   });
 
+  // LIN-2889 close-out ledger L2: the negative half of "clear only on genuine
+  // success". Both 409 non-success branches changed nothing this call can
+  // claim, so the next poll must still be served from the warm cache.
+  // Mutation M9 (clear on 409 ALREADY_TERMINAL) fails the first case.
+  for (const [label, answerResult, expectedCode] of [
+    ['409 ALREADY_TERMINAL (lost the terminal race)', { record: { outcome: 'answered' }, firstStampWins: false, unretried: false }, 'ALREADY_TERMINAL'],
+    ['409 RETRY_REQUIRED (leftover self-resolved)', { record: { outcome: 'self-resolved' }, firstStampWins: false, unretried: false }, 'RETRY_REQUIRED'],
+  ]) {
+    test(`LIN-2889 L2: answer ${label} does NOT invalidate the rulings cache`, async () => {
+      const { store, reads } = countingHistoryStore(() => []);
+      const router = createDashboardRoutes({
+        workspaceFromUrl: (req, res, next) => next(),
+        dispatchQueueStore: store,
+        agentStatusStore: { async listStatus() { return { items: [] }; } },
+        runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+        freeTierStore: { async tryUse() { return { allowed: true }; } },
+        getWorkspaceAccessToken: async () => 'token',
+        fetchIssueContext: async () => ({}),
+        getOpenRouterSource: () => 'env',
+        getDeployInfo: () => ({}),
+        sessionsFeedCache: createSessionsFeedCache(),
+        taskDecisionsStore: {
+          async listUnansweredForWorkspaces() { return []; },
+          async listNewestScanPerTask() { return {}; },
+          async answer() { return answerResult; }
+        }
+      });
+      const getRulings = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+      const answer = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/rulings/answer');
+      const session = { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] };
+
+      const warm = makeReqRes({ session });
+      await getRulings(warm.req, warm.res);
+      assert.equal(reads(), 1, 'sanity: the first poll always reconstructs');
+
+      const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+      req.body = { taskDecisionId: 'scan_1', taskDecisionIssueId: '11111111-2222-3333-4444-555555555555', optionId: 'opt-a' };
+      await answer(req, res);
+      assert.equal(res.statusCode, 409);
+      assert.equal(res.jsonBody.code, expectedCode);
+
+      const afterWrite = makeReqRes({ session });
+      await getRulings(afterWrite.req, afterWrite.res);
+      assert.equal(reads(), 1, 'a non-success answer must not invalidate the cache — the next poll is still served from it');
+    });
+  }
+
   test('shelve (dashboard.js:1697) invalidates the rulings cache — witness 1+3', async () => {
     const { store, reads } = countingHistoryStore(() => []);
     const router = createDashboardRoutes({
