@@ -487,7 +487,7 @@ merges or marks the task done. A separate **`close-out`** worker performs it, di
 accepting each ledger item before it merges and sets Done — and per John's ruling on LIN-2825 (amended by
 LIN-3006), an item is **inside** when it's the same defect or the same idiom as a class this ticket
 bounded, whether or not research's enumeration listed it — the list is evidence of the class, not its
-edge. An inside item discharges only by cited evidence it's done, or an explicit drop naming what's left
+edge — or a claim this ticket's own change depends on. An inside item discharges only by cited evidence it's done, or an explicit drop naming what's left
 and why (warranted only when finishing it is materially larger than this ticket's own change, not merely
 inconvenient); **filing a follow-up ticket for it is never a discharge**, however well the ticket reads,
 and a dropped inside item stays dropped — it is not filed later. Only an item **outside** every bounded
