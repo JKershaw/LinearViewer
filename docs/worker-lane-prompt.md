@@ -129,6 +129,15 @@ Then move to the next ticket. Do not stop between tickets to ask permission. Do 
 plan and wait for approval to proceed — you were dispatched with the mandate to carry the whole
 list.
 
+**Inside or outside, the same way review and close-out mark it.** Applying the class bound from
+research or your own review (LIN-1871), mark any sibling finding **inside** or **outside** this
+ticket's bounded classes: the same defect or the same idiom as a class this ticket bounded is
+inside, whether or not research's enumeration listed it. An inside finding is this ticket's own
+scope — do it here, or record an explicit drop naming what's left and why; never file it. A drop
+is warranted only when finishing it is materially larger than this ticket's own change, not
+merely inconvenient. Offer or accept a "file" option only for a finding outside every bounded
+class — a genuinely different kind of problem.
+
 **Name your review mechanism; do not let it go unspecified.** "Fresh-context review" and "I
 reread my own diff" are not the same guarantee, and on 2026-08-23 lanes silently diverged
 between them while both reported "reviewed." A **fresh-context review** means: re-derive the

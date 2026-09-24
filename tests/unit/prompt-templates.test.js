@@ -942,7 +942,11 @@ describe('class check — isolated or one of a class (LIN-313)', () => {
   test('review template includes the class-check section before close-out', () => {
     const result = generatePrompt('review', reviewIssue, ctx);
     assert.ok(/### Isolated, or One of a Class\?/.test(result.prompt), 'review prompt must carry the class-check section');
-    assert.ok(/do not expand this task to fix them/i.test(result.prompt), 'siblings become a finding, not new scope');
+    // LIN-3006: a sibling is no longer unconditionally routed to "list as a
+    // finding, do not expand this task" — it is marked inside/outside first,
+    // and an inside sibling becomes a ledger item rather than expanding the task.
+    assert.ok(/without expanding this task to fix it now/i.test(result.prompt),
+      'siblings are marked inside/outside, not unconditionally expanded into new scope');
     assert.ok(/genuinely isolated change is a valid result/i.test(result.prompt),
       'an isolated result must be explicitly valid');
   });
@@ -2557,10 +2561,10 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const { prompt } = generatePrompt('close-out', issue, context);
       assert.ok(/An item marked inside scope.*discharges only by \(a\) cited evidence that it is \*\*done\*\*/is.test(prompt),
         'an inside item discharges by cited evidence of done');
-      assert.ok(/\(b\) an \*\*explicit drop\*\*: a line in your summary naming exactly what is being left undone and why/i.test(prompt),
-        'an inside item may also discharge by an explicit drop naming what remains and why');
-      assert.ok(/Filing a follow-up ticket for an inside item is NOT a discharge/i.test(prompt),
-        'filing a ticket for an inside item is explicitly not a discharge');
+      assert.ok(/\(b\) an \*\*explicit drop\*\*, warranted only when finishing the item is materially larger than this ticket's own change/i.test(prompt),
+        'an inside item may also discharge by an explicit drop, gated on the materiality bar');
+      assert.ok(/Filing a follow-up ticket for a dropped inside item is NOT a discharge and is never eligible for filing/i.test(prompt),
+        'filing a ticket for a dropped inside item is explicitly not a discharge and not eligible for filing');
       assert.ok(/A close-out that still has an undischarged inside item must not set Done/i.test(prompt),
         'close-out must not set Done over an undischarged inside item');
     });
@@ -2573,12 +2577,37 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
         'the filing must stand alone as a ticketable problem');
     });
 
-    test('close-out\'s follow-up triage restricts filing to outside items and explicitly-dropped inside items', () => {
+    // LIN-3006: the drop-then-file route is removed on purpose — a dropped
+    // inside item is recorded, never filed. This pin asserts the OPPOSITE of
+    // what it asserted before LIN-3006 (that drop-then-file text is present);
+    // it must fail against the pre-LIN-3006 prompt text.
+    test('close-out\'s follow-up triage restricts filing to outside-scope items only — a dropped inside item is never filed', () => {
       const { prompt } = generatePrompt('close-out', issue, context);
-      assert.ok(/Only outside-scope items, and inside-scope items you have explicitly dropped in the summary above, are eligible to be filed here/i.test(prompt),
-        'follow-up triage gates eligibility on the scope mark');
+      assert.ok(/Only outside-scope items are eligible to be filed here/i.test(prompt),
+        'follow-up triage gates eligibility to outside-scope items only');
+      assert.ok(!/inside-scope items you have explicitly dropped in the summary above, are eligible to be filed/i.test(prompt),
+        'the drop-then-file route is removed — a dropped inside item is not eligible to be filed');
+      assert.ok(/An inside-scope item you have explicitly dropped in the summary above is recorded there, not filed/i.test(prompt),
+        'a dropped inside item is recorded, not filed');
+      assert.ok(/the drop is not a license to file it/i.test(prompt),
+        'states explicitly that a drop is not a license to file');
       assert.ok(/an inside-scope ledger item that is neither done nor dropped is not eligible for filing/i.test(prompt),
         'an undischarged inside item is not eligible for filing');
+    });
+
+    test('review and close-out limit ruling options to outside-only filing', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      const closeout = generatePrompt('close-out', issue, context).prompt;
+      const rulingClause = /an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item/i;
+      assert.ok(rulingClause.test(review), 'review limits ruling options to outside-only filing');
+      assert.ok(rulingClause.test(closeout), 'close-out limits ruling options to outside-only filing');
+    });
+
+    test('inside is defined by kind (defect/idiom), not by research\'s enumerated list', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      const kindNotList = /same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i;
+      assert.ok(kindNotList.test(review), 'review defines inside by kind, not by the research list');
+      assert.ok(/genuinely different kind of problem/i.test(review), 'outside is a genuinely different kind of problem');
     });
 
     test('the LIN-1579 named-monitor/named-rollback lanes remain untouched — a different axis from scope', () => {
@@ -2702,7 +2731,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const irreversible = prompt.slice(prompt.indexOf('### On All-Clear — Perform the Irreversible Set'));
     const summaryAt = irreversible.search(/\d\. Post the summary comment/);
     const archiveAt = irreversible.search(/\d\. Archive a pre-prune snapshot of the description, then prune/);
-    const followUpsAt = irreversible.search(/\d\. File any remaining review or task follow-ups/);
+    const followUpsAt = irreversible.search(/\d\. File any remaining outside-scope review or task follow-ups/);
     assert.ok(summaryAt > -1 && archiveAt > -1 && followUpsAt > -1, 'all three list items are present');
     assert.ok(summaryAt < archiveAt && archiveAt < followUpsAt,
       'archive+prune sits strictly between the summary post and follow-up filing');

@@ -60,4 +60,14 @@ describe('buildPassagePlannerKickoff', () => {
     const text = buildPassagePlannerKickoff();
     assert.ok(text.endsWith('\n'));
   });
+
+  // LIN-3006: a leg's exclusion may drop in-kind work with a reason, but it
+  // must never pre-schedule a later filing — that closed the LIN-2978/2972 leak.
+  test('the Hard rules bar pre-scheduled filings, bound by kind not by touched files (LIN-3006)', () => {
+    const text = buildPassagePlannerKickoff();
+    assert.ok(text.includes('never instructs a later stage to file'),
+      'the Hard rules must bar a leg from pre-scheduling a later filing');
+    assert.ok(text.includes('Bind an exclusion by kind, not by the files this leg happens to touch'),
+      'exclusions are bound by kind, not by the touched file set');
+  });
 });

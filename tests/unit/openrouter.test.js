@@ -1087,6 +1087,15 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
         'the rule states the scope mark is a different axis from the named-monitor/named-rollback lanes');
     });
 
+    test('the Review-prompts rule defines inside by kind (defect/idiom), not by research\'s enumerated list, and limits ruling options', () => {
+      const rule = reviewRule();
+      assert.ok(/same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i.test(rule),
+        'the rule defines inside by kind, not by the research list');
+      assert.ok(/genuinely different kind of problem/i.test(rule), 'outside is a genuinely different kind of problem');
+      assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
+        'the rule limits ruling options to outside-only filing');
+    });
+
     test('the Review-prompts rule\'s ledger item (6) is marked inside/outside and routes discharge accordingly', () => {
       const rule = reviewRule();
       assert.ok(/each marked inside or outside per \(5a\) and stated with how it can be discharged/i.test(rule),
@@ -1102,10 +1111,10 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
       assert.ok(/each gap's inside\/outside mark \(LIN-1871\)/i.test(rule),
         'the rule reads the inside/outside mark from the review comment');
-      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop naming exactly what is being left undone and why/is.test(rule),
-        'an inside item discharges only by done or an explicit drop');
-      assert.ok(/filing a follow-up ticket for an inside item is NOT a discharge, however well written/i.test(rule),
-        'filing is explicitly not a discharge for an inside item');
+      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop, warranted only when finishing the item is materially larger than this ticket's own change/is.test(rule),
+        'an inside item discharges only by done or a materially-gated explicit drop');
+      assert.ok(/filing a follow-up ticket for a dropped inside item is NOT a discharge and is never eligible for filing/i.test(rule),
+        'filing is explicitly not a discharge for a dropped inside item, and it is never eligible for filing');
       assert.ok(/a close-out that still has an undischarged inside item must not set Done/i.test(rule),
         'close-out must not set Done over an undischarged inside item');
     });
@@ -1114,10 +1123,26 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       const rule = closeoutRule();
       assert.ok(/an item marked \*\*outside\*\* every bounded class.*may be discharged by filing it as a follow-up ticket that states the problem on its own terms/is.test(rule),
         'an outside item may discharge by a self-contained filed ticket');
-      assert.ok(/only outside-scope items, and inside-scope items explicitly dropped in the summary, are eligible to be filed/i.test(rule),
-        'follow-up filing eligibility is gated on the scope mark');
       assert.ok(/an inside-scope ledger item that is neither done nor dropped must be discharged first, never filed as a substitute/i.test(rule),
         'an undischarged inside item must not be filed as a substitute for finishing it');
+    });
+
+    // LIN-3006: the drop-then-file route is removed on purpose — a dropped
+    // inside item is recorded, never filed. This pin asserts the OPPOSITE of
+    // what it asserted before LIN-3006 (that drop-then-file text is present);
+    // it must fail against the pre-LIN-3006 rule text.
+    test('the Close-out-prompts rule restricts filing to outside-scope items only — a dropped inside item is never filed', () => {
+      const rule = closeoutRule();
+      assert.ok(/\*\*only outside-scope items are eligible to be filed\*\*/i.test(rule),
+        'follow-up filing eligibility is restricted to outside-scope items only');
+      assert.ok(!/only outside-scope items, and inside-scope items explicitly dropped in the summary, are eligible to be filed/i.test(rule),
+        'the drop-then-file route is removed — a dropped inside item is not eligible to be filed');
+      assert.ok(/an inside-scope item explicitly dropped in the summary is recorded there, not filed/i.test(rule),
+        'a dropped inside item is recorded, not filed');
+      assert.ok(/the drop is not a license to file it/i.test(rule),
+        'states explicitly that a drop is not a license to file');
+      assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
+        'ruling options on close-out limit filing to outside-only');
     });
 
     test('the LIN-1579 named-monitor/named-rollback lanes remain untouched on the meta path — a different axis from scope', () => {
@@ -1532,9 +1557,12 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
       result.includes('class check before approving the close'),
       'the review rule must include the close-out class check'
     );
+    // LIN-3006: a sibling is no longer unconditionally routed to "record as a
+    // finding, rather than expanding the task" — it is marked inside/outside
+    // per (5a) first, and an inside sibling becomes a ledger item instead.
     assert.ok(
-      result.includes('record the instances as a review finding rather than expanding the task'),
-      'siblings become a finding, not new scope'
+      result.includes('so follow-up work is scoped deliberately without expanding this task to fix it now'),
+      'siblings are marked inside/outside, not unconditionally expanded into new scope'
     );
   });
 

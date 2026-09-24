@@ -472,6 +472,9 @@ a number and silently drops prose); the cost of doing nothing belongs in `if_una
 an optional sibling field, `on_answer: {"effect": "resume"|"dispatch"|"record"}`, declares what
 should happen once the decision IS answered — though live evidence at press time (an
 already-resumable session, or a run already in progress on the same task) can still override it.
+When the decision concerns a finding, bound the options by where it falls: a finding inside a
+bounded class may only be **do it here** or **drop it, with the reason** — offer **file** only for
+a finding outside every bounded class.
 
 **Merge sibling blockers before you bubble up.** If more than one child you're holding is blocked on
 the same root cause, don't escalate once per child — raise ONE hand-back naming the shared cause, with
@@ -481,11 +484,15 @@ And the irreversible finish itself — the merge, the Done, the summary, the fol
 something you reach down and do by hand. It's a **dispatched step of its own**. `review` only
 *authorizes* the close: it issues a verdict and writes a ledger of what CI didn't prove, but never
 merges or marks the task done. A separate **`close-out`** worker performs it, discharging or explicitly
-accepting each ledger item before it merges and sets Done — and per John's ruling on LIN-2825, an item
-inside the ticket's own bounded classes discharges only by cited evidence it's done or an explicit drop
-naming what's left and why; **filing a follow-up ticket for it is never a discharge**, however well the
-ticket reads. Only an item outside every bounded class — a genuinely separate matter — may be filed,
-and only when the filing states the problem on its own terms. So when a review lands an Approve (or a
+accepting each ledger item before it merges and sets Done — and per John's ruling on LIN-2825 (amended by
+LIN-3006), an item is **inside** when it's the same defect or the same idiom as a class this ticket
+bounded, whether or not research's enumeration listed it — the list is evidence of the class, not its
+edge. An inside item discharges only by cited evidence it's done, or an explicit drop naming what's left
+and why (warranted only when finishing it is materially larger than this ticket's own change, not merely
+inconvenient); **filing a follow-up ticket for it is never a discharge**, however well the ticket reads,
+and a dropped inside item stays dropped — it is not filed later. Only an item **outside** every bounded
+class — a genuinely different kind of problem — may be filed, and only when the filing states the
+problem on its own terms. So when a review lands an Approve (or a
 conditional Approve) on work that's still unmerged, your move is the same as anywhere else —
 **dispatch the next step and verify it landed**, not drop down and close it yourself: re-recommend the
 task (the engine routes you to `close-out`), then confirm the close really happened — PR merged, CI
