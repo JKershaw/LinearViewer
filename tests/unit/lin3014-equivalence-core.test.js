@@ -15,6 +15,8 @@ import {
   comparisonKeyFor,
   compareLoops,
   compareSessionCounts,
+  compareSessions,
+  computeAbortHarvestStats,
   hasNonDecreasingTimestamps,
   selectSample
 } from '../../scripts/lin3014/lib/equivalence-core.mjs';
@@ -155,4 +157,116 @@ test('LIN-3014 selectSample: a class with no population is reported MISSING, not
   assert.ok(missing.includes('just-healed row'));
   assert.ok(missing.includes('abort-harvest source'));
   assert.ok(missing.includes('lineage member'));
+});
+
+// Review ledger L1(a) on PR #1563 (`2fa813e3`): the run only checked
+// lean -> pre-digest-lean, so a session dropped entirely from lean was
+// invisible. compareSessions itself had no direct test — a mutant that
+// always returned equal survived. These plant a non-exempt difference
+// INSIDE loops[] (not at the session's own top level), which is exactly
+// what a session-level comparator could get wrong by only checking fields
+// outside `loops[]`.
+function baseSession(overrides = {}) {
+  return {
+    sessionId: 's1',
+    loops: [
+      {
+        loopId: 'l1',
+        terminalStatus: 'completed',
+        promptText: 'irrelevant (exempt)',
+        feedback: [],
+        toolPeak: 3,
+        telemetry: { metrics: [{ ts: 1 }] },
+        lineageMetrics: [{ ts: 1 }]
+      }
+    ],
+    ...overrides
+  };
+}
+
+test('LIN-3014 compareSessions: identical sessions (after loops[] exemptions) PASS', () => {
+  const lean = baseSession();
+  const baseline = baseSession();
+  assert.strictEqual(compareSessions(lean, baseline).equal, true);
+});
+
+test('LIN-3014 compareSessions: exempt-only loops[] differences (toolPeak/telemetry.metrics/lineageMetrics/feedback/promptText) still PASS', () => {
+  const lean = baseSession({
+    loops: [{ ...baseSession().loops[0], promptText: undefined, toolPeak: 9, telemetry: { metrics: [{ ts: 42 }] }, lineageMetrics: [{ ts: 42 }] }]
+  });
+  const baseline = baseSession({
+    loops: [{ ...baseSession().loops[0], promptText: 'full text', toolPeak: null, telemetry: { metrics: [{ ts: 1 }, { ts: 2 }] }, lineageMetrics: [{ ts: 1 }] }]
+  });
+  const result = compareSessions(lean, baseline);
+  assert.strictEqual(result.equal, true, `exempt-only loops[] differences must not fail: ${result.message}`);
+});
+
+test('LIN-3014 compareSessions PLANTED DIFFERENCE: a non-exempt field INSIDE loops[] is caught', () => {
+  const lean = baseSession();
+  const baseline = baseSession({ loops: [{ ...baseSession().loops[0], terminalStatus: 'failed' }] });
+  const result = compareSessions(lean, baseline);
+  assert.strictEqual(result.equal, false, 'a changed non-exempt loops[] field must fail the session comparison');
+  assert.match(result.message, /terminalStatus/);
+});
+
+// Review ledger L1(b)/(iii): the V2 bounds require abort source/target
+// counts and at least one W1 sub-second case (a target whose own genuine
+// terminal predates the abort) to be identified, not just sampled.
+test('LIN-3014 computeAbortHarvestStats: counts sources and distinct targets', () => {
+  const rows = [
+    { _id: 'a1', abort: true, abortTo: 't1', feedback: [{ message: '[aborted]', timestamp: '2026-09-24T10:00:00.000Z' }] },
+    { _id: 'a2', abort: true, abortTo: 't1', feedback: [{ message: '[aborted]', timestamp: '2026-09-24T10:00:01.000Z' }] }, // same target
+    { _id: 'a3', abort: true, abortTo: 't2', feedback: [{ message: '[aborted]', timestamp: '2026-09-24T10:00:00.000Z' }] },
+    { _id: 't1' },
+    { _id: 't2' },
+    { _id: 'plain-1' }
+  ];
+  const stats = computeAbortHarvestStats(rows);
+  assert.strictEqual(stats.sourceCount, 3);
+  assert.strictEqual(stats.targetCount, 2); // t1, t2 — deduplicated
+});
+
+test('LIN-3014 computeAbortHarvestStats W1 case: the harvested abort wins when the target\'s own terminal predates it', () => {
+  const rows = [
+    {
+      _id: 'target-1',
+      // Target's own genuine terminal, well before the abort.
+      feedback: [{ message: '[done]', timestamp: '2026-09-24T09:00:00.000Z' }]
+    },
+    {
+      _id: 'abort-1',
+      abort: true,
+      abortTo: 'target-1',
+      // Sub-second-later abort — must win per the app's own F1 guard.
+      feedback: [{ message: '[aborted]', timestamp: '2026-09-24T09:00:00.500Z' }]
+    }
+  ];
+  const stats = computeAbortHarvestStats(rows);
+  assert.deepStrictEqual(stats.w1Cases, [{ sourceId: 'abort-1', targetId: 'target-1' }]);
+});
+
+test('LIN-3014 computeAbortHarvestStats: NOT a W1 case when the target\'s own terminal is AFTER the abort (guard keeps the later genuine terminal)', () => {
+  const rows = [
+    {
+      _id: 'target-1',
+      feedback: [{ message: '[done]', timestamp: '2026-09-24T09:00:01.000Z' }]
+    },
+    {
+      _id: 'abort-1',
+      abort: true,
+      abortTo: 'target-1',
+      feedback: [{ message: '[aborted]', timestamp: '2026-09-24T09:00:00.000Z' }]
+    }
+  ];
+  const stats = computeAbortHarvestStats(rows);
+  assert.deepStrictEqual(stats.w1Cases, []);
+});
+
+test('LIN-3014 computeAbortHarvestStats: a target with no prior terminal at all is also a W1-shaped win (there is nothing to predate)', () => {
+  const rows = [
+    { _id: 'target-1', feedback: [] },
+    { _id: 'abort-1', abort: true, abortTo: 'target-1', feedback: [{ message: '[aborted]', timestamp: '2026-09-24T09:00:00.000Z' }] }
+  ];
+  const stats = computeAbortHarvestStats(rows);
+  assert.deepStrictEqual(stats.w1Cases, [{ sourceId: 'abort-1', targetId: 'target-1' }]);
 });

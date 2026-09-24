@@ -15,6 +15,7 @@
  */
 import assert from 'node:assert';
 import { isFreshDigest } from '../../../lib/digest-feedback.js';
+import { findTerminalFeedback, feedbackWithHarvestedAbort } from '../../../lib/dispatch-terminal.js';
 import { LOOP_EXEMPTIONS, SESSION_LOOP_EXEMPTIONS, stripPaths } from './exemptions.mjs';
 
 /**
@@ -150,6 +151,46 @@ export function classifyRow(doc) {
  */
 export function comparisonKeyFor(row) {
   return row?.abort === true && row?.abortTo ? row.abortTo : row?._id;
+}
+
+/**
+ * V2 abort-harvest population stats: every abort-harvest source and target
+ * in `rows`, plus which of them are the required W1 sub-second case — a
+ * target whose own genuine terminal comes BEFORE the abort, so the
+ * harvested abort must win (review ledger L1(b), `2fa813e3`).
+ *
+ * Reuses the app's OWN append guard (`feedbackWithHarvestedAbort`,
+ * `lib/dispatch-terminal.js`) to decide W1, rather than re-deriving the
+ * timestamp comparison: that function returns the SAME array reference when
+ * the abort does not outrank an existing terminal, and a NEW array when it
+ * does — so identity tells us whether the target's own terminal predates
+ * the abort, with zero chance of drifting from the app's real F1 rule.
+ *
+ * @param {Array<Object>} rows - raw `dispatch-history` documents, each with
+ *   `_id` and (for abort sources) `abort`/`abortTo`/`feedback`
+ * @returns {{ sourceCount: number, targetCount: number, w1Cases: Array<{sourceId: *, targetId: *}> }}
+ */
+export function computeAbortHarvestStats(rows) {
+  const byId = new Map((rows || []).map((r) => [String(r?._id), r]));
+  const sources = (rows || []).filter((r) => r?.abort === true && r?.abortTo != null);
+  const targetIds = new Set(sources.map((r) => String(r.abortTo)));
+  const w1Cases = [];
+
+  for (const source of sources) {
+    const target = byId.get(String(source.abortTo));
+    if (!target) continue;
+    const abortTerminal = findTerminalFeedback(Array.isArray(source.feedback) ? source.feedback : []);
+    if (!abortTerminal || abortTerminal.status !== 'aborted') continue;
+    const targetFeedback = Array.isArray(target.feedback) ? target.feedback : [];
+    const merged = feedbackWithHarvestedAbort(targetFeedback, abortTerminal.entry);
+    // `merged` is a NEW array only when the abort was appended — i.e. only
+    // when it outranked (postdates) an existing genuine terminal on target.
+    if (merged !== targetFeedback) {
+      w1Cases.push({ sourceId: source._id, targetId: source.abortTo });
+    }
+  }
+
+  return { sourceCount: sources.length, targetCount: targetIds.size, w1Cases };
 }
 
 /**
