@@ -44,6 +44,48 @@ import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 // staged prompt back out via `cat` inside the spawned `sh -c` command.
 const HARBOUR_STAGING_DIR = path.join(os.tmpdir(), 'harbour-dispatch');
 
+// LIN-3024 (LIN-2994 Surface 2): default bound for the poll handler's halt
+// read, independent of `maxTimeMS` (nothing sets that yet, LIN-2997) and well
+// below Simple Dispatcher's own 15s client timeout. Overridable per
+// `createDispatchRoutes` call (`haltReadTimeoutMs`) so tests can inject a
+// short bound instead of waiting out the production value.
+const POLL_HALT_READ_TIMEOUT_MS = 1500;
+
+// Bounds `promise` with a local timeout, mirroring the withTimeout idiom in
+// lib/dispatch-repo-guard.js: reject on the timer, but always clear it so an
+// already-won race doesn't keep the event loop (or a test process) alive.
+// This does NOT cancel `promise` itself — the underlying store read keeps
+// running to completion in the background (accepted residual, LIN-2997).
+function raceWithLocalTimeout(promise, timeoutMs) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('workspace halt read timed out')), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// Projects a raw workspace-halt document (which carries a Mongo `_id`) to
+// the poll response's contract shape. `doc` is `null` when unset.
+function projectHaltForPoll(doc) {
+  if (!doc) return null;
+  const { mode, setAt, setBy } = doc;
+  return { mode, setAt, setBy };
+}
+
+// LIN-3024's bounded halt read for the poll handler. Never throws: a missing
+// store, a timeout, or a store-read failure all degrade to the shared
+// store's synchronous last-known cache (null on a cold cache), so a halt
+// read can never turn the poll into a non-2xx response.
+async function readHaltForPoll(workspaceHaltStore, urlKey, timeoutMs) {
+  if (!workspaceHaltStore) return null;
+  try {
+    const doc = await raceWithLocalTimeout(workspaceHaltStore.getWorkspaceHalt(urlKey), timeoutMs);
+    return projectHaltForPoll(doc);
+  } catch {
+    return workspaceHaltStore.getLastKnownHalt(urlKey);
+  }
+}
+
 /**
  * Writes the prompt to a staging file under HARBOUR_STAGING_DIR (mode 0600
  * inside a 0700 dir). The file is read back by the Harbour OS-spawned `sh -c`
@@ -135,7 +177,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS }) {
   const router = Router();
 
   // =========================================================================
@@ -1271,11 +1313,30 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * GET /api/dispatch/poll
    * Poll for available items in the queue.
    * Requires token authentication.
+   *
+   * LIN-3024 (LIN-2994 Surface 2): additively also reads the operator halt
+   * flag for this urlKey through `workspaceHaltStore`, in parallel with the
+   * item read above. That halt read alone is bounded by `haltReadTimeoutMs`;
+   * `pollAvailable` is never timed out here and its rejection keeps today's
+   * 500 behavior unchanged. A halt-read timeout or failure degrades to the
+   * store's last-known cached value (warmed by both this read and any
+   * successful halt write, lib/workspace-halt.js), or omits the key entirely
+   * on a cold cache — it must never turn into a non-2xx response. When there
+   * is nothing to add the body stays exactly `{ items }` (no `halt: null`).
    */
   router.get('/api/dispatch/poll', authenticateDispatchToken, async (req, res) => {
     try {
-      const items = await dispatchQueueStore.pollAvailable(req.dispatchUrlKey);
-      res.json({ items });
+      const itemsPromise = dispatchQueueStore.pollAvailable(req.dispatchUrlKey);
+      // Mark this promise as handled right away so a pollAvailable rejection
+      // arriving while the (independently bounded) halt read below is still
+      // in flight never surfaces as an unhandledRejection. The no-op catch
+      // does not swallow the failure: `await itemsPromise` further down
+      // still throws with the original error, since it's a second, separate
+      // reaction on the same promise.
+      itemsPromise.catch(() => {});
+      const halt = await readHaltForPoll(workspaceHaltStore, req.dispatchUrlKey, haltReadTimeoutMs);
+      const items = await itemsPromise;
+      res.json({ items, ...(halt ? { halt } : {}) });
     } catch (err) {
       console.error('Poll error:', err.message);
       jsonError(res, 500, 'Failed to poll dispatch queue');
