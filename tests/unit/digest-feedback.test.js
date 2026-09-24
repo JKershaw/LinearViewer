@@ -677,3 +677,65 @@ describe('digestFeedback: message-less / timestamp-less raw entries normalize to
     assert.equal(digest.kpiTerminalEntry.timestamp, null);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// Re-review ledger N1–N3: three small inside-scope gaps found on top of L1–L8
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('digestFeedback: re-review ledger N1–N3', () => {
+  // Ledger N1: a timestamp-less TICKET MARKER is the one kpi* projection
+  // `deriveKpiFacts` narrows without `narrowToMessageTimestamp`/`?? null`
+  // (`digest-feedback.js:218-220`), so it rides through as `undefined`
+  // instead of this module's `null` absence convention — the same class as
+  // L8, just on `kpiTicketMarkerEntries` instead of the terminal/usage entries.
+  test('a timestamp-less ticket marker: kpiTicketMarkerEntries[i].timestamp is null, not undefined (N1)', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [{ message: '[ticket] LIN-1 started' }] }); // no `timestamp`
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.equal(digest.kpiTicketMarkerEntries.length, 1, 'a ticket marker entry exists and must be surfaced');
+    assert.equal(digest.kpiTicketMarkerEntries[0].timestamp, null);
+    assertNoUndefined(digest, 'digest');
+  });
+
+  // Ledger N2: the retention union when BOTH halves genuinely contribute —
+  // some metrics fall inside the 6h window AND the last-6 extends further
+  // back with metrics the window alone would have excluded. Neither the
+  // original retention fixture (last 6 all inside the window) nor the L3
+  // fixture (none inside the window) exercises a true union, so a mutant
+  // that computes "window if non-empty, else last 6" (dropping the union)
+  // or that reorders the union to window-first-then-older-last-6 survived
+  // undetected. A stalled run — heartbeats at 20, 12, 11, 10, 9, 2 and 1
+  // hours before `now` — has exactly 2 inside 6h and 6 as the tail, with
+  // partial overlap, so both mutants are now observable.
+  test('retention union: metrics inside 6h plus the last 6, both genuinely contributing, kept in original chronological order (N2)', () => {
+    requireDigestFeedback();
+    const now = at(0).getTime() + 24 * 60 * 60 * 1000; // now = T0 + 24h
+    const hoursBefore = [20, 12, 11, 10, 9, 2, 1]; // oldest first (chronological order)
+    const hb = (hours, toolCount) => ({
+      kind: 'heartbeat',
+      message: `[working · running] ${toolCount} tools in ${toolCount}s: Bash×${toolCount} · ${toolCount} total`,
+      timestamp: new Date(now - hours * 60 * 60 * 1000),
+    });
+    const feedback = hoursBefore.map((h, i) => hb(h, i + 1));
+    const doc = rawDoc({ feedback, dispatchedAt: at(0) });
+    const digest = digestFeedback(doc, { now });
+
+    assert.equal(digest.telemetry.metrics.length, 6, 'exactly 6 retained: the last 6 union, with the 20h-before row dropped');
+
+    const retainedTimestamps = digest.telemetry.metrics.map(m => m.timestamp);
+    const expectedOrder = feedback.slice(1).map(m => m.timestamp.toISOString()); // drop the oldest (20h before), keep original order
+    assert.deepEqual(retainedTimestamps, expectedOrder, 'retained metrics must stay in their original chronological order');
+  });
+
+  // Ledger N3: `kpiUsageEntry.timestamp` must normalize to `null`, matching
+  // the `?? null` L8 added to `message`/`kind` on the same projection but
+  // never pinned for `timestamp` itself (`digest-feedback.js:213`).
+  test('a timestamp-less usage entry: kpiUsageEntry.timestamp is null, not undefined (N3)', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [{ kind: 'usage', message: usageMessage() }] }); // no `timestamp`
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.ok(digest.kpiUsageEntry, 'a usage entry exists and must be surfaced');
+    assert.equal(digest.kpiUsageEntry.timestamp, null);
+    assertNoUndefined(digest, 'digest');
+  });
+});
