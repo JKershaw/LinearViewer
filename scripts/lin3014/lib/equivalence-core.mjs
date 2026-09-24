@@ -155,26 +155,31 @@ export function comparisonKeyFor(row) {
 
 /**
  * V2 abort-harvest population stats: every abort-harvest source and target
- * in `rows`, plus which of them are the required W1 sub-second case — a
- * target whose own genuine terminal comes BEFORE the abort, so the
- * harvested abort must win (review ledger L1(b), `2fa813e3`).
+ * in `rows`, split into the required **W1** case — a target whose own
+ * GENUINE terminal comes BEFORE the abort, so the harvested abort must win
+ * on the merits (review ledger F1, `cf94f4e1`) — and `noPriorTerminal`, a
+ * separate, non-W1 population where the harvested abort wins only because
+ * the target has no terminal of its own to predate.
  *
- * Reuses the app's OWN append guard (`feedbackWithHarvestedAbort`,
- * `lib/dispatch-terminal.js`) to decide W1, rather than re-deriving the
- * timestamp comparison: that function returns the SAME array reference when
- * the abort does not outrank an existing terminal, and a NEW array when it
- * does — so identity tells us whether the target's own terminal predates
- * the abort, with zero chance of drifting from the app's real F1 rule.
+ * `feedbackWithHarvestedAbort`'s `if (existing)` guard is skipped entirely
+ * when the target has no prior terminal, so array-identity alone (`merged
+ * !== targetFeedback`) cannot distinguish "genuinely outranked a terminal"
+ * from "there was nothing to outrank" — the bug F1 found. This function
+ * re-checks `findTerminalFeedback(targetFeedback)` itself to tell the two
+ * apart, and records each genuine W1 case's gap in milliseconds (the
+ * `w1Cases` print label calls this "sub-second"; `gapMs` is what backs
+ * that claim rather than asserting it).
  *
  * @param {Array<Object>} rows - raw `dispatch-history` documents, each with
  *   `_id` and (for abort sources) `abort`/`abortTo`/`feedback`
- * @returns {{ sourceCount: number, targetCount: number, w1Cases: Array<{sourceId: *, targetId: *}> }}
+ * @returns {{ sourceCount: number, targetCount: number, w1Cases: Array<{sourceId: *, targetId: *, gapMs: number}>, noPriorTerminal: Array<{sourceId: *, targetId: *}> }}
  */
 export function computeAbortHarvestStats(rows) {
   const byId = new Map((rows || []).map((r) => [String(r?._id), r]));
   const sources = (rows || []).filter((r) => r?.abort === true && r?.abortTo != null);
   const targetIds = new Set(sources.map((r) => String(r.abortTo)));
   const w1Cases = [];
+  const noPriorTerminal = [];
 
   for (const source of sources) {
     const target = byId.get(String(source.abortTo));
@@ -183,14 +188,22 @@ export function computeAbortHarvestStats(rows) {
     if (!abortTerminal || abortTerminal.status !== 'aborted') continue;
     const targetFeedback = Array.isArray(target.feedback) ? target.feedback : [];
     const merged = feedbackWithHarvestedAbort(targetFeedback, abortTerminal.entry);
-    // `merged` is a NEW array only when the abort was appended — i.e. only
-    // when it outranked (postdates) an existing genuine terminal on target.
-    if (merged !== targetFeedback) {
-      w1Cases.push({ sourceId: source._id, targetId: source.abortTo });
+    // `merged` is a NEW array only when the abort was appended — either
+    // because it genuinely outranked an existing terminal, or because there
+    // was no existing terminal at all. Which one happened is decided below.
+    if (merged === targetFeedback) continue;
+
+    const existing = findTerminalFeedback(targetFeedback);
+    if (existing) {
+      const existingMs = Date.parse(existing.entry?.timestamp);
+      const abortMs = Date.parse(abortTerminal.entry?.timestamp);
+      w1Cases.push({ sourceId: source._id, targetId: source.abortTo, gapMs: abortMs - existingMs });
+    } else {
+      noPriorTerminal.push({ sourceId: source._id, targetId: source.abortTo });
     }
   }
 
-  return { sourceCount: sources.length, targetCount: targetIds.size, w1Cases };
+  return { sourceCount: sources.length, targetCount: targetIds.size, w1Cases, noPriorTerminal };
 }
 
 /**

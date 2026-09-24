@@ -91,17 +91,21 @@ async function main() {
     console.log(`lineage population: ${lineageMembers.length} members / ${lineageCount} distinct lineages`);
 
     // V2 abort-harvest population: every source/target in this window, plus
-    // the required W1 sub-second case (a target whose own genuine terminal
-    // predates the harvested abort, so the abort must win). Review ledger
-    // L1(b)/(iii), `2fa813e3`.
+    // the required W1 case — a target whose own GENUINE terminal predates
+    // the harvested abort, so the abort must win on the merits. Review
+    // ledger F1 (`cf94f4e1`): a target with NO prior terminal at all is a
+    // separate, non-W1 population — there's nothing for the abort to have
+    // outranked, so it's reported apart rather than folded into W1.
     const abortStats = computeAbortHarvestStats(rows);
     console.log(`abort-harvest population: ${abortStats.sourceCount} source(s) / ${abortStats.targetCount} distinct target(s)`);
     if (abortStats.w1Cases.length === 0) {
-      console.log('W1 sub-second case (target terminal predates the abort): NONE found in this window — not assumed, reported as absent');
+      console.log('W1 case (target\'s own genuine terminal predates the abort): NONE found in this window — not assumed, reported as absent');
     } else {
-      console.log(`W1 sub-second case(s) found: ${abortStats.w1Cases.length}`);
-      for (const w1 of abortStats.w1Cases) console.log(`  W1 sourceId=${w1.sourceId} targetId=${w1.targetId}`);
+      console.log(`W1 case(s) found: ${abortStats.w1Cases.length}`);
+      for (const w1 of abortStats.w1Cases) console.log(`  W1 sourceId=${w1.sourceId} targetId=${w1.targetId} gapMs=${w1.gapMs}`);
     }
+    console.log(`noPriorTerminal (harvested abort wins with no terminal to predate — NOT W1): ${abortStats.noPriorTerminal.length}`);
+    for (const np of abortStats.noPriorTerminal) console.log(`  noPriorTerminal sourceId=${np.sourceId} targetId=${np.targetId}`);
 
     const liveQueue = db.collection('lin3014-empty-live-queue-scratch'); // never populated: the sample is over archived rows only
     const dispatchStore = new DispatchQueueStore({ collection: liveQueue, historyCollection: history });

@@ -242,7 +242,8 @@ test('LIN-3014 computeAbortHarvestStats W1 case: the harvested abort wins when t
     }
   ];
   const stats = computeAbortHarvestStats(rows);
-  assert.deepStrictEqual(stats.w1Cases, [{ sourceId: 'abort-1', targetId: 'target-1' }]);
+  assert.deepStrictEqual(stats.w1Cases, [{ sourceId: 'abort-1', targetId: 'target-1', gapMs: 500 }]);
+  assert.deepStrictEqual(stats.noPriorTerminal, []);
 });
 
 test('LIN-3014 computeAbortHarvestStats: NOT a W1 case when the target\'s own terminal is AFTER the abort (guard keeps the later genuine terminal)', () => {
@@ -260,13 +261,15 @@ test('LIN-3014 computeAbortHarvestStats: NOT a W1 case when the target\'s own te
   ];
   const stats = computeAbortHarvestStats(rows);
   assert.deepStrictEqual(stats.w1Cases, []);
+  assert.deepStrictEqual(stats.noPriorTerminal, []);
 });
 
-test('LIN-3014 computeAbortHarvestStats: a target with no prior terminal at all is also a W1-shaped win (there is nothing to predate)', () => {
+test('LIN-3014 computeAbortHarvestStats F1: a target with no prior terminal at all is NOT a W1 case (nothing to predate) — it is reported separately', () => {
   const rows = [
     { _id: 'target-1', feedback: [] },
     { _id: 'abort-1', abort: true, abortTo: 'target-1', feedback: [{ message: '[aborted]', timestamp: '2026-09-24T09:00:00.000Z' }] }
   ];
   const stats = computeAbortHarvestStats(rows);
-  assert.deepStrictEqual(stats.w1Cases, [{ sourceId: 'abort-1', targetId: 'target-1' }]);
+  assert.deepStrictEqual(stats.w1Cases, []);
+  assert.deepStrictEqual(stats.noPriorTerminal, [{ sourceId: 'abort-1', targetId: 'target-1' }]);
 });
