@@ -2505,14 +2505,29 @@ describe('LIN-3013 — buildSessionCounts is identical for lean and non-lean loo
     const nonLeanLoops = await getLoopsForWorkspace('ws', nonLeanStores);
     const leanLoops = await getLoopsForWorkspace('ws', { ...leanStores, lean: true });
 
-    // Guard against the fixture silently not exercising what it claims to:
-    // the identifier-less abort row must never surface as a loop, and the
-    // harvest must actually have landed on the target, on BOTH paths.
+    // Guard against the fixture silently not exercising what it claims to,
+    // on BOTH paths: every named row category must actually land in the
+    // state its name promises, not merely exist. Without these, a fixture
+    // row that quietly fails to trip its detector (e.g. the wrong message
+    // format) would still pass the count-only assertions below vacuously.
     for (const [label, loops] of [['non-lean', nonLeanLoops], ['lean', leanLoops]]) {
       assert.ok(!loops.some(l => l.loopId === 'b-abort-row'), `${label}: the identifier-less abort row must never become a loop`);
+
       const target = loops.find(l => l.loopId === 'b-harvest-target');
       assert.ok(target, `${label}: the harvest target loop must survive`);
       assert.strictEqual(target.terminalStatus, 'aborted', `${label}: the abort harvest must have actually landed on the target`);
+
+      const decisionLoop = loops.find(l => l.loopId === 'a-decision');
+      assert.ok(decisionLoop, `${label}: the decision loop must survive`);
+      assert.strictEqual(decisionLoop.decision?.decision_id, FULL_DECISION_PAYLOAD.decision_id, `${label}: the decision must actually be carried on the loop`);
+
+      const abortedLoop = loops.find(l => l.loopId === 'b-aborted');
+      assert.ok(abortedLoop, `${label}: the self-terminal aborted loop must survive`);
+      assert.strictEqual(abortedLoop.terminalStatus, 'aborted', `${label}: the self-terminal abort must actually be detected`);
+
+      const parkedLoop = loops.find(l => l.loopId === 'b-parked');
+      assert.ok(parkedLoop, `${label}: the parked loop must survive`);
+      assert.ok(parkedLoop.telemetry?.parkedWait, `${label}: the parked-wait state must actually be detected (parseParkedWait), not just present as a row`);
     }
 
     const expected = { [ISSUE_A]: 2, [ISSUE_B]: 3 };

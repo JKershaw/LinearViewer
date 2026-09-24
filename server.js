@@ -2745,7 +2745,7 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
     // to an empty map.
     const [{ trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId }, allLoops] = await Promise.all([
       fetchAndPrepareProjects(workspace, teamId),
-      getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore }).catch(() => [])
+      getLoopsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore, lean: true }).catch(() => [])
     ]);
     const sessionCounts = buildSessionCounts(allLoops);
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
