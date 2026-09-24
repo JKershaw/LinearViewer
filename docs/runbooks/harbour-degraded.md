@@ -29,27 +29,45 @@ placeholder until its ticket lands.
 A dispatch with no `repo` runs in the workspace's default folder
 (`docs/dispatch-integration.md:932`). Railway access comes from **the host's own linked
 Railway CLI** — the agent environment carries no `RAILWAY_TOKEN` or Railway API access
-(LIN-1756). **This read-only limit is enforced only by the dispatch prompt, not
-mechanically** — there is no code-level guard preventing a write command.
+(LIN-1756). Run `railway` from a directory linked to the Harbour project (on 2026-09-22,
+the host's `LinearViewer` checkout) — an unlinked directory won't resolve the service.
+**This read-only limit is enforced only by the dispatch prompt, not mechanically** —
+there is no code-level guard preventing a write command.
 
 **Allowed (read-only):**
 - `railway deployment list`
 - `railway logs`, `railway logs --http`, `railway logs -s <service>`
 - `railway metrics --raw`
-- Read-only `mongosh` via `railway run -s MongoDB-harbour -- sh -c 'mongosh "$MONGO_PUBLIC_URL" --quiet --eval "…"'`
-  (the `sh -c` wrapper matters: expanding `$MONGO_PUBLIC_URL` in the operator's own shell
-  finds it unset, since `railway run` injects service variables into the subshell, not the
-  host — LIN-2993 comment `8b2bcfa4`),
-  restricted to: `db.currentOp({active:true, secs_running:{$gt:5}})`,
+- Read-only `mongosh` via `railway run`, on the public proxy URL (LIN-2993 comment
+  `8b2bcfa4`), with the query written to a quoted-heredoc script file and run with
+  `--file`, not `--eval`:
+
+  ```sh
+  cat > ro.js <<'EOF'
+  printjson(db.currentOp({active:true, secs_running:{$gt:5}}))
+  EOF
+  railway run -s MongoDB-harbour -- sh -c 'mongosh "$MONGO_PUBLIC_URL" --quiet --file "$0"' ro.js
+  ```
+
+  Both parts of this form matter: `sh -c` lets `$MONGO_PUBLIC_URL` expand inside
+  `railway run`'s child environment rather than the operator's own (unset) shell, and the
+  quoted heredoc (`<<'EOF'`) keeps the query's own `$` operators — `$gt`, `$gte` — out of
+  any shell's expansion, since they'd otherwise be stripped the same way `--eval "…"`
+  would strip them. This is the form the investigator's session actually ran (LIN-2993
+  review `a531d11f`; investigator session `46c06407`).
+
+  Restricted to: `db.currentOp({active:true, secs_running:{$gt:5}})`,
   `db.serverStatus()` (connections, globalLock, WiredTiger cache, opcounters), and
   `db.stats()`. Never print the connection string — pass it through the environment.
 - A read-only `find`/`explain("executionStats")` on the slow view's own query, to compare
   server execution time against payload bytes — this is what actually discriminated the
   2026-09-22 incident: the feed's history read (`dispatch-history`, filtered by `urlKey`
   and a 30-day `dispatchedAt` window, `prompt` excluded) executed in 29 ms on the server
-  but returned a 32 MB payload (LIN-2993 comment `8b2bcfa4`). **Caveat:** pulling the
-  payload itself adds load over an already-degraded link, so prefer `explain` over
-  fetching the full result where the discrimination doesn't require it.
+  but returned a 32 MB payload (LIN-2993 comment `8b2bcfa4`). Its `dispatchedAt` filter
+  also uses a `$` operator (`$gte`), so write it into a script file the same way — the
+  quoted-heredoc `--file` form above, not `--eval`. **Caveat:** pulling the payload itself
+  adds load over an already-degraded link, so prefer `explain` over fetching the full
+  result where the discrimination doesn't require it.
 
   **This `mongosh`-via-`railway run` allowance is a deliberate, bounded relaxation.**
   The original investigator dispatch (`10022ce7`) forbade `railway run` against
