@@ -1096,6 +1096,16 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
         'the rule limits ruling options to outside-only filing');
     });
 
+    // LIN-3006 review fixup: meta (5a) never carried the "or a claim this
+    // ticket's own change depends on" disjunct — a pre-existing parity gap with
+    // the handwritten path, same defect. This pin fails until the disjunct is
+    // mirrored here.
+    test('the Review-prompts rule\'s inside definition also covers a claim this ticket\'s own change depends on', () => {
+      const rule = reviewRule();
+      assert.ok(/whether or not research's enumeration listed it \(the list is evidence of the class, not its edge\), or a claim this ticket's own change depends on/i.test(rule),
+        'the dependency-claim disjunct sits alongside the kind-not-list definition');
+    });
+
     test('the Review-prompts rule\'s ledger item (6) is marked inside/outside and routes discharge accordingly', () => {
       const rule = reviewRule();
       assert.ok(/each marked inside or outside per \(5a\) and stated with how it can be discharged/i.test(rule),
@@ -1125,6 +1135,14 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
         'an outside item may discharge by a self-contained filed ticket');
       assert.ok(/an inside-scope ledger item that is neither done nor dropped must be discharged first, never filed as a substitute/i.test(rule),
         'an undischarged inside item must not be filed as a substitute for finishing it');
+    });
+
+    // LIN-3006 review fixup (non-blocking suggestion): rule (6)'s filing
+    // instruction was scoped to outside items but had no pin of its own.
+    test('the Close-out-prompts rule (6) scopes the irreversible-set filing step to outside-scope follow-ups', () => {
+      const rule = closeoutRule();
+      assert.ok(/file remaining outside-scope follow-ups/i.test(rule),
+        'rule (6) restricts the irreversible-set filing step to outside-scope follow-ups');
     });
 
     // LIN-3006: the drop-then-file route is removed on purpose — a dropped
@@ -1560,8 +1578,11 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
     // LIN-3006: a sibling is no longer unconditionally routed to "record as a
     // finding, rather than expanding the task" — it is marked inside/outside
     // per (5a) first, and an inside sibling becomes a ledger item instead.
+    // LIN-3006 review fixup: "so the remaining work is scoped deliberately —
+    // review itself does not fix it" replaces the residual "follow-up work"
+    // framing, which implied an inside sibling is a follow-up rather than scope.
     assert.ok(
-      result.includes('so follow-up work is scoped deliberately without expanding this task to fix it now'),
+      result.includes('so the remaining work is scoped deliberately — review itself does not fix it'),
       'siblings are marked inside/outside, not unconditionally expanded into new scope'
     );
   });

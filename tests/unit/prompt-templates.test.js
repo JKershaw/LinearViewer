@@ -945,7 +945,10 @@ describe('class check — isolated or one of a class (LIN-313)', () => {
     // LIN-3006: a sibling is no longer unconditionally routed to "list as a
     // finding, do not expand this task" — it is marked inside/outside first,
     // and an inside sibling becomes a ledger item rather than expanding the task.
-    assert.ok(/without expanding this task to fix it now/i.test(result.prompt),
+    // LIN-3006 review fixup: "so the remaining work is scoped deliberately —
+    // review itself does not fix it" replaces the residual "follow-up work"
+    // framing, which implied an inside sibling is a follow-up rather than scope.
+    assert.ok(/so the remaining work is scoped deliberately — review itself does not fix it/i.test(result.prompt),
       'siblings are marked inside/outside, not unconditionally expanded into new scope');
     assert.ok(/genuinely isolated change is a valid result/i.test(result.prompt),
       'an isolated result must be explicitly valid');
@@ -2595,6 +2598,14 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
         'an undischarged inside item is not eligible for filing');
     });
 
+    // LIN-3006 review fixup (non-blocking suggestion): step 8's filing
+    // instruction was scoped to outside items but had no pin of its own.
+    test('close-out\'s workflow step 8 scopes filing to outside-scope follow-up tickets', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/Create any remaining outside-scope follow-up tickets the review named/i.test(prompt),
+        'step 8 restricts filing to outside-scope follow-up tickets');
+    });
+
     test('review and close-out limit ruling options to outside-only filing', () => {
       const review = generatePrompt('review', issue, context).prompt;
       const closeout = generatePrompt('close-out', issue, context).prompt;
@@ -2608,6 +2619,17 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const kindNotList = /same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i;
       assert.ok(kindNotList.test(review), 'review defines inside by kind, not by the research list');
       assert.ok(/genuinely different kind of problem/i.test(review), 'outside is a genuinely different kind of problem');
+    });
+
+    // LIN-3006 review fixup: the kind-not-list rewrite dropped the pre-existing
+    // "or a claim this ticket's own change depends on" disjunct, which every
+    // What-CI-Did-Not-Prove ledger item satisfies by definition. This pin fails
+    // against the wording landed on PR #1554 before the fixup (kind-only, no
+    // disjunct) and passes once the disjunct is restored.
+    test('inside also covers a claim this ticket\'s own change depends on, alongside the kind definition', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      assert.ok(/whether or not research's enumeration listed it — the list is evidence of the class, not its edge — or a claim this ticket's own change depends on/i.test(review),
+        'the dependency-claim disjunct sits alongside the kind-not-list definition');
     });
 
     test('the LIN-1579 named-monitor/named-rollback lanes remain untouched — a different axis from scope', () => {
