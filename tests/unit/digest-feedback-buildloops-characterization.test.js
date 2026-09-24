@@ -17,10 +17,28 @@
  * against HEAD `36425161` on this fixture (see the beat-2 report for the
  * capture transcript) — not hand-computed, so it can't encode a wrong
  * assumption about today's behaviour.
+ *
+ * LIN-3011 (LIN-2996 Phase 3, beat 4) update: two INTENTIONAL, approved
+ * changes to the golden value since capture, both required by this ticket's
+ * plan, not accidental drift —
+ *   1. every loop (lean AND non-lean) now carries a top-level `toolPeak`
+ *      field (`null` on non-lean, where `routes/dashboard.js`'s own
+ *      `peakToolCount(metrics)` over the always-full non-lean metrics list
+ *      stays the source of truth).
+ *   2. the LEAN case now derives from a `feedbackDigest` attached to the
+ *      fixture (computed here via `digestFeedback`, the same per-row
+ *      derivation this file's non-lean path already uses), not from raw
+ *      `feedback` directly — the lean read excludes `feedback` entirely in
+ *      production, so a lean build with no digest now correctly derives
+ *      nothing, which would make the ORIGINAL "same input, lean:true...
+ *      keeps every derived fact identical" premise false by design. The
+ *      fixture is updated so the test proves the CURRENT version of that
+ *      same invariant: lean and non-lean stay identical, now via the digest.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { __internal } from '../../lib/pipeline-loops.js';
+import { digestFeedback } from '../../lib/digest-feedback.js';
 
 const { _buildLoops } = __internal;
 
@@ -151,6 +169,10 @@ const EXPECTED_GOLDEN_LOOP = {
       { identifier: 'LIN-920', state: 'started', outcomeLine: null, timestamp: '2026-01-01T10:00:45.000Z' }
     ]
   },
+  // LIN-3011 beat 4: every loop now carries a top-level `toolPeak` — `null`
+  // on non-lean, where `routes/dashboard.js`'s `peakToolCount(metrics)` over
+  // the always-full metrics list stays the source of truth.
+  toolPeak: null,
   lineageId: 'h-golden-1',
   lineageMetrics: [
     {
@@ -175,13 +197,23 @@ describe('LIN-3008 characterization guard: non-lean _buildLoops stays byte-ident
       'non-lean _buildLoops output must stay byte-identical once it is re-pointed at the shared digest derivations (beat 3)');
   });
 
-  test('lean fixture: same input, lean:true drops promptText and raw feedback, but keeps every derived fact identical', () => {
+  test('lean fixture: same input plus a matching feedbackDigest, lean:true drops promptText and raw feedback, but keeps every derived fact identical (LIN-3011: now via the digest)', () => {
     const now = new Date(at(120));
-    const result = _buildLoops({ liveItems: [], historyItems: [goldenHistoryItem()], agentStatusEntries: [], now, lean: true });
+    // LIN-3011: the lean build derives from feedbackDigest, not raw feedback
+    // — attach one consistent with this fixture's own feedback (the SAME
+    // per-row derivation the non-lean path above already exercises).
+    const leanItem = goldenHistoryItem();
+    leanItem.feedbackVersion = 0;
+    leanItem.feedbackDigest = digestFeedback(leanItem, { now: now.getTime() });
+    leanItem.feedbackDigest.version = 0;
+    const result = _buildLoops({ liveItems: [], historyItems: [leanItem], agentStatusEntries: [], now, lean: true });
     const { promptText, feedback, ...leanExpected } = EXPECTED_GOLDEN_LOOP;
+    // The digest's own toolPeak (an always-full-window peak over ALL
+    // heartbeats, independent of retention) — 6, the fixture's one heartbeat.
+    leanExpected.toolPeak = 6;
     const { promptText: _p, feedback: _f, ...leanActual } = result[0];
     assert.deepStrictEqual(leanActual, leanExpected,
-      'every derived fact (terminal/wake/decision/telemetry/lineage) must be identical between lean and non-lean, only promptText/feedback differ');
+      'every derived fact (terminal/wake/decision/telemetry/lineage) must be identical between lean and non-lean, only promptText/feedback/toolPeak differ');
     assert.deepStrictEqual(result[0].feedback, []);
     assert.equal('promptText' in result[0], false);
   });

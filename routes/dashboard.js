@@ -717,7 +717,15 @@ export function createDashboardRoutes({
         // run is unbounded. Shipping all of it on every poll was waste that scaled
         // with run length (LIN-608 memory follow-up).
         metrics: metrics.slice(-6),
-        toolPeak: peakToolCount(metrics),
+        // LIN-3011: prefer the loop's own digest-sourced `toolPeak` (an
+        // always-full-window peak, lib/pipeline-loops.js `_buildLoops`) when
+        // present — on the lean path `metrics` above is itself the digest's
+        // RETAINED (possibly trimmed) subset (R4), so recomputing over it
+        // would under-report a peak outside the retention window. Falls back
+        // to the old recompute for a non-lean loop (`l.toolPeak` is always
+        // `null` there) or a stale-shape doc materialized before the field
+        // existed, where `metrics` is still the full list either way.
+        toolPeak: l.toolPeak != null ? l.toolPeak : peakToolCount(metrics),
         producedArtifacts: Array.isArray(l.telemetry?.producedArtifacts) ? l.telemetry.producedArtifacts : [],
         resources: l.telemetry?.resources || null,
         // LIN-2243: a worker-lane's per-ticket walk, parsed from this run's own

@@ -18,6 +18,7 @@ import { getSessionsForWorkspace, getLoopsForWorkspace } from '../../lib/pipelin
 import { classifyLoop } from '../../lib/observer-sweep.js';
 import { computeSupersededLoopIds } from '../../lib/loop-supersede.js';
 import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
+import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { collectUnansweredDecisions } from '../../lib/unanswered-decisions.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -724,7 +725,7 @@ function makeMockSessionStores({ history = [] } = {}) {
       },
       async listHistory(urlKey, options) {
         const id = options?.issueIdentifier;
-        const items = id ? history.filter(x => x.issueIdentifier === id) : history;
+        const items = withFreshDigests(id ? history.filter(x => x.issueIdentifier === id) : history);
         return { items, total: items.length };
       },
     },

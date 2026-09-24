@@ -16,13 +16,16 @@ import {
   getLoopsForIssue,
   getLoopsForWorkspace,
   getSessionsForWorkspace,
+  getSessionsForIssues,
   isDecisionAnswerEntry,
   resolvedDecisionEvents,
   firstRaisedAt,
   __internal
 } from '../../lib/pipeline-loops.js';
-import { parseDecisions, parseHeartbeat } from '../../lib/session-telemetry.js';
+import { parseDecisions, parseHeartbeat, deriveRuntime } from '../../lib/session-telemetry.js';
 import { loopLastActivityMs, isFreshlyActive, isLoopActive } from '../../lib/live-console.js';
+import { digestFeedback, deriveLoopFacingFacts } from '../../lib/digest-feedback.js';
+import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const {
   _toDate,
@@ -62,7 +65,7 @@ function liveItem(overrides = {}) {
 }
 
 function historyItem(overrides = {}) {
-  return {
+  const item = {
     id: 'hist-1',
     promptName: 'implementation',
     prompt: 'implementation prompt text',
@@ -81,6 +84,24 @@ function historyItem(overrides = {}) {
     feedback: [],
     ...overrides
   };
+  // LIN-3011: the lean build derives ONLY from `feedbackDigest` — a raw
+  // `feedback` array is never read on the lean path (production Mongo
+  // excludes it entirely under the new projection). Every existing/new test
+  // that exercises `lean: true` through this fixture needs a digest
+  // consistent with its OWN `feedback`, computed here so fixture authors
+  // don't have to hand-derive one; `digestFeedback` shares the exact same
+  // per-row derivation `_buildLoops`'s non-lean path uses, so lean/non-lean
+  // stay in agreement by construction. Skipped when the caller explicitly
+  // provides `feedbackVersion`/`feedbackDigest` (e.g. the LIN-3011-specific
+  // self-heal/freshness/abort-harvest fixtures below, which need full control
+  // over staleness and legacy shapes).
+  if (!('feedbackDigest' in overrides) && !('feedbackVersion' in overrides)) {
+    const digest = digestFeedback({ feedback: item.feedback, dispatchedAt: item.dispatchedAt }, { now: Date.now() });
+    digest.version = 0;
+    item.feedbackVersion = 0;
+    item.feedbackDigest = digest;
+  }
+  return item;
 }
 
 function agentStatusEntry(overrides = {}) {
@@ -1033,29 +1054,48 @@ describe('lean projection (LIN-622)', () => {
 // Mongo read (the cold-start latency win) while leaving non-lean reads — and the
 // retained `feedback` the feed still derives telemetry from — untouched.
 describe('lean read projection (LIN-623)', () => {
-  test('getSessionsForWorkspace lean projects `prompt` out of the history read', async () => {
+  test('getSessionsForWorkspace lean projects `prompt` AND `feedback` out of the history read (LIN-3011)', async () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getSessionsForWorkspace('ws', { ...stores, lean: true });
-    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0 },
-      'the lean feed read must exclude `prompt` at the query so a real DB never transfers it');
+    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0, feedback: 0 },
+      'the lean feed read must exclude BOTH `prompt` and `feedback` at the query (LIN-3011) — the digest is a complete substitute, so feedback need not cross the wire either');
     // It is a column exclusion, NOT a row cap — the truncation-footgun guard stays.
     assert.ok(!('limit' in capture.listHistoryOptions), 'projection must not become a row cap');
   });
 
-  test('lean read projects ONLY `prompt` — feedback (telemetry source) is retained', async () => {
+  // LIN-3011: this replaces the old "feedback must NOT be projected away" guard.
+  // That constraint held only because the derivations ran over raw feedback at
+  // read time; now that `feedbackDigest` (lib/digest-feedback.js, LIN-3008)
+  // persists every loop-facing fact `_buildLoops` derives, feedback is safe to
+  // exclude too. This asserts BOTH halves: the digest is a complete substitute
+  // (precondition, already true post-Phase-0), and the lean read now excludes
+  // feedback given that precondition (LIN-3011, not yet true pre-fix).
+  test('the digest carries every derived fact, which is why the lean read can now project feedback away too', async () => {
+    const doc = {
+      feedback: [
+        { kind: 'assistant-text', message: 'working on it', timestamp: new Date('2026-04-10T10:00:00.000Z') },
+        { kind: 'status', message: '[done] finished in 5m', timestamp: new Date('2026-04-10T10:05:00.000Z') }
+      ],
+      dispatchedAt: new Date('2026-04-10T09:55:00.000Z')
+    };
+    const digest = digestFeedback(doc, { now: Date.now() });
+    for (const key of ['terminal', 'wake', 'decision', 'decisionEntryIndex', 'decisionCase', 'answeredDecisionId', 'parkedWait', 'telemetry']) {
+      assert.ok(key in digest, `digest is missing loop-facing fact "${key}" — not a complete substitute for feedback`);
+    }
+
     const capture = {};
     const stores = makeMockStores({ capture });
     await getSessionsForWorkspace('ws', { ...stores, lean: true });
-    assert.ok(!('feedback' in capture.listHistoryOptions.projection),
-      'feedback must NOT be projected away — terminal/telemetry facts are derived from it');
+    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0, feedback: 0 },
+      'now that the digest carries every derived fact, the lean read excludes feedback too (LIN-3011)');
   });
 
-  test('getLoopsForWorkspace lean also projects `prompt` out of the read', async () => {
+  test('getLoopsForWorkspace lean also projects `prompt` AND `feedback` out of the read (LIN-3011)', async () => {
     const capture = {};
     const stores = makeMockStores({ capture });
     await getLoopsForWorkspace('ws', { ...stores, lean: true });
-    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0 });
+    assert.deepStrictEqual(capture.listHistoryOptions.projection, { prompt: 0, feedback: 0 });
   });
 
   test('non-lean reads carry NO projection (byte-identical full documents)', async () => {
@@ -1091,6 +1131,657 @@ describe('lean read projection (LIN-623)', () => {
     assert.strictEqual(sessions.length, 1);
     assert.strictEqual(sessions[0].completedAt, completedTs,
       'derived terminal time survives the projected lean read');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIN-3011 (LIN-2996 Phase 3): self-heal + digest-backed lean loop build
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// From LIN-3011 the lean read excludes `feedback` too (see above), so the lean
+// path can no longer derive terminal/wake/decision/telemetry facts by
+// re-scanning `item.feedback` — that array is absent. It must instead read
+// those facts off the row's persisted `feedbackDigest` (lib/digest-feedback.js,
+// LIN-3008), self-healing (`historyCollection.find({_id:{$in:[...]}})`,
+// `{prompt:0}` projection) any row whose digest is missing or stale. None of
+// this exists at HEAD yet — every witness below fails today, either because a
+// derived fact comes back null/undefined (nothing scans the absent `feedback`)
+// or because a field this beat's acceptance requires (`loop.toolPeak`) does
+// not exist on the built loop at all yet.
+//
+// `leanDigestItem` shapes a `listHistory` row EXACTLY as a post-LIN-3011 lean
+// read would: no `feedback` key (exclusion projection), plus
+// `feedbackVersion`/`feedbackDigest`. `rawCollectionDoc` shapes what a
+// self-heal `_id $in` re-read would hit: a raw Mongo-ish doc with `feedback`
+// retained. The two are deliberately NOT auto-derived from one another so each
+// test states its fixture in the exact shape it needs.
+//
+// Fixture timestamps are relative to test-run time (`Date.now()`), never a
+// fixed calendar date: these go through the PUBLIC getLoops*/getSessions* API
+// (not `_buildLoops` directly), which always uses a real `now`, so a fixed
+// calendar date risks silently ageing out of the 30-day lookback and being
+// dropped rather than genuinely asserted on.
+const MIN = 60 * 1000;
+const HOUR = 60 * MIN;
+const DIGEST_ANCHOR_MS = Date.now() - 8 * HOUR; // the whole fixture timeline sits inside the last 8h
+function digestIso(offsetMs = 0) { return new Date(DIGEST_ANCHOR_MS + offsetMs).toISOString(); }
+
+function leanDigestItem(overrides = {}) {
+  const item = {
+    id: 'h-1',
+    promptName: 'implementation',
+    issueId: 'uuid-100',
+    issueIdentifier: ISSUE_A,
+    issueTitle: 'Issue A',
+    issueUrl: 'https://linear.app/x/issue/LIN-100',
+    dispatchedAt: digestIso(HOUR),
+    dispatchedBy: 'user-1',
+    target: 'cli',
+    repo: null,
+    status: 'taken',
+    resolvedAt: digestIso(2 * HOUR),
+    sessionId: null,
+    rootItemId: null,
+    abort: false,
+    abortTo: null,
+    feedbackVersion: 1,
+    feedbackDigest: null,
+    ...overrides
+  };
+  delete item.feedback; // exclusion projection: the key is never present, not even []
+  return item;
+}
+
+function rawCollectionDoc(overrides = {}) {
+  return {
+    _id: 'h-1',
+    urlKey: 'ws',
+    issueIdentifier: ISSUE_A,
+    dispatchedAt: new Date(digestIso(HOUR)),
+    feedback: [],
+    feedbackVersion: 1,
+    feedbackDigest: null,
+    ...overrides
+  };
+}
+
+function makeLeanDigestStores({ items = [], liveItems = [], collectionDocs = [], findError = null, updateError = null, findSpy = null, updateSpy = null } = {}) {
+  const collection = createMockCollection();
+  for (const d of collectionDocs) collection._docs.push({ ...d });
+  const historyCollection = {
+    find(query, opts) {
+      if (findSpy) findSpy(query, opts);
+      if (findError) return { toArray: async () => { throw findError; } };
+      return collection.find(query, opts);
+    },
+    async updateOne(query, update, opts) {
+      if (updateSpy) updateSpy(query, update, opts);
+      if (updateError) throw updateError;
+      return collection.updateOne(query, update, opts);
+    }
+  };
+  return {
+    // `_collection` is the raw, UNSPIED mock — tests that need to read back
+    // written state (e.g. "did the write-back land") use this directly so
+    // that diagnostic read doesn't itself inflate `findSpy`'s call count.
+    _collection: collection,
+    dispatchStore: {
+      historyCollection,
+      async listItems() { return liveItems; },
+      async listHistory() { return { items, total: items.length }; }
+    },
+    agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } }
+  };
+}
+
+describe('self-heal (LIN-3011): missing/stale feedbackDigest re-reads by _id, guarded write-back', () => {
+  test('a missing digest (feedbackVersion:0, feedbackDigest:null) triggers a re-read and the fill derives from the healed digest', async () => {
+    const findCalls = [];
+    const updateCalls = [];
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 0, feedbackDigest: null })],
+      collectionDocs: [rawCollectionDoc({
+        feedbackVersion: 0,
+        feedback: [{ kind: 'status', message: '[done] finished in 5m', timestamp: new Date(digestIso(HOUR + 5 * MIN)) }]
+      })],
+      findSpy: (q, o) => findCalls.push({ q, o }),
+      updateSpy: (q, u) => updateCalls.push({ q, u })
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops.length, 1, 'the row is not dropped');
+    assert.strictEqual(loops[0].terminalStatus, 'done', 'derived from the re-read + digested feedback, not the absent lean feedback[]');
+    assert.strictEqual(findCalls.length, 1, 'exactly one self-heal re-read for the one stale row');
+    assert.deepStrictEqual(findCalls[0].q, { _id: { $in: ['h-1'] } });
+    assert.deepStrictEqual(findCalls[0].o?.projection, { prompt: 0 }, 'self-heal re-read excludes prompt (N3) but keeps feedback');
+    assert.strictEqual(updateCalls.length, 1, 'the healed digest is written back');
+    assert.deepStrictEqual(updateCalls[0].q, { _id: 'h-1', feedbackVersion: 0 },
+      'write-back is guarded on the row\'s CURRENT feedbackVersion ({_id, feedbackVersion: doc.feedbackVersion ?? null})');
+  });
+
+  test('a stale version (feedbackVersion !== feedbackDigest.version) triggers a re-read', async () => {
+    const findCalls = [];
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({
+        feedbackVersion: 3,
+        feedbackDigest: { version: 2, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null, telemetry: { runtime: {}, metrics: [], toolPeak: null } }
+      })],
+      collectionDocs: [rawCollectionDoc({
+        feedbackVersion: 3,
+        feedback: [{ kind: 'status', message: '[done] finished in 5m', timestamp: new Date(digestIso(HOUR + 5 * MIN)) }]
+      })],
+      findSpy: (q, o) => findCalls.push({ q, o })
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(findCalls.length, 1, 'stale version must re-read, not trust the outdated digest');
+    assert.strictEqual(loops[0].terminalStatus, 'done');
+  });
+
+  test('a fresh digest (feedbackVersion === feedbackDigest.version) needs zero re-reads', async () => {
+    const findCalls = [];
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({
+        feedbackVersion: 2,
+        feedbackDigest: {
+          version: 2,
+          terminal: { status: 'done', entry: { message: '[done] finished', timestamp: digestIso(HOUR + 5 * MIN) } },
+          wake: null, decision: null, decisionCase: [], answeredDecisionId: null,
+          parkedWait: null,
+          telemetry: { runtime: {}, metrics: [], toolPeak: null }
+        }
+      })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 2 })],
+      findSpy: (q, o) => findCalls.push({ q, o })
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(findCalls.length, 0, 'a fresh digest must not trigger any re-read');
+    assert.strictEqual(loops[0].terminalStatus, 'done', 'derived straight from the fresh digest');
+  });
+
+  test('a re-read failure THROWS and fails the whole fill — no dropped row, no nulled fact', async () => {
+    const stores = makeLeanDigestStores({
+      items: [
+        leanDigestItem({ id: 'h-1', feedbackVersion: 0, feedbackDigest: null }),
+        leanDigestItem({ id: 'h-2', feedbackVersion: 0, feedbackDigest: null })
+      ],
+      collectionDocs: [rawCollectionDoc({ _id: 'h-1' }), rawCollectionDoc({ _id: 'h-2' })],
+      findError: new Error('simulated Mongo re-read failure')
+    });
+    await assert.rejects(
+      () => getLoopsForWorkspace('ws', { ...stores, lean: true }),
+      /simulated Mongo re-read failure/,
+      "the fill must fail loudly, unlike listHistory's catch -> {items:[]} convention"
+    );
+  });
+
+  test('a write-back failure is logged only — the fill still succeeds with the healed value', async () => {
+    const originalError = console.error;
+    const logged = [];
+    console.error = (...args) => logged.push(args);
+    try {
+      const stores = makeLeanDigestStores({
+        items: [leanDigestItem({ feedbackVersion: 0, feedbackDigest: null })],
+        collectionDocs: [rawCollectionDoc({
+          feedbackVersion: 0,
+          feedback: [{ kind: 'status', message: '[done] finished in 5m', timestamp: new Date(digestIso(HOUR + 5 * MIN)) }]
+        })],
+        updateError: new Error('simulated write-back failure')
+      });
+      const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+      assert.strictEqual(loops.length, 1, 'the fill still succeeds');
+      assert.strictEqual(loops[0].terminalStatus, 'done', 'still uses the healed value for THIS fill');
+      assert.ok(
+        logged.some(a => a.join(' ').match(/write-?back/i)),
+        'the write-back failure is logged, not swallowed silently'
+      );
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test('a legacy row converges after one heal — the second lean fill makes zero further re-reads', async () => {
+    const findCalls = [];
+    const items = [leanDigestItem({ feedbackVersion: 0, feedbackDigest: null })];
+    const stores = makeLeanDigestStores({
+      items,
+      collectionDocs: [rawCollectionDoc({
+        feedbackVersion: 0,
+        feedback: [{ kind: 'status', message: '[done] finished in 5m', timestamp: new Date(digestIso(HOUR + 5 * MIN)) }]
+      })],
+      findSpy: (q, o) => findCalls.push({ q, o })
+    });
+    await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(findCalls.length, 1, 'first fill heals the legacy row');
+
+    // Read back what the first fill's write-back actually persisted, and feed
+    // THAT (not a hand-authored fixture) into the second fill's listHistory —
+    // isolates "does a fresh digest skip re-reads" (covered above) from "does
+    // this converge via the real write-back the first fill performed".
+    const healed = (await collectionArray(stores)).find(d => d._id === 'h-1');
+    items[0] = leanDigestItem({ feedbackVersion: healed.feedbackVersion, feedbackDigest: healed.feedbackDigest });
+
+    await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(findCalls.length, 1, 'second fill made zero further re-reads — the healed digest is now fresh');
+  });
+
+  test('self-heal re-read excludes `prompt` but keeps `feedback` (N3)', async () => {
+    const findCalls = [];
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 0, feedbackDigest: null })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 0, prompt: 'a 30kb prompt body', feedback: [] })],
+      findSpy: (q, o) => findCalls.push({ q, o })
+    });
+    await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(findCalls.length, 1);
+    assert.deepStrictEqual(findCalls[0].o?.projection, { prompt: 0 });
+  });
+
+  // Review ledger L5 (PR #1560): decides what `_selfHealLeanHistory`'s
+  // `if (!raw) return item` branch should do when the `_id $in` re-read
+  // finds nothing for a row `listHistory` DID return moments earlier — a
+  // narrow TTL-expiry/delete race. DECISION: serve the row exactly as
+  // `listHistory` returned it (stale-but-not-invented, never dropped),
+  // logged — never throw and fail the WHOLE fill for one benign, self-
+  // resolving row vanishing. See the code comment at the branch for the
+  // full reasoning (blast-radius disproportion vs. every other caller's own
+  // characterized degradation semantics).
+  test('L5: self-heal "re-read found nothing" (a vanished/expired row) is served stale-but-unchanged, never dropped, never throws, and is logged', async () => {
+    const originalError = console.error;
+    const logged = [];
+    console.error = (...args) => logged.push(args);
+    try {
+      const stores = makeLeanDigestStores({
+        items: [leanDigestItem({ id: 'vanished-1', feedbackVersion: 0, feedbackDigest: null })],
+        collectionDocs: [] // the re-read finds NOTHING for this id — simulates a TTL/delete race
+      });
+      const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+      assert.strictEqual(loops.length, 1, 'the row is NOT dropped — M28 would have dropped it');
+      assert.strictEqual(loops[0].loopId, 'vanished-1');
+      assert.strictEqual(loops[0].terminalStatus, null, 'no fact is invented — served with its stale (here: absent) digest, unchanged');
+      assert.ok(logged.some(a => a.join(' ').match(/vanished/i)), 'the vanished-row race is logged, never silent');
+    } finally {
+      console.error = originalError;
+    }
+  });
+});
+
+// Helper for the convergence test above: read back the mock historyCollection's
+// current documents via its own `find` (not `_docs` directly), so the test
+// exercises the same interface production code uses.
+async function collectionArray(stores) {
+  // Reads the raw, UNSPIED collection directly — going through
+  // `historyCollection.find` here would itself count as a self-heal read and
+  // inflate `findSpy`'s call count, contaminating the very thing this helper
+  // exists to verify.
+  return stores._collection.find({}, {}).toArray();
+}
+
+describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDigest (LIN-3011)', () => {
+  const FRESH_DIGEST = {
+    version: 5,
+    terminal: { status: 'done', entry: { message: '[done] shipped it', timestamp: digestIso(HOUR + 10 * MIN) } },
+    wake: { marker: 'blocked', waitingMessage: 'need a ruling' },
+    decision: { decision_id: 'd-1', question: 'ship or hold?' },
+    decisionEntryIndex: 2,
+    decisionCase: ['here is the case'],
+    answeredDecisionId: 'd-0',
+    parkedWait: { reason: 'ci-poll' },
+    telemetry: {
+      model: 'opus', evidence: [{ url: 'https://x' }], usage: { costUsd: 1.2 }, resources: null,
+      ticketMarkers: [], metrics: [{ timestamp: digestIso(HOUR), total: 3 }], toolPeak: 3,
+      runtime: { ms: 600000, dispatchedAt: digestIso(HOUR), completedAt: digestIso(HOUR + 10 * MIN), crossCheck: null }
+    }
+  };
+
+  test('terminal/wake/decision/decisionCase/answeredDecisionId/parkedWait are sourced from the digest, not re-derived from (absent) feedback', async () => {
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: FRESH_DIGEST })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops.length, 1);
+    const loop = loops[0];
+    assert.strictEqual(loop.terminalStatus, 'done');
+    assert.strictEqual(loop.terminalCompletedAt, digestIso(HOUR + 10 * MIN));
+    assert.strictEqual(loop.wakeMarker, 'blocked');
+    assert.strictEqual(loop.waitingMessage, 'need a ruling');
+    assert.deepStrictEqual(loop.decision, FRESH_DIGEST.decision);
+    assert.deepStrictEqual(loop.decisionCase, ['here is the case']);
+    assert.strictEqual(loop.answeredDecisionId, 'd-0');
+    assert.deepStrictEqual(loop.telemetry.parkedWait, { reason: 'ci-poll' });
+    assert.strictEqual(loop.telemetry.runtime.ms, 600000);
+  });
+
+  test('omitted vs null is preserved through the digest-backed build: absent decision/wake stay null, absent parkedWait stays OMITTED (never invented as null)', async () => {
+    // LIN-3011 beat-4 fix: this test originally asserted
+    // `loop.telemetry.parkedWait === null` for the absent case, but the REAL
+    // contract (confirmed against `deriveLoopFacingFacts`/`buildRunTelemetry`,
+    // session-telemetry.js's `_assembleTelemetry`: `if (parkedWait) telemetry.
+    // parkedWait = parkedWait`) OMITS the key entirely when there is no
+    // parked wait — unlike `decision`/`wake`, which are always-present,
+    // explicit-null-when-absent fields. Asserting `=== null` here would have
+    // been the WRONG omitted-vs-null contract to pin, and the fix that makes
+    // this beat's build correctly omit the key (matching non-lean byte-for-
+    // byte) would have looked like a regression against it. Corrected to
+    // check for the key's absence instead, which is what "never coerced or
+    // invented" actually requires for this specific field.
+    const digest = { ...FRESH_DIGEST, decision: null, decisionCase: [], parkedWait: null, wake: null };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: digest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.decision, null);
+    assert.deepStrictEqual(loop.decisionCase, []);
+    assert.strictEqual(loop.wakeMarker, null);
+    assert.strictEqual(loop.waitingMessage, null);
+    assert.ok(!('parkedWait' in loop.telemetry), 'no parked wait -> the key is omitted, matching the non-lean buildRunTelemetry contract exactly');
+    assert.ok('decision' in loop && 'decisionCase' in loop, 'keys present even when empty — the !== undefined build-discriminators depend on this');
+  });
+
+  test('the non-lean path is unaffected: it still derives from raw feedback, ignoring any feedbackDigest present (regression guard)', async () => {
+    // Not a new-behavior witness — deliberately NOT expected to fail today,
+    // since no production code has changed yet. See the beat-2 report for the
+    // mutation evidence proving this guard catches a regression if the
+    // non-lean path is ever accidentally switched to read the digest.
+    const misleadingDigest = {
+      ...FRESH_DIGEST,
+      terminal: { status: 'aborted', entry: { message: '[aborted]', timestamp: '2099-01-01T00:00:00.000Z' } }
+    };
+    const stores = makeMockStores({
+      history: [historyItem({
+        id: 'h-1',
+        dispatchedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+        resolvedAt: new Date(Date.now() - 50 * 60 * 1000).toISOString(),
+        feedback: [{ message: '[done] finished in 5m', timestamp: new Date(Date.now() - 55 * 60 * 1000).toISOString() }],
+        feedbackVersion: 5,
+        feedbackDigest: misleadingDigest
+      })]
+    });
+    const loops = await getLoopsForWorkspace('ws', stores); // no lean: true
+    assert.strictEqual(loops[0].terminalStatus, 'done', 'non-lean derives from raw feedback, not the (deliberately wrong) digest');
+  });
+
+  // Review ledger L1 (PR #1560, independent review comment 14:22): the
+  // no-digest default runtime in `_loopFactsFromDigest` hard-coded
+  // `dispatchedAt: null`, but a queued LIVE item never carries a digest at
+  // all (it hasn't been archived yet) — so on the lean path every live loop
+  // regressed from reporting its own dispatchedAt to reporting null, a
+  // silent drift in `telemetry.runtime.dispatchedAt` the reviewer's
+  // differential probe (main vs PR, same raw rows) caught but no committed
+  // test guarded.
+  test('L1: a queued live item (no digest at all) still reports its own dispatchedAt in telemetry.runtime, matching deriveLoopFacingFacts([], dispatchedAt)', async () => {
+    // Relative to test-run time, not a fixed calendar date — this goes
+    // through the PUBLIC getLoopsForWorkspace API (real `now`), so a fixed
+    // past date risks silently ageing out of the 30-day lookback.
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const stores = makeLeanDigestStores({
+      liveItems: [liveItem({ id: 'live-l1', dispatchedAt })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const loop = loops.find(l => l.loopId === 'live-l1');
+    assert.ok(loop, 'the live loop is present');
+    const expected = deriveLoopFacingFacts([], dispatchedAt);
+    assert.deepStrictEqual(loop.telemetry, expected.telemetry,
+      'a digest-less live item must still carry its own dispatchedAt in telemetry.runtime — never a hard-coded null');
+  });
+});
+
+describe("abort harvest sourced from the abort row's own feedbackDigest.terminal (LIN-3011)", () => {
+  function abortRow(overrides = {}) {
+    return leanDigestItem({
+      id: 'abort-1',
+      abort: true,
+      abortTo: 'target-1',
+      feedbackVersion: 1,
+      feedbackDigest: {
+        version: 1,
+        terminal: { status: 'aborted', entry: { message: '[aborted] cancelled', timestamp: digestIso(HOUR + 900) } },
+        wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+        telemetry: { runtime: {}, metrics: [], toolPeak: null }
+      },
+      dispatchedAt: digestIso(59 * MIN),
+      resolvedAt: digestIso(HOUR + MIN),
+      ...overrides
+    });
+  }
+
+  function targetRow(digestOverrides = {}) {
+    return leanDigestItem({
+      id: 'target-1',
+      feedbackVersion: 1,
+      feedbackDigest: {
+        version: 1,
+        terminal: null, wake: { marker: 'blocked', waitingMessage: 'waiting' }, decision: null, decisionCase: [],
+        answeredDecisionId: null,
+        parkedWait: { reason: 'ci-poll' },
+        telemetry: { runtime: { ms: null, dispatchedAt: digestIso(0), completedAt: null, crossCheck: null }, metrics: [], toolPeak: null },
+        ...digestOverrides
+      },
+      dispatchedAt: digestIso(0)
+    });
+  }
+
+  const abortCollectionDocs = () => [rawCollectionDoc({ _id: 'abort-1' }), rawCollectionDoc({ _id: 'target-1' })];
+
+  test('terminal status becomes aborted on the target', async () => {
+    const stores = makeLeanDigestStores({ items: [abortRow(), targetRow()], collectionDocs: abortCollectionDocs() });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.ok(target, 'target loop survives');
+    assert.strictEqual(target.terminalStatus, 'aborted');
+  });
+
+  test('wakeMarker becomes "aborted" with a null waitingMessage', async () => {
+    const stores = makeLeanDigestStores({ items: [abortRow(), targetRow()], collectionDocs: abortCollectionDocs() });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.strictEqual(target.wakeMarker, 'aborted');
+    assert.strictEqual(target.waitingMessage, null);
+  });
+
+  test('runtime completedAt/ms are taken from the abort entry', async () => {
+    const stores = makeLeanDigestStores({ items: [abortRow(), targetRow()], collectionDocs: abortCollectionDocs() });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.strictEqual(target.telemetry.runtime.completedAt, digestIso(HOUR + 900));
+    assert.strictEqual(target.telemetry.runtime.ms, Date.parse(digestIso(HOUR + 900)) - Date.parse(digestIso(0)));
+  });
+
+  test('parkedWait becomes null on a harvested abort (omitted on the built loop, matching the non-lean omit-when-absent contract)', async () => {
+    // LIN-3011 beat-4 fix: same correction as the "omitted vs null" test
+    // above — `digest.parkedWait: null` correctly maps to the KEY BEING
+    // OMITTED on `loop.telemetry`, never an explicit `null`, matching
+    // `buildRunTelemetry`'s `if (parkedWait) telemetry.parkedWait = ...`
+    // omit-when-absent convention exactly.
+    const stores = makeLeanDigestStores({ items: [abortRow(), targetRow()], collectionDocs: abortCollectionDocs() });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.ok(!('parkedWait' in target.telemetry), 'a harvested abort clears any parked wait, and the key is omitted, not set to null');
+  });
+
+  test('crossCheck: the F1 millisecond-exact guard lets a 700ms-later abort win over a pre-abort duration tail', async () => {
+    // The target's own digest already carries a genuine terminal at
+    // HOUR+200ms ("[failed] ... in 3m"); the abort at HOUR+900ms is strictly
+    // later, so F1 lets it win — the plan's sub-second reproduction.
+    const stores = makeLeanDigestStores({
+      items: [
+        abortRow(),
+        targetRow({ terminal: { status: 'failed', entry: { message: '[failed] ... in 3m', timestamp: digestIso(HOUR + 200) } } })
+      ],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.strictEqual(target.terminalStatus, 'aborted', 'the later abort (700ms after) wins the millisecond-exact F1 guard');
+    assert.strictEqual(target.terminalCompletedAt, digestIso(HOUR + 900));
+  });
+
+  // Review ledger L2 (PR #1560): acceptance case 5 ("crossCheck when the
+  // target had a pre-abort duration tail") had no witness asserting
+  // `crossCheck` itself, and the F1 equal-millisecond boundary was untested.
+  test("L2: crossCheck reflects deriveRuntime(dispatchedAt, abortEntry.timestamp, [abortEntry]) after the harvest, not the target's own pre-abort duration tail", async () => {
+    // The abort entry's OWN message carries a duration ("in 5m") so this test
+    // can actually distinguish "derived from [abortEntry]" (crossCheck: 5m)
+    // from "derived from []" (crossCheck: null) — the same-looking null
+    // result either way would otherwise let a broken derivation pass.
+    const abortEntry = { message: '[aborted] cancelled in 5m', timestamp: digestIso(HOUR + 900) };
+    const stores = makeLeanDigestStores({
+      items: [
+        abortRow({
+          feedbackDigest: {
+            version: 1,
+            terminal: { status: 'aborted', entry: abortEntry },
+            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            telemetry: { runtime: {}, metrics: [], toolPeak: null }
+          }
+        }),
+        targetRow({
+          terminal: { status: 'failed', entry: { message: '[failed] ... in 3m', timestamp: digestIso(HOUR + 200) } },
+          telemetry: {
+            // The target's OWN pre-abort crossCheck ("3m") — must NOT survive
+            // the harvest; the abort recomputes runtime (incl. crossCheck)
+            // from scratch via deriveRuntime(dispatchedAt, abortEntry.timestamp, [abortEntry]).
+            runtime: { ms: null, dispatchedAt: digestIso(0), completedAt: null, crossCheck: { seconds: 180, ms: 180000, raw: '3m' } },
+            metrics: [], toolPeak: null
+          }
+        })
+      ],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    const expectedRuntime = deriveRuntime(digestIso(0), abortEntry.timestamp, [abortEntry]);
+    assert.deepStrictEqual(target.telemetry.runtime.crossCheck, expectedRuntime.crossCheck);
+    assert.deepStrictEqual(target.telemetry.runtime.crossCheck, { seconds: 300, ms: 300000, raw: '5m' },
+      'crossCheck must come from the harvested abort entry\'s own "in 5m", never the target\'s own pre-abort "3m" tail nor null (an empty-array derivation)');
+  });
+
+  test("L2: an abort at the SAME millisecond as the target's own genuine terminal does NOT win under the F1 guard (strict >, not >=)", async () => {
+    const equalMs = digestIso(HOUR + 200);
+    const stores = makeLeanDigestStores({
+      items: [
+        abortRow({
+          feedbackDigest: {
+            version: 1,
+            terminal: { status: 'aborted', entry: { message: '[aborted] cancelled', timestamp: equalMs } },
+            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            telemetry: { runtime: {}, metrics: [], toolPeak: null }
+          }
+        }),
+        targetRow({ terminal: { status: 'failed', entry: { message: '[failed] ... in 3m', timestamp: equalMs } } })
+      ],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.strictEqual(target.terminalStatus, 'failed', 'an EQUAL-millisecond abort must not override a genuine terminal — F1 is strictly-later-only');
+    assert.strictEqual(target.terminalCompletedAt, equalMs);
+  });
+
+  test('decision fields are unaffected by the harvested abort', async () => {
+    const decision = { decision_id: 'd-9', question: 'proceed?' };
+    const stores = makeLeanDigestStores({
+      items: [abortRow(), targetRow({ decision, decisionCase: ['case text'], answeredDecisionId: 'd-8' })],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.deepStrictEqual(target.decision, decision);
+    assert.deepStrictEqual(target.decisionCase, ['case text']);
+    assert.strictEqual(target.answeredDecisionId, 'd-8');
+  });
+
+  // Review ledger L3 (PR #1560): LIN-1261's exclusion — a `[skipped]` row
+  // (the runner refused the cancel; a human is still continuing the
+  // session) must never be harvested as an abort, since nothing actually
+  // ended there. `_harvestAbortedTargetsFromDigests` already checks
+  // `terminal.status === 'aborted'`, but no committed test pinned it on the
+  // lean, digest-backed path.
+  test("L3: a [skipped]-terminal abort row must NOT mark the target aborted on the lean path", async () => {
+    const stores = makeLeanDigestStores({
+      items: [
+        abortRow({
+          feedbackDigest: {
+            version: 1,
+            terminal: { status: 'skipped', entry: { message: '[skipped] human-continued session', timestamp: digestIso(HOUR + 900) } },
+            wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+            telemetry: { runtime: {}, metrics: [], toolPeak: null }
+          }
+        }),
+        targetRow()
+      ],
+      collectionDocs: abortCollectionDocs()
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const target = loops.find(l => l.loopId === 'target-1');
+    assert.ok(target, 'target loop survives');
+    assert.strictEqual(target.terminalStatus, null, 'a [skipped] abort row must never be harvested — nothing actually ended, so the target stays un-terminal');
+    assert.strictEqual(target.wakeMarker, 'blocked', "the target's own digest facts (unrelated to any abort) are untouched");
+  });
+});
+
+describe('lineage metrics union + retention-safe toolPeak on the lean digest-backed build (LIN-3011)', () => {
+  test("lineageMetrics is a time-ordered union of each row's retained metric list; lineageLastActivityMs is exact", async () => {
+    const m1 = { timestamp: digestIso(0), total: 2 };
+    const m2 = { timestamp: digestIso(30 * MIN), total: 4 };
+    const items = [
+      leanDigestItem({
+        id: 'r-1', dispatchedAt: digestIso(0), feedbackVersion: 1,
+        feedbackDigest: { version: 1, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null, telemetry: { runtime: {}, metrics: [m2], toolPeak: 4 } }
+      }),
+      leanDigestItem({
+        id: 'r-2', dispatchedAt: digestIso(1000), feedbackVersion: 1, rootItemId: 'r-1',
+        feedbackDigest: { version: 1, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null, telemetry: { runtime: {}, metrics: [m1], toolPeak: 2 } }
+      })
+    ];
+    const stores = makeLeanDigestStores({ items, collectionDocs: [rawCollectionDoc({ _id: 'r-1' }), rawCollectionDoc({ _id: 'r-2' })] });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const r1 = loops.find(l => l.loopId === 'r-1');
+    assert.deepStrictEqual(r1.lineageMetrics.map(m => m.timestamp), [m1.timestamp, m2.timestamp], 'time-ordered union across the lineage, not fetch order');
+    assert.strictEqual(r1.lineageLastActivityMs, Date.parse(m2.timestamp));
+  });
+
+  test('runs[].toolPeak is exact even when telemetry.metrics is retention-trimmed to the recent tail', async () => {
+    // The digest's retained `metrics` deliberately does NOT include the peak
+    // (it fell outside the 6h/last-6 retention window) — `toolPeak` must still
+    // be exact because it is a SEPARATE, always-full-window digest field, not
+    // a recompute over the (trimmed) metrics list.
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({
+        feedbackVersion: 1,
+        feedbackDigest: {
+          version: 1, terminal: null, wake: null, decision: null, decisionCase: [], answeredDecisionId: null, parkedWait: null,
+          telemetry: {
+            runtime: {},
+            metrics: [{ timestamp: digestIso(7 * HOUR), total: 2 }], // recent tail only, NOT the peak
+            toolPeak: 50 // the true peak, from an early heartbeat retention dropped
+          }
+        }
+      })],
+      collectionDocs: [rawCollectionDoc({})]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops[0].toolPeak, 50, "toolPeak reads the digest field directly, never recomputed from the (trimmed) metrics list");
+  });
+});
+
+describe('getSessionsForIssues lean path inherits self-heal + digest-backed build (LIN-3011)', () => {
+  test('a lean getSessionsForIssues call heals a stale digest and builds the session from it (materializer\'s only lean caller, observation-sessions-materializer.js:336)', async () => {
+    const findCalls = [];
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 0, feedbackDigest: null })],
+      collectionDocs: [rawCollectionDoc({
+        feedbackVersion: 0,
+        feedback: [{ kind: 'status', message: '[done] finished in 5m', timestamp: new Date(digestIso(HOUR + 5 * MIN)) }]
+      })],
+      findSpy: (q, o) => findCalls.push({ q, o })
+    });
+    const sessions = await getSessionsForIssues('ws', stores, [ISSUE_A], { lean: true });
+    assert.strictEqual(findCalls.length, 1, "getSessionsForIssues's lean read self-heals too");
+    const loop = sessions.flatMap(s => s.loops).find(l => l.loopId === 'h-1');
+    assert.ok(loop, 'the loop is present');
+    assert.strictEqual(loop.terminalStatus, 'done');
   });
 });
 

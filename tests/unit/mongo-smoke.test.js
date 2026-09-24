@@ -23,9 +23,10 @@ import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
 import {
-  loadDispatchHistory, collectKpiStats, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages
+  loadDispatchHistory, collectKpiStats, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages,
+  __internal as KPI_INTERNAL
 } from '../../lib/kpi-stats.js';
-import { digestFeedback } from '../../lib/digest-feedback.js';
+import { digestFeedback, isFreshDigest } from '../../lib/digest-feedback.js';
 import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
 import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
 import { WorkspaceStore } from '../../lib/workspace-store.js';
@@ -36,6 +37,7 @@ import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
+import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -1600,6 +1602,155 @@ describe(
           assert.deepStrictEqual(freshStats, legacyStats, `${shape.name}: full collectKpiStats output must be identical between the fresh and legacy twin`);
         });
       }
+    });
+    // -------------------------------------------------------------------------
+    // LIN-3011 (LIN-2996 Phase 3): freshness agreement + W1 persist-and-read
+    // deep equality, the two real-mongod witnesses this phase's plan names.
+    // -------------------------------------------------------------------------
+
+    // Ledger L3 (carried from the LIN-3012 review, comment `92446c4b`, to this
+    // ticket — see the LIN-3011 comment thread): proves Phase 3's JS
+    // `isFreshDigest` and Phase 4's real, IMPORTED `FRESH_DIGEST` `$cond`
+    // (lib/kpi-stats.js, via its `__internal` export — not a hand-copied
+    // approximation) agree on real mongod, over the SAME 7 row shapes the
+    // `loadDispatchHistory digest read` suite above already exercises: fresh,
+    // legacy, seeded-empty, stale, digest-without-version, null-feedbackVersion,
+    // and non-object digest (the scalar-string shape the `$type` guard test
+    // above needs — see its own comment for why that shape is the one that
+    // could reveal a real divergence: a non-object `feedbackDigest` whose
+    // missing `.version` happens to normalize equal to `feedbackVersion`).
+    test('LIN-3011 ledger L3: isFreshDigest (JS) and the real, imported FRESH_DIGEST $cond agree on all 8 row shapes', async () => {
+      const collection = freshCollection('lin3011-freshness-l3');
+      const shapes = [
+        { _id: 'fresh', label: 'fresh (digest.version === feedbackVersion)', doc: { feedbackVersion: 3, feedbackDigest: { version: 3 } } },
+        { _id: 'legacy', label: 'legacy (both fields absent)', doc: {} },
+        { _id: 'seeded-empty', label: 'seeded-empty (feedbackVersion:0, feedbackDigest:null)', doc: { feedbackVersion: 0, feedbackDigest: null } },
+        { _id: 'stale', label: 'stale (digest.version !== feedbackVersion)', doc: { feedbackVersion: 5, feedbackDigest: { version: 3 } } },
+        // Review ledger L7 (PR #1560): `feedbackVersion: 0` here (not 2, as
+        // the rebase had it) is load-bearing — it's what makes THIS test
+        // itself catch a `$ifNull` sentinel regression (M29: the Mongo
+        // sentinel for a missing `.version` flipped from -1 to 0). At
+        // feedbackVersion 2, both the correct sentinel (-1) and a mutated
+        // one (0) already differ from 2, so the mutation would silently
+        // survive; only at feedbackVersion 0 does the mutated sentinel (0)
+        // collide with the (also 0) feedbackVersion side and read wrongly
+        // fresh, which this test must catch.
+        { _id: 'digest-no-version', label: 'digest-without-version (present but missing .version) at feedbackVersion:0', doc: { feedbackVersion: 0, feedbackDigest: { count: 999 } } },
+        { _id: 'null-feedback-version', label: 'null-feedbackVersion (normalizes like missing -> 0, digest.version:0 IS fresh)', doc: { feedbackVersion: null, feedbackDigest: { version: 0 } } },
+        { _id: 'non-object-digest', label: 'non-object digest (scalar string; $type guard case)', doc: { feedbackVersion: -1, feedbackDigest: 'x' } },
+        // Restored (review ledger L7): dropped by the rebase that introduced
+        // the 7-shape array — a legacy row healed exactly once, converging
+        // to version 0 on both sides via the SAME `feedbackVersion` absence
+        // (not an explicit 0), the shape self-heal's write-back actually
+        // produces in production.
+        { _id: 'healed-legacy', label: 'healed-legacy (feedbackVersion absent, digest {version:0})', doc: { feedbackDigest: { version: 0 } } }
+      ];
+      await collection.insertMany(shapes.map((s) => ({ _id: s._id, ...s.doc })));
+
+      const mongoResults = await collection.aggregate([{ $project: { isFresh: KPI_INTERNAL.FRESH_DIGEST } }]).toArray();
+      const mongoById = new Map(mongoResults.map((r) => [r._id, r.isFresh]));
+
+      for (const s of shapes) {
+        const jsResult = isFreshDigest(s.doc);
+        const mongoResult = mongoById.get(s._id);
+        assert.strictEqual(jsResult, mongoResult,
+          `isFreshDigest (JS) and the real FRESH_DIGEST $cond disagree on the "${s.label}" shape: JS=${jsResult}, Mongo=${mongoResult}`);
+      }
+    });
+
+    // Extracts only the loop-facing facts the digest is responsible for
+    // (terminal/wake/decision/decisionCase/answeredDecisionId/telemetry's
+    // parkedWait+runtime+model+usage+resources+ticketWalk) — never raw
+    // `feedback`/`promptText`, which legitimately differ between the lean and
+    // non-lean shapes for reasons unrelated to this equivalence (LIN-622).
+    // Review ledger L6 (PR #1560): the original version of this helper
+    // coalesced every telemetry sub-field with `?? null`/`?? []`, so an
+    // omitted-vs-explicitly-absent divergence between the lean (digest-
+    // backed) and non-lean (baseline) paths could never surface here — both
+    // sides normalize to the SAME coalesced value regardless of whether the
+    // key was genuinely present. N4 (omitted vs null must be preserved,
+    // never normalized) is exactly the class this witness exists to guard.
+    // Compares `loop.telemetry` AS-IS (destructuring only `metrics` out,
+    // R4's one accepted exemption — it's deliberately retention-trimmed on
+    // lean, full on non-lean, a real and intended difference) so a missing
+    // key on one side and a present key on the other is a genuine mismatch,
+    // and adds `producedArtifacts`, which the original version omitted
+    // entirely.
+    function pickLoopFacingFacts(loop) {
+      const { metrics, ...telemetryRest } = loop.telemetry || {};
+      return {
+        terminalStatus: loop.terminalStatus,
+        terminalCompletedAt: loop.terminalCompletedAt,
+        wakeMarker: loop.wakeMarker,
+        waitingMessage: loop.waitingMessage,
+        decision: loop.decision,
+        decisionCase: loop.decisionCase,
+        answeredDecisionId: loop.answeredDecisionId,
+        telemetry: telemetryRest
+      };
+    }
+
+    test('LIN-3011 (W1): a persisted-and-read row builds identically via the digest-backed lean path and the N2 formatted-history baseline (deep equality, no JSON normalization)', async () => {
+      const historyCollection = freshCollection('lin3011-w1-history');
+      const store = new DispatchQueueStore({ collection: freshCollection('lin3011-w1-queue'), historyCollection });
+      const urlKey = 'w1-ws';
+      const targetId = randomUUID();
+      const abortId = randomUUID();
+      const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000);
+      const t0 = dispatchedAt.getTime();
+
+      const baseDoc = (id, overrides = {}) => ({
+        _id: id, urlKey, issueIdentifier: 'LIN-100', issueId: 'uuid-100', issueTitle: 'Issue A',
+        issueUrl: 'https://linear.app/x/issue/LIN-100', promptName: 'implementation', dispatchedAt,
+        dispatchedBy: 'user-1', target: 'cli', repo: null, status: 'taken', takenByTokenLabel: 'consumer-1',
+        resolvedAt: new Date(t0 + 2000), feedback: [], feedbackVersion: 0, feedbackDigest: null,
+        ...overrides
+      });
+      await historyCollection.insertOne(baseDoc(targetId));
+      await historyCollection.insertOne(baseDoc(abortId, { abort: true, abortTo: targetId, issueIdentifier: null }));
+
+      // Write through the REAL Phase 1 path so feedbackDigest is computed and
+      // persisted exactly as production would (LIN-3009). addFeedback stamps
+      // its own `timestamp: new Date()`; the sub-second ordering this case
+      // needs (target's genuine terminal at T+200ms, superseded by an abort
+      // 700ms LATER at T+900ms — the plan's W1 reproduction) is pinned by
+      // patching each entry's timestamp immediately after, then recomputing +
+      // persisting the digest against the corrected timestamps.
+      await store.addFeedback(targetId, urlKey, { message: '[failed] step one in 3m', kind: 'status' }, 'consumer-1');
+      await historyCollection.updateOne({ _id: targetId }, { $set: { 'feedback.0.timestamp': new Date(t0 + 200) } });
+      await store.addFeedback(abortId, urlKey, { message: '[aborted] cancelled', kind: 'status' }, 'consumer-1');
+      await historyCollection.updateOne({ _id: abortId }, { $set: { 'feedback.0.timestamp': new Date(t0 + 900) } });
+
+      for (const id of [targetId, abortId]) {
+        const raw = await historyCollection.findOne({ _id: id });
+        const feedbackDigest = digestFeedback(raw, { now: Date.now() });
+        feedbackDigest.version = raw.feedbackVersion;
+        await historyCollection.updateOne({ _id: id }, { $set: { feedbackDigest } });
+      }
+
+      // N2 baseline: the FORMATTED history path — {prompt:0} projection, then
+      // listHistory -> _formatHistoryItem, then today's _buildLoops derivation
+      // over the un-digested feedback plus the harvested abort. NOT a raw
+      // Date-typed array; _buildLoops drops raw docs that lack `id` anyway.
+      const { items: baselineItems } = await store.listHistory(urlKey, { projection: { prompt: 0 } });
+      const baselineLoops = pipelineInternal._buildLoops({ historyItems: baselineItems, lean: false });
+      const baseline = pickLoopFacingFacts(baselineLoops.find((l) => l.loopId === targetId));
+
+      // Digest-backed (LIN-3011): a lean read that ALSO excludes feedback,
+      // forcing derivation off feedbackDigest (with self-heal) alone.
+      const { items: leanItems } = await store.listHistory(urlKey, { projection: { prompt: 0, feedback: 0 } });
+      const digestBackedLoops = pipelineInternal._buildLoops({ historyItems: leanItems, lean: true });
+      const digestBacked = pickLoopFacingFacts(digestBackedLoops.find((l) => l.loopId === targetId));
+
+      // Absolute anchors on BOTH sides, asserted as strings (N2) — two sides
+      // fed the same wrong input could still agree without these.
+      assert.strictEqual(baseline.terminalStatus, 'aborted', 'baseline: the later abort wins the F1 guard');
+      assert.strictEqual(baseline.terminalCompletedAt, new Date(t0 + 900).toISOString());
+      assert.strictEqual(digestBacked.terminalStatus, 'aborted', 'digest-backed: same outcome, sourced from feedbackDigest');
+      assert.strictEqual(digestBacked.terminalCompletedAt, new Date(t0 + 900).toISOString());
+
+      assert.deepStrictEqual(digestBacked, baseline,
+        'no JSON normalization: a lingering Date-vs-ISO-string divergence must fail this, not be silently coerced to matching strings');
     });
   }
 );

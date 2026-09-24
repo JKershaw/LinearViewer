@@ -21,6 +21,7 @@ import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cach
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
+import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -42,8 +43,12 @@ function findSession(body, id) {
 function makeStores(perWorkspace) {
   return {
     dispatchQueueStore: {
-      async listItems(urlKey) { return perWorkspace[urlKey]?.live || []; },
-      async listHistory(urlKey) { return { items: perWorkspace[urlKey]?.history || [] }; }
+      // `withFreshDigests` here too: a handful of fixtures below simulate a
+      // still-live item that ALREADY carries feedback (an edge case, since
+      // production live items never do — feedback only ever lands on an
+      // archived/history row) to exercise a derived field before archival.
+      async listItems(urlKey) { return withFreshDigests(perWorkspace[urlKey]?.live || []); },
+      async listHistory(urlKey) { return { items: withFreshDigests(perWorkspace[urlKey]?.history || []) }; }
     },
     agentStatusStore: {
       async listStatus(urlKey) { return { items: perWorkspace[urlKey]?.agentStatus || [] }; }
@@ -230,7 +235,7 @@ describe('GET /api/dashboard/loops', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
-        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [historyItem('g', 'LIN-9')] }; }
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: withFreshDigests([historyItem('g', 'LIN-9')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [agentStatusDone('g', 'LIN-9')] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -331,7 +336,7 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
-        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [decisionItem('g-dec', 'LIN-26', 'd-6')] }; }
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: withFreshDigests([decisionItem('g-dec', 'LIN-26', 'd-6')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -355,7 +360,7 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { reads++; return { items: [decisionItem('a-dec', 'LIN-27', 'd-7')] }; }
+        async listHistory() { reads++; return { items: withFreshDigests([decisionItem('a-dec', 'LIN-27', 'd-7')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -636,7 +641,7 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { historyReads++; return { items: [decisionItem('a-dec', 'LIN-60', 'd-poll-1')] }; }
+        async listHistory() { historyReads++; return { items: withFreshDigests([decisionItem('a-dec', 'LIN-60', 'd-poll-1')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -1920,6 +1925,51 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(run.toolPeak, 10, 'peak tool count precomputed across ALL heartbeats');
   });
 
+  // Review ledger L4 (PR #1560): the test above can't distinguish "reads the
+  // digest's toolPeak" from "recomputes peakToolCount(metrics)", because all
+  // 10 heartbeats share one timestamp close to "now" — R4 retention (last-6
+  // OR within-6h) keeps every one of them, so the retained `metrics` list is
+  // never actually trimmed below the true peak. This test forces a REAL
+  // trim: an old (7h-ago) heartbeat carries the true peak (50 tools) and
+  // falls outside both "last 6" and the 6h window, while nine recent,
+  // lower-count heartbeats survive retention. `routes/dashboard.js:720` must
+  // still report the true peak — only reachable by reading `l.toolPeak`
+  // (the digest's own, always-full-window figure), never by recomputing
+  // `peakToolCount` over the (now genuinely trimmed) `metrics` list.
+  test('L4: runs[].toolPeak reads the digest peak even when it falls outside the retained metrics window (routes/dashboard.js:720)', async () => {
+    const oldPeakBeat = { message: '[working] 50 tools/1s · alive', timestamp: new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString() };
+    const recentBeats = [];
+    for (let i = 1; i <= 9; i++) {
+      recentBeats.push({ message: `[working] ${i} tools/${i}s · alive`, timestamp: new Date(Date.now() - i * 1000).toISOString() });
+    }
+    const trimmedWorker = {
+      id: 'w-trimmed', sessionId: 'sess-trimmed', issueIdentifier: 'LIN-832', issueTitle: 'Trimmed worker',
+      promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [oldPeakBeat, ...recentBeats, { message: '[done] shipped it', timestamp: NOW_ISO }]
+    };
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-trimmed', 'LIN-833'), trimmedWorker],
+        agentStatus: [agentStatusDone('sess-trimmed', 'LIN-833'), agentStatusDone('w-trimmed', 'LIN-832')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-trimmed');
+    const run = sess.runs.find(r => r.loopId === 'w-trimmed');
+    assert.ok(run, 'worker run present');
+    // Sanity: prove retention genuinely trimmed the old peak beat out of the
+    // served metrics tail, so a pass below can't come from "nothing was
+    // actually trimmed" (the failure mode of the sibling test above).
+    assert.ok(run.metrics.every(m => (m.total ?? m.toolCount) < 50), 'sanity: the 50-tool beat is genuinely absent from the retained/served metrics');
+    assert.equal(run.toolPeak, 50, 'toolPeak must still be exact — read from the digest, not recomputed over the (now-trimmed) metrics list');
+  });
+
   // ─── Lineage identity survives into the runs[] projection (LIN-1487, T1) ─────
   // LIN-1477 pins `lineageId` DERIVATION (lib/pipeline-loops.js). This pins the
   // one novel thing S2c adds: the derived id reaches the FEED's runs[] projection
@@ -2345,7 +2395,7 @@ describe('GET /api/dashboard/sessions', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
-        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [autopilotHistoryItem('sess-x', 'LIN-400')] }; }
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: withFreshDigests([autopilotHistoryItem('sess-x', 'LIN-400')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [agentStatusDone('sess-x', 'LIN-400')] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -2374,7 +2424,7 @@ describe('GET /api/dashboard/sessions', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { historyReads++; return { items: [autopilotHistoryItem('sess-c', 'LIN-617')] }; }
+        async listHistory() { historyReads++; return { items: withFreshDigests([autopilotHistoryItem('sess-c', 'LIN-617')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [agentStatusDone('sess-c', 'LIN-617')] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -4792,7 +4842,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
           reads++;
           const item = decisionItem('loop-1', 'LIN-99', 'd-99',
             discharged ? [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-99', outcome: 'dismissed' }), timestamp: new Date().toISOString() }] : []);
-          return { items: [item] };
+          return { items: withFreshDigests([item]) };
         },
         async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 2 }; }
       },
@@ -4935,7 +4985,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { reads++; return { items: [decisionItem(`loop-${reads}`, 'LIN-99', `d-${reads}`)] }; }
+        async listHistory() { reads++; return { items: withFreshDigests([decisionItem(`loop-${reads}`, 'LIN-99', `d-${reads}`)]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),

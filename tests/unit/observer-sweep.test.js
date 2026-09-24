@@ -64,6 +64,7 @@ import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';
 import { isDecisionAnswered } from '../../lib/unanswered-decisions.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
+import { digestFeedback } from '../../lib/digest-feedback.js';
 
 const { _buildLoops } = __internal;
 
@@ -75,7 +76,7 @@ const STALE_MS = DEFAULT_LANE_STALE_MS;
 let idCounter = 0;
 
 function historyItem(overrides = {}) {
-  return {
+  const item = {
     id: `hist-${idCounter++}`,
     promptName: 'implementation',
     prompt: 'implementation prompt text',
@@ -94,6 +95,20 @@ function historyItem(overrides = {}) {
     feedback: [],
     ...overrides
   };
+  // LIN-3011: this whole file drives `_buildLoops` directly with `lean: true`
+  // (bypassing `_fetchWorkspaceData`/self-heal), so the lean derivation needs
+  // a matching digest — computed relative to this file's fixed `NOW_MS`
+  // clock (not real execution time), since several tests deliberately place
+  // fixture timestamps hours/days from `NOW` to probe retention/staleness.
+  // Skipped when the caller explicitly controls `feedbackVersion`/
+  // `feedbackDigest` itself.
+  if (!('feedbackDigest' in overrides) && !('feedbackVersion' in overrides)) {
+    const digest = digestFeedback({ feedback: item.feedback, dispatchedAt: item.dispatchedAt }, { now: NOW_MS });
+    digest.version = 0;
+    item.feedbackVersion = 0;
+    item.feedbackDigest = digest;
+  }
+  return item;
 }
 
 function liveItem(overrides = {}) {
@@ -538,9 +553,18 @@ describe('observer-sweep: payload contract (LIN-2131)', () => {
     // Control for the DELTA: before the answer stamp exists, the same row is
     // blocked and IS in attentionKeysFull. A payload assertion alone would be
     // satisfiable by the row simply never having been attention-eligible.
+    //
+    // LIN-3011: rebuilt via `historyItem(...)` (not a raw `{...answered}`
+    // spread) so the auto-attached digest is recomputed from the TRIMMED
+    // feedback — a spread would keep `answered`'s ORIGINAL digest, which
+    // was computed from feedback that INCLUDES the answer, silently
+    // contradicting the "not yet answered" fixture this control needs.
     const preAnswer = _buildLoops({
       historyItems: [
-        { ...answered, feedback: answered.feedback.filter((e) => e.kind !== 'decision-answer') },
+        historyItem({
+          id: 'ans-blocked', issueIdentifier: 'LIN-441', dispatchedAt: '2026-04-11T11:55:00.000Z',
+          feedback: answered.feedback.filter((e) => e.kind !== 'decision-answer')
+        }),
         open
       ],
       now: NOW, lean: true
@@ -1151,13 +1175,69 @@ describe('observer-sweep: idempotency (real MangoDB tmpdir, LIN-2131 / LIN-2128 
 // ─── D. Negative capability ────────────────────────────────────────────────
 
 describe('observer-sweep: negative capability — no automated-intervention path is reachable (hard invariant; LIN-2128 ledger item B)', () => {
-  function forbiddenProxy(target, allowedMethods, label) {
+  // LIN-2128 ledger item B ("MangoDB's residual double-fire — this sweep's
+  // strict idempotency IS the safety net", comment `c42aa096` on LIN-2131)
+  // is a claim about WRITES, not reads: on the file-backed MangoDB backend
+  // cross-process exclusivity is absent, so this sweep's own effects must be
+  // safe under an interleaved duplicate tick — and the item names "outward-
+  // facing effect" and "automated intervention" as "nearly the same
+  // predicate", routing the detector for BOTH into this same negative test.
+  //
+  // LIN-3011's self-heal write-back (`historyCollection.updateOne`, guarded
+  // `$set` of `feedbackDigest` only, keyed on the row's own `feedbackVersion`)
+  // is NEITHER: it is strictly idempotent by construction — the guard means a
+  // duplicate/interleaved tick either writes the SAME derived value again or
+  // loses the race harmlessly, never diverges — and it never feeds the
+  // dispatch pipeline's own decisions (resume/kill/status/abort read nothing
+  // from `feedbackDigest`; it is a derived READ-side cache field only). So
+  // this describe block's OWN historyCollection Proxy allows `updateOne`
+  // (previously blocked-and-silently-swallowed by self-heal's own try/catch,
+  // which hid the real write from this test rather than proving it safe) —
+  // and each test below asserts every recorded write is EXACTLY that shape:
+  // a guarded `$set` of `feedbackDigest` alone, nothing else, no other
+  // collection.
+  function assertOnlyFeedbackDigestWrites(writeLog) {
+    for (const { query, update } of writeLog) {
+      assert.deepStrictEqual(Object.keys(update), ['$set'], 'every self-heal write-back is a $set, never $inc/$push/anything else');
+      assert.deepStrictEqual(Object.keys(update.$set), ['feedbackDigest'], 'the $set touches ONLY feedbackDigest — never terminal/status/abort/sessionId or any dispatch-pipeline field');
+      assert.deepStrictEqual(Object.keys(query).sort(), ['_id', 'feedbackVersion'], 'the write is guarded on {_id, feedbackVersion} — a stale-witness concurrent write loses harmlessly, never diverging');
+    }
+  }
+
+  function forbiddenProxy(target, allowedMethods, label, writeLog = null) {
     return new Proxy(target, {
       get(obj, prop, receiver) {
         if (typeof prop === 'symbol' || prop === 'then') return Reflect.get(obj, prop, receiver);
         if (allowedMethods.includes(prop)) {
           const value = Reflect.get(obj, prop, receiver);
           return typeof value === 'function' ? value.bind(obj) : value;
+        }
+        // LIN-3011 (LIN-2996 Phase 3): the lean read's self-heal needs a
+        // re-read of `dispatchStore.historyCollection` (find) when a row's
+        // feedbackDigest is missing/stale, and a guarded write-back
+        // (updateOne) once healed — `_fetchWorkspaceData` reads/writes it
+        // directly (lib/pipeline-loops.js `_selfHealLeanHistory`), so it
+        // can't go through the `listHistory` allowlist entry above. Granted
+        // here as its OWN nested Proxy — narrower than an all-or-nothing
+        // property gate — with `updateOne` wrapped to record every call in
+        // `writeLog` for `assertOnlyFeedbackDigestWrites` above to verify,
+        // rather than silently delegating (per the ledger-item-B reasoning
+        // above, this write is deliberately NOT swallowed-and-hidden here).
+        if (prop === 'historyCollection') {
+          const raw = Reflect.get(obj, prop, receiver);
+          if (raw == null) return raw;
+          const nested = forbiddenProxy(raw, ['find', 'findOne', 'countDocuments'], `${label}.historyCollection`);
+          return new Proxy(nested, {
+            get(nObj, nProp, nReceiver) {
+              if (nProp === 'updateOne') {
+                return async (query, update, opts) => {
+                  if (writeLog) writeLog.push({ query, update });
+                  return raw.updateOne(query, update, opts);
+                };
+              }
+              return Reflect.get(nObj, nProp, nReceiver);
+            }
+          });
         }
         throw new Error(`forbidden intervention path: ${label}.${String(prop)}`);
       }
@@ -1215,7 +1295,8 @@ describe('observer-sweep: negative capability — no automated-intervention path
       status: (await agentStatusCollection.find({ urlKey }).toArray()).length
     };
 
-    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore');
+    const writeLog = [];
+    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore', writeLog);
     const agentStatusStore = forbiddenProxy(realAgentStatusStore, ['listStatus'], 'agentStatusStore');
     const observerStateStore = forbiddenProxy(realObserverStateStore, ['readCurrent', 'ensureSeeded', 'advance'], 'observerStateStore');
 
@@ -1242,6 +1323,14 @@ describe('observer-sweep: negative capability — no automated-intervention path
       status: (await agentStatusCollection.find({ urlKey }).toArray()).length
     };
     assert.deepStrictEqual(countsAfter, countsBefore, 'no dispatch write and no agent-status write occurred during the guarded sweep');
+
+    // LIN-3011 / LIN-2128 ledger item B: self-heal DID write back (both
+    // fixture rows are legacy — `_archiveItem` seeds `feedbackDigest: null`
+    // — so the first tick's lean read heals both), and this asserts the
+    // write is EXACTLY the safe, idempotent shape ledger item B requires,
+    // not merely that it happened.
+    assert.ok(writeLog.length > 0, 'sanity: self-heal actually wrote back at least once (both rows start with no digest)');
+    assertOnlyFeedbackDigestWrites(writeLog);
   });
 
   test('LIN-2132: sweepOneWorkspace, given deps.observerShadowLogStore, writes ONLY to that store — dispatch/agent-status stay untouched, and the logged entry matches the real wake-marker vocabulary', async () => {
@@ -1271,7 +1360,8 @@ describe('observer-sweep: negative capability — no automated-intervention path
       status: (await agentStatusCollection.find({ urlKey }).toArray()).length
     };
 
-    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore');
+    const writeLog = [];
+    const dispatchStore = forbiddenProxy(realDispatchStore, ['listItems', 'listHistory'], 'dispatchStore', writeLog);
     const agentStatusStore = forbiddenProxy(realAgentStatusStore, ['listStatus'], 'agentStatusStore');
     const observerStateStore = forbiddenProxy(realObserverStateStore, ['readCurrent', 'ensureSeeded', 'advance'], 'observerStateStore');
     // Unlike the three stores above, recordActions IS an allowed call here —
@@ -1283,6 +1373,13 @@ describe('observer-sweep: negative capability — no automated-intervention path
     await sweepOneWorkspace(urlKey, { dispatchStore, agentStatusStore, observerStateStore, observerShadowLogStore, now });
     assert.strictEqual(net.attempts.length, 0, 'this tier makes no /api/proxy call and no model call');
     net.restore();
+
+    // LIN-3011 / LIN-2128 ledger item B: unlike the sibling test above, this
+    // row's digest is ALREADY fresh — `addFeedback` (the real Phase 1 write
+    // path) kept it current — so self-heal needs no re-read and issues no
+    // write-back at all. Zero writes is the OTHER half of "safe under
+    // duplicate ticks": nothing to converge because there was nothing stale.
+    assert.deepStrictEqual(writeLog, [], 'the row was already fresh — self-heal must not write back when there is nothing to heal');
 
     const countsAfter = {
       queue: (await dispatchQueueCollection.find({ urlKey }).toArray()).length,

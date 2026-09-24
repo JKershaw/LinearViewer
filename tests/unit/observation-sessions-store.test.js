@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { ObservationSessionsStore, BUILDER_VERSION } from '../../lib/observation-sessions-store.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
+import { digestFeedback } from '../../lib/digest-feedback.js';
 
 const URL_KEY = 'acme';
 
@@ -92,9 +93,9 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The pin tracks the CURRENT version (LIN-2403 moved it 10 → 11); a lingering v3
+  // The pin tracks the CURRENT version (LIN-3011 moved it 11 → 12); a lingering v3
   // archive doc from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 11, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 12, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
@@ -252,6 +253,13 @@ function decisionBearingSession(sessionId) {
       { kind: 'status', message: '[blocked] awaiting a ruling', timestamp: '2026-04-10T10:31:01.000Z' }
     ]
   };
+  // LIN-3011: the lean build now derives from `feedbackDigest`, never raw
+  // `feedback` — attach one consistent with this fixture's own feedback so
+  // the round trip below still exercises real decision/decisionCase
+  // derivation instead of reading nothing.
+  historyItem.feedbackVersion = 0;
+  historyItem.feedbackDigest = digestFeedback(historyItem, { now: ROUNDTRIP_NOW.getTime() });
+  historyItem.feedbackDigest.version = 0;
   // `lean: true` is the shape the materializer actually persists — the one whose
   // dropped `feedback[]` makes a lazily-derived field unrecoverable downstream.
   const loops = _buildLoops({ historyItems: [historyItem], now: ROUNDTRIP_NOW, lean: true });
@@ -310,4 +318,25 @@ test('a v8 doc (pre-LIN-2182) read-misses on both list and point reads so it reb
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v8 doc');
   assert.equal(await store.getSession(URL_KEY, 'S-decision'), null, 'point read misses the v8 doc → route reconstructs');
+});
+
+// LIN-3011 (LIN-2996 Phase 3): the v11 -> v12 bump exists because the lean
+// loop's terminal/wake/decision/decisionCase/answeredDecisionId/parkedWait/
+// telemetry/toolPeak now derive from a self-healed `feedbackDigest` instead of
+// a raw-feedback re-scan — a v11 doc was built the old way, so without the
+// bump it would keep serving pre-digest-backed values for up to
+// DEFAULT_HISTORY_TTL (30 days). Pinning the v11 doc as the target set is what
+// makes this bump load-bearing rather than cosmetic.
+test('BUILDER_VERSION is 12 (LIN-3011), and a v11 doc (pre-digest-backed loops) read-misses on both list and point reads', async () => {
+  assert.equal(BUILDER_VERSION, 12, 'LIN-3011 bumps 11 -> 12 for digest-backed lean loop derivation');
+
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 11;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v11 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v11 doc -> route reconstructs');
 });
