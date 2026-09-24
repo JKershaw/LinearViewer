@@ -20,6 +20,8 @@ import {
   harnessOf, usageOf, evidenceCountOf, ticketMarkerEntriesOf, loadDispatchHistory, groupDispatchLineages
 } from '../../lib/kpi-stats.js';
 import { computeTerminalMarkedTaskCost } from '../../lib/terminal-marked-task-cost.js';
+import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
+import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
 // find({}).toArray() and countDocuments({} | simple equality filter).
@@ -874,6 +876,150 @@ describe('loadDispatchHistory — aggregation failure propagates, never falls ba
     };
     await assert.rejects(() => loadDispatchHistory(collection), /boom/);
     assert.strictEqual(findCalls, 0, 'find({}) must never be called after an aggregation failure');
+  });
+});
+
+// LIN-3012 (LIN-2996 Phase 4, beat 2 — TDD, written and run against the
+// UNFIXED code first; see the beat-2 report for the captured failure).
+// Structural witness: MangoDB (the shared createMockCollection() has no
+// aggregate() at all, so it can never exercise this) can't reproduce the
+// missing-vs-null distinction FRESH_DIGEST depends on, so this asserts the
+// LITERAL shape of the $project stage's $cond/FRESH_DIGEST operands instead
+// of running the pipeline against a real engine (that's the real-mongod
+// witness in tests/unit/mongo-smoke.test.js). Uses a local one-off stub
+// collection — per the same constraint the LIN-3002 tests above follow, do
+// NOT add aggregate() to the shared createMockCollection() helper.
+describe('loadDispatchHistory — FRESH_DIGEST $cond structural witness (LIN-3012, LIN-2996 Phase 4)', () => {
+  // FRESH_DIGEST (V1), copied verbatim from the approved plan / ticket text —
+  // normalizes both sides so "missing" and "null" can never compare equal.
+  const FRESH_DIGEST = {
+    $and: [
+      { $eq: [{ $type: '$feedbackDigest' }, 'object'] },
+      { $eq: [{ $ifNull: ['$feedbackDigest.version', -1] }, { $ifNull: ['$feedbackVersion', 0] }] }
+    ]
+  };
+
+  // Today's exact per-field expressions (kpi-stats.js:308-409) — the required
+  // ELSE branch once each field is wrapped in $cond. Reuses the SAME shared
+  // regex sources the production pipeline does, never a retyped copy.
+  const todaysTerminalEntry = {
+    $last: {
+      $filter: {
+        input: {
+          $map: {
+            input: { $ifNull: ['$feedback', []] },
+            as: 'f',
+            in: { message: '$$f.message', timestamp: '$$f.timestamp' }
+          }
+        },
+        as: 'entry',
+        cond: {
+          $regexMatch: {
+            input: { $ifNull: ['$$entry.message', ''] },
+            regex: TERMINAL_INTERNAL.TERMINAL_FEEDBACK_REGEX.source,
+            options: 'i'
+          }
+        }
+      }
+    }
+  };
+  const todaysUsageEntry = {
+    $last: {
+      $filter: {
+        input: {
+          $map: {
+            input: { $ifNull: ['$feedback', []] },
+            as: 'f',
+            in: { message: '$$f.message', timestamp: '$$f.timestamp', kind: '$$f.kind' }
+          }
+        },
+        as: 'entry',
+        cond: { $eq: ['$$entry.kind', 'usage'] }
+      }
+    }
+  };
+  const todaysEvidenceCount = {
+    $size: {
+      $filter: {
+        input: {
+          $map: {
+            input: { $ifNull: ['$feedback', []] },
+            as: 'f',
+            in: { message: '$$f.message', timestamp: '$$f.timestamp', kind: '$$f.kind' }
+          }
+        },
+        as: 'entry',
+        cond: { $eq: ['$$entry.kind', 'evidence'] }
+      }
+    }
+  };
+  const todaysTicketMarkerEntries = {
+    $filter: {
+      input: {
+        $map: {
+          input: { $ifNull: ['$feedback', []] },
+          as: 'f',
+          in: { message: '$$f.message', timestamp: '$$f.timestamp' }
+        }
+      },
+      as: 'entry',
+      cond: {
+        $regexMatch: {
+          input: { $ifNull: ['$$entry.message', ''] },
+          regex: SESSION_TELEMETRY_INTERNAL.TICKET_PREFIX.source,
+          options: 'i'
+        }
+      }
+    }
+  };
+  const todaysFeedbackCount = { $size: { $ifNull: ['$feedback', []] } };
+
+  function capturePipelineStub() {
+    let capturedPipeline = null;
+    const collection = {
+      aggregate(pipeline) {
+        capturedPipeline = pipeline;
+        return { toArray: async () => [] };
+      },
+      find() { throw new Error('find() must not be called when aggregate() is available'); }
+    };
+    return { collection, getPipeline: () => capturedPipeline };
+  }
+
+  test('the $project stage wraps each digest-backed field in $cond(FRESH_DIGEST, digest.kpi*, today\'s expression)', async () => {
+    const { collection, getPipeline } = capturePipelineStub();
+    await loadDispatchHistory(collection);
+
+    const pipeline = getPipeline();
+    assert.ok(Array.isArray(pipeline) && pipeline.length >= 1, 'loadDispatchHistory must call aggregate() with a pipeline');
+    const project = pipeline.find(stage => stage && stage.$project)?.$project;
+    assert.ok(project, 'the pipeline must include a $project stage');
+
+    assert.deepStrictEqual(
+      project.feedbackCount,
+      { $cond: [FRESH_DIGEST, '$feedbackDigest.count', todaysFeedbackCount] },
+      'feedbackCount must read feedbackDigest.count when fresh, else today\'s $size expression'
+    );
+    assert.deepStrictEqual(
+      project.terminalEntry,
+      { $cond: [FRESH_DIGEST, '$feedbackDigest.kpiTerminalEntry', todaysTerminalEntry] },
+      'terminalEntry must read feedbackDigest.kpiTerminalEntry when fresh, else today\'s exact expression'
+    );
+    assert.deepStrictEqual(
+      project.usageEntry,
+      { $cond: [FRESH_DIGEST, '$feedbackDigest.kpiUsageEntry', todaysUsageEntry] },
+      'usageEntry must read feedbackDigest.kpiUsageEntry when fresh, else today\'s exact expression'
+    );
+    assert.deepStrictEqual(
+      project.evidenceCount,
+      { $cond: [FRESH_DIGEST, '$feedbackDigest.kpiEvidenceCount', todaysEvidenceCount] },
+      'evidenceCount must read feedbackDigest.kpiEvidenceCount when fresh, else today\'s exact expression'
+    );
+    assert.deepStrictEqual(
+      project.ticketMarkerEntries,
+      { $cond: [FRESH_DIGEST, '$feedbackDigest.kpiTicketMarkerEntries', todaysTicketMarkerEntries] },
+      'ticketMarkerEntries must read feedbackDigest.kpiTicketMarkerEntries when fresh, else today\'s exact expression'
+    );
   });
 });
 

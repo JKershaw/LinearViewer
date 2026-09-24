@@ -22,6 +22,9 @@ import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
+import { loadDispatchHistory } from '../../lib/kpi-stats.js';
+import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
+import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';
 import { WorkspaceStore } from '../../lib/workspace-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountStore } from '../../lib/account-store.js';
@@ -1113,6 +1116,296 @@ describe(
       const current = await store.readCurrent(key);
       assert.strictEqual(current.rev, 2, 'rev must land at expectedRev + 1, never expectedRev + N, under real concurrent writers');
       assert.strictEqual(current.ledger.length, 1);
+    });
+
+    // -----------------------------------------------------------------------
+    // LIN-3012 (LIN-2996 Phase 4): loadDispatchHistory digest-read witnesses.
+    // Beat 2 (TDD): written and run against the UNFIXED loadDispatchHistory
+    // first. The fresh-row assertions below are expected to FAIL today —
+    // current code always recomputes from raw feedback and never looks at
+    // feedbackDigest. The legacy/seeded-empty/stale/digest-without-version/
+    // null-normalization rows are expected to PASS already, since for those
+    // rows the (eventual) FRESH_DIGEST fallback must reproduce exactly what
+    // today's un-digest-aware code already does. See the beat-2 report for
+    // the captured pre-fix run.
+    //
+    // `legacyHistoryProject()` is a standalone copy of kpi-stats.js's CURRENT
+    // (pre-Phase-4) `$project` stage (`loadDispatchHistory`, :308-409), run
+    // for real against this real mongod to compute "what today's expression
+    // yields" independently of the function under test, rather than
+    // hand-copying expected values. It reuses the exact same shared regex
+    // sources kpi-stats.js's own pipeline does (TERMINAL_FEEDBACK_REGEX,
+    // TICKET_PREFIX), so it can never silently drift into testing a
+    // different terminal/ticket-marker definition than production uses.
+    // -----------------------------------------------------------------------
+    function legacyHistoryProject() {
+      return {
+        feedbackCount: { $size: { $ifNull: ['$feedback', []] } },
+        terminalEntry: {
+          $last: {
+            $filter: {
+              input: {
+                $map: {
+                  input: { $ifNull: ['$feedback', []] },
+                  as: 'f',
+                  in: { message: '$$f.message', timestamp: '$$f.timestamp' }
+                }
+              },
+              as: 'entry',
+              cond: {
+                $regexMatch: {
+                  input: { $ifNull: ['$$entry.message', ''] },
+                  regex: TERMINAL_INTERNAL.TERMINAL_FEEDBACK_REGEX.source,
+                  options: 'i'
+                }
+              }
+            }
+          }
+        },
+        usageEntry: {
+          $last: {
+            $filter: {
+              input: {
+                $map: {
+                  input: { $ifNull: ['$feedback', []] },
+                  as: 'f',
+                  in: { message: '$$f.message', timestamp: '$$f.timestamp', kind: '$$f.kind' }
+                }
+              },
+              as: 'entry',
+              cond: { $eq: ['$$entry.kind', 'usage'] }
+            }
+          }
+        },
+        evidenceCount: {
+          $size: {
+            $filter: {
+              input: {
+                $map: {
+                  input: { $ifNull: ['$feedback', []] },
+                  as: 'f',
+                  in: { message: '$$f.message', timestamp: '$$f.timestamp', kind: '$$f.kind' }
+                }
+              },
+              as: 'entry',
+              cond: { $eq: ['$$entry.kind', 'evidence'] }
+            }
+          }
+        },
+        ticketMarkerEntries: {
+          $filter: {
+            input: {
+              $map: {
+                input: { $ifNull: ['$feedback', []] },
+                as: 'f',
+                in: { message: '$$f.message', timestamp: '$$f.timestamp' }
+              }
+            },
+            as: 'entry',
+            cond: {
+              $regexMatch: {
+                input: { $ifNull: ['$$entry.message', ''] },
+                regex: SESSION_TELEMETRY_INTERNAL.TICKET_PREFIX.source,
+                options: 'i'
+              }
+            }
+          }
+        }
+      };
+    }
+
+    async function expectedTodayOutput(collection, id) {
+      const [row] = await collection.aggregate([
+        { $match: { _id: id } },
+        { $project: legacyHistoryProject() }
+      ]).toArray();
+      return row;
+    }
+
+    function feedbackEntry(kind, message, timestamp) {
+      return { kind, message, timestamp };
+    }
+
+    describe('loadDispatchHistory digest read (LIN-3012, LIN-2996 Phase 4)', () => {
+      test('fresh row: digest kpi* values are read verbatim, even though they deliberately differ from raw feedback', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('assistant-text', 'working', new Date('2026-06-01T10:00:00.000Z')),
+          feedbackEntry('usage', '[usage] {"costUsd":1}', new Date('2026-06-01T10:01:00.000Z')),
+          feedbackEntry('done', '[done] finished', new Date('2026-06-01T10:02:00.000Z'))
+        ];
+        // Deliberately different from what deriving over rawFeedback above
+        // would produce, so a passing assertion below can only mean the
+        // digest branch was actually read, not coincidentally re-derived.
+        const digestTerminal = { message: '[done] DIGEST-SAYS-THIS-ONE', timestamp: new Date('2026-06-01T11:00:00.000Z') };
+        const digestUsage = { message: '[usage] {"costUsd":999}', timestamp: new Date('2026-06-01T11:01:00.000Z'), kind: 'usage' };
+        const digestTicketMarkers = [{ message: '[ticket] LIN-9999 started', timestamp: new Date('2026-06-01T11:02:00.000Z') }];
+
+        await collection.insertOne({
+          _id: id,
+          feedback: rawFeedback,
+          feedbackVersion: 4,
+          feedbackDigest: {
+            version: 4,
+            count: 42,
+            kpiTerminalEntry: digestTerminal,
+            kpiUsageEntry: digestUsage,
+            kpiEvidenceCount: 7,
+            kpiTicketMarkerEntries: digestTicketMarkers
+          }
+        });
+
+        const [actual] = await loadDispatchHistory(collection);
+        assert.strictEqual(actual._id, id);
+        assert.deepStrictEqual(actual.terminalEntry, digestTerminal, 'fresh row must read feedbackDigest.kpiTerminalEntry, not re-derive from feedback');
+        assert.deepStrictEqual(actual.usageEntry, digestUsage, 'fresh row must read feedbackDigest.kpiUsageEntry');
+        assert.strictEqual(actual.evidenceCount, 7, 'fresh row must read feedbackDigest.kpiEvidenceCount');
+        assert.deepStrictEqual(actual.ticketMarkerEntries, digestTicketMarkers, 'fresh row must read feedbackDigest.kpiTicketMarkerEntries');
+        assert.strictEqual(actual.feedbackCount, 42, 'fresh row must read feedbackDigest.count');
+        assert.ok(actual.terminalEntry.timestamp instanceof Date, 'digest-sourced timestamps must stay raw Date, never coerced to string');
+      });
+
+      test('legacy row (no feedbackVersion/feedbackDigest at all) falls back to exactly today\'s expression', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('assistant-text', 'working', new Date('2026-06-02T10:00:00.000Z')),
+          feedbackEntry('usage', '[usage] {"costUsd":1}', new Date('2026-06-02T10:01:00.000Z')),
+          feedbackEntry('evidence', 'proof A', new Date('2026-06-02T10:02:00.000Z')),
+          feedbackEntry('custom', '[ticket] LIN-1 started', new Date('2026-06-02T10:03:00.000Z')),
+          feedbackEntry('failed', '[failed] boom', new Date('2026-06-02T10:04:00.000Z'))
+        ];
+        await collection.insertOne({ _id: id, feedback: rawFeedback });
+
+        const expected = await expectedTodayOutput(collection, id);
+        const [actual] = await loadDispatchHistory(collection);
+        assert.strictEqual(actual._id, id);
+        assert.deepStrictEqual(actual.terminalEntry, expected.terminalEntry);
+        assert.deepStrictEqual(actual.usageEntry, expected.usageEntry);
+        assert.strictEqual(actual.evidenceCount, expected.evidenceCount);
+        assert.deepStrictEqual(actual.ticketMarkerEntries, expected.ticketMarkerEntries);
+        assert.strictEqual(actual.feedbackCount, expected.feedbackCount);
+      });
+
+      test('seeded-empty row (feedbackVersion: 0, feedbackDigest: null) falls back to today\'s expression', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('done', '[done] ok', new Date('2026-06-03T10:00:00.000Z'))
+        ];
+        await collection.insertOne({ _id: id, feedback: rawFeedback, feedbackVersion: 0, feedbackDigest: null });
+
+        const expected = await expectedTodayOutput(collection, id);
+        const [actual] = await loadDispatchHistory(collection);
+        assert.deepStrictEqual(actual.terminalEntry, expected.terminalEntry);
+        assert.strictEqual(actual.feedbackCount, expected.feedbackCount);
+      });
+
+      test('stale row (feedbackDigest.version !== feedbackVersion) falls back to today\'s expression, not the stale digest', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('done', '[done] real answer', new Date('2026-06-04T10:00:00.000Z'))
+        ];
+        const staleTerminal = { message: '[done] STALE-SHOULD-NOT-APPEAR', timestamp: new Date('2026-06-04T09:00:00.000Z') };
+        await collection.insertOne({
+          _id: id,
+          feedback: rawFeedback,
+          feedbackVersion: 5,
+          feedbackDigest: {
+            version: 3,
+            count: 999,
+            kpiTerminalEntry: staleTerminal,
+            kpiUsageEntry: null,
+            kpiEvidenceCount: 999,
+            kpiTicketMarkerEntries: []
+          }
+        });
+
+        const expected = await expectedTodayOutput(collection, id);
+        const [actual] = await loadDispatchHistory(collection);
+        assert.deepStrictEqual(actual.terminalEntry, expected.terminalEntry);
+        assert.notDeepStrictEqual(actual.terminalEntry, staleTerminal);
+        assert.strictEqual(actual.feedbackCount, expected.feedbackCount);
+      });
+
+      test('digest-without-version row (feedbackDigest present but missing .version) falls back to today\'s expression', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('done', '[done] answer', new Date('2026-06-05T10:00:00.000Z'))
+        ];
+        await collection.insertOne({
+          _id: id,
+          feedback: rawFeedback,
+          feedbackVersion: 2,
+          feedbackDigest: {
+            // no `version` key at all — a hand-inserted or historical row.
+            count: 999,
+            kpiTerminalEntry: { message: '[done] SHOULD-NOT-APPEAR', timestamp: new Date('2026-06-05T09:00:00.000Z') },
+            kpiUsageEntry: null,
+            kpiEvidenceCount: 999,
+            kpiTicketMarkerEntries: []
+          }
+        });
+
+        const expected = await expectedTodayOutput(collection, id);
+        const [actual] = await loadDispatchHistory(collection);
+        assert.deepStrictEqual(actual.terminalEntry, expected.terminalEntry);
+        assert.strictEqual(actual.feedbackCount, expected.feedbackCount);
+      });
+
+      test('N4 missing-vs-null: feedbackDigest.version explicitly null + feedbackVersion MISSING must not compare fresh', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('done', '[done] answer', new Date('2026-06-06T10:00:00.000Z'))
+        ];
+        await collection.insertOne({
+          _id: id,
+          feedback: rawFeedback,
+          // feedbackVersion intentionally OMITTED entirely (normalizes to 0
+          // via $ifNull, same as if it were explicitly null).
+          feedbackDigest: {
+            version: null, // present, explicitly null -> normalizes to -1, NOT 0
+            count: 999,
+            kpiTerminalEntry: { message: '[done] SHOULD-NOT-APPEAR', timestamp: new Date('2026-06-06T09:00:00.000Z') },
+            kpiUsageEntry: null,
+            kpiEvidenceCount: 999,
+            kpiTicketMarkerEntries: []
+          }
+        });
+
+        const expected = await expectedTodayOutput(collection, id);
+        const [actual] = await loadDispatchHistory(collection);
+        assert.deepStrictEqual(actual.terminalEntry, expected.terminalEntry, '-1 (null digest.version) vs 0 (missing feedbackVersion) must never compare fresh');
+      });
+
+      test('N4 missing-vs-null: feedbackVersion explicitly null normalizes the SAME as missing (0), so digest.version:0 IS fresh', async () => {
+        const collection = freshCollection('lin3012-history');
+        const id = randomUUID();
+        const rawFeedback = [
+          feedbackEntry('done', '[done] real (should not appear, digest wins)', new Date('2026-06-07T10:00:00.000Z'))
+        ];
+        const digestTerminal = { message: '[done] DIGEST-WINS-HERE', timestamp: new Date('2026-06-07T11:00:00.000Z') };
+        await collection.insertOne({
+          _id: id,
+          feedback: rawFeedback,
+          feedbackVersion: null, // present, explicitly null -> $ifNull normalizes to 0, same as missing
+          feedbackDigest: {
+            version: 0,
+            count: 1,
+            kpiTerminalEntry: digestTerminal,
+            kpiUsageEntry: null,
+            kpiEvidenceCount: 0,
+            kpiTicketMarkerEntries: []
+          }
+        });
+
+        const [actual] = await loadDispatchHistory(collection);
+        assert.deepStrictEqual(actual.terminalEntry, digestTerminal, 'a null feedbackVersion must normalize like a missing one (both -> 0), matching digest.version:0 as fresh');
+      });
     });
   }
 );
