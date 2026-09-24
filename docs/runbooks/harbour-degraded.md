@@ -40,14 +40,23 @@ mechanically** — there is no code-level guard preventing a write command.
   restricted to: `db.currentOp({active:true, secs_running:{$gt:5}})`,
   `db.serverStatus()` (connections, globalLock, WiredTiger cache, opcounters), and
   `db.stats()`. Never print the connection string — pass it through the environment.
+- A read-only `find`/`explain("executionStats")` on the slow view's own query, to compare
+  server execution time against payload bytes — this is what actually discriminated the
+  2026-09-22 incident: the feed's history read (`dispatch-history`, filtered by `urlKey`
+  and a 30-day `dispatchedAt` window, `prompt` excluded) executed in 29 ms on the server
+  but returned a 32 MB payload (LIN-2993 comment `8b2bcfa4`). **Caveat:** pulling the
+  payload itself adds load over an already-degraded link, so prefer `explain` over
+  fetching the full result where the discrimination doesn't require it.
 
   **This `mongosh`-via-`railway run` allowance is a deliberate, bounded relaxation.**
   The original investigator dispatch (`10022ce7`) forbade `railway run` against
   production outright. The con's own follow-up (`3fc09da4`, citing `1df2ffb0`) asked for
-  exactly this read-only invocation, and the investigator ran it successfully — no
-  writes, no `killOp`, no index builds (LIN-2993 comments `1df2ffb0`, `243ce77e`,
-  `8b2bcfa4`). The relaxation is bounded to those specific reads; it does not extend to
-  any other `railway run` use.
+  the `currentOp`/`serverStatus`/`db.stats()` reads above, and the investigator ran them
+  successfully — no writes, no `killOp`, no index builds (LIN-2993 comments `1df2ffb0`,
+  `243ce77e`, `8b2bcfa4`). The investigator's own history-read `find` went one step
+  further than that request, and is included here because it's the read that actually
+  discriminated the cause. The relaxation is bounded to these specific reads; it does not
+  extend to any other `railway run` use.
 
 **Forbidden:** restart, redeploy, rollback, scale, variable changes, `railway variables`
 output, DB writes, index builds, `railway up`, any other `railway run` invocation,
