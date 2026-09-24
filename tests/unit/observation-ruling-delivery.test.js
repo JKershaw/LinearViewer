@@ -433,6 +433,39 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
     assert.doesNotMatch(feedback.textContent, /Recorded/, 'the answer was never durably recorded here — must not claim otherwise');
   });
 
+  // LIN-2933 close-out ledger L1 (review `b1ab28d5`): the gone+dispatch
+  // comment failure (:3497) is a second C1 site the implementation review
+  // found unpinned — mutation M8c (reverting this site to the old bare
+  // `'reply failed: ' + err.message`) survives the suite without this case.
+  test('LIN-2933 L1: a LINEAR_AUTH comment failure at the gone+dispatch site shows the named cause and restores the row (M8c witness)', async () => {
+    const authErr = Object.assign(new Error('Failed to create comment'), {
+      code: 'LINEAR_AUTH',
+      detail: 'Linear rejected the request as unauthenticated.'
+    });
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => { throw authErr; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
+    });
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
+    const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-gone-linear-auth');
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-gone-linear-auth' } }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(dispatchCalls, 0, 'a failed comment write must never attempt the dispatch');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'Linear rejected the request as unauthenticated. Sign in again and press once more.');
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
+    const buttons = li.querySelectorAll('.chat-option-btn');
+    buttons.forEach((b) => assert.equal(b.disabled, false, 'restore() must re-enable controls on a LINEAR_AUTH failure'));
+    assert.ok(!rulingsPending.has(key), 'restore() must release the pending guard');
+  });
+
   test('G1: an anchor with an issueIdentifier but no raw issueId is answerable — the identifier is used for both the comment write and the fresh dispatch', async () => {
     // This is the ORDINARY gone-ruling case in this codebase today: every
     // recommend-and-dispatch loop writes issueId: null (routes/proxy.js),
@@ -537,6 +570,39 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     assert.equal(dispatchCalls, 0, 'a record delivery must never dispatch');
     const feedback = li.querySelector('.obs-ruling-feedback');
     assert.match(feedback.textContent, /recorded ✓/);
+  });
+
+  // LIN-2933 close-out ledger L1 (review `b1ab28d5`): the gone+record
+  // comment failure (:3414) is the third C1 site the implementation review
+  // found unpinned — mutation M8b (reverting this site to the old bare
+  // `'reply failed: ' + err.message`) survives the suite without this case.
+  test('LIN-2933 L1: a LINEAR_AUTH comment failure at the gone+record site shows the named cause and restores the row (M8b witness)', async () => {
+    const authErr = Object.assign(new Error('Failed to create comment'), {
+      code: 'LINEAR_AUTH',
+      detail: 'Linear rejected the request as unauthenticated.'
+    });
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => { throw authErr; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
+    });
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
+    const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-record-linear-auth');
+
+    deliverRulingReply(makeRow({ decision: { decision_id: 'd-record-linear-auth' }, effect: 'record', alternate: null }), 'Approve', li);
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(dispatchCalls, 0, 'a record delivery must never dispatch');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'Linear rejected the request as unauthenticated. Sign in again and press once more.');
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
+    const buttons = li.querySelectorAll('.chat-option-btn');
+    buttons.forEach((b) => assert.equal(b.disabled, false, 'restore() must re-enable controls on a LINEAR_AUTH failure'));
+    assert.ok(!rulingsPending.has(key), 'restore() must release the pending guard');
   });
 
   test('record_on misrouting: an UNKNOWN record_on (matches nothing in the neighbourhood) targets the anchor, and the note renders', async () => {
@@ -903,6 +969,36 @@ describe('deliverRulingReply — resumable disposition (LIN-1728 review F1/F4)',
 
     assert.equal(capturedOpts.issueless, false);
     assert.equal(capturedOpts.issueId, 'real-issue-id');
+  });
+
+  // LIN-2933 close-out ledger L1 (review `b1ab28d5`): `onCommentFailed`
+  // (:3346) is one of the three C1 sites the implementation review found
+  // unpinned — mutation M8a (reverting this site to the old bare `'reply
+  // failed: ' + err.message`) survives the suite without this case. Rejects
+  // deliverReply's onCommentFailed with the exact LINEAR_AUTH shape the
+  // route's classifier produces and asserts the named cause plus action
+  // clause rulingReplyFailureMessage builds, and that restore() ran first
+  // (buttons re-enabled, rulingsPending released) — never a stuck row.
+  test('LIN-2933 L1: a LINEAR_AUTH onCommentFailed shows the named cause and restores the row (M8a witness)', async () => {
+    const authErr = Object.assign(new Error('Failed to create comment'), {
+      code: 'LINEAR_AUTH',
+      detail: 'Linear rejected the request as unauthenticated.'
+    });
+    const { module } = makeSandbox({
+      deliverReply: (opts, prompt, handlers) => { handlers.onCommentFailed(authErr); }
+    });
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
+    const li = makeLi();
+    const key = rulingKey('the-ruling-workspace', ANCHOR, 'd-resumable-1');
+
+    deliverRulingReply(makeResumableRow(), 'Approve', li);
+
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.equal(feedback.textContent, 'Linear rejected the request as unauthenticated. Sign in again and press once more.');
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
+    const buttons = li.querySelectorAll('.chat-option-btn');
+    buttons.forEach((b) => assert.equal(b.disabled, false, 'restore() must re-enable controls on a LINEAR_AUTH failure'));
+    assert.ok(!rulingsPending.has(key), 'restore() must release the pending guard');
   });
 });
 

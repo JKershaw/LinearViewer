@@ -158,6 +158,21 @@ function makeFlakyHarbourCommentsStore() {
   };
 }
 
+// A plain (never-fails) harbour-comments ledger spy — LIN-2933 L2, close-out
+// ledger item `b1ab28d5`: used to prove a RECOVERED retry still runs the
+// shared success tail's ledger write exactly once, carrying the retry's own
+// comment id (never the original, failed attempt's).
+function makeSpyHarbourCommentsStore() {
+  const calls = [];
+  return {
+    calls,
+    async record({ urlKey, commentId }) {
+      calls.push({ urlKey, commentId });
+      return { urlKey, commentId, recordedAt: new Date().toISOString() };
+    },
+  };
+}
+
 function buildApp({ provider, session, dispatchQueueStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, workspaceOverrides } = {}) {
   registerProvider(provider);
   const app = express();
@@ -861,6 +876,51 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — session-lane auth re
     assert.deepStrictEqual(calls.issueWriteGuard, [REJECTED_TOKEN, FRESH_TOKEN], 'guard runs on the original attempt and again on the retry');
     assert.deepStrictEqual(calls.createComment, [REJECTED_TOKEN, FRESH_TOKEN], 'create runs on the original attempt and again on the retry');
     assert.strictEqual(storeCalls.length, 1, 'exactly one durable point-read');
+  });
+
+  // LIN-2933 close-out ledger L2 (review `b1ab28d5`): a RECOVERED retry must
+  // run the SAME shared success tail (`finishCommentSuccess`) the original
+  // attempt would have — dedupe write, ledger record, and decision/task
+  // stamp — exactly once, keyed on the retry's own comment id. Mutation M10
+  // (the retry returning 201 directly, bypassing the tail) survives every
+  // other case in this file without this one.
+  test('(a2) L2: a recovered retry runs the shared success tail exactly once — ledger record (retry\'s comment id), one stamp, and dedupe on an identical re-press with no third createComment', async () => {
+    const { provider, calls } = makeCredentialKeyedProvider({ rejectedTokens: [REJECTED_TOKEN] });
+    const { store: ownerCredentialStore, calls: storeCalls } = makeFakeOwnerCredentialStore({
+      token: FRESH_TOKEN, tokenExpiresAt: Date.now() + 3600_000, provider: 'linear',
+    });
+    const { store: dispatchQueueStore, calls: stampCalls } = makeFakeDispatchQueueStore();
+    const harbourCommentsStore = makeSpyHarbourCommentsStore();
+    const app = buildApp({
+      provider, session: makeRecoverySession(), ownerCredentialStore,
+      dispatchQueueStore, harbourCommentsStore,
+      workspaceOverrides: { provider: 'linear', accessToken: REJECTED_TOKEN },
+    });
+    const payload = { body: 'LIN-2933 L2 recovered success tail', decisionLoopId: 'loop-l2', decisionId: 'd-l2' };
+
+    const first = await postComment(app, ISSUE_ID, payload);
+
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(first.body.success, true);
+    assert.deepStrictEqual(calls.createComment, [REJECTED_TOKEN, FRESH_TOKEN], 'the original attempt fails; the recovered retry is what actually creates the comment');
+    const retryCommentId = first.body.comment.id;
+
+    assert.strictEqual(harbourCommentsStore.calls.length, 1, 'exactly one ledger record for the recovered write');
+    assert.strictEqual(harbourCommentsStore.calls[0].commentId, retryCommentId, 'the ledger record must carry the RETRY\'s comment id, never a stale/absent original-attempt id');
+
+    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'exactly one decision stamp for the recovered write');
+    assert.deepStrictEqual(stampCalls.markDecisionAnswered[0], { itemId: 'loop-l2', urlKey: 'acme', decisionId: 'd-l2' });
+
+    // An identical resubmission must hit the dedupe cache the recovered
+    // retry just populated — 200/deduped:true, no third provider write, and
+    // no second recovery attempt (no second durable point-read either).
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true);
+    assert.strictEqual(second.body.comment.id, retryCommentId);
+    assert.strictEqual(calls.createComment.length, 2, 'the identical resubmission must not mint a third comment');
+    assert.strictEqual(storeCalls.length, 1, 'the dedupe hit must not attempt a second durable-credential read');
+    assert.strictEqual(stampCalls.markDecisionAnswered.length, 1, 'a deduped resubmission must not re-stamp — the recovered write already stamped it');
   });
 
   test('(b) the durable store holds the SAME dead credential → no recovery, classified 500, retryable:false', async () => {
