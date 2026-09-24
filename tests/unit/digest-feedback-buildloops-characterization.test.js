@@ -34,6 +34,10 @@
  *      keeps every derived fact identical" premise false by design. The
  *      fixture is updated so the test proves the CURRENT version of that
  *      same invariant: lean and non-lean stay identical, now via the digest.
+ *
+ * LIN-3022 (LIN-2991 Surface 2, §1) update: the golden loop now also carries
+ * `answeredDecisions` (the set-derived sibling of `answeredDecisionId`), so
+ * both this and the lean-derived variant below gained that field.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -124,6 +128,9 @@ const EXPECTED_GOLDEN_LOOP = {
   },
   decisionCase: ['Investigated the approach.', 'Found two viable options.'],
   answeredDecisionId: 'd-1',
+  answeredDecisions: [
+    { decisionId: 'd-1', raisedAt: at(32), resolvedAt: at(40), outcome: 'answered' }
+  ],
   source: 'history',
   historyStatus: 'done',
   bookkeeping: null,

@@ -1528,6 +1528,46 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
   });
 });
 
+describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2, F1)', () => {
+  test('a fresh legacy digest (no answeredDecisions key, scalar answeredDecisionId set) maps to the synthesized one-entry set', async () => {
+    const legacyDigest = {
+      version: 5,
+      terminal: null, wake: null, decision: { decision_id: 'x', question: 'ship?' }, decisionEntryIndex: 0, decisionCase: [],
+      answeredDecisionId: 'x',
+      // No `answeredDecisions` key at all — this is the pre-this-change shape.
+      parkedWait: null,
+      telemetry: { runtime: {}, metrics: [], toolPeak: null }
+    };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: legacyDigest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops.length, 1);
+    assert.deepStrictEqual(loops[0].answeredDecisions, [
+      { decisionId: 'x', raisedAt: null, resolvedAt: null, outcome: null }
+    ], 'a legacy digest with no answeredDecisions key must synthesize a one-entry set from the scalar answeredDecisionId');
+  });
+
+  test('a post-change digest with a genuine empty answeredDecisions set stays empty, side by side with the legacy case above', async () => {
+    const postChangeDigest = {
+      version: 5,
+      terminal: null, wake: null, decision: null, decisionEntryIndex: -1, decisionCase: [],
+      answeredDecisionId: null,
+      answeredDecisions: [],
+      parkedWait: null,
+      telemetry: { runtime: {}, metrics: [], toolPeak: null }
+    };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: postChangeDigest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.deepStrictEqual(loops[0].answeredDecisions, [],
+      'a post-change digest with a genuine empty set must stay empty, never fall back to the scalar (there is none here)');
+  });
+});
+
 describe("abort harvest sourced from the abort row's own feedbackDigest.terminal (LIN-3011)", () => {
   function abortRow(overrides = {}) {
     return leanDigestItem({
