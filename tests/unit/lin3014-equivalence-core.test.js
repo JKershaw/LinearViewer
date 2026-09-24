@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import {
   classifyRow,
+  comparisonKeyFor,
   compareLoops,
   compareSessionCounts,
   hasNonDecreasingTimestamps,
@@ -124,6 +125,26 @@ test('LIN-3014 selectSample: covers each named class when present, and reports w
   assert.strictEqual(coverage.lineageMember, true);
   assert.deepStrictEqual(missing, []);
   assert.strictEqual(sample.length, docs.length);
+});
+
+// LIN-3014 beat 3 production-run finding: an abort row is never its own
+// standalone loop (it only harvests onto its TARGET's loop via `abortTo`),
+// so looking it up by its own _id always misses on BOTH lean and non-lean —
+// a false "ROW DROPPED" that isn't a real equivalence failure. Found running
+// the actual tangle equivalence sample: both sampled abort rows reported
+// "lean=false baseline=false" (agreement, not divergence) yet were still
+// counted as failures.
+test('LIN-3014 comparisonKeyFor: an abort row resolves to its TARGET loop id (abortTo), not its own _id', () => {
+  assert.strictEqual(comparisonKeyFor({ _id: 'abort-row-1', abort: true, abortTo: 'target-loop-1' }), 'target-loop-1');
+});
+
+test('LIN-3014 comparisonKeyFor: an ordinary (non-abort) row resolves to its own _id', () => {
+  assert.strictEqual(comparisonKeyFor({ _id: 'loop-1', abort: false }), 'loop-1');
+  assert.strictEqual(comparisonKeyFor({ _id: 'loop-2' }), 'loop-2');
+});
+
+test('LIN-3014 comparisonKeyFor: abort:true with no abortTo falls back to its own _id rather than losing the row entirely', () => {
+  assert.strictEqual(comparisonKeyFor({ _id: 'malformed-abort', abort: true }), 'malformed-abort');
 });
 
 test('LIN-3014 selectSample: a class with no population is reported MISSING, not silently skipped', () => {

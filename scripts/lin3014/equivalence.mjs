@@ -27,7 +27,7 @@ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { getLoopsForWorkspace, getSessionsForWorkspace, __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
 import { buildSessionCounts } from '../../lib/sessions-view.js';
 import { assertSafeConnection, isLoopbackHost, loadCredential } from './lib/guard.mjs';
-import { classifyRow, compareLoops, compareSessionCounts, compareSessions, hasNonDecreasingTimestamps, selectSample } from './lib/equivalence-core.mjs';
+import { classifyRow, comparisonKeyFor, compareLoops, compareSessionCounts, compareSessions, hasNonDecreasingTimestamps, selectSample } from './lib/equivalence-core.mjs';
 
 /** listStatus/listItems are unused for archived rows — agent-status only matters for live loops, which this sample doesn't cover (documented bystander, research beat 2 L-G). */
 const EMPTY_AGENT_STATUS_STORE = { listStatus: async () => ({ items: [] }) };
@@ -96,15 +96,19 @@ async function main() {
         classes.legacyUnhealed && 'legacy',
         classes.healWritten && 'just-healed'
       ].filter(Boolean).join(',') || 'plain';
-      const lean = leanById.get(row._id);
-      const baseline = baselineById.get(row._id);
+      // An abort row is never its own loop (it only harvests onto its
+      // TARGET's loop via abortTo) — look the TARGET up for it, or the
+      // "ROW DROPPED" check below always fires on agreement, not divergence.
+      const compareId = comparisonKeyFor(row);
+      const lean = leanById.get(compareId);
+      const baseline = baselineById.get(compareId);
       if (!lean || !baseline) {
-        console.log(`ROW DROPPED _id=${row._id} [${tag}]: lean=${!!lean} baseline=${!!baseline}`);
+        console.log(`ROW DROPPED _id=${row._id} [${tag}] (compared as ${compareId}): lean=${!!lean} baseline=${!!baseline}`);
         failures++;
         continue;
       }
       const result = compareLoops(lean, baseline);
-      console.log(`_id=${row._id} [${tag}] deepStrictEqual(lean minus exemptions, baseline minus exemptions): ${result.equal ? 'PASSED' : 'FAILED'}`);
+      console.log(`_id=${row._id} [${tag}] (compared as ${compareId}) deepStrictEqual(lean minus exemptions, baseline minus exemptions): ${result.equal ? 'PASSED' : 'FAILED'}`);
       if (!result.equal) {
         console.log(`  ${result.message}`);
         failures++;

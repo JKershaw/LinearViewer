@@ -136,6 +136,23 @@ export function classifyRow(doc) {
 }
 
 /**
+ * An abort row is never its own standalone loop — it carries no prompt and
+ * exists only to harvest its `[aborted]` entry onto the TARGET loop named by
+ * `abortTo` (`_harvestAbortedTargetsFromDigests`/`harvestAbortedTargets`).
+ * Looking a sampled abort row up by its OWN `_id` in a loop-by-loopId map
+ * always misses — on BOTH the lean and non-lean side equally, so that's not
+ * a lean/non-lean divergence, just the wrong key. The abort-harvest
+ * equivalence case is what the TARGET loop looks like with the abort
+ * applied, so compare THAT loop's id instead.
+ *
+ * @param {Object} row - a raw dispatch-history document
+ * @returns {string} the loopId to look up for this row's comparison
+ */
+export function comparisonKeyFor(row) {
+  return row?.abort === true && row?.abortTo ? row.abortTo : row?._id;
+}
+
+/**
  * Pick a bounded sample that's guaranteed to cover the named classes the
  * plan requires (abort-harvest, lineage, >=1 legacy row, >=1 just-healed
  * row) wherever the population has them, plus enough of the rest to reach
