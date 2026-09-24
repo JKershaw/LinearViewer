@@ -608,6 +608,11 @@ describe('TaskDecisionsStore.markOutcome', () => {
     const second = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered' });
     assert.equal(second.outcome, 'dismissed', 'the first stamp wins; a second call cannot flip it');
     assert.equal(second.outcomeAt, first.outcomeAt);
+    // LIN-2889 C1: firstStampWins is an explicit discriminant on BOTH calls —
+    // true for the write that actually landed, false for the terminal-row
+    // fast path, never left for the caller to infer from `outcome` alone.
+    assert.equal(first.firstStampWins, true);
+    assert.equal(second.firstStampWins, false);
   });
 
   test('returns null for a non-existent row, a bad outcome value, or missing fields', async () => {
@@ -695,6 +700,8 @@ describe('TaskDecisionsStore.markOutcome — self-resolved (LIN-2650)', () => {
     assert.equal(second.outcomeReason, 'first reason', 'first stamp wins — re-marking is not the correction path, reverseOutcome is');
     assert.equal(second.outcomeBasisHash, 'hash-1');
     assert.equal(second.outcomeAt, first.outcomeAt);
+    assert.equal(first.firstStampWins, true);
+    assert.equal(second.firstStampWins, false);
   });
 
   // LIN-2650 plan-review C3: closes the pruning-exemption bound named in the
@@ -802,6 +809,213 @@ describe('TaskDecisionsStore.reverseOutcome (LIN-2650)', () => {
     assert.equal(afterReverse.length, 1, 'the un-retired row must re-enter the unanswered set');
     assert.equal(afterReverse[0].id, id);
     assert.equal(afterReverse[0].outcome, null);
+  });
+});
+
+// LIN-2889/LIN-2724: markOutcome/reverseOutcome's conditional writes must
+// decide "who won" from the write itself (matchedCount), never from the
+// earlier read — these tests make the interleaving concrete (mirrors the
+// TOCTOU pattern in tests/unit/observer-state-store.test.js) rather than
+// asserting the guard away.
+describe('TaskDecisionsStore — conditional-write races (LIN-2889/LIN-2724)', () => {
+  let collection, store;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  test('an answer and a self-resolve interleaved on the same row: exactly one caller gets firstStampWins, and the saved outcome matches the winner', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+
+    let interceptOnce = true;
+    const racyCollection = {
+      ...collection,
+      findOne: async (...args) => {
+        const result = await collection.findOne(...args);
+        // Snapshot BEFORE the racer runs — a real MongoDB findOne returns an
+        // independent document, not a live reference into shared state. This
+        // caller's own `existing` must stay the PRE-race value (undecided),
+        // so its own conditional updateOne — not a mutated-in-place fast
+        // path — is what actually gets exercised by the race below.
+        const snapshot = result ? { ...result } : null;
+        if (interceptOnce) {
+          interceptOnce = false;
+          // A genuinely separate, later writer self-resolves the SAME row
+          // for real, landing in the exact window between this call's own
+          // findOne and its conditional updateOne.
+          const raced = await racedStore.markOutcome({
+            urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved',
+            outcomeReason: 'a rescan found nothing pending', outcomeBasisHash: 'basis-xyz'
+          });
+          assert.equal(raced.firstStampWins, true, 'the interceptor\'s own call must genuinely land for this to be a real race, not a no-op');
+        }
+        return snapshot;
+      }
+    };
+    const racedStore = new TaskDecisionsStore({ collection: racyCollection });
+
+    const answerResult = await racedStore.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered' });
+
+    assert.equal(answerResult.firstStampWins, false, 'the answer call lost the race — its conditional write could not match');
+    assert.equal(answerResult.outcome, 'self-resolved', 're-read reports the TRUE current state, not the outcome this caller requested');
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, 'self-resolved', 'the saved row belongs to whichever caller actually won the conditional write');
+  });
+
+  test('two reverseOutcome calls racing on the same self-resolved row: exactly one succeeds, the other throws "not self-resolved"', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz' });
+
+    let interceptOnce = true;
+    const racyCollection = {
+      ...collection,
+      findOne: async (...args) => {
+        const result = await collection.findOne(...args);
+        // Snapshot BEFORE the racer runs — a real MongoDB findOne returns an
+        // independent document, not a live reference into shared state, so
+        // this caller's own read must not observe the racer's later write.
+        const snapshot = result ? { ...result } : null;
+        if (interceptOnce) {
+          interceptOnce = false;
+          const raced = await racedStore.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+          assert.ok(raced, 'the interceptor\'s own reverse must genuinely land for this to be a real race, not a no-op');
+        }
+        return snapshot;
+      }
+    };
+    const racedStore = new TaskDecisionsStore({ collection: racyCollection });
+
+    await assert.rejects(
+      () => racedStore.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id }),
+      { message: 'reverseOutcome: row is not self-resolved' }
+    );
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, null, 'exactly one reverse landed; the row is unretired, not double-cleared or left self-resolved');
+  });
+});
+
+describe('TaskDecisionsStore.answer (LIN-2889)', () => {
+  let collection, store;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  async function selfResolvedRow() {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'self-resolved', outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz' });
+    return id;
+  }
+
+  test('a self-resolved row: answer() un-retires then answers — unretried: true, firstStampWins: true, persisted outcome "answered"', async () => {
+    const id = await selfResolvedRow();
+    const result = await store.answer({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+
+    assert.equal(result.unretried, true);
+    assert.equal(result.firstStampWins, true);
+    assert.equal(result.record.outcome, 'answered');
+
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, 'answered', 'a human answer outranks the earlier self-resolve guess');
+    assert.equal(status.outcomeReason, null, 'the self-resolved outcomeReason/outcomeBasisHash do not survive the un-retire');
+    assert.equal(status.outcomeBasisHash, null);
+  });
+
+  test('an already-answered row: answer() reports firstStampWins: false, unretried: false, and never calls reverseOutcome', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'answered' });
+
+    let reverseCalls = 0;
+    const originalReverse = store.reverseOutcome.bind(store);
+    store.reverseOutcome = async (...args) => { reverseCalls++; return originalReverse(...args); };
+
+    const result = await store.answer({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+
+    assert.equal(reverseCalls, 0, 'an already-terminal non-self-resolved row must never call reverseOutcome');
+    assert.equal(result.unretried, false);
+    assert.equal(result.firstStampWins, false, 'reported as success by the caller via record.outcome, not firstStampWins — see stampDecisionAnswers/the route');
+    assert.equal(result.record.outcome, 'answered');
+  });
+
+  test('an already-dismissed row: answer() reports firstStampWins: false, unretried: false, and never calls reverseOutcome', async () => {
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+    const id = TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id, outcome: 'dismissed' });
+
+    let reverseCalls = 0;
+    const originalReverse = store.reverseOutcome.bind(store);
+    store.reverseOutcome = async (...args) => { reverseCalls++; return originalReverse(...args); };
+
+    const result = await store.answer({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+
+    assert.equal(reverseCalls, 0);
+    assert.equal(result.unretried, false);
+    assert.equal(result.firstStampWins, false);
+    assert.equal(result.record.outcome, 'dismissed');
+  });
+
+  test('reverseOutcome losing an already-lost race ("not self-resolved") is swallowed — answer() falls through to the retry and returns its honest state', async () => {
+    const id = await selfResolvedRow();
+
+    // collection.findOne calls inside a single answer() call, in order:
+    // 1) markOutcome's first attempt (sees self-resolved) 2) reverseOutcome's
+    // own read (about to run) 3) markOutcome's retry. Land the external
+    // un-retire exactly between 1 and 2, so THIS call's own reverseOutcome —
+    // not its first markOutcome — is the one that loses the race.
+    let findOneCalls = 0;
+    const racyCollection = {
+      ...collection,
+      findOne: async (...args) => {
+        findOneCalls++;
+        if (findOneCalls === 2) {
+          // Simulate a second, independent un-retire landing first.
+          await collection.updateOne(
+            { _id: id, urlKey: URL_KEY, issueId: ISSUE_ID, outcome: 'self-resolved' },
+            { $set: { outcome: null, outcomeReason: null, outcomeBasisHash: null, outcomeAt: null } }
+          );
+        }
+        return collection.findOne(...args);
+      }
+    };
+    const racedStore = new TaskDecisionsStore({ collection: racyCollection });
+
+    const result = await racedStore.answer({ urlKey: URL_KEY, issueId: ISSUE_ID, id });
+
+    assert.equal(result.unretried, false, 'this call\'s own reverseOutcome never actually reversed anything — the race was already lost');
+    assert.equal(result.firstStampWins, true, 'the retry markOutcome call is the one that actually lands, on the now-open row');
+    assert.equal(result.record.outcome, 'answered');
+  });
+
+  test('reverseOutcome failing for any OTHER reason propagates out of answer() unchanged (fail-loud, not swallowed)', async () => {
+    const id = await selfResolvedRow();
+
+    let findOneCalls = 0;
+    const racyCollection = {
+      ...collection,
+      findOne: async (...args) => {
+        findOneCalls++;
+        if (findOneCalls === 2) {
+          // Simulate the row being pruned/replaced between markOutcome's own
+          // read (call 1, inside answer()) and reverseOutcome's read (call 2).
+          await collection.deleteOne({ _id: id, urlKey: URL_KEY });
+        }
+        return collection.findOne(...args);
+      }
+    };
+    const racedStore = new TaskDecisionsStore({ collection: racyCollection });
+
+    await assert.rejects(
+      () => racedStore.answer({ urlKey: URL_KEY, issueId: ISSUE_ID, id }),
+      { message: 'reverseOutcome: row not found (pruned or replaced)' }
+    );
   });
 });
 

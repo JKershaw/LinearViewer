@@ -30,6 +30,7 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -71,13 +72,43 @@ function makeFakeDispatchQueueStore(overrides = {}) {
   return { store, calls };
 }
 
+// A minimal in-memory collection backing a REAL TaskDecisionsStore (same shape
+// as the real-store `/rulings/answer` tests in dashboard-routes.test.js):
+// equality-match filters, `matchedCount` reporting and upsert — enough for the
+// store's conditional writes to behave as they do against MongoDB. Reads
+// return a copy, matching a real driver's independent documents.
+function makeMockTaskDecisionsCollection() {
+  const docs = [];
+  const matches = (doc, query) => Object.entries(query).every(([k, v]) => doc[k] === v);
+  return {
+    _docs: docs,
+    async findOne(query) { const doc = docs.find(d => matches(d, query)); return doc ? { ...doc } : null; },
+    async updateOne(query, update, opts = {}) {
+      const idx = docs.findIndex(d => matches(d, query));
+      if (idx >= 0) { Object.assign(docs[idx], update.$set || {}); return { matchedCount: 1 }; }
+      if (opts.upsert) { docs.push({ ...(update.$set || {}) }); return { matchedCount: 0, upsertedId: true }; }
+      return { matchedCount: 0 };
+    },
+    find(query = {}) { return { async toArray() { return docs.filter(d => matches(d, query)).map(d => ({ ...d })); } }; },
+  };
+}
+
 function makeFakeTaskDecisionsStore(overrides = {}) {
-  const calls = { markOutcome: [] };
+  const calls = { markOutcome: [], answer: [] };
   const store = {
     async markOutcome({ urlKey, issueId, id, outcome }) {
       calls.markOutcome.push({ urlKey, issueId, id, outcome });
       if (overrides.markOutcome) return overrides.markOutcome({ urlKey, issueId, id, outcome });
       return { id, urlKey, issueId, outcome, outcomeAt: new Date().toISOString() };
+    },
+    // LIN-2889: default delegates to this same store's markOutcome (so
+    // calls.markOutcome is still recorded and every override above keeps
+    // working unchanged) rather than adding a second, independent call shape.
+    async answer({ urlKey, issueId, id, optionId }) {
+      calls.answer.push({ urlKey, issueId, id, optionId });
+      if (overrides.answer) return overrides.answer({ urlKey, issueId, id, optionId });
+      const record = await store.markOutcome({ urlKey, issueId, id, outcome: 'answered' });
+      return { record, firstStampWins: !!record && record.firstStampWins !== false, unretried: false };
     },
   };
   return { store, calls };
@@ -633,6 +664,89 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — task-decision answer
     assert.strictEqual(third.status, 200);
     assert.strictEqual(calls.markOutcome.length, 2, 'no further stamp once one has already succeeded');
   });
+
+  // LIN-2889 close-out ledger L1 (RW1): the LIN-2724 repro through THIS route
+  // — the bug's own surface — against the REAL TaskDecisionsStore, not the
+  // permissive fake above. A self-resolved row answered via a comment must
+  // persist `answered` with the self-resolve reason/hash cleared, and an
+  // identical re-POST must not stamp again.
+  test('LIN-2889 L1 (RW1): a self-resolved row answered via a comment persists `answered` with reason/hash cleared (real store, LIN-2724); an identical re-POST does not re-stamp', async () => {
+    const taskDecisionsStore = new TaskDecisionsStore({ collection: makeMockTaskDecisionsCollection() });
+    const issueId = '11111111-2222-3333-4444-555555555555';
+    const scanned = await taskDecisionsStore.recordScan({
+      urlKey: 'acme', issueId, issueIdentifier: 'LIN-30', inputHash: 'a'.repeat(64),
+      decision: { decision_id: 'd-1', question: 'Proceed?', options: [{ id: 'opt-a', label: 'Yes' }] }
+    });
+    await taskDecisionsStore.markOutcome({
+      urlKey: 'acme', issueId, id: scanned.id, outcome: 'self-resolved',
+      outcomeReason: 'Retired automatically: a rescan found no pending decision.', outcomeBasisHash: 'basis-xyz'
+    });
+    const seeded = await taskDecisionsStore.getStatus('acme', issueId);
+    assert.equal(seeded.outcome, 'self-resolved', 'sanity: the LIN-2724 precondition is seeded');
+    assert.equal(seeded.outcomeBasisHash, 'basis-xyz');
+
+    // Count answer() calls on the real store without changing its behavior.
+    let answerCalls = 0;
+    const realAnswer = taskDecisionsStore.answer.bind(taskDecisionsStore);
+    taskDecisionsStore.answer = async (args) => { answerCalls += 1; return realAnswer(args); };
+
+    const { provider } = makeFakeProvider();
+    const app = buildApp({ provider, taskDecisionsStore });
+    const payload = { body: 'ship it — LIN-2724 real-store repro', taskDecisionId: scanned.id, taskDecisionIssueId: issueId };
+
+    const first = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(answerCalls, 1);
+
+    const status = await taskDecisionsStore.getStatus('acme', issueId);
+    assert.equal(status.outcome, 'answered', 'a human answer outranks the earlier self-resolve guess');
+    assert.equal(status.outcomeReason, null, 'the self-resolved outcomeReason does not survive the un-retire');
+    assert.equal(status.outcomeBasisHash, null, 'the self-resolved outcomeBasisHash does not survive the un-retire');
+
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true);
+    assert.strictEqual(answerCalls, 1, 'the stamp succeeded, so an identical re-POST must not re-stamp');
+    assert.equal((await taskDecisionsStore.getStatus('acme', issueId)).outcome, 'answered');
+  });
+
+  // LIN-2889 close-out ledger L1 (RW2): pins the task half's POSITIVE success
+  // rule. answer() returning a leftover `self-resolved` record (the rare
+  // stacked-retire race) is a record, but NOT a landed answer — it must count
+  // as a failed stamp so the LIN-2208 identical-text retry re-attempts it.
+  // Reverting the rule to the pre-fix `!!record` (mutation M6) makes the first
+  // attempt look successful and the retry never happens.
+  test('LIN-2889 L1 (RW2): answer() returning a leftover self-resolved record is a failed stamp — an identical re-POST re-attempts it', async () => {
+    const { provider } = makeFakeProvider();
+    let attempt = 0;
+    const { store, calls } = makeFakeTaskDecisionsStore({
+      answer: ({ id, urlKey, issueId }) => {
+        attempt += 1;
+        return attempt === 1
+          ? { record: { id, urlKey, issueId, outcome: 'self-resolved' }, firstStampWins: false, unretried: false }
+          : { record: { id, urlKey, issueId, outcome: 'answered' }, firstStampWins: true, unretried: true };
+      },
+    });
+    const app = buildApp({ provider, taskDecisionsStore: store });
+
+    const payload = {
+      body: 'the same text — leftover self-resolved retry',
+      taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+      taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+    };
+    const first = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(first.status, 201);
+    assert.strictEqual(calls.answer.length, 1);
+
+    const second = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(second.status, 200);
+    assert.strictEqual(second.body.deduped, true);
+    assert.strictEqual(calls.answer.length, 2, 'a leftover self-resolved record is not a landed answer — the retry must re-attempt');
+
+    const third = await postComment(app, ISSUE_ID, payload);
+    assert.strictEqual(third.status, 200);
+    assert.strictEqual(calls.answer.length, 2, 'no further stamp once one has genuinely landed');
+  });
 });
 
 // =============================================================================
@@ -721,12 +835,21 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
 
   function makeSharedTaskDecisionsStore() {
     const calls = [];
-    return {
+    const store = {
       calls,
       async listUnansweredForWorkspaces() { return []; }, // this half's write is exercised in isolation below
       async listNewestScanPerTask() { return {}; },
       async markOutcome(args) { calls.push(args); return { ...args, outcomeAt: new Date().toISOString() }; },
+      // LIN-2889: stampDecisionAnswers now calls answer(), not markOutcome()
+      // directly — delegate so `calls` still records the underlying stamp
+      // attempt, keeping this witness's "the write actually reached the
+      // store" assertion meaningful.
+      async answer({ urlKey, issueId, id, optionId }) {
+        const record = await store.markOutcome({ urlKey, issueId, id, outcome: 'answered', optionId });
+        return { record, firstStampWins: true, unretried: false };
+      },
     };
+    return store;
   }
 
   // Mounts the SAME workspace-api app `buildApp` builds, plus a
@@ -848,6 +971,45 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
     const afterWriteAgain = await getRulings(app);
     assert.equal(historyReads, 2, 'bound (LIN-2227): one write costs at most one reconstruction, not two');
   });
+
+  // LIN-2889 close-out ledger L2: the negative half of "clear only on genuine
+  // success". A task-half stamp that did NOT land — no matching row, or a
+  // leftover self-resolved record — changed nothing this call can claim, so
+  // it must leave the cache warm. Mutation M7 (clear on a failed stamp) fails
+  // this test.
+  for (const [label, answerResult] of [
+    ['no matching row', { record: null, firstStampWins: false, unretried: false }],
+    ['leftover self-resolved record', { record: { outcome: 'self-resolved' }, firstStampWins: false, unretried: false }],
+  ]) {
+    test(`LIN-2889 L2: a failed task-half stamp (${label}) does NOT invalidate the rulings cache`, async () => {
+      let historyReads = 0;
+      const dispatchQueueStore = {
+        async listItems() { return []; },
+        async listHistory() { historyReads++; return { items: [] }; },
+      };
+      let answerCalls = 0;
+      const taskDecisionsStore = {
+        async listUnansweredForWorkspaces() { return []; },
+        async listNewestScanPerTask() { return {}; },
+        async answer() { answerCalls++; return answerResult; },
+      };
+      const app = buildCrossRouterApp({ dispatchQueueStore, taskDecisionsStore, sessionsFeedCache: createSessionsFeedCache() });
+
+      await getRulings(app);
+      assert.equal(historyReads, 1, 'sanity: the first poll always reconstructs');
+
+      const write = await postComment(app, ISSUE_ID, {
+        body: `ship it — failed task-half stamp (${label})`,
+        taskDecisionId: 'scan_11111111_aaaaaaaaaaaa',
+        taskDecisionIssueId: '11111111-2222-3333-4444-555555555555',
+      }, CACHE_URL_KEY);
+      assert.strictEqual(write.status, 201, 'a failed stamp never fails the comment itself');
+      assert.strictEqual(answerCalls, 1, 'sanity: the stamp was attempted');
+
+      await getRulings(app);
+      assert.equal(historyReads, 1, 'a failed stamp must not invalidate the cache — the next poll is still served from it');
+    });
+  }
 });
 
 // =============================================================================
