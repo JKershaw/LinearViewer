@@ -21,6 +21,7 @@ import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cach
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
+import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -42,8 +43,12 @@ function findSession(body, id) {
 function makeStores(perWorkspace) {
   return {
     dispatchQueueStore: {
-      async listItems(urlKey) { return perWorkspace[urlKey]?.live || []; },
-      async listHistory(urlKey) { return { items: perWorkspace[urlKey]?.history || [] }; }
+      // `withFreshDigests` here too: a handful of fixtures below simulate a
+      // still-live item that ALREADY carries feedback (an edge case, since
+      // production live items never do — feedback only ever lands on an
+      // archived/history row) to exercise a derived field before archival.
+      async listItems(urlKey) { return withFreshDigests(perWorkspace[urlKey]?.live || []); },
+      async listHistory(urlKey) { return { items: withFreshDigests(perWorkspace[urlKey]?.history || []) }; }
     },
     agentStatusStore: {
       async listStatus(urlKey) { return { items: perWorkspace[urlKey]?.agentStatus || [] }; }
@@ -230,7 +235,7 @@ describe('GET /api/dashboard/loops', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
-        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [historyItem('g', 'LIN-9')] }; }
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: withFreshDigests([historyItem('g', 'LIN-9')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [agentStatusDone('g', 'LIN-9')] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -331,7 +336,7 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
-        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [decisionItem('g-dec', 'LIN-26', 'd-6')] }; }
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: withFreshDigests([decisionItem('g-dec', 'LIN-26', 'd-6')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -355,7 +360,7 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { reads++; return { items: [decisionItem('a-dec', 'LIN-27', 'd-7')] }; }
+        async listHistory() { reads++; return { items: withFreshDigests([decisionItem('a-dec', 'LIN-27', 'd-7')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -636,7 +641,7 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { historyReads++; return { items: [decisionItem('a-dec', 'LIN-60', 'd-poll-1')] }; }
+        async listHistory() { historyReads++; return { items: withFreshDigests([decisionItem('a-dec', 'LIN-60', 'd-poll-1')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -2345,7 +2350,7 @@ describe('GET /api/dashboard/sessions', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return []; },
-        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: [autopilotHistoryItem('sess-x', 'LIN-400')] }; }
+        async listHistory(urlKey) { if (urlKey === 'bad') throw new Error('store down'); return { items: withFreshDigests([autopilotHistoryItem('sess-x', 'LIN-400')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [agentStatusDone('sess-x', 'LIN-400')] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -2374,7 +2379,7 @@ describe('GET /api/dashboard/sessions', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { historyReads++; return { items: [autopilotHistoryItem('sess-c', 'LIN-617')] }; }
+        async listHistory() { historyReads++; return { items: withFreshDigests([autopilotHistoryItem('sess-c', 'LIN-617')]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [agentStatusDone('sess-c', 'LIN-617')] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
@@ -4792,7 +4797,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
           reads++;
           const item = decisionItem('loop-1', 'LIN-99', 'd-99',
             discharged ? [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-99', outcome: 'dismissed' }), timestamp: new Date().toISOString() }] : []);
-          return { items: [item] };
+          return { items: withFreshDigests([item]) };
         },
         async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 2 }; }
       },
@@ -4935,7 +4940,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       workspaceFromUrl: (req, res, next) => next(),
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { reads++; return { items: [decisionItem(`loop-${reads}`, 'LIN-99', `d-${reads}`)] }; }
+        async listHistory() { reads++; return { items: withFreshDigests([decisionItem(`loop-${reads}`, 'LIN-99', `d-${reads}`)]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),

@@ -84,9 +84,16 @@ describe('applyHarvestedAbortToDigest(digest, abortEntry, dispatchedAt) — V4 +
   });
 
   test('parkedWait becomes null', () => {
+    // LIN-3011 beat-4 fix: `parkedWait` is TOP-LEVEL on the persisted digest
+    // shape (lib/digest-feedback.js's digestFeedback: `parkedWait: facts.
+    // telemetry.parkedWait ?? null`), never nested under `.telemetry` — this
+    // beat-2 fixture already seeded it top-level (see baseDigest above), but
+    // the assertion below checked the wrong path (`out.telemetry.parkedWait`)
+    // and would have passed vacuously against `undefined`. Corrected to match
+    // the real digestFeedback shape this function actually operates on.
     const abortEntry = { message: '[aborted] cancelled', timestamp: '2026-04-10T10:00:00.900Z' };
     const out = applyHarvestedAbortToDigest(baseDigest(), abortEntry, '2026-04-10T09:00:00.000Z');
-    assert.equal(out.telemetry.parkedWait, null);
+    assert.equal(out.parkedWait, null);
   });
 
   test('runtime.completedAt/ms reproduce deriveRuntime(dispatchedAt, abortEntry.timestamp, [abortEntry])', () => {

@@ -65,7 +65,7 @@ function liveItem(overrides = {}) {
 }
 
 function historyItem(overrides = {}) {
-  return {
+  const item = {
     id: 'hist-1',
     promptName: 'implementation',
     prompt: 'implementation prompt text',
@@ -84,6 +84,24 @@ function historyItem(overrides = {}) {
     feedback: [],
     ...overrides
   };
+  // LIN-3011: the lean build derives ONLY from `feedbackDigest` — a raw
+  // `feedback` array is never read on the lean path (production Mongo
+  // excludes it entirely under the new projection). Every existing/new test
+  // that exercises `lean: true` through this fixture needs a digest
+  // consistent with its OWN `feedback`, computed here so fixture authors
+  // don't have to hand-derive one; `digestFeedback` shares the exact same
+  // per-row derivation `_buildLoops`'s non-lean path uses, so lean/non-lean
+  // stay in agreement by construction. Skipped when the caller explicitly
+  // provides `feedbackVersion`/`feedbackDigest` (e.g. the LIN-3011-specific
+  // self-heal/freshness/abort-harvest fixtures below, which need full control
+  // over staleness and legacy shapes).
+  if (!('feedbackDigest' in overrides) && !('feedbackVersion' in overrides)) {
+    const digest = digestFeedback({ feedback: item.feedback, dispatchedAt: item.dispatchedAt }, { now: Date.now() });
+    digest.version = 0;
+    item.feedbackVersion = 0;
+    item.feedbackDigest = digest;
+  }
+  return item;
 }
 
 function agentStatusEntry(overrides = {}) {
@@ -1405,7 +1423,19 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
     assert.strictEqual(loop.telemetry.runtime.ms, 600000);
   });
 
-  test('omitted vs null is preserved through the digest-backed build: absent decision/wake/parkedWait stay null, never coerced or invented', async () => {
+  test('omitted vs null is preserved through the digest-backed build: absent decision/wake stay null, absent parkedWait stays OMITTED (never invented as null)', async () => {
+    // LIN-3011 beat-4 fix: this test originally asserted
+    // `loop.telemetry.parkedWait === null` for the absent case, but the REAL
+    // contract (confirmed against `deriveLoopFacingFacts`/`buildRunTelemetry`,
+    // session-telemetry.js's `_assembleTelemetry`: `if (parkedWait) telemetry.
+    // parkedWait = parkedWait`) OMITS the key entirely when there is no
+    // parked wait — unlike `decision`/`wake`, which are always-present,
+    // explicit-null-when-absent fields. Asserting `=== null` here would have
+    // been the WRONG omitted-vs-null contract to pin, and the fix that makes
+    // this beat's build correctly omit the key (matching non-lean byte-for-
+    // byte) would have looked like a regression against it. Corrected to
+    // check for the key's absence instead, which is what "never coerced or
+    // invented" actually requires for this specific field.
     const digest = { ...FRESH_DIGEST, decision: null, decisionCase: [], parkedWait: null, wake: null };
     const stores = makeLeanDigestStores({
       items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: digest })],
@@ -1417,7 +1447,7 @@ describe('lean loop build reads terminal/wake/decision/telemetry from feedbackDi
     assert.deepStrictEqual(loop.decisionCase, []);
     assert.strictEqual(loop.wakeMarker, null);
     assert.strictEqual(loop.waitingMessage, null);
-    assert.strictEqual(loop.telemetry.parkedWait, null);
+    assert.ok(!('parkedWait' in loop.telemetry), 'no parked wait -> the key is omitted, matching the non-lean buildRunTelemetry contract exactly');
     assert.ok('decision' in loop && 'decisionCase' in loop, 'keys present even when empty — the !== undefined build-discriminators depend on this');
   });
 
@@ -1506,11 +1536,16 @@ describe("abort harvest sourced from the abort row's own feedbackDigest.terminal
     assert.strictEqual(target.telemetry.runtime.ms, Date.parse(digestIso(HOUR + 900)) - Date.parse(digestIso(0)));
   });
 
-  test('parkedWait becomes null on a harvested abort', async () => {
+  test('parkedWait becomes null on a harvested abort (omitted on the built loop, matching the non-lean omit-when-absent contract)', async () => {
+    // LIN-3011 beat-4 fix: same correction as the "omitted vs null" test
+    // above — `digest.parkedWait: null` correctly maps to the KEY BEING
+    // OMITTED on `loop.telemetry`, never an explicit `null`, matching
+    // `buildRunTelemetry`'s `if (parkedWait) telemetry.parkedWait = ...`
+    // omit-when-absent convention exactly.
     const stores = makeLeanDigestStores({ items: [abortRow(), targetRow()], collectionDocs: abortCollectionDocs() });
     const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
     const target = loops.find(l => l.loopId === 'target-1');
-    assert.strictEqual(target.telemetry.parkedWait, null);
+    assert.ok(!('parkedWait' in target.telemetry), 'a harvested abort clears any parked wait, and the key is omitted, not set to null');
   });
 
   test('crossCheck: the F1 millisecond-exact guard lets a 700ms-later abort win over a pre-abort duration tail', async () => {

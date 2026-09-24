@@ -30,6 +30,7 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -707,10 +708,10 @@ describe('POST /workspace/:urlKey/api/comments/:issueId — ruling-write cache i
           ];
           if (discharged) feedback.push({ kind: 'decision-answer', message: JSON.stringify({ decision_id: CACHE_DECISION_ID }), timestamp: nowIso });
           return {
-            items: [{
+            items: withFreshDigests([{
               id: 'loop-1', issueIdentifier: 'LIN-99', issueTitle: 'Title LIN-99', promptName: 'implementation',
               prompt: 'p', dispatchedAt: nowIso, resolvedAt: nowIso, status: 'taken', feedback,
-            }],
+            }]),
           };
         },
         async markDecisionAnswered() { discharged = true; return { success: true, feedbackCount: 3 }; },

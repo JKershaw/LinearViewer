@@ -22,6 +22,7 @@ import { createRulingsRoutes } from '../../routes/proxy-rulings.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
+import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const URL_KEY = 'test-workspace';
 const DECISION_ID = 'd-1';
@@ -104,8 +105,8 @@ before(async () => {
     // (LIN-2773) drives the `liveDispatchOnAnchor` witness — a live queue
     // item sharing a ruling's own anchor issue. `listHistory` below is what
     // carries the workspace isolation.
-    async listItems(urlKey) { return urlKey === URL_KEY ? (liveItems || []) : []; },
-    async listHistory(urlKey) { return { items: urlKey === URL_KEY ? historyItems : foreignHistoryItems }; }
+    async listItems(urlKey) { return withFreshDigests(urlKey === URL_KEY ? (liveItems || []) : []); },
+    async listHistory(urlKey) { return { items: withFreshDigests(urlKey === URL_KEY ? historyItems : foreignHistoryItems) }; }
   };
   const agentStatusStore = { async listStatus() { return { items: [] }; } };
 
@@ -931,7 +932,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       logEvent: () => {},
       dispatchQueueStore: {
         async listItems() { return []; },
-        async listHistory() { reads++; return { items: [decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, [{ id: 'a', label: 'Yes' }])] }; }
+        async listHistory() { reads++; return { items: withFreshDigests([decisionItemWithOptions('loop-1', 'LIN-1', DECISION_ID, [{ id: 'a', label: 'Yes' }])]) }; }
       },
       agentStatusStore: { async listStatus() { return { items: [] }; } },
       dismissalSuggestionsStore: suggestionsStore,

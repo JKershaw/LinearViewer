@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { ObservationSessionsStore, BUILDER_VERSION } from '../../lib/observation-sessions-store.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
+import { digestFeedback } from '../../lib/digest-feedback.js';
 
 const URL_KEY = 'acme';
 
@@ -92,9 +93,9 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The pin tracks the CURRENT version (LIN-2403 moved it 10 → 11); a lingering v3
+  // The pin tracks the CURRENT version (LIN-3011 moved it 11 → 12); a lingering v3
   // archive doc from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 11, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 12, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
@@ -252,6 +253,13 @@ function decisionBearingSession(sessionId) {
       { kind: 'status', message: '[blocked] awaiting a ruling', timestamp: '2026-04-10T10:31:01.000Z' }
     ]
   };
+  // LIN-3011: the lean build now derives from `feedbackDigest`, never raw
+  // `feedback` — attach one consistent with this fixture's own feedback so
+  // the round trip below still exercises real decision/decisionCase
+  // derivation instead of reading nothing.
+  historyItem.feedbackVersion = 0;
+  historyItem.feedbackDigest = digestFeedback(historyItem, { now: ROUNDTRIP_NOW.getTime() });
+  historyItem.feedbackDigest.version = 0;
   // `lean: true` is the shape the materializer actually persists — the one whose
   // dropped `feedback[]` makes a lazily-derived field unrecoverable downstream.
   const loops = _buildLoops({ historyItems: [historyItem], now: ROUNDTRIP_NOW, lean: true });

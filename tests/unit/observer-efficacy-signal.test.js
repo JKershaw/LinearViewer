@@ -42,6 +42,7 @@ import {
 import { ObserverShadowLogStore, computeWouldBeAction, computeWouldBeActions } from '../../lib/observer-shadow-log.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
+import { digestFeedback } from '../../lib/digest-feedback.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 
 const { _buildLoops } = __internal;
@@ -584,16 +585,23 @@ describe('observer-efficacy-signal: collectNewHarnessSignal / collectIncumbentSi
     // One blocked row (same _buildLoops discipline as section B's fixtures —
     // a real dispatch-history row with a real [blocked] marker, never a
     // hand-built Loop literal).
+    const fossilItem = {
+      id: 'fossil-capped-loop', promptName: 'implementation', prompt: 'p',
+      issueId: 'uuid-1', issueIdentifier: 'LIN-77', issueTitle: 'Issue',
+      issueUrl: 'https://linear.app/x/issue/LIN-77', workspace: { urlKey: 'ws' },
+      dispatchedAt: new Date(T_MS).toISOString(), dispatchedBy: 'user-1',
+      target: 'cli', repo: null, status: 'taken',
+      resolvedAt: new Date(T_MS + 60_000).toISOString(), takenByTokenLabel: 'consumer-1',
+      feedback: [{ message: '[blocked] need a decision', timestamp: new Date(T_MS).toISOString() }]
+    };
+    // LIN-3011: this calls `_buildLoops` directly (bypassing `_fetchWorkspaceData`
+    // and its self-heal), so the lean derivation needs a matching digest
+    // attached by hand, computed the same way a real self-heal/write would.
+    fossilItem.feedbackVersion = 0;
+    fossilItem.feedbackDigest = digestFeedback(fossilItem, { now: T_MS });
+    fossilItem.feedbackDigest.version = 0;
     const loops = _buildLoops({
-      historyItems: [{
-        id: 'fossil-capped-loop', promptName: 'implementation', prompt: 'p',
-        issueId: 'uuid-1', issueIdentifier: 'LIN-77', issueTitle: 'Issue',
-        issueUrl: 'https://linear.app/x/issue/LIN-77', workspace: { urlKey: 'ws' },
-        dispatchedAt: new Date(T_MS).toISOString(), dispatchedBy: 'user-1',
-        target: 'cli', repo: null, status: 'taken',
-        resolvedAt: new Date(T_MS + 60_000).toISOString(), takenByTokenLabel: 'consumer-1',
-        feedback: [{ message: '[blocked] need a decision', timestamp: new Date(T_MS).toISOString() }]
-      }],
+      historyItems: [fossilItem],
       now: new Date(T_MS + 10 * DAY_MS), lean: true
     });
     assert.strictEqual(loops.length, 1, 'sanity: one loop in the fleet');
