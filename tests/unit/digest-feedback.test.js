@@ -33,6 +33,7 @@ import { __internal as PIPELINE_LOOPS_INTERNAL } from '../../lib/pipeline-loops.
 import { feedbackWithHarvestedAbort, findTerminalFeedback } from '../../lib/dispatch-terminal.js';
 import { loadDispatchHistory } from '../../lib/kpi-stats.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { PULSE_MAX_WINDOW_MS } from '../../lib/live-console.js';
 
 // ── Guarded dynamic imports: the modules/exports under test, which do not ──
 // ── exist yet on this branch (TDD red). Each stays `null` until beat 3.   ──
@@ -169,6 +170,44 @@ describe('digestFeedback(doc, { now }): doc contract', () => {
     const digest = digestFeedback(noDispatchedAtDoc, { now: Date.now() });
     assert.equal(digest.telemetry.runtime.dispatchedAt, null);
   });
+
+  // Ledger L1: a REAL bare feedback array (not a doc wrapper) must be
+  // rejected with a TypeError, not silently coerced into an empty digest.
+  // Current code (`Array.isArray(doc?.feedback) ? doc.feedback : []`, `digest-feedback.js:286`)
+  // reads `.feedback` off an array `doc`, which is always `undefined` on a
+  // plain array, so it falls through to `[]` and returns a fully-formed,
+  // wrongly-empty digest instead of throwing — the exact "wrong but fresh"
+  // shape N1 warns about (mutant #31 survived on this). Expected RED against 92ef6706.
+  test('a real bare feedback array (not a doc wrapper) throws a TypeError (L1)', () => {
+    requireDigestFeedback();
+    const bareArray = [{ message: '[done] x', timestamp: at(0) }];
+    assert.throws(() => digestFeedback(bareArray, { now: Date.now() }), TypeError);
+  });
+
+  test('null throws a TypeError (L1)', () => {
+    requireDigestFeedback();
+    assert.throws(() => digestFeedback(null, { now: Date.now() }), TypeError);
+  });
+
+  test('a non-object primitive throws a TypeError (L1)', () => {
+    requireDigestFeedback();
+    assert.throws(() => digestFeedback('not a doc', { now: Date.now() }), TypeError);
+  });
+
+  // Ledger L7: `count` must be the doc's exact `feedback.length`, including
+  // entries that carry no `message` at all — never a length recomputed from
+  // a filtered subset (mutant #33 survived: every prior fixture entry had a
+  // message, so a "count of messaged entries" mutation went undetected).
+  test('count === feedback.length exactly, even when an entry has no message (L7)', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [
+      { message: 'a', timestamp: at(0) },
+      { timestamp: at(1) }, // no `message` field at all
+      { message: 'c', timestamp: at(2) },
+    ] });
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.equal(digest.count, 3, 'count must be the exact array length, never a filtered count');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -271,6 +310,29 @@ describe('digestFeedback: sub-second abort-vs-terminal, proven through the real 
     // false and the F1 guard keeps the (wrongly) stale target terminal.
     assert.equal(result.status, 'failed',
       'demonstrates the exact bug a raw-Date terminal timestamp would reproduce — digestFeedback must never emit one');
+  });
+
+  // Ledger L6: the INVERSE sub-second direction. N1(c) only proves a LATER
+  // harvested abort (.900) beats an earlier target (.200). This proves the
+  // guard also correctly keeps an EARLIER abort (.200) from overriding a
+  // LATER genuine terminal (.900) — millisecond precision must be preserved
+  // on both sides, not just the direction the existing test happens to cover
+  // (mutant #29, truncating `terminal.entry.timestamp` to the whole second,
+  // survived because the existing fixtures never separate two timestamps by
+  // less than a full second in this direction).
+  test('inverse case: an EARLIER harvested abort (.200) must not override a LATER genuine failed terminal (.900) (L6)', () => {
+    requireDigestFeedback();
+    const targetDoc = rawDoc({
+      feedback: [{ message: '[failed] boom', timestamp: new Date('2026-01-01T10:00:00.900Z') }],
+    });
+    const digest = digestFeedback(targetDoc, { now: Date.now() });
+    assert.equal(digest.terminal.status, 'failed');
+
+    const abortEntry = { message: '[aborted] cascade', timestamp: '2026-01-01T10:00:00.200Z' };
+    const harvested = feedbackWithHarvestedAbort([digest.terminal.entry], abortEntry);
+    const result = findTerminalFeedback(harvested);
+    assert.equal(result.status, 'failed',
+      'an abort only 700ms EARLIER than the genuine terminal must not win — sub-second ISO precision must be preserved on both sides');
   });
 });
 
@@ -458,6 +520,28 @@ describe('digestFeedback: kpi* fields match loadDispatchHistory (real MangoDB ag
     assert.equal(digest.kpiEvidenceCount, 1, 'must use kind==="evidence", not the loop-side EVIDENCE_PREFIX regex');
     assert.equal(digest.kpiEvidenceCount, row.evidenceCount);
   });
+
+  // Ledger L2: kpiTerminalEntry must be the LAST terminal marker, matching
+  // the aggregation's `$last` (mutant #16 survived: the only prior kpi
+  // fixture had a single terminal entry, so "take the FIRST match" was
+  // indistinguishable from "take the LAST match").
+  test('kpiTerminalEntry is the LAST terminal entry on a multi-terminal fixture, matching the aggregation\'s $last (L2)', async () => {
+    requireDigestFeedback();
+    const doc = rawDoc({
+      feedback: [
+        { message: '[failed] first attempt', timestamp: at(0) },
+        { message: 'unrelated chatter', timestamp: at(1) },
+        { message: '[done] retried and finished', timestamp: at(2) },
+      ],
+    });
+    const collection = await seededCollection(doc);
+    const [row] = await loadDispatchHistory(collection);
+    const digest = digestFeedback(doc, { now: Date.now() });
+
+    assert.deepStrictEqual(digest.kpiTerminalEntry, row.terminalEntry);
+    assert.equal(digest.kpiTerminalEntry.message, '[done] retried and finished',
+      'kpiTerminalEntry must be the LAST terminal marker, matching the aggregation\'s $last');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -496,5 +580,100 @@ describe('digestFeedback: metric retention (persisted digest only)', () => {
     for (const m of digest.telemetry.metrics) {
       assert.ok('state' in m && 'raw' in m, 'retained metrics must be full parseHeartbeat() objects, including state and raw');
     }
+  });
+
+  // Ledger L3: the "last 6" half of the union must apply even when ALL of
+  // them are outside the 6h window (mutant #18: dropping the last-6 union
+  // entirely, and mutant #20: keeping the last 3 instead of the last 6, both
+  // survived because the prior fixture's last 6 all happened to also fall
+  // inside the 6h window).
+  test('the last 6 heartbeats are kept even when every one of them lies outside the 6h window (L3)', () => {
+    requireDigestFeedback();
+    const now = at(0).getTime() + 24 * 60 * 60 * 1000; // now = T0 + 24h
+    const hb = (offsetSec, toolCount) => ({
+      kind: 'heartbeat',
+      message: `[working · running] ${toolCount} tools in ${toolCount}s: Bash×${toolCount} · ${toolCount} total`,
+      timestamp: at(offsetSec),
+    });
+    // Exactly 6 heartbeats, all clustered near T0 — ~24h before `now`, far
+    // outside the 6h retention window. None qualifies via the window alone.
+    const feedback = Array.from({ length: 6 }, (_, i) => hb(i, i + 1));
+    const doc = rawDoc({ feedback, dispatchedAt: at(0) });
+    const digest = digestFeedback(doc, { now });
+
+    assert.equal(digest.telemetry.metrics.length, 6,
+      'the last 6 must be kept via the union even though every one of them is outside the 6h window');
+  });
+
+  // Ledger L4: the exact `now - PULSE_MAX_WINDOW_MS` (6h) boundary.
+  // Chosen: INCLUSIVE (`timestamp >= cutoff`), matching `retainMetrics`'s
+  // existing implementation (`lib/digest-feedback.js:263`). No other
+  // production call site pins a direction — `PULSE_MAX_WINDOW_MS`'s only
+  // other use (`lib/live-console.js`) is a UI zoom-span rung, not a
+  // retention filter — so this test documents and pins the implementation's
+  // own existing boundary choice rather than a documented external contract
+  // (mutant #24, flipping `>=` to `>`, survived: it is only observable for a
+  // metric exactly at the millisecond boundary, which no fixture had).
+  test('retention boundary at exactly now - 6h is INCLUSIVE (documented choice) (L4)', () => {
+    requireDigestFeedback();
+    const now = at(0).getTime() + 7 * 60 * 60 * 1000; // now = T0 + 7h
+    const cutoffMs = now - PULSE_MAX_WINDOW_MS; // = T0 + 1h, to the millisecond
+    const boundary = {
+      kind: 'heartbeat',
+      message: '[working · running] 1 tools in 1s: Bash×1 · 1 total',
+      timestamp: new Date(cutoffMs),
+    };
+    // 6 more, chronologically AFTER the boundary row, so `slice(-6)` excludes
+    // it — isolating the boundary row to the window check alone.
+    const recent = Array.from({ length: 6 }, (_, i) => ({
+      kind: 'heartbeat',
+      message: `[working · running] ${i + 2} tools in ${i + 2}s: Bash×${i + 2} · ${i + 2} total`,
+      timestamp: new Date(cutoffMs + (i + 1) * 60 * 60 * 1000),
+    }));
+    const feedback = [boundary, ...recent];
+    const doc = rawDoc({ feedback, dispatchedAt: at(0) });
+    const digest = digestFeedback(doc, { now });
+
+    assert.equal(digest.telemetry.metrics.length, 7, 'the exact-boundary metric must be retained (inclusive)');
+    assert.ok(digest.telemetry.metrics.some(m => m.timestamp === boundary.timestamp.toISOString()),
+      'the boundary row itself must appear in the retained metrics');
+  });
+
+  // Ledger L5: `toolPeak` must use `total ?? toolCount` precedence
+  // (`peakToolCount` semantics), not `toolCount` alone (mutant #26 survived:
+  // the prior fixture messages always had `total === toolCount`).
+  test('toolPeak uses total ?? toolCount precedence on a mixed heartbeat (L5)', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({
+      feedback: [
+        { kind: 'heartbeat', message: '[working · running] 3 tools in 3s: Bash×3 · 12 total', timestamp: at(0) },
+      ],
+    });
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.equal(digest.telemetry.toolPeak, 12, 'toolPeak must prefer `total` over `toolCount` when they differ');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Ledger L8: no `undefined` on a message-less / timestamp-less RAW entry
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('digestFeedback: message-less / timestamp-less raw entries normalize to null, never undefined (L8)', () => {
+  test('a message-less usage entry: kpiUsageEntry.message is null, not undefined (L8)', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [{ kind: 'usage', timestamp: at(0) }] }); // no `message`
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.ok(digest.kpiUsageEntry, 'a usage entry exists and must be surfaced');
+    assertNoUndefined(digest.kpiUsageEntry, 'digest.kpiUsageEntry');
+    assert.equal(digest.kpiUsageEntry.message, null);
+  });
+
+  test('a timestamp-less terminal entry: kpiTerminalEntry.timestamp is null, not undefined (L8)', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [{ message: '[done] finished' }] }); // no `timestamp`
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.ok(digest.kpiTerminalEntry, 'a terminal entry exists and must be surfaced');
+    assertNoUndefined(digest.kpiTerminalEntry, 'digest.kpiTerminalEntry');
+    assert.equal(digest.kpiTerminalEntry.timestamp, null);
   });
 });
