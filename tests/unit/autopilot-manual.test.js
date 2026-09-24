@@ -48,6 +48,23 @@ describe('extractPrincipleZeroSection', () => {
     assert.ok(!section.includes('An issue-bearing child autopilot counts as one task'));
   });
 
+  // LIN-2991/LIN-3022 §5: the two idempotency clauses sit immediately after
+  // LIN-3006's "offer file only for a finding outside every bounded class"
+  // eligibility sentence, before the sibling-merge rule — LIN-3006's own
+  // boundary is unchanged, this only adds an existence/re-raise check on top.
+  test('§5: carries the existing-ticket-check and no-re-raise clauses, immediately after the file-eligibility sentence and before sibling-merge', () => {
+    const section = extractPrincipleZeroSection();
+    const eligibilityAt = section.indexOf('offer **file** only for');
+    const existingTicketAt = section.indexOf('Before offering file, check the ticket');
+    const noReRaiseAt = section.indexOf('Before raising a `DECISION:` on a finding, check it isn');
+    const mergeAt = section.indexOf('Merge sibling blockers before you bubble up');
+    assert.ok(eligibilityAt > -1, 'sanity: the LIN-3006 eligibility sentence is present');
+    assert.ok(existingTicketAt > -1, 'the existing-ticket-check clause is present');
+    assert.ok(noReRaiseAt > -1, 'the no-re-raise clause is present');
+    assert.ok(eligibilityAt < existingTicketAt && existingTicketAt < noReRaiseAt && noReRaiseAt < mergeAt,
+      'both new clauses sit after the eligibility sentence and before sibling-merge, in order');
+  });
+
   test('is an exact substring of the full manual (a pure slice, not a rewrite)', () => {
     const manual = buildAutopilotManual();
     const section = extractPrincipleZeroSection();

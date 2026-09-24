@@ -476,6 +476,16 @@ When the decision concerns a finding, bound the options by where it falls: a fin
 bounded class may only be **do it here** or **drop it, with the reason** — offer **file** only for
 a finding outside every bounded class.
 
+**Before offering file, check the ticket doesn't already exist.** Search the anchor's relations
+(`GET /api/proxy/issues/{id}/relations`) and `GET /api/proxy/search` for a ticket already naming the
+same file and finding. If one exists, link it (a `related` relation) and record it in the close-out
+summary instead of raising a ruling or filing a new one.
+
+**Before raising a `DECISION:` on a finding, check it isn't already covered.** Query
+`GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true` and read the prior stage's
+comments. Don't re-raise a finding an open, answered, or dismissed row already covers for the same
+anchor — task-bound rulings aren't covered by `includeResolved`.
+
 **Merge sibling blockers before you bubble up.** If more than one child you're holding is blocked on
 the same root cause, don't escalate once per child — raise ONE hand-back naming the shared cause, with
 the blocked branches named in the case itself (there's no separate field for this; say it in prose).

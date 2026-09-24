@@ -2642,6 +2642,89 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     });
   });
 
+  // LIN-2991/LIN-3022 §5: two idempotency clauses inserted immediately after
+  // LIN-3006's own "file is offered only for an outside item" eligibility
+  // clause, at each of review, close-out step 8, and Follow-up Triage —
+  // LIN-3006's own boundary (which decisions may offer "file" at all) is
+  // untouched; this only adds an existence/re-raise check on top of it.
+  describe('idempotency guidance — existing-ticket check and no-re-raise (LIN-2991/LIN-3022 §5)', () => {
+    const existingTicketClause = /before filing an outside item.*search the anchor's relations.*GET \/api\/proxy\/issues\/\{id\}\/relations.*GET \/api\/proxy\/search.*if one exists,? link it/is;
+    const noReRaiseClause = /before raising a `DECISION:` on a finding.*GET \/api\/proxy\/rulings\?issueIdentifier=<anchor>&includeResolved=true.*do not re-raise a finding.*includeResolved.*covers loop-backed rulings only, never a task-bound one/is;
+
+    test('review carries both clauses, immediately after (not before) the LIN-3006 eligibility clause and before Test Quality Check', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      const eligibilityIdx = review.search(/"file" is offered only for an outside item/i);
+      const existingIdx = review.search(existingTicketClause);
+      const noReRaiseIdx = review.search(noReRaiseClause);
+      const nextSectionIdx = review.indexOf('### Test Quality Check');
+      assert.ok(eligibilityIdx > -1, 'sanity: LIN-3006\'s eligibility clause is present');
+      assert.ok(existingIdx > -1, 'the existing-ticket-check clause is present');
+      assert.ok(noReRaiseIdx > -1, 'the no-re-raise clause is present');
+      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx,
+        'both clauses sit after the eligibility clause and before the next section, in order');
+    });
+
+    test('close-out step 8 checks for an existing ticket before filing', () => {
+      const closeout = generatePrompt('close-out', issue, context).prompt;
+      assert.match(closeout, /File follow-ups.*but first check each one does not already exist \(see Follow-up Triage's existing-ticket check\)/i);
+    });
+
+    test('Follow-up Triage carries both clauses, immediately after the eligibility clause and before the Priority bullet', () => {
+      const closeout = generatePrompt('close-out', issue, context).prompt;
+      const eligibilityIdx = closeout.search(/"file" is offered only for an outside item/i);
+      const existingIdx = closeout.search(existingTicketClause);
+      const noReRaiseIdx = closeout.search(noReRaiseClause);
+      const priorityIdx = closeout.indexOf('**Priority**');
+      assert.ok(eligibilityIdx > -1 && existingIdx > -1 && noReRaiseIdx > -1, 'all three clauses are present');
+      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < priorityIdx,
+        'both new clauses sit after the eligibility clause and before the Priority bullet, in order');
+    });
+
+    // LIN-3006's own pins (the block above and this ticket's own review/
+    // close-out describe) must stay green unmodified — re-asserted here so a
+    // future edit to this new describe block cannot silently regress them.
+    test('LIN-3006\'s own eligibility clause and boundary are untouched by the new clauses', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      const closeout = generatePrompt('close-out', issue, context).prompt;
+      const rulingClause = /an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item/i;
+      assert.ok(rulingClause.test(review), 'review still limits ruling options to outside-only filing, unchanged');
+      assert.ok(rulingClause.test(closeout), 'close-out still limits ruling options to outside-only filing, unchanged');
+    });
+
+    function metaRule(name) {
+      const meta = buildMetaPromptTemplate({
+        issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
+        completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
+        aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
+      });
+      return meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith(name));
+    }
+
+    test('meta (5b/5c): the Review-prompts quality rule carries both clauses, immediately after (5a)\'s eligibility sentence and before (6)', () => {
+      const rule = metaRule('- **Review prompts**');
+      assert.ok(rule, 'the Review-prompts quality rule exists');
+      const eligibilityIdx = rule.search(/"file" is offered only for an outside item/i);
+      const existingIdx = rule.search(existingTicketClause);
+      const noReRaiseIdx = rule.search(noReRaiseClause);
+      const nextItemIdx = rule.indexOf('(6) **write a `### What CI Did Not Prove` ledger**');
+      assert.ok(eligibilityIdx > -1 && existingIdx > -1 && noReRaiseIdx > -1, 'all three markers are present');
+      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < nextItemIdx,
+        'both new sub-items sit after (5a)\'s eligibility sentence and before (6), in order');
+    });
+
+    test('meta (6c/6d): the Close-out quality rule carries both clauses, immediately after (6b)\'s eligibility sentence and before the priority/label instruction', () => {
+      const rule = metaRule('- **Close-out prompts**');
+      assert.ok(rule, 'the Close-out prompts quality rule exists');
+      const eligibilityIdx = rule.search(/"file" is offered only for an outside item/i);
+      const existingIdx = rule.search(existingTicketClause);
+      const noReRaiseIdx = rule.search(noReRaiseClause);
+      const priorityIdx = rule.indexOf('every follow-up ticket filed above must additionally carry a priority');
+      assert.ok(eligibilityIdx > -1 && existingIdx > -1 && noReRaiseIdx > -1, 'all three markers are present');
+      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < priorityIdx,
+        'both new sub-items sit after (6b)\'s eligibility sentence and before the priority/label instruction, in order');
+    });
+  });
+
   test('(b) review writes a structured ledger; close-out reads the verdict/gaps without keying on the heading (LIN-810 decoupling)', () => {
     const review = generatePrompt('review', issue, context).prompt;
     const closeout = generatePrompt('close-out', issue, context).prompt;

@@ -313,6 +313,13 @@ describe('corrective reviews: bounded follow-up creation', () => {
       // Every finding still lands in the report even if not promoted to a task.
       assert.match(prompt, /every finding|not promote|nothing is lost/i);
     });
+
+    // LIN-2991/LIN-3022 §5 clause (a): before minting, check the finding
+    // doesn't already have a ticket — never a re-raise of the same file/finding.
+    test(`${template.title} checks for an existing ticket before minting`, () => {
+      const prompt = template.generatePrompt();
+      assert.match(prompt, /before minting a task, search for an existing ticket already naming the same finding/i);
+    });
   }
 });
 
