@@ -550,7 +550,7 @@ describe('addFeedback: feedbackVersion/feedbackDigest under real concurrency (re
     });
   }
 
-  test('N concurrent addFeedback calls: feedbackVersion equals N, and a persisted feedbackDigest (if any) is never stale relative to it (the guarded $set case)', async () => {
+  test('N concurrent addFeedback calls: feedbackVersion equals N, and the settled feedbackDigest exists and matches the final version', async () => {
     const store = freshStore();
     const item = await store.addItem(URL_KEY, {
       prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42'
@@ -568,16 +568,61 @@ describe('addFeedback: feedbackVersion/feedbackDigest under real concurrency (re
     const stored = await store.historyCollection.findOne({ _id: item._id });
     assert.equal(stored.feedback.length, N, 'the atomic append contract (LIN-1343) is unchanged');
     assert.equal(stored.feedbackVersion, N, `feedbackVersion must equal the number of concurrent writers (${N}), each incrementing atomically in the same findOneAndUpdate as its append`);
-    // The guard's whole point: a writer whose digest $set is filtered on a
-    // feedbackVersion that has since moved on must lose the CAS silently
-    // (matchedCount 0) rather than overwrite a newer digest with a stale one.
-    // The only state that can survive N concurrent writers is therefore either
-    // no digest at all, or a digest whose OWN version matches the CURRENT
-    // feedbackVersion exactly — never a lower, stale one.
-    if (stored.feedbackDigest) {
-      assert.equal(stored.feedbackDigest.version, stored.feedbackVersion, 'a persisted digest must never be stale relative to the current feedbackVersion — this is what the guarded $set exists to prevent');
-      assert.equal(stored.feedbackDigest.count, stored.feedback.length);
-    }
+    // Once all N writers have settled, exactly one of them — whichever ran
+    // its guarded digest $set while its own captured version still matched
+    // the (by-then-final) stored version — must have won and persisted. A
+    // missing digest here would mean every single writer lost its CAS, which
+    // is not a real possibility once the last writer's append lands (its own
+    // captured version IS the final version at that instant).
+    assert.ok(stored.feedbackDigest, 'a feedbackDigest must exist once all concurrent writers have settled');
+    assert.equal(stored.feedbackDigest.version, stored.feedbackVersion, 'the settled digest must match the final feedbackVersion — never a stale, lower one');
+    assert.equal(stored.feedbackDigest.count, stored.feedback.length);
+  });
+
+  test('a deterministic race: writer B fully lands (append + version bump + its own digest persist) between writer A\'s append and A\'s guarded digest persist — A\'s stale digest must lose the CAS, not overwrite B\'s newer one', async () => {
+    const db = client.db(`feedback_version_deterministic_race_${counter++}`);
+    const collection = db.collection('dispatch-queue');
+    const historyCollection = db.collection('dispatch-history');
+    // storeA writes through the INTERCEPTED collection; storeB shares the
+    // exact same underlying real collections, representing a fully
+    // independent concurrent writer. Test seam only — no production hooks —
+    // wrapping the collection dependency the store already accepts via its
+    // own constructor injection point.
+    const storeA = new DispatchQueueStore({ collection, historyCollection });
+    const storeB = new DispatchQueueStore({ collection, historyCollection });
+
+    const item = await storeA.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42'
+    });
+    await storeA.takeItem(item._id, URL_KEY, 'token-a');
+
+    // Intercept the FIRST call to historyCollection.updateOne (writer A's own
+    // guarded digest persist, once implemented) and run writer B's ENTIRE
+    // addFeedback — append, version bump, and B's own digest persist — to
+    // completion before letting A's (now-stale) update proceed. B's own
+    // digest updateOne call passes straight through (the flag is already
+    // set), so this does not recurse.
+    let intercepted = false;
+    const realUpdateOne = historyCollection.updateOne.bind(historyCollection);
+    historyCollection.updateOne = async (...args) => {
+      if (!intercepted) {
+        intercepted = true;
+        const resB = await storeB.addFeedback(item._id, URL_KEY, { message: 'writer B lands first' }, 'token-a');
+        assert.ok(resB && resB.success, 'writer B must land cleanly inside the interception window');
+      }
+      return realUpdateOne(...args);
+    };
+
+    const resA = await storeA.addFeedback(item._id, URL_KEY, { message: 'writer A (stale by the time its digest write runs)' }, 'token-a');
+    assert.ok(resA && resA.success);
+
+    assert.ok(intercepted, 'the interception point (historyCollection.updateOne, writer A\'s guarded digest persist) must actually be reached — otherwise this test cannot prove anything about the race');
+    const stored = await historyCollection.findOne({ _id: item._id });
+    assert.equal(stored.feedback.length, 2, 'both writers\' entries land — the atomic append contract is unaffected by the race');
+    assert.equal(stored.feedbackVersion, 2, 'both atomic increments land');
+    assert.ok(stored.feedbackDigest, 'B\'s guarded write (matching the CURRENT version at the time it ran) must have persisted a digest');
+    assert.equal(stored.feedbackDigest.version, 2, 'the persisted digest must reflect the CURRENT version — never A\'s stale captured version (1)');
+    assert.equal(stored.feedbackDigest.count, 2, 'the persisted digest must reflect BOTH entries — proof A\'s stale, 1-entry digest lost the CAS and did not overwrite B\'s newer one');
   });
 
   test('a real persistence round trip: loop-facing timestamps stay ISO strings, kpi* timestamps stay Date, and no digest field is undefined (N4, W1)', async () => {

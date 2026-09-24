@@ -384,7 +384,7 @@ describe('markDecisionAnswered: feedbackVersion/feedbackDigest under real concur
     });
   }
 
-  test('N concurrent markDecisionAnswered calls: feedbackVersion equals N, and a persisted feedbackDigest (if any) is never stale relative to it (the guarded $set case)', async () => {
+  test('N concurrent markDecisionAnswered calls: feedbackVersion equals N, and the settled feedbackDigest exists and matches the final version', async () => {
     const store = freshStore();
     const item = await store.addItem(URL_KEY, {
       prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42'
@@ -402,10 +402,44 @@ describe('markDecisionAnswered: feedbackVersion/feedbackDigest under real concur
     const stored = await store.historyCollection.findOne({ _id: item._id });
     assert.equal(stored.feedback.length, N, 'the atomic append contract is unchanged');
     assert.equal(stored.feedbackVersion, N, `feedbackVersion must equal the number of concurrent writers (${N}), each incrementing atomically in the same findOneAndUpdate as its append`);
-    if (stored.feedbackDigest) {
-      assert.equal(stored.feedbackDigest.version, stored.feedbackVersion, 'a persisted digest must never be stale relative to the current feedbackVersion — this is what the guarded $set exists to prevent');
-      assert.equal(stored.feedbackDigest.count, stored.feedback.length);
-    }
+    assert.ok(stored.feedbackDigest, 'a feedbackDigest must exist once all concurrent writers have settled');
+    assert.equal(stored.feedbackDigest.version, stored.feedbackVersion, 'the settled digest must match the final feedbackVersion — never a stale, lower one');
+    assert.equal(stored.feedbackDigest.count, stored.feedback.length);
+  });
+
+  test('a deterministic race: writer B fully lands (append + version bump + its own digest persist) between writer A\'s append and A\'s guarded digest persist — A\'s stale digest must lose the CAS, not overwrite B\'s newer one', async () => {
+    const db = client.db(`decision_version_deterministic_race_${counter++}`);
+    const collection = db.collection('dispatch-queue');
+    const historyCollection = db.collection('dispatch-history');
+    const storeA = new DispatchQueueStore({ collection, historyCollection });
+    const storeB = new DispatchQueueStore({ collection, historyCollection });
+
+    const item = await storeA.addItem(URL_KEY, {
+      prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42'
+    });
+    await storeA.takeItem(item._id, URL_KEY, 'token-a');
+
+    let intercepted = false;
+    const realUpdateOne = historyCollection.updateOne.bind(historyCollection);
+    historyCollection.updateOne = async (...args) => {
+      if (!intercepted) {
+        intercepted = true;
+        const resB = await storeB.markDecisionAnswered(item._id, URL_KEY, 'd-B');
+        assert.ok(resB && resB.success, 'writer B must land cleanly inside the interception window');
+      }
+      return realUpdateOne(...args);
+    };
+
+    const resA = await storeA.markDecisionAnswered(item._id, URL_KEY, 'd-A');
+    assert.ok(resA && resA.success);
+
+    assert.ok(intercepted, 'the interception point (historyCollection.updateOne, writer A\'s guarded digest persist) must actually be reached — otherwise this test cannot prove anything about the race');
+    const stored = await historyCollection.findOne({ _id: item._id });
+    assert.equal(stored.feedback.length, 2, 'both writers\' entries land — the atomic append contract is unaffected by the race');
+    assert.equal(stored.feedbackVersion, 2, 'both atomic increments land');
+    assert.ok(stored.feedbackDigest, 'B\'s guarded write (matching the CURRENT version at the time it ran) must have persisted a digest');
+    assert.equal(stored.feedbackDigest.version, 2, 'the persisted digest must reflect the CURRENT version — never A\'s stale captured version (1)');
+    assert.equal(stored.feedbackDigest.count, 2, 'the persisted digest must reflect BOTH entries — proof A\'s stale, 1-entry digest lost the CAS and did not overwrite B\'s newer one');
   });
 
   test('a real persistence round trip: no digest field is undefined, and the digest reflects the decision-answer stamp (N4, W1)', async () => {
