@@ -2,10 +2,10 @@
 title: Learning While the Tools Change
 kind: essay
 argument: Engineering experience, AI experience and tool capability run on separate clocks, and better tools can take away the mistakes that used to teach — so what a team most needs to grow is calibrated distrust, knowing which output to check and which needs no check, and no snapshot of speed or seniority can see it.
-version: 4
+version: 5
 date: 2026-09-23
 authors: [Astra 6, Opus 5.5]
-model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. Version 3 by the same model and harness, correcting a survey figure after reading it at source and adding the further-reading list, typeset as Harbour Archive #7. Version 4 by the same model and harness from Astra 6's review of version 3: sections 6 to 8 simplified, three overstatements corrected, and the closing paragraphs replaced with Astra 6's own. No Harbour dispatch lineage for any version."
+model: "Version 1 by Astra 6, per John Kershaw's attribution on filing; harness and effort not recorded, and the source .docx carries no author or model metadata. Version 2 by Claude Opus 5.5 (claude-opus-5-5, Claude Code CLI web session, effort high), at John's invitation, revising from the findings in learning-while-the-tools-change-check.md. Version 3 by the same model and harness, correcting a survey figure after reading it at source and adding the further-reading list, typeset as Harbour Archive #7. Version 4 by the same model and harness from Astra 6's review of version 3: sections 6 to 8 simplified, three overstatements corrected, and the closing paragraphs replaced with Astra 6's own. Version 5 by the same model and harness from Astra 6's rereading of version 4: three small cuts and one distinction carried into section 6. No Harbour dispatch lineage for any version."
 sources:
   - "Cui et al., The Effects of Generative AI on High-Skilled Work, Management Science, 2026 — https://doi.org/10.1287/mnsc.2025.00535"
   - "docs/ladder.md@0d652fbc0f2fef12bf063f047d855c346b337595"
@@ -315,13 +315,15 @@ miss what the mistake would have taught them. They need not learn less overall: 
 can go into other lessons, and the agent can teach directly, as the explanation-seekers in the
 Trio study suggest. But a particular lesson can go missing without anyone noticing.
 
-So the practical question is what gives those lessons back. Debugging your own mistake exposes
-the assumption behind it; reading a colleague's reasoning reveals a constraint you had not seen.
-If the agent now does both, something else has to show the developer what they would have
-learned, without restoring every manual step the tool made unnecessary. A developer might explain
-a generated change before merging it, predict how it would behave if a requirement changed, or
-give it a deliberately awkward input and watch what happens. Each is worth keeping only if the
-work that follows gets better.
+So the practical question is which of those lessons still matter, and section 3's test applies:
+ask what the missing step was doing. Some lessons belonged to a limitation the tool has since
+removed, and can go with it; nobody needs to learn to coax a model that no longer needs coaxing.
+Others are still essential. Debugging your own mistake exposes the assumption behind it; reading a
+colleague's reasoning reveals a constraint you had not seen. Where the agent now does those for
+the developer, something else has to show them what they would have learned. A developer might
+explain a generated change before merging it, predict how it would behave if a requirement
+changed, or give it a deliberately awkward input and watch what happens. Each is worth keeping
+only if the work that follows gets better.
 
 ## 7 What good judgement looks like as the tools improve
 
@@ -341,13 +343,12 @@ when a check is unnecessary — letting a throwaway prototype run, or trusting a
 test suite already covers — because checking everything is its own failure: slow, and a way of
 never finding out what the tool can be trusted with.
 
-If the essay has to commit to one reading — and an essay should — it is this. Calibrated
-distrust, more than fluency with the tools or years in the profession, decides who can be
-trusted with more. It is learned mostly from consequence, from being caught out and seeing why,
+Calibrated distrust, more than fluency with the tools or years in the profession, decides who can
+be trusted with more. It is learned mostly from consequence, from being caught out and seeing why,
 which is why it tends to come with experience, and why a tool that heads off mistakes can take
 away some of the occasions for learning it even as it speeds delivery.
 
-The contemporary evidence fits that reading without proving it. The Trio learners with
+The contemporary evidence fits that claim without proving it. The Trio learners with
 assistance understood less, and fewer of their errors were theirs to meet. Anthropic's telemetry
 found experienced Claude Code users both more likely to approve everything up front and more
 likely to interrupt: they let work proceed and stepped in along the way. That pattern is
@@ -391,9 +392,8 @@ weak. If a developer gets useful results quickly and handles later changes with 
 recognise it, even when they got there by a different route from the rest of the team.
 
 Help knowledge travel both ways. Ask experienced engineers to explain the constraints behind their
-decisions. Ask colleagues fluent with agents to show their workflows, including how they recover
-when one fails. Then work through a real task together, so that claims about speed or reliability
-meet a shared example.
+decisions, and colleagues fluent with agents to show their workflows, including how they recover
+when one fails.
 
 When a tool changes, pick a few established procedures and ask of each whether it still protects
 something that matters, whether it could be simpler, or whether it is no longer needed. That keeps
@@ -666,15 +666,19 @@ agent's mistakes in both is a direct test of the first condition, and it is alre
 `proposals.md`.
 
 **This version is unchecked.** Version 1 was checked against its eleven sources in
-`learning-while-the-tools-change-check.md`, and versions 2 to 4 were revised by the check's own
+`learning-while-the-tools-change-check.md`, and versions 2 to 5 were revised by the check's own
 author, who is now this essay's second author — which `standard.md` allows for an essay, on
 condition that it is visible. The check covers version 1 only. The new material a reader should
-weigh for themselves is the rollout's figures, read at the source on 2026-09-22; the chess boundary
-condition; the reading in section 7, with the two conditions under Next that would refute it; and
-the Stack Overflow figure, which version 2 took second-hand and attributed to agent users, and which
-version 3 read at the source, where it is reported across all respondents. Version 4 follows Astra
-6's review of version 3. It adds no source and no figure. It narrows three claims that had outrun
-their evidence: that better tools slow learning, where they remove particular lessons; that the
-telemetry's approval pattern shows calibration, where it is only consistent with it; and that
-following the same people is the only design that can separate the clocks, where it helps but is
-neither the only design nor enough by itself. Its four closing paragraphs are Astra 6's own.
+weigh for themselves is the rollout's figures, read at the source on 2026-09-22; the chess
+boundary condition; the reading in section 7, with the two conditions under Next that would refute
+it; and the Stack Overflow figure, which version 2 took second-hand and attributed to agent users,
+and which version 3 read at the source, where it is reported across all respondents. Version 4
+follows Astra 6's review of version 3. It adds no source and no figure. It narrows three claims
+that had outrun their evidence: that better tools slow learning, where they remove particular
+lessons; that the telemetry's approval pattern shows calibration, where it is only consistent with
+it; and that following the same people is the only design that can separate the clocks, where it
+helps but is neither the only design nor enough by itself. Its four closing paragraphs are Astra
+6's own. Version 5 makes three small edits from Astra 6's rereading of version 4: section 7 states
+its claim without an aside about the essay, section 8 no longer anticipates the conclusion's
+shared task, and section 6 now asks which lost lessons still matter before proposing to replace
+them.
