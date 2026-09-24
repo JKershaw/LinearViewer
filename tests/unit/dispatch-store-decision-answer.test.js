@@ -334,29 +334,42 @@ describe('markDecisionAnswered: feedbackDigest is best-effort — injected failu
     assert.ok(notified, '_notifyWriteForDoc must still run after a digest persistence failure (fire-and-forget onWrite hook)');
   });
 
-  test('the feedbackDigest is already persisted by the time _notifyWriteForDoc\'s onWrite hook fires (ordering: digest write before notify)', async () => {
+  test('ordering: the digest write settles before _notifyWriteForDoc\'s onWrite hook fires, even when digest persistence is slow', async () => {
+    // A same-tick mock (no real I/O latency) can't discriminate call ORDER
+    // from call ORDER-OF-COMPLETION — its updateOne mutates synchronously
+    // regardless of where it's placed relative to a fire-and-forget notify.
+    // A real setTimeout delay on the digest updateOne forces a genuine
+    // suspension, so if the digest write happens to be called AFTER notify
+    // (wrong order), notify's onWrite fires first for real, not just in
+    // appearance.
     const collection = createMockCollection();
     const historyCollection = createMockCollection();
-    let itemId;
-    let sawDigestAtNotifyTime = null;
+    const order = [];
+    const realUpdateOne = historyCollection.updateOne.bind(historyCollection);
+    historyCollection.updateOne = async (...args) => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      const result = await realUpdateOne(...args);
+      order.push('digest-write-settled');
+      return result;
+    };
     const store = new DispatchQueueStore({
       collection,
       historyCollection,
-      onWrite: () => {
-        const stored = historyCollection._docs.find(d => d._id === itemId);
-        sawDigestAtNotifyTime = !!(stored && stored.feedbackDigest);
-      }
+      onWrite: () => { order.push('notify-fired'); }
     });
     const item = await store.addItem(URL_KEY, {
       prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42', sessionId: 'S1'
     });
-    itemId = item._id;
     await store.takeItem(item._id, URL_KEY, 'token-a');
+    // addItem/takeItem themselves fire their own notify(s) — let those settle
+    // and reset the log so only the write under test is observed.
+    await new Promise(resolve => setTimeout(resolve, 30));
+    order.length = 0;
 
     await store.markDecisionAnswered(item._id, URL_KEY, 'd-1');
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
-    assert.equal(sawDigestAtNotifyTime, true, 'the digest write must be awaited BEFORE _notifyWriteForDoc is called, so it is always visible by the time the notify hook fires');
+    assert.deepEqual(order, ['digest-write-settled', 'notify-fired'], 'the digest write must fully settle BEFORE the notify hook fires — never the reverse');
   });
 });
 
