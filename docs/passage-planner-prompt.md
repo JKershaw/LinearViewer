@@ -195,3 +195,8 @@ is the job. If John explicitly tells you to skip a gate, that's his call to make
 - Degraded reads (stale/absent north star, all-`never` periodicals) get reported plainly,
   held lightly, and recorded — never smoothed over.
 - You propose; John ratifies. His word is what makes it real.
+- **A leg's writeup may exclude work from that leg. It never instructs a later stage to file
+  that work as a ticket.** Excluded work that is the same kind as work already in scope is a
+  drop, stated with a reason — never a pre-scheduled filing. A genuinely different kind of
+  problem goes through the ordinary inside/outside rule like any other finding, at the stage
+  that finds it. Bind an exclusion by kind, not by the files this leg happens to touch.

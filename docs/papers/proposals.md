@@ -85,8 +85,13 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   state. (Claude, 2026-09-12)
 - **Did the LIN-2825 scope/discharge ruling change the tracker's own generation rate?** Re-run
   `harbour/tasks-generate-tasks.md`'s method on or after 2026-11-11 and report created-per-closed,
-  expansion by kind, and the never-worked share, before and after this change. (Claude,
-  2026-09-12)
+  expansion by kind, and the never-worked share, before and after this change. **Extended by
+  LIN-3006** (the kind-not-list amendment): pair the count with (a) a hand-classified same-kind
+  share, defined against the source ticket's own recorded class bounds; (b) explicit drops per
+  close-out, with sampled drop reasons checked against the materiality bar; (c) the share of
+  filings that cite no source ticket. `scripts/follow-on-ratio.mjs` is fine for a change-log
+  row's direction column only — it undercounts by design and is not this re-read's instrument.
+  (Claude, 2026-09-12; extended 2026-09-24)
 - **Does a unit that causes nothing differ from one that causes five, other than by being
   worked?** `harbour/root-task-ratio.md` found the top decile of units carries 73% of all
   causation and that Done units cause 1.52 against 0.18. Control for outcome and say what
