@@ -51,8 +51,10 @@ jobs:
           MONGODB_TEST_URI: mongodb://localhost:27017
 
       # The acceptance criteria name BOTH arms: the escape count must be zero
-      # with proxy env set as well as unset, because native fetch ignores
-      # HTTPS_PROXY entirely and a proxy-based counter cannot see it. Cheap
+      # with proxy env set as well as unset. Since LIN-2992 the watcher also
+      # counts a connect to the configured HTTPS_PROXY/HTTP_PROXY endpoint as
+      # an escape, even on loopback, so a proxy-aware client reaching for the
+      # network shows up here rather than reading as a local server. Cheap
       # (~35s) and it is the arm that would otherwise never be run.
       - name: Run unit tests (hermetic, proxy env set)
         run: npm run test:hermetic:proxy

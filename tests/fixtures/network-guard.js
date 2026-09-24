@@ -85,6 +85,17 @@ export function guardNetwork() {
  * given a dispatcher, so proxy-based counting cannot see it either. Two
  * instruments, one blind spot each, the same escape invisible to both.
  *
+ * A THIRD blind spot closed later (LIN-2992): a proxy-AWARE client
+ * (`lib/openrouter.js`'s `customFetch`, `lib/proxy-fetch.js`'s
+ * `createProxyFetch`) routes through `HTTPS_PROXY`/`HTTP_PROXY` via
+ * `https-proxy-agent`, so the socket this guard sees connects to the proxy's
+ * own host:port, not to the real destination. When the proxy listens on
+ * loopback — as it does in Harbour cloud-agent containers — that connect read
+ * as loopback and a live, billable call passed as clean. `defaultIsLoopback`
+ * now also treats a connect matching the CURRENT `HTTPS_PROXY`/`HTTP_PROXY`/
+ * `https_proxy`/`http_proxy` endpoint (env read at connect time, matched by
+ * host and port) as an escape, whatever host the proxy happens to listen on.
+ *
  * WHY `net.Socket.prototype.connect`, and not the module functions. An earlier
  * version wrapped `net.connect` / `net.createConnection` / `tls.connect` — the
  * module exports — and that is NODE-VERSION DEPENDENT. Node 20's
@@ -111,11 +122,15 @@ export function guardNetwork() {
  * classified by STRING, so a non-loopback name that RESOLVES to 127.0.0.1
  * counts as an escape. Unix sockets are loopback in both call shapes
  * (`{ path }` has no host; the bare-string form is recognised by its leading
- * `/` in `defaultIsLoopback`).
+ * `/` in `defaultIsLoopback`). `ALL_PROXY`/`NO_PROXY` are not read — no
+ * `lib/` client or `https-proxy-agent` honours either, so there is nothing to
+ * classify against.
  *
  * @param {Object} [opts]
- * @param {(host: string|null) => boolean} [opts.isLoopback] - override the
- *   loopback predicate (for testing this guard itself).
+ * @param {(host: string|null, port: number|null) => boolean} [opts.isLoopback] -
+ *   override the loopback predicate (for testing this guard itself). A
+ *   single-argument override keeps working unchanged — the `port` argument is
+ *   simply ignored by a function that doesn't declare it.
  * @returns {{connections: Array<{host: string|null, port: number|null, kind: string}>, restore: () => void}}
  */
 export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
@@ -147,7 +162,7 @@ export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
 
   net.Socket.prototype.connect = function guardedSocketConnect(...args) {
     const { host, port } = destinationOf(args);
-    if (!isLoopback(host)) connections.push({ host, port, kind: 'net.Socket.connect' });
+    if (!isLoopback(host, port)) connections.push({ host, port, kind: 'net.Socket.connect' });
     return originalConnect.apply(this, args);
   };
 
@@ -163,6 +178,57 @@ export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
 }
 
 /**
+ * Parse one `HTTPS_PROXY`-shaped value into its `{ host, port }` endpoint, or
+ * `null` if it doesn't name one. Accepts a full URL (`http://host:port`) or a
+ * bare `host:port` — `https-proxy-agent` and the `lib/` clients that build one
+ * both accept either shape, so the guard must too. IPv6 brackets are
+ * stripped so the parsed host matches what `net.Socket.prototype.connect`
+ * actually receives as `host`/`hostname` (unbracketed).
+ *
+ * @param {string} spec
+ * @returns {{host: string, port: number}|null}
+ */
+function parseProxyEndpoint(spec) {
+  const raw = (spec || '').trim();
+  if (!raw) return null;
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(raw) ? raw : `http://${raw}`;
+  let url;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  if (!host) return null;
+  const port = url.port ? Number(url.port) : (url.protocol === 'https:' ? 443 : 80);
+  return { host, port };
+}
+
+/**
+ * The set of proxy endpoints ("host:port" strings) the process is currently
+ * configured to route through, read at CALL TIME rather than cached — tests
+ * mutate `HTTPS_PROXY`/etc. in-process (`next-run`, `openrouter`,
+ * `proxy-attachment-relay`, `recommend-*`), and a cached read would go stale
+ * the moment the first such test ran after this module loaded.
+ *
+ * EXPORTED for the same reason `defaultIsLoopback` is: so a caller that wants
+ * the raw set (rather than the loopback predicate) doesn't have to
+ * reimplement the four-spelling union.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {Set<string>} entries shaped `"host:port"`
+ */
+export function proxyEndpoints(env = process.env) {
+  const specs = [env.HTTPS_PROXY, env.HTTP_PROXY, env.https_proxy, env.http_proxy];
+  const endpoints = new Set();
+  for (const spec of specs) {
+    const endpoint = parseProxyEndpoint(spec);
+    if (endpoint) endpoints.add(`${endpoint.host}:${endpoint.port}`);
+  }
+  return endpoints;
+}
+
+/**
  * Hosts that are not an escape: the suite's own in-process servers.
  *
  * EXPORTED because `scripts/assert-unit-suite-hermetic.mjs` generates a
@@ -171,12 +237,31 @@ export function guardSockets({ isLoopback = defaultIsLoopback } = {}) {
  * then flagged a legitimate test as an escape. Two instruments disagreeing
  * about what they measure is the defect class this whole ticket is about, so
  * they now share one function rather than a convention.
+ *
+ * `port` is optional so existing single-argument callers/overrides are
+ * unaffected; it is only consulted for the proxy-endpoint check below, which
+ * needs it to tell a proxy connect apart from an ordinary loopback server on
+ * a different port (LIN-2992). `env` defaults to `process.env` for both real
+ * call sites; it is a parameter (not a hardcoded `proxyEndpoints()` call) so
+ * this file's own tests can exercise the proxy-matching branch against a
+ * fabricated env object — proving the parsing/matching logic without
+ * mutating real `process.env`, which the generated whole-suite watcher reads
+ * too and would otherwise flag the test's own local server as a genuine
+ * escape when run under `test:hermetic`.
  */
-export function defaultIsLoopback(host) {
+export function defaultIsLoopback(host, port, env = process.env) {
   if (!host) return true;
   // A unix-socket path, passed as a bare string to net.connect('/tmp/x.sock').
   // It never leaves the machine, so it is not an escape — and the `{ path }`
   // form already lands in the `!host` branch above, so both shapes agree.
   if (host.startsWith('/')) return true;
+  // A connect to the CURRENT proxy endpoint is never loopback, even though its
+  // host is typically 127.0.0.1: it is the socket a proxy-aware client
+  // (lib/openrouter.js, lib/proxy-fetch.js) opens on the way to a real,
+  // possibly billable, remote destination. Checked BEFORE the loopback-literal
+  // return below, or a proxy listening on 127.0.0.1 would never reach this
+  // branch. Matched by host AND port so an ordinary in-process test server on
+  // a different port is unaffected.
+  if (proxyEndpoints(env).has(`${host}:${port}`)) return false;
   return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0';
 }

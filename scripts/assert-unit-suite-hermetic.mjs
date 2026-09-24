@@ -19,7 +19,11 @@
  * WHAT COUNTS AS AN ESCAPE. Non-loopback `net.connect` / `net.createConnection`
  * / `tls.connect`. Loopback is excluded because the suite's own house pattern is
  * `app.listen(0, '127.0.0.1')` plus a real `fetch` against it (CLAUDE.md), which
- * is legitimate and would otherwise drown the signal.
+ * is legitimate and would otherwise drown the signal. A connect to the CURRENT
+ * `HTTPS_PROXY`/`HTTP_PROXY` endpoint also counts as an escape, whatever host
+ * it listens on — a proxy-aware client routes its real destination's traffic
+ * through that socket, so a loopback proxy must not read as a loopback server
+ * (LIN-2992).
  *
  * MEASURED BASELINE, for anyone who wants to know this works. At `44ffe713`,
  * before the fix, this reported 8 connections to `api.linear.app:443` from 8
@@ -91,7 +95,7 @@ function destinationOf(args) {
 const originalConnect = net.Socket.prototype.connect;
 net.Socket.prototype.connect = function (...args) {
   const { host, port } = destinationOf(args);
-  if (!loopback(host)) {
+  if (!loopback(host, port)) {
     hits.push({ kind: 'net.Socket.connect', host, port, argv: process.argv.slice(1).join(' ') });
   }
   return originalConnect.apply(this, args);
@@ -115,9 +119,13 @@ const env = {
   NODE_OPTIONS: [process.env.NODE_OPTIONS, `--import ${JSON.stringify(watcherPath)}`].filter(Boolean).join(' '),
 };
 if (withProxy) {
-  // Deliberately a dead loopback port. The point is only that the env vars are
-  // SET: the original investigation showed the escape count is identical with
-  // and without them, because native `fetch` ignores them entirely.
+  // Deliberately a dead loopback port. Since LIN-2992 the watcher recognizes a
+  // connect to this exact host:port as an attempted escape in its own right,
+  // so a proxy-aware client (openrouter.js, proxy-fetch.js) now shows up here
+  // as a reported attempt rather than silently failing to reach a dead port.
+  // On a clean, keyless suite nothing routes through the proxy, so this arm
+  // still stays green - the dead port only matters once something tries to
+  // use it.
   env.HTTPS_PROXY = 'http://127.0.0.1:9';
   env.HTTP_PROXY = 'http://127.0.0.1:9';
 }

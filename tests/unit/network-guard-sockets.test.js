@@ -25,7 +25,25 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import net from 'node:net';
-import { guardNetwork, guardSockets } from '../fixtures/network-guard.js';
+import { guardNetwork, guardSockets, defaultIsLoopback, proxyEndpoints } from '../fixtures/network-guard.js';
+
+/**
+ * Save the current value (or absence) of `process.env[key]`, set `value`, and
+ * return a restorer. Uses `hasOwnProperty` rather than `=== undefined` so a
+ * key that was never set is deleted again rather than left as `'undefined'` —
+ * the same pattern `lin-2353-feedback-triage-provider-ui.test.js` uses for its
+ * own env pin, so a failure partway through a test can't leak a proxy var into
+ * a sibling test.
+ */
+function withEnvVar(key, value) {
+  const had = Object.prototype.hasOwnProperty.call(process.env, key);
+  const prev = process.env[key];
+  process.env[key] = value;
+  return () => {
+    if (had) process.env[key] = prev;
+    else delete process.env[key];
+  };
+}
 
 /**
  * Run `fn(origin)` against a server that exists only for this call.
@@ -225,6 +243,164 @@ describe('LIN-1880: guardSockets sees the transport layer', () => {
     guard.restore();
     guard.restore(); // second call must be a no-op, not a re-restore of a patched fn
     assert.equal(net.Socket.prototype.connect, before, 'prototype restored');
+  });
+});
+
+/**
+ * Wire a fabricated env object into `defaultIsLoopback` via `guardSockets`'
+ * override seam, rather than mutating real `process.env`. `guardSockets`'
+ * `isLoopback` option only ever receives `(host, port)`, never `env` — so a
+ * FAKE env is closed over here and threaded through as `defaultIsLoopback`'s
+ * own third, testing-only parameter.
+ *
+ * This is deliberate, not incidental: the tests below make a REAL local
+ * connect to prove the wiring end-to-end, and this suite runs under
+ * `test:hermetic`'s own instance of this exact guard (installed at the whole
+ * -process level via `--import`). If these tests set the REAL
+ * `HTTPS_PROXY`/etc. to match that real connect, the whole-suite watcher
+ * would — correctly, by the very design this ticket adds — also see it as an
+ * escape, and this file would start failing `test:hermetic` despite testing
+ * exactly the intended, contained behavior. Routing the fake config through
+ * `env` instead keeps the proxy-endpoint match entirely local to the guard
+ * instance under test.
+ */
+function guardWithFakeProxyEnv(fakeEnv) {
+  return guardSockets({ isLoopback: (host, port) => defaultIsLoopback(host, port, fakeEnv) });
+}
+
+describe('LIN-2992: proxy-endpoint connects are escapes', () => {
+  test('a connect to the configured HTTPS_PROXY host:port is recorded, even though the host is 127.0.0.1', async () => {
+    // This is the bug: a proxy-aware client's socket connects to the PROXY,
+    // not to the real destination, and the proxy commonly listens on
+    // loopback. Pointing a fake HTTPS_PROXY at a real local server and
+    // connecting to it directly reproduces exactly the socket shape a
+    // proxy-aware client would open — same host, same port.
+    await withFreshServer(async (url) => {
+      const { port } = new URL(url);
+      const guard = guardWithFakeProxyEnv({ HTTPS_PROXY: `http://127.0.0.1:${port}` });
+      try {
+        await fetch(url);
+      } finally {
+        guard.restore();
+      }
+      assert.ok(
+        guard.connections.some((c) => c.host === '127.0.0.1' && String(c.port) === String(port)),
+        'a connect to the configured proxy endpoint must be reported as an escape'
+      );
+    });
+  });
+
+  test('an ordinary loopback server on a DIFFERENT port stays clean with a proxy configured elsewhere', async () => {
+    await withFreshServer(async (url) => {
+      const { port } = new URL(url);
+      // Point the fake proxy at a port that is NOT the test server's port.
+      const otherPort = Number(port) === 65535 ? Number(port) - 1 : Number(port) + 1;
+      const guard = guardWithFakeProxyEnv({ HTTPS_PROXY: `http://127.0.0.1:${otherPort}` });
+      try {
+        await httpRequestOnce(url);
+      } finally {
+        guard.restore();
+      }
+      assert.deepEqual(guard.connections, [], 'a loopback server on another port is not the configured proxy');
+    });
+  });
+
+  test('all four proxy-variable spellings are each individually recognized', async () => {
+    for (const key of ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy']) {
+      await withFreshServer(async (url) => {
+        const { port } = new URL(url);
+        const guard = guardWithFakeProxyEnv({ [key]: `http://127.0.0.1:${port}` });
+        try {
+          await fetch(url);
+        } finally {
+          guard.restore();
+        }
+        assert.ok(
+          guard.connections.some((c) => c.host === '127.0.0.1' && String(c.port) === String(port)),
+          `${key} must be recognized as a proxy endpoint`
+        );
+      });
+    }
+  });
+
+  test('scheme default ports and bracketed IPv6 are parsed correctly', () => {
+    assert.ok(
+      proxyEndpoints({ HTTPS_PROXY: 'https://proxy.example' }).has('proxy.example:443'),
+      'https:// with no explicit port defaults to 443'
+    );
+    assert.ok(
+      proxyEndpoints({ HTTP_PROXY: 'http://proxy.example' }).has('proxy.example:80'),
+      'http:// with no explicit port defaults to 80'
+    );
+    assert.ok(
+      proxyEndpoints({ HTTPS_PROXY: 'http://[::1]:9999' }).has('::1:9999'),
+      'IPv6 brackets are stripped so the host matches connect() args'
+    );
+    assert.ok(
+      proxyEndpoints({ HTTPS_PROXY: '127.0.0.1:8080' }).has('127.0.0.1:8080'),
+      'a bare host:port with no scheme is accepted'
+    );
+  });
+
+  test('env is read at connect time, not at guard-construction time', async () => {
+    await withFreshServer(async (url) => {
+      const { port } = new URL(url);
+      const fakeEnv = {}; // empty at guard-construction time
+      const guard = guardWithFakeProxyEnv(fakeEnv);
+      fakeEnv.HTTPS_PROXY = `http://127.0.0.1:${port}`; // set AFTER construction
+      try {
+        await fetch(url);
+      } finally {
+        guard.restore();
+      }
+      assert.ok(
+        guard.connections.some((c) => c.host === '127.0.0.1' && String(c.port) === String(port)),
+        'a proxy var set after the guard is constructed must still be honoured'
+      );
+    });
+  });
+
+  test('the real HTTPS_PROXY/HTTP_PROXY/https_proxy/http_proxy vars are read when env is not overridden', () => {
+    // The tests above inject a fake env to keep this file hermetic-safe (see
+    // guardWithFakeProxyEnv). This test proves defaultIsLoopback's DEFAULT
+    // parameter really is process.env, using a tight save/restore window with
+    // no socket connect in it — so nothing here is visible to the whole-suite
+    // watcher, but the real-env code path is still pinned.
+    const restore = withEnvVar('HTTPS_PROXY', 'http://127.0.0.1:0');
+    try {
+      assert.equal(defaultIsLoopback('127.0.0.1', 0), false, 'must consult real process.env by default');
+    } finally {
+      restore();
+    }
+    assert.equal(defaultIsLoopback('127.0.0.1', 0), true, 'restored env: back to an ordinary loopback address');
+  });
+
+  test('a custom single-argument isLoopback override still works unchanged', async () => {
+    // The existing house pattern in this file (`isLoopback: () => false`) takes
+    // no arguments at all. Passing (host, port) to it must not break — JS
+    // simply ignores the extra argument.
+    await withFreshServer(async (url) => {
+      const guard = guardSockets({ isLoopback: () => false });
+      try {
+        await fetch(url);
+      } finally {
+        guard.restore();
+      }
+      assert.ok(guard.connections.length > 0, 'a zero-arg override must still receive and correctly classify the call');
+    });
+  });
+
+  test('defaultIsLoopback still treats ordinary loopback literals as loopback when no proxy is configured', () => {
+    // An explicit empty env, not the ambient process.env: this file itself
+    // runs under `test:hermetic:proxy`, which sets real HTTPS_PROXY/HTTP_PROXY
+    // to a dead port for the whole process, so process.env cannot be assumed
+    // proxy-free here.
+    const noProxyEnv = {};
+    assert.equal(proxyEndpoints(noProxyEnv).size, 0, 'precondition: the fabricated env has no proxy vars');
+    assert.equal(defaultIsLoopback('127.0.0.1', 12345, noProxyEnv), true);
+    assert.equal(defaultIsLoopback('localhost', 80, noProxyEnv), true);
+    assert.equal(defaultIsLoopback('::1', 443, noProxyEnv), true);
+    assert.equal(defaultIsLoopback('example.com', 443, noProxyEnv), false);
   });
 });
 
