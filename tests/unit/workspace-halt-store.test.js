@@ -109,14 +109,14 @@ describe('WorkspaceHaltStore', () => {
     assert.ok(proxyLine && /\bworkspaceHaltStore\b/.test(proxyLine), 'workspaceHaltStore must be passed to createProxyRoutes');
   });
 
-  test("G1: server.js's workspace-halt collection feeds new WorkspaceHaltStore(", () => {
+  test("G1: server.js's workspace-halt collection is actually bound into new WorkspaceHaltStore(", () => {
     assert.ok(
-      /db\.collection\(['"]workspace-halt['"]\)/.test(SERVER_SRC),
-      "server.js must construct db.collection('workspace-halt')"
+      /const workspaceHaltCollection = db\.collection\(['"]workspace-halt['"]\)/.test(SERVER_SRC),
+      "server.js must construct workspaceHaltCollection from db.collection('workspace-halt')"
     );
     assert.ok(
-      /new WorkspaceHaltStore\(/.test(SERVER_SRC),
-      'server.js must construct new WorkspaceHaltStore('
+      /new WorkspaceHaltStore\(\{\s*collection: workspaceHaltCollection\s*\}\)/.test(SERVER_SRC),
+      'server.js must construct new WorkspaceHaltStore({ collection: workspaceHaltCollection }) — the store must receive the workspace-halt collection, not merely appear near it'
     );
   });
 });
