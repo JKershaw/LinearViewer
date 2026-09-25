@@ -17,6 +17,21 @@ const UUID_DISPATCH_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 let queueListPollId = null
 const QUEUE_LIST_POLL_MS = 3000
 
+// Workspace halt polling state (LIN-2994 Surface 4 / LIN-3026). Halt changes
+// rarely, so this gets its own slow interval rather than piggybacking on the
+// queue's 3s timer (which would couple the two sections and triple the reads
+// for no benefit).
+let haltPollId = null
+const HALT_POLL_MS = 30000
+// A halt read that hasn't answered by now is treated as a failed read, so a
+// hung GET shows the failure state + disclosure instead of "Loading…"
+// forever (close-out L9).
+const HALT_READ_TIMEOUT_MS = 10000
+// The last halt state successfully read or written (`undefined` until the
+// first success). A failed read/write keeps showing it rather than replacing
+// it with failure text, since the server still holds it (close-out L3).
+let haltLastKnown
+
 // =============================================================================
 // Dispatch Prompt
 // =============================================================================
@@ -733,6 +748,145 @@ function initQueueList() {
 }
 
 // =============================================================================
+// Workspace Halt (LIN-2994 Surface 4 / LIN-3026)
+//
+// Decision-4 best-effort surface: this is a REQUEST only. The runner does not
+// yet honor it (pending LIN-2995), so the status copy must always say
+// "requested", never "paused"/"stopped". Its own small client-side read; no
+// server-render-path involvement (server.js is untouched).
+// =============================================================================
+
+// The degraded-mode disclosure has exactly one source: the server-rendered
+// `.halt-disclaimer` (lib/render-dispatch.js). Every client-side failure
+// state reads that node's own markup rather than keeping a second literal
+// here, so the two can never drift (close-out L1) — an operator sees
+// identical wording whether the page loaded fine or is failing to load.
+function haltDisclosureHtml() {
+  const disclaimerEl = document.querySelector('.halt-disclaimer')
+  return disclaimerEl ? disclaimerEl.innerHTML : ''
+}
+
+// The same disclosure as plain text, for toasts (which render text only).
+function haltDisclosureText() {
+  const disclaimerEl = document.querySelector('.halt-disclaimer')
+  return disclaimerEl ? disclaimerEl.textContent : ''
+}
+
+/**
+ * Builds the requested-not-effective status line for a halt object (or the
+ * unset state). Never renders "paused"/"stopped", and drops the "by <who>"
+ * clause entirely when `setBy` is null rather than rendering "by null".
+ */
+function formatHaltStatusHtml(halt) {
+  if (!halt) return 'No halt requested.'
+  const verb = halt.mode === 'stop' ? 'Stop' : 'Pause'
+  const time = escapeHtml(new Date(halt.setAt).toLocaleString())
+  const by = halt.setBy ? ` by ${escapeHtml(halt.setBy)}` : ''
+  return `${verb} requested — ${time}${by}. The runner does not yet honor this (pending LIN-2995).`
+}
+
+function renderHaltStatus(halt) {
+  haltLastKnown = halt
+  const statusEl = document.querySelector('.halt-status')
+  if (statusEl) statusEl.innerHTML = formatHaltStatusHtml(halt)
+}
+
+function renderHaltFailure(actionLabel) {
+  const statusEl = document.querySelector('.halt-status')
+  if (!statusEl) return
+  const failure = `${actionLabel} ${haltDisclosureHtml()}`
+  statusEl.innerHTML = haltLastKnown === undefined
+    ? failure
+    : `Last known: ${formatHaltStatusHtml(haltLastKnown)}<br>${failure}`
+}
+
+function toastHaltFailure(message) {
+  toast(`${message} ${haltDisclosureText()}`, { type: 'error', duration: 10000 })
+}
+
+async function refreshHaltStatus(urlKey) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), HALT_READ_TIMEOUT_MS)
+  try {
+    const { halt } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/halt`, { on401: false, signal: controller.signal })
+    renderHaltStatus(halt)
+  } catch (e) {
+    console.error('Failed to load workspace halt:', e)
+    renderHaltFailure('Failed to load halt status.')
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function requestWorkspaceHalt(urlKey, mode) {
+  try {
+    const { halt } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/halt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+      on401: false
+    })
+    // Render straight from the write response — no extra GET round-trip.
+    renderHaltStatus(halt)
+  } catch (e) {
+    console.error('Failed to request workspace halt:', e)
+    renderHaltFailure(`Failed to request ${mode}.`)
+    toastHaltFailure(`Failed to request ${mode}: ${e.message}.`)
+  }
+}
+
+async function resumeWorkspaceHalt(urlKey) {
+  try {
+    await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/halt`, { method: 'DELETE', on401: false })
+    renderHaltStatus(null)
+  } catch (e) {
+    console.error('Failed to resume workspace:', e)
+    renderHaltFailure('Failed to resume.')
+    toastHaltFailure(`Failed to resume: ${e.message}.`)
+  }
+}
+
+/**
+ * Initialize the Workspace Halt section: its own small read, a slow periodic
+ * refresh (document.hidden skip, cleared in the shared beforeunload handler
+ * alongside the queue timer), and the Pause/Stop/Resume controls.
+ */
+function initWorkspaceHalt() {
+  const statusEl = document.querySelector('.halt-status')
+  if (!statusEl) return
+
+  const urlKey = statusEl.dataset.urlKey
+  refreshHaltStatus(urlKey)
+
+  haltPollId = setInterval(() => {
+    if (!document.hidden) {
+      refreshHaltStatus(urlKey)
+    }
+  }, HALT_POLL_MS)
+
+  // The halt controls are `type="button"`, never `type="submit"` — this
+  // `<form>` never fires a submit event, so it cannot be picked up by
+  // #create-token-form's id-scoped submit handler (or any other form's).
+  // Click delegation only, matching the queue list's remove-button pattern.
+  const form = document.querySelector('.halt-form')
+  if (form) {
+    form.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.action-btn')
+      if (!btn) return
+      e.preventDefault()
+
+      if (btn.classList.contains('halt-pause')) {
+        await requestWorkspaceHalt(urlKey, 'pause')
+      } else if (btn.classList.contains('halt-stop')) {
+        await requestWorkspaceHalt(urlKey, 'stop')
+      } else if (btn.classList.contains('halt-resume')) {
+        await resumeWorkspaceHalt(urlKey)
+      }
+    })
+  }
+}
+
+// =============================================================================
 // Token Management
 // =============================================================================
 
@@ -1094,6 +1248,10 @@ window.addEventListener('beforeunload', () => {
     clearInterval(queueListPollId)
     queueListPollId = null
   }
+  if (haltPollId) {
+    clearInterval(haltPollId)
+    haltPollId = null
+  }
 })
 
 // =============================================================================
@@ -1103,6 +1261,7 @@ window.addEventListener('beforeunload', () => {
 document.addEventListener('DOMContentLoaded', () => {
   initDispatchPagePrompt()
   initDispatchToggle()
+  initWorkspaceHalt()
   initQueueList()
   initDispatchTokenManagement()
   initDispatchHistory()

@@ -20,6 +20,7 @@
  */
 import { Router } from 'express';
 import { badRequest, jsonError } from '../lib/errors.js';
+import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 
 const HALT_ROUTE = '/api/proxy/dispatch/halt';
 
@@ -66,16 +67,16 @@ export function createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authen
 
   /**
    * POST /api/proxy/dispatch/halt
-   * Body `{ mode: 'pause' | 'stop' }`; anything else is a 400. `setBy` is
-   * attributed from the token creator (`null` for a legacy ownerless
+   * Body `{ mode }` with `mode` one of `HALT_MODES`; anything else is a 400.
+   * `setBy` is attributed from the token creator (`null` for a legacy ownerless
    * token — the proxy-dispatch.js:354 precedent — rather than rejecting the
    * halt outright).
    */
   router.post(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     const { mode } = req.body || {};
-    if (mode !== 'pause' && mode !== 'stop') {
+    if (!HALT_MODES.includes(mode)) {
       logEvent(req, HALT_ROUTE, 400);
-      return badRequest.json(res, "mode must be 'pause' or 'stop'");
+      return badRequest.json(res, HALT_MODE_ERROR);
     }
 
     if (!workspaceHaltStore) {

@@ -38,6 +38,7 @@ import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, ap
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
+import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -983,6 +984,89 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Failed to remove favorite prompt:', err.message);
       jsonError(res, 500, 'Failed to remove favorite prompt');
+    }
+  });
+
+  // =========================================================================
+  // Workspace Halt API (Session Auth) — LIN-2994 Surface 4 / LIN-3026
+  //
+  // MUST be registered before `DELETE /workspace/:urlKey/api/dispatch/:itemId`
+  // below — otherwise `DELETE .../dispatch/halt` falls into that UUID-gated
+  // route and returns 400 "Invalid item ID format" instead of clearing the
+  // halt, silently breaking Resume. See routes/task-chat.js:289-292 for the
+  // same literal-before-`/:param` guard, and
+  // tests/unit/task-chat-route.test.js:177-192 for the precedent witness
+  // pattern this file's own DELETE-not-captured test follows.
+  //
+  // This is a REQUEST-only surface (Decision 4, best-effort): setting a halt
+  // does not itself pause or stop anything — the runner does not yet honor it
+  // (pending LIN-2995). No per-write audit log is added here; the halt
+  // document's own `setAt`/`setBy` is its audit trail.
+  // =========================================================================
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/halt
+   * Reuses the poll handler's own `projectHaltForPoll` (this file, above) so
+   * there is exactly one `{mode,setAt,setBy}` projection, not a third copy.
+   */
+  router.get('/workspace/:urlKey/api/dispatch/halt', workspaceFromUrl, async (req, res) => {
+    if (!workspaceHaltStore) {
+      return serviceUnavailable.json(res, 'Failed to read halt');
+    }
+
+    try {
+      const doc = await workspaceHaltStore.getWorkspaceHalt(req.workspace.urlKey);
+      res.json({ halt: projectHaltForPoll(doc) });
+    } catch (err) {
+      console.error('Workspace halt read error:', err.message);
+      jsonError(res, 500, 'Failed to read halt');
+    }
+  });
+
+  /**
+   * POST /workspace/:urlKey/api/dispatch/halt
+   * Body `{ mode }` with `mode` one of `HALT_MODES`; anything else is a 400,
+   * checked before any write. `setBy` is the session's own accountId (`null`
+   * when absent), exactly as the tokens route attributes `createdBy` above.
+   */
+  router.post('/workspace/:urlKey/api/dispatch/halt', workspaceFromUrl, async (req, res) => {
+    const { mode } = req.body || {};
+    if (!HALT_MODES.includes(mode)) {
+      return badRequest.json(res, HALT_MODE_ERROR);
+    }
+
+    if (!workspaceHaltStore) {
+      return serviceUnavailable.json(res, 'Failed to set halt');
+    }
+
+    const setBy = req.session?.accountId || null;
+    const now = new Date();
+
+    try {
+      await workspaceHaltStore.setWorkspaceHalt(req.workspace.urlKey, { mode, setBy, now });
+      res.json({ success: true, halt: { mode, setAt: now, setBy } });
+    } catch (err) {
+      console.error('Workspace halt set error:', err.message);
+      jsonError(res, 500, 'Failed to set halt');
+    }
+  });
+
+  /**
+   * DELETE /workspace/:urlKey/api/dispatch/halt
+   * Resume: clears the stored halt request. Idempotent — harmless when
+   * nothing is set (the store's own `deleteOne` semantics).
+   */
+  router.delete('/workspace/:urlKey/api/dispatch/halt', workspaceFromUrl, async (req, res) => {
+    if (!workspaceHaltStore) {
+      return serviceUnavailable.json(res, 'Failed to clear halt');
+    }
+
+    try {
+      await workspaceHaltStore.clearWorkspaceHalt(req.workspace.urlKey);
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Workspace halt clear error:', err.message);
+      jsonError(res, 500, 'Failed to clear halt');
     }
   });
 

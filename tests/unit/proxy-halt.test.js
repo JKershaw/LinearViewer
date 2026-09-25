@@ -114,7 +114,8 @@ describe('LIN-3025: GET/POST/DELETE /api/proxy/dispatch/halt (composed router)',
 
     const { status, body } = await call(app, 'POST', PATH, { body: { mode: 'resume' } });
     assert.equal(status, 400);
-    assert.ok(body.error);
+    // Exact bytes (LIN-3026 close-out L8): derived from HALT_MODES, unchanged.
+    assert.equal(body.error, "mode must be 'pause' or 'stop'");
     assert.deepEqual(setCalls, [], 'setWorkspaceHalt must not be called on an invalid mode');
   });
 
