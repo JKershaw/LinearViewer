@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 import { parseTranscriptLines, sessionSpend, partitionByDispatchTime, __internal } from '../lib/transcript-spend.js';
 import { decomposeEffort } from '../lib/wall-clock-summary.js';
 import { classifyUpstreamError } from '../lib/errors.js';
+import { isDecisionLifecycleStampEntry } from '../lib/digest-feedback.js';
 
 const BASE = process.env.PROXY_BASE || 'https://projects.jkershaw.com/api/proxy';
 const TOKEN = process.env.PROXY_TOKEN;
@@ -83,8 +84,13 @@ export function computeCompleteness({ attempted, joined, detailSkipped, transcri
 }
 
 const LAUNCH_RE = /session\s+launched\s*\(session:\s*([0-9a-f]{6,})/i;
-function launchedPrefix(feedback = []) {
+// LIN-3037: LAUNCH_RE is unanchored and had no kind filter, so a
+// decision-lifecycle stamp whose free-text `reason` happens to contain a
+// "Session launched (session: <hex>)"-shaped string could win the join key
+// ahead of (or instead of) the real launch line. Skip the three stamp kinds.
+export function launchedPrefix(feedback = []) {
   for (const f of feedback) {
+    if (isDecisionLifecycleStampEntry(f)) continue;
     const m = LAUNCH_RE.exec(f?.message || '');
     if (m) return m[1].toLowerCase();
   }
