@@ -2419,7 +2419,7 @@ Returns:
 DELETE /api/proxy/dispatch/halt
 ```
 
-**Requires `readWrite`.** Clears the request, resuming the workspace. Harmless when nothing is set.
+**Requires `readWrite`.** Clears the stored halt request. Like `POST`, this changes only the stored request: the runner does not yet honor it (pending LIN-2995), so clearing it does not by itself change what a running session does. Harmless when nothing is set.
 
 ```json
 { "success": true }

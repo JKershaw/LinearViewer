@@ -9,8 +9,9 @@
  * asserts that all 55 registrations still resolve"). This file is that
  * replacement, landed as PR-0 (no handler moves) before any group is moved.
  *
- * All 71 (method, URL) forms — 61 route registrations, 10 of them
- * array-path aliases (2 URL forms each) — are driven through
+ * 71 covered (method, URL) forms (3 `routes/proxy-rulings.js` forms
+ * known-uncovered; see the Group K comment below) — 61 route registrations,
+ * 10 of them array-path aliases (2 URL forms each) — are driven through
  * `createProxyRoutes` over REAL HTTP (an express app + `fetch`, the pattern
  * already established by tests/unit/proxy-route-aliases.test.js), each
  * against a deterministic, offline/network-free input chosen to be the
@@ -542,7 +543,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (all 71 URL forms resolve)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (71 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();

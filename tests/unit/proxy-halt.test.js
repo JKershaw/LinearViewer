@@ -250,6 +250,34 @@ describe('LIN-3025: GET/POST/DELETE /api/proxy/dispatch/halt (composed router)',
     assert.ok(body.error);
   });
 
+  // LIN-3025 review ledger L3: the POST/DELETE null-store branches. Without
+  // the handler's own `!workspaceHaltStore` guard, `null.setWorkspaceHalt()`
+  // would throw a TypeError inside the same try and the catch would still
+  // answer a JSON 500 + logEvent 500 — so the 500 alone cannot tell the guard
+  // from an accident. The guard never reaches the catch's console.error
+  // ("Workspace halt … error"), which is what pins it here.
+  for (const [method, reqOpts] of [['POST', { body: { mode: 'pause' } }], ['DELETE', {}]]) {
+    test(`${method}: a null workspaceHaltStore is a JSON 500 with logEvent 500, handled by the guard (never dereferenced)`, async (t) => {
+      const recorded = [];
+      const consoleError = t.mock.method(console, 'error', () => {});
+      const app = buildApp({
+        workspaceHaltStore: null,
+        proxyEventStore: { ...BASE_DEPS().proxyEventStore, recordEvent: async (event) => { recorded.push(event); } },
+      });
+
+      const { status, body } = await call(app, method, PATH, reqOpts);
+      assert.equal(status, 500);
+      assert.equal(typeof body.error, 'string');
+      assert.ok(body.error.length > 0);
+      assert.deepEqual(
+        recorded.filter((e) => e.endpoint === PATH).map((e) => `${e.method} ${e.status}`),
+        [`${method} 500`],
+      );
+      const haltStoreErrors = consoleError.mock.calls.filter((c) => /^Workspace halt .* error:/.test(String(c.arguments[0])));
+      assert.deepEqual(haltStoreErrors.map((c) => c.arguments.join(' ')), [], 'a null store must be handled by the guard, not by catching a TypeError from dereferencing it');
+    });
+  }
+
   test('never touches Linear/provider access, resolveWorkspaceAccess, getWorkspaceAccessToken, or the dispatch queue', async () => {
     const app = buildApp({
       workspaceHaltStore: makeFakeHaltStore(),

@@ -99,8 +99,10 @@ export function createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authen
 
   /**
    * DELETE /api/proxy/dispatch/halt
-   * Same auth as POST. Resumes a halted workspace; harmless when nothing is
-   * set (the store's own `deleteOne` semantics).
+   * Same auth as POST. Clears the stored halt request only; like POST, the
+   * runner does not yet honor it (pending LIN-2995), so no runner effect is
+   * claimed. Harmless when nothing is set (the store's own `deleteOne`
+   * semantics).
    */
   router.delete(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     if (!workspaceHaltStore) {
