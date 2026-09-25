@@ -30,6 +30,9 @@ function createMockCollection() {
         // Honour top-level equality on taskIdentifier so this mock mirrors real
         // MangoDB/MongoDB query matching (LIN-613 pushes this filter into the query).
         if (query.taskIdentifier && doc.taskIdentifier !== query.taskIdentifier) return false;
+        // Honour top-level equality on dispatchId (LIN-2934 D1 pushes this
+        // general-anchor filter into the query too).
+        if (query.dispatchId && doc.dispatchId !== query.dispatchId) return false;
         // Honour the 30-day `since` window (LIN-622) the feed read pushes down,
         // and the exclusive `until` upper bound (LIN-1494) the live-console
         // history cursor pushes down.
@@ -292,6 +295,52 @@ describe('AgentStatusStore.listStatus', () => {
       const unattributed = await store.listStatus('ws-1', { taskIdentifier: 'LIN-9', tokenId: '__unattributed__' });
       assert.strictEqual(unattributed.total, 1);
       assert.strictEqual(unattributed.items[0].tokenId, undefined);
+    });
+  });
+
+  // LIN-2934 D1: the general-anchor agent-status read (getSessionsForIssues
+  // extraItems) looks up entries by dispatchId rather than taskIdentifier —
+  // some workers record status under a free-form taskIdentifier the anchor's
+  // own id can't find, but dispatchId always can. That filter must ride into
+  // the query so the {urlKey, dispatchId} index bounds the read, not a JS
+  // post-filter over the whole workspace log.
+  describe('dispatchId pushdown', () => {
+    test('pushes dispatchId into the collection query (not a JS post-filter)', async () => {
+      await store.recordStatus({ urlKey: 'ws-1', taskIdentifier: 'LIN-1', dispatchId: 'disp-3', action: 'a', status: 'completed', summary: 's' });
+      collection._queries.length = 0;
+
+      await store.listStatus('ws-1', { dispatchId: 'disp-3' });
+
+      assert.strictEqual(collection._queries.length, 1, 'exactly one query issued');
+      assert.strictEqual(
+        collection._queries[0].dispatchId,
+        'disp-3',
+        'the general-anchor filter must be in the query sent to the store, so a real DB ' +
+        'uses the {urlKey, dispatchId} index instead of scanning the workspace'
+      );
+    });
+
+    test('returns only the requested dispatch\'s entries', async () => {
+      await store.recordStatus({ urlKey: 'ws-1', taskIdentifier: 'LIN-1', dispatchId: 'disp-1', action: 'a', status: 'completed', summary: 's' });
+      await store.recordStatus({ urlKey: 'ws-1', taskIdentifier: 'other-task', dispatchId: 'disp-1', action: 'a', status: 'completed', summary: 's' });
+      await store.recordStatus({ urlKey: 'ws-1', taskIdentifier: 'LIN-2', dispatchId: 'disp-2', action: 'a', status: 'completed', summary: 's' });
+
+      const result = await store.listStatus('ws-1', { dispatchId: 'disp-1' });
+      assert.strictEqual(result.total, 2);
+      assert.ok(result.items.every(item => item.dispatchId === 'disp-1'));
+    });
+
+    test('omitting dispatchId leaves it out of the query (workspace-wide read)', async () => {
+      await seed('ws-1', 3);
+      collection._queries.length = 0;
+
+      await store.listStatus('ws-1');
+
+      assert.strictEqual(collection._queries.length, 1);
+      assert.ok(
+        !('dispatchId' in collection._queries[0]),
+        'unscoped reads must not carry a dispatchId predicate'
+      );
     });
   });
 });

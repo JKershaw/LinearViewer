@@ -109,6 +109,17 @@ describe('db-indexes', () => {
     assert.ok(hasIt, 'dispatch-history must have a {urlKey:1, resolvedAt:-1} index');
   });
 
+  test('declares the general-anchor agent-status dispatchId index (LIN-2934 D1)', () => {
+    // Backs AgentStatusStore.listStatus's dispatchId pushdown (the
+    // getSessionsForIssues extraItems anchor read) so it uses the
+    // {urlKey, dispatchId} index instead of scanning the workspace's status log.
+    const hasIt = INDEX_SPECS.some(s =>
+      s.collection === 'foreman-status' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, dispatchId: 1 })
+    );
+    assert.ok(hasIt, 'foreman-status must have a {urlKey:1, dispatchId:1} index');
+  });
+
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
     // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
     // last-CHANGED — updatedAt only moves on a genuine transition, so an
