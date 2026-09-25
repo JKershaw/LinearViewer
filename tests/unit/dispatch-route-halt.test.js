@@ -139,7 +139,9 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
 
         const { status, body } = await call(app, 'POST', PATH, { mode });
         assert.equal(status, 400);
-        assert.ok(body.error);
+        // Exact bytes (close-out L8): the message is now derived from
+        // HALT_MODES and must stay identical to the original hand-written one.
+        assert.equal(body.error, "mode must be 'pause' or 'stop'");
         assert.deepEqual(setCalls, [], 'setWorkspaceHalt must never be called on an invalid mode');
       });
     }
@@ -159,6 +161,30 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
       const { body } = await call(app, 'POST', PATH, { mode: 'pause' });
       assert.equal(body.halt.setBy, null);
     });
+  });
+
+  // Close-out L6 (class b): the dashboard write path must land on the shared
+  // store's last-known cache — the one the poll handler's bounded-read
+  // fallback reads (LIN-3024) — not just on the collection. No GET is issued
+  // in between, so only the POST/DELETE themselves can have warmed the cache;
+  // a route that bypassed the store and wrote the collection directly would
+  // still pass the GET round-trip test above, but not this one.
+  test('POST and DELETE update the shared store\'s last-known cache (the poll fallback\'s source)', async () => {
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const app = buildApp({ workspaceHaltStore });
+    assert.equal(workspaceHaltStore.getLastKnownHalt(URL_KEY), null);
+
+    const posted = await call(app, 'POST', PATH, { mode: 'stop' });
+    assert.equal(posted.status, 200);
+    assert.deepEqual(workspaceHaltStore.getLastKnownHalt(URL_KEY), {
+      mode: 'stop',
+      setAt: new Date(posted.body.halt.setAt),
+      setBy: 'acct-1',
+    });
+
+    const deleted = await call(app, 'DELETE');
+    assert.equal(deleted.status, 200);
+    assert.equal(workspaceHaltStore.getLastKnownHalt(URL_KEY), null);
   });
 
   test('DELETE is idempotent: clearing an already-unset halt still returns { success: true }', async () => {

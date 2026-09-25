@@ -748,11 +748,15 @@ function initQueueList() {
 // server-render-path involvement (server.js is untouched).
 // =============================================================================
 
-// Reused verbatim (never paraphrased) by both the static server-rendered
-// disclaimer (lib/render-dispatch.js) and every client-side failure state
-// below, so an operator sees identical wording whether the page loaded fine
-// or is actively failing to load.
-const HALT_DISCLOSURE_HTML = 'This page can load slowly when Linear or the database is degraded. If it hasn\'t loaded, use <code>POST /api/proxy/dispatch/halt</code> directly.'
+// The degraded-mode disclosure has exactly one source: the server-rendered
+// `.halt-disclaimer` (lib/render-dispatch.js). Every client-side failure
+// state reads that node's own markup rather than keeping a second literal
+// here, so the two can never drift (close-out L1) — an operator sees
+// identical wording whether the page loaded fine or is failing to load.
+function haltDisclosureHtml() {
+  const disclaimerEl = document.querySelector('.halt-disclaimer')
+  return disclaimerEl ? disclaimerEl.innerHTML : ''
+}
 
 /**
  * Builds the requested-not-effective status line for a halt object (or the
@@ -774,7 +778,7 @@ function renderHaltStatus(halt) {
 
 function renderHaltFailure(actionLabel) {
   const statusEl = document.querySelector('.halt-status')
-  if (statusEl) statusEl.innerHTML = `${actionLabel} ${HALT_DISCLOSURE_HTML}`
+  if (statusEl) statusEl.innerHTML = `${actionLabel} ${haltDisclosureHtml()}`
 }
 
 async function refreshHaltStatus(urlKey) {

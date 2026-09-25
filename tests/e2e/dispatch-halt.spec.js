@@ -20,20 +20,40 @@ import { dispatchHalt } from '../helpers.js';
 let WS, DISPATCH_URL, API_PREFIX;
 
 test.describe('Workspace Halt (LIN-2994 Surface 4 / LIN-3026)', () => {
+  // Clears the halt on this worker's urlKey and PROVES it (close-out L2):
+  // a 200 from the clear endpoint alone can't detect a clear that silently
+  // does nothing, so read the halt back through the dashboard GET and
+  // require `{ halt: null }`.
+  async function clearHaltAndProve(page) {
+    const clearRes = await page.request.get(`/test/clear-workspace-halt?urlKey=${WS}`);
+    expect(clearRes.status()).toBe(200);
+    const readBack = await page.request.get(`${API_PREFIX}/api/dispatch/halt`);
+    expect(readBack.status()).toBe(200);
+    expect(await readBack.json()).toEqual({ halt: null });
+  }
+
   test.beforeEach(async ({ page, localWorkerUrlKey }) => {
     WS = localWorkerUrlKey;
     DISPATCH_URL = `/workspace/${WS}/dispatch`;
     API_PREFIX = `/workspace/${WS}`;
 
-    // Isolation, asserted rather than assumed (plan-review d745e3ec carry-
-    // forward #2): a mis-wired workspaceHaltStore DI param on
-    // createTestRoutes would make this clear fail SILENTLY under a bare
-    // `page.goto` (it doesn't throw on a 500), leaking halt state into
-    // later specs that share the same worker urlKey.
-    const clearRes = await page.request.get(`/test/clear-workspace-halt?urlKey=${WS}`);
-    expect(clearRes.status()).toBe(200);
-
     await seedLocalWorkspace(page, null, { features: { dispatch: true }, urlKey: WS });
+
+    // Isolation, asserted rather than assumed (plan-review d745e3ec carry-
+    // forward #2, close-out L2). Deliberately dirty the worker's halt FIRST,
+    // then clear and read back: the clear is exercised against a set halt on
+    // every test, so a no-op clear fails every spec on its own — even one run
+    // alone with `-g` — instead of only when an earlier spec happened to
+    // leave a halt behind.
+    const dirty = await page.request.post(`${API_PREFIX}/api/dispatch/halt`, { data: { mode: 'stop' } });
+    expect(dirty.status()).toBe(200);
+    await clearHaltAndProve(page);
+  });
+
+  // Several specs leave a halt set; never leak it to other specs sharing this
+  // worker's urlKey (e.g. settings.spec.js polls it without clearing).
+  test.afterEach(async ({ page }) => {
+    await clearHaltAndProve(page);
   });
 
   test('sets a halt from the dashboard UI, delivers it on poll before Resume, and poll reverts to exactly {items} after Resume', async ({ page }) => {
@@ -153,6 +173,13 @@ test.describe('Workspace Halt (LIN-2994 Surface 4 / LIN-3026)', () => {
     await expect(halt.status()).toContainText('Failed to load halt status', { timeout: 5000 });
     // The read-failure state reuses the degraded-mode disclosure verbatim.
     await expect(halt.status()).toContainText('POST /api/proxy/dispatch/halt');
+
+    // Close-out L1: the client failure copy can't drift from the rendered
+    // disclosure — exact markup equality, not a substring, so a one-word
+    // change on either side goes red.
+    const disclaimerHtml = await halt.disclaimer().innerHTML();
+    expect(disclaimerHtml).toContain('POST /api/proxy/dispatch/halt');
+    expect(await halt.status().innerHTML()).toBe(`Failed to load halt status. ${disclaimerHtml}`);
 
     const statusText = await halt.status().textContent();
     expect(statusText).not.toMatch(/\b(paused|stopped)\b/i);

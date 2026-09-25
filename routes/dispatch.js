@@ -38,7 +38,7 @@ import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, ap
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
-import { HALT_MODES } from '../lib/workspace-halt.js';
+import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -1025,14 +1025,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * POST /workspace/:urlKey/api/dispatch/halt
-   * Body `{ mode: 'pause' | 'stop' }`; anything else is a 400, checked before
-   * any write. `setBy` is the session's own accountId (`null` when absent),
-   * exactly as the tokens route attributes `createdBy` above.
+   * Body `{ mode }` with `mode` one of `HALT_MODES`; anything else is a 400,
+   * checked before any write. `setBy` is the session's own accountId (`null`
+   * when absent), exactly as the tokens route attributes `createdBy` above.
    */
   router.post('/workspace/:urlKey/api/dispatch/halt', workspaceFromUrl, async (req, res) => {
     const { mode } = req.body || {};
     if (!HALT_MODES.includes(mode)) {
-      return badRequest.json(res, "mode must be 'pause' or 'stop'");
+      return badRequest.json(res, HALT_MODE_ERROR);
     }
 
     if (!workspaceHaltStore) {
