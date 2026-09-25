@@ -121,7 +121,7 @@ export function createKickoffRoutes({
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks, maxSessionsPerTask } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -234,6 +234,14 @@ export function createKickoffRoutes({
           return badRequest.json(res, 'maxTasks must be an integer >= 1');
         }
       }
+      // Sibling per-task bound (LIN-2934): caps fresh worker-session dispatches
+      // for a single task, same rule and same enforcement seam as maxTasks.
+      if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) {
+        if (!Number.isInteger(maxSessionsPerTask) || maxSessionsPerTask < 1) {
+          logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+          return badRequest.json(res, 'maxSessionsPerTask must be an integer >= 1');
+        }
+      }
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
       // incidental fields: an undeclared edge is `terminal-only`, full stop. (This
@@ -284,6 +292,7 @@ export function createKickoffRoutes({
         mode: resolvedMode,
         variant: resolvedVariant,
         maxTasks: maxTasks ?? null,
+        maxSessionsPerTask: maxSessionsPerTask ?? null,
         // LIN-2804: only resolved when this was a SCOPED kickoff (see the
         // identical note on the attachProxyContext call below) — a goal-only
         // kickoff resolves no provider and correctly stays neutral.
@@ -392,7 +401,10 @@ export function createKickoffRoutes({
           // Scope bound (LIN-1751): stored on the run row so the dispatch-factory
           // seam can enforce it on every later worker dispatch under this run's
           // own id. null ⇒ unbounded, byte-identical to today.
-          maxTasks: maxTasks ?? null
+          maxTasks: maxTasks ?? null,
+          // Sibling per-task bound (LIN-2934): same rationale as maxTasks —
+          // stored on the run row so the dispatch-factory seam can enforce it.
+          maxSessionsPerTask: maxSessionsPerTask ?? null
         }
       });
 
@@ -415,6 +427,8 @@ export function createKickoffRoutes({
         target: item.target,
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
         maxTasks: item.maxTasks,
+        maxSessionsPerTask: item.maxSessionsPerTask ?? null,
+        ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
         consumerLastSeenAt: item.consumerLastSeenAt || null,
         ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
       });

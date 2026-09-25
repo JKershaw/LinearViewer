@@ -858,7 +858,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   function refuseIfBudgetExhausted(err, req, res, endpoint, keepalive = null) {
     if (!err || !err.budgetExhausted) return false;
     const refusal = err.budgetExhausted;
-    logEvent(req, endpoint, 409, `${BUDGET_EXHAUSTED_CODE} ${refusal.sessionId}`);
+    // LIN-2934 (F1): additive bound discriminator on the durable proxy-event
+    // note, so a BUDGET_EXHAUSTED refusal's server-written record distinguishes
+    // which bound fired ('tasks' | 'sessionsPerTask' | 'unverified') without a
+    // new field or a new code.
+    logEvent(req, endpoint, 409, `${BUDGET_EXHAUSTED_CODE} ${refusal.bound} ${refusal.sessionId}`);
     if (keepalive) {
       keepalive.send(409, { error: err.message, ...refusal });
     } else {

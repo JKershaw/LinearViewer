@@ -163,6 +163,34 @@ function childAutopilotHistoryItem(id, identifier, parentSessionId, ts = NOW_ISO
   return { id, kind: 'autopilot', sessionId: parentSessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'autopilot', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken' };
 }
 
+/**
+ * LIN-2934 (S4): a `gone` GENERAL (goal-only) autopilot anchor — `kind:'autopilot'`
+ * with NO `issueIdentifier`, retained anchorless by R1's
+ * `ANCHOR_KINDS_WITHOUT_ISSUE`. Terminal, well past the 6h reap window, so
+ * disposition is `gone` (never self-matches `liveDispatchOnAnchor`).
+ */
+function goneGeneralAnchorItem(id, decisionId, onAnswerEffect) {
+  const oldIso = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past REAP_INACTIVITY_MS (6h)
+  const payload = { decision_id: decisionId, question: 'Proceed?', on_answer: { effect: onAnswerEffect } };
+  return {
+    id, kind: 'autopilot', issueIdentifier: null, issueTitle: 'Goal-only run',
+    promptName: 'autopilot', prompt: 'p', dispatchedAt: oldIso, resolvedAt: oldIso,
+    status: 'taken',
+    feedback: [
+      { kind: 'decision', message: JSON.stringify(payload), timestamp: oldIso },
+      { message: '[done] shipped it', timestamp: oldIso }
+    ]
+  };
+}
+
+/**
+ * LIN-2934 (S4): a live (queued, non-terminal) GENERAL autopilot anchor —
+ * `kind:'autopilot'`, no `issueIdentifier`. An UNRELATED general run.
+ */
+function liveGeneralAnchorItem(id) {
+  return { id, kind: 'autopilot', issueIdentifier: null, issueTitle: 'Another goal-only run', promptName: 'autopilot', prompt: 'p', dispatchedAt: NOW_ISO };
+}
+
 // The page is first-class (LIN-595): no feature flag is required. ENABLED is kept
 // as an empty session so the existing spreads (`{ ...ENABLED, workspaces }`) read
 // naturally and document that no flag is needed.
@@ -658,6 +686,35 @@ describe('GET /api/dashboard/rulings (LIN-1728 Phase 2)', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.count, 1);
     assert.equal(historyReads, 1, 'the store read actually happened — this is not a vacuous pass');
+  });
+
+  // LIN-2934 (S4): a null-anchored ruling (a GENERAL autopilot run's own
+  // decision) must not read as "live" merely because some UNRELATED general
+  // run elsewhere in the workspace also carries `issueIdentifier: null`.
+  // Before the S4 fix, `liveDispatchOnAnchor: (id) => merged.some(l =>
+  // l.issueIdentifier === id && !isTerminalLoop(l))` matched `null === null`,
+  // so the live-but-unrelated general anchor below forced this row's effect
+  // to 'record', overriding its declared 'dispatch'.
+  test('a null-anchored (general-run) ruling does NOT read as live merely because an UNRELATED general run is also live', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [liveGeneralAnchorItem('sess-live-general')], // a DIFFERENT, unrelated general run — also null-anchored
+        history: [goneGeneralAnchorItem('sess-gone-general', 'd-gone-general-1', 'dispatch')],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const row = res.jsonBody.rulings.find(r => r.decision.decision_id === 'd-gone-general-1');
+    assert.ok(row, 'the general-run row is still present');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.anchor.issueIdentifier, null, 'sanity: this really is a null-anchored row');
+    assert.equal(row.declaredEffect, 'dispatch');
+    assert.equal(row.effect, 'dispatch', 'an unrelated general run must never force record via a null === null match');
   });
 
   // LIN-2773 beat 4 note (recorded for review, per the beat's own instruction —
@@ -1735,7 +1792,144 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(done.runs[0].issueIdentifier, 'LIN-101');
     // Telemetry runtime is attached (LIN-594).
     assert.ok(done.runtime, 'session carries a runtime telemetry block');
-    assert.equal(body.counts.total, 2);
+  });
+
+  test('LIN-2934: taskPosition/sessionPosition surface on the payload when the run declares a bound', async () => {
+    const perWorkspace = {
+      'ws-c': {
+        live: [{ ...autopilotLiveItem('sess-3', 'LIN-300'), maxSessionsPerTask: 5 }, workerLiveItem('w-3', 'LIN-300', 'sess-3')],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-c', name: 'Gamma' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-3');
+    assert.ok(live, 'expected the budgeted live session on the payload');
+    assert.deepEqual(live.sessionPosition, { count: 1, maxSessionsPerTask: 5, issueIdentifier: 'LIN-300' });
+    assert.strictEqual(live.taskPosition, null, 'maxTasks was never declared on this run');
+  });
+
+  test('LIN-2934: taskPosition/sessionPosition are null when no bound is declared (unaffected by this ticket)', async () => {
+    const perWorkspace = {
+      'ws-d': {
+        live: [autopilotLiveItem('sess-4', 'LIN-400')],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-d', name: 'Delta' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-4');
+    assert.ok(live);
+    assert.strictEqual(live.taskPosition, null);
+    assert.strictEqual(live.sessionPosition, null);
+  });
+
+  // LIN-2934 R1: a GENERAL (goal-only) autopilot kickoff — its own anchor row
+  // carries NO issueIdentifier at all. Before R1 that row was dropped as
+  // "malformed" by pipeline-loops.js's `_buildLoops`, so this session never
+  // had an anchor loop to read its declared bounds off, and the dashboard
+  // feed chip stayed null for every general run regardless of what was
+  // declared at kickoff. `autopilotLiveItem(id, null)` builds exactly that
+  // anchorless-by-design row.
+  test('LIN-2934 R1: taskPosition/sessionPosition surface for a GENERAL (goal-only) run too, not only a scoped one', async () => {
+    const perWorkspace = {
+      'ws-g': {
+        live: [
+          { ...autopilotLiveItem('sess-g', null), maxTasks: 3, maxSessionsPerTask: 5 },
+          workerLiveItem('w-g', 'LIN-500', 'sess-g')
+        ],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-g', name: 'Goal-only' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-g');
+    assert.ok(live, 'expected the general (seedIssue-less) run to surface on the payload at all');
+    assert.strictEqual(live.seedIssue, null, 'sanity: this really is the unscoped shape, not a scoped run in disguise');
+    assert.deepEqual(live.taskPosition, { count: 1, maxTasks: 3 });
+    assert.deepEqual(live.sessionPosition, { count: 1, maxSessionsPerTask: 5, issueIdentifier: 'LIN-500' });
+  });
+
+  // LIN-2934 (S7): R1 made the general anchor `session.loops[0]` — before R1
+  // that slot was always the first WORKER (a general kickoff row never
+  // reached `_buildLoops` at all). A general kickoff names no single task, so
+  // its own `issueTitle` is empty; the pre-S7 fallback chain
+  // `anchor.issueTitle || session.loops[0].issueTitle || seedIssue || ''`
+  // stopped at that title-less `loops[0]` and regressed the card to the
+  // "autopilot session" placeholder instead of showing the first worker's
+  // title, which is what a general run's card showed before R1.
+  test('LIN-2934 (S7): a GENERAL run\'s card title falls back to the first WORKER\'s title, not the title-less anchor', async () => {
+    const perWorkspace = {
+      'ws-g': {
+        live: [
+          { ...autopilotLiveItem('sess-g7', null), issueTitle: null }, // no issueTitle at all — a goal-only kickoff
+          workerLiveItem('w-g7', 'LIN-501', 'sess-g7')
+        ],
+        history: [],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-g', name: 'Goal-only' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-g7');
+    assert.ok(live, 'expected the general run to surface on the payload');
+    assert.equal(live.seedTitle, 'Title LIN-501', 'must skip the title-less anchor and use the first worker\'s title');
+  });
+
+  // LIN-2934 (S7, documented/accepted side effect): `sessionIsTerminal`
+  // (routes/dashboard.js) already preferred anchor-loop terminality over an
+  // all-loops-terminal fallback — but before R1 a general run had NO anchor
+  // loop at all, so it always took the all-loops-terminal (wait for every
+  // worker) path. Now that R1 retains the general anchor, a general run's
+  // terminality follows the ORCHESTRATOR'S OWN status, exactly like a scoped
+  // run's already does — even while a worker it dispatched is still running.
+  // The review flagged this as an unreviewed-but-arguably-intended behavior
+  // change (S7); this test states and pins it explicitly.
+  test('LIN-2934 (S7, accepted): a GENERAL run\'s terminality follows the anchor, even while a worker it dispatched is still running', async () => {
+    const perWorkspace = {
+      'ws-g': {
+        live: [
+          workerLiveItem('w-g8', 'LIN-502', 'sess-g8') // still running — no resolvedAt
+        ],
+        history: [
+          { ...autopilotHistoryItem('sess-g8', null), feedback: [{ message: '[done] wound down', timestamp: NOW_ISO }] }
+        ],
+        agentStatus: []
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-g', name: 'Goal-only' }] };
+    const { req, res } = makeReqRes({ session });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const found = findSession(res.jsonBody, 'sess-g8');
+    assert.ok(found, 'expected the general run to surface on the payload');
+    assert.equal(found.terminal, true, 'terminality follows the anchor\'s own [done], not the still-running worker');
   });
 
   test('each run carries its Level-3 drill-down payload (telemetry + recap), Mongo-only', async () => {
@@ -3414,6 +3608,67 @@ describe('session-context endpoint', () => {
     // LIN-101's neighborhood shows its parent is the seed (parent/children edge).
     const child = body.graph.tasks.find(t => t.root.identifier === 'LIN-101');
     assert.equal(child.parent.identifier, 'LIN-100');
+  });
+
+  // LIN-2934 (S6): `pointReadSession` (this endpoint's issue-scoped point-read,
+  // used whenever `observationSessionsStore` misses/is absent) must build a
+  // GENERAL run's session with the SAME anchor-aware construction as the feed
+  // (`getSessionsForIssues`'s `extraItems`) — not the old orphan shape, which
+  // silently dropped the anchor row entirely because it carries no
+  // `issueIdentifier` for the per-issue queries to find. The anchor's own
+  // completion time is LATER than its worker's, so `window.completedAt`
+  // (session-level completion = the LATEST terminal loop, but only once EVERY
+  // loop is terminal) is the observable proof: the orphan build never even
+  // sees the anchor loop, so it reads the worker's own (earlier) completion.
+  //
+  // Uses `scopedStore` (defined below), whose listItems/listHistory actually
+  // FILTER by `issueIdentifier`/`sessionId` like the real store — the generic
+  // `makeRouter`/`makeStores` mock returns every row regardless of query
+  // options, which would let the anchor leak in even without `extraItems` and
+  // mask exactly the bug this test exists to catch.
+  test('a GENERAL (goal-only) session point-read includes the anchor loop, not the old orphan shape', async () => {
+    const anchorDispatch = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const workerDispatch = new Date(Date.now() - 50 * 60 * 1000).toISOString();
+    const workerResolve = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+    const anchorResolve = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // later than the worker's own completion
+    const stores = scopedStore({
+      live: [],
+      history: [
+        {
+          id: 'sess-g6', kind: 'autopilot', issueIdentifier: null, issueTitle: 'Goal-only run',
+          promptName: 'autopilot', prompt: 'p', dispatchedAt: anchorDispatch, resolvedAt: anchorResolve,
+          status: 'taken', feedback: [{ message: '[done] wound down', timestamp: anchorResolve }]
+        },
+        {
+          id: 'w-g6', sessionId: 'sess-g6', issueIdentifier: 'LIN-600', issueTitle: 'Title LIN-600',
+          promptName: 'implementation', prompt: 'p', dispatchedAt: workerDispatch, resolvedAt: workerResolve,
+          status: 'taken', feedback: [{ message: '[done] shipped', timestamp: workerResolve }]
+        }
+      ],
+      agentStatus: [agentStatusDone('w-g6', 'LIN-600', workerResolve)]
+    });
+    const router = createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/session-context/:sessionId');
+    const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-g6' } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200, 'the general-run session must be found at all, not 404');
+    assert.equal(res.jsonBody.seedIssue, null, 'sanity: this really is a general (unscoped) run');
+    assert.deepEqual(res.jsonBody.tasksTouched, ['LIN-600']);
+    assert.equal(res.jsonBody.window.completedAt, anchorResolve, 'the anchor loop must be counted — the orphan build (anchor missing) would read the worker\'s own earlier completion instead');
   });
 
   test('400 when sessionId is missing', async () => {

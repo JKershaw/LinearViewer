@@ -219,6 +219,131 @@ describe('inference fallback over an injected issue graph', () => {
   });
 });
 
+// ─── Budget "n of N" (LIN-2934) ────────────────────────────────────────────────
+
+describe('taskPosition/sessionPosition (LIN-2934)', () => {
+  test('sessionPosition counts ONLY the seam-scoped rows (sessionId === the run\'s own id), not the wider loop set (N1)', () => {
+    // The over-count the plan's N1 fix exists to prevent: the anchor loop
+    // itself (sessionId: null) and an inference-attached loop with no
+    // sessionId both carry issueIdentifier === EPIC (the seed) and would
+    // pass a naive followUpTo/abort/issueIdentifier-only filter — but the
+    // seam's own query is scoped to {sessionId}, which excludes both.
+    const loops = loopsFrom([
+      orchestrator({ maxSessionsPerTask: 3 }),
+      worker('w1', EPIC, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      worker('w2', EPIC, '2026-06-22T11:00:00.000Z', { sessionId: SESSION_ID }),
+      // Inference-attached (no sessionId) — matches the seed issue, so
+      // _buildSessions absorbs it into this session for DISPLAY purposes
+      // (tasksTouched, telemetry), but the seam never counted it.
+      worker('w3', EPIC, '2026-06-22T11:30:00.000Z')
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(s.loops.length, 4, 'sanity: all four loops (anchor + w1 + w2 + w3) are in this session\'s wider set');
+    assert.deepStrictEqual(s.sessionPosition, { count: 2, maxSessionsPerTask: 3, issueIdentifier: EPIC },
+      'must count only w1+w2 (stamped with this run\'s own sessionId), never the anchor or the inference-attached w3');
+  });
+
+  // Third-pass review T4 (`0cd1d40f`): `seamScoped`'s `followUpTo == null`
+  // filter (lib/pipeline-loops.js:1022) was correct in code but unpinned —
+  // mutation M08 (dropping just that clause from the filter) passed the full
+  // suite. Wakes and liveness nudges carry BOTH `sessionId` (so they land in
+  // the session's wider `loops` set via the explicit-sessionId pass above)
+  // AND `followUpTo` (so the seam's own count excludes them) — on run
+  // `dc398411`'s shape (10 workers plus 10 wakes) an unfiltered count would
+  // read "session 20 of 10" where the seam counted 10.
+  test('sessionPosition excludes rows carrying followUpTo, even when explicitly stamped with the run\'s own sessionId (N1/T4, M08)', () => {
+    const loops = loopsFrom([
+      orchestrator({ maxSessionsPerTask: 3 }),
+      worker('w1', EPIC, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      // A wake/liveness nudge on the same task: carries the run's own
+      // sessionId (so it's in the session's wider loop set) AND followUpTo
+      // (so the seam itself never counted it as a fresh task dispatch).
+      worker('w2', EPIC, '2026-06-22T11:00:00.000Z', { sessionId: SESSION_ID, followUpTo: 'w1' })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(s.loops.length, 3, 'sanity: anchor + w1 + w2 are all in this session\'s wider set');
+    assert.deepStrictEqual(s.sessionPosition, { count: 1, maxSessionsPerTask: 3, issueIdentifier: EPIC },
+      'must count only w1 — w2 carries followUpTo and the seam never counts it as a fresh dispatch');
+  });
+
+  test('taskPosition counts distinct issueIdentifiers among the seam-scoped rows only, not every inference-attached task', () => {
+    const GRANDCHILD = 'LIN-999';
+    // A local graph where BOTH SPAWNED and GRANDCHILD descend from the seed,
+    // so an unstamped GRANDCHILD worker gets inference-attached to this
+    // session for display (tasksTouched) purposes — exactly the widening the
+    // seam's own {sessionId}-scoped query never sees.
+    const localGraph = { parentOf: { [SPAWNED]: EPIC, [GRANDCHILD]: EPIC } };
+    const loops = loopsFrom([
+      orchestrator({ maxTasks: 5 }),
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      worker('w2', SPAWNED, '2026-06-22T11:00:00.000Z', { sessionId: SESSION_ID }),
+      // Inference-attached (no sessionId) — a THIRD, otherwise-uncounted
+      // task. Must not inflate the distinct-task count the seam never saw.
+      worker('w3', GRANDCHILD, '2026-06-22T11:30:00.000Z')
+    ]);
+    const [s] = _buildSessions(loops, { issueGraph: localGraph, now: NOW });
+
+    assert.deepStrictEqual(s.tasksTouched, [EPIC, CHILD, SPAWNED, GRANDCHILD], 'sanity: w3 IS attached to this session, for display');
+    assert.deepStrictEqual(s.taskPosition, { count: 2, maxTasks: 5 }, 'CHILD + SPAWNED only (stamped), never the anchor\'s own EPIC nor the unstamped GRANDCHILD');
+  });
+
+  test('sessionPosition reflects the MOST RECENTLY DISPATCHED task on a multi-task run, not a combined or first-task count', () => {
+    const loops = loopsFrom([
+      orchestrator({ maxSessionsPerTask: 10 }),
+      // Two dispatches to CHILD first...
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      worker('w2', CHILD, '2026-06-22T10:45:00.000Z', { sessionId: SESSION_ID }),
+      // ...then the run moves on to SPAWNED, with a single dispatch so far.
+      worker('w3', SPAWNED, '2026-06-22T11:30:00.000Z', { sessionId: SESSION_ID })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+
+    // The operator watching the live feed cares about the task in flight NOW
+    // (SPAWNED, count 1) — not CHILD's count (2) and not a combined 3.
+    assert.deepStrictEqual(s.sessionPosition, { count: 1, maxSessionsPerTask: 10, issueIdentifier: SPAWNED });
+  });
+
+  test('sessionPosition on an A→B→A run reflects A (the LAST dispatch by time), not B (R5 — "last first-seen" is not "most recently dispatched")', () => {
+    const loops = loopsFrom([
+      orchestrator({ maxSessionsPerTask: 10 }),
+      // CHILD dispatched first...
+      worker('w1', CHILD, '2026-06-22T10:00:00.000Z', { sessionId: SESSION_ID }),
+      // ...then the run moves to SPAWNED once...
+      worker('w2', SPAWNED, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      // ...then back to CHILD, which is actually in flight now.
+      worker('w3', CHILD, '2026-06-22T11:00:00.000Z', { sessionId: SESSION_ID })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+
+    // Before the R5 fix this read `{count: 1, issueIdentifier: SPAWNED}` — the
+    // last task to be FIRST seen — even though CHILD (2 dispatches) is the one
+    // the seam most recently admitted a row for.
+    assert.deepStrictEqual(s.sessionPosition, { count: 2, maxSessionsPerTask: 10, issueIdentifier: CHILD });
+  });
+
+  test('both taskPosition and sessionPosition are null when neither bound is declared', () => {
+    const loops = loopsFrom([
+      orchestrator(),
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+    assert.strictEqual(s.taskPosition, null);
+    assert.strictEqual(s.sessionPosition, null);
+  });
+
+  test('an anchorless (orphan) session reports both positions as null — there is no run row to read a bound from', () => {
+    const loops = loopsFrom([
+      worker('w1', CHILD, '2026-06-22T10:30:00.000Z', { sessionId: 'orphaned-session' })
+    ]);
+    const sessions = _buildSessions(loops, { now: NOW });
+    const s = sessions.find(x => x.sessionId === 'orphaned-session');
+    assert.strictEqual(s.taskPosition, null);
+    assert.strictEqual(s.sessionPosition, null);
+  });
+});
+
 // ─── Orphan sessionId groups ──────────────────────────────────────────────────
 
 describe('orphan sessionId group (orchestrator absent)', () => {

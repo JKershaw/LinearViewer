@@ -209,3 +209,148 @@ describe('LIN-1751 — end-to-end budget enforcement at the dispatch seam', () =
     }
   });
 });
+
+describe('LIN-2934 — POST /api/proxy/autopilot/kickoff maxSessionsPerTask validation', () => {
+  test('no maxSessionsPerTask at all: byte-identical, unbounded', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.strictEqual(res.body.maxSessionsPerTask, null);
+  });
+
+  test('a valid maxSessionsPerTask is accepted, stored, and echoed on the response, independent of maxTasks', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', maxSessionsPerTask: 10 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.maxSessionsPerTask, 10);
+    assert.strictEqual(res.body.maxTasks, null, 'declaring the sibling bound must not synthesize maxTasks');
+  });
+
+  test('both bounds may be declared together', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', maxTasks: 8, maxSessionsPerTask: 10 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.maxTasks, 8);
+    assert.equal(res.body.maxSessionsPerTask, 10);
+  });
+
+  for (const bad of [0, -1, 1.5, 'ten', true, {}, []]) {
+    test(`maxSessionsPerTask: ${JSON.stringify(bad)} is rejected 400`, async () => {
+      const app = buildApp({ dispatchQueueStore: makeStore() });
+      const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', maxSessionsPerTask: bad });
+      assert.equal(res.status, 400, JSON.stringify(res.body));
+      assert.ok(res.body.error);
+    });
+  }
+});
+
+describe('LIN-2934 — a scoped one-task kickoff bounded by maxSessionsPerTask, end-to-end', () => {
+  test('the run refuses the (bound+1)th fresh dispatch to its own single task, with a usable budgetPosition on admitted dispatches', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const kickoff = await call(app, 'post', KICKOFF, { goal: 'ship LIN-1', target: 'cli', maxSessionsPerTask: 2 });
+    assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
+    const sessionId = kickoff.body.id;
+
+    const t1 = await call(app, 'post', DISPATCH, {
+      prompt: 'implement', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t1.status, 201, JSON.stringify(t1.body));
+    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
+
+    const t2 = await call(app, 'post', DISPATCH, {
+      prompt: 'review', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t2.status, 201, JSON.stringify(t2.body));
+    assert.deepEqual(t2.body.budgetPosition.sessionsPerTask, { count: 2, maxSessionsPerTask: 2 });
+
+    const t3 = await call(app, 'post', DISPATCH, {
+      prompt: 'close out', promptName: 'close-out', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    });
+    assert.equal(t3.status, 409, JSON.stringify(t3.body));
+    assert.equal(t3.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(t3.body.bound, 'sessionsPerTask');
+  });
+});
+
+describe('LIN-2934 R4 (M9) — a CHILD kickoff dispatched under a budgeted coordinator echoes budgetPosition too', () => {
+  // The route's own comment (routes/proxy-kickoff.js) is explicit: "a kickoff
+  // itself is never budget-refused ... but a child-autopilot kickoff
+  // dispatched with sessionId set to a coordinator's budgeted run can be."
+  // Every OTHER test in this file dispatches the kickoff's own row unbudgeted
+  // (no incoming sessionId), so `item.budgetPosition` was never populated on
+  // any kickoff 201 anywhere in this suite — a mutation dropping the echo
+  // from that response would fail nothing (M9), even though the field is
+  // reachable in production via exactly this child-kickoff shape.
+  test('a child kickoff scoped under a budgeted parent run gets a real budgetPosition on its own 201, and can be refused', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const parent = await call(app, 'post', KICKOFF, { goal: 'coordinate the epic', target: 'cli', maxSessionsPerTask: 1 });
+    assert.equal(parent.status, 201, JSON.stringify(parent.body));
+    const parentSessionId = parent.body.id;
+
+    // A child autopilot kickoff, scoped to one task under the coordinator's
+    // budgeted run (LIN-813's up-chain edge: sessionId targets the parent).
+    // TEST-1 (not LIN-1): an issue-scoped kickoff resolves the real issue for
+    // its prompt, so it must be a real identifier from the hermetic fixture.
+    const child = await call(app, 'post', KICKOFF, {
+      goal: 'ship TEST-1', issueIdentifier: 'TEST-1', target: 'cli', sessionId: parentSessionId
+    });
+    assert.equal(child.status, 201, JSON.stringify(child.body));
+    assert.deepEqual(child.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 1 });
+
+    // The parent's per-task session bound is now spent for TEST-1 — an
+    // ordinary worker dispatch to the SAME task under the SAME parent session
+    // is refused. (A second kickoff to the same issue would collide with the
+    // unrelated same-issue-same-kind DUPLICATE_DISPATCH cooldown first, which
+    // would prove nothing about the budget bound specifically.)
+    const worker = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'TEST-1', target: 'cli', sessionId: parentSessionId
+    });
+    assert.equal(worker.status, 409, JSON.stringify(worker.body));
+    assert.equal(worker.body.code, 'BUDGET_EXHAUSTED');
+    assert.equal(worker.body.bound, 'sessionsPerTask');
+  });
+});
+
+// Third-pass review T3 (`0cd1d40f`): the v1 Go path is an ISSUE-SCOPED kickoff
+// (`issueIdentifier` present, routes/proxy-kickoff.js's own `if (issueIdentifier)`
+// branch) — the exact call site the plan's F4 named. Mutation M26 (deleting
+// `maxSessionsPerTask` from that call's `buildAutopilotKickoff({...})` args)
+// passed the full suite because nothing asserted the dispatched PROMPT TEXT
+// itself carries the per-task budget statement; every other test in this file
+// only checks the response's `maxSessionsPerTask`/`budgetPosition` fields,
+// which are echoed by a separate, unrelated code path (the `fields:` block
+// below the `buildAutopilotKickoff` call).
+describe('LIN-2934 T3 — the v1 Go (issue-scoped) kickoff prompt carries the per-task session-budget prose', () => {
+  test('an issue-scoped kickoff with maxSessionsPerTask set dispatches a prompt containing the per-task budget statement', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const res = await call(app, 'post', KICKOFF, {
+      goal: 'ship TEST-1', issueIdentifier: 'TEST-1', target: 'cli', maxSessionsPerTask: 3
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    const item = await store.getItemStatus('acme', res.body.id);
+    assert.ok(item, 'expected the dispatched item to be readable back from the store');
+    assert.match(
+      item.prompt,
+      /Per-task session budget \(LIN-2934\): at most 3 worker sessions/,
+      'the dispatched kickoff prompt must state the declared per-task session bound'
+    );
+  });
+
+  test('an issue-scoped kickoff with NO maxSessionsPerTask carries no per-task budget statement', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship TEST-1', issueIdentifier: 'TEST-1', target: 'cli' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    const item = await store.getItemStatus('acme', res.body.id);
+    assert.doesNotMatch(item.prompt, /Per-task session budget \(LIN-2934\)/);
+  });
+});

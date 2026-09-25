@@ -530,6 +530,55 @@ describe('_buildLoops', () => {
     assert.strictEqual(loops[0].agentState, 'complete');
   });
 
+  // Third-pass review T2 (`0cd1d40f`): an identifier-less GENERAL anchor
+  // (`kind: 'autopilot'`, `issueIdentifier: null`) buckets under its own
+  // `__anchor__:<loopId>` key (S5), which never equals any agent-status
+  // entry's `taskIdentifier` — so before the fix, its own agent-status rows
+  // (reported under some free-form taskIdentifier, or none at all) could
+  // never be found, and the anchor's agentState/agentStatus stayed stuck at
+  // whatever the terminal-feedback-only derivation gave it.
+  test('T2: an anchorless GENERAL anchor matches its own agent-status rows by dispatchId, not taskIdentifier', () => {
+    const anchor = historyItem({
+      id: 'anchor-general-1',
+      issueId: null,
+      issueIdentifier: null,
+      kind: 'autopilot',
+      status: 'taken'
+      // resolvedAt intentionally omitted below via override
+    });
+    delete anchor.resolvedAt;
+    // Reported under a free-form taskIdentifier ('GOAL', per the review's own
+    // probe) that has nothing to do with the anchor's loopId — the OLD
+    // taskIdentifier-keyed grouping can never find this row for the anchor.
+    const status = agentStatusEntry({
+      id: 'f-general-1',
+      taskIdentifier: 'GOAL',
+      dispatchId: 'anchor-general-1',
+      action: 'plan',
+      status: 'completed',
+      timestamp: '2026-04-10T10:30:00.000Z'
+    });
+    const loops = _buildLoops({ historyItems: [anchor], agentStatusEntries: [status], now: NOW });
+    assert.strictEqual(loops.length, 1);
+    assert.strictEqual(loops[0].agentAction, 'plan');
+    assert.strictEqual(loops[0].agentStatus, 'completed');
+  });
+
+  test('T2: two anchorless GENERAL anchors each match only their OWN dispatchId, never the other\'s', () => {
+    const anchorA = historyItem({ id: 'anchor-A', issueId: null, issueIdentifier: null, kind: 'autopilot', status: 'taken' });
+    const anchorB = historyItem({ id: 'anchor-B', issueId: null, issueIdentifier: null, kind: 'autopilot', status: 'taken' });
+    delete anchorA.resolvedAt;
+    delete anchorB.resolvedAt;
+    const statusA = agentStatusEntry({ id: 'f-A', taskIdentifier: 'GOAL', dispatchId: 'anchor-A', action: 'plan', status: 'completed' });
+    const statusB = agentStatusEntry({ id: 'f-B', taskIdentifier: 'GOAL', dispatchId: 'anchor-B', action: 'review', status: 'blocked' });
+    const loops = _buildLoops({ historyItems: [anchorA, anchorB], agentStatusEntries: [statusA, statusB], now: NOW });
+    const byId = Object.fromEntries(loops.map(l => [l.loopId, l]));
+    assert.strictEqual(byId['anchor-A'].agentAction, 'plan');
+    assert.strictEqual(byId['anchor-A'].agentStatus, 'completed');
+    assert.strictEqual(byId['anchor-B'].agentAction, 'review');
+    assert.strictEqual(byId['anchor-B'].agentStatus, 'blocked');
+  });
+
   test('feedback array is passed through verbatim', () => {
     const hist = historyItem({
       feedback: [

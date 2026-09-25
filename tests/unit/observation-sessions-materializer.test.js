@@ -36,7 +36,7 @@ function setup() {
 
 // Insert an archived dispatch row directly (bypassing the hooks) so we control the
 // exact cross-session fixture the equivalence spike needs.
-function archive(historyCollection, { id, issueIdentifier, sessionId = null, sessionGroupId = null, kind = 'implementation', followUpTo = null, dispatchedAtMs, resolvedAtMs, feedback = [] }) {
+function archive(historyCollection, { id, issueIdentifier, sessionId = null, sessionGroupId = null, kind = 'implementation', followUpTo = null, dispatchedAtMs, resolvedAtMs, feedback = [], maxTasks = null, maxSessionsPerTask = null }) {
   historyCollection._docs.push({
     _id: id,
     urlKey: URL_KEY,
@@ -54,6 +54,9 @@ function archive(historyCollection, { id, issueIdentifier, sessionId = null, ses
     followUpTo,
     sessionId,
     sessionGroupId,
+    // LIN-2934: budget bounds, only meaningful on the kind:'autopilot' anchor row.
+    maxTasks,
+    maxSessionsPerTask,
     status: 'taken',
     resolvedAt: resolvedAtMs ? new Date(resolvedAtMs) : null,
     takenByTokenLabel: null,
@@ -140,6 +143,185 @@ test('rebuildForWrite by sessionId reconstructs that session\'s full closure (by
   const s1 = sessions.find(s => s.sessionId === 'S1');
   assert.deepEqual(s1, fullS1);
   assert.deepEqual(s1.tasksTouched.sort(), ['LIN-100', 'LIN-200', 'LIN-300'], 'full issue closure recovered');
+});
+
+// LIN-2934 (F2): a budgeted run's sessionPosition/taskPosition must survive
+// the materialized read path — not just the pure pipeline-loops.js build.
+function seedBudgetedFixture({ historyCollection, statusCollection }) {
+  archive(historyCollection, { id: 'SB', issueIdentifier: 'LIN-700', kind: 'autopilot', dispatchedAtMs: min(60), resolvedAtMs: min(61), maxSessionsPerTask: 5 });
+  archive(historyCollection, { id: 'WB1', issueIdentifier: 'LIN-700', sessionId: 'SB', dispatchedAtMs: min(62), resolvedAtMs: min(65), feedback: [{ message: '[done] shipped WB1', tsMs: min(65) }] });
+  archive(historyCollection, { id: 'WB2', issueIdentifier: 'LIN-700', sessionId: 'SB', dispatchedAtMs: min(66), resolvedAtMs: min(69), feedback: [{ message: '[done] shipped WB2', tsMs: min(69) }] });
+
+  status(statusCollection, { id: 'AS-sb-anchor', taskIdentifier: 'LIN-700', tsMs: min(60) + 30 * 1000 });
+  status(statusCollection, { id: 'AS-wb1', taskIdentifier: 'LIN-700', tsMs: min(63) });
+  status(statusCollection, { id: 'AS-wb2', taskIdentifier: 'LIN-700', tsMs: min(67) });
+}
+
+test('LIN-2934 (F2): a materialized session doc carries sessionPosition, matching the pure build byte-identically', async () => {
+  const ctx = setup();
+  seedBudgetedFixture(ctx);
+  const { agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
+  const fullSB = full.find(s => s.sessionId === 'SB');
+  assert.deepEqual(fullSB.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-700' },
+    'sanity: the pure build itself carries the position');
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SB' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const sb = sessions.find(s => s.sessionId === 'SB');
+  assert.deepEqual(sb, fullSB, 'the materialized doc must be byte-identical to the pure build, including sessionPosition');
+  assert.deepEqual(sb.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-700' });
+
+  // Confirmed reachable through the point read too (what the Observation UI's
+  // per-session fetch actually calls).
+  const point = await observationSessionsStore.getSession(URL_KEY, 'SB');
+  assert.deepEqual(point.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-700' });
+});
+
+// LIN-2934 R1: a GENERAL (goal-only) autopilot kickoff — its own row carries
+// NO issueIdentifier at all (that's the whole point of "general"). Before the
+// R1 fix this anchor was dropped by `_buildLoops` as "malformed" (so the pure
+// build never saw it either), AND even once retained, the materialized
+// incremental rebuild (`getSessionsForIssues`, issue-scoped by construction)
+// could never discover it — no issue in its closure is ever this anchor's own
+// id. Both halves are exercised here.
+function seedGeneralBudgetedFixture({ historyCollection, statusCollection }) {
+  archive(historyCollection, { id: 'SG', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(80), resolvedAtMs: min(81), maxTasks: 3, maxSessionsPerTask: 5 });
+  archive(historyCollection, { id: 'WG1', issueIdentifier: 'LIN-800', sessionId: 'SG', dispatchedAtMs: min(82), resolvedAtMs: min(85), feedback: [{ message: '[done] shipped WG1', tsMs: min(85) }] });
+  archive(historyCollection, { id: 'WG2', issueIdentifier: 'LIN-800', sessionId: 'SG', dispatchedAtMs: min(86), resolvedAtMs: min(89), feedback: [{ message: '[done] shipped WG2', tsMs: min(89) }] });
+
+  status(statusCollection, { id: 'AS-sg-w1', taskIdentifier: 'LIN-800', tsMs: min(83) });
+  status(statusCollection, { id: 'AS-sg-w2', taskIdentifier: 'LIN-800', tsMs: min(87) });
+}
+
+test('LIN-2934 R1: a GENERAL (goal-only) run\'s materialized session doc carries taskPosition/sessionPosition too, byte-identical to the pure build', async () => {
+  const ctx = setup();
+  seedGeneralBudgetedFixture(ctx);
+  const { agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
+  const fullSG = full.find(s => s.sessionId === 'SG');
+  assert.ok(fullSG, 'sanity: the pure build must find the general run\'s session at all — this is exactly the gap R1 closes');
+  assert.deepEqual(fullSG.taskPosition, { count: 1, maxTasks: 3 });
+  assert.deepEqual(fullSG.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-800' });
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg = sessions.find(s => s.sessionId === 'SG');
+  assert.ok(sg, 'the materialized (incremental, per-issue-scoped) rebuild must find this session too — not only a full workspace build');
+  assert.deepEqual(sg, fullSG, 'byte-identical to the pure build');
+  assert.deepEqual(sg.taskPosition, { count: 1, maxTasks: 3 });
+  assert.deepEqual(sg.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-800' });
+
+  // Confirmed reachable through the point read too.
+  const point = await observationSessionsStore.getSession(URL_KEY, 'SG');
+  assert.deepEqual(point.taskPosition, { count: 1, maxTasks: 3 });
+});
+
+test('LIN-2934 R1: a GENERAL run with zero workers dispatched yet still materializes an anchor-only session (parity with a scoped run)', async () => {
+  const ctx = setup();
+  archive(ctx.historyCollection, { id: 'SG0', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(90), resolvedAtMs: min(91), maxTasks: 3 });
+
+  await ctx.materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG0' });
+
+  const { sessions } = await ctx.observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg0 = sessions.find(s => s.sessionId === 'SG0');
+  assert.ok(sg0, 'an anchor-only general run must still materialize a session doc, matching a scoped run\'s zero-worker behavior');
+  assert.deepEqual(sg0.taskPosition, { count: 0, maxTasks: 3 });
+  assert.strictEqual(sg0.sessionPosition, null, 'no maxSessionsPerTask declared on this fixture');
+});
+
+// LIN-2934 (S5): TWO independent GENERAL (goal-only) runs in the same 30-day
+// window. Before the fix, `_buildLoops` grouped every identifier-less anchor
+// into ONE shared `issueIdentifier: null` bucket, so `iteration` was numbered
+// across ALL general runs rather than per-anchor — G2's own anchor read
+// `iteration: 2` (it dispatched second) purely because G1's anchor also had
+// no identifier, not because G2 itself had a prior iteration. The incremental
+// materializer, which discovers G2's anchor alone via `extraItems` (it can
+// never see G1 — no issue in G2's closure is G1's anchor id), computed
+// `iteration: 1` for the SAME row: the exact byte-identity break the R1 tests
+// above pin for the single-general-run case, here reproduced with two.
+test('LIN-2934 (S5): iteration is numbered PER anchor, not across all general runs — full build matches the incremental materializer with two general runs present', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  // G1 dispatches first — an anchor-only general run, no workers.
+  archive(historyCollection, { id: 'SG1', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(100), resolvedAtMs: min(101), maxTasks: 2 });
+  // G2 dispatches second, with one worker on LIN-810.
+  archive(historyCollection, { id: 'SG2', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(102), resolvedAtMs: min(103), maxTasks: 4 });
+  archive(historyCollection, { id: 'WG2-1', issueIdentifier: 'LIN-810', sessionId: 'SG2', dispatchedAtMs: min(104), resolvedAtMs: min(107), feedback: [{ message: '[done] shipped WG2-1', tsMs: min(107) }] });
+  status(statusCollection, { id: 'AS-sg2-w1', taskIdentifier: 'LIN-810', tsMs: min(105) });
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
+  const fullSG1 = full.find(s => s.sessionId === 'SG1');
+  const fullSG2 = full.find(s => s.sessionId === 'SG2');
+  assert.ok(fullSG1 && fullSG2, 'both general runs must surface in the same full build');
+
+  const anchorIterationOf = (session, sessionId) => session.loops.find(l => l.loopId === sessionId)?.iteration;
+  assert.strictEqual(anchorIterationOf(fullSG1, 'SG1'), 1, 'G1 is the only member of its own bucket');
+  assert.strictEqual(anchorIterationOf(fullSG2, 'SG2'), 1, 'G2 must NOT inherit G1\'s bucket position just because both are null-anchored');
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG2' });
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg2 = sessions.find(s => s.sessionId === 'SG2');
+  assert.ok(sg2, 'the incremental rebuild (extraItems-scoped) must find SG2 even though G1 exists');
+  assert.deepEqual(sg2, fullSG2, 'byte-identical to the full build — the incremental path can never see G1, so parity here proves iteration does not depend on OTHER general runs being present');
+  assert.strictEqual(anchorIterationOf(sg2, 'SG2'), 1);
+});
+
+// LIN-2934 (D1): a GENERAL (goal-only) anchor's OWN agent-status row (reported
+// under a free-form taskIdentifier — 'GOAL', matching the review's own probe —
+// that has nothing to do with the anchor's dispatch id). `_buildLoops` (T2)
+// already knows how to fall back to a dispatchId-keyed match for an anchorless
+// bucket, but only when it is GIVEN those rows: `getSessionsForIssues`
+// (issue-scoped, used by both the incremental materializer and the dashboard
+// point read) fetched agent-status per-issue by `taskIdentifier` only, so an
+// anchor's own status row was invisible on that path even though the full
+// workspace build (which reads agent-status unscoped) saw it fine — the exact
+// full-vs-incremental divergence D1 closes.
+function seedGeneralAnchorStatusFixture({ historyCollection, statusCollection }) {
+  archive(historyCollection, { id: 'SG3', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(110), resolvedAtMs: min(111) });
+  archive(historyCollection, { id: 'WG3-1', issueIdentifier: 'LIN-810', sessionId: 'SG3', dispatchedAtMs: min(112), resolvedAtMs: min(115), feedback: [{ message: '[done] shipped WG3-1', tsMs: min(115) }] });
+  status(statusCollection, { id: 'AS-sg3-w1', taskIdentifier: 'LIN-810', tsMs: min(113) });
+  // The anchor's own agent-status row: taskIdentifier is a free-form goal
+  // string unrelated to the anchor's own dispatch id, dispatchId names the
+  // anchor's own id directly — the only field `_buildLoops`' T2 fallback can
+  // match on for an anchorless bucket.
+  status(statusCollection, { id: 'AS-sg3-anchor', taskIdentifier: 'GOAL', dispatchId: 'SG3', action: 'plan', status: 'blocked', tsMs: min(110) + 30 * 1000 });
+}
+
+test('LIN-2934 (D1): a GENERAL anchor\'s own agent-status reaches the materialized session doc, byte-identical to the full build', async () => {
+  const ctx = setup();
+  seedGeneralAnchorStatusFixture(ctx);
+  const { agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
+  const fullSG3 = full.find(s => s.sessionId === 'SG3');
+  assert.ok(fullSG3, 'sanity: the pure full-workspace build finds the general run');
+  const fullAnchorLoop = fullSG3.loops.find(l => l.loopId === 'SG3');
+  assert.strictEqual(fullAnchorLoop.agentAction, 'plan', 'sanity: the full build already resolves the anchor\'s own agent-status row (T2)');
+  assert.strictEqual(fullAnchorLoop.agentStatus, 'blocked');
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG3' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg3 = sessions.find(s => s.sessionId === 'SG3');
+  assert.ok(sg3, 'the incremental (issue-scoped) rebuild must find this session too');
+  assert.deepEqual(sg3, fullSG3, 'byte-identical to the full build, including the anchor\'s agent-status fields');
+  const incrementalAnchorLoop = sg3.loops.find(l => l.loopId === 'SG3');
+  assert.strictEqual(incrementalAnchorLoop.agentAction, 'plan');
+  assert.strictEqual(incrementalAnchorLoop.agentStatus, 'blocked');
+
+  // Confirmed reachable through the dashboard point-read path too (S6):
+  // pointReadSession calls the SAME getSessionsForIssues, so the point-read
+  // session doc must carry the same anchor fields.
+  const point = await observationSessionsStore.getSession(URL_KEY, 'SG3');
+  const pointAnchorLoop = point.loops.find(l => l.loopId === 'SG3');
+  assert.strictEqual(pointAnchorLoop.agentAction, 'plan');
+  assert.strictEqual(pointAnchorLoop.agentStatus, 'blocked');
 });
 
 // LIN-1307: autopilot session S, worker W (sessionId: S), and a reply-box

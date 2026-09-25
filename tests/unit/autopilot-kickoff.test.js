@@ -625,6 +625,31 @@ describe('buildAutopilotKickoff (maxTasks budget, LIN-1751)', () => {
     assert.ok(budgeted.includes('BUDGET_EXHAUSTED'));
   });
 
+  // Third-pass review T5 (`0cd1d40f`): a run bounded ONLY by maxSessionsPerTask
+  // (the v1 Go shape — a single-task run with no maxTasks) is not open-ended —
+  // it has a declared, enforced per-task stop. Before the fix, the finish-line
+  // sentence still led with "no finish line — it runs until it needs you.",
+  // directly contradicting the per-task budget sentence that follows it in the
+  // very same paragraph.
+  test('T5: a scoped run bounded only by maxSessionsPerTask does not contradict itself with the open-ended finish-line sentence', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxSessionsPerTask: 2 });
+    assert.ok(!text.includes('has no finish line — it runs until it needs you.'),
+      'must not claim open-ended when a per-task session bound is declared');
+    assert.ok(text.includes('Any ONE task in this run may take at most **2 worker sessions**'));
+
+    // A genuinely unbounded run (neither maxTasks nor maxSessionsPerTask) is
+    // unaffected — the open-ended sentence is still correct there.
+    const unbounded = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
+    assert.ok(unbounded.includes('has no finish line — it runs until it needs you.'));
+
+    // Both bounds declared together: unchanged from before this fix — still
+    // "Separately, any ONE task...", following the maxTasks sentence.
+    const both = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxTasks: 5, maxSessionsPerTask: 2 });
+    assert.ok(!both.includes('has no finish line — it runs until it needs you.'));
+    assert.ok(both.includes('This run covers **up to 5 distinct tasks**'));
+    assert.ok(both.includes('Separately, any ONE task in this run may take at most **2 worker sessions**'));
+  });
+
   test('the BUDGET_EXHAUSTED quirk-list bullet appears only when a budget is declared', () => {
     // The inlined manual (docs/autopilot-operating-manual.md) mentions
     // BUDGET_EXHAUSTED generically regardless of whether THIS run is budgeted
@@ -635,11 +660,25 @@ describe('buildAutopilotKickoff (maxTasks budget, LIN-1751)', () => {
     assert.ok(!unbudgeted.includes(QUIRK_BULLET));
 
     const budgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 50 });
-    assert.ok(budgeted.includes('A `409 BUDGET_EXHAUSTED` means this run reached its task budget'));
-    assert.ok(budgeted.includes('it is not a failure and not a\n  broken instrument'),
+    // LIN-2934: the bullet now names its bound discriminator explicitly.
+    assert.ok(budgeted.includes("A `409 BUDGET_EXHAUSTED` with `bound: 'tasks'` means this run reached its task budget"));
+    assert.ok(budgeted.includes('not a\n  failure and not a broken instrument'),
       'must be framed as an orderly finish, matching the DUPLICATE_DISPATCH quirk\'s framing');
     // Sits in the same quirks list as the existing DUPLICATE_DISPATCH entry.
     assert.ok(budgeted.indexOf('DUPLICATE_DISPATCH') < budgeted.indexOf(QUIRK_BULLET));
+  });
+
+  test('the BUDGET_EXHAUSTED sessionsPerTask quirk-list bullet appears only when that sibling bound is declared (LIN-2934)', () => {
+    const QUIRK_BULLET = "reached its\n  per-task session budget";
+    const unbudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL });
+    assert.ok(!unbudgeted.includes(QUIRK_BULLET));
+
+    const sessionBudgeted = buildAutopilotKickoff({ baseUrl: BASE_URL, maxSessionsPerTask: 10 });
+    assert.ok(sessionBudgeted.includes("A `409 BUDGET_EXHAUSTED` with `bound: 'sessionsPerTask'` means the CURRENT task"));
+    assert.ok(sessionBudgeted.includes('Comment on the ticket naming the bound that was hit and the ledger'));
+    // The task-budget bullet is independent — declaring only the sibling
+    // bound must not synthesize the tasks-bound bullet.
+    assert.ok(!sessionBudgeted.includes("bound: 'tasks'` means this run reached its task budget"));
   });
 
   test('a budgeted scoped run still pins the goal and names the task, unaffected by the budget block', () => {

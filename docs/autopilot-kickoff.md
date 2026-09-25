@@ -206,6 +206,11 @@ when it's actually done. If the run reaches the bound first, Harbour enforces it
 (see `BUDGET_EXHAUSTED` below); that refusal is itself a clean, expected stop, not a broken
 instrument.
 
+A run may also declare a **sibling per-task bound** (`maxSessionsPerTask`, LIN-2934),
+independent of `maxTasks`: it caps fresh worker-session dispatches to a single task, which is
+the bound a *scoped one-task run* actually needs — `maxTasks` cannot bind a run whose whole job
+is one task. Either, both, or neither bound may be declared; enforced at the same seam.
+
 ## Your instruments — and when to halt
 
 You drive a small set of verbs. Knowing how each behaves up front is what keeps a hiccup from
@@ -231,12 +236,21 @@ becoming a halt you didn't need — recognise these known quirks, don't debug th
   `$?` and the assignment aborts. Use `dispatch_status`, or run the loop under `bash`.
 - **`/recommend` can run past 25s** behind whitespace keepalives that `JSON.parse` ignores —
   don't set a short client timeout on it.
-- **A `409 BUDGET_EXHAUSTED` means a budgeted run reached its task limit — it is not a failure
-  and not a broken instrument.** A run launched with `maxTasks` refuses a fresh worker dispatch
-  for a NEW task once that many distinct tasks are underway; a dispatch that continues a task
-  already inside the budget (its review, its close-out, a corrective follow-up) is never
-  refused. Wind down any other in-flight work, post the run summary, and stop — that is the
-  run's clean, expected finish, not something to retry, work around, or count as a strike.
+- **A `409 BUDGET_EXHAUSTED` with `bound: "tasks"` means a budgeted run reached its task
+  limit — it is not a failure and not a broken instrument.** A run launched with `maxTasks`
+  refuses a fresh worker dispatch for a NEW task once that many distinct tasks are underway; a
+  dispatch that continues a task already inside the budget (its review, its close-out, a
+  corrective follow-up) is never refused. Wind down any other in-flight work, **comment on the
+  ticket naming the bound that was hit and the ledger** (sessions used, tasks touched, priced
+  spend for worker + orchestrator), post the run summary, and stop — that is the run's clean,
+  expected finish, not something to retry, work around, or count as a strike.
+- **A `409 BUDGET_EXHAUSTED` with `bound: "sessionsPerTask"` means the CURRENT task reached its
+  per-task session limit (LIN-2934) — also not a failure or a broken instrument.** A run
+  launched with `maxSessionsPerTask` refuses the next fresh dispatch to a task once that task's
+  own dispatch count reaches the bound — unlike the task-budget refusal above, there is **no**
+  exemption for review/close-out here, since this bound counts dispatches to that one task, not
+  distinct tasks. Comment on the ticket naming the bound and the ledger, post the run summary,
+  and stop.
 - **Rate limit: 60 requests/minute.** Space your polls.
 
 A broken signal in *your own* calls is a halt, not a puzzle: a network error, timeout, or 5xx

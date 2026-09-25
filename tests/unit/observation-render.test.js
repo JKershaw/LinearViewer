@@ -42,6 +42,7 @@ const { renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DE
 const { boundDecisionOptions, DECISION_OPTIONS_CHARS } = sandbox.module.exports;
 const { laneTicketWalk, ticketProgressText } = sandbox.module.exports;
 const { sessionParkedWait } = sandbox.module.exports;
+const { fillSessionHead } = sandbox.module.exports;
 
 test.describe('renderActivityLog — §6.3 burst copy', () => {
   test('drops the redundant per-burst total when a breakdown sums it', () => {
@@ -318,6 +319,79 @@ test.describe('sessionParkedWait / renderSummaryLine parked branch (LIN-2244)', 
     const s = { stale: false, waiting: false, terminal: false, statusLine: null, runs: [] };
     const html = renderSummaryLine(s);
     assert.ok(!html.includes('obs-summary-parked'));
+  });
+});
+
+// Third-pass review L3 (`0cd1d40f`): the taskPosition/sessionPosition "n of N"
+// chip had ONLY ever been asserted against the JSON payload feeding it
+// (tests/unit/pipeline-sessions.test.js) — no test exercised the actual
+// rendered DOM `fillSessionHead` produces. Mutation M21 (deleting the chip's
+// render branch entirely, public/observation.js:734) passed the full unit
+// suite AND CI's E2E shards, because `observation-card-order.test.js:75`
+// stubs `fillSessionHead` out to a no-op rather than calling the real one.
+// This describe block calls the REAL `fillSessionHead` against a minimal
+// `li` stub (just enough of `.obs-session-head`'s `innerHTML` setter — the
+// only DOM surface this function touches) and asserts the rendered markup.
+test.describe('fillSessionHead — budget "n of N" chip (LIN-2934, L3)', () => {
+  function makeLi() {
+    const head = { innerHTML: '' };
+    return { querySelector: (sel) => (sel === '.obs-session-head' ? head : null), head };
+  }
+
+  function budgetSession(overrides = {}) {
+    return {
+      sessionId: 'sess-budget-1',
+      workspaceUrlKey: 'ws-a',
+      seedIssue: 'LIN-2934',
+      seedTitle: null,
+      status: 'in-progress',
+      terminal: false,
+      stale: false,
+      waiting: false,
+      waitingMessage: null,
+      decision: null,
+      decisionCase: [],
+      statusLine: null,
+      recentKind: null,
+      runs: [],
+      tasksTouched: ['LIN-2934'],
+      model: null,
+      workspaceName: null,
+      runtime: null,
+      lastActivity: '2026-04-11T12:00:00.000Z',
+      taskPosition: null,
+      sessionPosition: null,
+      ...overrides
+    };
+  }
+
+  test('renders "task N of maxTasks · session M of maxSessionsPerTask" when both bounds are declared', () => {
+    const li = makeLi();
+    fillSessionHead(li, budgetSession({
+      taskPosition: { count: 2, maxTasks: 8 },
+      sessionPosition: { count: 4, maxSessionsPerTask: 10 }
+    }));
+    assert.match(li.head.innerHTML, /<span class="obs-meta obs-meta-budget">task 2 of 8 · session 4 of 10<\/span>/);
+  });
+
+  test('renders ONLY the session chip on a scoped run bounded by maxSessionsPerTask alone (the v1 Go shape)', () => {
+    const li = makeLi();
+    fillSessionHead(li, budgetSession({ sessionPosition: { count: 1, maxSessionsPerTask: 2 } }));
+    assert.match(li.head.innerHTML, /<span class="obs-meta obs-meta-budget">session 1 of 2<\/span>/);
+    assert.doesNotMatch(li.head.innerHTML, /task \d+ of \d+/);
+  });
+
+  test('renders ONLY the task chip when only maxTasks is declared', () => {
+    const li = makeLi();
+    fillSessionHead(li, budgetSession({ taskPosition: { count: 3, maxTasks: 8 } }));
+    assert.match(li.head.innerHTML, /<span class="obs-meta obs-meta-budget">task 3 of 8<\/span>/);
+    assert.doesNotMatch(li.head.innerHTML, /session \d+ of \d+/);
+  });
+
+  test('renders no budget chip at all when neither bound is declared', () => {
+    const li = makeLi();
+    fillSessionHead(li, budgetSession());
+    assert.doesNotMatch(li.head.innerHTML, /obs-meta-budget/);
   });
 });
 

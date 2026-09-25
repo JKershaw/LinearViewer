@@ -126,12 +126,14 @@ are short: dispatch queue items 24 hours, dispatch history 30 days
 transcripts on either path; LIN-2954 is where that one-page note on terms, retention and revocation
 is owed, and it is blocked on this milestone.
 
-**One run cannot be capped today, on either path, and the instrument that would cap it is off.**
-`maxTasks` counts *distinct issue identifiers*: ten worker sessions on one ticket is a count of
-one, so "a scoped run on one ticket has no bound" (LIN-2934, as corrected 2026-09-19) — and one
-task is precisely the shape `docs/v1.md`'s Go puts in front of a stranger. The north star's clause
-("no autonomous run starts without a declared task budget, enforced at the seam") is therefore not
-met for the exact run shape v1 ships. Worse for a cap keyed on money: the usage relay that carries
+**One run's SESSION COUNT is now capped on a single ticket (LIN-2934, shipped 2026-09-25); its
+SPEND is not, on either path, and the instrument that would cap spend is off.** `maxTasks` counts
+*distinct issue identifiers*: ten worker sessions on one ticket is a count of one, so a scoped run
+on one ticket had no bound of its own — the exact shape `docs/v1.md`'s Go puts in front of a
+stranger. LIN-2934 closed that gap with a sibling bound, `maxSessionsPerTask`, enforced at the
+same seam and shown as "n of N" in the feed; the north star's clause ("no autonomous run starts
+without a declared task budget, enforced at the seam") is now met for that run shape, on session
+count. It is still not met on **money**: worse for a cap keyed on that axis, the usage relay that carries
 cost back is default-OFF (`config.js@d0e809e3:1100-1102`), and `MODEL_PRICING`
 (`lib/model-pricing.js@d249ec51:108-134`) carries rows for Claude, GPT and `gpt-5.4-mini` and **no
 cheap-model row at all** — no DeepSeek, no GLM, no Gemini Flash — so a table-priced fold of a cheap
@@ -155,8 +157,10 @@ minutes is **$0.01 (Fly) to $0.055 (E2B/Cloud Run)** plus a ~$12/month control-p
 structural.** Every figure above comes from the operator's OpenRouter export or a per-platform
 price list — not from Harbour's own telemetry — and `cheap-implementer.md` says so in terms ("a
 reading Harbour's own relay cannot make"). Three things stand between that and a cap that tracks
-real money: the relay is default-off; the pricing table has no cheap rows; and `maxTasks` counts
-tickets, not dollars, so it cannot be made into a spend cap by tuning. The one path that does work
+real money: the relay is default-off; the pricing table has no cheap rows; and `maxTasks`/
+`maxSessionsPerTask` count tickets and sessions, not dollars, so neither can be made into a spend
+cap by tuning — LIN-2934 shows spend in the hand-back/feed but does not enforce it, by design. The
+one path that does work
 needs no new pricing: `reduceLineageCost`'s `opencode` branch sums the harness's own reported
 `costUsd` — OpenRouter's real figure — and marks `fullyPriced: false` when any row fails to price
 rather than silently dropping it (`lib/terminal-marked-task-cost.js@d249ec51:137-161`). The
@@ -230,7 +234,7 @@ stand up", and the box wins by being cheapest to stand up rather than by being r
 | **3. Isolation** | *Exists:* per-session clone dir (LIN-558), per-session `TMPDIR` (LIN-1701), one non-root service user (`provision.sh:16,75`). *Left:* the temp dir is not `0700` (LIN-1712), all sessions share one Unix user, and every launch is `--dangerously-skip-permissions`. No per-account boundary at all. | *Exists:* nothing. *Designed:* container-per-task, which is a real boundary by construction and the one place this path is strictly better. *Left:* the runtime is undecided (Docker → Fargate / Cloud Run / K8s / Fly). |
 | **4. Hostile input** | Same three controls both paths inherit: `--strict-mcp-config` blocks the repo's own MCP servers (`executors.js:427-431`), `AskUserQuestion` denied, auto-updates off. Against them: the repo's own code runs in bypass mode, and the localhost broker accepts unauthenticated `/api/proxy/*` calls from anything in the session (`harbour-token-mcp-server.js:19-24,232-235`). Box-specific: CVE-2026-64600 local privesc, mitigated only by a reboot window; port 22 at `0.0.0.0/0` with the upstream firewall parked (LIN-2421). | The same three controls and the same broker hole. The container bounds the blast radius of what the repo's code can reach on the host — the one improvement — but it must then hold push credentials, which `remote-execution-epic.md` calls "the single most underestimated piece of P1". |
 | **5. Retention** | *Exists:* never delete (`clones.js:5-11`); a daily orphan reap on the box; transcripts persist under `~/.claude/projects/` by design, because the reboot recovery depends on it. Harbour side: 24h queue, 30d history (`dispatch-store.js:170-171`). *Left:* a written policy — none exists (LIN-2954, LIN-1635). | *Exists:* nothing. *By construction:* the container dies with the task, which answers the question for code but not for transcripts or feedback, which still land in Harbour under the same two TTLs. *Left:* the same written policy. |
-| **6. Spend** | *Exists:* `maxTasks`, which counts distinct issue identifiers and therefore cannot bound a one-task run (LIN-2934). Fixed cost €16.49/mo. *Left:* a per-run bound; and the telemetry to enforce it is default-off (`config.js:1100-1102`) with no cheap-model pricing rows. On the `claude-code` lane `costUsd` is null, so a money cap is not buildable there. | The same absent cap, plus per-minute compute that is directly metered ($0.01–$0.055 a 20-minute run). On the `opencode` lane the harness reports OpenRouter's own USD (`opencode-runner.js:409-430`) and `reduceLineageCost` sums it with an explicit `fullyPriced` flag — so a real money cap **is** buildable, on either host, if the harness is `opencode`. |
+| **6. Spend** | *Exists:* `maxTasks` (distinct issue identifiers) plus the sibling `maxSessionsPerTask` (LIN-2934), which does bound a one-task run's worker-session count, shown in the feed. Fixed cost €16.49/mo. *Left:* a MONEY bound — the telemetry to enforce one is default-off (`config.js:1100-1102`) with no cheap-model pricing rows, and LIN-2934 deliberately shows spend without enforcing it. On the `claude-code` lane `costUsd` is null, so a money cap is not buildable there. | The same absent money cap, plus per-minute compute that is directly metered ($0.01–$0.055 a 20-minute run). On the `opencode` lane the harness reports OpenRouter's own USD (`opencode-runner.js:409-430`) and `reduceLineageCost` sums it with an explicit `fullyPriced` flag — so a real money cap **is** buildable, on either host, if the harness is `opencode`. |
 
 ## The recommendation
 

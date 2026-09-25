@@ -128,6 +128,39 @@ describe('maxTasks field threading (LIN-1751)', () => {
     assert.equal(watch.status, 'taken', 'sanity: resolved via the history branch');
     assert.equal(watch.maxTasks, taken.maxTasks);
   });
+
+  // LIN-2934 R2: the sibling of the `maxTasks` LOAD-BEARING archive-hop test
+  // above, for `maxSessionsPerTask`. Review found this leg untested — a
+  // mutation dropping `maxSessionsPerTask` from `_archiveItem`'s allowlist
+  // survived the full 19-file budget suite (M11) even though the identical
+  // mutation on `maxTasks` fails 3 tests, including the one right above this.
+  test('maxSessionsPerTask is carried into history — the LOAD-BEARING leg (LIN-1698 failure class)', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 4 });
+
+    // takeItem archives the doc to history — a kickoff row is typically
+    // archived within seconds of a real run starting, so the budget guard's
+    // anchor read (getItemStatus) must resolve maxSessionsPerTask through the
+    // ARCHIVED branch (_formatHistoryItem), not only the still-queued branch.
+    await store.takeItem(created._id, 'acme');
+
+    const status = await store.getItemStatus('acme', created._id);
+    assert.equal(status.status, 'taken', 'sanity: resolved via the history branch, not the active queue');
+    assert.equal(status.maxSessionsPerTask, 4, 'a missing field here makes the sessions-per-task guard silently stop enforcing');
+
+    const { items } = await store.listHistory('acme');
+    assert.equal(items.length, 1);
+    assert.equal(items[0].maxSessionsPerTask, 4);
+  });
+
+  test('echo honesty: getItemStatus and _formatItem agree on maxSessionsPerTask — once archived', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 6 });
+    const taken = await store.takeItem(created._id, 'acme');
+    const watch = await store.getItemStatus('acme', created._id);
+    assert.equal(watch.status, 'taken', 'sanity: resolved via the history branch');
+    assert.equal(watch.maxSessionsPerTask, taken.maxSessionsPerTask);
+  });
 });
 
 describe('countDistinctTasksForSession (LIN-1751)', () => {
@@ -150,11 +183,13 @@ describe('countDistinctTasksForSession (LIN-1751)', () => {
     }
   });
 
-  test('projects down to issueIdentifier only on both reads', async () => {
+  test('projects down to _id and issueIdentifier only on both reads', async () => {
+    // LIN-2934 (F3): `_id` is projected too, so `taskDispatches` can de-dupe by
+    // `_id` across the queue+history union without a second read.
     const { store, mainFindOpts, historyFindOpts } = makeCapturingStore();
     await store.countDistinctTasksForSession('acme', 'run-1', 'LIN-1');
-    assert.deepEqual(mainFindOpts[0], { projection: { issueIdentifier: 1 } });
-    assert.deepEqual(historyFindOpts[0], { projection: { issueIdentifier: 1 } });
+    assert.deepEqual(mainFindOpts[0], { projection: { _id: 1, issueIdentifier: 1 } });
+    assert.deepEqual(historyFindOpts[0], { projection: { _id: 1, issueIdentifier: 1 } });
   });
 
   test('counts DISTINCT issueIdentifiers, deduping repeat dispatches for the same task', async () => {
@@ -169,6 +204,35 @@ describe('countDistinctTasksForSession (LIN-1751)', () => {
     const result = await store.countDistinctTasksForSession('acme', 'run-1', 'LIN-1');
     assert.equal(result.count, 2, 'two DISTINCT tasks, not four dispatches');
     assert.equal(result.alreadyCounted, true, 'LIN-1 already has dispatches under this session');
+    // LIN-2934: taskDispatches counts DISPATCHES to the candidate task, not
+    // distinct tasks — the opposite of `count` — so it reports 3, not 2.
+    assert.equal(result.taskDispatches, 3, 'LIN-1 was dispatched 3 times under this session');
+  });
+
+  test('taskDispatches is 0 for a genuinely new task, and unaffected by other tasks\' dispatch counts (LIN-2934)', async () => {
+    const store = makeStore();
+    await store.addItem('acme', { prompt: 'x', issueIdentifier: 'LIN-1', sessionId: 'run-1' });
+    await store.addItem('acme', { prompt: 'x', issueIdentifier: 'LIN-1', sessionId: 'run-1' });
+
+    const result = await store.countDistinctTasksForSession('acme', 'run-1', 'LIN-99');
+    assert.equal(result.taskDispatches, 0, 'LIN-99 has never been dispatched under this session');
+  });
+
+  test('taskDispatches de-duplicates by _id across a queue/history archive-overlap window (LIN-2934, F3)', async () => {
+    const store = makeStore();
+    const item = await store.addItem('acme', { prompt: 'x', issueIdentifier: 'LIN-1', sessionId: 'run-1' });
+    await store.addItem('acme', { prompt: 'x', issueIdentifier: 'LIN-1', sessionId: 'run-1' });
+
+    // Simulate the `cleanup()` archive window: `_archiveItem` has inserted the
+    // doc into history, but the matching `deleteMany` on the queue hasn't run
+    // yet — so the SAME row (same `_id`) is briefly present in BOTH
+    // collections. A flat length over the unioned results would double-count
+    // it; taskDispatches must not.
+    await store.historyCollection.insertOne({ ...item, status: 'expired' });
+    assert.equal((await store.listItems('acme')).length, 2, 'the queue row was not actually removed yet (simulated overlap)');
+
+    const result = await store.countDistinctTasksForSession('acme', 'run-1', 'LIN-1');
+    assert.equal(result.taskDispatches, 2, 'the overlapping row must be counted once, by _id, not twice');
   });
 
   test('alreadyCounted is false for a genuinely new task', async () => {
@@ -204,6 +268,7 @@ describe('countDistinctTasksForSession (LIN-1751)', () => {
 
     const result = await store.countDistinctTasksForSession('acme', 'run-1', 'LIN-1');
     assert.equal(result.count, 1, 'only the one fresh, issue-bearing row counts');
+    assert.equal(result.taskDispatches, 1, 'taskDispatches excludes the same rows, for the same reasons');
   });
 
   test('never filters on status — a stale "taken" row still counts (LIN-1594)', async () => {

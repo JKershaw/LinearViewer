@@ -412,7 +412,9 @@ travel to it.** If your run was launched with a task budget (`maxTasks`), dispat
 took on, the same as any other. A child dispatched with no `issueIdentifier` holds no task of its own,
 so it doesn't consume the bound. The bound itself stays at your altitude: it does **not** auto-inherit
 onto the child's own kickoff, so a child you dispatch is unbudgeted unless you deliberately declare its
-own `maxTasks`.
+own `maxTasks`. The sibling per-task bound (`maxSessionsPerTask`, LIN-2934) follows the identical
+non-inheritance rule — it stays at your altitude too, and a child is unbounded per-task unless you
+declare it explicitly on that child's own kickoff.
 
 **A lane child's budget accounting is genuinely different, and this is a known, currently-open gap —
 not a design choice to restate as if it were solved.** `LIN-1751`'s task-budget guard
@@ -530,8 +532,18 @@ exists.
 If this run was launched with a declared task budget (`maxTasks`), that budget is a **scope bound**, not
 a substitute for this judgment — it says how far the run reaches, not when it's actually done. Keep
 applying the same discrimination above; if the run reaches the bound first, Harbour enforces it
-server-side (a `409 BUDGET_EXHAUSTED` refusal on the next new task) and that refusal is itself a clean,
-expected stop, not a broken instrument — wind down in-flight work and report where the run stands.
+server-side (a `409 BUDGET_EXHAUSTED` refusal, `bound: "tasks"`, on the next new task) and that refusal
+is itself a clean, expected stop, not a broken instrument — wind down in-flight work, **comment on the
+ticket naming the bound and the ledger** (sessions used, tasks touched, priced spend), and report where
+the run stands.
+
+The sibling per-task bound (`maxSessionsPerTask`, LIN-2934) applies the same discrimination at a finer
+grain: it caps fresh worker-session dispatches to a SINGLE task, so a scoped one-task run — the shape
+`maxTasks` alone cannot bind — still has a declared stop. A `409 BUDGET_EXHAUSTED` refusal with
+`bound: "sessionsPerTask"` is the same clean, expected finish, but with no already-counted exemption:
+it counts dispatches to that one task, never a count of tasks themselves, so it can refuse even
+that task's own review or close-out once its own session count reaches the bound. Same hand-back:
+comment on the ticket naming the bound and the ledger.
 
 There's a quieter stop that's easy to miss: leaving a thing *incomplete* on purpose and letting the
 loop's own redundancy carry it. The design already assumes no single judgment has to be perfect —

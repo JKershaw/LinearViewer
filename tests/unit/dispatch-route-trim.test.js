@@ -118,3 +118,47 @@ describe('PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim (LIN-2147)', () 
     assert.equal(res.status, 404);
   });
 });
+
+describe('PATCH .../trim — maxSessionsPerTask sibling bound (LIN-2934)', () => {
+  test('rejects a body with neither maxTasks nor maxSessionsPerTask', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'patch', `/workspace/acme/api/dispatch/${UUID}/trim`, {});
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'At least one of maxTasks or maxSessionsPerTask is required');
+  });
+
+  test('trims maxSessionsPerTask alone, independent of maxTasks', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', maxTasks: 10, maxSessionsPerTask: 10 });
+    const app = buildApp({ dispatchQueueStore: store });
+    const res = await call(app, 'patch', `/workspace/acme/api/dispatch/${created._id}/trim`, { maxSessionsPerTask: 3 });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.item.maxSessionsPerTask, 3);
+    assert.equal(res.body.item.maxTasks, 10, 'trimming the sibling bound must not touch maxTasks');
+  });
+
+  test('trims both bounds in one call', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', maxTasks: 10, maxSessionsPerTask: 10 });
+    const app = buildApp({ dispatchQueueStore: store });
+    const res = await call(app, 'patch', `/workspace/acme/api/dispatch/${created._id}/trim`, { maxTasks: 4, maxSessionsPerTask: 3 });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.item.maxTasks, 4);
+    assert.equal(res.body.item.maxSessionsPerTask, 3);
+  });
+
+  test('409s a non-downward maxSessionsPerTask trim even when maxTasks is omitted', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', maxSessionsPerTask: 5 });
+    const app = buildApp({ dispatchQueueStore: store });
+    const res = await call(app, 'patch', `/workspace/acme/api/dispatch/${created._id}/trim`, { maxSessionsPerTask: 8 });
+    assert.equal(res.status, 409);
+  });
+
+  test('rejects a non-integer maxSessionsPerTask', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const res = await call(app, 'patch', `/workspace/acme/api/dispatch/${UUID}/trim`, { maxSessionsPerTask: 0 });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, 'maxSessionsPerTask must be a positive integer');
+  });
+});

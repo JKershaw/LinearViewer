@@ -93,9 +93,10 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The pin tracks the CURRENT version (LIN-3022 moved it 12 → 13); a lingering v3
-  // archive doc from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 13, 'this bump-specific pin tracks the current version');
+  // The pin tracks the CURRENT version (LIN-3022 moved it 12 → 13, LIN-2934 moved
+  // it 13 → 14); a lingering v3 archive doc from before LIN-1487 must still miss
+  // on both reads.
+  assert.equal(BUILDER_VERSION, 14, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
@@ -356,4 +357,25 @@ test('a v12 doc (pre-answeredDecisions loops, LIN-3022) read-misses on both list
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v12 doc');
   assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v12 doc -> route reconstructs');
+});
+
+// LIN-2934: the v13 -> v14 bump exists because the assembled session now
+// carries `taskPosition`/`sessionPosition` ("n of N" against the run's
+// `maxTasks`/`maxSessionsPerTask` bounds) — a v13 doc was built before those
+// keys existed, so without the bump it would keep serving a session with
+// neither field (the Observation feed chip renders nothing) for up to
+// DEFAULT_HISTORY_TTL (30 days). Pinning the v13 doc as the target set is
+// what makes this bump load-bearing rather than cosmetic — same
+// version-agnostic style as the v11 doc test above, so this stays meaningful
+// after the next bump instead of asserting a specific CURRENT version number.
+test('a v13 doc (pre-taskPosition/sessionPosition, LIN-2934) read-misses on both list and point reads', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 13;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v13 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v13 doc -> route reconstructs');
 });

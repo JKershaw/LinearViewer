@@ -1278,6 +1278,142 @@ describe('createDispatchItem — task-budget guard, refusals (LIN-1751)', () => 
     assert.equal(err.budgetExhausted.code, 'BUDGET_EXHAUSTED');
     assert.strictEqual(err.budgetExhausted.count, null);
     assert.equal(err.budgetExhausted.maxTasks, 50);
+    // N3: a fail-closed body must always carry a bound discriminator so the
+    // refusal note template's ${refusal.bound} never interpolates undefined.
+    assert.equal(err.budgetExhausted.bound, 'tasks', 'only maxTasks was declared on this run');
+  });
+
+  test('maxTasks unaffected: only maxSessionsPerTask declared has zero effect until its own bound is hit (LIN-2934)', async () => {
+    // First half of the guard test (pre-implementation shape): declaring only
+    // maxSessionsPerTask, well under its own bound, changes nothing.
+    const under = budgetStore({
+      runs: { 'run-1': { maxSessionsPerTask: 10 } },
+      countResult: { count: 1, alreadyCounted: false, taskDispatches: 3 }
+    });
+    const item = await freshDispatch(under, { fields: { sessionId: 'run-1' } });
+    assert.equal(item.issueIdentifier, 'LIN-1');
+  });
+
+  test('maxSessionsPerTask reached for the candidate task: refused with BUDGET_EXHAUSTED, bound: sessionsPerTask (LIN-2934)', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxSessionsPerTask: 10 } },
+      countResult: { count: 1, alreadyCounted: false, taskDispatches: 10 }
+    });
+    const err = await freshDispatch(store, { fields: { sessionId: 'run-1' } }).then(() => null, e => e);
+    assert.ok(err, 'expected a refusal');
+    assert.equal(err.status, 409);
+    assert.equal(err.budgetExhausted.code, 'BUDGET_EXHAUSTED');
+    assert.equal(err.budgetExhausted.bound, 'sessionsPerTask');
+    assert.equal(err.budgetExhausted.taskDispatches, 10);
+    assert.equal(err.budgetExhausted.maxSessionsPerTask, 10);
+    assert.equal(err.budgetExhausted.sessionId, 'run-1');
+  });
+
+  test('maxSessionsPerTask has NO alreadyCounted-style exemption — a task already inside maxTasks is still refused once its own session count is reached (LIN-2934)', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxTasks: 50, maxSessionsPerTask: 5 } },
+      // alreadyCounted:true would exempt this from the maxTasks check, but
+      // sessionsPerTask counts DISPATCHES to this task, not distinct tasks,
+      // so it must still refuse.
+      countResult: { count: 10, alreadyCounted: true, taskDispatches: 5 }
+    });
+    await assert.rejects(
+      () => freshDispatch(store, { fields: { sessionId: 'run-1' } }),
+      err => err.status === 409
+        && err.budgetExhausted.code === 'BUDGET_EXHAUSTED'
+        && err.budgetExhausted.bound === 'sessionsPerTask',
+      'an already-counted task must still be refused once ITS OWN session count reaches the bound'
+    );
+  });
+
+  test('a real count-read error with ONLY maxSessionsPerTask declared fails CLOSED with bound: sessionsPerTask (LIN-2934, N3)', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxSessionsPerTask: 10 } },
+      countError: new Error('db unavailable')
+    });
+    const err = await freshDispatch(store, { fields: { sessionId: 'run-1' } }).then(() => null, e => e);
+    assert.ok(err);
+    assert.equal(err.status, 409);
+    assert.equal(err.budgetExhausted.bound, 'sessionsPerTask');
+    assert.equal(err.budgetExhausted.maxSessionsPerTask, 10);
+    assert.strictEqual(err.budgetExhausted.maxTasks, null, 'maxTasks was never declared on this run');
+  });
+
+  test('a real count-read error with BOTH bounds declared fails CLOSED with bound: unverified (LIN-2934, N3)', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxTasks: 50, maxSessionsPerTask: 10 } },
+      countError: new Error('db unavailable')
+    });
+    const err = await freshDispatch(store, { fields: { sessionId: 'run-1' } }).then(() => null, e => e);
+    assert.ok(err);
+    assert.equal(err.status, 409);
+    // Neither bound can be blamed specifically — the read failed before
+    // either could be evaluated, so naming one would misattribute which
+    // bound "fired".
+    assert.equal(err.budgetExhausted.bound, 'unverified');
+    assert.equal(err.budgetExhausted.maxTasks, 50);
+    assert.equal(err.budgetExhausted.maxSessionsPerTask, 10);
+  });
+});
+
+describe('createDispatchItem — budgetPosition snapshot (LIN-2934)', () => {
+  test('budgetPosition is absent (not just null) when no budget is declared', async () => {
+    const store = budgetStore({ runs: { 'run-1': {} } });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.ok(!('budgetPosition' in item), 'no budget declared, no position to report');
+  });
+
+  test('budgetPosition.tasks.count gates on alreadyCounted (a distinct-task count), unaffected by this revision', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxTasks: 8 } },
+      countResult: { count: 3, alreadyCounted: false, taskDispatches: 0 }
+    });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.deepEqual(item.budgetPosition.tasks, { count: 4, maxTasks: 8 }, 'a genuinely new task advances the distinct count by one');
+    assert.strictEqual(item.budgetPosition.sessionsPerTask, null, 'maxSessionsPerTask was never declared');
+  });
+
+  test('budgetPosition.tasks.count does NOT advance for an already-counted task', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxTasks: 8 } },
+      countResult: { count: 3, alreadyCounted: true, taskDispatches: 2 }
+    });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.deepEqual(item.budgetPosition.tasks, { count: 3, maxTasks: 8 }, 'continuing an already-counted task does not grow the distinct count');
+  });
+
+  test('budgetPosition.sessionsPerTask.count is taskDispatches + 1 UNCONDITIONALLY, even when alreadyCounted is true (LIN-2934, N2)', async () => {
+    // The off-by-one the prior draft's formula produced: copying the `tasks`
+    // field's alreadyCounted gate onto sessionsPerTask would report this as
+    // "3 of 10" instead of "4 of 10" on a scoped run's 4th session.
+    const store = budgetStore({
+      runs: { 'run-1': { maxTasks: 50, maxSessionsPerTask: 10 } },
+      countResult: { count: 1, alreadyCounted: true, taskDispatches: 3 }
+    });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.deepEqual(
+      item.budgetPosition.sessionsPerTask,
+      { count: 4, maxSessionsPerTask: 10 },
+      'taskDispatches + 1, regardless of alreadyCounted'
+    );
+  });
+
+  test('budgetPosition.sessionsPerTask.count advances on the FIRST dispatch to a task too (alreadyCounted: false)', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxSessionsPerTask: 10 } },
+      countResult: { count: 0, alreadyCounted: false, taskDispatches: 0 }
+    });
+    const item = await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.deepEqual(item.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 10 });
+  });
+
+  test('budgetPosition is never passed to store.addItem (non-persisted)', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { maxTasks: 8 } },
+      countResult: { count: 3, alreadyCounted: false, taskDispatches: 0 }
+    });
+    await freshDispatch(store, { fields: { sessionId: 'run-1' } });
+    assert.ok(!('budgetPosition' in store.captured.item), 'budgetPosition must be attached to the RETURNED item only, never sent to addItem');
   });
 });
 

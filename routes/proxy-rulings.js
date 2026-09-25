@@ -152,9 +152,13 @@ export function createRulingsRoutes({
     // `isTerminalLoop` rather than a second hand-rolled terminal check —
     // zero new reads, scanning only the `loops` array already fetched above.
     // `anchorTerminal` stays unpassed here too (S3's press-time read).
+    //
+    // LIN-2934 (S4): guard against a null anchor matching another null
+    // anchor — see the identical comment in routes/dashboard.js.
     return collectUnansweredDecisions({ loops, taskDecisions, shelvedRulings, newestScanByTask }, {
       now: new Date(),
       liveDispatchOnAnchor: (issueIdentifier) =>
+        issueIdentifier != null &&
         loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l)),
       includeResolved
     });
