@@ -11,6 +11,22 @@ const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
 
 const URL_KEY = 'test-workspace';
 
+// Hold a findOne's resolution while snapshotting its result at call time, so
+// a write/clear issued meanwhile cannot leak into the held read. Delaying the
+// query itself (running it at release time) would return fresh data and never
+// exercise the ordering guard (LIN-3024 review, mutation M1).
+function holdFindOneWithSnapshot(collection) {
+  const originalFindOne = collection.findOne.bind(collection);
+  let releaseRead;
+  const held = new Promise((resolve) => { releaseRead = resolve; });
+  collection.findOne = async (query) => {
+    const snapshot = await originalFindOne(query);
+    await held;
+    return snapshot;
+  };
+  return releaseRead;
+}
+
 describe('WorkspaceHaltStore', () => {
   test('setWorkspaceHalt upserts the full document shape', async () => {
     const collection = createMockCollection();
@@ -206,16 +222,14 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
     const now = new Date('2026-01-01T00:00:00.000Z');
     await store.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now });
 
-    let releaseRead;
-    const originalFindOne = collection.findOne.bind(collection);
-    collection.findOne = (query) => new Promise((resolve) => {
-      releaseRead = () => resolve(originalFindOne(query));
-    });
+    const releaseRead = holdFindOneWithSnapshot(collection);
 
     const staleRead = store.getWorkspaceHalt(URL_KEY);
     await store.clearWorkspaceHalt(URL_KEY);
     releaseRead();
-    await staleRead;
+    // Non-vacuity: the held read must really carry the pre-clear document,
+    // otherwise the guard below is never exercised.
+    assert.deepStrictEqual(await staleRead, { _id: URL_KEY, mode: 'pause', setAt: now, setBy: 'alice' });
 
     assert.strictEqual(store.getLastKnownHalt(URL_KEY), null);
   });
@@ -227,16 +241,14 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
     const secondNow = new Date('2026-01-02T00:00:00.000Z');
     await store.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now: firstNow });
 
-    let releaseRead;
-    const originalFindOne = collection.findOne.bind(collection);
-    collection.findOne = (query) => new Promise((resolve) => {
-      releaseRead = () => resolve(originalFindOne(query));
-    });
+    const releaseRead = holdFindOneWithSnapshot(collection);
 
     const staleRead = store.getWorkspaceHalt(URL_KEY);
     await store.setWorkspaceHalt(URL_KEY, { mode: 'stop', setBy: 'bob', now: secondNow });
     releaseRead();
-    await staleRead;
+    // Non-vacuity: the held read must really carry the pre-write document,
+    // otherwise the guard below is never exercised.
+    assert.deepStrictEqual(await staleRead, { _id: URL_KEY, mode: 'pause', setAt: firstNow, setBy: 'alice' });
 
     assert.deepStrictEqual(store.getLastKnownHalt(URL_KEY), { mode: 'stop', setAt: secondNow, setBy: 'bob' });
   });

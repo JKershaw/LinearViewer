@@ -227,6 +227,38 @@ describe('LIN-3024 — GET /api/dispatch/poll: bounded timeout', () => {
   });
 });
 
+describe('LIN-3024 — GET /api/dispatch/poll: halt read runs in parallel with pollAvailable', () => {
+  test('both ~200ms reads overlap: elapsed stays well under their sum, and the halt read starts while items are in flight', async () => {
+    const READ_MS = 200;
+    const halt = { mode: 'pause', setAt: '2026-01-01T00:00:00.000Z', setBy: 'alice' };
+    let itemsInFlight = false;
+    let haltStartedWhileItemsInFlight = null;
+    const pollAvailable = () => {
+      itemsInFlight = true;
+      return new Promise(resolve => setTimeout(() => { itemsInFlight = false; resolve(ITEMS); }, READ_MS));
+    };
+    const workspaceHaltStore = {
+      getWorkspaceHalt: () => {
+        haltStartedWhileItemsInFlight = itemsInFlight;
+        return new Promise(resolve => setTimeout(() => resolve({ _id: URL_KEY, ...halt }), READ_MS));
+      },
+      getLastKnownHalt: () => null
+    };
+    // Timeout well above READ_MS so the halt read completes rather than falling back.
+    const app = buildApp({ workspaceHaltStore, haltReadTimeoutMs: 1000, pollAvailable });
+
+    const res = await call(app);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { items: ITEMS, halt });
+    assert.strictEqual(haltStartedWhileItemsInFlight, true, 'the halt read must start before pollAvailable settles');
+    // Serialised reads cannot finish in under 2 * READ_MS (timers never fire
+    // early); overlapping ones take ~READ_MS, leaving ~150ms of headroom.
+    assert.ok(res.elapsedMs < 1.75 * READ_MS,
+      `expected overlapping reads (~${READ_MS}ms), took ${res.elapsedMs}ms (serialised would be >= ${2 * READ_MS}ms)`);
+  });
+});
+
 describe('LIN-3024 — GET /api/dispatch/poll: pollAvailable failure is untouched', () => {
   test('pollAvailable rejecting still returns 500, regardless of the halt store', async () => {
     const pollAvailable = async () => { throw new Error('boom'); };
