@@ -2580,6 +2580,55 @@ describe('_buildLoops: answeredDecisionId derivation end-to-end (LIN-1728)', () 
   });
 });
 
+// LIN-2891/LIN-3034: withdrawal derivation, mirroring the answeredDecisionId
+// end-to-end idiom directly above — the lean/non-lean equivalence rule
+// (LIN-3008/LIN-3011/LIN-3022) applies to `withdrawal` the same as any other
+// field, and the characterization golden / mongo-smoke W1 fixtures only ever
+// exercise the null case, so this is the sole coverage of a LIVE withdrawal
+// flowing end-to-end through `_buildLoops` on both paths.
+describe('_buildLoops: withdrawal derivation end-to-end (LIN-2891/LIN-3034)', () => {
+  test('a loop with no withdrawal stamp derives withdrawal: null', () => {
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.withdrawal, null);
+    assert.ok('withdrawal' in loop, 'key must be present, never omitted');
+  });
+
+  test('non-lean carries a live withdrawal derived from a decision-withdrawn entry', () => {
+    const feedback = [
+      decisionEntry(FULL_DECISION_PAYLOAD, 't1'),
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'moot' }), timestamp: 't2' }
+    ];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.deepStrictEqual(loop.withdrawal, { decisionId: 'd-1', reason: 'moot', timestamp: 't2' });
+  });
+
+  test('lean/non-lean parity: withdrawal is identical on both paths when a live withdrawal is present', () => {
+    const feedback = [
+      decisionEntry(FULL_DECISION_PAYLOAD, 't1'),
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'moot' }), timestamp: 't2' }
+    ];
+    const hist = historyItem({ feedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+    assert.deepStrictEqual(lean.withdrawal, full.withdrawal);
+    assert.deepStrictEqual(lean.withdrawal, { decisionId: 'd-1', reason: 'moot', timestamp: 't2' });
+  });
+
+  test('lean/non-lean parity: a reversed withdrawal derives withdrawal: null end-to-end on both paths', () => {
+    const feedback = [
+      decisionEntry(FULL_DECISION_PAYLOAD, 't1'),
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'moot' }), timestamp: 't2' },
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: 't3' }
+    ];
+    const hist = historyItem({ feedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+    assert.strictEqual(full.withdrawal, null);
+    assert.strictEqual(lean.withdrawal, null);
+  });
+});
+
 // ─── LIN-3013: swipe page session-count read goes lean ─────────────────────
 //
 // The swipe page's session-count read (server.js:2748) feeds ONLY
