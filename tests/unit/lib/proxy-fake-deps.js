@@ -82,6 +82,13 @@ export const BASE_DEPS = () => ({
   workspacePreferencesStore: {},
   freeTierStore: { tryUse: async () => ({ allowed: true }) },
   provider: makeFakeProvider(),
+  // LIN-3025: routes/proxy-halt.js's required dep. Harmless here — no
+  // existing probe below reads it.
+  workspaceHaltStore: {
+    getWorkspaceHalt: async () => null,
+    setWorkspaceHalt: async () => {},
+    clearWorkspaceHalt: async () => {},
+  },
 });
 
 /**
