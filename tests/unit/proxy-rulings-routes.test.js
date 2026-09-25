@@ -178,6 +178,38 @@ function liveQueueItem(id, identifier) {
   return { id, issueIdentifier: identifier, issueTitle: `Title ${identifier}`, promptName: 'plan', prompt: 'p', dispatchedAt: new Date().toISOString() };
 }
 
+/**
+ * LIN-2934 (S4): a `gone` GENERAL (goal-only) autopilot anchor — `kind:'autopilot'`
+ * with NO `issueIdentifier` at all, retained anchorless by R1's
+ * `ANCHOR_KINDS_WITHOUT_ISSUE` (a non-anchor kind with no identifier would
+ * still be dropped as malformed; only `autopilot` survives). Terminal, well
+ * past the 6h reap window, so disposition is `gone` (never self-matches
+ * `liveDispatchOnAnchor` the way a live/mid-turn loop would).
+ */
+function goneGeneralAnchorItem(id, decisionId, onAnswerEffect) {
+  const oldIso = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past REAP_INACTIVITY_MS (6h)
+  const payload = { decision_id: decisionId, question: 'Proceed?', on_answer: { effect: onAnswerEffect } };
+  return {
+    id, kind: 'autopilot', issueIdentifier: null, issueTitle: 'Goal-only run',
+    promptName: 'autopilot', prompt: 'p', dispatchedAt: oldIso, resolvedAt: oldIso,
+    status: 'taken',
+    feedback: [
+      { kind: 'decision', message: JSON.stringify(payload), timestamp: oldIso },
+      { message: '[done] shipped it', timestamp: oldIso }
+    ]
+  };
+}
+
+/**
+ * LIN-2934 (S4): a live (queued, non-terminal) GENERAL autopilot anchor —
+ * `kind:'autopilot'`, no `issueIdentifier`. An UNRELATED general run: it
+ * shares no anchor with `goneGeneralAnchorItem` above except that both
+ * carry `issueIdentifier: null`.
+ */
+function liveGeneralAnchorItem(id) {
+  return { id, kind: 'autopilot', issueIdentifier: null, issueTitle: 'Another goal-only run', promptName: 'autopilot', prompt: 'p', dispatchedAt: new Date().toISOString() };
+}
+
 async function req(method, path, body) {
   const res = await fetch(`${baseUrl}${path}`, {
     method,
@@ -259,6 +291,26 @@ describe('GET /api/proxy/rulings', () => {
     const { body } = await req('GET', '/api/proxy/rulings');
     const row = body.rulings.find(r => r.decision.decision_id === 'd-gone-2');
     assert.equal(row.effect, 'dispatch');
+  });
+
+  // LIN-2934 (S4): a null-anchored ruling (a GENERAL autopilot run's own
+  // decision) must not read as "live" merely because some UNRELATED general
+  // run elsewhere in the workspace also carries `issueIdentifier: null`.
+  // Before the S4 fix, `liveDispatchOnAnchor: (id) => loops.some(l =>
+  // l.issueIdentifier === id && !isTerminalLoop(l))` matched `null === null`,
+  // so the live-but-unrelated general anchor below forced this row's effect
+  // to 'record', overriding its declared 'dispatch'.
+  test('a null-anchored (general-run) ruling does NOT read as live merely because an UNRELATED general run is also live', async () => {
+    historyItems = [goneGeneralAnchorItem('loop-gone-general', 'd-gone-general-1', 'dispatch')];
+    liveItems = [liveGeneralAnchorItem('loop-live-general')]; // a DIFFERENT, unrelated general run — also null-anchored
+    const { status, body } = await req('GET', '/api/proxy/rulings');
+    assert.equal(status, 200);
+    const row = body.rulings.find(r => r.decision.decision_id === 'd-gone-general-1');
+    assert.ok(row, 'the general-run row is still present');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.anchor.issueIdentifier, null, 'sanity: this really is a null-anchored row');
+    assert.equal(row.declaredEffect, 'dispatch');
+    assert.equal(row.effect, 'dispatch', 'an unrelated general run must never force record via a null === null match');
   });
 });
 

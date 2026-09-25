@@ -756,7 +756,15 @@ export function createDashboardRoutes({
       workspaceUrlKey: ws.urlKey,
       workspaceName: ws.name || ws.urlKey,
       seedIssue: session.seedIssue || null,
-      seedTitle: (anchor && anchor.issueTitle) || (session.loops?.[0]?.issueTitle) || session.seedIssue || '',
+      // LIN-2934 (S7): the fallback used to read `session.loops?.[0]?.issueTitle`
+      // unconditionally — safe when every loop carried a real issue, but R1 now
+      // retains a GENERAL run's own anchor loop as `loops[0]` with no
+      // `issueTitle` at all (a goal-only kickoff names no single task). Skip to
+      // the first loop that actually HAS a title (the first worker, for a
+      // general run) instead of stopping at a title-less loops[0], so the card
+      // keeps showing a worker's title rather than regressing to the "autopilot
+      // session" placeholder.
+      seedTitle: (anchor && anchor.issueTitle) || (session.loops || []).find(l => l.issueTitle)?.issueTitle || session.seedIssue || '',
       tasksTouched: Array.isArray(session.tasksTouched) ? session.tasksTouched : [],
       // Budget "n of N" (LIN-2934), derived read-time by pipeline-loops.js's
       // `_assembleSession` off the run's own `maxTasks`/`maxSessionsPerTask` —
@@ -1296,7 +1304,19 @@ export function createDashboardRoutes({
     const root = typeof dispatchQueueStore.getItemStatus === 'function'
       ? await Promise.resolve(dispatchQueueStore.getItemStatus(urlKey, sessionId)).catch(() => null)
       : null;
-    if (root?.issueIdentifier) ids.add(root.issueIdentifier);
+    // LIN-2934 (S6): a GENERAL (goal-only) autopilot anchor's own row carries no
+    // `issueIdentifier`, so it can never land in `ids` and is otherwise invisible
+    // to getSessionsForIssues' per-issue queries — same anchor-aware construction
+    // the materializer's `_collectSessionIssues`/`anchorsOut` already use (see
+    // getSessionsForIssues' own `extraItems` doc). Without this, this point-read
+    // path silently built the OLD orphan (anchor-less) session shape the feed no
+    // longer serves.
+    let anchorExtraItem = null;
+    if (root?.issueIdentifier) {
+      ids.add(root.issueIdentifier);
+    } else if (root && root.kind === 'autopilot') {
+      anchorExtraItem = root;
+    }
     const projection = { issueIdentifier: 1 };
     const [live, hist] = await Promise.all([
       Promise.resolve(dispatchQueueStore.listItems(urlKey, { sessionId, projection })).catch(() => []),
@@ -1305,8 +1325,11 @@ export function createDashboardRoutes({
     for (const r of (Array.isArray(live) ? live : [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
     for (const r of (hist?.items || [])) if (r?.issueIdentifier) ids.add(r.issueIdentifier);
 
-    if (!ids.size) return null;
-    const rebuilt = await getSessionsForIssues(urlKey, loopDeps, [...ids], { lean: false });
+    if (!ids.size && !anchorExtraItem) return null;
+    const rebuilt = await getSessionsForIssues(urlKey, loopDeps, [...ids], {
+      lean: false,
+      extraItems: anchorExtraItem ? [anchorExtraItem] : []
+    });
     return rebuilt.find(s => String(s.sessionId) === String(sessionId)) || null;
   }
 
@@ -1551,12 +1574,20 @@ export function createDashboardRoutes({
       // `anchorTerminal` is deliberately NOT passed here: this route backs the
       // 5s ambient nav-badge poll (see the comment atop this handler), which
       // must never evaluate it — full stop, not merely omitted by convention.
+      //
+      // LIN-2934 (S4): a null-anchored ruling (`issueIdentifier` itself null —
+      // e.g. an identifier-less general-autopilot anchor row, now retained by
+      // `_buildLoops`) must never read as "live" just because some UNRELATED
+      // general run elsewhere in `merged` also carries a null identifier. Guard
+      // on `issueIdentifier != null` before the scan, so `null === null` can
+      // never fire this predicate true.
       const rulings = attachStandingSuggestions(
         collectUnansweredDecisions(
           { loops: merged, taskDecisions, shelvedRulings, newestScanByTask },
           {
             now: new Date(),
             liveDispatchOnAnchor: (issueIdentifier) =>
+              issueIdentifier != null &&
               merged.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
           }
         ),

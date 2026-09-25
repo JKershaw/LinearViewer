@@ -126,6 +126,10 @@ describe('LIN-2934 R3 — recommend-and-dispatch 201s echo the declared bounds a
     const t1 = await call(app, 'post', RECOMMEND_DISPATCH, { issueIdentifier: 'TEST-14', sessionId });
     assert.equal(t1.status, 201, JSON.stringify(t1.body));
     assert.equal(t1.body.override, undefined, 'sanity: this is the LLM-derived arm, not the override arm');
+    // LIN-2934 (S3): the declared bound itself, not just budgetPosition, must
+    // be echoed on this arm too — this was unpinned (a mutation dropping
+    // `maxSessionsPerTask` from this response survived the full suite).
+    assert.equal(t1.body.maxSessionsPerTask, null, 'sanity: the bound lives on the anchor row, not this worker row');
     assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
   });
 });

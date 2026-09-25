@@ -140,6 +140,72 @@ describe('trimSessionBudget — successful trims', () => {
   });
 });
 
+// LIN-2934 (S2, R6): a successful trim changes the bound(s) the Observation
+// feed's `taskPosition`/`sessionPosition` chip reads, but until R6 no write
+// notified the materializer — the chip's denominator stayed stale until this
+// session's next UNRELATED write. `trimSessionBudget` now calls
+// `_notifyWriteForDoc` on success; this mirrors
+// `tests/unit/store-onwrite-hooks.test.js`'s existing write-notify pattern
+// (the `onWrite` hook), which this trim path previously had zero coverage
+// under.
+describe('trimSessionBudget — notifies the materialized feed on success (LIN-2934 S2/R6)', () => {
+  const drain = () => new Promise(resolve => setImmediate(resolve));
+
+  test('a successful trim on a QUEUED anchor fires onWrite with sessionId = the anchor id', async () => {
+    const calls = [];
+    const store = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection(),
+      onWrite: p => calls.push(p)
+    });
+    const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', issueIdentifier: 'LIN-1', maxTasks: 10 });
+    calls.length = 0; // ignore the addItem fire
+
+    const result = await store.trimSessionBudget('acme', created._id, { maxTasks: 3 });
+    assert.equal(result.ok, true);
+    await drain();
+
+    assert.deepEqual(calls, [{ urlKey: 'acme', sessionId: created._id, issueIdentifier: 'LIN-1' }],
+      'the trim must notify the materializer for this anchor, not stay silent until an unrelated write');
+  });
+
+  test('a successful trim on an ARCHIVED anchor fires onWrite with sessionId = the anchor id', async () => {
+    const calls = [];
+    const store = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection(),
+      onWrite: p => calls.push(p)
+    });
+    const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', issueIdentifier: 'LIN-2', maxTasks: 10 });
+    await store.takeItem(created._id, 'acme');
+    calls.length = 0; // ignore the addItem/takeItem fires
+
+    const result = await store.trimSessionBudget('acme', created._id, { maxTasks: 3 });
+    assert.equal(result.ok, true);
+    await drain();
+
+    assert.deepEqual(calls, [{ urlKey: 'acme', sessionId: created._id, issueIdentifier: 'LIN-2' }],
+      'the trim must notify the materializer for the ARCHIVED anchor too, not only a still-queued one');
+  });
+
+  test('a REFUSED trim (not-downward) does NOT fire onWrite — nothing changed', async () => {
+    const calls = [];
+    const store = new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection(),
+      onWrite: p => calls.push(p)
+    });
+    const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', issueIdentifier: 'LIN-3', maxTasks: 5 });
+    calls.length = 0;
+
+    const result = await store.trimSessionBudget('acme', created._id, { maxTasks: 8 }); // wider, refused
+    assert.equal(result.ok, false);
+    await drain();
+
+    assert.deepEqual(calls, [], 'a refusal must never fire a spurious materializer notify');
+  });
+});
+
 describe('trimSessionBudget — auditable (who/when/what)', () => {
   test('appends an audit entry recording at/maxTasks/by, readable via getItemStatus/_formatItem/_formatHistoryItem', async () => {
     const store = makeStore();

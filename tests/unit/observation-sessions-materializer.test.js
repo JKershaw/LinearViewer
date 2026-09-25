@@ -234,6 +234,44 @@ test('LIN-2934 R1: a GENERAL run with zero workers dispatched yet still material
   assert.strictEqual(sg0.sessionPosition, null, 'no maxSessionsPerTask declared on this fixture');
 });
 
+// LIN-2934 (S5): TWO independent GENERAL (goal-only) runs in the same 30-day
+// window. Before the fix, `_buildLoops` grouped every identifier-less anchor
+// into ONE shared `issueIdentifier: null` bucket, so `iteration` was numbered
+// across ALL general runs rather than per-anchor — G2's own anchor read
+// `iteration: 2` (it dispatched second) purely because G1's anchor also had
+// no identifier, not because G2 itself had a prior iteration. The incremental
+// materializer, which discovers G2's anchor alone via `extraItems` (it can
+// never see G1 — no issue in G2's closure is G1's anchor id), computed
+// `iteration: 1` for the SAME row: the exact byte-identity break the R1 tests
+// above pin for the single-general-run case, here reproduced with two.
+test('LIN-2934 (S5): iteration is numbered PER anchor, not across all general runs — full build matches the incremental materializer with two general runs present', async () => {
+  const ctx = setup();
+  const { historyCollection, statusCollection, agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  // G1 dispatches first — an anchor-only general run, no workers.
+  archive(historyCollection, { id: 'SG1', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(100), resolvedAtMs: min(101), maxTasks: 2 });
+  // G2 dispatches second, with one worker on LIN-810.
+  archive(historyCollection, { id: 'SG2', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(102), resolvedAtMs: min(103), maxTasks: 4 });
+  archive(historyCollection, { id: 'WG2-1', issueIdentifier: 'LIN-810', sessionId: 'SG2', dispatchedAtMs: min(104), resolvedAtMs: min(107), feedback: [{ message: '[done] shipped WG2-1', tsMs: min(107) }] });
+  status(statusCollection, { id: 'AS-sg2-w1', taskIdentifier: 'LIN-810', tsMs: min(105) });
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
+  const fullSG1 = full.find(s => s.sessionId === 'SG1');
+  const fullSG2 = full.find(s => s.sessionId === 'SG2');
+  assert.ok(fullSG1 && fullSG2, 'both general runs must surface in the same full build');
+
+  const anchorIterationOf = (session, sessionId) => session.loops.find(l => l.loopId === sessionId)?.iteration;
+  assert.strictEqual(anchorIterationOf(fullSG1, 'SG1'), 1, 'G1 is the only member of its own bucket');
+  assert.strictEqual(anchorIterationOf(fullSG2, 'SG2'), 1, 'G2 must NOT inherit G1\'s bucket position just because both are null-anchored');
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG2' });
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg2 = sessions.find(s => s.sessionId === 'SG2');
+  assert.ok(sg2, 'the incremental rebuild (extraItems-scoped) must find SG2 even though G1 exists');
+  assert.deepEqual(sg2, fullSG2, 'byte-identical to the full build — the incremental path can never see G1, so parity here proves iteration does not depend on OTHER general runs being present');
+  assert.strictEqual(anchorIterationOf(sg2, 'SG2'), 1);
+});
+
 // LIN-1307: autopilot session S, worker W (sessionId: S), and a reply-box
 // follow-up F that resumes W (followUpTo: W, sessionId: null, kind: 'custom',
 // target: 'cli') on its OWN distinct issue — the shape a human follow-up reply
