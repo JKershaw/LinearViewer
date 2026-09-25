@@ -184,11 +184,17 @@ describe('Half A: mount-completeness census against the real repo', () => {
   // invariant catching it, not evidence Half A's own missing/extra detectors
   // saw the gap; keeping the two in separate tests keeps that distinction
   // legible in the mutation-validation record.
-  test('the corpus is exactly 10 proxy sub-router files totalling 132 declared deps', () => {
+  //
+  // LIN-3025: routes/proxy-halt.js adds an 11th file with 5 required deps —
+  // workspaceHaltStore, proxyLimiter, authenticateProxyToken,
+  // requireWriteScope, logEvent — all undefaulted (workspaceHaltStore is
+  // deliberately NOT defaulted here, unlike createProxyRoutes's own `= null`
+  // default, so this census counts it): 132 + 5 = 137.
+  test('the corpus is exactly 11 proxy sub-router files totalling 137 declared deps', () => {
     const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
-    assert.equal(rows.length, 10, `expected 10 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
+    assert.equal(rows.length, 11, `expected 11 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
     const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
-    assert.equal(totalDeps, 132, `expected 132 total required deps across the 10 factories, found ${totalDeps}`);
+    assert.equal(totalDeps, 137, `expected 137 total required deps across the 11 factories, found ${totalDeps}`);
   });
 });
 
@@ -314,6 +320,31 @@ describe('Half B: reach probes through the real composer', () => {
       'handler did not reach the injected provider.createIssue — resolveProviderAccess or an earlier dep in the chain did not resolve'
     );
     assert.equal(calls[0][1].teamId, '11111111-1111-1111-1111-111111111111');
+  });
+
+  test('LIN-3025/halt: GET /api/proxy/dispatch/halt must land in createProxyHaltRoutes and dereference workspaceHaltStore.getWorkspaceHalt (routes/proxy-halt.js)', async () => {
+    const calls = [];
+    const app = buildApp({
+      workspaceHaltStore: {
+        ...BASE_DEPS().workspaceHaltStore,
+        getWorkspaceHalt: async (urlKey) => {
+          calls.push(urlKey);
+          return { _id: urlKey, mode: 'pause', setAt: new Date('2026-01-01T00:00:00.000Z'), setBy: 'u1' };
+        },
+      },
+    });
+
+    const { status, body } = await call(app, 'GET', '/api/proxy/dispatch/halt');
+
+    // A 500 here is the exact failure a signature+mount drop of
+    // workspaceHaltStore from the createProxyHaltRoutes mount produces
+    // (TypeError -> the handler's catch) — or, since workspaceHaltStore is
+    // undefaulted in this factory (unlike createProxyRoutes's own `= null`
+    // default), a dropped mount key surfaces here even though Half A's own
+    // census can't see it (research §5: 136 either way).
+    assert.equal(status, 200);
+    assert.deepEqual(body, { halt: { mode: 'pause', setAt: '2026-01-01T00:00:00.000Z', setBy: 'u1' } });
+    assert.deepEqual(calls, [ACME], 'handler did not reach the injected workspaceHaltStore.getWorkspaceHalt');
   });
 
   // G/agent-status — NO new probe here. tests/unit/lin-2533-agent-status-extraction.test.js:153-206

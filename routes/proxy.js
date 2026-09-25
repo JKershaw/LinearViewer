@@ -18,6 +18,7 @@ import { createDedupeCache, createGenerationTracker } from '../lib/proxy-dedupe.
 import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
 import { buildInstructions } from '../lib/proxy-instructions.js';
 import { createAgentStatusRoutes } from './proxy-agent-status.js';
+import { createProxyHaltRoutes } from './proxy-halt.js';
 import { createRulingsRoutes } from './proxy-rulings.js';
 import { createTokensAdminRoutes } from './proxy-tokens-admin.js';
 import { createTokenExchangeRoutes } from './proxy-token-exchange.js';
@@ -1543,6 +1544,15 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // Group G agent-status (LIN-679 Stage 1 / LIN-2533): extracted to
   // routes/proxy-agent-status.js, mounted at its original position.
   router.use(createAgentStatusRoutes({ agentStatusStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }));
+
+  // LIN-2994 Surface 3 / LIN-3025: the operator halt path
+  // (GET/POST/DELETE /api/proxy/dispatch/halt), routes/proxy-halt.js. MUST
+  // mount strictly before createDispatchRoutes below: GET
+  // /api/proxy/dispatch/:id (routes/proxy-dispatch.js:1585, whose id guard
+  // lets the literal "halt" through) would otherwise capture
+  // /dispatch/halt and answer with dispatch's wrong-shaped 404 instead of
+  // this router's own halt response.
+  router.use(createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }));
 
   // LIN-2444: the consumer-API rulings surface — a workspace-scoped READ of
   // unanswered decisions, plus a PROPOSE-a-dismissal write. Deliberately no
