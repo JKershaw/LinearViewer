@@ -4760,6 +4760,20 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
         'R3: the aiHint must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
       assert.ok(/If no such Approve verdict is on this ticket's own comment trail, write a plain acceptance-criteria subtask instead — no session-fit line, no plan-review-due line\./.test(goal),
         'R3: the aiHint must carry the no-Approve plain-acceptance-criteria fallback with no false session-fit/plan-review-due markers');
+      // R5: the aiHint workflow carries its own copy of the own-trail precondition
+      // and the plain fallback; formatAIHintsForMetaPrompt renders it beside the
+      // goal, so a regression to "the Parent Task's comment trail" here would put
+      // the F4 wrong-ticket instruction in the AI router's own hint while the goal
+      // stays correct and every other test stays green (M4w/M4w2).
+      const workflow = PROMPT_TEMPLATES.breakdown.aiHint.workflow;
+      assert.ok(/Check this ticket's own comment trail for a recorded `### Plan Review Verdict` of Approve/.test(workflow),
+        'R5: the aiHint workflow must check this ticket\'s own comment trail for an Approve verdict, not the Parent Task');
+      assert.ok(/otherwise write a plain acceptance-criteria subtask/.test(workflow),
+        'R5: the aiHint workflow must retain its plain acceptance-criteria fallback when no Approve verdict exists');
+      // R6: the goal must not copy a false `fits one session` onto a surface the
+      // approved plan itself could not scope to one session.
+      assert.ok(/or, for a surface the plan itself could not scope to one session, omit the false claim/.test(goal),
+        'R6: the aiHint goal must require omitting a false session-fit claim when the plan could not scope the surface to one session');
     });
   }
 
@@ -4776,6 +4790,11 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
     assert.ok(/cited from this ticket's own approving verdict \(the one the precondition found\)/.test(section),
       'N2: bullet (c) must cite this ticket\'s own approving verdict');
+    // R6: bullet (b) must not copy a false `fits one session` onto a surface the
+    // approved plan itself could not scope to one session; it must defer to a
+    // fresh `plan` pass instead (M13).
+    assert.ok(/if a surface genuinely does not fit one session, leave this line for a fresh `plan` pass to answer honestly rather than copying a false claim/.test(section),
+      'R6: bullet (b) must require omitting the session-fit line for a surface that does not fit one session');
   });
 
   test('the existing drift exit is extended to name the approach/files each surface section names', () => {
