@@ -1515,6 +1515,67 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     assert.equal(body.escalationRate.raisedInWindow, 2, 'both decisions were raised within the 30-day window');
   });
 
+  // LIN-2891/LIN-3036 Rev 8: the named `computeWorkspaceEscalationKpis`
+  // INTERIM GAP, pinned here so it stays intentional and visible. A withdrawn
+  // decision drops out of `unansweredRows` (Surface 5's `resolved` exclusion)
+  // AND is NOT added to `resolvedEvents` (Surface 2 deliberately leaves
+  // `resolvedDecisionEvents` untouched), so it silently leaves `raisedInWindow`
+  // entirely — neither a live escalation nor a false one. This is the ACCEPTED
+  // interim behaviour, not a defect: it is safer than booking the row either
+  // way, and it has a direct precedent in the `'self-resolved'` early-`continue`
+  // bucket (lib/escalation-kpis.js:113-117). The proper third bucket is
+  // LIN-2895's own surface — do NOT implement it here.
+  test('LIN-3036 interim gap (owned by LIN-2895): a withdrawn decision is in NEITHER unansweredRows NOR resolvedEvents, so it drops out of raisedInWindow', async () => {
+    const raisedMs = Date.now() - 2 * 60 * 60 * 1000;
+    const ts = new Date(raisedMs).toISOString();
+    const withdrawnLoop = {
+      id: 'w-withdrawn', issueIdentifier: 'LIN-7', issueTitle: 'withdrawn', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: ts, resolvedAt: ts, status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: ts },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-withdrawn', question: 'Proceed?' }), timestamp: ts },
+        { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-withdrawn', reason: 'asker retracted it' }), timestamp: ts }
+      ]
+    };
+    const openLoop = {
+      id: 'w-open', issueIdentifier: 'LIN-8', issueTitle: 'open', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: ts, resolvedAt: ts, status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: ts },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-open', question: 'Proceed?' }), timestamp: ts }
+      ]
+    };
+
+    // Control: BEFORE the withdrawal lands, the same decision is unanswered and
+    // counts — so the drop asserted below is caused by the withdrawal, not by
+    // the fixture having never been counted in the first place.
+    const controlLoops = [
+      { ...withdrawnLoop, feedback: withdrawnLoop.feedback.filter((e) => e.kind !== 'decision-withdrawn') },
+      openLoop
+    ];
+    const controlRouter = makeKpiRouter({ 'ws-a': { live: [], history: controlLoops, agentStatus: [] } });
+    const controlHandler = getHandler(controlRouter, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const control = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await controlHandler(control.req, control.res);
+    assert.equal(control.res.jsonBody.unansweredAge.count, 2, 'control: without the withdrawal both decisions count as unanswered');
+    assert.equal(control.res.jsonBody.escalationRate.raisedInWindow, 2, 'control: both are raised in-window');
+
+    const router = makeKpiRouter({ 'ws-a': { live: [], history: [withdrawnLoop, openLoop], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.unansweredAge.count, 1, 'only the still-open decision remains unanswered');
+    assert.equal(res.jsonBody.timeToResponse.count, 0, 'the withdrawn decision is NOT a resolved event — no duration is recorded');
+    assert.equal(res.jsonBody.falseEscalation.answered, 0, 'nor does it book as answered');
+    assert.equal(res.jsonBody.falseEscalation.dismissed, 0, 'nor dismissed');
+    assert.equal(
+      res.jsonBody.escalationRate.raisedInWindow, 1,
+      'INTERIM GAP (LIN-2895): the withdrawn decision leaves raisedInWindow entirely — neither unanswered nor resolved'
+    );
+  });
+
   test('a dismissed decision counts toward falseEscalation.dismissed, not answered', async () => {
     const raisedMs = Date.now() - 2 * 24 * 60 * 60 * 1000;
     const resolvedMs = raisedMs + 60 * 60 * 1000;
