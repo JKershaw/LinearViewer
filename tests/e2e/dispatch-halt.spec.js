@@ -113,6 +113,11 @@ test.describe('Workspace Halt (LIN-2994 Surface 4 / LIN-3026)', () => {
 
     // Disclosure is visible statically, before any control is used.
     await expect(halt.disclaimer()).toContainText('POST /api/proxy/dispatch/halt');
+    // Close-out L7: the escape hatch needs a read-write proxy token, minted
+    // from a flag-gated page — the copy must say so rather than promise a
+    // path the operator may not have ready.
+    await expect(halt.disclaimer()).toContainText('needs a read-write proxy token');
+    await expect(halt.disclaimer()).toContainText('before an incident');
 
     await halt.stop().click();
     await expect(halt.status()).toContainText('Stop requested', { timeout: 5000 });
@@ -183,5 +188,107 @@ test.describe('Workspace Halt (LIN-2994 Surface 4 / LIN-3026)', () => {
 
     const statusText = await halt.status().textContent();
     expect(statusText).not.toMatch(/\b(paused|stopped)\b/i);
+  });
+  test('write failure keeps the last known halt visible, and the error toast carries the disclosure', async ({ page }) => {
+    await page.goto(DISPATCH_URL);
+    await page.waitForLoadState('networkidle');
+
+    const halt = dispatchHalt(page);
+    await halt.pause().click();
+    await expect(halt.status()).toContainText('Pause requested', { timeout: 5000 });
+
+    // Fail only the write; the server still holds the pause.
+    await page.route(`**/workspace/${WS}/api/dispatch/halt`, (route) => {
+      if (route.request().method() === 'POST') {
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Failed to set halt' }) });
+      }
+      return route.continue();
+    });
+    await halt.stop().click();
+
+    // Close-out L3: the failure notice is ADDED to the known state, never
+    // replaces it — the operator must still see that a pause is requested.
+    await expect(halt.status()).toContainText('Failed to request stop', { timeout: 5000 });
+    await expect(halt.status()).toContainText('Pause requested');
+    await expect(halt.status()).not.toContainText('Stop requested');
+    await expect(halt.status()).toContainText('POST /api/proxy/dispatch/halt');
+    expect(await halt.status().textContent()).not.toMatch(/\b(paused|stopped)\b/i);
+
+    // Close-out L4: the transient error toast carries the same disclosure
+    // (plain text of the one rendered source), not just the raw error.
+    const disclaimerText = (await halt.disclaimer().textContent()).trim();
+    const toastEl = page.getByRole('alert').filter({ hasText: 'Failed to request stop' });
+    await expect(toastEl).toBeVisible({ timeout: 5000 });
+    await expect(toastEl).toContainText(disclaimerText);
+  });
+
+  test('periodic refresh is skipped while the tab is hidden and stops after beforeunload', async ({ page }) => {
+    await page.clock.install();
+
+    const haltPath = `/workspace/${WS}/api/dispatch/halt`;
+    let pollGets = 0;
+    page.on('request', (req) => {
+      const url = new URL(req.url());
+      if (req.method() === 'GET' && url.pathname === haltPath && !url.searchParams.has('settle')) pollGets++;
+    });
+    // A marker request issued AFTER the ticks under test: once its fetch
+    // resolves, every GET a tick issued earlier has already been counted, so
+    // a zero count is settled rather than merely early.
+    let settleN = 0;
+    const settle = () => page.evaluate((u) => fetch(u).then(r => r.status), `${haltPath}?settle=${++settleN}`);
+
+    await page.goto(DISPATCH_URL);
+    const halt = dispatchHalt(page);
+    await expect(halt.status()).toHaveText('No halt requested.');
+    await settle();
+
+    // Control: a visible tab refreshes once per HALT_POLL_MS (30s).
+    pollGets = 0;
+    await page.clock.fastForward(30000);
+    await settle();
+    expect(pollGets).toBe(1);
+
+    // Close-out L5 (a): hidden -> 90s elapse (fastForward fires a due timer at
+    // most once, so a broken skip shows as 1 GET, not 3), zero GETs.
+    await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }));
+    pollGets = 0;
+    await page.clock.fastForward(90000);
+    await settle();
+    expect(pollGets).toBe(0);
+
+    // Visible again -> polling resumes.
+    await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }));
+    pollGets = 0;
+    await page.clock.fastForward(30000);
+    await settle();
+    expect(pollGets).toBe(1);
+
+    // Close-out L5 (b): beforeunload clears the timer -> zero GETs after.
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')));
+    pollGets = 0;
+    await page.clock.fastForward(120000);
+    await settle();
+    expect(pollGets).toBe(0);
+  });
+
+  test('hung read: times out into the failure state with the disclosure instead of loading forever', async ({ page }) => {
+    await page.clock.install();
+    // The section's GET never answers; writes pass through.
+    await page.route(`**/workspace/${WS}/api/dispatch/halt`, (route) => {
+      if (route.request().method() === 'GET') return; // never fulfilled
+      return route.continue();
+    });
+
+    await page.goto(DISPATCH_URL);
+    const halt = dispatchHalt(page);
+    await expect(halt.status()).toHaveText('Loading…');
+
+    // Close-out L9: HALT_READ_TIMEOUT_MS (public/dispatch.js) is 10s.
+    await page.clock.fastForward(10000);
+    await expect(halt.status()).toContainText('Failed to load halt status', { timeout: 5000 });
+    const disclaimerHtml = await halt.disclaimer().innerHTML();
+    expect(await halt.status().innerHTML()).toBe(`Failed to load halt status. ${disclaimerHtml}`);
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
   });
 });

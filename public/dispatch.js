@@ -23,6 +23,14 @@ const QUEUE_LIST_POLL_MS = 3000
 // for no benefit).
 let haltPollId = null
 const HALT_POLL_MS = 30000
+// A halt read that hasn't answered by now is treated as a failed read, so a
+// hung GET shows the failure state + disclosure instead of "Loading…"
+// forever (close-out L9).
+const HALT_READ_TIMEOUT_MS = 10000
+// The last halt state successfully read or written (`undefined` until the
+// first success). A failed read/write keeps showing it rather than replacing
+// it with failure text, since the server still holds it (close-out L3).
+let haltLastKnown
 
 // =============================================================================
 // Dispatch Prompt
@@ -758,6 +766,12 @@ function haltDisclosureHtml() {
   return disclaimerEl ? disclaimerEl.innerHTML : ''
 }
 
+// The same disclosure as plain text, for toasts (which render text only).
+function haltDisclosureText() {
+  const disclaimerEl = document.querySelector('.halt-disclaimer')
+  return disclaimerEl ? disclaimerEl.textContent : ''
+}
+
 /**
  * Builds the requested-not-effective status line for a halt object (or the
  * unset state). Never renders "paused"/"stopped", and drops the "by <who>"
@@ -772,22 +786,35 @@ function formatHaltStatusHtml(halt) {
 }
 
 function renderHaltStatus(halt) {
+  haltLastKnown = halt
   const statusEl = document.querySelector('.halt-status')
   if (statusEl) statusEl.innerHTML = formatHaltStatusHtml(halt)
 }
 
 function renderHaltFailure(actionLabel) {
   const statusEl = document.querySelector('.halt-status')
-  if (statusEl) statusEl.innerHTML = `${actionLabel} ${haltDisclosureHtml()}`
+  if (!statusEl) return
+  const failure = `${actionLabel} ${haltDisclosureHtml()}`
+  statusEl.innerHTML = haltLastKnown === undefined
+    ? failure
+    : `Last known: ${formatHaltStatusHtml(haltLastKnown)}<br>${failure}`
+}
+
+function toastHaltFailure(message) {
+  toast(`${message} ${haltDisclosureText()}`, { type: 'error', duration: 10000 })
 }
 
 async function refreshHaltStatus(urlKey) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), HALT_READ_TIMEOUT_MS)
   try {
-    const { halt } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/halt`, { on401: false })
+    const { halt } = await api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/halt`, { on401: false, signal: controller.signal })
     renderHaltStatus(halt)
   } catch (e) {
     console.error('Failed to load workspace halt:', e)
     renderHaltFailure('Failed to load halt status.')
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -804,7 +831,7 @@ async function requestWorkspaceHalt(urlKey, mode) {
   } catch (e) {
     console.error('Failed to request workspace halt:', e)
     renderHaltFailure(`Failed to request ${mode}.`)
-    toast(`Failed to request ${mode}: ` + e.message, { type: 'error' })
+    toastHaltFailure(`Failed to request ${mode}: ${e.message}.`)
   }
 }
 
@@ -815,7 +842,7 @@ async function resumeWorkspaceHalt(urlKey) {
   } catch (e) {
     console.error('Failed to resume workspace:', e)
     renderHaltFailure('Failed to resume.')
-    toast('Failed to resume: ' + e.message, { type: 'error' })
+    toastHaltFailure(`Failed to resume: ${e.message}.`)
   }
 }
 
