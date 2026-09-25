@@ -1,0 +1,106 @@
+{
+  "name": "Approved-Parent-Breakdown",
+  "note": "Deliberately-synthetic fixtures (LIN-3049) for the breakdown-created-subtask exemption in lib/prompts/meta-prompt-template.js: a subtask of an already-approved, decomposed plan carries its own copied plan slice plus a committed `Session fit: fits one session` and a `Plan-review due: no — covered by <parent>'s approving plan-review` line, so Step 1's over-fire guard, the completed-prep rule and the plan-review gate all recognize it as settled prep and route it straight to `implementation` (positive). The negative twin is the same thin child today's breakdown template produces — acceptance criteria only, no session-fit and no plan-review-due line — and must NOT be handed a false `plan-review due: no`: its existing no-worse-than-baseline routing to `plan` (sometimes `implement`, a pre-existing flake on small single-surface tickets recorded during planning) is the point. The divergence case carries the copied slice but a later comment shows the parent plan revised past what the slice cites, exercising the gate addition's re-derive-on-divergence clause: it must NOT reach `implementation`. Each target is a childless In-Progress leaf (no children/focusedChild) so the descent terminates on it. The deterministic structural half lives in tests/unit/openrouter.test.js and tests/unit/prompt-templates.test.js ('LIN-3049'); this file measures the live routing shape only.",
+  "targets": [
+    {
+      "id": "LIN-APB-pos",
+      "role": "breakdown child of an approved parent plan, carrying its own copied plan slice + session-fit + plan-review-due:no citing the parent's approving verdict (expect -> implement/implementation: the approved slice is completed prep and the gate does not re-fire)",
+      "expect": ["implement", "implementation"]
+    },
+    {
+      "id": "LIN-APB-neg",
+      "role": "breakdown child with a plain acceptance-criteria description and NO recorded Approve on the decomposed ticket's own trail (expect -> plan (sometimes implement: a pre-existing flake on small single-surface tickets); must NOT be given a false session-fit or plan-review-due:no claim)",
+      "expect": ["plan", "implement", "implementation"]
+    },
+    {
+      "id": "LIN-APB-diverged",
+      "role": "breakdown child whose copied slice cites the parent's approving verdict, but a later comment shows the parent plan revised past that slice (expect -> plan/plan-review: the gate addition re-derives on visible divergence; `implementation` is the failure this case exists to catch)",
+      "expect": ["plan", "plan-review"]
+    }
+  ],
+  "bundles": {
+    "LIN-APB-pos": {
+      "issue": {
+        "id": "lin-apb-pos-uuid",
+        "identifier": "LIN-APB-pos",
+        "title": "Token exchange: mint one scoped child proxy token",
+        "description": "## Slice of the approved parent plan (LIN-PARENT)\n\n**Source of truth: LIN-PARENT's approved Implementation Plan and its approving plan-review — do not redesign this surface; re-ground it against the current code and stop to recommend re-planning if it has drifted.**\n\n- **Files/surfaces:** the token exchange in `routes/proxy-token.js` (mint the child token) and the child-token record shape in `lib/token-record.js` (record the parent token id).\n- **Approach:** extend the existing working-token exchange so a working token can mint exactly one scoped child token, inheriting scope and ownership, and record the parent token id on the child for the audit trail.\n- **Testing strategy:** unit-cover inheritance and the single-use bootstrap invariant.\n\n**Session fit: fits one session**\n\n**Plan-review due: no — covered by LIN-PARENT's approving plan-review (comment 48be9b95, rev 3)**\n\n**Grounding:** `71688a42`.",
+        "url": "https://linear.app/linearviewer/issue/LIN-APB-pos",
+        "state": { "name": "Todo", "type": "unstarted" },
+        "createdAt": "2026-09-25T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": {
+        "identifier": "LIN-PARENT",
+        "title": "Worker child proxy tokens",
+        "state": { "name": "In Progress" }
+      },
+      "siblings": [
+        { "identifier": "LIN-PARENT-S2", "title": "Audit readout for child tokens", "state": { "name": "Todo" } }
+      ],
+      "siblingsTotal": 1,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "Breakdown created this subtask from LIN-PARENT rev 3, approved by plan-review comment 48be9b95. The copied slice above is the source of truth for this surface.",
+          "createdAt": "2026-09-25T00:05:00.000Z",
+          "user": "breakdown"
+        }
+      ],
+      "focusedChild": null
+    },
+    "LIN-APB-neg": {
+      "issue": {
+        "id": "lin-apb-neg-uuid",
+        "identifier": "LIN-APB-neg",
+        "title": "Footer deploy label should read \"deployed\"",
+        "description": "Acceptance criteria for just this surface:\n\n- The footer deploy label reads \"deployed\" instead of \"deploy\".\n- The existing footer unit test asserts the new label.",
+        "url": "https://linear.app/linearviewer/issue/LIN-APB-neg",
+        "state": { "name": "Todo", "type": "unstarted" },
+        "createdAt": "2026-09-25T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": {
+        "identifier": "LIN-PARENT",
+        "title": "Worker child proxy tokens",
+        "state": { "name": "In Progress" }
+      },
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [],
+      "focusedChild": null
+    },
+    "LIN-APB-diverged": {
+      "issue": {
+        "id": "lin-apb-diverged-uuid",
+        "identifier": "LIN-APB-diverged",
+        "title": "Token exchange: mint one scoped child proxy token",
+        "description": "## Slice of the approved parent plan (LIN-PARENT)\n\n**Source of truth: LIN-PARENT's approved Implementation Plan and its approving plan-review — do not redesign this surface.**\n\n- **Files/surfaces:** the token exchange in `routes/proxy-token.js` (mint the child token) and the child-token record shape in `lib/token-record.js`.\n- **Approach:** extend the existing working-token exchange so a working token can mint exactly one scoped child token, inheriting scope and ownership.\n- **Testing strategy:** unit-cover inheritance and the single-use bootstrap invariant.\n\n**Session fit: fits one session**\n\n**Plan-review due: no — covered by LIN-PARENT's approving plan-review (comment 48be9b95, rev 3)**\n\n**Grounding:** `71688a42`.",
+        "url": "https://linear.app/linearviewer/issue/LIN-APB-diverged",
+        "state": { "name": "Todo", "type": "unstarted" },
+        "createdAt": "2026-09-25T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": {
+        "identifier": "LIN-PARENT",
+        "title": "Worker child proxy tokens",
+        "state": { "name": "In Progress" }
+      },
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "Breakdown created this subtask from LIN-PARENT rev 3. **This slice is now stale:** LIN-PARENT was revised to rev 4 on 2026-09-25 (comment ef01d2c4) — the token exchange was reworked onto a new shared minting seam in `lib/proxy-token-mint.js`, and `routes/proxy-token.js` no longer owns the mint. The copied files/approach above cite the superseded rev-3 surface and no longer reflect the approved plan.",
+          "createdAt": "2026-09-25T01:00:00.000Z",
+          "user": "planner"
+        }
+      ],
+      "focusedChild": null
+    }
+  }
+}

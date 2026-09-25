@@ -3108,3 +3108,112 @@ describe('getPaidEnvKey / hasPaidEnvKey (LIN-961)', () => {
     assert.strictEqual(isRecommendationEnabled('sess_abc'), true);
   });
 });
+
+// =============================================================================
+// Breakdown-created subtask approved-parent-plan exemption (LIN-3049) — the
+// two-path fix so a child of an already-approved, decomposed plan carries its
+// own plan slice (plus a committed session-fit and a plan-review-due:no line
+// citing the approving verdict) into routing, while a child with no recorded
+// Approve on the decomposed ticket's own trail stays a plain acceptance-criteria
+// subtask. These are the deterministic structural pins; the live routing shape is
+// measured by scripts/eval/fixtures/recommend/approved-parent-breakdown.json.
+// =============================================================================
+describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: true, commentCount: 2, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '),
+      isTerminal: false, hasOpenChildren: false, ...overrides
+    });
+  }
+
+  test('the Step 1 over-fire guard names the breakdown child slice as findings-plus-validated-approach', () => {
+    const text = build();
+    const guardIntro = text.indexOf('Guard against over-firing');
+    const addition = text.indexOf('counts as findings-plus-validated-approach already in hand');
+    const nextBranch = text.indexOf('→ If the knowledge the deliverable depends on is not yet gathered');
+    assert.ok(guardIntro > -1 && addition > -1 && nextBranch > -1, 'all three Step 1 landmarks must be present');
+    assert.ok(guardIntro < addition && addition < nextBranch,
+      'the addition must sit INSIDE the over-fire guard list, not in the routing branches below');
+    assert.ok(/copied slice of the parent's approved plan.*naming its surfaces, approach, and tests/is.test(text),
+      'the addition must name the copied approved-parent-plan slice explicitly');
+  });
+
+  test('the completed-prep addition is sited before the ONE exception and names the copied slice', () => {
+    const text = build();
+    const rule = text.indexOf('Completed prep ⇒ never re-emit the prep verb');
+    const addition = text.indexOf('copied approved-parent-plan slice with a committed session-fit answer');
+    const exception = text.indexOf('ONE exception, and only one:');
+    assert.ok(rule > -1 && addition > -1 && exception > -1, 'all three landmarks must be present');
+    assert.ok(rule < addition && addition < exception,
+      'the addition must sit after the base rule and before its single exception');
+    assert.ok(/treat it as settled prep even though the `plan` step never literally ran/is.test(text),
+      'the addition must say the breakdown child is settled prep without a plan session of its own');
+  });
+
+  test('the gate addition sits strictly between criterion (d) and the verdict routing, outside (a)-(d)', () => {
+    const text = build();
+    const criterionD = text.indexOf('(d) it touches credential, merge-rule, or dispatch-contract surfaces');
+    const addition = text.indexOf('copied approved-plan slice clears the gate');
+    const verdict = text.indexOf('Once a plan-review verdict IS on the trail');
+    assert.ok(criterionD > -1 && addition > -1 && verdict > -1, 'all three gate landmarks must be present');
+    assert.ok(criterionD < addition && addition < verdict,
+      'the addition must sit after the (a)-(d) criteria and before the verdict routing');
+    assert.ok(/does not re-fire solely because the underlying surface is the same dispatch-contract surface/is.test(text),
+      'the addition must name the criterion-(d) non-refire for a copied slice');
+    assert.ok(/Re-derive the gate independently only if the child's copied slice visibly diverges/i.test(text),
+      'the addition must keep the divergence re-derivation escape hatch');
+  });
+
+  test('a Breakdown prompts quality rule exists and requires the this-ticket-own-trail Approve precondition FIRST', () => {
+    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Breakdown prompts**'));
+    assert.ok(rule, 'the meta-prompt must carry a Breakdown prompts quality rule');
+    assert.ok(/THIS TICKET'S OWN comment trail/.test(rule),
+      'the rule must target the decomposed ticket\'s own trail');
+    assert.ok(/never its own rendered Parent Task section/.test(rule),
+      'the rule must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
+    const precond = rule.indexOf('Approve on the plan being decomposed FIRST');
+    const slice = rule.indexOf('slice of the approved plan');
+    assert.ok(precond > -1 && slice > -1 && precond < slice,
+      'the Approve precondition must be stated BEFORE the copy mandate');
+    assert.ok(/Session fit: fits one session/.test(rule), 'the rule must require the committed session-fit');
+    assert.ok(/Plan-review due: no — covered by <parent>'s approving plan-review \(comment <id>, rev <N>\)/.test(rule),
+      'the rule must require the plan-review-due:no line citing the approving verdict');
+    assert.ok(/grounding SHA\(s\) the plan cited/.test(rule), 'the rule must require the grounding SHA(s)');
+    assert.ok(/the parent plan is the source of truth; do not redesign/.test(rule),
+      'the rule must carry the do-not-redesign line');
+  });
+
+  test('the Breakdown prompts rule states the no-Approve fallback with no false session-fit or plan-review-due claim', () => {
+    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Breakdown prompts**'));
+    assert.ok(rule, 'the meta-prompt must carry a Breakdown prompts quality rule');
+    assert.ok(/a task broken down before any plan approval.*must NOT be given a false session-fit or plan-review-due answer/s.test(rule),
+      'the rule must forbid a false claim when no Approve is on this ticket\'s own trail');
+    assert.ok(/it stays a plain acceptance-criteria subtask and is expected to route through `research`\/`plan` normally/s.test(rule),
+      'the fallback must keep the child on the normal preparation path');
+  });
+
+  test('parity: the LIN-597 downward bias and the LIN-1603 verdict/revision pins are untouched byte-for-byte', () => {
+    const text = build();
+    assert.ok(/fits one session.*`implementation`.*needs multiple sessions.*`breakdown`/is.test(text),
+      'both pre-existing session-fit routes must survive');
+    assert.ok(/\*\*Approve\*\* → route on the session-fit answer exactly as today/i.test(text),
+      'the Approve routing pin (openrouter.test.js:993) must survive');
+    assert.ok(/this Approve authorizes implementation only — it is never close-out evidence/i.test(text),
+      'the Approve-not-close-out pin must survive');
+    assert.ok(/Completed prep ⇒ never re-emit the prep verb/i.test(text),
+      'the completed-prep rule itself must survive');
+    assert.ok(/ONE exception, and only one: a `plan-review` that recorded \*\*Request Changes\*\* or \*\*Needs Discussion\*\*/i.test(text),
+      'the single request-changes exception pin (openrouter.test.js:1005) must survive');
+    assert.ok(/A SECOND Request Changes \/ Needs Discussion on the same task\*\* → \*\*stop and escalate to the human edge: recommend `blocked`/i.test(text),
+      'the one-cycle bound pin must survive');
+    assert.ok(/no committed scope ⇒ never `implement`/i.test(text),
+      'the no-committed-scope rule must survive');
+    assert.ok(/one-directional/i.test(text) && /resolve DOWN/i.test(text),
+      'the one-directional downward bias must survive');
+    assert.ok(/never overrides a plan that exists/i.test(text),
+      'the guard-fires-only-when-scope-absent pin must survive');
+  });
+});

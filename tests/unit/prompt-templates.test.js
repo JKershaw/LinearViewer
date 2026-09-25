@@ -3288,9 +3288,14 @@ describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-
     const rules = meta.split('\n').filter(l => l.startsWith('- **'));
     const ruleIdx = rules.findIndex(r => r.startsWith('- **Plan-review prompts**'));
     assert.ok(ruleIdx > -1, 'the meta-prompt carries a Plan-review quality rule');
-    // S2 placement: adjacent to the Plan-prompts rule.
+    // S2 placement: in the plan/breakdown quality-rule block, immediately after
+    // the Plan-prompts rule. LIN-3049 inserted the Breakdown-prompts rule between
+    // them (an approved two-path addition), so Plan-review is now two slots down
+    // but stays adjacent to the plan-family rules — which is the property S2 pins.
     const planIdx = rules.findIndex(r => r.startsWith('- **Plan prompts**'));
-    assert.strictEqual(ruleIdx, planIdx + 1, 'the Plan-review rule sits adjacent to the Plan-prompts rule');
+    const breakdownIdx = rules.findIndex(r => r.startsWith('- **Breakdown prompts**'));
+    assert.strictEqual(breakdownIdx, planIdx + 1, 'the Breakdown-prompts rule sits between Plan and Plan-review');
+    assert.strictEqual(ruleIdx, planIdx + 2, 'the Plan-review rule stays adjacent to the plan-family rules');
     // Trap 2: scoped to the single bullet, so the template's line numbering is irrelevant.
     assertSevenChecksOrdered(rules[ruleIdx], 'meta');
   });
@@ -4690,5 +4695,97 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
     });
     assert.ok(/If the repo has no CI configured, say so explicitly and run the local-suite substitute/.test(p),
       'flag-gated CI/CD block is conditional');
+  });
+});
+
+// =============================================================================
+// Breakdown template subtask-description mandate (LIN-3049) — the handwritten
+// path half of the two-path fix. A subtask of an already-approved, decomposed
+// plan must carry its own plan slice (session-fit + plan-review-due:no citing
+// the approving verdict) so it routes straight to implementation; a subtask
+// whose decomposed ticket carries NO Approve on its own comment trail stays a
+// plain acceptance-criteria task. The precondition must name the decomposed
+// ticket's own trail, never the rendered Parent Task section (F4).
+// =============================================================================
+describe('breakdown template subtask-description mandate (LIN-3049)', () => {
+  const baseIssue = {
+    identifier: 'LIN-910', title: 'Break down the surfaces', description: 'd',
+    state: { name: 'In Progress', type: 'started' }, labels: ['breakdown']
+  };
+  const baseContext = {
+    project: { name: 'Proj' },
+    parent: { identifier: 'LIN-900', title: 'Grandparent', state: { name: 'Todo' } },
+    siblings: [], children: [], comments: []
+  };
+  const approvedVerdict = {
+    body: '### Plan Review Verdict\n\n**Verdict: Approve.**',
+    user: 'reviewer', createdAt: '2026-09-25T00:00:00.000Z'
+  };
+
+  const sectionOf = (prompt) => prompt.slice(
+    prompt.indexOf('### Creating Subtasks'),
+    prompt.indexOf('### After Creating All Subtasks')
+  );
+
+  // F4: the verdict lives on the DECOMPOSED ticket's own trail, never on
+  // context.parent. Both fixtures hold context.parent constant and vary only the
+  // issue's own comments; the static prose must name the this-ticket-own-trail
+  // precondition in both cases (the template is static — this pins its presence,
+  // not a runtime branch).
+  for (const [label, comments] of [
+    ['no Approve on the issue\'s own trail', []],
+    ['an Approve on the issue\'s own trail', [approvedVerdict]]
+  ]) {
+    test(`the precondition names the decomposed ticket's own trail (${label})`, () => {
+      const issue = { ...baseIssue, comments };
+      const p = generatePrompt('breakdown', issue, baseContext).prompt;
+      const section = sectionOf(p);
+      assert.ok(/THIS TICKET'S OWN comment trail/.test(section),
+        'the Creating Subtasks section must name the decomposed ticket\'s own comment trail');
+      assert.ok(/not the 'Parent Task' section rendered above in Context/.test(section),
+        'it must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
+      assert.ok(/If no such Approve is on record on this ticket's own trail/.test(section),
+        'it must state the no-Approve fallback');
+      assert.ok(/this ticket's own comment trail/.test(PROMPT_TEMPLATES.breakdown.aiHint.goal),
+        'the breakdown aiHint goal must name the same precondition');
+      assert.ok(/this ticket's own comment trail/.test(formatAIHintsForMetaPrompt()),
+        'the rendered aiHints must carry the precondition too (two-path parity)');
+    });
+  }
+
+  test('the five approved-path bullets are present and in (a)-(e) order', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    const section = sectionOf(p);
+    const a = section.indexOf('(a) This surface\'s slice of the approved plan');
+    const b = section.indexOf('(b) `Session fit: fits one session`');
+    const c = section.indexOf('(c) `Plan-review due: no');
+    const d = section.indexOf('(d) The grounding commit SHA(s)');
+    const e = section.indexOf('(e) An explicit "the parent\'s plan is the source of truth');
+    assert.ok(a > -1 && b > -1 && c > -1 && d > -1 && e > -1, 'all five approved-path bullets must be present');
+    assert.ok(a < b && b < c && c < d && d < e, 'the five bullets must appear in (a)-(e) order');
+    // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
+    assert.ok(/cited from this ticket's own approving verdict \(the one the precondition found\)/.test(section),
+      'N2: bullet (c) must cite this ticket\'s own approving verdict');
+  });
+
+  test('the existing drift exit is extended to name the approach/files each surface section names', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    assert.ok(/Confirm the surfaces, any dependency arrows, and the approach\/files each surface's plan section names still reflect the current codebase/.test(p),
+      'the existing drift exit must name the copied specifics');
+  });
+
+  test('the existing fallback wording survives for the no-Approve case', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    const section = sectionOf(p);
+    assert.ok(/create the subtask with only a plain acceptance-criteria description/.test(section),
+      'the no-Approve path must still produce a plain acceptance-criteria subtask');
+    assert.ok(/none of bullets \(b\)\/\(c\)\/\(d\)\/\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
+      'the fallback must explicitly withhold the session-fit and plan-review-due bullets');
+  });
+
+  test('byte-parity: explicit Linear ui stays a no-op for the new breakdown content', () => {
+    const base = generatePrompt('breakdown', baseIssue, baseContext, {}).prompt;
+    const withUi = generatePrompt('breakdown', baseIssue, baseContext, {}, { ...DEFAULT_PROMPT_UI }).prompt;
+    assert.strictEqual(withUi, base, 'the new breakdown content must remain byte-identical for Linear');
   });
 });
