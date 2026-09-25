@@ -805,6 +805,29 @@ describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2
     assert.strictEqual(yRow.resolution.decisionId, 'y', 'y’s own resolution must not be shadowed by x’s (no last-stamp-wins collision under includeResolved either)');
   });
 
+  // LIN-2991 corrective fix: the latest parent review's live repro
+  // (LIN-2985's `lin2985-flight-companion-*` shape) — a decision is raised
+  // and answered on the lineage's ROOT loop, then a later reply supersedes
+  // that same root via `followUpTo`. The root is both the answered group's
+  // only member and its own content loop, so the unconditional "skip a
+  // superseded content loop" gate was hiding the row from `includeResolved`
+  // too, defeating the no-re-raise guidance this endpoint exists to support.
+  test('LIN-2985 shape: an answered root-raised decision stays hidden by default, and includeResolved surfaces it even after a follow-up supersedes the root', () => {
+    const root = loop({ loopId: 'root-2985', wakeMarker: 'blocked', decision: decision('d-2985'), answeredDecisions: answered('d-2985') });
+    const followUp = loop({ loopId: 'follow-2985', followUpTo: 'root-2985', wakeMarker: null, decision: null });
+
+    const dflt = collectUnansweredDecisions({ loops: [root, followUp] }, { now: NOW });
+    assert.deepStrictEqual(dflt, [], 'the default (unanswered) read must still omit the answered group — this fix must not widen it');
+
+    const resolved = collectUnansweredDecisions({ loops: [root, followUp] }, { now: NOW, includeResolved: true });
+    assert.strictEqual(resolved.length, 1, 'includeResolved must surface the row even though its content loop (the root) is now superseded');
+    assert.strictEqual(resolved[0].decision.decision_id, 'd-2985');
+    assert.strictEqual(resolved[0].anchor.loopId, 'root-2985');
+    assert.ok(resolved[0].resolution, 'the surfaced row must carry its resolution');
+    assert.strictEqual(resolved[0].resolution.decisionId, 'd-2985');
+    assert.strictEqual(resolved[0].resolution.outcome, 'answered');
+  });
+
   test('duplicate carriers (the live LIN-2996/LIN-3002 shape): 4 members raising the same decision in one lineage collapse into exactly one row, anchored on the root, stamped on the content loop', () => {
     const root = loop({ loopId: 'root-1', wakeMarker: null, decision: null, dispatchedAt: '2026-08-19T00:00:00.000Z' });
     const wake1 = loop({ loopId: 'wake-1', lineageId: 'root-1', wakeMarker: 'blocked', decision: decision('dup-x'), dispatchedAt: '2026-08-20T00:00:00.000Z' });

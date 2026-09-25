@@ -337,6 +337,41 @@ describe('GET /api/proxy/rulings — issueIdentifier and includeResolved (LIN-29
     assert.equal(dflt.body.rulings.some(r => r.decision.decision_id === 'd-dismissed'), false);
   });
 
+  // LIN-2991 corrective fix: the latest parent review's live repro
+  // (LIN-2985's `lin2985-flight-companion-*` shape) at the route level — a
+  // decision raised and answered on the root loop, then superseded by a
+  // reply. The root is the group's own content loop, so the unconditional
+  // supersession skip hid it from includeResolved too.
+  test('LIN-2985 shape: includeResolved surfaces an answered root-raised ruling even after its content loop is superseded by a follow-up', async () => {
+    const iso = nowIso();
+    historyItems = [
+      {
+        id: 'root-2985', issueIdentifier: 'LIN-1', issueTitle: 'Root', promptName: 'implementation', prompt: 'p',
+        dispatchedAt: iso, resolvedAt: iso, status: 'taken',
+        feedback: [
+          { message: '[blocked] need a decision', timestamp: iso },
+          { kind: 'decision', message: JSON.stringify({ decision_id: 'd-2985', question: 'Proceed?' }), timestamp: iso },
+          { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-2985' }), timestamp: iso }
+        ]
+      },
+      {
+        // The reply that supersedes the root — carries no decision of its
+        // own, just a follow-up that leaves the root's own last marker stale.
+        id: 'follow-2985', issueIdentifier: 'LIN-1', issueTitle: 'Root', promptName: 'implementation', prompt: 'p',
+        dispatchedAt: iso, resolvedAt: iso, status: 'taken', followUpTo: 'root-2985', rootItemId: 'root-2985',
+        feedback: [{ message: '[working] resumed', timestamp: iso }]
+      }
+    ];
+
+    const dflt = await req('GET', '/api/proxy/rulings');
+    assert.equal(dflt.body.rulings.some(r => r.decision.decision_id === 'd-2985'), false, 'the default read must still omit the answered, superseded row');
+
+    const included = await req('GET', '/api/proxy/rulings?includeResolved=true');
+    const row = included.body.rulings.find(r => r.decision.decision_id === 'd-2985');
+    assert.ok(row, 'includeResolved must surface the answered root-raised ruling even though its content loop (the root) is now superseded');
+    assert.equal(row.resolution.outcome, 'answered');
+  });
+
   test('includeResolved: an unanswered loop row carries no resolution field', async () => {
     // Shape check only: no taskDecisionsStore is wired in this suite (null).
     // The task-bound behaviour under includeResolved is pinned against a real
