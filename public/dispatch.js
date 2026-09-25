@@ -1104,11 +1104,14 @@ async function loadDispatchHistory(urlKey, offset) {
  * Render feedback entries for a history item
  */
 function renderFeedbackEntries(feedback) {
-  // LIN-2205 (LIN-1728 F6 follow-up): a `decision-answer` stamp is answer
-  // metadata, not a feedback line — `_formatFeedbackEntries`
+  // LIN-2205 (LIN-1728 F6 follow-up) / LIN-3037: a decision-lifecycle stamp
+  // (decision-answer, decision-withdrawn, decision-withdrawal-reversed) is
+  // answer/withdrawal metadata, not a feedback line — `_formatFeedbackEntries`
   // (lib/dispatch-store.js) carries `kind` through, so filter here rather
-  // than render a bare `{"decision_id":...}` entry.
-  const visible = (feedback || []).filter(f => f.kind !== 'decision-answer')
+  // than render a bare `{"decision_id":...}` entry (or a withdrawal's raw
+  // `reason` text).
+  const visible = (feedback || []).filter(f =>
+    f.kind !== 'decision-answer' && f.kind !== 'decision-withdrawn' && f.kind !== 'decision-withdrawal-reversed')
   if (visible.length === 0) return ''
 
   const entries = visible.map((f, i) => {
