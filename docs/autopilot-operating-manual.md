@@ -485,7 +485,7 @@ summary instead of raising a ruling or filing a new one.
 
 **Before raising a `DECISION:` on a finding, check it isn't already covered.** Query
 `GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true` and read the prior stage's
-comments. Don't re-raise a finding an open, answered, or dismissed row already covers for the same
+comments. Don't re-raise a finding an open, answered, dismissed, or withdrawn row already covers for the same
 anchor — task-bound rulings aren't covered by `includeResolved`.
 
 **Merge sibling blockers before you bubble up.** If more than one child you're holding is blocked on
