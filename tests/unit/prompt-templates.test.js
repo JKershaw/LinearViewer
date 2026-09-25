@@ -2642,6 +2642,89 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     });
   });
 
+  describe('close-out authors only a trivial, review-named change (LIN-3033)', () => {
+    test('close-out\'s Ledger Gate carries the (a)+(b) trivial-and-named definition, the pin carve-out, and the evidence/CI-on-new-head requirement', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/the diff is exactly the text, value, or line a review sentence quoted/i.test(prompt),
+        'states condition (a): exact review-quoted content');
+      assert.ok(/an illustrative "e\.g\." does not qualify/i.test(prompt), 'an "e.g." example does not qualify as exact content');
+      assert.ok(/at most 2 files and 3 hunks/i.test(prompt), 'states the size bound');
+      assert.ok(/no new or changed test case, function, branch, condition, or control flow/i.test(prompt),
+        'states condition (b): no new/changed test, function, branch, condition, or control flow');
+      assert.ok(/an update to an existing literal\/expected-string pin that review quoted verbatim is allowed/i.test(prompt),
+        'the pin-update carve-out is present — this is what makes the wording match the ruling\'s own allowance for a pin update');
+      assert.ok(/writing a new witness test is never trivial/i.test(prompt), 'a new witness test is never trivial');
+      assert.ok(/cite the commit and the review sentence verbatim/i.test(prompt), 'requires citing commit + review sentence verbatim');
+      assert.ok(/re-establish CI on the new head/i.test(prompt) && /--match-head-commit/.test(prompt),
+        'requires CI re-established on the new head, merged with --match-head-commit');
+    });
+
+    test('close-out\'s Role states the authoring limit at CLASS level, not scoped to ledger discharge only (F1′ regression pin)', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/whatever prompted it/i.test(prompt), 'the class-level scope uses the generalizing phrase');
+      assert.ok(/conditional-Approve caveat/i.test(prompt), 'names the caveat route');
+      assert.ok(/non-gating review finding/i.test(prompt), 'names the non-gating-finding route');
+      assert.ok(/self-found sibling|same-class sibling/i.test(prompt), 'names the self-found-sibling route');
+      assert.ok(!/author a change to discharge a ledger item only when/i.test(prompt),
+        'must NOT regress to the ledger-only scoping this pin exists to catch');
+    });
+
+    test('close-out\'s Role names resolving a merge conflict as a bounded authoring route (F3 regression pin)', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/resolving a conflict between the PR branch and its base while merging/i.test(prompt),
+        'the class-level list names the merge-conflict route — this pin fails against wording that never mentions a merge conflict');
+    });
+
+    test('the merge bullet carries the merge-conflict corollary and the conflict-free-merge exclusion, without rewriting the pinned bullet itself', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/1\. Merge the approved PR\./.test(prompt), 'the pinned merge bullet text is untouched');
+      assert.ok(/is never review-named/i.test(prompt) && /resolving a conflict between the PR branch and its base/i.test(prompt),
+        'a merge-conflict resolution is stated as never review-named');
+      assert.ok(/lands with \*\*no conflict\*\*.*is ordinary merge mechanics.*not authoring/is.test(prompt),
+        'a conflict-free merge/rebase is explicitly excluded from authoring');
+      assert.ok(/whether by merge or rebase/i.test(prompt), 'the exclusion is worded neutrally over merge or rebase (plan-review advisory A2)');
+    });
+
+    test('"Always name a next action" fires on a non-trivial close-out-authored change, including a merge-conflict resolution', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/is not trivial and review-named/i.test(prompt), 'the next-action trigger names the non-trivial/non-named failure');
+      assert.ok(/resolving a merge conflict while landing the PR/i.test(prompt), 'the widened trigger names the merge-conflict route');
+      assert.ok(/"do it here" ruling/i.test(prompt), 'the widened trigger still names the do-it-here route');
+    });
+
+    test('Follow-up Triage carries the "do it here during close-out is not review-named" sentence after, not replacing, the pinned ruling-options sentence', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item\./i.test(prompt),
+        'the pinned ruling-options sentence is untouched');
+      assert.ok(/a "do it here" ruling on a finding raised during close-out is, by construction, not review-named/i.test(prompt),
+        'the new sentence states a close-out-raised "do it here" ruling is never review-named');
+    });
+
+    test('review states the exact change when handing an edit to close-out; a vague example forces Request Changes', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      assert.ok(/state the exact change/i.test(prompt), 'review is told to state the exact change');
+      assert.ok(/never an illustrative "e\.g\." example/i.test(prompt), 'an "e.g." example does not qualify as exact content');
+      assert.ok(/your verdict is \*\*Request Changes\*\*/i.test(prompt), 'a vague or non-trivial hand-off forces Request Changes');
+    });
+
+    test('close-out still emits no literal "Linear" with the LIN-3033 authoring-limit text included', () => {
+      const linear = generatePrompt('close-out', issue, context).prompt;
+      assert.ok(!linear.includes('Linear'), 'the LIN-3033 authoring-limit additions introduce no literal "Linear" for Linear');
+      const local = generatePrompt('close-out', { ...issue, labels: ['close-out'] }, context, {},
+        { write: true, comments: true, subtasks: true, displayName: 'Local' }).prompt;
+      assert.ok(!local.includes('Linear'), 'no Linear leaks for a non-Linear provider');
+    });
+
+    test('the pre-existing inside/outside, done-or-drop, and outside-only-filing wording is untouched by the LIN-3033 additions', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      const closeout = generatePrompt('close-out', issue, context).prompt;
+      const rulingClause = /an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item/i;
+      assert.ok(rulingClause.test(review), 'review still limits ruling options to outside-only filing');
+      assert.ok(rulingClause.test(closeout), 'close-out still limits ruling options to outside-only filing');
+      assert.ok(/Only outside-scope items are eligible to be filed here/i.test(closeout), 'follow-up triage still gates eligibility to outside-scope items only');
+    });
+  });
+
   // LIN-2991/LIN-3022 §5: two idempotency clauses inserted immediately after
   // LIN-3006's own "file is offered only for an outside item" eligibility
   // clause, at each of review, close-out step 8, and Follow-up Triage —

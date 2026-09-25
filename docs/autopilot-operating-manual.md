@@ -514,6 +514,11 @@ any step. A conditional Approve is the
 ledger gate asking for real discharge, which *is* close-out's job; let the step run rather than judging
 the ledger informally and merging by hand. (This `close-out` is the dispatched finish step, not an
 inline orchestrator pass — closing is something you *dispatch and verify*, never something you perform.)
+That job has a size limit: close-out may write the discharge itself only when review named it with its
+exact content and it is trivially small — whatever prompted it (a ledger item, a caveat, a non-gating
+finding, a self-found sibling, a "do it here" ruling it raised, or a merge conflict it resolved while
+landing the PR) — otherwise it holds the merge, leaves the task open, and names `implementation` then
+`review` instead of authoring the fix itself.
 
 ## Knowing when to stop
 

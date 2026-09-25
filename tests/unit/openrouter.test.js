@@ -1200,6 +1200,95 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       assert.ok(/close-out rejects an entry missing that line as undischarged/i.test(closeout),
         'the meta Close-out rule rejects a lane entry with no justification line');
     });
+
+    describe('close-out authors only a trivial, review-named change (LIN-3033)', () => {
+      test('both rules stay one physical line', () => {
+        const review = reviewRule();
+        const closeout = closeoutRule();
+        assert.ok(review && closeout, 'both rules are present');
+        assert.ok(!review.includes('\n'), 'the Review-prompts rule stays a single line, since tests extract it by its line prefix');
+        assert.ok(!closeout.includes('\n'), 'the Close-out-prompts rule stays a single line, since tests extract it by its line prefix');
+      });
+
+      test('the Close-out rule carries the (a)+(b) trivial-and-named definition, the pin carve-out, and the evidence/CI-on-new-head requirement', () => {
+        const rule = closeoutRule();
+        assert.ok(/the diff is exactly the text, value, or line a review sentence quoted/i.test(rule),
+          'states condition (a): exact review-quoted content');
+        assert.ok(/an illustrative "e\.g\." does not qualify/i.test(rule), 'an "e.g." example does not qualify as exact content');
+        assert.ok(/at most 2 files and 3 hunks/i.test(rule), 'states the size bound');
+        assert.ok(/no new or changed test case, function, branch, condition, or control flow/i.test(rule),
+          'states condition (b): no new/changed test, function, branch, condition, or control flow');
+        assert.ok(/an update to an existing literal\/expected-string pin that review quoted verbatim is allowed/i.test(rule),
+          'the pin-update carve-out is present');
+        assert.ok(/writing a new witness test is never trivial/i.test(rule), 'a new witness test is never trivial');
+        assert.ok(/citing the commit and the review sentence verbatim/i.test(rule), 'requires citing commit + review sentence verbatim');
+        assert.ok(/re-establishing CI on the new head/i.test(rule) && /--match-head-commit/.test(rule),
+          'requires CI re-established on the new head, merged with --match-head-commit');
+      });
+
+      test('the Close-out rule states the authoring limit at CLASS level, not scoped to ledger discharge only (F1′ regression pin)', () => {
+        const rule = closeoutRule();
+        assert.ok(/whatever prompted it/i.test(rule), 'the class-level scope uses the generalizing phrase');
+        assert.ok(/conditional-Approve caveat/i.test(rule), 'names the caveat route');
+        assert.ok(/non-gating review finding/i.test(rule), 'names the non-gating-finding route');
+        assert.ok(/self-found sibling/i.test(rule), 'names the self-found-sibling route');
+        assert.ok(!/author a change to discharge a ledger item only when/i.test(rule),
+          'must NOT regress to the ledger-only scoping this pin exists to catch');
+      });
+
+      test('the Close-out rule names resolving a merge conflict as a bounded authoring route (F3 regression pin)', () => {
+        const rule = closeoutRule();
+        assert.ok(/resolving a conflict between the PR branch and its base while merging/i.test(rule),
+          'the class-level lead-in names the merge-conflict route — this pin fails against wording that never mentions a merge conflict');
+      });
+
+      test('clause (6) carries the merge-conflict corollary alongside the untouched merge/verify/summary text', () => {
+        const rule = closeoutRule();
+        assert.ok(/perform the irreversible set — merge, verify the change on the landed commit/i.test(rule),
+          'the pinned (6) merge/verify text is untouched');
+        assert.ok(/categorically fails the exact-content test in \(2\)/i.test(rule) && /resolving a conflict between the PR branch and its base while performing this merge/i.test(rule),
+          'a merge-conflict resolution while performing the merge categorically fails the exact-content test');
+        assert.ok(/a merge that lands with no conflict, whether by merge or rebase, with no hunk close-out chose or wrote, is ordinary merge mechanics and not authoring/i.test(rule),
+          'a conflict-free merge/rebase is explicitly excluded from authoring, worded neutrally over merge or rebase (plan-review advisory A2)');
+      });
+
+      test('clause (7) widens the next-action trigger to a non-trivial close-out-authored change, including a merge-conflict resolution', () => {
+        const rule = closeoutRule();
+        assert.ok(/is not trivial and review-named/i.test(rule), 'the next-action trigger names the non-trivial/non-named failure');
+        assert.ok(/a merge-conflict resolution/i.test(rule), 'the widened trigger names the merge-conflict route');
+        assert.ok(/a "do it here" ruling/i.test(rule), 'the widened trigger still names the do-it-here route');
+      });
+
+      test('clause (6b) carries the "do it here during close-out is not review-named" sentence after, not replacing, the pinned ruling-options text', () => {
+        const rule = closeoutRule();
+        assert.ok(/if a ruling is raised on a finding during close-out, an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
+          'the pinned ruling-options sentence is untouched');
+        assert.ok(/a "do it here" ruling on a finding raised during close-out is, by construction, not review-named/i.test(rule),
+          'the new sentence states a close-out-raised "do it here" ruling is never review-named');
+      });
+
+      test('the Review rule states the exact-change hand-off, scoped to the new clause only for the no-Linear check', () => {
+        const rule = reviewRule();
+        assert.ok(/must state the exact change/i.test(rule), 'review is told to state the exact change');
+        assert.ok(/never an illustrative "e\.g\." example/i.test(rule), 'an "e.g." example does not qualify as exact content');
+        assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve naming a vague fix/i.test(rule),
+          'a vague or non-trivial hand-off forces Request Changes');
+        // Scoped no-Linear check (plan-review advisory): the review rule as a
+        // whole legitimately contains "Create a new Linear ticket" in its
+        // cannot-close branch, so only the new clause itself is checked here.
+        const m = rule.match(/when review wants close-out to make an edit rather than doing it itself.*?not a conditional Approve naming a vague fix\./is);
+        assert.ok(m, 'the new clause is present and extractable on its own');
+        assert.ok(!m[0].includes('Linear'), 'the new LIN-3033 clause introduces no literal "Linear" of its own');
+      });
+
+      test('the pre-existing inside/outside, done-or-drop, and outside-only-filing wording is untouched by the LIN-3033 additions', () => {
+        const review = reviewRule();
+        const closeout = closeoutRule();
+        assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(review),
+          'review still limits ruling options to outside-only filing');
+        assert.ok(/"file" is offered only for an outside item/i.test(closeout), 'close-out still limits ruling options to outside-only filing');
+      });
+    });
   });
 
   test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {

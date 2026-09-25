@@ -43,4 +43,18 @@ describe('buildWorkerLaneKickoff', () => {
     assert.ok(/Offer or accept a "file" option only for a finding outside every bounded\s+class/.test(text),
       'a "file" option is limited to outside findings');
   });
+
+  // LIN-3033: Step 3 must require another fresh-context review for any edit
+  // made after the fresh-context review's Approve — unless it is the trivial,
+  // review-named edit review itself asked for. This covers a "do it here"
+  // ruling raised mid-lane too, without a dedicated clause of its own.
+  test('Step 3 requires another fresh-context review for any post-Approve edit that is not the named trivial edit (LIN-3033)', () => {
+    const text = buildWorkerLaneKickoff();
+    assert.ok(/needs another fresh-context review before\s+merge/.test(text),
+      'Step 3 must require a second fresh-context review for a post-Approve edit');
+    assert.ok(/unless it is the trivial, review-named edit review itself asked for/.test(text),
+      'the trivial, review-named edit is the sole exception');
+    assert.ok(/This\s+already covers a "do it here" ruling raised mid-lane/.test(text),
+      'the same clause covers a mid-lane "do it here" ruling without a dedicated clause');
+  });
 });
