@@ -1200,6 +1200,95 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       assert.ok(/close-out rejects an entry missing that line as undischarged/i.test(closeout),
         'the meta Close-out rule rejects a lane entry with no justification line');
     });
+
+    describe('close-out authors only a trivial, review-named change (LIN-3033)', () => {
+      test('both rules stay one physical line', () => {
+        const review = reviewRule();
+        const closeout = closeoutRule();
+        assert.ok(review && closeout, 'both rules are present');
+        assert.ok(!review.includes('\n'), 'the Review-prompts rule stays a single line, since tests extract it by its line prefix');
+        assert.ok(!closeout.includes('\n'), 'the Close-out-prompts rule stays a single line, since tests extract it by its line prefix');
+      });
+
+      test('the Close-out rule carries the (a)+(b) trivial-and-named definition, the pin carve-out, and the evidence/CI-on-new-head requirement', () => {
+        const rule = closeoutRule();
+        assert.ok(/the diff is exactly the text, value, or line a review sentence quoted/i.test(rule),
+          'states condition (a): exact review-quoted content');
+        assert.ok(/an illustrative "e\.g\." does not qualify/i.test(rule), 'an "e.g." example does not qualify as exact content');
+        assert.ok(/at most 2 files and 3 hunks/i.test(rule), 'states the size bound');
+        assert.ok(/no new or changed test case, function, branch, condition, or control flow/i.test(rule),
+          'states condition (b): no new/changed test, function, branch, condition, or control flow');
+        assert.ok(/an update to an existing literal\/expected-string pin that review quoted verbatim is allowed/i.test(rule),
+          'the pin-update carve-out is present');
+        assert.ok(/writing a new witness test is never trivial/i.test(rule), 'a new witness test is never trivial');
+        assert.ok(/citing the commit and the review sentence verbatim/i.test(rule), 'requires citing commit + review sentence verbatim');
+        assert.ok(/re-establishing CI on the new head/i.test(rule) && /--match-head-commit/.test(rule),
+          'requires CI re-established on the new head, merged with --match-head-commit');
+      });
+
+      test('the Close-out rule states the authoring limit at CLASS level, not scoped to ledger discharge only (F1′ regression pin)', () => {
+        const rule = closeoutRule();
+        assert.ok(/whatever prompted it/i.test(rule), 'the class-level scope uses the generalizing phrase');
+        assert.ok(/conditional-Approve caveat/i.test(rule), 'names the caveat route');
+        assert.ok(/non-gating review finding/i.test(rule), 'names the non-gating-finding route');
+        assert.ok(/self-found sibling/i.test(rule), 'names the self-found-sibling route');
+        assert.ok(!/author a change to discharge a ledger item only when/i.test(rule),
+          'must NOT regress to the ledger-only scoping this pin exists to catch');
+      });
+
+      test('the Close-out rule names resolving a merge conflict as a bounded authoring route (F3 regression pin)', () => {
+        const rule = closeoutRule();
+        assert.ok(/resolving a conflict between the PR branch and its base while merging/i.test(rule),
+          'the class-level lead-in names the merge-conflict route — this pin fails against wording that never mentions a merge conflict');
+      });
+
+      test('clause (6) carries the merge-conflict corollary alongside the untouched merge/verify/summary text', () => {
+        const rule = closeoutRule();
+        assert.ok(/perform the irreversible set — merge, verify the change on the landed commit/i.test(rule),
+          'the pinned (6) merge/verify text is untouched');
+        assert.ok(/categorically fails the exact-content test in \(2\)/i.test(rule) && /resolving a conflict between the PR branch and its base while performing this merge/i.test(rule),
+          'a merge-conflict resolution while performing the merge categorically fails the exact-content test');
+        assert.ok(/a merge that lands with no conflict, whether by merge or rebase, with no hunk close-out chose or wrote, is ordinary merge mechanics and not authoring/i.test(rule),
+          'a conflict-free merge/rebase is explicitly excluded from authoring, worded neutrally over merge or rebase (plan-review advisory A2)');
+      });
+
+      test('clause (7) widens the next-action trigger to a non-trivial close-out-authored change, including a merge-conflict resolution', () => {
+        const rule = closeoutRule();
+        assert.ok(/is not trivial and review-named/i.test(rule), 'the next-action trigger names the non-trivial/non-named failure');
+        assert.ok(/a merge-conflict resolution/i.test(rule), 'the widened trigger names the merge-conflict route');
+        assert.ok(/a "do it here" ruling/i.test(rule), 'the widened trigger still names the do-it-here route');
+      });
+
+      test('clause (6b) carries the "do it here during close-out is not review-named" sentence after, not replacing, the pinned ruling-options text', () => {
+        const rule = closeoutRule();
+        assert.ok(/if a ruling is raised on a finding during close-out, an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
+          'the pinned ruling-options sentence is untouched');
+        assert.ok(/a "do it here" ruling on a finding raised during close-out is, by construction, not review-named/i.test(rule),
+          'the new sentence states a close-out-raised "do it here" ruling is never review-named');
+      });
+
+      test('the Review rule states the exact-change hand-off, scoped to the new clause only for the no-Linear check', () => {
+        const rule = reviewRule();
+        assert.ok(/must state the exact change/i.test(rule), 'review is told to state the exact change');
+        assert.ok(/never an illustrative "e\.g\." example/i.test(rule), 'an "e.g." example does not qualify as exact content');
+        assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve naming a vague fix/i.test(rule),
+          'a vague or non-trivial hand-off forces Request Changes');
+        // Scoped no-Linear check (plan-review advisory): the review rule as a
+        // whole legitimately contains "Create a new Linear ticket" in its
+        // cannot-close branch, so only the new clause itself is checked here.
+        const m = rule.match(/when review wants close-out to make an edit rather than doing it itself.*?not a conditional Approve naming a vague fix\./is);
+        assert.ok(m, 'the new clause is present and extractable on its own');
+        assert.ok(!m[0].includes('Linear'), 'the new LIN-3033 clause introduces no literal "Linear" of its own');
+      });
+
+      test('the pre-existing inside/outside, done-or-drop, and outside-only-filing wording is untouched by the LIN-3033 additions', () => {
+        const review = reviewRule();
+        const closeout = closeoutRule();
+        assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(review),
+          'review still limits ruling options to outside-only filing');
+        assert.ok(/"file" is offered only for an outside item/i.test(closeout), 'close-out still limits ruling options to outside-only filing');
+      });
+    });
   });
 
   test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {
@@ -3017,5 +3106,135 @@ describe('getPaidEnvKey / hasPaidEnvKey (LIN-961)', () => {
   test('isRecommendationEnabled honours a session key regardless of env', () => {
     delete process.env.OPENROUTER_API_KEY;
     assert.strictEqual(isRecommendationEnabled('sess_abc'), true);
+  });
+});
+
+// =============================================================================
+// Breakdown-created subtask approved-parent-plan exemption (LIN-3049) — the
+// two-path fix so a child of an already-approved, decomposed plan carries its
+// own plan slice (plus a committed session-fit and a plan-review-due:no line
+// citing the approving verdict) into routing, while a child with no recorded
+// Approve on the decomposed ticket's own trail stays a plain acceptance-criteria
+// subtask. These are the deterministic structural pins; the live routing shape is
+// measured by scripts/eval/fixtures/recommend/approved-parent-breakdown.json.
+// =============================================================================
+describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049)', () => {
+  function build(overrides = {}) {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
+      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+      hasComments: true, commentCount: 2, aiHints: 'hints',
+      actionVocabulary: getAIRecommendationActionNames().join(', '),
+      isTerminal: false, hasOpenChildren: false, ...overrides
+    });
+  }
+
+  test('the Step 1 over-fire guard names the breakdown child slice as findings-plus-validated-approach', () => {
+    const text = build();
+    const guardIntro = text.indexOf('Guard against over-firing');
+    const addition = text.indexOf('counts as findings-plus-validated-approach already in hand');
+    const nextBranch = text.indexOf('→ If the knowledge the deliverable depends on is not yet gathered');
+    assert.ok(guardIntro > -1 && addition > -1 && nextBranch > -1, 'all three Step 1 landmarks must be present');
+    assert.ok(guardIntro < addition && addition < nextBranch,
+      'the addition must sit INSIDE the over-fire guard list, not in the routing branches below');
+    assert.ok(/copied slice of the parent's approved plan.*naming its surfaces, approach, and tests/is.test(text),
+      'the addition must name the copied approved-parent-plan slice explicitly');
+  });
+
+  test('the completed-prep addition is sited before the ONE exception and names the copied slice', () => {
+    const text = build();
+    const rule = text.indexOf('Completed prep ⇒ never re-emit the prep verb');
+    const addition = text.indexOf('copied approved-parent-plan slice with a committed session-fit answer');
+    const exception = text.indexOf('ONE exception, and only one:');
+    assert.ok(rule > -1 && addition > -1 && exception > -1, 'all three landmarks must be present');
+    assert.ok(rule < addition && addition < exception,
+      'the addition must sit after the base rule and before its single exception');
+    assert.ok(/treat it as settled prep even though the `plan` step never literally ran/is.test(text),
+      'the addition must say the breakdown child is settled prep without a plan session of its own');
+  });
+
+  test('the gate addition sits strictly between criterion (d) and the verdict routing, outside (a)-(d)', () => {
+    const text = build();
+    const criterionD = text.indexOf('(d) it touches credential, merge-rule, or dispatch-contract surfaces');
+    const addition = text.indexOf('copied approved-plan slice clears the gate');
+    const verdict = text.indexOf('Once a plan-review verdict IS on the trail');
+    assert.ok(criterionD > -1 && addition > -1 && verdict > -1, 'all three gate landmarks must be present');
+    assert.ok(criterionD < addition && addition < verdict,
+      'the addition must sit after the (a)-(d) criteria and before the verdict routing');
+    assert.ok(/does not re-fire solely because the underlying surface is the same dispatch-contract surface/is.test(text),
+      'the addition must name the criterion-(d) non-refire for a copied slice');
+    assert.ok(/Re-derive the gate independently only if the child's copied slice visibly diverges/i.test(text),
+      'the addition must keep the divergence re-derivation escape hatch');
+  });
+
+  test('all three new guards carry the divergence condition, not only the gate', () => {
+    const text = build();
+    const step1 = text.indexOf('counts as findings-plus-validated-approach already in hand');
+    const step1End = text.indexOf('→ If the knowledge the deliverable depends on is not yet gathered');
+    assert.ok(step1 > -1 && step1End > step1, 'the Step 1 addition must be present and bounded');
+    assert.ok(/unless the copied slice visibly diverges from what the cited approving verdict approved/.test(text.slice(step1, step1End)),
+      'R1: the Step 1 over-fire guard must not apply when the copied slice visibly diverges');
+
+    const prep = text.indexOf('treat it as settled prep even though the `plan` step never literally ran');
+    const prepEnd = text.indexOf('ONE exception, and only one:');
+    assert.ok(prep > -1 && prepEnd > prep, 'the completed-prep addition must be present and bounded');
+    assert.ok(/This settled-prep read does NOT apply when the child's copied slice visibly diverges/.test(text.slice(prep, prepEnd)),
+      'R1: the completed-prep rule must not apply when the copied slice visibly diverges');
+
+    const gate = text.indexOf('copied approved-plan slice clears the gate');
+    const gateEnd = text.indexOf('Once a plan-review verdict IS on the trail');
+    assert.ok(gate > -1 && gateEnd > gate, 'the gate addition must be present and bounded');
+    assert.ok(/Re-derive the gate independently only if the child's copied slice visibly diverges/.test(text.slice(gate, gateEnd)),
+      'R1: the gate must re-derive on the same visible divergence');
+  });
+
+  test('a Breakdown prompts quality rule exists and requires the this-ticket-own-trail Approve precondition FIRST', () => {
+    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Breakdown prompts**'));
+    assert.ok(rule, 'the meta-prompt must carry a Breakdown prompts quality rule');
+    assert.ok(/THIS TICKET'S OWN comment trail/.test(rule),
+      'the rule must target the decomposed ticket\'s own trail');
+    assert.ok(/never its own rendered Parent Task section/.test(rule),
+      'the rule must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
+    const precond = rule.indexOf('Approve on the plan being decomposed FIRST');
+    const slice = rule.indexOf('slice of the approved plan');
+    assert.ok(precond > -1 && slice > -1 && precond < slice,
+      'the Approve precondition must be stated BEFORE the copy mandate');
+    assert.ok(/Session fit: fits one session/.test(rule), 'the rule must require the committed session-fit');
+    assert.ok(/Plan-review due: no — covered by <parent>'s approving plan-review \(comment <id>, rev <N>\)/.test(rule),
+      'the rule must require the plan-review-due:no line citing the approving verdict');
+    assert.ok(/grounding SHA\(s\) the plan cited/.test(rule), 'the rule must require the grounding SHA(s)');
+    assert.ok(/the parent plan is the source of truth; do not redesign/.test(rule),
+      'the rule must carry the do-not-redesign line');
+  });
+
+  test('the Breakdown prompts rule states the no-Approve fallback with no false session-fit or plan-review-due claim', () => {
+    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Breakdown prompts**'));
+    assert.ok(rule, 'the meta-prompt must carry a Breakdown prompts quality rule');
+    assert.ok(/a task broken down before any plan approval.*must NOT be given a false session-fit or plan-review-due answer/s.test(rule),
+      'the rule must forbid a false claim when no Approve is on this ticket\'s own trail');
+    assert.ok(/it stays a plain acceptance-criteria subtask and is expected to route through `research`\/`plan` normally/s.test(rule),
+      'the fallback must keep the child on the normal preparation path');
+  });
+
+  test('parity: the LIN-597 downward bias and the LIN-1603 verdict/revision pins are untouched byte-for-byte', () => {
+    const text = build();
+    assert.ok(/fits one session.*`implementation`.*needs multiple sessions.*`breakdown`/is.test(text),
+      'both pre-existing session-fit routes must survive');
+    assert.ok(/\*\*Approve\*\* → route on the session-fit answer exactly as today/i.test(text),
+      'the Approve routing pin (openrouter.test.js:993) must survive');
+    assert.ok(/this Approve authorizes implementation only — it is never close-out evidence/i.test(text),
+      'the Approve-not-close-out pin must survive');
+    assert.ok(/Completed prep ⇒ never re-emit the prep verb/i.test(text),
+      'the completed-prep rule itself must survive');
+    assert.ok(/ONE exception, and only one: a `plan-review` that recorded \*\*Request Changes\*\* or \*\*Needs Discussion\*\*/i.test(text),
+      'the single request-changes exception pin (openrouter.test.js:1005) must survive');
+    assert.ok(/A SECOND Request Changes \/ Needs Discussion on the same task\*\* → \*\*stop and escalate to the human edge: recommend `blocked`/i.test(text),
+      'the one-cycle bound pin must survive');
+    assert.ok(/no committed scope ⇒ never `implement`/i.test(text),
+      'the no-committed-scope rule must survive');
+    assert.ok(/one-directional/i.test(text) && /resolve DOWN/i.test(text),
+      'the one-directional downward bias must survive');
+    assert.ok(/never overrides a plan that exists/i.test(text),
+      'the guard-fires-only-when-scope-absent pin must survive');
   });
 });

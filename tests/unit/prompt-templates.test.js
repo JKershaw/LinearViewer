@@ -2642,6 +2642,89 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     });
   });
 
+  describe('close-out authors only a trivial, review-named change (LIN-3033)', () => {
+    test('close-out\'s Ledger Gate carries the (a)+(b) trivial-and-named definition, the pin carve-out, and the evidence/CI-on-new-head requirement', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/the diff is exactly the text, value, or line a review sentence quoted/i.test(prompt),
+        'states condition (a): exact review-quoted content');
+      assert.ok(/an illustrative "e\.g\." does not qualify/i.test(prompt), 'an "e.g." example does not qualify as exact content');
+      assert.ok(/at most 2 files and 3 hunks/i.test(prompt), 'states the size bound');
+      assert.ok(/no new or changed test case, function, branch, condition, or control flow/i.test(prompt),
+        'states condition (b): no new/changed test, function, branch, condition, or control flow');
+      assert.ok(/an update to an existing literal\/expected-string pin that review quoted verbatim is allowed/i.test(prompt),
+        'the pin-update carve-out is present — this is what makes the wording match the ruling\'s own allowance for a pin update');
+      assert.ok(/writing a new witness test is never trivial/i.test(prompt), 'a new witness test is never trivial');
+      assert.ok(/cite the commit and the review sentence verbatim/i.test(prompt), 'requires citing commit + review sentence verbatim');
+      assert.ok(/re-establish CI on the new head/i.test(prompt) && /--match-head-commit/.test(prompt),
+        'requires CI re-established on the new head, merged with --match-head-commit');
+    });
+
+    test('close-out\'s Role states the authoring limit at CLASS level, not scoped to ledger discharge only (F1′ regression pin)', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/whatever prompted it/i.test(prompt), 'the class-level scope uses the generalizing phrase');
+      assert.ok(/conditional-Approve caveat/i.test(prompt), 'names the caveat route');
+      assert.ok(/non-gating review finding/i.test(prompt), 'names the non-gating-finding route');
+      assert.ok(/self-found sibling|same-class sibling/i.test(prompt), 'names the self-found-sibling route');
+      assert.ok(!/author a change to discharge a ledger item only when/i.test(prompt),
+        'must NOT regress to the ledger-only scoping this pin exists to catch');
+    });
+
+    test('close-out\'s Role names resolving a merge conflict as a bounded authoring route (F3 regression pin)', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/resolving a conflict between the PR branch and its base while merging/i.test(prompt),
+        'the class-level list names the merge-conflict route — this pin fails against wording that never mentions a merge conflict');
+    });
+
+    test('the merge bullet carries the merge-conflict corollary and the conflict-free-merge exclusion, without rewriting the pinned bullet itself', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/1\. Merge the approved PR\./.test(prompt), 'the pinned merge bullet text is untouched');
+      assert.ok(/is never review-named/i.test(prompt) && /resolving a conflict between the PR branch and its base/i.test(prompt),
+        'a merge-conflict resolution is stated as never review-named');
+      assert.ok(/lands with \*\*no conflict\*\*.*is ordinary merge mechanics.*not authoring/is.test(prompt),
+        'a conflict-free merge/rebase is explicitly excluded from authoring');
+      assert.ok(/whether by merge or rebase/i.test(prompt), 'the exclusion is worded neutrally over merge or rebase (plan-review advisory A2)');
+    });
+
+    test('"Always name a next action" fires on a non-trivial close-out-authored change, including a merge-conflict resolution', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/is not trivial and review-named/i.test(prompt), 'the next-action trigger names the non-trivial/non-named failure');
+      assert.ok(/resolving a merge conflict while landing the PR/i.test(prompt), 'the widened trigger names the merge-conflict route');
+      assert.ok(/"do it here" ruling/i.test(prompt), 'the widened trigger still names the do-it-here route');
+    });
+
+    test('Follow-up Triage carries the "do it here during close-out is not review-named" sentence after, not replacing, the pinned ruling-options sentence', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      assert.ok(/an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item\./i.test(prompt),
+        'the pinned ruling-options sentence is untouched');
+      assert.ok(/a "do it here" ruling on a finding raised during close-out is, by construction, not review-named/i.test(prompt),
+        'the new sentence states a close-out-raised "do it here" ruling is never review-named');
+    });
+
+    test('review states the exact change when handing an edit to close-out; a vague example forces Request Changes', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      assert.ok(/state the exact change/i.test(prompt), 'review is told to state the exact change');
+      assert.ok(/never an illustrative "e\.g\." example/i.test(prompt), 'an "e.g." example does not qualify as exact content');
+      assert.ok(/your verdict is \*\*Request Changes\*\*/i.test(prompt), 'a vague or non-trivial hand-off forces Request Changes');
+    });
+
+    test('close-out still emits no literal "Linear" with the LIN-3033 authoring-limit text included', () => {
+      const linear = generatePrompt('close-out', issue, context).prompt;
+      assert.ok(!linear.includes('Linear'), 'the LIN-3033 authoring-limit additions introduce no literal "Linear" for Linear');
+      const local = generatePrompt('close-out', { ...issue, labels: ['close-out'] }, context, {},
+        { write: true, comments: true, subtasks: true, displayName: 'Local' }).prompt;
+      assert.ok(!local.includes('Linear'), 'no Linear leaks for a non-Linear provider');
+    });
+
+    test('the pre-existing inside/outside, done-or-drop, and outside-only-filing wording is untouched by the LIN-3033 additions', () => {
+      const review = generatePrompt('review', issue, context).prompt;
+      const closeout = generatePrompt('close-out', issue, context).prompt;
+      const rulingClause = /an inside item's options are "do it here" or "drop it, with the reason"; "file" is offered only for an outside item/i;
+      assert.ok(rulingClause.test(review), 'review still limits ruling options to outside-only filing');
+      assert.ok(rulingClause.test(closeout), 'close-out still limits ruling options to outside-only filing');
+      assert.ok(/Only outside-scope items are eligible to be filed here/i.test(closeout), 'follow-up triage still gates eligibility to outside-scope items only');
+    });
+  });
+
   // LIN-2991/LIN-3022 §5: two idempotency clauses inserted immediately after
   // LIN-3006's own "file is offered only for an outside item" eligibility
   // clause, at each of review, close-out step 8, and Follow-up Triage —
@@ -3205,9 +3288,14 @@ describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-
     const rules = meta.split('\n').filter(l => l.startsWith('- **'));
     const ruleIdx = rules.findIndex(r => r.startsWith('- **Plan-review prompts**'));
     assert.ok(ruleIdx > -1, 'the meta-prompt carries a Plan-review quality rule');
-    // S2 placement: adjacent to the Plan-prompts rule.
+    // S2 placement: in the plan/breakdown quality-rule block, immediately after
+    // the Plan-prompts rule. LIN-3049 inserted the Breakdown-prompts rule between
+    // them (an approved two-path addition), so Plan-review is now two slots down
+    // but stays adjacent to the plan-family rules — which is the property S2 pins.
     const planIdx = rules.findIndex(r => r.startsWith('- **Plan prompts**'));
-    assert.strictEqual(ruleIdx, planIdx + 1, 'the Plan-review rule sits adjacent to the Plan-prompts rule');
+    const breakdownIdx = rules.findIndex(r => r.startsWith('- **Breakdown prompts**'));
+    assert.strictEqual(breakdownIdx, planIdx + 1, 'the Breakdown-prompts rule sits between Plan and Plan-review');
+    assert.strictEqual(ruleIdx, planIdx + 2, 'the Plan-review rule stays adjacent to the plan-family rules');
     // Trap 2: scoped to the single bullet, so the template's line numbering is irrelevant.
     assertSevenChecksOrdered(rules[ruleIdx], 'meta');
   });
@@ -4607,5 +4695,131 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
     });
     assert.ok(/If the repo has no CI configured, say so explicitly and run the local-suite substitute/.test(p),
       'flag-gated CI/CD block is conditional');
+  });
+});
+
+// =============================================================================
+// Breakdown template subtask-description mandate (LIN-3049) — the handwritten
+// path half of the two-path fix. A subtask of an already-approved, decomposed
+// plan must carry its own plan slice (session-fit + plan-review-due:no citing
+// the approving verdict) so it routes straight to implementation; a subtask
+// whose decomposed ticket carries NO Approve on its own comment trail stays a
+// plain acceptance-criteria task. The precondition must name the decomposed
+// ticket's own trail, never the rendered Parent Task section (F4).
+// =============================================================================
+describe('breakdown template subtask-description mandate (LIN-3049)', () => {
+  const baseIssue = {
+    identifier: 'LIN-910', title: 'Break down the surfaces', description: 'd',
+    state: { name: 'In Progress', type: 'started' }, labels: ['breakdown']
+  };
+  const baseContext = {
+    project: { name: 'Proj' },
+    parent: { identifier: 'LIN-900', title: 'Grandparent', state: { name: 'Todo' } },
+    siblings: [], children: [], comments: []
+  };
+  const approvedVerdict = {
+    body: '### Plan Review Verdict\n\n**Verdict: Approve.**',
+    user: 'reviewer', createdAt: '2026-09-25T00:00:00.000Z'
+  };
+
+  const sectionOf = (prompt) => prompt.slice(
+    prompt.indexOf('### Creating Subtasks'),
+    prompt.indexOf('### After Creating All Subtasks')
+  );
+
+  // F4: the verdict lives on the DECOMPOSED ticket's own trail, never on
+  // context.parent. Both fixtures hold context.parent constant and vary only the
+  // issue's own comments; the static prose must name the this-ticket-own-trail
+  // precondition in both cases (the template is static — this pins its presence,
+  // not a runtime branch).
+  for (const [label, comments] of [
+    ['no Approve on the issue\'s own trail', []],
+    ['an Approve on the issue\'s own trail', [approvedVerdict]]
+  ]) {
+    test(`the precondition names the decomposed ticket's own trail (${label})`, () => {
+      const issue = { ...baseIssue, comments };
+      const p = generatePrompt('breakdown', issue, baseContext).prompt;
+      const section = sectionOf(p);
+      assert.ok(/THIS TICKET'S OWN comment trail/.test(section),
+        'the Creating Subtasks section must name the decomposed ticket\'s own comment trail');
+      assert.ok(/not the 'Parent Task' section rendered above in Context/.test(section),
+        'it must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
+      assert.ok(/If no such Approve is on record on this ticket's own trail/.test(section),
+        'it must state the no-Approve fallback');
+      assert.ok(/this ticket's own comment trail/.test(PROMPT_TEMPLATES.breakdown.aiHint.goal),
+        'the breakdown aiHint goal must name the same precondition');
+      assert.ok(/this ticket's own comment trail/.test(formatAIHintsForMetaPrompt()),
+        'the rendered aiHints must carry the precondition too (two-path parity)');
+      // R3: pin the aiHint precondition target AND its no-Approve fallback so the
+      // AI path cannot silently regress to "the Parent Task's comment trail" (M4) or
+      // lose the plain-acceptance-criteria fallback (M3).
+      const goal = PROMPT_TEMPLATES.breakdown.aiHint.goal;
+      assert.ok(/Only if this ticket's own comment trail/.test(goal),
+        'R3: the aiHint precondition must target this ticket\'s own comment trail');
+      assert.ok(/never its own rendered 'Parent Task' section/.test(goal),
+        'R3: the aiHint must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
+      assert.ok(/If no such Approve verdict is on this ticket's own comment trail, write a plain acceptance-criteria subtask instead — no session-fit line, no plan-review-due line\./.test(goal),
+        'R3: the aiHint must carry the no-Approve plain-acceptance-criteria fallback with no false session-fit/plan-review-due markers');
+      // R5: the aiHint workflow carries its own copy of the own-trail precondition
+      // and the plain fallback; formatAIHintsForMetaPrompt renders it beside the
+      // goal, so a regression to "the Parent Task's comment trail" here would put
+      // the F4 wrong-ticket instruction in the AI router's own hint while the goal
+      // stays correct and every other test stays green (M4w/M4w2).
+      const workflow = PROMPT_TEMPLATES.breakdown.aiHint.workflow;
+      assert.ok(/Check this ticket's own comment trail for a recorded `### Plan Review Verdict` of Approve/.test(workflow),
+        'R5: the aiHint workflow must check this ticket\'s own comment trail for an Approve verdict, not the Parent Task');
+      assert.ok(/otherwise write a plain acceptance-criteria subtask/.test(workflow),
+        'R5: the aiHint workflow must retain its plain acceptance-criteria fallback when no Approve verdict exists');
+      // R6: the goal must not copy a false `fits one session` onto a surface the
+      // approved plan itself could not scope to one session.
+      assert.ok(/or, for a surface the plan itself could not scope to one session, omit the false claim/.test(goal),
+        'R6: the aiHint goal must require omitting a false session-fit claim when the plan could not scope the surface to one session');
+    });
+  }
+
+  test('the five approved-path bullets are present and in (a)-(e) order', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    const section = sectionOf(p);
+    const a = section.indexOf('(a) This surface\'s slice of the approved plan');
+    const b = section.indexOf('(b) `Session fit: fits one session`');
+    const c = section.indexOf('(c) `Plan-review due: no');
+    const d = section.indexOf('(d) The grounding commit SHA(s)');
+    const e = section.indexOf('(e) An explicit "the parent\'s plan is the source of truth');
+    assert.ok(a > -1 && b > -1 && c > -1 && d > -1 && e > -1, 'all five approved-path bullets must be present');
+    assert.ok(a < b && b < c && c < d && d < e, 'the five bullets must appear in (a)-(e) order');
+    // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
+    assert.ok(/cited from this ticket's own approving verdict \(the one the precondition found\)/.test(section),
+      'N2: bullet (c) must cite this ticket\'s own approving verdict');
+    // R6: bullet (b) must not copy a false `fits one session` onto a surface the
+    // approved plan itself could not scope to one session; it must defer to a
+    // fresh `plan` pass instead (M13).
+    assert.ok(/if a surface genuinely does not fit one session, leave this line for a fresh `plan` pass to answer honestly rather than copying a false claim/.test(section),
+      'R6: bullet (b) must require omitting the session-fit line for a surface that does not fit one session');
+  });
+
+  test('the existing drift exit is extended to name the approach/files each surface section names', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    assert.ok(/Confirm the surfaces, any dependency arrows, and the approach\/files each surface's plan section names still reflect the current codebase/.test(p),
+      'the existing drift exit must name the copied specifics');
+  });
+
+  test('the existing fallback wording survives for the no-Approve case', () => {
+    const p = generatePrompt('breakdown', baseIssue, baseContext).prompt;
+    const section = sectionOf(p);
+    assert.ok(/create the subtask with only a plain acceptance-criteria description/.test(section),
+      'the no-Approve path must still produce a plain acceptance-criteria subtask');
+    // R4: the focused, per-surface acceptance-criteria guidance must survive as the
+    // fallback's description wording (it was deleted, leaving the precondition pointing
+    // at wording that no longer existed).
+    assert.ok(/Description with acceptance criteria for just this surface — the parent task carries the full scope and sibling context flows in at runtime, so keep the description focused on this surface alone/.test(section),
+      'R4: the no-Approve fallback must restore the focused per-surface acceptance-criteria guidance');
+    assert.ok(/none of bullets \(a\)–\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
+      'the fallback must withhold every approved-path bullet, (a) the plan slice included');
+  });
+
+  test('byte-parity: explicit Linear ui stays a no-op for the new breakdown content', () => {
+    const base = generatePrompt('breakdown', baseIssue, baseContext, {}).prompt;
+    const withUi = generatePrompt('breakdown', baseIssue, baseContext, {}, { ...DEFAULT_PROMPT_UI }).prompt;
+    assert.strictEqual(withUi, base, 'the new breakdown content must remain byte-identical for Linear');
   });
 });
