@@ -38,3 +38,16 @@ test('escapes dispatch default values in the rendered attributes', () => {
   assert.ok(!html.includes('<script>alert(1)</script>'));
   assert.ok(html.includes('&lt;script&gt;'));
 });
+
+// LIN-3027 L1 — the Integration Guide's halt note must stay request-only:
+// exact approved phrasing, never "paused"/"stopped" (LIN-2995 owns enforcement).
+test('the guide-halt-note states the halt is a request only, never paused/stopped', () => {
+  const html = renderDispatchPage('WS', { featureFlags: { dispatch: true } });
+  const match = html.match(/<p class="guide-halt-note">([\s\S]*?)<\/p>/);
+  assert.ok(match, 'guide-halt-note paragraph is present');
+  const noteText = match[1];
+  assert.ok(noteText.includes('does not yet honor it (pending LIN-2995)'),
+    'guide-halt-note states the exact approved honesty phrase');
+  assert.ok(!/\b(paused|stopped)\b/i.test(noteText),
+    'guide-halt-note never claims the runner is paused or stopped');
+});

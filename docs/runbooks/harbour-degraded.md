@@ -21,11 +21,11 @@ LIN-2995); there is still no deep-health endpoint (LIN-2999). Every step below m
    and `lib/proxy-instructions.js:763` — that correction belongs to **LIN-2998** and is
    not made here; treat a cascade abort as **not safe** while Harbour is degraded,
    whatever those three say.
-3. **Request a workspace halt (LIN-2994); the runner doesn't act on it yet (LIN-2995).**
+3. **Request a workspace halt (LIN-2994); the runner does not yet honor it (pending LIN-2995).**
    `POST /api/proxy/dispatch/halt` with body `{"mode":"pause"}` (or `"stop"`) records a
    halt **request** that the next poll carries. It needs a read-write proxy token —
    **mint one before an incident**, not during it (see *Halt caveats* below). The runner
-   does not yet honor the request (pending LIN-2995). The only way to stop the runner
+   does not yet honor it (pending LIN-2995). The only way to stop the runner
    right now is **on the host** (stop or kill the dispatcher process directly).
    `DELETE /api/proxy/dispatch/halt` **clears the request**; clearing it does not by
    itself change what a running session does. Runner-local halt stays
@@ -42,15 +42,19 @@ LIN-2995); there is still no deep-health endpoint (LIN-2999). Every step below m
    - The cache is per-process (`lib/workspace-halt.js:43-53`), so two containers
      overlapping during a deploy can briefly disagree.
    - `Promise.race` bounds the wait at 1.5 s but does not cancel the query
-     (`routes/dispatch.js:53,55-66`; LIN-2997), so a poll can wait up to 1.5 s.
+     (`routes/dispatch.js:53,55-66`; LIN-2997); that 1.5 s bound applies to the **halt
+     read only**, not to the poll as a whole.
    - Concurrent writes: the cache keeps whichever write finished last, not what the
      database committed last. After simultaneous writes, re-read with `GET` and
      re-issue if needed.
 2. **Full-outage limit:** the poll's token check (`routes/dispatch.js:207`) and item
-   read (`routes/dispatch.js:1429`) have no time limit. A database outage fails the
-   poll with a 500, and the runner gets no `halt`. The proxy verb needs the database
-   too: a token check (`routes/proxy.js:527`) plus the write. A halt does not get
-   through a full outage — the cache covers only the halt read.
+   read (`routes/dispatch.js:1429`) have no time limit of their own, unlike the halt
+   read above. Under a full database outage, the poll hangs until the runner's own
+   15 s client timeout (simple-dispatcher `config.js:26`), or fails with a 500 if the
+   database errors back instead of hanging. Either way the runner gets no `halt`. The
+   proxy verb needs the database too: a token check (`routes/proxy.js:527`) plus the
+   write. A halt does not get through a full outage — the cache covers only the halt
+   read.
 3. **Decision 4:** under degradation, use the proxy verb, not the dashboard, with the
    token minted in advance.
 4. **`stop` amplifier:** once LIN-2995 lands, `stop` flows abort → error
