@@ -2378,6 +2378,53 @@ Because `status` is derived last-wins over the merged, timestamp-sorted lineage,
 
 Note for aggregating consumers: `feedbackCount` is no longer additive across rows in the same response. Rows in one lineage report *overlapping* counts — each covers its own feedback plus every lineage entry timestamped at or after its own `dispatchedAt` — so summing across listed rows double-counts the shared entries. Note that overlapping is not identical: because the merge is forward-only, a later-dispatched row inherits a strict subset of what an earlier sibling sees, so its `feedbackCount` can legitimately be *lower*, and two rows of the same lineage can report different `status`/`completedAt` (a still-running follow-up reads `taken`/`null` while its finished parent reads `done`). What does hold for paging is that several rows of one lineage can share a terminal status, so `?status=done&limit=20` can be filled largely by a single lineage rather than 20 distinct ones.
 
+#### Operator Halt (LIN-2994 Decision 4)
+
+The **degraded-mode operator path** — proxy-token auth only, no Linear, no heavy render path in front of it. It stores an operator's pause/stop **request**; the runner does not yet honor it (pending LIN-2995). Treat a successful `POST`/read-back `{ halt: {...} }` as "a halt/stop has been requested", never as "the runner is actually paused or stopped."
+
+```
+GET /api/proxy/dispatch/halt
+```
+
+Read scope is enough (like the agent-status read above).
+
+```json
+{ "halt": null }
+```
+```json
+{ "halt": { "mode": "pause", "setAt": "2026-06-06T11:32:25.111Z", "setBy": "user_123" } }
+```
+
+`setBy` is the creator recorded on the token that made the request — `null` for a legacy token with no recorded creator (still a valid, accepted halt).
+
+```
+POST /api/proxy/dispatch/halt
+Content-Type: application/json
+
+{ "mode": "pause" }
+```
+
+**Requires `readWrite`** (a read-scope token gets `403`).
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mode` | string | Yes | `"pause"` or `"stop"` — anything else is rejected `400` |
+
+Returns:
+```json
+{ "success": true, "halt": { "mode": "pause", "setAt": "2026-06-06T11:32:25.111Z", "setBy": "user_123" } }
+```
+
+```
+DELETE /api/proxy/dispatch/halt
+```
+
+**Requires `readWrite`.** Clears the request, resuming the workspace. Harmless when nothing is set.
+
+```json
+{ "success": true }
+```
+
 ## Error Handling
 
 | Status | Error | Description |
