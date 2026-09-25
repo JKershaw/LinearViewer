@@ -25,6 +25,9 @@ import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { DispatchQueueStore, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
+import { AgentStatusStore } from '../../lib/agent-status-store.js';
+import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
+import { collectUnansweredDecisions, isDecisionWithdrawn } from '../../lib/unanswered-decisions.js';
 import { _findDecisionWithdrawal } from '../../lib/digest-feedback.js';
 
 const URL_KEY = 'acme';
@@ -285,3 +288,134 @@ describe(
     });
   }
 );
+
+// ─── Read-side adversarial cases (LIN-2891/LIN-3036 Surface 5) ──────────────
+//
+// These drive the REAL write path (DispatchQueueStore#addFeedback /
+// #markDecisionWithdrawalReversed — the exact methods the route calls) and then
+// read the result through the real derivation the feed uses
+// (`getLoopsForWorkspace(..., {lean:true})` -> `collectUnansweredDecisions`).
+//
+// Both are READ-SIDE guarantees, deliberately NOT write-scope claims. A consumer
+// token that has taken an item CAN write feedback onto it (the token retains
+// access to every item it has ever taken, routes/dispatch.js's own docblock),
+// so the guard against a forged or reversed stamp is that the read consults only
+// the WITHDRAWING loop's OWN `withdrawal` field (Choice C) — never a lineage
+// union, never a cross-loop lookup.
+describe('read-side adversarial: item-scoped withdrawal discharge (LIN-3036)', () => {
+  function decisionMessage(decisionId) {
+    return `[decision] ${JSON.stringify({
+      decision_id: decisionId,
+      question: 'Proceed?',
+      options: [{ id: 'a', label: 'Go' }, { id: 'b', label: 'Hold' }]
+    })}`;
+  }
+
+  async function loopsForWorkspace(store, urlKey = URL_KEY) {
+    const agentStatusStore = new AgentStatusStore({ collection: createMockCollection() });
+    const loops = await getLoopsForWorkspace(urlKey, { dispatchStore: store, agentStatusStore, lean: true });
+    return loops.map((l) => ({ ...l, workspaceUrlKey: urlKey }));
+  }
+
+  test('cross-loop forgery: a decision-withdrawn on item X carrying item Y\'s live decision_id does NOT discharge Y\'s row', async () => {
+    const { store } = makeStore();
+
+    // Item X raises its OWN decision d-X, then receives a decision-withdrawn
+    // that names d-Y. A token that has taken X can land this entry (the write is
+    // not the guard) — but it names a decision X does not carry.
+    const x = await store.addItem(URL_KEY, { prompt: 'x', kind: 'implementation', issueIdentifier: 'LIN-42' });
+    await store.takeItem(x._id, URL_KEY, 'token-a');
+    await store.addFeedback(x._id, URL_KEY, { kind: 'decision', message: decisionMessage('d-X') }, 'token-a');
+    await store.addFeedback(
+      x._id, URL_KEY,
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-Y', reason: 'forged onto X' }) },
+      'token-a'
+    );
+
+    // Item Y carries its live decision d-Y and NO withdrawal of its own.
+    const y = await store.addItem(URL_KEY, { prompt: 'y', kind: 'implementation', issueIdentifier: 'LIN-43' });
+    await store.takeItem(y._id, URL_KEY, 'token-a');
+    await store.addFeedback(y._id, URL_KEY, { kind: 'decision', message: decisionMessage('d-Y') }, 'token-a');
+
+    const loops = await loopsForWorkspace(store);
+    const loopX = loops.find((l) => l.loopId === String(x._id));
+    const loopY = loops.find((l) => l.loopId === String(y._id));
+    assert.ok(loopX && loopY, 'sanity: both items reconstruct as loops');
+    assert.strictEqual(loopY.withdrawal, null, 'sanity: Y carries no withdrawal of its own');
+    assert.strictEqual(
+      isDecisionWithdrawn(loopX), false,
+      "X's withdrawal names d-Y, not X's own d-X — the item-scoped predicate refuses it"
+    );
+
+    const rows = collectUnansweredDecisions({ loops }, { now: new Date() });
+    const ids = rows.map((r) => r.decision.decision_id);
+    assert.ok(ids.includes('d-Y'), "Y's row must still be unanswered — a forged stamp on X cannot discharge it");
+    assert.ok(ids.includes('d-X'), "X's own d-X row is likewise untouched — the forgery discharges nothing");
+  });
+
+  test('sibling after reversal: a reversed withdrawal on loop A does not block a fresh, independently-reasoned withdrawal on loop B for the same decision id; A\'s own pair stays discharged-false forever', async () => {
+    const { store } = makeStore();
+
+    // Loop A raises d-1, withdraws it, then the withdrawal is REVERSED. The
+    // reversal is terminal for the pair (A, d-1).
+    const a = await store.addItem(URL_KEY, { prompt: 'a', kind: 'implementation', issueIdentifier: 'LIN-50' });
+    await store.takeItem(a._id, URL_KEY, 'token-a');
+    await store.addFeedback(a._id, URL_KEY, { kind: 'decision', message: decisionMessage('d-1') }, 'token-a');
+    await store.addFeedback(
+      a._id, URL_KEY,
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'A retracted it' }) },
+      'token-a'
+    );
+    const reversedA = await store.markDecisionWithdrawalReversed(a._id, URL_KEY, 'd-1');
+    assert.ok(reversedA?.success, "sanity: A's withdrawal is reversed");
+
+    // Loop B is a later re-raise in the SAME lineage carrying d-1 again, with a
+    // FRESH, independently-reasoned withdrawal. A's reversal must not immunise B.
+    const b = await store.addItem(URL_KEY, { prompt: 'b', kind: 'implementation', issueIdentifier: 'LIN-50', rootItemId: a._id });
+    await store.takeItem(b._id, URL_KEY, 'token-a');
+    await store.addFeedback(b._id, URL_KEY, { kind: 'decision', message: decisionMessage('d-1') }, 'token-a');
+    await store.addFeedback(
+      b._id, URL_KEY,
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'B retracted it independently' }) },
+      'token-a'
+    );
+
+    // Pin the dispatch order explicitly: `addItem` stamps `dispatchedAt` at
+    // creation, but A and B can land in the SAME millisecond, and the
+    // content-loop tie-break is by `loopId` (a random UUID) — so without this
+    // the group's content loop would be nondeterministic and this test flaky.
+    // B must be the later-dispatched, content-loop member.
+    await store.historyCollection.updateOne({ _id: a._id }, { $set: { dispatchedAt: new Date(Date.now() - 120000) } });
+    await store.historyCollection.updateOne({ _id: b._id }, { $set: { dispatchedAt: new Date(Date.now() - 60000) } });
+
+    let loops = await loopsForWorkspace(store);
+    const loopA = () => loops.find((l) => l.loopId === String(a._id));
+    const loopB = () => loops.find((l) => l.loopId === String(b._id));
+    assert.ok(loopA() && loopB(), 'sanity: both lineage members reconstruct');
+    assert.strictEqual(isDecisionWithdrawn(loopA()), false, "A's reversed pair reads discharged-false");
+    assert.strictEqual(isDecisionWithdrawn(loopB()), true, "B's fresh withdrawal is live, independent of A's reversal");
+
+    assert.deepStrictEqual(
+      collectUnansweredDecisions({ loops }, { now: new Date() }),
+      [],
+      'the group discharges via B\'s live withdrawal — A\'s reversal does not block it'
+    );
+    const resolved = collectUnansweredDecisions({ loops }, { now: new Date(), includeResolved: true });
+    assert.strictEqual(resolved.length, 1);
+    assert.strictEqual(resolved[0].resolution.outcome, 'withdrawn');
+    assert.strictEqual(
+      resolved[0].resolution.reason, 'B retracted it independently',
+      "the surfaced resolution is B's own independently-reasoned withdrawal, never A's reversed one"
+    );
+
+    // Reverse B too: the row re-opens, and A still reads discharged-false —
+    // its reversal is terminal and untouched by anything on B.
+    const reversedB = await store.markDecisionWithdrawalReversed(b._id, URL_KEY, 'd-1');
+    assert.ok(reversedB?.success, "sanity: B's withdrawal is reversible independently");
+    loops = await loopsForWorkspace(store);
+    assert.strictEqual(isDecisionWithdrawn(loopA()), false, "A's own pair stays discharged-false forever");
+    const rows = collectUnansweredDecisions({ loops }, { now: new Date() });
+    assert.strictEqual(rows.length, 1, 'with both withdrawals reversed, d-1 is open again');
+    assert.strictEqual(rows[0].decision.decision_id, 'd-1');
+  });
+});
