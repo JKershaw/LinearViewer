@@ -37,6 +37,7 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
  * @param {Object} options
  * @param {Object} options.dispatchQueueStore - Dispatch queue store
  * @param {Object} options.dispatchTokenStore - Dispatch token store
+ * @param {Object} options.workspaceHaltStore - Workspace halt store (LIN-2994/LIN-3026 test isolation)
  * @param {Object} options.freeTierStore - Free tier usage store
  * @param {Object} options.userPreferencesStore - User preferences store
  * @param {Object} options.proxyTokenStore - Proxy token store
@@ -49,7 +50,7 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
  * @param {Function} options.resetKpiCache - Resets server.js's kpiCache to cold (LIN-3002)
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -402,6 +403,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/clear-dispatch-tokens', async (req, res) => {
     try {
       await dispatchTokenStore.clear(req.query.urlKey || 'test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear a workspace halt for testing (LIN-2994 Surface 4 /
+  // LIN-3026). Halt docs are keyed by the same shared urlKey fixture other
+  // spec files reuse, so an unclean halt state could otherwise leak into
+  // unrelated specs' poll assertions. `clearWorkspaceHalt` is already
+  // idempotent, so this is harmless when nothing is set.
+  router.get('/test/clear-workspace-halt', async (req, res) => {
+    try {
+      await workspaceHaltStore.clearWorkspaceHalt(req.query.urlKey || 'test-workspace')
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

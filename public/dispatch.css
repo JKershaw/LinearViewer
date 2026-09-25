@@ -457,6 +457,44 @@
 }
 
 /* =============================================================================
+   Workspace Halt
+   ============================================================================= */
+.halt-status {
+  font-family: var(--font-content);
+  font-size: 0.9em;
+  margin-bottom: 0.5rem;
+}
+
+.halt-status code {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  background: var(--card-h);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--fg-vdim);
+}
+
+.halt-disclaimer {
+  font-family: var(--font-content);
+  font-size: 0.85em;
+  color: var(--fg-dim);
+  margin: 0 0 0.75rem 0;
+}
+
+.halt-disclaimer code {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  background: var(--card-h);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--fg-vdim);
+}
+
+.halt-form .action-btn {
+  margin-right: 0.5rem;
+}
+
+/* =============================================================================
    Responsive
    ============================================================================= */
 @media (max-width: 640px) {
