@@ -7,7 +7,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered, buildRulingRef } from '../../lib/unanswered-decisions.js';
+import { collectUnansweredDecisions, resolveDisposition, resolveEffect, isDecisionAnswered, isDecisionWithdrawn, buildRulingRef } from '../../lib/unanswered-decisions.js';
 
 const NOW = new Date('2026-08-22T12:00:00.000Z');
 const REAP_INACTIVITY_MS = 21600000; // 6h, mirrors simple-dispatcher's config.js
@@ -66,6 +66,39 @@ describe('isDecisionAnswered (LIN-2671: the one exported predicate, LIN-3022: se
   test('null/undefined loops are tolerated, never throw', () => {
     assert.strictEqual(isDecisionAnswered(null), false);
     assert.strictEqual(isDecisionAnswered(undefined), false);
+  });
+});
+
+describe('isDecisionWithdrawn (LIN-2891/LIN-3036 Surface 5: item-scoped pure equality, Choice C)', () => {
+  // The withdrawal shape lib/pipeline-loops.js carries: {decisionId, reason,
+  // timestamp}. Only `decisionId` participates in the predicate.
+  function withdrawal(decisionId, overrides = {}) {
+    return { decisionId, reason: 'no longer needed', timestamp: '2026-08-22T10:00:00.000Z', ...overrides };
+  }
+
+  test('the withdrawal id matching the current decision id → true', () => {
+    assert.strictEqual(isDecisionWithdrawn(loop({ decision: decision('d-1'), withdrawal: withdrawal('d-1') })), true);
+  });
+
+  test('a mismatched withdrawal id (a newer decision after an older withdrawal) → false', () => {
+    assert.strictEqual(isDecisionWithdrawn(loop({ decision: decision('d-2'), withdrawal: withdrawal('d-1') })), false);
+  });
+
+  test('no decision at all is never withdrawn — even with a stray withdrawal id', () => {
+    assert.strictEqual(isDecisionWithdrawn(loop({ decision: null, withdrawal: withdrawal('d-1') })), false);
+  });
+
+  test('no withdrawal stamp is never withdrawn', () => {
+    assert.strictEqual(isDecisionWithdrawn(loop({ decision: decision('d-1'), withdrawal: null })), false);
+  });
+
+  test('a malformed null decision_id cannot match a null withdrawal', () => {
+    assert.strictEqual(isDecisionWithdrawn(loop({ decision: { question: 'q?' }, withdrawal: withdrawal(null) })), false);
+  });
+
+  test('null/undefined loops are tolerated, never throw', () => {
+    assert.strictEqual(isDecisionWithdrawn(null), false);
+    assert.strictEqual(isDecisionWithdrawn(undefined), false);
   });
 });
 
@@ -934,6 +967,160 @@ describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2
     const member2 = loop({ loopId: 'member-2', lineageId: 'root-5', wakeMarker: 'blocked', decision: decision('d-1'), dispatchedAt: '2026-08-21T00:00:00.000Z' });
     rows = collectUnansweredDecisions({ loops: [root, member1, member2], shelvedRulings }, { now: NOW });
     assert.deepStrictEqual(rows, [], 'the SAME shelf (keyed on the anchor/root, unchanged) still suppresses the row once the content loop shifts to member-2');
+  });
+});
+
+describe('collectUnansweredDecisions — withdrawal discharge (LIN-2891/LIN-3036 Surface 5, Choice C)', () => {
+  function withdrawal(decisionId, overrides = {}) {
+    return { decisionId, reason: 'asker retracted it', timestamp: '2026-08-22T10:00:00.000Z', ...overrides };
+  }
+
+  // Default read: a withdrawn decision is dropped exactly like an answered one.
+  // includeResolved: it surfaces carrying the plan's withdrawn `resolution`
+  // ({decisionId, raisedAt: null, resolvedAt: the withdrawal timestamp,
+  // outcome: 'withdrawn', reason}) — `raisedAt: null` is the deliberate,
+  // named gap mirroring the legacy-digest tolerance for a null outcome.
+  test('a withdrawn decision is excluded by default and surfaces under includeResolved with its withdrawal resolution', () => {
+    const l = loop({
+      loopId: 'w-loop', wakeMarker: 'blocked', decision: decision('d-w'),
+      withdrawal: withdrawal('d-w', { reason: 'asker retracted it', timestamp: '2026-08-22T10:00:00.000Z' })
+    });
+
+    assert.deepStrictEqual(
+      collectUnansweredDecisions({ loops: [l] }, { now: NOW }),
+      [],
+      'the default (unanswered) read must drop a withdrawn decision, exactly as it drops an answered one'
+    );
+
+    const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW, includeResolved: true });
+    assert.strictEqual(rows.length, 1, 'includeResolved must surface the withdrawn group');
+    assert.strictEqual(rows[0].decision.decision_id, 'd-w');
+    assert.deepStrictEqual(rows[0].resolution, {
+      decisionId: 'd-w',
+      raisedAt: null,
+      resolvedAt: '2026-08-22T10:00:00.000Z',
+      outcome: 'withdrawn',
+      reason: 'asker retracted it'
+    });
+  });
+
+  // Tie-break (named in the plan): a decision answered ANYWHERE in the lineage
+  // and also withdrawn on the content loop reports the ANSWER, never the
+  // withdrawal — the answer stamp is the more authoritative resolution.
+  test('answered-over-withdrawn tie-break: the resolution reports answered, never withdrawn', () => {
+    const answeringSibling = loop({
+      loopId: 'tie-answer', lineageId: 'lineage-tie', wakeMarker: 'blocked', decision: decision('d-tie'),
+      dispatchedAt: '2026-08-20T00:00:00.000Z', answeredDecisions: answered('d-tie')
+    });
+    const withdrawnContent = loop({
+      loopId: 'tie-withdrawn', lineageId: 'lineage-tie', wakeMarker: 'blocked', decision: decision('d-tie'),
+      dispatchedAt: '2026-08-21T00:00:00.000Z', withdrawal: withdrawal('d-tie', { reason: 'also retracted' })
+    });
+
+    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [answeringSibling, withdrawnContent] }, { now: NOW }), []);
+
+    const rows = collectUnansweredDecisions({ loops: [answeringSibling, withdrawnContent] }, { now: NOW, includeResolved: true });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].stampLoopId, 'tie-withdrawn', 'the content loop is the later-dispatched, withdrawn member');
+    assert.strictEqual(rows[0].resolution.outcome, 'answered', 'the answer wins the tie-break');
+    assert.strictEqual(rows[0].resolution.decisionId, 'd-tie');
+    assert.strictEqual(rows[0].resolution.reason, undefined, 'the withdrawal reason must not leak into an answered resolution');
+  });
+
+  // Item-scoped (Choice C): the predicate reads ONLY the content loop's own
+  // withdrawal. A withdrawal stamp on a non-content sibling raising the same
+  // decision must NOT discharge the group.
+  test('item-scoped: a withdrawal on a non-content sibling does NOT discharge the group', () => {
+    const root = loop({ loopId: 'root-shift', wakeMarker: null, decision: null });
+    const sibling = loop({
+      loopId: 'sib-shift', lineageId: 'root-shift', wakeMarker: 'blocked', decision: decision('d-shift'),
+      dispatchedAt: '2026-08-20T00:00:00.000Z', withdrawal: withdrawal('d-shift', { reason: 'sibling stamp' })
+    });
+    const content = loop({
+      loopId: 'content-shift', lineageId: 'root-shift', wakeMarker: 'blocked', decision: decision('d-shift'),
+      dispatchedAt: '2026-08-21T00:00:00.000Z'
+    });
+
+    const rows = collectUnansweredDecisions({ loops: [root, sibling, content] }, { now: NOW });
+    assert.strictEqual(rows.length, 1, 'the withdrawal is on the sibling, not the content loop — the group stays open');
+    assert.strictEqual(rows[0].stampLoopId, 'content-shift');
+    assert.strictEqual(rows[0].resolution, undefined, 'an open row carries no resolution');
+  });
+
+  // Mirror of the above: the withdrawal landing on the CONTENT loop (the one
+  // that would actually receive a stamp) does discharge the group.
+  test('item-scoped: a withdrawal landing on the content loop discharges the group', () => {
+    const root = loop({ loopId: 'root-content', wakeMarker: null, decision: null });
+    const content = loop({
+      loopId: 'content-w', lineageId: 'root-content', wakeMarker: 'blocked', decision: decision('d-content'),
+      dispatchedAt: '2026-08-21T00:00:00.000Z', withdrawal: withdrawal('d-content', { reason: 'content stamp' })
+    });
+    const sibling = loop({
+      loopId: 'sib-content', lineageId: 'root-content', wakeMarker: 'blocked', decision: decision('d-content'),
+      dispatchedAt: '2026-08-20T00:00:00.000Z'
+    });
+
+    assert.deepStrictEqual(
+      collectUnansweredDecisions({ loops: [root, sibling, content] }, { now: NOW }),
+      [],
+      'the withdrawal is on the content loop — the group must discharge'
+    );
+
+    const rows = collectUnansweredDecisions({ loops: [root, sibling, content] }, { now: NOW, includeResolved: true });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].resolution.outcome, 'withdrawn');
+    assert.strictEqual(rows[0].stampLoopId, 'content-w');
+  });
+
+  // A withdrawal naming a DIFFERENT decision id is never a discharge for the
+  // live one — pure equality, not a bare presence check.
+  test('a withdrawal naming a different decision id never discharges the row', () => {
+    const l = loop({
+      loopId: 'mismatch-w', wakeMarker: 'blocked', decision: decision('d-live'),
+      withdrawal: withdrawal('d-old', { reason: 'stale stamp for an older decision' })
+    });
+    const rows = collectUnansweredDecisions({ loops: [l] }, { now: NOW });
+    assert.strictEqual(rows.length, 1, 'a withdrawal for another decision id must not discharge this one');
+    assert.strictEqual(rows[0].decision.decision_id, 'd-live');
+  });
+
+  // Resolved exemption, supersession leg: a withdrawn group stays hidden by
+  // default and still surfaces under includeResolved even after a follow-up
+  // supersedes its content loop — the same exemption an answered group gets
+  // (the live LIN-2985 shape), now keyed on `resolved`.
+  test('resolved exemption: a withdrawn group surfaces under includeResolved even after its content loop is superseded', () => {
+    const root = loop({
+      loopId: 'root-superseded', wakeMarker: 'blocked', decision: decision('d-superseded'),
+      withdrawal: withdrawal('d-superseded', { reason: 'retracted' })
+    });
+    const followUp = loop({ loopId: 'follow-superseded', followUpTo: 'root-superseded', wakeMarker: null, decision: null });
+
+    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [root, followUp] }, { now: NOW }), []);
+
+    const rows = collectUnansweredDecisions({ loops: [root, followUp] }, { now: NOW, includeResolved: true });
+    assert.strictEqual(rows.length, 1, 'the supersession gate must exempt a withdrawn group exactly as it exempts an answered one');
+    assert.strictEqual(rows[0].resolution.outcome, 'withdrawn');
+  });
+
+  // Resolved exemption, shelf leg: a withdrawn group under an active
+  // loop-scoped shelf stays hidden by default and surfaces under
+  // includeResolved — mirroring the F2 answered-group exemption.
+  test('resolved exemption: a withdrawn group under an active loop-scoped shelf surfaces under includeResolved', () => {
+    const l = loop({
+      loopId: 'root-shelf-w', wakeMarker: 'blocked', decision: decision('d-shelf-w'),
+      withdrawal: withdrawal('d-shelf-w', { reason: 'retracted' })
+    });
+    const shelvedRulings = [{
+      decisionId: 'd-shelf-w', urlKey: 'acme', decisionLoopId: 'root-shelf-w',
+      reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z',
+      resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0
+    }];
+
+    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [l], shelvedRulings }, { now: NOW }), []);
+
+    const rows = collectUnansweredDecisions({ loops: [l], shelvedRulings }, { now: NOW, includeResolved: true });
+    assert.strictEqual(rows.length, 1, 'the shelf gate must exempt a withdrawn group exactly as it exempts an answered one');
+    assert.strictEqual(rows[0].resolution.outcome, 'withdrawn');
   });
 });
 
