@@ -166,9 +166,9 @@ export function comparisonKeyFor(row) {
  * !== targetFeedback`) cannot distinguish "genuinely outranked a terminal"
  * from "there was nothing to outrank" — the bug F1 found. This function
  * re-checks `findTerminalFeedback(targetFeedback)` itself to tell the two
- * apart, and records each genuine W1 case's gap in milliseconds (the
- * `w1Cases` print label calls this "sub-second"; `gapMs` is what backs
- * that claim rather than asserting it).
+ * apart, and records each genuine W1 case's gap in milliseconds (`gapMs`)
+ * so the timing is measured rather than asserted — production gaps were
+ * 6 s to ~80 min, none sub-second (`7cbe39e9`).
  *
  * @param {Array<Object>} rows - raw `dispatch-history` documents, each with
  *   `_id` and (for abort sources) `abort`/`abortTo`/`feedback`

@@ -210,7 +210,7 @@ test('LIN-3014 compareSessions PLANTED DIFFERENCE: a non-exempt field INSIDE loo
 });
 
 // Review ledger L1(b)/(iii): the V2 bounds require abort source/target
-// counts and at least one W1 sub-second case (a target whose own genuine
+// counts and at least one W1 case (a target whose own genuine
 // terminal predates the abort) to be identified, not just sampled.
 test('LIN-3014 computeAbortHarvestStats: counts sources and distinct targets', () => {
   const rows = [
