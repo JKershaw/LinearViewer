@@ -39,9 +39,10 @@ import { PULSE_MAX_WINDOW_MS } from '../../lib/live-console.js';
 // ── exist yet on this branch (TDD red). Each stays `null` until beat 3.   ──
 let digestFeedback = null;
 let _findDecisionWithdrawal = null;
+let isDecisionLifecycleStampEntry = null;
 let digestFeedbackImportError = null;
 try {
-  ({ digestFeedback, _findDecisionWithdrawal } = await import('../../lib/digest-feedback.js'));
+  ({ digestFeedback, _findDecisionWithdrawal, isDecisionLifecycleStampEntry } = await import('../../lib/digest-feedback.js'));
 } catch (err) {
   digestFeedbackImportError = err;
 }
@@ -755,6 +756,26 @@ function requireFindDecisionWithdrawal() {
   assert.ok(typeof _findDecisionWithdrawal === 'function',
     'lib/digest-feedback.js must export _findDecisionWithdrawal');
 }
+
+describe('isDecisionLifecycleStampEntry (LIN-2891/LIN-3037)', () => {
+  test('true for exactly the 3 decision-lifecycle stamp kinds', () => {
+    assert.ok(typeof isDecisionLifecycleStampEntry === 'function',
+      `lib/digest-feedback.js must export isDecisionLifecycleStampEntry (import error: ${digestFeedbackImportError?.message || 'n/a'})`);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision-answer' }), true);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision-withdrawn' }), true);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision-withdrawal-reversed' }), true);
+  });
+
+  test('false for the decision kind, other kinds, and untyped entries', () => {
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'usage' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'status' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'assistant-text' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({}), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry(undefined), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry(null), false);
+  });
+});
 
 describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
   test('returns the last decision-withdrawn entry (backward scan, last entry wins)', () => {
