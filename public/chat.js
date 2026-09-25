@@ -32,18 +32,6 @@
   }
 
   /**
-   * Pure predicate: is `el` scrolled at (or within 60px of) its own bottom?
-   * A null/hidden/unlaid-out element (`clientHeight` reading 0) reads as
-   * pinned — the gate fails toward following, not toward stranding a reader
-   * mid-scroll on first render.
-   * @param {Element} el
-   * @returns {boolean}
-   */
-  function isPinnedToBottom(el) {
-    return !el || (el.scrollHeight - el.scrollTop - (el.clientHeight || 0)) < 60;
-  }
-
-  /**
    * Append one conversational turn to a `.chat-thread` list.
    * @param {Element} thread - the `<ul class="chat-thread">` to append into.
    * @param {Object} opts
@@ -97,7 +85,7 @@
     li.innerHTML = whoPill + bodySurface + timeHtml;
 
     var doReveal = opts.reveal !== false;
-    var wasPinned = doReveal ? isPinnedToBottom(thread) : false;
+    var wasPinned = doReveal ? window.isPinnedToBottom(thread) : false;
     thread.appendChild(li);
     if (doReveal) reveal(thread, { wasPinned: wasPinned, force: !!opts.self });
     return li;
@@ -121,7 +109,7 @@
     li.className = 'chat-note' + (opts.liClass ? ' ' + opts.liClass : '');
     li.textContent = text;
     var doReveal = opts.reveal !== false;
-    var wasPinned = doReveal ? isPinnedToBottom(thread) : false;
+    var wasPinned = doReveal ? window.isPinnedToBottom(thread) : false;
     if (opts.before && opts.before.parentNode === thread) {
       thread.insertBefore(li, opts.before);
     } else {
@@ -390,7 +378,7 @@
     appendMessage: appendMessage,
     appendNote: appendNote,
     appendOptions: appendOptions,
-    isPinnedToBottom: isPinnedToBottom,
+    isPinnedToBottom: window.isPinnedToBottom,
     resolveCaption: resolveCaption,
     renderMarkdownText: renderMarkdownText,
     toolBreadcrumbLabel: toolBreadcrumbLabel

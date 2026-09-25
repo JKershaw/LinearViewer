@@ -597,3 +597,170 @@ test.describe('Context UI — Swipe (LIN-572)', () => {
     await expect(section.locator('.context-node--root')).toBeVisible();
   });
 });
+
+// =============================================================================
+// AI Recommend stream — scroll-follow regression (LIN-2987)
+// =============================================================================
+//
+// public/prompt-section.js's scheduleRender used to sample the near-bottom
+// predicate AFTER `body.innerHTML = renderMarkdown(...)` — the mutation that
+// grows the body. A render pass whose growth alone exceeds the shared
+// `window.isPinnedToBottom` 60px threshold (real markdown re-rendering a
+// growing document is exactly this shape) measured the already-grown gap and
+// read a pinned reader as scrolled away, stranding them for the rest of the
+// stream (LIN-2987's research measured 288px growing to a persistent 288-317px
+// gap against unfixed HEAD). The fix samples `wasPinned` before the mutation
+// and carries it across the render.
+//
+// Swipe's own local AI mock (routes/workspace-api.js, `shouldMockAi`) writes
+// every SSE frame back to back with no delay, so it settles in a single paint
+// and can never be caught mid-stream — precisely the reason task-chat.js's
+// sibling LIN-2812 regression needed its own explicit-delay "stream slowly"
+// mock trigger server-side. Here `window.fetch` is stubbed in-page instead,
+// returning a real `ReadableStream` paced with real `setTimeout`s — genuine
+// task-queue boundaries a `page.waitForFunction({polling:'raf'})` poll can
+// land inside, with full control over each frame's size and timing.
+test.describe('Swipe AI Recommend stream — scroll-follow behavior (LIN-2987)', () => {
+  test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+  });
+
+  /**
+   * Stub `window.fetch` so a request to the AI-recommend stream endpoint
+   * resolves with a `text/event-stream` body assembled from `frameContents`,
+   * one `data:` line per entry, each `content` field appended to the
+   * `prompt` section. Frames are enqueued `pauseMs` apart at
+   * `pauseAfterIndex` (default: a short 30ms elsewhere) so the caller can
+   * hold the stream open — still `.streaming`, mid-render — for exactly as
+   * long as the test needs to observe it.
+   */
+  async function stubRecommendStream(page, frameContents, { pauseAfterIndex = -1, pauseMs = 400 } = {}) {
+    await page.evaluate(({ frameContents, pauseAfterIndex, pauseMs }) => {
+      const realFetch = window.fetch.bind(window);
+      window.fetch = (input, opts) => {
+        const href = typeof input === 'string' ? input : input.url;
+        if (!href.includes('/api/recommend/') || !href.includes('/stream')) {
+          return realFetch(input, opts);
+        }
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            for (let i = 0; i < frameContents.length; i++) {
+              const payload = JSON.stringify({ section: 'prompt', content: frameContents[i] });
+              controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
+              await new Promise((resolve) => setTimeout(resolve, i === pauseAfterIndex ? pauseMs : 30));
+            }
+            controller.close();
+          },
+        });
+        return Promise.resolve(new Response(stream, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }));
+      };
+    }, { frameContents, pauseAfterIndex, pauseMs });
+  }
+
+  async function openAiRecommend(page) {
+    await page.locator('.swipe-accordion-header[data-accordion="prompts"]').first().click();
+    await page.locator('[data-prompt="__ai__"]').first().click();
+  }
+
+  // Each warm-up frame is one short paragraph — safely under the 60px
+  // threshold on its own. BIG_FRAME is 20 separate paragraphs landing in ONE
+  // render pass — the exact shape (real markdown re-rendering a growing
+  // document) that stranded a pinned reader pre-fix.
+  const WARMUP_FRAME = 'A short warm-up line that adds only a little height.\n\n';
+  const BIG_FRAME = Array.from({ length: 20 }, (_, i) => `Big frame paragraph number ${i}.`).join('\n\n') + '\n\n';
+  const BIG_FRAME_LAST_MARKER = 'Big frame paragraph number 19.';
+  // `.swipe-prompt-text` caps at 400px (overflow-y: auto) — this needs to
+  // already overflow that cap before the scrolled-up test's scroll-away
+  // gesture, or there is nothing to scroll away FROM and the gesture is a
+  // no-op (the box just keeps auto-following, since it was never anything
+  // but pinned).
+  const PRELOAD_FRAME = Array.from({ length: 40 }, (_, i) => `Preload paragraph number ${i}.`).join('\n\n') + '\n\n';
+  const PRELOAD_FRAME_LAST_MARKER = 'Preload paragraph number 39.';
+
+  test('a pinned reader keeps following across a render pass that grows the body by more than 60px', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err));
+
+    // Pause right after BIG_FRAME lands, before the trailing warm-up frame or
+    // the terminal settle-render can run.
+    await stubRecommendStream(page, [WARMUP_FRAME, WARMUP_FRAME, BIG_FRAME, WARMUP_FRAME], { pauseAfterIndex: 2 });
+    await openAiRecommend(page);
+
+    const body = page.locator('[data-prompt-body]').first();
+    const container = page.locator('.prompt-section').first();
+
+    // Land inside the held-open pause via rAF polling, never a web-first
+    // assertion — its backoff risks resolving only after the stream has
+    // already finished, which would measure the post-settle DOM rebuild
+    // instead of the live mid-stream state (the same vacuous-test shape
+    // LIN-2812's review flagged).
+    await page.waitForFunction((marker) => {
+      const el = document.querySelector('[data-prompt-body]');
+      return !!el && el.textContent.includes(marker);
+    }, BIG_FRAME_LAST_MARKER, { polling: 'raf', timeout: 5000 });
+
+    // The stream must still be genuinely live at the measurement point —
+    // proof this isn't measuring the post-settle rebuild, which resets
+    // scrollTop to 0 regardless of whether the mid-stream bug exists.
+    await expect(container).toHaveClass(/streaming/);
+
+    const grewPastThreshold = await body.evaluate((el) => el.scrollHeight > 200);
+    expect(grewPastThreshold).toBe(true);
+
+    const gap = await body.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+    expect(gap).toBeLessThan(60);
+
+    await expect(container).not.toHaveClass(/streaming/, { timeout: 5000 });
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('a reader scrolled away mid-stream is not pulled back down by a later render pass', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (err) => pageErrors.push(err));
+
+    // PRELOAD_FRAME alone already overflows the 400px cap, so scrolling away
+    // after it lands is a genuine gesture, not a no-op on an empty/short box.
+    // Pause right after it lands, before BIG_FRAME arrives.
+    await stubRecommendStream(page, [PRELOAD_FRAME, BIG_FRAME, WARMUP_FRAME], { pauseAfterIndex: 0 });
+    await openAiRecommend(page);
+
+    const body = page.locator('[data-prompt-body]').first();
+    const container = page.locator('.prompt-section').first();
+
+    await page.waitForFunction((marker) => {
+      const el = document.querySelector('[data-prompt-body]');
+      return !!el && el.textContent.includes(marker);
+    }, PRELOAD_FRAME_LAST_MARKER, { polling: 'raf', timeout: 5000 });
+    await expect(container).toHaveClass(/streaming/);
+
+    // Confirm there is real overflow to scroll away from before scrolling —
+    // well past the 60px threshold itself, or scrollTop=0 would still read
+    // as "pinned" (within 60px of the bottom) and this wouldn't be a genuine
+    // scroll-away gesture at all.
+    const overflowBeforeScroll = await body.evaluate((el) => el.scrollHeight - el.clientHeight);
+    expect(overflowBeforeScroll).toBeGreaterThan(200);
+
+    await body.evaluate((el) => { el.scrollTop = 0; });
+    expect(await body.evaluate((el) => el.scrollTop)).toBe(0);
+
+    // Let the remaining frames — including the >60px BIG_FRAME hop — land
+    // while scrolled away, and confirm the stream is still genuinely live
+    // (not settled) at the point of measurement.
+    await page.waitForFunction((marker) => {
+      const el = document.querySelector('[data-prompt-body]');
+      return !!el && el.textContent.includes(marker);
+    }, BIG_FRAME_LAST_MARKER, { polling: 'raf', timeout: 5000 });
+    await expect(container).toHaveClass(/streaming/);
+
+    expect(await body.evaluate((el) => el.scrollTop)).toBe(0);
+
+    await expect(container).not.toHaveClass(/streaming/, { timeout: 5000 });
+    expect(pageErrors).toEqual([]);
+  });
+});
