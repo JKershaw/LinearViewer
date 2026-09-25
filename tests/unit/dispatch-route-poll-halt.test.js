@@ -48,6 +48,13 @@ function buildApp({ workspaceHaltStore, haltReadTimeoutMs, pollAvailable, urlKey
   return app;
 }
 
+// Bounds the request itself so a handler that never responds (e.g. the
+// halt-read timeout being removed) fails the calling test promptly and by
+// name instead of hanging the whole unit-test run. `closeAllConnections()`
+// then lets the listening server close immediately rather than `close()`
+// waiting forever on that same still-open connection.
+const CALL_TIMEOUT_MS = 5000;
+
 async function call(app, token = TOKEN) {
   const server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
@@ -56,12 +63,16 @@ async function call(app, token = TOKEN) {
     const headers = {};
     if (token !== undefined) headers.Authorization = `Bearer ${token}`;
     const started = Date.now();
-    const res = await fetch(`http://127.0.0.1:${port}${PATH}`, { headers });
+    const res = await fetch(`http://127.0.0.1:${port}${PATH}`, {
+      headers,
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS)
+    });
     const elapsedMs = Date.now() - started;
     const text = await res.text();
     let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
     return { status: res.status, body: parsed, text, elapsedMs };
   } finally {
+    server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
   }
 }
