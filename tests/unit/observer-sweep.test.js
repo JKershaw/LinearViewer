@@ -664,6 +664,66 @@ describe('observer-sweep: withdrawal discharge (LIN-2891/LIN-3036 Surface 6)', (
     );
   });
 
+  test('a withdrawn decision does NOT override supersession — a follow-up still wins (withdrawn sibling of the answered pin)', () => {
+    // LIN-3036 review L1: the answered side has this pin
+    // (`observer-sweep: an answered decision does NOT override supersession`);
+    // the withdrawn side needs its own. Withdrawal discharge must sit INSIDE the
+    // `!supersededIds.has(loopId)` guard exactly as the answered check does, so a
+    // superseded blocked row keeps its prior fall-through — never a
+    // newly-minted `resolved` (mutation M11 moves the check outside this guard
+    // and this test is the witness that dies).
+    const original = historyItem({
+      id: 'wz1', issueIdentifier: 'LIN-357', dispatchedAt: '2026-04-11T10:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
+        decisionFeedbackEntry('wdec-sup', '2026-04-11T10:06:00.000Z'),
+        withdrawalFeedbackEntry('wdec-sup', 'retracted before the follow-up', '2026-04-11T10:08:00.000Z')
+      ]
+    });
+    const followUp = historyItem({
+      id: 'wz2', issueIdentifier: 'LIN-357', followUpTo: 'wz1',
+      feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:40:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [original, followUp], now: NOW, lean: true });
+    const loopZ = loops.find((l) => l.loopId === 'wz1');
+    assert.strictEqual(loopZ.wakeMarker, 'blocked', 'sanity: the blocked marker is present');
+    assert.strictEqual(loopZ.withdrawal?.decisionId, 'wdec-sup', 'sanity: the row is withdrawn too');
+    assert.strictEqual(isDecisionWithdrawn(loopZ), true, 'sanity: the item-scoped predicate reads true');
+    const superseded = computeSupersededLoopIds(loops);
+    assert.ok(superseded.has('wz1'), 'sanity: and a follow-up names it');
+
+    const lane = classifyLoop(loopZ, { superseded, now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(
+      lane, 'silent',
+      'supersession keeps its prior path — a withdrawn decision only clears blocked when nothing supersedes it'
+    );
+    assert.notStrictEqual(lane, 'resolved', 'a superseded withdrawn row must never be newly minted resolved');
+  });
+
+  test('a withdrawal on a NON-blocked lifecycle does not force resolved — the discharge is scoped to the blocked lane', () => {
+    // LIN-3036 review L1: withdrawal only discharges the blocked lane. A fresh
+    // active row that happens to carry a matching decision + withdrawal must
+    // keep its own lifecycle lane (mutation M12 hoists a `resolved` return for
+    // ANY lifecycle above the blocked branch, and this test is the witness).
+    const hist = historyItem({
+      id: 'w-working', issueIdentifier: 'LIN-358', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        decisionFeedbackEntry('wdec-working', '2026-04-11T11:52:00.000Z'),
+        withdrawalFeedbackEntry('wdec-working', 'retracted', '2026-04-11T11:53:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.wakeMarker, null, 'sanity: no blocked marker — the lifecycle is not blocked');
+    assert.notStrictEqual(loop.agentState, 'waiting', 'sanity: the agent-status channel is not blocked either');
+    assert.strictEqual(loop.decision.decision_id, 'wdec-working', 'sanity: the decision derives onto the lean loop');
+    assert.strictEqual(isDecisionWithdrawn(loop), true, 'sanity: the withdrawal predicate is true on this loop');
+
+    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'working', 'a fresh active row stays working — withdrawal only discharges the blocked lane');
+    assert.notStrictEqual(lane, 'resolved', 'a withdrawal on a non-blocked lifecycle must not force resolved');
+  });
+
   test('caller 1 — buildSweepPayload: a withdrawn blocked row leaves lanes.blocked AND attention, the open row stays', () => {
     const withdrawn = historyItem({
       id: 'w-census', issueIdentifier: 'LIN-354', dispatchedAt: '2026-04-11T11:55:00.000Z',
