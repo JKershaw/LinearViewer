@@ -178,7 +178,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null }) {
   const router = Router();
 
   // =========================================================================
@@ -1720,6 +1720,29 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
     }
 
+    // LIN-2891/LIN-3035: kind:'decision-withdrawn' carries its own required
+    // shape — `message` must be JSON `{decision_id, reason}`, both non-empty
+    // (trimmed) strings — validated HERE, immediately before the sole
+    // production addFeedback call below, so a malformed payload returns 400
+    // instead of silently landing kind-less (the merge-order hazard the
+    // `:100` sanitize test guards for every OTHER unrecognized/rejected kind).
+    if (sanitizedKind === 'decision-withdrawn') {
+      let parsedWithdrawal;
+      try {
+        parsedWithdrawal = JSON.parse(message);
+      } catch {
+        return badRequest.json(res, 'message must be valid JSON for kind:"decision-withdrawn"');
+      }
+      const decisionId = parsedWithdrawal?.decision_id;
+      const reason = parsedWithdrawal?.reason;
+      if (
+        typeof decisionId !== 'string' || decisionId.trim().length === 0 ||
+        typeof reason !== 'string' || reason.trim().length === 0
+      ) {
+        return badRequest.json(res, 'kind:"decision-withdrawn" requires a non-empty decision_id and reason');
+      }
+    }
+
     try {
       const result = await dispatchQueueStore.addFeedback(
         itemId,
@@ -1732,6 +1755,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (!result) {
         return notFound.json(res, 'Item not found or feedback not allowed');
       }
+
+      sessionsFeedCache?.clear(req.dispatchUrlKey);
 
       res.json(result);
     } catch (err) {

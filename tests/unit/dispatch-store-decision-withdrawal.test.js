@@ -1,0 +1,258 @@
+/**
+ * Unit tests for `'decision-withdrawn'`'s FEEDBACK_ENTRY_KINDS membership and
+ * DispatchQueueStore#markDecisionWithdrawalReversed (LIN-2891/LIN-3035).
+ *
+ * markDecisionWithdrawalReversed is deliberately NOT addFeedback, and not a
+ * copy of markDecisionAnswered either: it is the one decision-lifecycle
+ * transition gated behind a pre-write TERMINAL check
+ * (`_findDecisionWithdrawal`, lib/digest-feedback.js) — a never-withdrawn or
+ * already-reversed `decisionId` must return `null` with NO append — plus a
+ * NEW `{_id, urlKey, feedbackVersion}` CAS on the `$push` itself, because
+ * (unlike addFeedback/markDecisionAnswered, which only gate ownership) this
+ * write's correctness depends on the pre-check snapshot still holding at
+ * write time. `'decision-withdrawal-reversed'` is kept OUT of
+ * FEEDBACK_ENTRY_KINDS, exactly like `'decision-answer'`, so this store
+ * method is structurally the only write path — no token can ever reach it.
+ *
+ * Subtask C (LIN-3036) extends this same file with the two read-side
+ * adversarial cases.
+ */
+process.env.NODE_ENV = 'test';
+
+import { test, describe, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { MongoClient } from 'mongodb';
+import { createMockCollection } from '../fixtures/mock-collection.js';
+import { DispatchQueueStore, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
+import { _findDecisionWithdrawal } from '../../lib/digest-feedback.js';
+
+const URL_KEY = 'acme';
+
+describe('FEEDBACK_ENTRY_KINDS membership (LIN-2891/LIN-3035)', () => {
+  test('decision-withdrawn IS a member — the runner-facing sanitizer (routes/dispatch.js) must accept it', () => {
+    assert.ok(FEEDBACK_ENTRY_KINDS.includes('decision-withdrawn'));
+  });
+
+  test('decision-withdrawal-reversed is NOT a member — session-auth-only, structurally like decision-answer', () => {
+    assert.ok(!FEEDBACK_ENTRY_KINDS.includes('decision-withdrawal-reversed'));
+  });
+});
+
+// ─── Mock-store behavior ────────────────────────────────────────────────────
+
+function makeStore() {
+  const collection = createMockCollection();
+  const historyCollection = createMockCollection();
+  const store = new DispatchQueueStore({ collection, historyCollection });
+  return { store, collection, historyCollection };
+}
+
+async function withdrawnItem(store, { decisionId = 'd-1', reason = 'superseded by LIN-99' } = {}) {
+  const item = await store.addItem(URL_KEY, {
+    prompt: 'do the thing',
+    kind: 'implementation',
+    issueIdentifier: 'LIN-42'
+  });
+  await store.takeItem(item._id, URL_KEY, 'token-a');
+  await store.addFeedback(
+    item._id,
+    URL_KEY,
+    { message: JSON.stringify({ decision_id: decisionId, reason }), kind: 'decision-withdrawn' },
+    'token-a'
+  );
+  return item;
+}
+
+describe('DispatchQueueStore#markDecisionWithdrawalReversed', () => {
+  test('success: appends a terminal decision-withdrawal-reversed entry and the withdrawal no longer reads as live', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+
+    const result = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-1');
+    assert.deepEqual(result, { success: true, feedbackCount: 2 });
+
+    const stored = await historyCollection.findOne({ _id: item._id });
+    const reversal = stored.feedback.find(e => e.kind === 'decision-withdrawal-reversed');
+    assert.ok(reversal, 'a decision-withdrawal-reversed entry must be appended');
+    assert.deepEqual(JSON.parse(reversal.message), { decision_id: 'd-1' });
+    assert.equal(stored.feedbackVersion, 2, 'feedbackVersion must $inc alongside the $push, same as addFeedback/markDecisionAnswered');
+    assert.equal(_findDecisionWithdrawal(stored.feedback), null, 'the withdrawal must no longer read as live after reversal');
+  });
+
+  test('never-withdrawn: an unrelated decisionId returns null, no append', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await store.addItem(URL_KEY, { prompt: 'do the thing', kind: 'implementation', issueIdentifier: 'LIN-42' });
+    await store.takeItem(item._id, URL_KEY, 'token-a');
+
+    const result = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'never-withdrawn');
+    assert.equal(result, null);
+
+    const stored = await historyCollection.findOne({ _id: item._id });
+    assert.equal((stored.feedback || []).length, 0, 'no entry must be appended for a decisionId that was never withdrawn');
+  });
+
+  test('already-reversed: a second reversal of the same decisionId returns null, with no second entry appended', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+
+    const first = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-1');
+    assert.equal(first.success, true, 'sanity: the first reversal must succeed');
+
+    const second = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-1');
+    assert.equal(second, null, 'reversing an already-reversed withdrawal must return null');
+
+    const stored = await historyCollection.findOne({ _id: item._id });
+    const reversals = stored.feedback.filter(e => e.kind === 'decision-withdrawal-reversed');
+    assert.equal(reversals.length, 1, 'no second reversal entry must be appended');
+  });
+
+  test('wrong urlKey: returns null, no append (cross-workspace isolation)', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+
+    const result = await store.markDecisionWithdrawalReversed(item._id, 'someone-elses-workspace', 'd-1');
+    assert.equal(result, null);
+
+    const stored = await historyCollection.findOne({ _id: item._id });
+    assert.equal(stored.feedback.filter(e => e.kind === 'decision-withdrawal-reversed').length, 0);
+  });
+
+  // Deterministic (non-timing-dependent) proof of the CAS guard's actual
+  // job: a write that lands between the pre-check read and the $push must
+  // invalidate the stale snapshot, so this call returns null rather than
+  // blindly appending a reversal onto a doc that has moved on. The genuinely
+  // concurrent version of this property is proven against real MongoDB below
+  // (mock findOneAndUpdate calls are atomic by construction, so a real race
+  // there would pass vacuously — see mongo-smoke.test.js's header for the
+  // same reasoning applied to addFeedback).
+  test('a write landing between the pre-check read and the CAS causes the reversal to lose the race and return null', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+
+    const originalFindOne = historyCollection.findOne.bind(historyCollection);
+    let interleaved = false;
+    historyCollection.findOne = async (query) => {
+      const doc = await originalFindOne(query);
+      if (!interleaved && query._id === item._id && !('feedbackVersion' in query)) {
+        // This is markDecisionWithdrawalReversed's PRE-CHECK read (its only
+        // findOne call keyed on {_id, urlKey}). Land a concurrent write here,
+        // between that read and the CAS $push below, bumping feedbackVersion
+        // out from under the snapshot just read.
+        interleaved = true;
+        await store.addFeedback(item._id, URL_KEY, { message: 'a concurrent heartbeat' }, 'token-a');
+      }
+      return doc;
+    };
+
+    const result = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-1');
+    assert.equal(result, null, 'a lost CAS must return null, never blindly append onto a stale snapshot');
+
+    const stored = await originalFindOne({ _id: item._id });
+    assert.equal(
+      stored.feedback.filter(e => e.kind === 'decision-withdrawal-reversed').length,
+      0,
+      'no reversal entry must be appended when the CAS is lost'
+    );
+  });
+});
+
+// ─── Real-MongoDB race safety (the CAS) ────────────────────────────────────
+//
+// Mirrors mongo-smoke.test.js's guard exactly (LIN-1337): a mock's
+// findOneAndUpdate is a single-body-per-call atomic operation by
+// construction, so it cannot reproduce the interleavings a real engine can.
+// This is session-fit catch #2 for LIN-3035 — the whole terminal-reversal
+// property depends on this CAS actually holding under concurrent writers on
+// real MongoDB, not merely on the mock.
+const MONGO_URI = process.env.MONGODB_TEST_URI;
+if (!MONGO_URI && process.env.CI) {
+  throw new Error(
+    'MONGODB_TEST_URI must be set in CI: the decision-withdrawal-reversed CAS race test must never silently skip'
+  );
+}
+
+describe(
+  'markDecisionWithdrawalReversed: CAS race safety (real MongoDB)',
+  { skip: MONGO_URI ? false : 'MONGODB_TEST_URI not set; skipping real-Mongo race test (local dev)' },
+  () => {
+    let client;
+    let db;
+    let counter = 0;
+
+    before(async () => {
+      client = new MongoClient(MONGO_URI);
+      await client.connect();
+      db = client.db(`lin3035_withdrawal_${randomUUID().slice(0, 8)}`);
+    });
+
+    after(async () => {
+      if (db) await db.dropDatabase();
+      if (client) await client.close();
+    });
+
+    function freshStore(name) {
+      return new DispatchQueueStore({
+        collection: db.collection(`${name}-queue-${counter++}`),
+        historyCollection: db.collection(`${name}-history-${counter++}`)
+      });
+    }
+
+    test('20 concurrent reversal attempts for one live withdrawal: exactly one wins, exactly one reversal entry lands', async () => {
+      const store = freshStore('race');
+      const item = await store.addItem(URL_KEY, {
+        prompt: 'do the thing',
+        kind: 'implementation',
+        issueIdentifier: 'LIN-42'
+      });
+      await store.takeItem(item._id, URL_KEY, 'token-a');
+      await store.addFeedback(
+        item._id,
+        URL_KEY,
+        { message: JSON.stringify({ decision_id: 'd-1', reason: 'superseded' }), kind: 'decision-withdrawn' },
+        'token-a'
+      );
+
+      const N = 20;
+      const results = await Promise.all(
+        Array.from({ length: N }, () => store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-1'))
+      );
+
+      const successes = results.filter((r) => r && r.success);
+      assert.strictEqual(successes.length, 1, `exactly one of ${N} concurrent reversal attempts must win the CAS on real MongoDB`);
+
+      const stored = await store.historyCollection.findOne({ _id: item._id });
+      const reversals = (stored.feedback || []).filter((e) => e.kind === 'decision-withdrawal-reversed');
+      assert.strictEqual(reversals.length, 1, 'exactly one reversal entry must be appended on real MongoDB, never a duplicate');
+    });
+
+    // A legacy row predates LIN-3009's feedbackVersion $inc and so has no
+    // feedbackVersion field at all. The CAS filter reads
+    // `{ _id, urlKey, feedbackVersion: doc.feedbackVersion }`, i.e.
+    // `feedbackVersion: undefined` for such a row — this must still match
+    // the absent field on real MongoDB (the driver sends `undefined` as
+    // `null`, which matches "missing" with no `ignoreUndefined` set).
+    test('a legacy row with no feedbackVersion field still reverses correctly on real MongoDB', async () => {
+      const store = freshStore('legacy');
+      const itemId = randomUUID();
+      await store.historyCollection.insertOne({
+        _id: itemId,
+        urlKey: URL_KEY,
+        status: 'taken',
+        takenByTokenLabel: 'token-a',
+        feedback: [
+          { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'legacy row' }), timestamp: new Date() }
+        ]
+      });
+
+      const result = await store.markDecisionWithdrawalReversed(itemId, URL_KEY, 'd-1');
+      assert.ok(result && result.success, 'a legacy row missing feedbackVersion must still satisfy the CAS filter');
+
+      const stored = await store.historyCollection.findOne({ _id: itemId });
+      assert.strictEqual(
+        stored.feedback.filter((e) => e.kind === 'decision-withdrawal-reversed').length,
+        1
+      );
+    });
+  }
+);
