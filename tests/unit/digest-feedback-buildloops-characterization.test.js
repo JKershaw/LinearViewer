@@ -38,6 +38,12 @@
  * LIN-3022 (LIN-2991 Surface 2, §1) update: the golden loop now also carries
  * `answeredDecisions` (the set-derived sibling of `answeredDecisionId`), so
  * both this and the lean-derived variant below gained that field.
+ *
+ * LIN-2891 (LIN-3034) update: the golden loop now also carries `withdrawal`
+ * (item-scoped decision-withdrawal, derived by `_findDecisionWithdrawal` in
+ * lib/digest-feedback.js). Purely additive — the fixture has no
+ * `decision-withdrawn` entry, so `null` is the correct derived value for both
+ * the non-lean and lean-derived variants; no existing assertion loosens.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -135,6 +141,7 @@ const EXPECTED_GOLDEN_LOOP = {
   answeredDecisions: [
     { decisionId: 'd-1', raisedAt: at(32), resolvedAt: at(40), outcome: 'answered' }
   ],
+  withdrawal: null,
   source: 'history',
   historyStatus: 'done',
   bookkeeping: null,

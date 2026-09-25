@@ -231,11 +231,14 @@
 
       for (var j = 0; j < entries.length; j++) {
         var entry = entries[j];
-        // LIN-1728 Phase 2 (Revision 3, F6): a `decision-answer` stamp is
-        // answer metadata, not a chat turn — it must never render as a bare
-        // `{"decision_id":...}` agent bubble. `entry.kind` rides the encoded
-        // JSON per LIN-2184 (lib/render-session.js's encodeFeedbackJSON).
-        if (entry.kind === 'decision-answer') continue;
+        // LIN-1728 Phase 2 (Revision 3, F6) / LIN-3037: a decision-lifecycle
+        // stamp (decision-answer, decision-withdrawn,
+        // decision-withdrawal-reversed) is answer/withdrawal metadata, not a
+        // chat turn — it must never render as a bare `{"decision_id":...}`
+        // agent bubble (or a withdrawal's raw `reason` text). `entry.kind`
+        // rides the encoded JSON per LIN-2184 (lib/render-session.js's
+        // encodeFeedbackJSON).
+        if (entry.kind === 'decision-answer' || entry.kind === 'decision-withdrawn' || entry.kind === 'decision-withdrawal-reversed') continue;
         var messageHtml = typeof window.renderMarkdown === 'function'
           ? window.renderMarkdown(entry.message || '', { breaks: true })
           : window.escapeHtml(entry.message || '');

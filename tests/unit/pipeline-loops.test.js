@@ -1650,6 +1650,59 @@ describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2,
   });
 });
 
+// LIN-2891 (LIN-3034) Surface 2: `withdrawal` has NO legacy scalar predecessor
+// (unlike `answeredDecisions` above) — a pre-ship digest with no `withdrawal`
+// key at all must read as `null`, not be synthesized from anything else.
+describe('withdrawal (LIN-2891/LIN-3034 Surface 2): lean path via _loopFactsFromDigest', () => {
+  test('no-digest default: a queued live item (no feedbackDigest at all) reports withdrawal: null', async () => {
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const stores = makeLeanDigestStores({
+      liveItems: [liveItem({ id: 'live-w1', dispatchedAt })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const loop = loops.find(l => l.loopId === 'live-w1');
+    assert.ok(loop, 'the live loop is present');
+    assert.strictEqual(loop.withdrawal, null);
+  });
+
+  test('a digest carrying withdrawal is passed through unchanged', async () => {
+    const digest = {
+      version: 5,
+      terminal: null, wake: null, decision: { decision_id: 'd-1', question: 'ship?' }, decisionEntryIndex: 0, decisionCase: [],
+      answeredDecisionId: null,
+      answeredDecisions: [],
+      withdrawal: { decisionId: 'd-1', reason: 'no longer needed', timestamp: digestIso(HOUR) },
+      parkedWait: null,
+      telemetry: { runtime: {}, metrics: [], toolPeak: null }
+    };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: digest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops.length, 1);
+    assert.deepStrictEqual(loops[0].withdrawal, { decisionId: 'd-1', reason: 'no longer needed', timestamp: digestIso(HOUR) });
+  });
+
+  test('a pre-ship digest with no withdrawal key at all reads as null — no synthesis (unlike answeredDecisions)', async () => {
+    const preShipDigest = {
+      version: 5,
+      terminal: null, wake: null, decision: null, decisionEntryIndex: -1, decisionCase: [],
+      answeredDecisionId: null,
+      answeredDecisions: [],
+      // No `withdrawal` key at all — this is the pre-this-change shape.
+      parkedWait: null,
+      telemetry: { runtime: {}, metrics: [], toolPeak: null }
+    };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: preShipDigest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops[0].withdrawal, null, 'a keyless pre-ship digest must read as null, never synthesized');
+  });
+});
+
 describe("abort harvest sourced from the abort row's own feedbackDigest.terminal (LIN-3011)", () => {
   function abortRow(overrides = {}) {
     return leanDigestItem({
@@ -2524,6 +2577,55 @@ describe('_buildLoops: answeredDecisionId derivation end-to-end (LIN-1728)', () 
     const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
     assert.strictEqual(lean.answeredDecisionId, full.answeredDecisionId);
     assert.strictEqual(lean.answeredDecisionId, 'd-1');
+  });
+});
+
+// LIN-2891/LIN-3034: withdrawal derivation, mirroring the answeredDecisionId
+// end-to-end idiom directly above — the lean/non-lean equivalence rule
+// (LIN-3008/LIN-3011/LIN-3022) applies to `withdrawal` the same as any other
+// field, and the characterization golden / mongo-smoke W1 fixtures only ever
+// exercise the null case, so this is the sole coverage of a LIVE withdrawal
+// flowing end-to-end through `_buildLoops` on both paths.
+describe('_buildLoops: withdrawal derivation end-to-end (LIN-2891/LIN-3034)', () => {
+  test('a loop with no withdrawal stamp derives withdrawal: null', () => {
+    const feedback = [decisionEntry(FULL_DECISION_PAYLOAD, 't1')];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.strictEqual(loop.withdrawal, null);
+    assert.ok('withdrawal' in loop, 'key must be present, never omitted');
+  });
+
+  test('non-lean carries a live withdrawal derived from a decision-withdrawn entry', () => {
+    const feedback = [
+      decisionEntry(FULL_DECISION_PAYLOAD, 't1'),
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'moot' }), timestamp: 't2' }
+    ];
+    const loop = _buildLoops({ historyItems: [historyItem({ feedback })], now: NOW })[0];
+    assert.deepStrictEqual(loop.withdrawal, { decisionId: 'd-1', reason: 'moot', timestamp: 't2' });
+  });
+
+  test('lean/non-lean parity: withdrawal is identical on both paths when a live withdrawal is present', () => {
+    const feedback = [
+      decisionEntry(FULL_DECISION_PAYLOAD, 't1'),
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'moot' }), timestamp: 't2' }
+    ];
+    const hist = historyItem({ feedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+    assert.deepStrictEqual(lean.withdrawal, full.withdrawal);
+    assert.deepStrictEqual(lean.withdrawal, { decisionId: 'd-1', reason: 'moot', timestamp: 't2' });
+  });
+
+  test('lean/non-lean parity: a reversed withdrawal derives withdrawal: null end-to-end on both paths', () => {
+    const feedback = [
+      decisionEntry(FULL_DECISION_PAYLOAD, 't1'),
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'moot' }), timestamp: 't2' },
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: 't3' }
+    ];
+    const hist = historyItem({ feedback });
+    const full = _buildLoops({ historyItems: [hist], now: NOW })[0];
+    const lean = _buildLoops({ historyItems: [hist], now: NOW, lean: true })[0];
+    assert.strictEqual(full.withdrawal, null);
+    assert.strictEqual(lean.withdrawal, null);
   });
 });
 

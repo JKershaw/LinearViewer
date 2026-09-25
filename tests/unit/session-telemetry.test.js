@@ -258,6 +258,60 @@ describe('parseParkedWait (LIN-2244)', () => {
     assert.equal(parseParkedWait(undefined), null);
     assert.equal(parseParkedWait([]), null);
   });
+
+  // LIN-3037: a decision-lifecycle stamp must not decide "currently" (it
+  // can't be the entry that reports parked) and must not break the backward
+  // walk when it sits inside a parked run.
+  test('a decision-withdrawn stamp AFTER the real latest parked entry does not mask it — the latest NON-STAMP entry decides', () => {
+    const feedback = [
+      { message: '[working] 6 tools/32s · alive', timestamp: 't1' },
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't2' },
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' }), timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't2', latest: 't2' });
+  });
+
+  test('a decision-withdrawal-reversed stamp as the LAST entry does not mask a parked wait — the latest non-stamp entry decides', () => {
+    const feedback = [
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
+  test('a decision-withdrawn stamp in the MIDDLE of a parked run is passed over without breaking the run', () => {
+    const feedback = [
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated, re-scope needed' }), timestamp: 't2' },
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't3' });
+  });
+
+  test('a stamp in the middle still respects a genuine non-stamp break in the parked run', () => {
+    const feedback = [
+      { message: '[working] 6 tools/32s · alive', timestamp: 't1' }, // real progress — breaks the run
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' }), timestamp: 't2' },
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3' });
+  });
+
+  test('a run of ONLY stamps before the parked entry yields since === latest (no earlier non-stamp parked entry)', () => {
+    const feedback = [
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' }), timestamp: 't1' },
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: 't2' },
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't3' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't3', latest: 't3' });
+  });
+
+  test('all-stamp feedback (no non-stamp entry at all) returns null', () => {
+    const feedback = [
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' }), timestamp: 't1' },
+    ];
+    assert.equal(parseParkedWait(feedback), null);
+  });
 });
 
 describe('parseModel', () => {
@@ -1095,6 +1149,41 @@ describe('parseHeartbeats — decision-prose collision (LIN-2182)', () => {
     const metrics = parseHeartbeats(feedback);
     assert.equal(metrics.length, 1);
     assert.equal(metrics[0].toolCount, 4);
+  });
+});
+
+describe('parseHeartbeats — decision-lifecycle stamp exclusion (LIN-3037)', () => {
+  // A withdrawal's free-text `reason` can incidentally match HEARTBEAT_HINT
+  // the same way decision prose can (LIN-2182 above) — must mint no phantom
+  // heartbeat metric.
+  test('a decision-withdrawn reason phrased as "N tools in ..." mints no phantom heartbeat', () => {
+    const feedback = [
+      {
+        kind: 'decision-withdrawn',
+        message: JSON.stringify({ decision_id: 'd-1', reason: 'batch 3 tools in one turn, revisit later' }),
+      },
+    ];
+    assert.deepEqual(parseHeartbeats(feedback), []);
+  });
+
+  test('a decision-withdrawal-reversed entry mints no phantom heartbeat', () => {
+    const feedback = [
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }) },
+    ];
+    assert.deepEqual(parseHeartbeats(feedback), []);
+  });
+
+  test('a real heartbeat in the same feedback array still parses — the exclusion is scoped to the 3 stamp kinds', () => {
+    const feedback = [
+      { kind: 'heartbeat', message: '[working] 6 tools in 32s: Bash×6 · 6 total' },
+      {
+        kind: 'decision-withdrawn',
+        message: JSON.stringify({ decision_id: 'd-1', reason: 'batch 3 tools in one turn?' }),
+      },
+    ];
+    const metrics = parseHeartbeats(feedback);
+    assert.equal(metrics.length, 1);
+    assert.equal(metrics[0].toolCount, 6);
   });
 });
 

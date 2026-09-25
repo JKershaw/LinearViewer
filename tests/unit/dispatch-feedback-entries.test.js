@@ -61,6 +61,31 @@ test('renderFeedbackEntries returns empty string when only a decision-answer ent
   assert.equal(html, '');
 });
 
+test('renderFeedbackEntries excludes a decision-withdrawn entry, keeping real feedback lines (LIN-3037)', () => {
+  const sandbox = makeSandbox();
+  const html = sandbox.renderFeedbackEntries([
+    { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+    { kind: 'decision-withdrawn', message: '{"decision_id":"d-1","reason":"scheduled wakeup, re-raise later"}', timestamp: '2026-08-01T00:01:00.000Z' },
+    { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+  ]);
+  assert.ok(html.includes('a real feedback line'));
+  assert.ok(html.includes('another real line'));
+  assert.ok(!html.includes('decision_id'), 'the stamp never renders as a bare JSON line');
+  assert.ok(!html.includes('scheduled wakeup'), 'the withdrawal reason never renders');
+});
+
+test('renderFeedbackEntries excludes a decision-withdrawal-reversed entry, keeping real feedback lines (LIN-3037)', () => {
+  const sandbox = makeSandbox();
+  const html = sandbox.renderFeedbackEntries([
+    { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+    { kind: 'decision-withdrawal-reversed', message: '{"decision_id":"d-1"}', timestamp: '2026-08-01T00:01:00.000Z' },
+    { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+  ]);
+  assert.ok(html.includes('a real feedback line'));
+  assert.ok(html.includes('another real line'));
+  assert.ok(!html.includes('decision_id'), 'the stamp never renders as a bare JSON line');
+});
+
 test('renderFeedbackEntries is unchanged for feedback with no decision-answer entries (regression pin)', () => {
   const sandbox = makeSandbox();
   const html = sandbox.renderFeedbackEntries([

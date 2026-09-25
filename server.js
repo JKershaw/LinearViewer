@@ -2015,7 +2015,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache }))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions

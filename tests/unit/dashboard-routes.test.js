@@ -841,6 +841,181 @@ describe('POST /api/dashboard/rulings/dismiss (LIN-2225)', () => {
   });
 });
 
+describe('POST /api/dashboard/rulings/reverse-withdrawal (LIN-2891/LIN-3035)', () => {
+  const REVERSE_PATH = '/workspace/:urlKey/api/dashboard/rulings/reverse-withdrawal';
+
+  function makeReverseWithdrawalRouter(dispatchQueueStoreOverrides = {}, extra = {}) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { return { items: [] }; },
+        ...dispatchQueueStoreOverrides
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      ...extra
+    });
+  }
+
+  test('stamps markDecisionWithdrawalReversed on the ruling\'s own workspace and reports success', async () => {
+    const calls = [];
+    const router = makeReverseWithdrawalRouter({
+      async markDecisionWithdrawalReversed(itemId, urlKey, decisionId) {
+        calls.push({ itemId, urlKey, decisionId });
+        return { success: true, feedbackCount: 2 };
+      }
+    });
+    const handler = getHandler(router, 'post', REVERSE_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.jsonBody, { success: true });
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], { itemId: 'loop-1', urlKey: 'ws-a', decisionId: 'd-1' });
+  });
+
+  test('400 when decisionLoopId or decisionId is missing — never a half-reversal attempt', async () => {
+    let called = false;
+    const router = makeReverseWithdrawalRouter({ async markDecisionWithdrawalReversed() { called = true; return { success: true }; } });
+    const handler = getHandler(router, 'post', REVERSE_PATH);
+
+    const missingDecisionId = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    missingDecisionId.req.body = { decisionLoopId: 'loop-1' };
+    await handler(missingDecisionId.req, missingDecisionId.res);
+    assert.equal(missingDecisionId.res.statusCode, 400);
+
+    const missingLoopId = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    missingLoopId.req.body = { decisionId: 'd-1' };
+    await handler(missingLoopId.req, missingLoopId.res);
+    assert.equal(missingLoopId.res.statusCode, 400);
+
+    assert.equal(called, false, 'markDecisionWithdrawalReversed must never be called on a partial payload');
+  });
+
+  test('404 when there is nothing to reverse (never-withdrawn or already-reversed)', async () => {
+    const router = makeReverseWithdrawalRouter({ async markDecisionWithdrawalReversed() { return null; } });
+    const handler = getHandler(router, 'post', REVERSE_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 404);
+  });
+
+  test('500 when the store throws, never propagates the raw error', async () => {
+    const router = makeReverseWithdrawalRouter({ async markDecisionWithdrawalReversed() { throw new Error('store down'); } });
+    const handler = getHandler(router, 'post', REVERSE_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 500);
+  });
+
+  test('a successful reversal clears sessionsFeedCache for this urlKey; a 404 does not (LIN-2755 pattern)', async () => {
+    const cleared = [];
+    const sessionsFeedCache = { clear: (urlKey) => cleared.push(urlKey), get: async (key, fn) => fn(), keyFor: () => 'k' };
+
+    const router = makeReverseWithdrawalRouter(
+      { async markDecisionWithdrawalReversed() { return { success: true, feedbackCount: 2 }; } },
+      { sessionsFeedCache }
+    );
+    const handler = getHandler(router, 'post', REVERSE_PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(cleared, ['ws-a']);
+
+    cleared.length = 0;
+    const router404 = makeReverseWithdrawalRouter(
+      { async markDecisionWithdrawalReversed() { return null; } },
+      { sessionsFeedCache }
+    );
+    const handler404 = getHandler(router404, 'post', REVERSE_PATH);
+    const attempt = makeReqRes({ workspace: { urlKey: 'ws-a' } });
+    attempt.req.body = { decisionLoopId: 'loop-1', decisionId: 'd-1' };
+    await handler404(attempt.req, attempt.res);
+    assert.equal(attempt.res.statusCode, 404);
+    assert.deepEqual(cleared, [], 'a 404 (nothing reversed) must never invalidate the cache');
+  });
+
+  // Every other test in this describe block bypasses workspaceFromUrl
+  // entirely (getHandler only ever extracts the route's LAST stack entry —
+  // see the helper's own comment above). This route's whole point is that
+  // it is reachable ONLY through session auth, so this test drives the
+  // route's FULL middleware stack instead, with a session-shaped stub that
+  // mirrors the real contract (401 with no session; Authorization is never
+  // read) — the approach LIN-3035's own research recorded as covering this
+  // without a new shared seam (workspaceFromUrl itself is not exported from
+  // server.js).
+  test('mounted under workspaceFromUrl: a runner (Bearer) token alone, with no session, is blocked (401), and the store is never called', async () => {
+    let storeCalled = false;
+    const sessionOnlyMiddleware = (req, res, next) => {
+      if (!req.session || !Array.isArray(req.session.workspaces)) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      req.workspace = { urlKey: req.params.urlKey };
+      next();
+    };
+    const router = createDashboardRoutes({
+      workspaceFromUrl: sessionOnlyMiddleware,
+      dispatchQueueStore: {
+        async listItems() { return []; },
+        async listHistory() { return { items: [] }; },
+        async markDecisionWithdrawalReversed() { storeCalled = true; return { success: true, feedbackCount: 2 }; }
+      },
+      agentStatusStore: { async listStatus() { return { items: [] }; } },
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+
+    const layer = router.stack.find(l => l.route?.path === REVERSE_PATH && l.route.methods.post);
+    assert.ok(layer, 'the route must be registered');
+    assert.ok(
+      layer.route.stack.some(s => s.handle === sessionOnlyMiddleware),
+      'the route must be mounted under the injected workspaceFromUrl middleware, by identity'
+    );
+
+    const req = {
+      params: { urlKey: 'ws-a' },
+      body: { decisionLoopId: 'loop-1', decisionId: 'd-1' },
+      headers: { authorization: 'Bearer some-runner-token' },
+      session: null
+    };
+    let statusCode = null;
+    let jsonBody = null;
+    const res = {
+      status(code) { statusCode = code; return this; },
+      json(body) { jsonBody = body; return this; }
+    };
+
+    const stack = layer.route.stack;
+    let idx = 0;
+    const runNext = (err) => {
+      if (err || idx >= stack.length) return;
+      const mw = stack[idx++];
+      mw.handle(req, res, runNext);
+    };
+    runNext();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(statusCode, 401, 'a Bearer header with no session must be blocked, never reach the handler');
+    assert.deepEqual(jsonBody, { error: 'Unauthorized' });
+    assert.equal(storeCalled, false, 'markDecisionWithdrawalReversed must never be invoked for a request the session gate rejected');
+  });
+});
+
 describe('POST /api/dashboard/rulings/answer (LIN-2754 Track B)', () => {
   function makeAnswerRouter(taskDecisionsStore) {
     return createDashboardRoutes({
@@ -1338,6 +1513,67 @@ describe('GET /api/escalation-kpis (LIN-1736)', () => {
     assert.equal(body.unansweredAge.count, 1);
     assert.equal(body.unansweredAge.staleCount, 0, 'a 2h-old ruling is not stale under the 24h default threshold');
     assert.equal(body.escalationRate.raisedInWindow, 2, 'both decisions were raised within the 30-day window');
+  });
+
+  // LIN-2891/LIN-3036 Rev 8: the named `computeWorkspaceEscalationKpis`
+  // INTERIM GAP, pinned here so it stays intentional and visible. A withdrawn
+  // decision drops out of `unansweredRows` (Surface 5's `resolved` exclusion)
+  // AND is NOT added to `resolvedEvents` (Surface 2 deliberately leaves
+  // `resolvedDecisionEvents` untouched), so it silently leaves `raisedInWindow`
+  // entirely — neither a live escalation nor a false one. This is the ACCEPTED
+  // interim behaviour, not a defect: it is safer than booking the row either
+  // way, and it has a direct precedent in the `'self-resolved'` early-`continue`
+  // bucket (lib/escalation-kpis.js:113-117). The proper third bucket is
+  // LIN-2895's own surface — do NOT implement it here.
+  test('LIN-3036 interim gap (owned by LIN-2895): a withdrawn decision is in NEITHER unansweredRows NOR resolvedEvents, so it drops out of raisedInWindow', async () => {
+    const raisedMs = Date.now() - 2 * 60 * 60 * 1000;
+    const ts = new Date(raisedMs).toISOString();
+    const withdrawnLoop = {
+      id: 'w-withdrawn', issueIdentifier: 'LIN-7', issueTitle: 'withdrawn', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: ts, resolvedAt: ts, status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: ts },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-withdrawn', question: 'Proceed?' }), timestamp: ts },
+        { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-withdrawn', reason: 'asker retracted it' }), timestamp: ts }
+      ]
+    };
+    const openLoop = {
+      id: 'w-open', issueIdentifier: 'LIN-8', issueTitle: 'open', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: ts, resolvedAt: ts, status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: ts },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-open', question: 'Proceed?' }), timestamp: ts }
+      ]
+    };
+
+    // Control: BEFORE the withdrawal lands, the same decision is unanswered and
+    // counts — so the drop asserted below is caused by the withdrawal, not by
+    // the fixture having never been counted in the first place.
+    const controlLoops = [
+      { ...withdrawnLoop, feedback: withdrawnLoop.feedback.filter((e) => e.kind !== 'decision-withdrawn') },
+      openLoop
+    ];
+    const controlRouter = makeKpiRouter({ 'ws-a': { live: [], history: controlLoops, agentStatus: [] } });
+    const controlHandler = getHandler(controlRouter, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const control = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await controlHandler(control.req, control.res);
+    assert.equal(control.res.jsonBody.unansweredAge.count, 2, 'control: without the withdrawal both decisions count as unanswered');
+    assert.equal(control.res.jsonBody.escalationRate.raisedInWindow, 2, 'control: both are raised in-window');
+
+    const router = makeKpiRouter({ 'ws-a': { live: [], history: [withdrawnLoop, openLoop], agentStatus: [] } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/escalation-kpis');
+    const { req, res } = makeReqRes({ session: { workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.unansweredAge.count, 1, 'only the still-open decision remains unanswered');
+    assert.equal(res.jsonBody.timeToResponse.count, 0, 'the withdrawn decision is NOT a resolved event — no duration is recorded');
+    assert.equal(res.jsonBody.falseEscalation.answered, 0, 'nor does it book as answered');
+    assert.equal(res.jsonBody.falseEscalation.dismissed, 0, 'nor dismissed');
+    assert.equal(
+      res.jsonBody.escalationRate.raisedInWindow, 1,
+      'INTERIM GAP (LIN-2895): the withdrawn decision leaves raisedInWindow entirely — neither unanswered nor resolved'
+    );
   });
 
   test('a dismissed decision counts toward falseEscalation.dismissed, not answered', async () => {

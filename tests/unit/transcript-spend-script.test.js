@@ -22,7 +22,7 @@ import { rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { classifyUpstreamError } from '../../lib/errors.js';
-import { proxy, computeCompleteness } from '../../scripts/transcript-spend.mjs';
+import { proxy, computeCompleteness, launchedPrefix } from '../../scripts/transcript-spend.mjs';
 
 const CACHE_DIR = join(tmpdir(), 'harbour-spend-cache');
 const uniquePath = (label) => `/${label}-${Math.floor(Math.random() * 1e9)}`;
@@ -90,5 +90,67 @@ describe('computeCompleteness (LIN-1984 review F7)', () => {
     const c = computeCompleteness({ attempted: 1, joined: 1, detailSkipped: [], transcriptSkipped: [{ sessionId: 'abc', reason: 'ENOENT' }] });
     assert.equal(c.complete, false);
     assert.equal(c.transcriptSkipped, 1);
+  });
+});
+
+describe('launchedPrefix (LIN-3037)', () => {
+  test('returns the 8hex prefix from the real launch line', () => {
+    const feedback = [
+      { message: '[working] Session launched (session: abc12345, tty: /dev/ttys004)' },
+    ];
+    assert.equal(launchedPrefix(feedback), 'abc12345');
+  });
+
+  test('first-match-wins is preserved when two real launch lines are present', () => {
+    const feedback = [
+      { message: '[working] Session launched (session: aaaa1111, tty: /dev/ttys004)' },
+      { message: '[working] Session launched (session: bbbb2222, tty: /dev/ttys005)' },
+    ];
+    assert.equal(launchedPrefix(feedback), 'aaaa1111');
+  });
+
+  test('no launch line at all returns null', () => {
+    assert.equal(launchedPrefix([{ message: 'unrelated' }]), null);
+    assert.equal(launchedPrefix([]), null);
+  });
+
+  // A decision-withdrawn stamp's free-text `reason` can incidentally contain
+  // a "Session launched (session: <hex>)"-shaped string — must never win the
+  // join key, even when it appears BEFORE the real launch line.
+  test('a decision-withdrawn stamp whose reason looks like a launch line, placed BEFORE the real one, does not win', () => {
+    const feedback = [
+      {
+        kind: 'decision-withdrawn',
+        message: JSON.stringify({
+          decision_id: 'd-1',
+          reason: 'copy-pasted from another run: Session launched (session: deadbeef, tty: /dev/ttys009)',
+        }),
+      },
+      { message: '[working] Session launched (session: cafe1234, tty: /dev/ttys004)' },
+    ];
+    assert.equal(launchedPrefix(feedback), 'cafe1234');
+  });
+
+  test('a decision-answer stamp whose message looks like a launch line does not win', () => {
+    const feedback = [
+      { kind: 'decision-answer', message: 'Session launched (session: facade00, tty: x)' },
+      { message: '[working] Session launched (session: cafe1234, tty: /dev/ttys004)' },
+    ];
+    assert.equal(launchedPrefix(feedback), 'cafe1234');
+  });
+
+  test('a decision-withdrawal-reversed stamp whose message looks like a launch line does not win', () => {
+    const feedback = [
+      { kind: 'decision-withdrawal-reversed', message: 'Session launched (session: facade00, tty: x)' },
+      { message: '[working] Session launched (session: cafe1234, tty: /dev/ttys004)' },
+    ];
+    assert.equal(launchedPrefix(feedback), 'cafe1234');
+  });
+
+  test('a stamp-only feedback list (no real launch line) still returns null', () => {
+    const feedback = [
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'Session launched (session: deadbeef, tty: x)' }) },
+    ];
+    assert.equal(launchedPrefix(feedback), null);
   });
 });

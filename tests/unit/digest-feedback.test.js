@@ -38,9 +38,11 @@ import { PULSE_MAX_WINDOW_MS } from '../../lib/live-console.js';
 // ── Guarded dynamic imports: the modules/exports under test, which do not ──
 // ── exist yet on this branch (TDD red). Each stays `null` until beat 3.   ──
 let digestFeedback = null;
+let _findDecisionWithdrawal = null;
+let isDecisionLifecycleStampEntry = null;
 let digestFeedbackImportError = null;
 try {
-  ({ digestFeedback } = await import('../../lib/digest-feedback.js'));
+  ({ digestFeedback, _findDecisionWithdrawal, isDecisionLifecycleStampEntry } = await import('../../lib/digest-feedback.js'));
 } catch (err) {
   digestFeedbackImportError = err;
 }
@@ -82,6 +84,12 @@ function textEntry(text, timestamp) {
 }
 function decisionAnswerEntry(decisionId, timestamp, extra = {}) {
   return { kind: 'decision-answer', message: JSON.stringify({ decision_id: decisionId, ...extra }), timestamp };
+}
+function withdrawnEntry(decisionId, reason, timestamp) {
+  return { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: decisionId, reason }), timestamp };
+}
+function withdrawalReversedEntry(decisionId, timestamp) {
+  return { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: decisionId }), timestamp };
 }
 function usageMessage(overrides = {}) {
   return `[usage] ${JSON.stringify({
@@ -737,5 +745,142 @@ describe('digestFeedback: re-review ledger N1–N3', () => {
     assert.ok(digest.kpiUsageEntry, 'a usage entry exists and must be surfaced');
     assert.equal(digest.kpiUsageEntry.timestamp, null);
     assertNoUndefined(digest, 'digest');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// LIN-2891 (LIN-3034): _findDecisionWithdrawal — sibling of _findDecisionAnswer
+// ─────────────────────────────────────────────────────────────────────────
+
+function requireFindDecisionWithdrawal() {
+  assert.ok(typeof _findDecisionWithdrawal === 'function',
+    'lib/digest-feedback.js must export _findDecisionWithdrawal');
+}
+
+describe('isDecisionLifecycleStampEntry (LIN-2891/LIN-3037)', () => {
+  test('true for exactly the 3 decision-lifecycle stamp kinds', () => {
+    assert.ok(typeof isDecisionLifecycleStampEntry === 'function',
+      `lib/digest-feedback.js must export isDecisionLifecycleStampEntry (import error: ${digestFeedbackImportError?.message || 'n/a'})`);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision-answer' }), true);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision-withdrawn' }), true);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision-withdrawal-reversed' }), true);
+  });
+
+  test('false for the decision kind, other kinds, and untyped entries', () => {
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'decision' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'usage' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'status' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({ kind: 'assistant-text' }), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry({}), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry(undefined), false);
+    assert.strictEqual(isDecisionLifecycleStampEntry(null), false);
+  });
+});
+
+describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
+  test('returns the last decision-withdrawn entry (backward scan, last entry wins)', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawnEntry('d-1', 'first reason', 't1'),
+      withdrawnEntry('d-2', 'second reason', 't2'),
+    ];
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-2', reason: 'second reason', timestamp: 't2' });
+  });
+
+  test('a malformed withdrawal message (not JSON) is skipped, scanning backwards to an earlier valid one', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawnEntry('d-1', 'valid reason', 't1'),
+      { kind: 'decision-withdrawn', message: 'not-json', timestamp: 't2' },
+    ];
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
+  });
+
+  test('a missing reason is skipped, scanning backwards to an earlier valid one', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawnEntry('d-1', 'valid reason', 't1'),
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-2' }), timestamp: 't2' },
+    ];
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
+  });
+
+  test('an empty-string reason is skipped, scanning backwards to an earlier valid one', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawnEntry('d-1', 'valid reason', 't1'),
+      withdrawnEntry('d-2', '', 't2'),
+    ];
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
+  });
+
+  test('no decision-withdrawn entries at all yields null', () => {
+    requireFindDecisionWithdrawal();
+    assert.strictEqual(_findDecisionWithdrawal([textEntry('A'), { kind: 'status', message: '[done]' }]), null);
+  });
+
+  test('non-array feedback is tolerated, never throws', () => {
+    requireFindDecisionWithdrawal();
+    assert.strictEqual(_findDecisionWithdrawal(undefined), null);
+  });
+
+  test('terminal reversal: null when the reversal entry comes AFTER the withdrawal', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawnEntry('d-1', 'valid reason', 't1'),
+      withdrawalReversedEntry('d-1', 't2'),
+    ];
+    assert.strictEqual(_findDecisionWithdrawal(feedback), null);
+  });
+
+  test('terminal reversal: null when the reversal entry comes BEFORE the withdrawal (order-independent)', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawalReversedEntry('d-1', 't1'),
+      withdrawnEntry('d-1', 'valid reason', 't2'),
+    ];
+    assert.strictEqual(_findDecisionWithdrawal(feedback), null);
+  });
+
+  test('a reversal only cancels the SAME decision_id — an unrelated withdrawal survives', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawnEntry('d-1', 'reason one', 't1'),
+      withdrawalReversedEntry('d-2', 't2'),
+    ];
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'reason one', timestamp: 't1' });
+  });
+
+  test('a malformed reversal entry is skipped fail-closed — its decision_id is NOT treated as reversed', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      { kind: 'decision-withdrawal-reversed', message: 'not-json', timestamp: 't1' },
+      withdrawnEntry('d-1', 'valid reason', 't2'),
+    ];
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't2' });
+  });
+
+  test('timestamp defaults to null when absent on the withdrawal entry', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [{ kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'r' }) }];
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'r', timestamp: null });
+  });
+});
+
+describe('digestFeedback: carries withdrawal (LIN-2891/LIN-3034)', () => {
+  test('withdrawal is null when no decision-withdrawn entry exists', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [textEntry('hello', at(0))] });
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.strictEqual(digest.withdrawal, null);
+  });
+
+  test('withdrawal carries {decisionId, reason, timestamp} when a decision-withdrawn entry exists', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'no longer needed' }), timestamp: at(0) },
+    ] });
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.deepStrictEqual(digest.withdrawal, { decisionId: 'd-1', reason: 'no longer needed', timestamp: at(0).toISOString() });
   });
 });

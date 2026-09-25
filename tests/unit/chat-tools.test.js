@@ -951,6 +951,41 @@ describe('pass-3 session reads — list_task_sessions / get_session (LIN-1073)',
       'a decision-answer stamp must never reach the LLM tool payload as a transcript entry');
   });
 
+  // LIN-3037: the same exclusion must cover the other two decision-lifecycle
+  // stamp kinds — a withdrawal's free-text `reason` must never reach the
+  // LLM tool payload as a transcript entry.
+  test('LIN-3037: get_session\'s transcript omits a decision-withdrawn stamp', async () => {
+    const history = twoSessionHistory();
+    const workerLoop = history.find(h => h.id === 'w-done');
+    workerLoop.feedback = [
+      ...workerLoop.feedback,
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'scheduled wakeup, re-raise later' }), timestamp: T_DONE },
+    ];
+    const executeTool = makeCatalog(history);
+    const result = await executeTool({ name: 'get_session', arguments: { sessionId: 'sess-done' } });
+    const workerRun = result.runs.find(r => r.kind !== 'autopilot' && r.terminalStatus === 'done');
+    assert.ok(workerRun, 'expected the worker run');
+    assert.strictEqual(workerRun.transcript.length, 2);
+    assert.ok(!workerRun.transcript.some(t => t.message.includes('scheduled wakeup')),
+      'a decision-withdrawn stamp\'s reason must never reach the LLM tool payload as a transcript entry');
+  });
+
+  test('LIN-3037: get_session\'s transcript omits a decision-withdrawal-reversed stamp', async () => {
+    const history = twoSessionHistory();
+    const workerLoop = history.find(h => h.id === 'w-done');
+    workerLoop.feedback = [
+      ...workerLoop.feedback,
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: T_DONE },
+    ];
+    const executeTool = makeCatalog(history);
+    const result = await executeTool({ name: 'get_session', arguments: { sessionId: 'sess-done' } });
+    const workerRun = result.runs.find(r => r.kind !== 'autopilot' && r.terminalStatus === 'done');
+    assert.ok(workerRun, 'expected the worker run');
+    assert.strictEqual(workerRun.transcript.length, 2);
+    assert.ok(!workerRun.transcript.some(t => t.message.includes('decision_id')),
+      'a decision-withdrawal-reversed stamp must never reach the LLM tool payload as a transcript entry');
+  });
+
   test('list_task_sessions does NOT forward resources — it only ever picks runtime, matching its narrower :735 field-by-field projection', async () => {
     const history = twoSessionHistory();
     const workerLoop = history.find(h => h.id === 'w-done');
@@ -2255,6 +2290,46 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
       'waitingOnHuman',
     ]);
     assert.strictEqual(row.latestFeedback, 'hello');
+  });
+
+  // LIN-3037: `latestFeedbackLine` (the helper behind `latestFeedback` here)
+  // must skip all three decision-lifecycle stamp kinds — otherwise a
+  // withdrawal's free-text `reason` (later-timestamped than the real
+  // feedback) would win and leak into `list_active_sessions`' payload.
+  test('LIN-3037: a decision-withdrawn stamp never becomes latestFeedback, even as the latest-timestamped entry', () => {
+    const row = projectActiveSession(
+      {
+        sessionId: 's2', seedIssue: 'LIN-9', tasksTouched: ['LIN-9'], dispatchedAt: T_FLEET_MID,
+        loops: [{
+          loopId: 's2', kind: 'autopilot', dispatchedAt: T_FLEET_MID, agentState: 'running',
+          terminalStatus: null, wakeMarker: null,
+          feedback: [
+            { message: 'real feedback line', timestamp: T_FLEET_MID },
+            { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'scheduled wakeup, re-raise later' }), timestamp: T_FLEET_FRESH },
+          ],
+        }],
+      },
+      { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS }
+    );
+    assert.strictEqual(row.latestFeedback, 'real feedback line');
+  });
+
+  test('LIN-3037: a decision-withdrawal-reversed stamp never becomes latestFeedback', () => {
+    const row = projectActiveSession(
+      {
+        sessionId: 's3', seedIssue: 'LIN-9', tasksTouched: ['LIN-9'], dispatchedAt: T_FLEET_MID,
+        loops: [{
+          loopId: 's3', kind: 'autopilot', dispatchedAt: T_FLEET_MID, agentState: 'running',
+          terminalStatus: null, wakeMarker: null,
+          feedback: [
+            { message: 'real feedback line', timestamp: T_FLEET_MID },
+            { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: T_FLEET_FRESH },
+          ],
+        }],
+      },
+      { superseded: new Set(), now: Date.now(), staleMs: DEFAULT_LANE_STALE_MS }
+    );
+    assert.strictEqual(row.latestFeedback, 'real feedback line');
   });
 
   test('LIN-2653 F1: a bookkeeping stamp flips both lifecycle and waitingOnHuman for projectActiveSession', () => {

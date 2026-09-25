@@ -769,3 +769,41 @@ describe('fossil pass — answered-decision guard (LIN-2991 §2, plan-review 18a
     assert.equal(reasonFor(loops, 'h-ans-fossil'), 'not-silent-or-blocked');
   });
 });
+
+// ─── LIN-3036 review L2: the withdrawn sibling of the answered-decision guard ─
+
+describe('fossil pass — withdrawn-decision guard (LIN-2891/LIN-3036 Surface 6 caller 3)', () => {
+  // L2: caller 3 (`selectFossilRows`) is the one `classifyLoop` call site that
+  // passes no `answeredByLineage` map, so it was only ever witnessed through
+  // direct no-map `classifyLoop` calls. This drives `selectFossilRows` itself
+  // and pins that a withdrawn blocked row is discharged by the item-scoped
+  // withdrawal read on the loop's OWN feedback — skipped as
+  // `not-silent-or-blocked` and never eligible for a stamp. Dropping
+  // `|| isDecisionWithdrawn(loop)` from `classifyLoop` (mutation M10) leaves the
+  // row `blocked` here, so it falls through the lane gate into `eligible`.
+  test('an old, [blocked] row whose decision is WITHDRAWN on its own feedback (no follow-up) is resolved, not eligible', () => {
+    const rows = [
+      historyItem({
+        id: 'h-withdrawn-fossil', issueIdentifier: 'LIN-995', dispatchedAt: daysAgo(20), resolvedAt: daysAgo(20),
+        feedback: [
+          { message: '[blocked] need a decision', timestamp: daysAgo(20) },
+          {
+            kind: 'decision', timestamp: daysAgo(20),
+            message: `[decision] ${JSON.stringify({ decision_id: 'h-wd', question: 'Proceed?', options: [{ id: 'a', label: 'Go' }, { id: 'b', label: 'Hold' }] })}`
+          },
+          { kind: 'decision-withdrawn', timestamp: daysAgo(20), message: JSON.stringify({ decision_id: 'h-wd', reason: 'asker retracted it' }) }
+        ]
+      })
+    ];
+    const loops = build({ historyItems: rows });
+    assert.equal(loops[0].wakeMarker, 'blocked', 'sanity: the blocked marker is really present');
+    assert.equal(loops[0].withdrawal?.decisionId, 'h-wd', 'sanity: the withdrawal derives onto the loop');
+    const superseded = computeSupersededLoopIds(loops);
+    const lane = classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS });
+    assert.equal(lane, 'resolved', 'withdrawn on its own feedback, no follow-up — resolved via the item-scoped withdrawal read (no answeredByLineage map passed)');
+
+    const result = select(loops);
+    assert.deepEqual(result.eligible, [], 'a resolved row is not silent-or-blocked, so it must never reach eligible (never stamped)');
+    assert.equal(reasonFor(loops, 'h-withdrawn-fossil'), 'not-silent-or-blocked');
+  });
+});

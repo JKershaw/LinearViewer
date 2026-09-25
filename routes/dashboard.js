@@ -13,6 +13,7 @@
  *   GET      /workspace/:urlKey/api/dashboard/loops                — merged cross-workspace runs (flat poll source)
  *   GET      /workspace/:urlKey/api/dashboard/rulings              — unanswered-decision feed (ambient count + rulings tab; LIN-1728)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/dismiss      — dismiss a loop-backed ruling with no comment (LIN-2225; the task-bound sibling reuses the existing scan dismiss route instead)
+ *   POST     /workspace/:urlKey/api/dashboard/rulings/reverse-withdrawal — reverse a `decision-withdrawn` stamp, terminal (LIN-2891/LIN-3035; session-auth-only, no UI button yet)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/answer       — stamp a TASK-BOUND ruling answered with no comment, durable optionId (LIN-2754 Track B; the answer already lives on the ticket, this is bookkeeping only)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/shelve       — shelve any ruling with a reason + re-surface timer (LIN-1727; view-only, works uniformly for loop-backed and task-bound)
  *   POST     /workspace/:urlKey/api/dashboard/rulings/keep         — withdraw a proposed dismissal (LIN-2444; view-only — never touches answer state, arms no keepalive)
@@ -1651,6 +1652,40 @@ export function createDashboardRoutes({
     } catch (error) {
       console.error('Ruling dismiss error:', error);
       jsonError(res, 500, 'Failed to dismiss ruling');
+    }
+  });
+
+  // ─── Reverse a decision withdrawal — session-auth-only, terminal (LIN-2891/LIN-3035) ──
+  //
+  // The write-side counterpart to `kind: 'decision-withdrawn'`
+  // (routes/dispatch.js, runner-writable behind a required `reason` — see
+  // `FEEDBACK_ENTRY_KINDS`'s docblock in lib/dispatch-store.js for the full
+  // credential-class audit). Reversal is deliberately the ONE decision-
+  // lifecycle transition no token can ever reach: mounted under the same
+  // session-only `workspaceFromUrl` as `.../dismiss` above, which never reads
+  // `Authorization`. There is no UI button for this yet — the route itself is
+  // this ticket's deliverable.
+  //
+  // `markDecisionWithdrawalReversed` (lib/dispatch-store.js) does the actual
+  // terminal check (a never-withdrawn or already-reversed `decisionId`
+  // returns `null`, with no append) and the CAS-guarded `$push`; this handler
+  // only translates its `null` to a 404 and clears the cache on success.
+  router.post('/workspace/:urlKey/api/dashboard/rulings/reverse-withdrawal', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { decisionLoopId, decisionId } = req.body || {};
+    if (typeof decisionLoopId !== 'string' || !decisionLoopId || typeof decisionId !== 'string' || !decisionId) {
+      return jsonError(res, 400, 'decisionLoopId and decisionId are both required');
+    }
+    try {
+      const reversed = await dispatchQueueStore.markDecisionWithdrawalReversed(decisionLoopId, workspace.urlKey, decisionId);
+      if (!reversed) {
+        return jsonError(res, 404, 'No matching withdrawal to reverse');
+      }
+      sessionsFeedCache.clear(workspace.urlKey);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Ruling withdrawal-reverse error:', error);
+      jsonError(res, 500, 'Failed to reverse withdrawal');
     }
   });
 

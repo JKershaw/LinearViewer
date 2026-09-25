@@ -94,9 +94,9 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
   // The pin tracks the CURRENT version (LIN-3022 moved it 12 → 13, LIN-2934 moved
-  // it 13 → 14); a lingering v3 archive doc from before LIN-1487 must still miss
-  // on both reads.
-  assert.equal(BUILDER_VERSION, 14, 'this bump-specific pin tracks the current version');
+  // it 13 → 14, LIN-2891/LIN-3034 moved it 14 → 15); a lingering v3 archive doc
+  // from before LIN-1487 must still miss on both reads.
+  assert.equal(BUILDER_VERSION, 15, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
@@ -378,4 +378,24 @@ test('a v13 doc (pre-taskPosition/sessionPosition, LIN-2934) read-misses on both
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v13 doc');
   assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v13 doc -> route reconstructs');
+});
+
+// LIN-2891 (LIN-3034): the v14 -> v15 bump exists because loops now also
+// carry the item-scoped `withdrawal` field (`{decisionId, reason, timestamp}`
+// or `null`) beside `answeredDecisions` — a genuinely new key, so a v14 doc's
+// embedded loops silently lack it. Same v10/v11/v12/v13 rationale. Pinning
+// the v14 doc as the target set is what makes this bump load-bearing rather
+// than cosmetic — same version-agnostic style as the v11/v12/v13 doc tests
+// above, so this stays meaningful after the next bump instead of asserting a
+// specific CURRENT version number.
+test('a v14 doc (pre-withdrawal loops, LIN-2891/LIN-3034) read-misses on both list and point reads', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 14;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v14 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v14 doc -> route reconstructs');
 });

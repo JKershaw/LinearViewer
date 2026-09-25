@@ -62,9 +62,10 @@ import { stableStringify } from '../../lib/recap-cache.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';
-import { isDecisionAnsweredInLineage, answeredDecisionIdsByLineage } from '../../lib/unanswered-decisions.js';
+import { isDecisionAnsweredInLineage, answeredDecisionIdsByLineage, isDecisionWithdrawn } from '../../lib/unanswered-decisions.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 import { digestFeedback } from '../../lib/digest-feedback.js';
+import { projectActiveSession } from '../../lib/chat-tools.js';
 
 const { _buildLoops } = __internal;
 
@@ -161,6 +162,13 @@ function decisionFeedbackEntry(decisionId, timestamp = '2026-04-11T11:06:00.000Z
 
 function answerFeedbackEntry(decisionId, timestamp = '2026-04-11T11:08:00.000Z') {
   return { kind: 'decision-answer', timestamp, message: JSON.stringify({ decision_id: decisionId }) };
+}
+
+// LIN-2891/LIN-3036: the wire shape B's write path posts
+// (`{kind: 'decision-withdrawn', message: {decision_id, reason}}`), which
+// `_findDecisionWithdrawal` parses into the loop's `withdrawal` fact.
+function withdrawalFeedbackEntry(decisionId, reason, timestamp = '2026-04-11T11:08:00.000Z') {
+  return { kind: 'decision-withdrawn', timestamp, message: JSON.stringify({ decision_id: decisionId, reason }) };
 }
 
 // ─── A. Classification ────────────────────────────────────────────────────
@@ -537,6 +545,231 @@ describe('LIN-2991: classifyLoop discharges every member of every answered decis
     assert.strictEqual(payload.lanes.blocked, 0, 'buildSweepPayload must compute and thread the lineage map itself');
     assert.strictEqual(payload.lanes.resolved, 1, 'the root is discharged by its sibling\'s answer stamp');
     assert.ok(!payload.attention.some((row) => row.loopId === 'l1-root'), 'a sibling-answered root must never be surfaced as waiting on a human');
+  });
+});
+
+describe('observer-sweep: withdrawal discharge (LIN-2891/LIN-3036 Surface 6)', () => {
+  // `classifyLoop` is the ONE shared classifier. The three production callers
+  // are: `buildSweepPayload` (lib/observer-sweep.js:310, the 60s census — tested
+  // below), `projectActiveSession` (lib/chat-tools.js:1115, list_pending_decisions
+  // / fleet read — tested below), and the fossil pass
+  // (scripts/fossil-pass-lin2633.js:361 — the direct `classifyLoop` calls here,
+  // which pass no `answeredByLineage`, exercise exactly that option shape).
+  // Withdrawal is read item-scoped from the loop itself, so it needs no map.
+
+  test('a blocked row whose OWN decision is withdrawn lands resolved — not blocked (fossil-pass caller shape: no lineage map)', () => {
+    const hist = historyItem({
+      id: 'w-blocked', issueIdentifier: 'LIN-350', dispatchedAt: '2026-04-11T11:50:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
+        decisionFeedbackEntry('wdec-1', '2026-04-11T11:52:00.000Z'),
+        withdrawalFeedbackEntry('wdec-1', 'the asker retracted it', '2026-04-11T11:53:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.wakeMarker, 'blocked', 'sanity: the blocked marker is really present');
+    assert.strictEqual(loop.withdrawal?.decisionId, 'wdec-1', 'sanity: the withdrawal derives onto the lean loop');
+    assert.strictEqual(isDecisionWithdrawn(loop), true, 'sanity: the item-scoped predicate reads true on this loop');
+
+    // Control: strip the withdrawal and the same blocked row reads blocked, so
+    // the assertion below is discriminating (mutation M1 witnesses this too).
+    const preWithdrawal = _buildLoops({
+      historyItems: [historyItem({
+        id: 'w-blocked', issueIdentifier: 'LIN-350', dispatchedAt: '2026-04-11T11:50:00.000Z',
+        feedback: hist.feedback.filter((e) => e.kind !== 'decision-withdrawn')
+      })],
+      now: NOW, lean: true
+    });
+    assert.strictEqual(
+      classifyLoop(preWithdrawal[0], { superseded: computeSupersededLoopIds(preWithdrawal), now: NOW_MS, staleMs: STALE_MS }),
+      'blocked',
+      'control: without the withdrawal the row is genuinely blocked'
+    );
+
+    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'resolved', 'a withdrawn decision is done-with, not waiting on anyone');
+    assert.notStrictEqual(lane, 'silent', 'silent is still a waiting-on-a-human lane and would keep the row in attention');
+  });
+
+  test('item-scoped: a withdrawal on a SIBLING loop does not clear this blocked loop', () => {
+    const root = historyItem({
+      id: 'w-sib-root', issueIdentifier: 'LIN-351', dispatchedAt: '2026-04-11T11:50:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
+        decisionFeedbackEntry('wdec-shared', '2026-04-11T11:52:00.000Z')
+      ]
+    });
+    // The sibling carries the withdrawal for the SAME decision id, but it is a
+    // different loop — the read is per-loop (Choice C), so the root stays blocked.
+    const sibling = historyItem({
+      id: 'w-sib-other', issueIdentifier: 'LIN-351', rootItemId: 'w-sib-root', dispatchedAt: '2026-04-11T11:54:00.000Z',
+      feedback: [withdrawalFeedbackEntry('wdec-shared', 'sibling stamp', '2026-04-11T11:55:00.000Z')]
+    });
+    const loops = _buildLoops({ historyItems: [root, sibling], now: NOW, lean: true });
+    const rootLoop = loops.find((l) => l.loopId === 'w-sib-root');
+    const siblingLoop = loops.find((l) => l.loopId === 'w-sib-other');
+    assert.strictEqual(isDecisionWithdrawn(rootLoop), false, 'sanity: the root has no withdrawal of its own');
+    assert.strictEqual(isDecisionWithdrawn(siblingLoop), false, 'sanity: the sibling has no decision, so its withdrawal can never match one');
+    assert.ok(!computeSupersededLoopIds(loops).has('w-sib-root'), 'sanity: the root is not superseded, so only withdrawal could clear it');
+
+    assert.strictEqual(
+      classifyLoop(rootLoop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS }),
+      'blocked',
+      'a withdrawal on a sibling cannot discharge this loop — the predicate reads only the loop\'s own field'
+    );
+  });
+
+  test('item-scoped: a withdrawal naming a MISMATCHED decision id leaves the blocked loop blocked', () => {
+    const hist = historyItem({
+      id: 'w-mismatch', issueIdentifier: 'LIN-352', dispatchedAt: '2026-04-11T11:50:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
+        decisionFeedbackEntry('wdec-new', '2026-04-11T11:52:00.000Z'),
+        withdrawalFeedbackEntry('wdec-old', 'stale', '2026-04-11T11:53:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.decision.decision_id, 'wdec-new', 'sanity: the CURRENT decision is the new one');
+    assert.strictEqual(loop.withdrawal?.decisionId, 'wdec-old', 'sanity: the withdrawal names the OLD decision');
+    assert.strictEqual(isDecisionWithdrawn(loop), false);
+
+    assert.strictEqual(
+      classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS }),
+      'blocked',
+      'a withdrawal for a different decision id must not discharge a newer, un-withdrawn one'
+    );
+  });
+
+  test('answered + withdrawn on the same blocked loop still lands resolved (the two discharge signals agree)', () => {
+    const hist = historyItem({
+      id: 'w-both', issueIdentifier: 'LIN-353', dispatchedAt: '2026-04-11T11:50:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
+        decisionFeedbackEntry('wdec-both', '2026-04-11T11:52:00.000Z'),
+        answerFeedbackEntry('wdec-both', '2026-04-11T11:53:00.000Z'),
+        withdrawalFeedbackEntry('wdec-both', 'also retracted', '2026-04-11T11:54:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.answeredDecisionId, 'wdec-both', 'sanity: answered too');
+    assert.strictEqual(loop.withdrawal?.decisionId, 'wdec-both', 'sanity: and withdrawn too');
+
+    assert.strictEqual(
+      classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS }),
+      'resolved',
+      'both independent signals agree on resolved; no special ordering is needed'
+    );
+  });
+
+  test('a withdrawn decision does NOT override supersession — a follow-up still wins (withdrawn sibling of the answered pin)', () => {
+    // LIN-3036 review L1: the answered side has this pin
+    // (`observer-sweep: an answered decision does NOT override supersession`);
+    // the withdrawn side needs its own. Withdrawal discharge must sit INSIDE the
+    // `!supersededIds.has(loopId)` guard exactly as the answered check does, so a
+    // superseded blocked row keeps its prior fall-through — never a
+    // newly-minted `resolved` (mutation M11 moves the check outside this guard
+    // and this test is the witness that dies).
+    const original = historyItem({
+      id: 'wz1', issueIdentifier: 'LIN-357', dispatchedAt: '2026-04-11T10:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
+        decisionFeedbackEntry('wdec-sup', '2026-04-11T10:06:00.000Z'),
+        withdrawalFeedbackEntry('wdec-sup', 'retracted before the follow-up', '2026-04-11T10:08:00.000Z')
+      ]
+    });
+    const followUp = historyItem({
+      id: 'wz2', issueIdentifier: 'LIN-357', followUpTo: 'wz1',
+      feedback: [{ message: '[done] resumed and finished', timestamp: '2026-04-11T11:40:00.000Z' }]
+    });
+    const loops = _buildLoops({ historyItems: [original, followUp], now: NOW, lean: true });
+    const loopZ = loops.find((l) => l.loopId === 'wz1');
+    assert.strictEqual(loopZ.wakeMarker, 'blocked', 'sanity: the blocked marker is present');
+    assert.strictEqual(loopZ.withdrawal?.decisionId, 'wdec-sup', 'sanity: the row is withdrawn too');
+    assert.strictEqual(isDecisionWithdrawn(loopZ), true, 'sanity: the item-scoped predicate reads true');
+    const superseded = computeSupersededLoopIds(loops);
+    assert.ok(superseded.has('wz1'), 'sanity: and a follow-up names it');
+
+    const lane = classifyLoop(loopZ, { superseded, now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(
+      lane, 'silent',
+      'supersession keeps its prior path — a withdrawn decision only clears blocked when nothing supersedes it'
+    );
+    assert.notStrictEqual(lane, 'resolved', 'a superseded withdrawn row must never be newly minted resolved');
+  });
+
+  test('a withdrawal on a NON-blocked lifecycle does not force resolved — the discharge is scoped to the blocked lane', () => {
+    // LIN-3036 review L1: withdrawal only discharges the blocked lane. A fresh
+    // active row that happens to carry a matching decision + withdrawal must
+    // keep its own lifecycle lane (mutation M12 hoists a `resolved` return for
+    // ANY lifecycle above the blocked branch, and this test is the witness).
+    const hist = historyItem({
+      id: 'w-working', issueIdentifier: 'LIN-358', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        decisionFeedbackEntry('wdec-working', '2026-04-11T11:52:00.000Z'),
+        withdrawalFeedbackEntry('wdec-working', 'retracted', '2026-04-11T11:53:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
+    const loop = loops[0];
+    assert.strictEqual(loop.wakeMarker, null, 'sanity: no blocked marker — the lifecycle is not blocked');
+    assert.notStrictEqual(loop.agentState, 'waiting', 'sanity: the agent-status channel is not blocked either');
+    assert.strictEqual(loop.decision.decision_id, 'wdec-working', 'sanity: the decision derives onto the lean loop');
+    assert.strictEqual(isDecisionWithdrawn(loop), true, 'sanity: the withdrawal predicate is true on this loop');
+
+    const lane = classifyLoop(loop, { superseded: computeSupersededLoopIds(loops), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(lane, 'working', 'a fresh active row stays working — withdrawal only discharges the blocked lane');
+    assert.notStrictEqual(lane, 'resolved', 'a withdrawal on a non-blocked lifecycle must not force resolved');
+  });
+
+  test('caller 1 — buildSweepPayload: a withdrawn blocked row leaves lanes.blocked AND attention, the open row stays', () => {
+    const withdrawn = historyItem({
+      id: 'w-census', issueIdentifier: 'LIN-354', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
+        decisionFeedbackEntry('wdec-census', '2026-04-11T11:57:00.000Z'),
+        withdrawalFeedbackEntry('wdec-census', 'retracted', '2026-04-11T11:58:00.000Z')
+      ]
+    });
+    const open = historyItem({
+      id: 'w-open', issueIdentifier: 'LIN-355', dispatchedAt: '2026-04-11T11:55:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
+        decisionFeedbackEntry('wdec-open', '2026-04-11T11:57:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [withdrawn, open], now: NOW, lean: true });
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.lanes.blocked, 1, 'only the genuinely open decision is still blocked');
+    assert.strictEqual(payload.lanes.resolved, 1, 'the withdrawn row is done-with');
+    assert.ok(payload.attention.some((row) => row.loopId === 'w-open'), 'an un-withdrawn blocked row is still waiting on a human');
+    assert.ok(!payload.attention.some((row) => row.loopId === 'w-census'), 'a withdrawn blocked row must never be surfaced as waiting');
+  });
+
+  test('caller 2 — projectActiveSession: a withdrawn blocked session reads lifecycle resolved, waitingOnHuman false', () => {
+    const mkSession = (withWithdrawal) => {
+      const feedback = [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:56:00.000Z' },
+        decisionFeedbackEntry('wdec-session', '2026-04-11T11:57:00.000Z'),
+        ...(withWithdrawal ? [withdrawalFeedbackEntry('wdec-session', 'retracted', '2026-04-11T11:58:00.000Z')] : [])
+      ];
+      const loops = _buildLoops({
+        historyItems: [historyItem({ id: 'w-session', issueIdentifier: 'LIN-356', dispatchedAt: '2026-04-11T11:55:00.000Z', feedback })],
+        now: NOW, lean: true
+      });
+      return { sessionId: 'sess-w', seedIssue: 'LIN-356', dispatchedAt: NOW.toISOString(), tasksTouched: [], loops };
+    };
+
+    const control = projectActiveSession(mkSession(false), { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(control.lifecycle, 'blocked', 'control: without the withdrawal the session is waiting on a human');
+    assert.strictEqual(control.waitingOnHuman, true, 'control: the open blocked loop keeps the session on the waiting list');
+
+    const row = projectActiveSession(mkSession(true), { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(row.lifecycle, 'resolved', 'the withdrawn decision is done-with — the fleet read must not show it blocked');
+    assert.strictEqual(row.waitingOnHuman, false, 'and it must not count as waiting on a human');
   });
 });
 
@@ -1505,20 +1738,24 @@ describe('observer-sweep: negative capability — no automated-intervention path
     );
   });
 
-  test('LIN-2671/LIN-2991 import-by-reference: classifyLoop reuses isDecisionAnsweredInLineage from lib/unanswered-decisions.js, never forks the comparison', () => {
+  test('LIN-2671/LIN-2991/LIN-3036 import-by-reference: classifyLoop reuses isDecisionAnsweredInLineage and isDecisionWithdrawn from lib/unanswered-decisions.js, never forks the comparison', () => {
     const modulePath = fileURLToPath(new URL('../../lib/observer-sweep.js', import.meta.url));
     const src = readFileSync(modulePath, 'utf8');
     assert.match(
       src,
-      /^import\s*\{\s*isDecisionAnsweredInLineage,\s*answeredDecisionIdsByLineage\s*\}\s*from\s*'\.\/unanswered-decisions\.js';/m,
-      'the answered-decision predicate must be imported by name from the shared module, not re-derived here'
+      /^import\s*\{\s*isDecisionAnsweredInLineage,\s*answeredDecisionIdsByLineage,\s*isDecisionWithdrawn\s*\}\s*from\s*'\.\/unanswered-decisions\.js';/m,
+      'both the answered and the withdrawn predicates must be imported by name from the shared module, not re-derived here'
     );
     assert.ok(
       !/answeredDecisionId\s*===/.test(src),
       'observer-sweep must NOT re-derive the comparison locally — a forked predicate is exactly how the census and the rulings feed disagreed (LIN-2671)'
     );
-    // The name imported above is the shared module's real export, not a
-    // same-named local; a renamed/re-exported shim would fail here.
+    assert.ok(
+      !/withdrawal\.decisionId\s*===/.test(src),
+      'observer-sweep must NOT re-derive the withdrawal comparison locally — it reuses isDecisionWithdrawn by reference (LIN-3036)'
+    );
+    // The names imported above are the shared module's real exports, not
+    // same-named locals; a renamed/re-exported shim would fail here.
     assert.strictEqual(typeof isDecisionAnsweredInLineage, 'function');
     assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' } }, new Map([['loop-1', new Set(['d-1'])]])), false, 'no lineageId/loopId on this bare fixture — the map lookup misses');
     const map = new Map([['lin-1', new Set(['d-1'])]]);
@@ -1526,6 +1763,9 @@ describe('observer-sweep: negative capability — no automated-intervention path
     assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-2' }, lineageId: 'lin-1' }, map), false);
     assert.strictEqual(isDecisionAnsweredInLineage({ decision: null, lineageId: 'lin-1' }, map), false);
     assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' }, lineageId: 'lin-1', answeredDecisions: [{ decisionId: 'd-1' }] }, undefined), true, 'map ABSENT falls back to the loop’s own answered set');
+    assert.strictEqual(typeof isDecisionWithdrawn, 'function');
+    assert.strictEqual(isDecisionWithdrawn({ decision: { decision_id: 'd-1' }, withdrawal: { decisionId: 'd-1' } }), true);
+    assert.strictEqual(isDecisionWithdrawn({ decision: { decision_id: 'd-1' }, withdrawal: { decisionId: 'd-2' } }), false);
   });
 });
 
