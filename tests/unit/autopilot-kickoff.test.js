@@ -625,6 +625,31 @@ describe('buildAutopilotKickoff (maxTasks budget, LIN-1751)', () => {
     assert.ok(budgeted.includes('BUDGET_EXHAUSTED'));
   });
 
+  // Third-pass review T5 (`0cd1d40f`): a run bounded ONLY by maxSessionsPerTask
+  // (the v1 Go shape — a single-task run with no maxTasks) is not open-ended —
+  // it has a declared, enforced per-task stop. Before the fix, the finish-line
+  // sentence still led with "no finish line — it runs until it needs you.",
+  // directly contradicting the per-task budget sentence that follows it in the
+  // very same paragraph.
+  test('T5: a scoped run bounded only by maxSessionsPerTask does not contradict itself with the open-ended finish-line sentence', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxSessionsPerTask: 2 });
+    assert.ok(!text.includes('has no finish line — it runs until it needs you.'),
+      'must not claim open-ended when a per-task session bound is declared');
+    assert.ok(text.includes('Any ONE task in this run may take at most **2 worker sessions**'));
+
+    // A genuinely unbounded run (neither maxTasks nor maxSessionsPerTask) is
+    // unaffected — the open-ended sentence is still correct there.
+    const unbounded = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
+    assert.ok(unbounded.includes('has no finish line — it runs until it needs you.'));
+
+    // Both bounds declared together: unchanged from before this fix — still
+    // "Separately, any ONE task...", following the maxTasks sentence.
+    const both = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxTasks: 5, maxSessionsPerTask: 2 });
+    assert.ok(!both.includes('has no finish line — it runs until it needs you.'));
+    assert.ok(both.includes('This run covers **up to 5 distinct tasks**'));
+    assert.ok(both.includes('Separately, any ONE task in this run may take at most **2 worker sessions**'));
+  });
+
   test('the BUDGET_EXHAUSTED quirk-list bullet appears only when a budget is declared', () => {
     // The inlined manual (docs/autopilot-operating-manual.md) mentions
     // BUDGET_EXHAUSTED generically regardless of whether THIS run is budgeted

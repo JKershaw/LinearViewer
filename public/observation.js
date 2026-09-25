@@ -3413,6 +3413,18 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
         .then((hydrateResult) => resolveRecordTarget(anchor, recordOn, hydrateResult))
         .then((resolved) => {
           const targetId = resolved.issueId || resolved.issueIdentifier;
+          // T1: an anchorless anchor (no issueId/issueIdentifier of its own,
+          // and no record_on match) resolves `targetId` to null here — the
+          // `!anchor.issueIdentifier` refusal below only guards the dispatch
+          // branch, so without this check a null-anchored 'record' effect
+          // would reach `postComment` with a null target and fail loudly
+          // against `/api/comments/null`.
+          if (!targetId) {
+            console.error('Ruling reply: no issue to record a comment against, cannot reply for an anchorless run');
+            restore();
+            setFeedback('cannot record a reply: no linked issue', true);
+            return Promise.resolve();
+          }
           // `optionId` (LIN-2792 round 3, F2): this literal is one of the
           // three silently-dropped call sites the delivery-pipeline thread
           // found — a fresh `{decisionLoopId, decisionId}` object built
@@ -4474,6 +4486,11 @@ if (typeof module !== 'undefined' && module.exports) {
     renderSummaryLine, excerptDecisionCase, renderWaitingDecisionSummary, DECISION_EXCERPT_CHARS,
     // LIN-2195: the option run's budget seam.
     boundDecisionOptions, DECISION_OPTIONS_CHARS,
+    // LIN-2934 (L3): expose the session-head renderer itself, so the
+    // Observation "n of N" budget chip is asserted against the actual
+    // rendered markup fillSessionHead produces, not only the taskPosition/
+    // sessionPosition JSON payload feeding it.
+    fillSessionHead,
     // LIN-1728 review (`2d47a7c8`, F2): expose the rulings press handler so
     // the `gone`-disposition partial-failure path (comment durably recorded,
     // the fresh run fails to start) is unit-testable against a hand-rolled

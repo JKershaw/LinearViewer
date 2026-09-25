@@ -244,6 +244,30 @@ describe('taskPosition/sessionPosition (LIN-2934)', () => {
       'must count only w1+w2 (stamped with this run\'s own sessionId), never the anchor or the inference-attached w3');
   });
 
+  // Third-pass review T4 (`0cd1d40f`): `seamScoped`'s `followUpTo == null`
+  // filter (lib/pipeline-loops.js:1022) was correct in code but unpinned —
+  // mutation M08 (dropping just that clause from the filter) passed the full
+  // suite. Wakes and liveness nudges carry BOTH `sessionId` (so they land in
+  // the session's wider `loops` set via the explicit-sessionId pass above)
+  // AND `followUpTo` (so the seam's own count excludes them) — on run
+  // `dc398411`'s shape (10 workers plus 10 wakes) an unfiltered count would
+  // read "session 20 of 10" where the seam counted 10.
+  test('sessionPosition excludes rows carrying followUpTo, even when explicitly stamped with the run\'s own sessionId (N1/T4, M08)', () => {
+    const loops = loopsFrom([
+      orchestrator({ maxSessionsPerTask: 3 }),
+      worker('w1', EPIC, '2026-06-22T10:30:00.000Z', { sessionId: SESSION_ID }),
+      // A wake/liveness nudge on the same task: carries the run's own
+      // sessionId (so it's in the session's wider loop set) AND followUpTo
+      // (so the seam itself never counted it as a fresh task dispatch).
+      worker('w2', EPIC, '2026-06-22T11:00:00.000Z', { sessionId: SESSION_ID, followUpTo: 'w1' })
+    ]);
+    const [s] = _buildSessions(loops, { now: NOW });
+
+    assert.strictEqual(s.loops.length, 3, 'sanity: anchor + w1 + w2 are all in this session\'s wider set');
+    assert.deepStrictEqual(s.sessionPosition, { count: 1, maxSessionsPerTask: 3, issueIdentifier: EPIC },
+      'must count only w1 — w2 carries followUpTo and the seam never counts it as a fresh dispatch');
+  });
+
   test('taskPosition counts distinct issueIdentifiers among the seam-scoped rows only, not every inference-attached task', () => {
     const GRANDCHILD = 'LIN-999';
     // A local graph where BOTH SPAWNED and GRANDCHILD descend from the seed,

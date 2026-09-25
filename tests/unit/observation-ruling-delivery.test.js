@@ -658,6 +658,44 @@ describe('deliverRulingReply — record delivery (LIN-2775 Area 6)', () => {
     assert.ok(!rulingsPending.has(key), 'restore() must release the pending guard');
   });
 
+  // Third-pass review T1 (`0cd1d40f`): a null-anchored row (a general
+  // orchestrator's decision, LIN-2775/R1's own class — no issueId, no
+  // issueIdentifier) whose resolved effect is 'record' must refuse rather
+  // than call postComment with a null target. Before the fix, `deliverAsRecord`
+  // resolved `targetId` to `resolved.issueId || resolved.issueIdentifier`
+  // unconditionally and posted to `/api/comments/null`.
+  test('T1: a null-anchored row with effect "record" refuses instead of posting to a null target', async () => {
+    let commentCalls = 0;
+    let dispatchCalls = 0;
+    const { module } = makeSandbox({
+      postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => { dispatchCalls += 1; return { id: 'dispatched-1' }; },
+      api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
+    });
+    const { deliverRulingReply, rulingsPending, rulingKey } = module.exports;
+    const li = makeLi();
+    const anchorlessAnchor = { ...ANCHOR, issueId: null, issueIdentifier: null };
+    const key = rulingKey('the-ruling-workspace', anchorlessAnchor, 'd-record-null-anchor');
+
+    deliverRulingReply(
+      makeRow({ decision: { decision_id: 'd-record-null-anchor' }, anchor: anchorlessAnchor, effect: 'record', alternate: null }),
+      'Approve',
+      li
+    );
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    assert.equal(commentCalls, 0, 'must never call postComment with a null target');
+    assert.equal(dispatchCalls, 0, 'a record delivery must never dispatch');
+    const feedback = li.querySelector('.obs-ruling-feedback');
+    assert.match(feedback.textContent, /no linked issue/);
+    assert.equal(feedback.classList.contains('obs-ruling-feedback--error'), true);
+    const buttons = li.querySelectorAll('.chat-option-btn');
+    buttons.forEach((b) => assert.equal(b.disabled, false, 'restore() must re-enable controls on refusal'));
+    assert.ok(!rulingsPending.has(key), 'restore() must release the pending guard');
+  });
+
   test('record_on misrouting: an UNKNOWN record_on (matches nothing in the neighbourhood) targets the anchor, and the note renders', async () => {
     let capturedIssueId = null;
     let dispatchCalls = 0;

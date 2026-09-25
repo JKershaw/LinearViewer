@@ -314,3 +314,43 @@ describe('LIN-2934 R4 (M9) — a CHILD kickoff dispatched under a budgeted coord
     assert.equal(worker.body.bound, 'sessionsPerTask');
   });
 });
+
+// Third-pass review T3 (`0cd1d40f`): the v1 Go path is an ISSUE-SCOPED kickoff
+// (`issueIdentifier` present, routes/proxy-kickoff.js's own `if (issueIdentifier)`
+// branch) — the exact call site the plan's F4 named. Mutation M26 (deleting
+// `maxSessionsPerTask` from that call's `buildAutopilotKickoff({...})` args)
+// passed the full suite because nothing asserted the dispatched PROMPT TEXT
+// itself carries the per-task budget statement; every other test in this file
+// only checks the response's `maxSessionsPerTask`/`budgetPosition` fields,
+// which are echoed by a separate, unrelated code path (the `fields:` block
+// below the `buildAutopilotKickoff` call).
+describe('LIN-2934 T3 — the v1 Go (issue-scoped) kickoff prompt carries the per-task session-budget prose', () => {
+  test('an issue-scoped kickoff with maxSessionsPerTask set dispatches a prompt containing the per-task budget statement', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const res = await call(app, 'post', KICKOFF, {
+      goal: 'ship TEST-1', issueIdentifier: 'TEST-1', target: 'cli', maxSessionsPerTask: 3
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    const item = await store.getItemStatus('acme', res.body.id);
+    assert.ok(item, 'expected the dispatched item to be readable back from the store');
+    assert.match(
+      item.prompt,
+      /Per-task session budget \(LIN-2934\): at most 3 worker sessions/,
+      'the dispatched kickoff prompt must state the declared per-task session bound'
+    );
+  });
+
+  test('an issue-scoped kickoff with NO maxSessionsPerTask carries no per-task budget statement', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const res = await call(app, 'post', KICKOFF, { goal: 'ship TEST-1', issueIdentifier: 'TEST-1', target: 'cli' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    const item = await store.getItemStatus('acme', res.body.id);
+    assert.doesNotMatch(item.prompt, /Per-task session budget \(LIN-2934\)/);
+  });
+});
