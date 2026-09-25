@@ -226,9 +226,10 @@ export function createRulingsRoutes({
    *     silently break both the lineage-answered union and `includeResolved`
    *     for a cross-issue-tagged group member).
    *   `includeResolved=true` — keeps answered LOOP groups too (each carrying a
-   *     `resolution`), instead of dropping them. Task-bound rows never appear
-   *     under this: `collectUnansweredDecisions`'s task-decision branch has no
-   *     `includeResolved` behaviour of its own.
+   *     `resolution`), instead of dropping them. An ANSWERED task-bound ruling
+   *     never appears under this: `collectUnansweredDecisions`'s task-decision
+   *     branch has no `includeResolved` behaviour of its own, so OPEN
+   *     task-bound rulings are returned exactly as in the default read.
    * The default read (neither param) is unchanged in row COUNT — set-preserving,
    * not byte-identical: every row now also carries `stampLoopId`, and a
    * non-root carrier's `anchor` names the root instead of itself.

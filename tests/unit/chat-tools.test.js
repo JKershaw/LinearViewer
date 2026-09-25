@@ -2308,6 +2308,34 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     assert.strictEqual(row.waitingOnHuman, false);
   });
 
+  // LIN-3022 L2: the F2 test above calls `projectActiveSession` directly with
+  // a hand-built map, so it cannot see the `list_active_sessions` HANDLER stop
+  // computing/threading one (review mutation M11 stayed green). This drives
+  // the tool end to end over the same sibling-answered lineage shape.
+  test('L2: list_active_sessions itself threads answeredByLineage — a tail decision answered on a SIBLING loop reads resolved', async () => {
+    const { executeTool } = makeFleetCatalog([
+      sessionHistoryItem({
+        id: 'sess-l2', kind: 'autopilot', issueIdentifier: 'LIN-743', target: 'cli',
+        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
+        feedback: [answerEntry('dec-l2', T_FLEET_MID)],
+      }),
+      sessionHistoryItem({
+        id: 'l2-tail', sessionId: 'sess-l2', rootItemId: 'sess-l2', issueIdentifier: 'LIN-743', target: 'cli',
+        dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
+        feedback: [
+          { message: '[blocked] which option?', timestamp: T_FLEET_FRESH },
+          decisionEntry('dec-l2', 'which option?', T_FLEET_FRESH),
+        ],
+      }),
+    ]);
+    const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+    const row = result.sessions.find(r => r.sessionId === 'sess-l2');
+    assert.ok(row, 'sanity: the session is reported');
+    assert.strictEqual(row.runCount, 2, 'sanity: both loops fold into the one session');
+    assert.strictEqual(row.lifecycle, 'resolved', 'the tail\'s decision, answered on a sibling loop, must discharge the session — the handler must thread the lineage map');
+    assert.strictEqual(row.waitingOnHuman, false);
+  });
+
   test('F2 pin: a single-loop answered decision (no grouping at all) still resolves — the map-threading must not regress it', () => {
     const solo = {
       loopId: 'solo-1', kind: 'autopilot', dispatchedAt: T_FLEET_OLD,
@@ -2560,6 +2588,9 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
     assert.ok(row, 'the grouped decision must appear exactly once, not once per carrier');
     assert.strictEqual(row.loopId, 'child-grouped', 'loopId must be the CONTENT loop (stampLoopId), not the anchor (sess-grouped)');
     assert.strictEqual(row.sessionId, 'sess-grouped', 'sessionId still resolves correctly off the content loop');
+    // LIN-3022 L3: `since` must come from the content loop too
+    // (`decisionSinceMs`, which also feeds flight-companion.js).
+    assert.strictEqual(row.since, T_FLEET_FRESH, 'since must be the CONTENT loop\'s activity, not the anchor\'s');
   });
 });
 

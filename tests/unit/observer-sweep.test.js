@@ -502,6 +502,42 @@ describe('LIN-2991: classifyLoop discharges every member of every answered decis
     assert.strictEqual(classifyLoop(followLoop1, opts), 'resolved', 'dec-b, answered on a LATER sibling loop, discharges follow-1 too — the sibling stamp for dec-b does not erase dec-a’s own discharge');
     assert.strictEqual(classifyLoop(followLoop2, opts), 'blocked', 'dec-c is still genuinely unanswered anywhere in the lineage and must stay blocked');
   });
+
+  test('LIN-3022 L1 — buildSweepPayload itself threads answeredByLineage: a root blocked on a decision answered on a SIBLING loop leaves lanes.blocked and attention', () => {
+    // The test above hands `classifyLoop` a hand-built map, so it cannot see
+    // `buildSweepPayload` stop computing/threading one (review mutation M12
+    // stayed green). This drives the production entry point instead.
+    const root = historyItem({
+      id: 'l1-root', issueIdentifier: 'LIN-340', dispatchedAt: '2026-04-11T11:50:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
+        decisionFeedbackEntry('l1-dec', '2026-04-11T11:52:00.000Z')
+      ]
+    });
+    const sibling = historyItem({
+      id: 'l1-sibling', issueIdentifier: 'LIN-340', rootItemId: 'l1-root', dispatchedAt: '2026-04-11T11:54:00.000Z',
+      feedback: [
+        answerFeedbackEntry('l1-dec', '2026-04-11T11:55:00.000Z'),
+        { message: '[done] finished after the answer', timestamp: '2026-04-11T11:56:00.000Z' }
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [root, sibling], now: NOW, lean: true });
+    const rootLoop = loops.find((l) => l.loopId === 'l1-root');
+    assert.strictEqual(rootLoop.decision.decision_id, 'l1-dec', 'sanity');
+    assert.ok(!computeSupersededLoopIds(loops).has('l1-root'), 'sanity: the root is not excluded as superseded, so only the lineage map can discharge it');
+    // Control: the root's OWN loop carries no answer, so without the map it
+    // reads blocked — the payload assertions below are discriminating.
+    assert.strictEqual(
+      classifyLoop(rootLoop, { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS }),
+      'blocked',
+      'control: with no lineage map, the own-loop fallback leaves the root blocked'
+    );
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.lanes.blocked, 0, 'buildSweepPayload must compute and thread the lineage map itself');
+    assert.strictEqual(payload.lanes.resolved, 1, 'the root is discharged by its sibling\'s answer stamp');
+    assert.ok(!payload.attention.some((row) => row.loopId === 'l1-root'), 'a sibling-answered root must never be surfaced as waiting on a human');
+  });
 });
 
 // ─── B. Payload contract (buildSweepPayload, the production entry point) ───

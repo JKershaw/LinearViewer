@@ -337,12 +337,10 @@ describe('GET /api/proxy/rulings — issueIdentifier and includeResolved (LIN-29
     assert.equal(dflt.body.rulings.some(r => r.decision.decision_id === 'd-dismissed'), false);
   });
 
-  test('includeResolved never surfaces a task-bound row', async () => {
-    // No taskDecisionsStore is wired in this suite's app (null), so a
-    // task-bound row can never appear at all here — this is a structural
-    // sanity check on the response shape (no `resolution` on a bare loop
-    // ruling not answered) rather than a positive fixture-based proof of the
-    // task-bound gap; that gap is documented in lib/proxy-instructions.js.
+  test('includeResolved: an unanswered loop row carries no resolution field', async () => {
+    // Shape check only: no taskDecisionsStore is wired in this suite (null).
+    // The task-bound behaviour under includeResolved is pinned against a real
+    // TaskDecisionsStore in the LIN-2650 WS0 §7 suite below (LIN-3022 L4).
     historyItems = [decisionItem('loop-1', 'LIN-1', DECISION_ID)];
     const { body } = await req('GET', '/api/proxy/rulings?includeResolved=true');
     assert.equal(body.rulings.length, 1);
@@ -811,6 +809,23 @@ describe('GET /api/proxy/rulings — task-bound rows via a real TaskDecisionsSto
     assert.equal(res.status, 200);
     assert.equal(body.rulings.length, 1, 'only the unanswered row, not the self-resolved one');
     assert.equal(body.rulings[0].decision.decision_id, 'scan_11111111_aaaaaaaaaaaa');
+  });
+
+  // LIN-3022 L4: `includeResolved` covers loop rulings only. An ANSWERED
+  // task-bound ruling never appears under it, but an OPEN one is returned
+  // exactly as in the default read — it is not hidden.
+  test('includeResolved: an open task-bound row is returned exactly as in the default read; the resolved one still never appears', async () => {
+    const dflt = await (await fetch(`${taskBaseUrl}/api/proxy/rulings`)).json();
+    const res = await fetch(`${taskBaseUrl}/api/proxy/rulings?includeResolved=true`);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(
+      body.rulings.map(r => [r.decision.decision_id, r.disposition]),
+      [['scan_11111111_aaaaaaaaaaaa', 'task-bound']],
+      'the open task-bound row stays; the self-resolved one is not surfaced'
+    );
+    assert.equal('resolution' in body.rulings[0], false, 'a task-bound row never carries a resolution');
+    assert.deepEqual(body.rulings, dflt.rulings, 'the open task-bound row is identical to the default read');
   });
 });
 
