@@ -20,6 +20,7 @@
  */
 import { Router } from 'express';
 import { badRequest, jsonError } from '../lib/errors.js';
+import { HALT_MODES } from '../lib/workspace-halt.js';
 
 const HALT_ROUTE = '/api/proxy/dispatch/halt';
 
@@ -73,7 +74,7 @@ export function createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authen
    */
   router.post(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     const { mode } = req.body || {};
-    if (mode !== 'pause' && mode !== 'stop') {
+    if (!HALT_MODES.includes(mode)) {
       logEvent(req, HALT_ROUTE, 400);
       return badRequest.json(res, "mode must be 'pause' or 'stop'");
     }
