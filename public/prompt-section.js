@@ -339,6 +339,7 @@
           const nameEl = container.querySelector('.swipe-prompt-name');
           body = container.querySelector('[data-prompt-body]');
           if (!body) return;
+          const wasPinned = window.isPinnedToBottom(body);
           if (currentField === 'reasoning') {
             if (nameEl) nameEl.textContent = 'AI thinking\u2026';
             body.innerHTML = renderReasoning(reasoningRaw);
@@ -354,8 +355,7 @@
             children[i].classList.toggle('stream-cursor', i === children.length - 1);
           }
           prevChildCount = children.length;
-          const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 60;
-          if (nearBottom) body.scrollTop = body.scrollHeight;
+          if (wasPinned) body.scrollTop = body.scrollHeight;
         });
       }
 

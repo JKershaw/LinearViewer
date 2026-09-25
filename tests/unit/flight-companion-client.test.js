@@ -65,6 +65,24 @@ function sliceReadSSEStreamSource() {
 }
 const READ_SSE_STREAM_SRC = sliceReadSSEStreamSource();
 
+// LIN-2987: isPinnedToBottom moved out of chat.js into the shared
+// public/common.js (window.isPinnedToBottom), same slice-by-marker approach
+// as readSSEStream above — sourcing the REAL shipped predicate rather than a
+// stub, so the LIN-2811 scroll-gate/boundary tests below exercise the actual
+// relocated definition. No rebind needed (unlike readSSEStream): chat.js now
+// calls `window.isPinnedToBottom` explicitly, and loadChatUI's sandbox.window
+// is a plain object the slice can assign onto directly.
+function sliceIsPinnedToBottomSource() {
+  const startMarker = 'window.isPinnedToBottom = function isPinnedToBottom(';
+  const startIdx = COMMON_JS_SRC.indexOf(startMarker);
+  assert.ok(startIdx !== -1, 'isPinnedToBottom marker not found in public/common.js — has it moved/been renamed?');
+  const endMarker = '\n};';
+  const endIdx = COMMON_JS_SRC.indexOf(endMarker, startIdx);
+  assert.ok(endIdx !== -1, 'closing `};` for isPinnedToBottom not found');
+  return COMMON_JS_SRC.slice(startIdx, endIdx + endMarker.length);
+}
+const IS_PINNED_TO_BOTTOM_SRC = sliceIsPinnedToBottomSource();
+
 // ─── Minimal DOM shim ───────────────────────────────────────────────────────
 
 class FakeClassList {
@@ -2519,6 +2537,11 @@ function loadChatUI(doc) {
   sandbox.window.renderSurface = function () { return '<div class="chat-msg__body"></div>'; };
   sandbox.window.escapeHtml = function (s) { return s == null ? '' : String(s); };
   vm.createContext(sandbox);
+  // LIN-2987: chat.js's isPinnedToBottom moved to common.js and chat.js now
+  // delegates to window.isPinnedToBottom, both at its two internal call
+  // sites and in its ChatUI.isPinnedToBottom export — so the real predicate
+  // must be on window BEFORE chat.js runs.
+  vm.runInContext(IS_PINNED_TO_BOTTOM_SRC, sandbox, { filename: 'common.js (isPinnedToBottom slice)' });
   vm.runInContext(CHAT_JS_SRC, sandbox, { filename: 'chat.js' });
   return sandbox.window.ChatUI;
 }

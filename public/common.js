@@ -260,6 +260,19 @@ window.renderChip = function renderChip({ label, className, attrs } = {}) {
   return `<code class="${classes.join(' ')}"${attrStr}>${window.escapeHtml(label)}</code>`;
 };
 
+/**
+ * Pure predicate: is `el` scrolled at (or within 60px of) its own bottom?
+ * A null/hidden/unlaid-out element (`clientHeight` reading 0) reads as
+ * pinned — the gate fails toward following, not toward stranding a reader
+ * mid-scroll on first render.
+ * @global
+ * @param {Element} el
+ * @returns {boolean}
+ */
+window.isPinnedToBottom = function isPinnedToBottom(el) {
+  return !el || (el.scrollHeight - el.scrollTop - (el.clientHeight || 0)) < 60;
+};
+
 // =============================================================================
 // Dispatch queue row (LIN-1244)
 // =============================================================================
