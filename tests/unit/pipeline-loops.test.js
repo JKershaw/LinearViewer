@@ -1650,6 +1650,59 @@ describe('answeredDecisions legacy-digest fallback (LIN-3022/LIN-2991 Surface 2,
   });
 });
 
+// LIN-2891 (LIN-3034) Surface 2: `withdrawal` has NO legacy scalar predecessor
+// (unlike `answeredDecisions` above) — a pre-ship digest with no `withdrawal`
+// key at all must read as `null`, not be synthesized from anything else.
+describe('withdrawal (LIN-2891/LIN-3034 Surface 2): lean path via _loopFactsFromDigest', () => {
+  test('no-digest default: a queued live item (no feedbackDigest at all) reports withdrawal: null', async () => {
+    const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const stores = makeLeanDigestStores({
+      liveItems: [liveItem({ id: 'live-w1', dispatchedAt })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    const loop = loops.find(l => l.loopId === 'live-w1');
+    assert.ok(loop, 'the live loop is present');
+    assert.strictEqual(loop.withdrawal, null);
+  });
+
+  test('a digest carrying withdrawal is passed through unchanged', async () => {
+    const digest = {
+      version: 5,
+      terminal: null, wake: null, decision: { decision_id: 'd-1', question: 'ship?' }, decisionEntryIndex: 0, decisionCase: [],
+      answeredDecisionId: null,
+      answeredDecisions: [],
+      withdrawal: { decisionId: 'd-1', reason: 'no longer needed', timestamp: digestIso(HOUR) },
+      parkedWait: null,
+      telemetry: { runtime: {}, metrics: [], toolPeak: null }
+    };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: digest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops.length, 1);
+    assert.deepStrictEqual(loops[0].withdrawal, { decisionId: 'd-1', reason: 'no longer needed', timestamp: digestIso(HOUR) });
+  });
+
+  test('a pre-ship digest with no withdrawal key at all reads as null — no synthesis (unlike answeredDecisions)', async () => {
+    const preShipDigest = {
+      version: 5,
+      terminal: null, wake: null, decision: null, decisionEntryIndex: -1, decisionCase: [],
+      answeredDecisionId: null,
+      answeredDecisions: [],
+      // No `withdrawal` key at all — this is the pre-this-change shape.
+      parkedWait: null,
+      telemetry: { runtime: {}, metrics: [], toolPeak: null }
+    };
+    const stores = makeLeanDigestStores({
+      items: [leanDigestItem({ feedbackVersion: 5, feedbackDigest: preShipDigest })],
+      collectionDocs: [rawCollectionDoc({ feedbackVersion: 5 })]
+    });
+    const loops = await getLoopsForWorkspace('ws', { ...stores, lean: true });
+    assert.strictEqual(loops[0].withdrawal, null, 'a keyless pre-ship digest must read as null, never synthesized');
+  });
+});
+
 describe("abort harvest sourced from the abort row's own feedbackDigest.terminal (LIN-3011)", () => {
   function abortRow(overrides = {}) {
     return leanDigestItem({

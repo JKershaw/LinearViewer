@@ -1660,8 +1660,8 @@ describe(
 
     // Extracts only the loop-facing facts the digest is responsible for
     // (terminal/wake/decision/decisionCase/answeredDecisionId/
-    // answeredDecisions/telemetry's parkedWait+runtime+model+usage+
-    // resources+ticketWalk) — never raw
+    // answeredDecisions/withdrawal (LIN-2891/LIN-3034)/telemetry's
+    // parkedWait+runtime+model+usage+resources+ticketWalk) — never raw
     // `feedback`/`promptText`, which legitimately differ between the lean and
     // non-lean shapes for reasons unrelated to this equivalence (LIN-622).
     // Review ledger L6 (PR #1560): the original version of this helper
@@ -1688,6 +1688,7 @@ describe(
         decisionCase: loop.decisionCase,
         answeredDecisionId: loop.answeredDecisionId,
         answeredDecisions: loop.answeredDecisions,
+        withdrawal: loop.withdrawal,
         telemetry: telemetryRest
       };
     }
