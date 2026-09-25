@@ -92,6 +92,35 @@ describe('DispatchQueueStore#markDecisionWithdrawalReversed', () => {
     assert.equal((stored.feedback || []).length, 0, 'no entry must be appended for a decisionId that was never withdrawn');
   });
 
+  // Review R2 (LIN-3035): the terminal pre-check's guard is
+  // `!liveWithdrawal || liveWithdrawal.decisionId !== decisionId`. Every case
+  // above only ever passes a decisionId that either matches the live
+  // withdrawal or has no withdrawal at all, so a mutation that drops the
+  // `.decisionId !== decisionId` comparison (leaving only `!liveWithdrawal`)
+  // survives them all. This case pins the comparison itself: with 'd-1' live,
+  // reversing the DIFFERENT 'd-2' must return null and append nothing — a
+  // stray reversal entry for 'd-2' would permanently pre-immunise it against
+  // any future withdrawal (A's reader collects reversedIds order-independently).
+  test('decisionId mismatch: reversing a different decisionId than the one live-withdrawn returns null, no append', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+
+    const result = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-2');
+    assert.equal(result, null, 'reversing a decisionId other than the live-withdrawn one must return null');
+
+    const stored = await historyCollection.findOne({ _id: item._id });
+    assert.equal(
+      stored.feedback.filter(e => e.kind === 'decision-withdrawal-reversed').length,
+      0,
+      'no reversal entry must be appended for the mismatched decisionId'
+    );
+    assert.equal(
+      _findDecisionWithdrawal(stored.feedback)?.decisionId,
+      'd-1',
+      'the original d-1 withdrawal must still read as live'
+    );
+  });
+
   test('already-reversed: a second reversal of the same decisionId returns null, with no second entry appended', async () => {
     const { store, historyCollection } = makeStore();
     const item = await withdrawnItem(store, { decisionId: 'd-1' });

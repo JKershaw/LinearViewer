@@ -1756,7 +1756,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return notFound.json(res, 'Item not found or feedback not allowed');
       }
 
-      sessionsFeedCache?.clear(req.dispatchUrlKey);
+      // Only the decision-withdrawn write needs a hard invalidation (Surface 3);
+      // ordinary feedback writes rely on the cache's 5s TTL, so clearing here on
+      // every kind would defeat the stale-while-revalidate path for any workspace
+      // with active runner traffic (review R1).
+      if (sanitizedKind === 'decision-withdrawn') {
+        sessionsFeedCache?.clear(req.dispatchUrlKey);
+      }
 
       res.json(result);
     } catch (err) {

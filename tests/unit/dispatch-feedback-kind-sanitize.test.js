@@ -220,4 +220,26 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
     assert.equal(res.status, 400, JSON.stringify(res.body));
     assert.deepEqual(cleared, [], 'a rejected write must never invalidate the cache');
   });
+
+  // Review R1: sessionsFeedCache?.clear() had been called after every successful
+  // addFeedback, not just kind:'decision-withdrawn' — a regression against Rev 8
+  // Surface 3, which defeats the LIN-617 stale-while-revalidate cache for any
+  // workspace with active runner traffic. The two tests above only ever exercise
+  // decision-withdrawn, so they cannot catch a clear that is unconditional; this
+  // is the negative witness for a successful write of a DIFFERENT kind.
+  test('a successful non-withdrawal feedback write does NOT clear sessionsFeedCache', async () => {
+    const { store: dispatchQueueStore } = makeStore();
+    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
+
+    const cleared = [];
+    const sessionsFeedCache = { clear: (urlKey) => cleared.push(urlKey) };
+    const app = buildApp({ dispatchQueueStore, dispatchTokenStore, sessionsFeedCache });
+    const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`,
+      { message: 'heartbeat', kind: 'heartbeat' },
+      token);
+
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(cleared, [], 'a successful write of a kind other than decision-withdrawn must not invalidate the cache');
+  });
 });
