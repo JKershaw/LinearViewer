@@ -73,6 +73,48 @@ describe('formatRunContext', () => {
       assert.match(out, new RegExp(entry.message), `expected "${entry.message}" to survive the last-8 tail despite the leading stamp`);
     }
   });
+
+  // LIN-3037: the same exclusion must cover the other two decision-lifecycle
+  // stamp kinds, not just decision-answer — a withdrawal's free-text `reason`
+  // must not leak into the prompt as a bare JSON fragment.
+  test('excludes decision-withdrawn entries: no reason fragment in the built context', () => {
+    const loopWithStamp = {
+      ...LOOP,
+      feedback: [
+        { message: 'opened PR #7' },
+        { kind: 'decision-withdrawn', message: '{"decision_id":"d-1","reason":"scheduled wakeup, re-raise later"}' },
+        'done'
+      ]
+    };
+    const out = formatRunContext(loopWithStamp);
+    assert.doesNotMatch(out, /decision_id/);
+    assert.doesNotMatch(out, /scheduled wakeup/);
+  });
+
+  test('excludes decision-withdrawal-reversed entries: no decision_id fragment in the built context', () => {
+    const loopWithStamp = {
+      ...LOOP,
+      feedback: [
+        { message: 'opened PR #7' },
+        { kind: 'decision-withdrawal-reversed', message: '{"decision_id":"d-1"}' },
+        'done'
+      ]
+    };
+    const out = formatRunContext(loopWithStamp);
+    assert.doesNotMatch(out, /decision_id/);
+  });
+
+  test('a decision-withdrawn entry does not consume one of the last-8 feedback slots', () => {
+    const genuine = Array.from({ length: 8 }, (_, i) => ({ message: `entry ${i}` }));
+    const withStamp = {
+      ...LOOP,
+      feedback: [{ kind: 'decision-withdrawn', message: '{"decision_id":"d-1","reason":"blocked"}' }, ...genuine]
+    };
+    const out = formatRunContext(withStamp);
+    for (const entry of genuine) {
+      assert.match(out, new RegExp(entry.message), `expected "${entry.message}" to survive the last-8 tail despite the leading stamp`);
+    }
+  });
 });
 
 describe('buildRunSummaryMessages', () => {

@@ -167,4 +167,41 @@ describe('toSessionView', () => {
       { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
     ]);
   });
+
+  // LIN-3037: the same exclusion must cover the other two decision-lifecycle
+  // stamp kinds — a withdrawal's free-text `reason` must not reach the
+  // accordion body as a bare feedback line.
+  it('LIN-3037: a decision-withdrawn entry is excluded entirely, not merely stripped of kind', () => {
+    const loop = {
+      loopId: 'd6',
+      iteration: 1,
+      feedback: [
+        { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+        { kind: 'decision-withdrawn', message: '{"decision_id":"d-1","reason":"scheduled wakeup"}', timestamp: '2026-08-01T00:01:00.000Z' },
+        { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+      ]
+    };
+    const view = toSessionView(loop);
+    assert.deepEqual(view.feedback, [
+      { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+      { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+    ]);
+  });
+
+  it('LIN-3037: a decision-withdrawal-reversed entry is excluded entirely, not merely stripped of kind', () => {
+    const loop = {
+      loopId: 'd7',
+      iteration: 1,
+      feedback: [
+        { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+        { kind: 'decision-withdrawal-reversed', message: '{"decision_id":"d-1"}', timestamp: '2026-08-01T00:01:00.000Z' },
+        { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+      ]
+    };
+    const view = toSessionView(loop);
+    assert.deepEqual(view.feedback, [
+      { message: 'a real feedback line', timestamp: '2026-08-01T00:00:00.000Z' },
+      { message: 'another real line', timestamp: '2026-08-01T00:02:00.000Z' }
+    ]);
+  });
 });

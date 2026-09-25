@@ -81,6 +81,27 @@ describe('hashLoop', () => {
     };
     assert.notEqual(hashLoop(LOOP), hashLoop(withExtra));
   });
+
+  // LIN-3037: the same immutability guarantee must hold for the other two
+  // decision-lifecycle stamp kinds — a withdrawal or a reversal appended
+  // after caching must not invalidate the cache either.
+  test('is identical before/after appending a decision-withdrawn entry to feedback', () => {
+    const withoutStamp = LOOP;
+    const withStamp = {
+      ...LOOP,
+      feedback: [...LOOP.feedback, { kind: 'decision-withdrawn', message: '{"decision_id":"d-1","reason":"3 tools in 2m"}', timestamp: '2026-08-22T10:00:00.000Z' }]
+    };
+    assert.equal(hashLoop(withoutStamp), hashLoop(withStamp));
+  });
+
+  test('is identical before/after appending a decision-withdrawal-reversed entry to feedback', () => {
+    const withoutStamp = LOOP;
+    const withStamp = {
+      ...LOOP,
+      feedback: [...LOOP.feedback, { kind: 'decision-withdrawal-reversed', message: '{"decision_id":"d-1"}', timestamp: '2026-08-22T10:00:00.000Z' }]
+    };
+    assert.equal(hashLoop(withoutStamp), hashLoop(withStamp));
+  });
 });
 
 describe('RunSummaryCacheStore', () => {
