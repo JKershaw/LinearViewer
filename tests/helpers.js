@@ -101,6 +101,27 @@ export const SELECTORS = {
   project: (name) => `[data-testid="project"][data-project-name="${name}"]`,
   /** An issue row by id (pairs the testid with the existing data-id hook). */
   issue: (id) => `[data-testid="issue-line"][data-id="${id}"]`,
+  dispatchHalt: {
+    status: '[data-testid="dispatch-halt-status"]',
+    disclaimer: '[data-testid="dispatch-halt-disclaimer"]',
+    pause: '[data-testid="dispatch-halt-pause"]',
+    stop: '[data-testid="dispatch-halt-stop"]',
+    resume: '[data-testid="dispatch-halt-resume"]',
+  },
+}
+
+/**
+ * Workspace Halt (LIN-2994 Surface 4 / LIN-3026) page object.
+ * @param {import('@playwright/test').Page} page
+ */
+export function dispatchHalt(page) {
+  return {
+    status: () => page.locator(SELECTORS.dispatchHalt.status),
+    disclaimer: () => page.locator(SELECTORS.dispatchHalt.disclaimer),
+    pause: () => page.locator(SELECTORS.dispatchHalt.pause),
+    stop: () => page.locator(SELECTORS.dispatchHalt.stop),
+    resume: () => page.locator(SELECTORS.dispatchHalt.resume),
+  }
 }
 
 /**
