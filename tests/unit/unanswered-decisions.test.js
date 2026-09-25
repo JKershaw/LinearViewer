@@ -805,6 +805,65 @@ describe('collectUnansweredDecisions — lineage grouping (LIN-2991/LIN-3022 §2
     assert.strictEqual(yRow.resolution.decisionId, 'y', 'y’s own resolution must not be shadowed by x’s (no last-stamp-wins collision under includeResolved either)');
   });
 
+  // LIN-2991 corrective fix: the latest parent review's live repro
+  // (LIN-2985's `lin2985-flight-companion-*` shape) — a decision is raised
+  // and answered on the lineage's ROOT loop, then a later reply supersedes
+  // that same root via `followUpTo`. The root is both the answered group's
+  // only member and its own content loop, so the unconditional "skip a
+  // superseded content loop" gate was hiding the row from `includeResolved`
+  // too, defeating the no-re-raise guidance this endpoint exists to support.
+  test('LIN-2985 shape: an answered root-raised decision stays hidden by default, and includeResolved surfaces it even after a follow-up supersedes the root', () => {
+    const root = loop({ loopId: 'root-2985', wakeMarker: 'blocked', decision: decision('d-2985'), answeredDecisions: answered('d-2985') });
+    const followUp = loop({ loopId: 'follow-2985', followUpTo: 'root-2985', wakeMarker: null, decision: null });
+
+    const dflt = collectUnansweredDecisions({ loops: [root, followUp] }, { now: NOW });
+    assert.deepStrictEqual(dflt, [], 'the default (unanswered) read must still omit the answered group — this fix must not widen it');
+
+    const resolved = collectUnansweredDecisions({ loops: [root, followUp] }, { now: NOW, includeResolved: true });
+    assert.strictEqual(resolved.length, 1, 'includeResolved must surface the row even though its content loop (the root) is now superseded');
+    assert.strictEqual(resolved[0].decision.decision_id, 'd-2985');
+    assert.strictEqual(resolved[0].anchor.loopId, 'root-2985');
+    assert.ok(resolved[0].resolution, 'the surfaced row must carry its resolution');
+    assert.strictEqual(resolved[0].resolution.decisionId, 'd-2985');
+    assert.strictEqual(resolved[0].resolution.outcome, 'answered');
+  });
+
+  // LIN-2991 F2 (the parent review's follow-up finding, same class as the
+  // supersession gate above): a decision answered while an active loop-scoped
+  // shelf still covers it must not vanish from `includeResolved`, exactly the
+  // same reasoning as the content-loop-supersession fix — the shelf gate at
+  // `:549-550` ran for answered groups too, before this fix.
+  test('F2: an answered decision under an active loop-scoped shelf stays hidden by default, and includeResolved surfaces it', () => {
+    const root = loop({ loopId: 'root-shelf', wakeMarker: 'blocked', decision: decision('d-shelf'), answeredDecisions: answered('d-shelf') });
+    const shelvedRulings = [{
+      decisionId: 'd-shelf', urlKey: 'acme', decisionLoopId: 'root-shelf',
+      reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z',
+      resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0
+    }];
+
+    const dflt = collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW });
+    assert.deepStrictEqual(dflt, [], 'the default (unanswered) read must still omit the answered group — the shelf exemption must not widen it');
+
+    const resolved = collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW, includeResolved: true });
+    assert.strictEqual(resolved.length, 1, 'includeResolved must surface the row even though it is still under an active shelf');
+    assert.strictEqual(resolved[0].decision.decision_id, 'd-shelf');
+    assert.ok(resolved[0].resolution, 'the surfaced row must carry its resolution');
+    assert.strictEqual(resolved[0].resolution.outcome, 'answered');
+  });
+
+  // Control for F2: the shelf gate must still apply to an UNANSWERED group,
+  // with or without includeResolved — only an answered group bypasses it.
+  test('F2 control: an UNANSWERED decision under an active loop-scoped shelf stays hidden, even with includeResolved', () => {
+    const root = loop({ loopId: 'root-shelf-open', wakeMarker: 'blocked', decision: decision('d-shelf-open') });
+    const shelvedRulings = [{
+      decisionId: 'd-shelf-open', urlKey: 'acme', decisionLoopId: 'root-shelf-open',
+      reason: 'waiting on a stakeholder', shelvedAt: '2026-08-22T00:00:00.000Z',
+      resurfaceAt: '2026-08-23T00:00:00.000Z', lapseCount: 0
+    }];
+    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW }), []);
+    assert.deepStrictEqual(collectUnansweredDecisions({ loops: [root], shelvedRulings }, { now: NOW, includeResolved: true }), [], 'an open shelved ruling stays hidden under includeResolved too — only an answered group bypasses the shelf gate');
+  });
+
   test('duplicate carriers (the live LIN-2996/LIN-3002 shape): 4 members raising the same decision in one lineage collapse into exactly one row, anchored on the root, stamped on the content loop', () => {
     const root = loop({ loopId: 'root-1', wakeMarker: null, decision: null, dispatchedAt: '2026-08-19T00:00:00.000Z' });
     const wake1 = loop({ loopId: 'wake-1', lineageId: 'root-1', wakeMarker: 'blocked', decision: decision('dup-x'), dispatchedAt: '2026-08-20T00:00:00.000Z' });
