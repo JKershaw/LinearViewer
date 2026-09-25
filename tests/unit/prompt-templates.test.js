@@ -4750,6 +4750,16 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
         'the breakdown aiHint goal must name the same precondition');
       assert.ok(/this ticket's own comment trail/.test(formatAIHintsForMetaPrompt()),
         'the rendered aiHints must carry the precondition too (two-path parity)');
+      // R3: pin the aiHint precondition target AND its no-Approve fallback so the
+      // AI path cannot silently regress to "the Parent Task's comment trail" (M4) or
+      // lose the plain-acceptance-criteria fallback (M3).
+      const goal = PROMPT_TEMPLATES.breakdown.aiHint.goal;
+      assert.ok(/Only if this ticket's own comment trail/.test(goal),
+        'R3: the aiHint precondition must target this ticket\'s own comment trail');
+      assert.ok(/never its own rendered 'Parent Task' section/.test(goal),
+        'R3: the aiHint must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
+      assert.ok(/If no such Approve verdict is on this ticket's own comment trail, write a plain acceptance-criteria subtask instead — no session-fit line, no plan-review-due line\./.test(goal),
+        'R3: the aiHint must carry the no-Approve plain-acceptance-criteria fallback with no false session-fit/plan-review-due markers');
     });
   }
 
@@ -4779,8 +4789,13 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const section = sectionOf(p);
     assert.ok(/create the subtask with only a plain acceptance-criteria description/.test(section),
       'the no-Approve path must still produce a plain acceptance-criteria subtask');
-    assert.ok(/none of bullets \(b\)\/\(c\)\/\(d\)\/\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
-      'the fallback must explicitly withhold the session-fit and plan-review-due bullets');
+    // R4: the focused, per-surface acceptance-criteria guidance must survive as the
+    // fallback's description wording (it was deleted, leaving the precondition pointing
+    // at wording that no longer existed).
+    assert.ok(/Description with acceptance criteria for just this surface — the parent task carries the full scope and sibling context flows in at runtime, so keep the description focused on this surface alone/.test(section),
+      'R4: the no-Approve fallback must restore the focused per-surface acceptance-criteria guidance');
+    assert.ok(/none of bullets \(a\)–\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
+      'the fallback must withhold every approved-path bullet, (a) the plan slice included');
   });
 
   test('byte-parity: explicit Linear ui stays a no-op for the new breakdown content', () => {

@@ -3167,6 +3167,27 @@ describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049
       'the addition must keep the divergence re-derivation escape hatch');
   });
 
+  test('all three new guards carry the divergence condition, not only the gate', () => {
+    const text = build();
+    const step1 = text.indexOf('counts as findings-plus-validated-approach already in hand');
+    const step1End = text.indexOf('→ If the knowledge the deliverable depends on is not yet gathered');
+    assert.ok(step1 > -1 && step1End > step1, 'the Step 1 addition must be present and bounded');
+    assert.ok(/unless the copied slice visibly diverges from what the cited approving verdict approved/.test(text.slice(step1, step1End)),
+      'R1: the Step 1 over-fire guard must not apply when the copied slice visibly diverges');
+
+    const prep = text.indexOf('treat it as settled prep even though the `plan` step never literally ran');
+    const prepEnd = text.indexOf('ONE exception, and only one:');
+    assert.ok(prep > -1 && prepEnd > prep, 'the completed-prep addition must be present and bounded');
+    assert.ok(/This settled-prep read does NOT apply when the child's copied slice visibly diverges/.test(text.slice(prep, prepEnd)),
+      'R1: the completed-prep rule must not apply when the copied slice visibly diverges');
+
+    const gate = text.indexOf('copied approved-plan slice clears the gate');
+    const gateEnd = text.indexOf('Once a plan-review verdict IS on the trail');
+    assert.ok(gate > -1 && gateEnd > gate, 'the gate addition must be present and bounded');
+    assert.ok(/Re-derive the gate independently only if the child's copied slice visibly diverges/.test(text.slice(gate, gateEnd)),
+      'R1: the gate must re-derive on the same visible divergence');
+  });
+
   test('a Breakdown prompts quality rule exists and requires the this-ticket-own-trail Approve precondition FIRST', () => {
     const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Breakdown prompts**'));
     assert.ok(rule, 'the meta-prompt must carry a Breakdown prompts quality rule');
