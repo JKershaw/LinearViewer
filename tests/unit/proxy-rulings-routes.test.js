@@ -89,7 +89,7 @@ function decisionItemWithOptions(id, identifier, decisionId, options) {
   };
 }
 
-let server, baseUrl, collection, suggestionsStore, tokenScope, historyItems, foreignHistoryItems, liveItems;
+let server, baseUrl, collection, suggestionsStore, tokenScope, historyItems, foreignHistoryItems, liveItems, shelvedRulings;
 
 before(async () => {
   process.env.NODE_ENV = 'test';
@@ -109,6 +109,15 @@ before(async () => {
     async listHistory(urlKey) { return { items: withFreshDigests(urlKey === URL_KEY ? historyItems : foreignHistoryItems) }; }
   };
   const agentStatusStore = { async listStatus() { return { items: [] }; } };
+
+  // Workspace-AWARE, same reasoning as `dispatchQueueStore` above — driven by
+  // a per-test `shelvedRulings` override (`beforeEach` below, empty by
+  // default) so a route-level test can exercise the real shelf-input read
+  // path (`shelvedRulingsStore.listForWorkspaces`) rather than only the
+  // collector directly (LIN-2991 F2).
+  const shelvedRulingsStore = {
+    async listForWorkspaces(urlKeys) { return urlKeys.includes(URL_KEY) ? (shelvedRulings || []) : []; }
+  };
 
   collection = createMockCollection();
   suggestionsStore = new DismissalSuggestionsStore({ collection });
@@ -132,7 +141,7 @@ before(async () => {
     dispatchQueueStore,
     agentStatusStore,
     taskDecisionsStore: null,
-    shelvedRulingsStore: null,
+    shelvedRulingsStore,
     dismissalSuggestionsStore: suggestionsStore,
     sessionsFeedCache: null
   }));
@@ -150,6 +159,7 @@ beforeEach(() => {
   historyItems = [decisionItem('loop-1', 'LIN-1', DECISION_ID)];
   foreignHistoryItems = [decisionItem('loop-9', 'OTHER-9', 'foreign-decision')];
   liveItems = [];
+  shelvedRulings = [];
 });
 
 /**
@@ -369,6 +379,36 @@ describe('GET /api/proxy/rulings — issueIdentifier and includeResolved (LIN-29
     const included = await req('GET', '/api/proxy/rulings?includeResolved=true');
     const row = included.body.rulings.find(r => r.decision.decision_id === 'd-2985');
     assert.ok(row, 'includeResolved must surface the answered root-raised ruling even though its content loop (the root) is now superseded');
+    assert.equal(row.resolution.outcome, 'answered');
+  });
+
+  // LIN-2991 F2: the same class as the supersession finding above, but for
+  // the shelf gate — the parent review's follow-up finding. Root-raised,
+  // answered decision, with a real loop-scoped shelf row (via the wired
+  // `shelvedRulingsStore`) still covering it.
+  test('F2: includeResolved surfaces an answered ruling even while it is still under an active shelf', async () => {
+    const iso = nowIso();
+    historyItems = [{
+      id: 'root-shelf', issueIdentifier: 'LIN-1', issueTitle: 'Root', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: iso, resolvedAt: iso, status: 'taken',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: iso },
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'd-shelf', question: 'Proceed?' }), timestamp: iso },
+        { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-shelf' }), timestamp: iso }
+      ]
+    }];
+    shelvedRulings = [{
+      urlKey: URL_KEY, decisionId: 'd-shelf', decisionLoopId: 'root-shelf',
+      reason: 'waiting on a stakeholder', shelvedAt: iso,
+      resurfaceAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), lapseCount: 0
+    }];
+
+    const dflt = await req('GET', '/api/proxy/rulings');
+    assert.equal(dflt.body.rulings.some(r => r.decision.decision_id === 'd-shelf'), false, 'the default read must still omit the answered, shelved row');
+
+    const included = await req('GET', '/api/proxy/rulings?includeResolved=true');
+    const row = included.body.rulings.find(r => r.decision.decision_id === 'd-shelf');
+    assert.ok(row, 'includeResolved must surface the answered ruling even though it is still under an active shelf');
     assert.equal(row.resolution.outcome, 'answered');
   });
 
