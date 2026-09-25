@@ -631,13 +631,14 @@ test.describe('Swipe AI Recommend stream — scroll-follow behavior (LIN-2987)',
    * Stub `window.fetch` so a request to the AI-recommend stream endpoint
    * resolves with a `text/event-stream` body assembled from `frameContents`,
    * one `data:` line per entry, each `content` field appended to the
-   * `prompt` section. Frames are enqueued `pauseMs` apart at
-   * `pauseAfterIndex` (default: a short 30ms elsewhere) so the caller can
-   * hold the stream open — still `.streaming`, mid-render — for exactly as
-   * long as the test needs to observe it.
+   * `prompt` section. Frames are enqueued `pauseMs` apart after each index in
+   * `pauseAfterIndex` (a number or an array of numbers; default: a short 30ms
+   * elsewhere) so the caller can hold the stream open — still `.streaming`,
+   * mid-render — for exactly as long as the test needs to observe it.
    */
   async function stubRecommendStream(page, frameContents, { pauseAfterIndex = -1, pauseMs = 400 } = {}) {
-    await page.evaluate(({ frameContents, pauseAfterIndex, pauseMs }) => {
+    const pauseAfter = [].concat(pauseAfterIndex);
+    await page.evaluate(({ frameContents, pauseAfter, pauseMs }) => {
       const realFetch = window.fetch.bind(window);
       window.fetch = (input, opts) => {
         const href = typeof input === 'string' ? input : input.url;
@@ -650,7 +651,7 @@ test.describe('Swipe AI Recommend stream — scroll-follow behavior (LIN-2987)',
             for (let i = 0; i < frameContents.length; i++) {
               const payload = JSON.stringify({ section: 'prompt', content: frameContents[i] });
               controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
-              await new Promise((resolve) => setTimeout(resolve, i === pauseAfterIndex ? pauseMs : 30));
+              await new Promise((resolve) => setTimeout(resolve, pauseAfter.includes(i) ? pauseMs : 30));
             }
             controller.close();
           },
@@ -660,7 +661,7 @@ test.describe('Swipe AI Recommend stream — scroll-follow behavior (LIN-2987)',
           headers: { 'Content-Type': 'text/event-stream' },
         }));
       };
-    }, { frameContents, pauseAfterIndex, pauseMs });
+    }, { frameContents, pauseAfter, pauseMs });
   }
 
   async function openAiRecommend(page) {
@@ -726,8 +727,11 @@ test.describe('Swipe AI Recommend stream — scroll-follow behavior (LIN-2987)',
 
     // PRELOAD_FRAME alone already overflows the 400px cap, so scrolling away
     // after it lands is a genuine gesture, not a no-op on an empty/short box.
-    // Pause right after it lands, before BIG_FRAME arrives.
-    await stubRecommendStream(page, [PRELOAD_FRAME, BIG_FRAME, WARMUP_FRAME], { pauseAfterIndex: 0 });
+    // Pause right after it lands, before BIG_FRAME arrives, and again right
+    // after BIG_FRAME lands so the measurement below happens mid-stream
+    // rather than racing the terminal settle-render (which resets scrollTop
+    // to 0 and would let a deleted `if (wasPinned)` gate pass vacuously).
+    await stubRecommendStream(page, [PRELOAD_FRAME, BIG_FRAME, WARMUP_FRAME], { pauseAfterIndex: [0, 1] });
     await openAiRecommend(page);
 
     const body = page.locator('[data-prompt-body]').first();
@@ -756,9 +760,17 @@ test.describe('Swipe AI Recommend stream — scroll-follow behavior (LIN-2987)',
       const el = document.querySelector('[data-prompt-body]');
       return !!el && el.textContent.includes(marker);
     }, BIG_FRAME_LAST_MARKER, { polling: 'raf', timeout: 5000 });
-    await expect(container).toHaveClass(/streaming/);
 
-    expect(await body.evaluate((el) => el.scrollTop)).toBe(0);
+    // Read scrollTop and the live-stream flag in ONE evaluate — a single JS
+    // task, so no render or settle can land between them. A separate
+    // `.streaming` check followed by a scrollTop read could straddle the
+    // settle-render under load and read its reset scrollTop=0 instead of the
+    // mid-stream value (LIN-2987 review F1).
+    const midStream = await body.evaluate((el) => ({
+      streaming: el.closest('.prompt-section').classList.contains('streaming'),
+      scrollTop: el.scrollTop,
+    }));
+    expect(midStream).toEqual({ streaming: true, scrollTop: 0 });
 
     await expect(container).not.toHaveClass(/streaming/, { timeout: 5000 });
     expect(pageErrors).toEqual([]);
