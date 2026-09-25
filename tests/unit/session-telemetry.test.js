@@ -279,6 +279,16 @@ describe('parseParkedWait (LIN-2244)', () => {
     assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
   });
 
+  test('a decision-answer stamp as the LAST entry does not mask a parked wait — the latest non-stamp entry decides', () => {
+    // Review L2: `decision-answer` is part of the same 3-kind set, so it must
+    // also be skipped when deciding "currently parked".
+    const feedback = [
+      { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
+      { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', answer: 'proceed' }), timestamp: 't2' },
+    ];
+    assert.deepEqual(parseParkedWait(feedback), { since: 't1', latest: 't1' });
+  });
+
   test('a decision-withdrawn stamp in the MIDDLE of a parked run is passed over without breaking the run', () => {
     const feedback = [
       { message: '[working · verifying] a scheduled wakeup still pending.', timestamp: 't1' },
@@ -1168,7 +1178,19 @@ describe('parseHeartbeats — decision-lifecycle stamp exclusion (LIN-3037)', ()
 
   test('a decision-withdrawal-reversed entry mints no phantom heartbeat', () => {
     const feedback = [
-      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }) },
+      // Review L1: the message must itself match HEARTBEAT_HINT, otherwise this
+      // case passes with the reversed kind removed from the stamp set and proves
+      // nothing. `reason` is the free-text field a stamp would carry.
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1', reason: 'reversed — batch 3 tools in 2m on retry' }) },
+    ];
+    assert.deepEqual(parseHeartbeats(feedback), []);
+  });
+
+  test('a decision-answer entry phrased as "N tools in ..." mints no phantom heartbeat', () => {
+    // Review L2: `decision-answer` is excluded by the same 3-kind set; pin it
+    // with a body that would otherwise mint a phantom heartbeat metric.
+    const feedback = [
+      { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', answer: 'batch 3 tools in 2m' }) },
     ];
     assert.deepEqual(parseHeartbeats(feedback), []);
   });
