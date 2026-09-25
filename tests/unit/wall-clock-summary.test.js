@@ -55,6 +55,46 @@ test('decomposeEffort splits onboarding / active / waiting / wrap-up from heartb
   assert.equal(e.wrapupMs, 4_000);
 });
 
+// LIN-3037: a decision-lifecycle stamp's free-text (e.g. a withdrawal's
+// `reason`) can incidentally contain a CI/test word — must not flip
+// `touchedCi` on prose that was never a real CI/test signal.
+test('decomposeEffort: a decision-withdrawn reason mentioning a CI/test word does not flip touchedCi', () => {
+  const e = decomposeEffort({
+    dispatchedAt: '2026-07-04T07:00:00.000Z',
+    completedAt: '2026-07-04T07:00:30.000Z',
+    feedback: [
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'npm test is flaky, re-raise later' }), timestamp: '2026-07-04T07:00:10.000Z' },
+      { message: '[aborted] cascade close', timestamp: '2026-07-04T07:00:30.000Z' },
+    ],
+  });
+  assert.equal(e.touchedCi, false);
+});
+
+test('decomposeEffort: a decision-withdrawal-reversed entry does not flip touchedCi', () => {
+  const e = decomposeEffort({
+    dispatchedAt: '2026-07-04T07:00:00.000Z',
+    completedAt: '2026-07-04T07:00:30.000Z',
+    feedback: [
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: '2026-07-04T07:00:10.000Z' },
+      { message: '[aborted] cascade close', timestamp: '2026-07-04T07:00:30.000Z' },
+    ],
+  });
+  assert.equal(e.touchedCi, false);
+});
+
+test('decomposeEffort: a real CI signature alongside an unrelated stamp still flags touchedCi (the exclusion is scoped)', () => {
+  const e = decomposeEffort({
+    dispatchedAt: '2026-07-04T07:00:00.000Z',
+    completedAt: '2026-07-04T07:00:30.000Z',
+    feedback: [
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'unrelated' }), timestamp: '2026-07-04T07:00:05.000Z' },
+      { message: 'ran npm test locally', timestamp: '2026-07-04T07:00:10.000Z' },
+      { message: '[aborted] cascade close', timestamp: '2026-07-04T07:00:30.000Z' },
+    ],
+  });
+  assert.equal(e.touchedCi, true);
+});
+
 test('decomposeEffort derives completion from the terminal marker when completedAt is absent', () => {
   const start = '2026-07-04T07:34:00.000Z';
   const e = decomposeEffort({ dispatchedAt: start, feedback: sampleFeedback(start) });
