@@ -10,9 +10,16 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
 - `DELETE /workspace/:urlKey/api/dispatch/:itemId` - Remove item
 - `PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim` - Graceful trim (LIN-2147): amend a live run's `maxTasks` bound downward. Body `{ maxTasks }` (positive integer, strictly less than the run's current bound — 409 otherwise). Invents no new termination path: the existing `maxTasks`/`countDistinctTasksForSession` guard (LIN-1751, `lib/dispatch-factory.js`) already refuses a genuinely NEW task past the bound while admitting a dispatch for a task already inside it (`alreadyCounted`) regardless of count — so lowering the bound here is sufficient on its own to make a run wind down (finish the current ticket, refuse the next new one) without interrupting any beat already in progress. Idempotent (an absolute set, not a relative decrement) and auditable (`by`/`at`/`maxTasks` appended to the run's own `trimHistory`, readable via `getItemStatus`). Distinct from abort (LIN-553/743): abort is a hard stop mid-work; trim is "finish what you're on, start nothing new."
 - Token management at `/workspace/:urlKey/api/dispatch/tokens`
+- `GET /workspace/:urlKey/api/dispatch/halt` - Read the workspace's halt request
+- `POST /workspace/:urlKey/api/dispatch/halt` - Request a pause or stop (LIN-2994)
+- `DELETE /workspace/:urlKey/api/dispatch/halt` - Clear the halt request
+
+Stores a request only: the runner does not yet honor it (pending LIN-2995). This path is
+best-effort under degradation; the degraded-mode path is the proxy verb (below).
 
 **Consumer endpoints** (Bearer token auth):
-- `GET /api/dispatch/poll` - Poll for available items
+- `GET /api/dispatch/poll` - Poll for available items (may carry an additive `halt` request
+  key, omitted when unset; the runner does not yet honor it (pending LIN-2995))
 - `POST /api/dispatch/take/:itemId` - Atomically claim an item
 - `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
 
@@ -48,6 +55,12 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 - `GET /workspace/:urlKey/api/proxy/events` - View audit log
 
 Consumer endpoints are Bearer-token authenticated and fall into three groups: **read** (issues, teams, projects, cycles, labels, search, relations), **write** (`readWrite` scope — create/update issues, comments, relations, labels), and **task automation** (stack, prompt, recommend, recap, brief, status). The full endpoint catalog, request/response shapes, and scope rules are the consumer contract and live in the integration guide — that's the source of truth, not this file. (Issue IDs accept both UUIDs and identifiers like `LIN-123`.) `GET /api/proxy/issues` is cursor-paged (LIN-1511): it accepts an opaque `after` request cursor (alias `cursor`) passed verbatim through the existing `provider.issues({ first, after })` seam, and returns `pageInfo.{hasNextPage,endCursor}` — loop `endCursor` back as `after` until `hasNextPage` is false to enumerate a workspace past the 250-per-page cap. `/api/proxy/search` is deliberately **not** paged (relevance-capped; tracked separately). A cursor the provider rejects is a **400**, not a 500: Linear signals a caller error *inside an HTTP 200 GraphQL envelope* (`extensions.userError: true`, no `statusCode`), which the four status branches of `graphqlErrorStatus()` cannot see, so before LIN-1511's follow-up every one fell through to 500. The `userError → 400` branch is evaluated **last**, after those branches, so it can only refine a would-be 500 — it applies to every proxy route, not just `/issues` (a caller error is a caller error wherever it lands), and `graphqlErrorDetail()` prefers Linear's `extensions.userPresentableMessage` over the generic top-level `message` so the caller is told *which* input was wrong.
+
+`GET/POST/DELETE /api/proxy/dispatch/halt` is the operator trio (LIN-2994 Decision 4) — the
+degraded-mode path for a workspace halt. It stores a request the runner does not yet honor
+(pending LIN-2995); the full contract lives in the [Operator Halt section of the integration
+guide](../proxy-integration.md#operator-halt-lin-2994-decision-4), not here. For incident use,
+see the [degraded-mode runbook](../runbooks/harbour-degraded.md).
 
 **See [docs/proxy-integration.md](docs/proxy-integration.md)** for the full consumer integration guide.
 

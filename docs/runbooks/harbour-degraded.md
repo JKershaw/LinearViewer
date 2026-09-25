@@ -3,8 +3,9 @@
 For when harbour.cat's database-backed reads (dispatch list, rulings, `/kpis`, the live
 and observation views) start hanging or timing out. Written after the 2026-09-22
 incident (LIN-2993; incident record: `docs/incidents/2026-09-22-harbour-db-reads-hang.md`).
-No live-health or halt endpoints exist yet — every step below marked **[unbuilt]** is a
-placeholder until its ticket lands.
+A workspace halt request exists (LIN-2994), but the runner does not yet honor it (pending
+LIN-2995); there is still no deep-health endpoint (LIN-2999). Every step below marked
+**[unbuilt]** is a placeholder until its ticket lands.
 
 ## First moves
 
@@ -16,18 +17,60 @@ placeholder until its ticket lands.
    on top of the feed request that was already hanging on the degraded Mongo link — an
    **amplifier, not the trigger**, of the 546–573 s holds (LIN-2994, LIN-2998; LIN-2993
    comments `ba819bcd`, `825a549b`). This contradicts the "harmless"/"safe no-op" wording
-   still live in `docs/dispatch-integration.md:591`, `docs/dispatch-integration.md:592`
-   and `lib/proxy-instructions.js:710` — that correction belongs to **LIN-2998** and is
+   still live in `docs/dispatch-integration.md:623`, `docs/dispatch-integration.md:624`
+   and `lib/proxy-instructions.js:763` — that correction belongs to **LIN-2998** and is
    not made here; treat a cascade abort as **not safe** while Harbour is degraded,
    whatever those three say.
-3. **Pause/halt is [unbuilt: LIN-2994, LIN-2995].** There is no in-system way to pause a
-   workspace or a runner today. The only way to stop the runner right now is **on the
-   host** (stop or kill the dispatcher process directly).
+3. **Request a workspace halt (LIN-2994); the runner does not yet honor it (pending LIN-2995).**
+   `POST /api/proxy/dispatch/halt` with body `{"mode":"pause"}` (or `"stop"`) records a
+   halt **request** that the next poll carries. It needs a read-write proxy token —
+   **mint one before an incident**, not during it (see *Halt caveats* below). The runner
+   does not yet honor it (pending LIN-2995). The only way to stop the runner
+   right now is **on the host** (stop or kill the dispatcher process directly).
+   `DELETE /api/proxy/dispatch/halt` **clears the request**; clearing it does not by
+   itself change what a running session does. Runner-local halt stays
+   **[unbuilt: LIN-2995]**. Mechanism: `routes/proxy-halt.js:44` (GET), `:75` (POST),
+   `:108` (DELETE). Full contract:
+   [Operator Halt](../proxy-integration.md#operator-halt-lin-2994-decision-4).
+
+## Halt caveats
+
+1. **Decision 2 residuals:**
+   - A cold cache or a freshly restarted process, plus a failed halt read: the halt is
+     silently omitted from the poll (`routes/dispatch.js:80-88`,
+     `lib/workspace-halt.js:110-111`).
+   - The cache is per-process (`lib/workspace-halt.js:43-53`), so two containers
+     overlapping during a deploy can briefly disagree.
+   - `Promise.race` bounds the wait at 1.5 s but does not cancel the query
+     (`routes/dispatch.js:53,55-66`; LIN-2997); that 1.5 s bound applies to the **halt
+     read only**, not to the poll as a whole.
+   - Concurrent writes: the cache keeps whichever write finished last, not what the
+     database committed last. After simultaneous writes, re-read with `GET` and
+     re-issue if needed.
+2. **Full-outage limit:** the poll's token check (`routes/dispatch.js:207`) and item
+   read (`routes/dispatch.js:1429`) have no time limit of their own, unlike the halt
+   read above. Under a full database outage, the poll hangs until the runner's own
+   15 s client timeout (simple-dispatcher `config.js:26`), or fails with a 500 if the
+   database errors back instead of hanging. Either way the runner gets no `halt`. The
+   proxy verb needs the database too: a token check (`routes/proxy.js:527`) plus the
+   write. A halt does not get through a full outage — the cache covers only the halt
+   read.
+3. **Decision 4:** under degradation, use the proxy verb, not the dashboard, with the
+   token minted in advance.
+4. **`stop` amplifier:** once LIN-2995 lands, `stop` flows abort → error
+   (`routes/dashboard.js:89`) → Linear hydration. That path is bounded by
+   `FEED_HYDRATION_CAP = 5` (`routes/dashboard.js:123`) and by the number of running
+   sessions. It is owned by **LIN-2998**: referenced here, not fixed.
+5. **No server-side enforcement:** `POST /api/dispatch/take` does not check the halt
+   (`routes/dispatch.js:1547`).
+6. **Deliberate Harbour OS exclusion:** `target:'local'` is never polled
+   (`routes/dispatch.js:625-676`), so a halt never reaches it. See the `local` row in
+   [the poll contract](../dispatch-integration.md#target-routing).
 
 ## Dispatch a read-only host investigator
 
 A dispatch with no `repo` runs in the workspace's default folder
-(`docs/dispatch-integration.md:932`). Railway access comes from **the host's own linked
+(`docs/dispatch-integration.md:964`). Railway access comes from **the host's own linked
 Railway CLI** — the agent environment carries no `RAILWAY_TOKEN` or Railway API access
 (LIN-1756). Run `railway` from a directory linked to the Harbour project (on 2026-09-22,
 the host's `LinearViewer` checkout) — an unlinked directory won't resolve the service.
@@ -155,10 +198,12 @@ in-system artefact) — there is no documented rollback procedure to follow here
 
 ## Links
 
-Health and halt mechanisms this runbook wants to point to, but none exist yet:
+Health and halt mechanisms this runbook wants to point to:
 
-- **[unbuilt: LIN-2994]** — workspace halt (pause/stop) reaching the runner even when
-  Harbour is degraded.
+- **Workspace halt (shipped, LIN-2994)** — a pause/stop *request*, which the runner does
+  not yet honor (pending LIN-2995). See
+  [Operator Halt](../proxy-integration.md#operator-halt-lin-2994-decision-4) and *Halt
+  caveats* above.
 - **[unbuilt: LIN-2995]** — runner-local halt / auto-pause, independent of Harbour.
 - **[unbuilt: LIN-2999]** — deep health read + early warning.
 - **[unbuilt: LIN-1756]** — Railway deploy settings (healthcheck path, draining,

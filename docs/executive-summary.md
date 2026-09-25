@@ -82,6 +82,10 @@ User generates prompt → Dispatches to queue → Consumer polls → Claims atom
 - `POST /api/dispatch/take/:itemId` — atomic claim (find-and-delete + archive)
 - `POST /api/dispatch/feedback/:itemId` — append-only feedback (ownership-enforced)
 
+**Operator halt** (LIN-2994): `GET/POST/DELETE /api/proxy/dispatch/halt` (proxy token; the
+degraded-mode path) and the matching dashboard trio record a pause/stop request that the
+poll carries as an optional `halt` key. The runner does not yet honor it (pending LIN-2995).
+
 Each dispatched item carries: prompt text, prompt name, issue metadata (id, identifier, title, URL), target (cli/web/dash), and optional repo. Items expire after 24 hours; history retained 30 days.
 
 **Token security**: consumer tokens are 32-byte random values; only SHA-256 hashes are stored. Plain text shown once at creation.
