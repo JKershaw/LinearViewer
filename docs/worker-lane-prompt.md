@@ -150,6 +150,14 @@ would I object to if someone else wrote this" stance is the minimum bar if a sub
 available) before every merge. State which you used in your close-out comment — do not let
 "reviewed" stand unqualified.
 
+**An edit made after the fresh-context review's Approve needs another fresh-context review before
+merge — unless it is the trivial, review-named edit review itself asked for.** If you touch the
+diff again after Approve for any other reason — discharging a ledger item, a caveat, a non-gating
+finding, a self-found sibling, a "do it here" ruling on a finding you raised mid-lane, or resolving
+a conflict between the branch and its base while merging — that is a change you authored after the
+review that was supposed to cover it, so run another fresh-context review before you merge. This
+already covers a "do it here" ruling raised mid-lane; no separate clause is needed for it.
+
 ## Step 4 — The refusal license
 
 **Do not close a ticket whose acceptance you only partly met.** State plainly what's unmet and
