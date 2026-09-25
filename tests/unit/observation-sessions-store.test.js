@@ -93,9 +93,9 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
-  // The pin tracks the CURRENT version (LIN-3011 moved it 11 → 12); a lingering v3
+  // The pin tracks the CURRENT version (LIN-3022 moved it 12 → 13); a lingering v3
   // archive doc from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 12, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 13, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
@@ -326,10 +326,10 @@ test('a v8 doc (pre-LIN-2182) read-misses on both list and point reads so it reb
 // a raw-feedback re-scan — a v11 doc was built the old way, so without the
 // bump it would keep serving pre-digest-backed values for up to
 // DEFAULT_HISTORY_TTL (30 days). Pinning the v11 doc as the target set is what
-// makes this bump load-bearing rather than cosmetic.
-test('BUILDER_VERSION is 12 (LIN-3011), and a v11 doc (pre-digest-backed loops) read-misses on both list and point reads', async () => {
-  assert.equal(BUILDER_VERSION, 12, 'LIN-3011 bumps 11 -> 12 for digest-backed lean loop derivation');
-
+// makes this bump load-bearing rather than cosmetic — unlike the generic
+// `BUILDER_VERSION - 1` tests, it stays meaningful after the next bump, so
+// (like the v8 doc test above) it asserts no specific CURRENT version number.
+test('a v11 doc (pre-digest-backed loops, LIN-3011) read-misses on both list and point reads', async () => {
   const collection = createMockCollection();
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));
@@ -339,4 +339,21 @@ test('BUILDER_VERSION is 12 (LIN-3011), and a v11 doc (pre-digest-backed loops) 
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v11 doc');
   assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v11 doc -> route reconstructs');
+});
+
+// LIN-3022 (LIN-2991 Surface 2): the v12 -> v13 bump exists because loops now
+// also carry the set-derived `answeredDecisions` field beside the scalar
+// `answeredDecisionId` — a genuinely new key, so a v12 doc's embedded loops
+// silently lack it. Same v10/v11 rationale. Pinning the v12 doc as the target
+// set is what makes this bump load-bearing rather than cosmetic.
+test('a v12 doc (pre-answeredDecisions loops, LIN-3022) read-misses on both list and point reads', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 12;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v12 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v12 doc -> route reconstructs');
 });

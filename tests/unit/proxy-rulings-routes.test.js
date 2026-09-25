@@ -262,6 +262,92 @@ describe('GET /api/proxy/rulings', () => {
   });
 });
 
+describe('GET /api/proxy/rulings — issueIdentifier and includeResolved (LIN-2991/LIN-3022 §3)', () => {
+  const nowIso = () => new Date().toISOString();
+
+  test('issueIdentifier filters rows AFTER grouping — a cross-issue-tagged lineage sibling still contributes its stamp to the group before the filter runs', async () => {
+    const iso = nowIso();
+    historyItems = [
+      {
+        id: 'root-cross', issueIdentifier: 'LIN-1', issueTitle: 'Root', promptName: 'implementation', prompt: 'p',
+        dispatchedAt: iso, resolvedAt: iso, status: 'taken',
+        feedback: [
+          { message: '[blocked] need a decision', timestamp: iso },
+          { kind: 'decision', message: JSON.stringify({ decision_id: 'x-cross', question: 'Proceed?' }), timestamp: iso }
+        ]
+      },
+      {
+        // A DIFFERENT issueIdentifier, but the SAME lineage (rootItemId names the root above) —
+        // this is exactly the shape a pre-filter-on-loops bug would break: fetching only
+        // LIN-1's own loops would never see this stamp at all.
+        id: 'sib-cross', issueIdentifier: 'LIN-2', issueTitle: 'Sibling', promptName: 'implementation', prompt: 'p',
+        dispatchedAt: iso, resolvedAt: iso, status: 'taken', rootItemId: 'root-cross',
+        feedback: [{ kind: 'decision-answer', message: JSON.stringify({ decision_id: 'x-cross' }), timestamp: iso }]
+      }
+    ];
+    const { status, body } = await req('GET', '/api/proxy/rulings?issueIdentifier=LIN-1&includeResolved=true');
+    assert.equal(status, 200);
+    const row = body.rulings.find(r => r.decision.decision_id === 'x-cross');
+    assert.ok(row, 'the row must appear under LIN-1 — it is the root/anchor issue, and the filter applies post-grouping');
+    assert.equal(row.anchor.issueIdentifier, 'LIN-1');
+    assert.ok(row.resolution, 'a pre-filter on loops would have excluded the LIN-2-tagged sibling entirely, so this decision would wrongly read as unanswered with no resolution');
+    assert.equal(row.resolution.decisionId, 'x-cross');
+  });
+
+  test('issueIdentifier excludes a row anchored on a different issue', async () => {
+    historyItems = [decisionItem('loop-1', 'LIN-1', DECISION_ID)];
+    const { body } = await req('GET', '/api/proxy/rulings?issueIdentifier=LIN-999');
+    assert.deepEqual(body.rulings, []);
+  });
+
+  test('includeResolved=true returns both an answered and a dismissed group, each with its own resolution.outcome; the default read excludes both', async () => {
+    const iso = nowIso();
+    historyItems = [
+      {
+        id: 'ans-1', issueIdentifier: 'LIN-1', issueTitle: 'T', promptName: 'implementation', prompt: 'p',
+        dispatchedAt: iso, resolvedAt: iso, status: 'taken',
+        feedback: [
+          { message: '[blocked] need a decision', timestamp: iso },
+          { kind: 'decision', message: JSON.stringify({ decision_id: 'd-answered', question: 'Proceed?' }), timestamp: iso },
+          { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-answered' }), timestamp: iso }
+        ]
+      },
+      {
+        id: 'dis-1', issueIdentifier: 'LIN-1', issueTitle: 'T', promptName: 'implementation', prompt: 'p',
+        dispatchedAt: iso, resolvedAt: iso, status: 'taken',
+        feedback: [
+          { message: '[blocked] need a decision', timestamp: iso },
+          { kind: 'decision', message: JSON.stringify({ decision_id: 'd-dismissed', question: 'Proceed?' }), timestamp: iso },
+          { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-dismissed', outcome: 'dismissed' }), timestamp: iso }
+        ]
+      }
+    ];
+
+    const included = await req('GET', '/api/proxy/rulings?includeResolved=true');
+    assert.equal(included.status, 200);
+    const answeredRow = included.body.rulings.find(r => r.decision.decision_id === 'd-answered');
+    const dismissedRow = included.body.rulings.find(r => r.decision.decision_id === 'd-dismissed');
+    assert.ok(answeredRow, 'the answered group must be included');
+    assert.equal(answeredRow.resolution.outcome, 'answered');
+    assert.ok(dismissedRow, 'the dismissed group must be included');
+    assert.equal(dismissedRow.resolution.outcome, 'dismissed');
+
+    const dflt = await req('GET', '/api/proxy/rulings');
+    assert.equal(dflt.body.rulings.some(r => r.decision.decision_id === 'd-answered'), false, 'the default read must not add rows — answered stays excluded');
+    assert.equal(dflt.body.rulings.some(r => r.decision.decision_id === 'd-dismissed'), false);
+  });
+
+  test('includeResolved: an unanswered loop row carries no resolution field', async () => {
+    // Shape check only: no taskDecisionsStore is wired in this suite (null).
+    // The task-bound behaviour under includeResolved is pinned against a real
+    // TaskDecisionsStore in the LIN-2650 WS0 §7 suite below (LIN-3022 L4).
+    historyItems = [decisionItem('loop-1', 'LIN-1', DECISION_ID)];
+    const { body } = await req('GET', '/api/proxy/rulings?includeResolved=true');
+    assert.equal(body.rulings.length, 1);
+    assert.equal('resolution' in body.rulings[0], false, 'an unanswered row never carries a resolution field, included or not');
+  });
+});
+
 describe('POST /api/proxy/rulings/:decisionId/suggest-dismissal', () => {
   test('records a proposal and says on the wire that it is not a dismissal', async () => {
     const { status, body } = await req('POST', `/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, {
@@ -723,6 +809,23 @@ describe('GET /api/proxy/rulings — task-bound rows via a real TaskDecisionsSto
     assert.equal(res.status, 200);
     assert.equal(body.rulings.length, 1, 'only the unanswered row, not the self-resolved one');
     assert.equal(body.rulings[0].decision.decision_id, 'scan_11111111_aaaaaaaaaaaa');
+  });
+
+  // LIN-3022 L4: `includeResolved` covers loop rulings only. An ANSWERED
+  // task-bound ruling never appears under it, but an OPEN one is returned
+  // exactly as in the default read — it is not hidden.
+  test('includeResolved: an open task-bound row is returned exactly as in the default read; the resolved one still never appears', async () => {
+    const dflt = await (await fetch(`${taskBaseUrl}/api/proxy/rulings`)).json();
+    const res = await fetch(`${taskBaseUrl}/api/proxy/rulings?includeResolved=true`);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.deepEqual(
+      body.rulings.map(r => [r.decision.decision_id, r.disposition]),
+      [['scan_11111111_aaaaaaaaaaaa', 'task-bound']],
+      'the open task-bound row stays; the self-resolved one is not surfaced'
+    );
+    assert.equal('resolution' in body.rulings[0], false, 'a task-bound row never carries a resolution');
+    assert.deepEqual(body.rulings, dflt.rulings, 'the open task-bound row is identical to the default read');
   });
 });
 

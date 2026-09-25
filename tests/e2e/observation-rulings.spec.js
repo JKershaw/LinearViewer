@@ -97,6 +97,63 @@ async function seedDecisionWorker(page, { issueIdentifier, issueTitle, decisionI
   return { workerId };
 }
 
+// LIN-2991/LIN-3022 D3: seeds a GENUINE two-loop lineage through the real
+// dispatch API — a root loop, then a child dispatched with `followUpTo:
+// rootId` (the exact reply-box wire shape; no `sessionId`), which
+// dispatch-factory.js's followUpTo-inheritance seam turns into a shared
+// `rootItemId` (see lib/dispatch-store.js's `doc.rootItemId = item.rootItemId
+// || doc._id`), never a hand-built fixture. The root carries no decision of
+// its own; only the child raises one — so `collectUnansweredDecisions`
+// anchors the row on the root (found by lineageId) while the CONTENT loop
+// (and hence `stampLoopId`) is the child, giving the resumable path two
+// genuinely different values to thread through instead of one that happens
+// to look right.
+async function seedGroupedDecisionWorker(page, { issueIdentifier, issueTitle, decisionId, urlKey = URL_KEY }) {
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`);
+  const { token } = await tokenResp.json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  const rootResp = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier, issueTitle, target: 'cli' }
+  });
+  expect(rootResp.status(), `root seed failed: ${await rootResp.text()}`).toBe(201);
+  const rootId = (await rootResp.json()).item.id;
+  const rootTake = await page.request.post(`/api/dispatch/take/${rootId}`, { headers: auth });
+  expect(rootTake.status(), `root take failed: ${await rootTake.text()}`).toBe(200);
+  const rootFeedback = await page.request.post(`/api/dispatch/feedback/${rootId}`, {
+    headers: auth, data: { message: '[working] dispatched a wake follow-up' }
+  });
+  expect(rootFeedback.status()).toBe(200);
+
+  const childResp = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'continue', followUpTo: rootId, issueIdentifier, issueTitle, target: 'cli' }
+  });
+  expect(childResp.status(), `child seed failed: ${await childResp.text()}`).toBe(201);
+  const childId = (await childResp.json()).item.id;
+  const childTake = await page.request.post(`/api/dispatch/take/${childId}`, { headers: auth });
+  expect(childTake.status(), `child take failed: ${await childTake.text()}`).toBe(200);
+
+  const blockedResp = await page.request.post(`/api/dispatch/feedback/${childId}`, {
+    headers: auth, data: { message: '[blocked] need a ruling before continuing' }
+  });
+  expect(blockedResp.status()).toBe(200);
+
+  const decision = await page.request.post(`/api/dispatch/feedback/${childId}`, {
+    headers: auth,
+    data: {
+      kind: 'decision',
+      message: JSON.stringify({
+        decision_id: decisionId,
+        question: 'Proceed with option A?',
+        options: [{ id: 'a', label: 'Approve' }, { id: 'b', label: 'Reject' }],
+        recommended: 'a'
+      })
+    }
+  });
+  expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
+  return { rootId, childId };
+}
+
 async function clearRunsFor(page, urlKey) {
   await page.request.get(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
   await page.request.get(`/test/clear-dispatch-history?urlKey=${urlKey}`);
@@ -176,6 +233,43 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     // (LIN-2444), so this assertion alone does not prove server-side
     // invalidation — see the LIN-2755 round-trip test below for that.
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-P' })).toHaveCount(0, { timeout: 20000 });
+  });
+
+  // LIN-2991/LIN-3022 D3: a genuinely grouped decision — raised on a non-root
+  // (child) loop of a real followUpTo lineage — must stamp the CONTENT loop
+  // (child) while the follow-up dispatch still resumes the ANCHOR (root).
+  // Mutation: reverting observation.js's decisionLoopId back to `anchor?.loopId`
+  // makes the comment assertion below fail (root !== child).
+  test('D3: a grouped decision stamps the content loop while the follow-up dispatch resumes the anchor', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { rootId, childId } = await seedGroupedDecisionWorker(page, {
+      issueIdentifier: 'LIN-1728-D3', issueTitle: 'Grouped ruling', decisionId: 'd-rulings-grouped'
+    });
+    expect(rootId).not.toBe(childId);
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-D3' });
+    await expect(row).toBeVisible();
+
+    const [commentReq, dispatchReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      row.locator('.chat-option-btn').filter({ hasText: 'Approve' }).click()
+    ]);
+    const commentPayload = commentReq.postDataJSON();
+    expect(commentPayload.decisionLoopId, 'the STAMP target must be the content (child) loop').toBe(childId);
+    expect(commentPayload.decisionId).toBe('d-rulings-grouped');
+    expect((await commentReq.response()).status()).toBe(201);
+
+    const dispatchPayload = dispatchReq.postDataJSON();
+    expect(dispatchPayload.followUpTo, 'the RESUME target must be the anchor (root) loop, never the stamp target').toBe(rootId);
+    expect((await dispatchReq.response()).status()).toBe(201);
+
+    await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-D3' })).toHaveCount(0, { timeout: 20000 });
   });
 
   // LIN-2209 (F1/L1): the test above proves the UI-driven flow works, but no

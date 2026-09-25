@@ -62,7 +62,7 @@ import { stableStringify } from '../../lib/recap-cache.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { isWakeEvent } from '../../lib/dispatch-terminal.js';
-import { isDecisionAnswered } from '../../lib/unanswered-decisions.js';
+import { isDecisionAnsweredInLineage, answeredDecisionIdsByLineage } from '../../lib/unanswered-decisions.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 import { digestFeedback } from '../../lib/digest-feedback.js';
 
@@ -457,6 +457,86 @@ describe('observer-sweep: classification (LIN-2131)', () => {
       lane, 'silent',
       'supersession keeps its prior path — an answered decision only clears blocked when nothing supersedes it'
     );
+  });
+});
+
+describe('LIN-2991: classifyLoop discharges every member of every answered decision group in a lineage, independently', () => {
+  test('two distinct decisions in one lineage each discharge on their own — an unanswered sibling decision stays blocked', () => {
+    const root = historyItem({
+      id: 'lin-root', issueIdentifier: 'LIN-330', dispatchedAt: '2026-04-11T10:00:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T10:05:00.000Z' },
+        decisionFeedbackEntry('dec-a', '2026-04-11T10:06:00.000Z')
+      ]
+    });
+    const follow1 = historyItem({
+      id: 'lin-follow-1', issueIdentifier: 'LIN-330', rootItemId: 'lin-root', dispatchedAt: '2026-04-11T10:30:00.000Z',
+      feedback: [
+        answerFeedbackEntry('dec-a', '2026-04-11T10:31:00.000Z'),
+        { message: '[blocked] a second question', timestamp: '2026-04-11T10:35:00.000Z' },
+        decisionFeedbackEntry('dec-b', '2026-04-11T10:36:00.000Z')
+      ]
+    });
+    const follow2 = historyItem({
+      id: 'lin-follow-2', issueIdentifier: 'LIN-330', rootItemId: 'lin-root', dispatchedAt: '2026-04-11T11:00:00.000Z',
+      feedback: [
+        answerFeedbackEntry('dec-b', '2026-04-11T11:01:00.000Z'),
+        { message: '[blocked] a third, still-open question', timestamp: '2026-04-11T11:05:00.000Z' },
+        decisionFeedbackEntry('dec-c', '2026-04-11T11:06:00.000Z')
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [root, follow1, follow2], now: NOW, lean: true });
+    const rootLoop = loops.find((l) => l.loopId === 'lin-root');
+    const followLoop1 = loops.find((l) => l.loopId === 'lin-follow-1');
+    const followLoop2 = loops.find((l) => l.loopId === 'lin-follow-2');
+    assert.strictEqual(rootLoop.decision.decision_id, 'dec-a', 'sanity');
+    assert.strictEqual(followLoop1.decision.decision_id, 'dec-b', 'sanity');
+    assert.strictEqual(followLoop2.decision.decision_id, 'dec-c', 'sanity');
+
+    const superseded = computeSupersededLoopIds(loops);
+    const answeredByLineage = answeredDecisionIdsByLineage(loops);
+    assert.deepStrictEqual(answeredByLineage.get('lin-root'), new Set(['dec-a', 'dec-b']), 'sanity: the union carries exactly the two answered ids, never the still-open dec-c');
+
+    const opts = { superseded, now: NOW_MS, staleMs: STALE_MS, answeredByLineage };
+    assert.strictEqual(classifyLoop(rootLoop, opts), 'resolved', 'dec-a, answered on a LATER sibling loop, must discharge the root');
+    assert.strictEqual(classifyLoop(followLoop1, opts), 'resolved', 'dec-b, answered on a LATER sibling loop, discharges follow-1 too — the sibling stamp for dec-b does not erase dec-a’s own discharge');
+    assert.strictEqual(classifyLoop(followLoop2, opts), 'blocked', 'dec-c is still genuinely unanswered anywhere in the lineage and must stay blocked');
+  });
+
+  test('LIN-3022 L1 — buildSweepPayload itself threads answeredByLineage: a root blocked on a decision answered on a SIBLING loop leaves lanes.blocked and attention', () => {
+    // The test above hands `classifyLoop` a hand-built map, so it cannot see
+    // `buildSweepPayload` stop computing/threading one (review mutation M12
+    // stayed green). This drives the production entry point instead.
+    const root = historyItem({
+      id: 'l1-root', issueIdentifier: 'LIN-340', dispatchedAt: '2026-04-11T11:50:00.000Z',
+      feedback: [
+        { message: '[blocked] need a decision', timestamp: '2026-04-11T11:51:00.000Z' },
+        decisionFeedbackEntry('l1-dec', '2026-04-11T11:52:00.000Z')
+      ]
+    });
+    const sibling = historyItem({
+      id: 'l1-sibling', issueIdentifier: 'LIN-340', rootItemId: 'l1-root', dispatchedAt: '2026-04-11T11:54:00.000Z',
+      feedback: [
+        answerFeedbackEntry('l1-dec', '2026-04-11T11:55:00.000Z'),
+        { message: '[done] finished after the answer', timestamp: '2026-04-11T11:56:00.000Z' }
+      ]
+    });
+    const loops = _buildLoops({ historyItems: [root, sibling], now: NOW, lean: true });
+    const rootLoop = loops.find((l) => l.loopId === 'l1-root');
+    assert.strictEqual(rootLoop.decision.decision_id, 'l1-dec', 'sanity');
+    assert.ok(!computeSupersededLoopIds(loops).has('l1-root'), 'sanity: the root is not excluded as superseded, so only the lineage map can discharge it');
+    // Control: the root's OWN loop carries no answer, so without the map it
+    // reads blocked — the payload assertions below are discriminating.
+    assert.strictEqual(
+      classifyLoop(rootLoop, { superseded: new Set(), now: NOW_MS, staleMs: STALE_MS }),
+      'blocked',
+      'control: with no lineage map, the own-loop fallback leaves the root blocked'
+    );
+
+    const payload = buildSweepPayload(loops, { now: NOW_MS, staleMs: STALE_MS });
+    assert.strictEqual(payload.lanes.blocked, 0, 'buildSweepPayload must compute and thread the lineage map itself');
+    assert.strictEqual(payload.lanes.resolved, 1, 'the root is discharged by its sibling\'s answer stamp');
+    assert.ok(!payload.attention.some((row) => row.loopId === 'l1-root'), 'a sibling-answered root must never be surfaced as waiting on a human');
   });
 });
 
@@ -1425,12 +1505,12 @@ describe('observer-sweep: negative capability — no automated-intervention path
     );
   });
 
-  test('LIN-2671 import-by-reference: classifyLoop reuses isDecisionAnswered from lib/unanswered-decisions.js, never forks the comparison', () => {
+  test('LIN-2671/LIN-2991 import-by-reference: classifyLoop reuses isDecisionAnsweredInLineage from lib/unanswered-decisions.js, never forks the comparison', () => {
     const modulePath = fileURLToPath(new URL('../../lib/observer-sweep.js', import.meta.url));
     const src = readFileSync(modulePath, 'utf8');
     assert.match(
       src,
-      /^import\s*\{\s*isDecisionAnswered\s*\}\s*from\s*'\.\/unanswered-decisions\.js';/m,
+      /^import\s*\{\s*isDecisionAnsweredInLineage,\s*answeredDecisionIdsByLineage\s*\}\s*from\s*'\.\/unanswered-decisions\.js';/m,
       'the answered-decision predicate must be imported by name from the shared module, not re-derived here'
     );
     assert.ok(
@@ -1439,10 +1519,13 @@ describe('observer-sweep: negative capability — no automated-intervention path
     );
     // The name imported above is the shared module's real export, not a
     // same-named local; a renamed/re-exported shim would fail here.
-    assert.strictEqual(typeof isDecisionAnswered, 'function');
-    assert.strictEqual(isDecisionAnswered({ decision: { decision_id: 'd-1' }, answeredDecisionId: 'd-1' }), true);
-    assert.strictEqual(isDecisionAnswered({ decision: { decision_id: 'd-1' }, answeredDecisionId: 'd-2' }), false);
-    assert.strictEqual(isDecisionAnswered({ decision: null, answeredDecisionId: null }), false);
+    assert.strictEqual(typeof isDecisionAnsweredInLineage, 'function');
+    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' } }, new Map([['loop-1', new Set(['d-1'])]])), false, 'no lineageId/loopId on this bare fixture — the map lookup misses');
+    const map = new Map([['lin-1', new Set(['d-1'])]]);
+    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' }, lineageId: 'lin-1' }, map), true);
+    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-2' }, lineageId: 'lin-1' }, map), false);
+    assert.strictEqual(isDecisionAnsweredInLineage({ decision: null, lineageId: 'lin-1' }, map), false);
+    assert.strictEqual(isDecisionAnsweredInLineage({ decision: { decision_id: 'd-1' }, lineageId: 'lin-1', answeredDecisions: [{ decisionId: 'd-1' }] }, undefined), true, 'map ABSENT falls back to the loop’s own answered set');
   });
 });
 

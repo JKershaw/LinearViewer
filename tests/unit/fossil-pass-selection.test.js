@@ -729,3 +729,43 @@ describe('fossil pass — age bucketing', () => {
     assert.equal(totalSkips, result.skipped.length, 'the counts sum to the itemised list');
   });
 });
+
+// ─── LIN-2991/LIN-3022 A1: the fossil guard (regression, per plan-review 18a547e2) ─
+
+describe('fossil pass — answered-decision guard (LIN-2991 §2, plan-review 18a547e2 correction A1)', () => {
+  // A1: unlike every other new test this ticket adds, this one is NOT
+  // expected to be red against unfixed code — the plan-review's own probe at
+  // 63da5387 found the row already classifies `resolved` today, through the
+  // scalar `isDecisionAnswered`. It is a REGRESSION GUARD, exempted from the
+  // "a test that already passes unmodified is not evidence" rule. Its only
+  // valid red witness is the mutation below: reverting
+  // `isDecisionAnsweredInLineage`'s `if (!answeredByLineage) return
+  // isDecisionAnswered(loop);` own-loop fallback (scripts/fossil-pass-lin2633.js's
+  // `selectFossilRows` deliberately passes no `answeredByLineage` map at all,
+  // per A2/A3), which would let this old, still-`[blocked]` row become
+  // eligible for a `--execute` bookkeeping stamp — a real widening of an
+  // operator write script's selection set.
+  test('an old, [blocked] row whose decision is answered on its own feedback (no follow-up) is resolved, not eligible', () => {
+    const rows = [
+      historyItem({
+        id: 'h-ans-fossil', issueIdentifier: 'LIN-994', dispatchedAt: daysAgo(20), resolvedAt: daysAgo(20),
+        feedback: [
+          { message: '[blocked] need a decision', timestamp: daysAgo(20) },
+          {
+            kind: 'decision', timestamp: daysAgo(20),
+            message: `[decision] ${JSON.stringify({ decision_id: 'h-ans', question: 'Proceed?', options: [{ id: 'a', label: 'Go' }, { id: 'b', label: 'Hold' }] })}`
+          },
+          { kind: 'decision-answer', timestamp: daysAgo(20), message: JSON.stringify({ decision_id: 'h-ans' }) }
+        ]
+      })
+    ];
+    const loops = build({ historyItems: rows });
+    const superseded = computeSupersededLoopIds(loops);
+    const lane = classifyLoop(loops[0], { superseded, now: NOW_MS, staleMs: DEFAULT_LANE_STALE_MS });
+    assert.equal(lane, 'resolved', 'answered on its own feedback, no follow-up — resolved via the own-loop fallback (no answeredByLineage map passed)');
+
+    const result = select(loops);
+    assert.deepEqual(result.eligible, [], 'a resolved row is not silent-or-blocked, so it must never reach eligible');
+    assert.equal(reasonFor(loops, 'h-ans-fossil'), 'not-silent-or-blocked');
+  });
+});
