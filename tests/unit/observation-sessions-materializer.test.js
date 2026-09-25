@@ -272,6 +272,58 @@ test('LIN-2934 (S5): iteration is numbered PER anchor, not across all general ru
   assert.strictEqual(anchorIterationOf(sg2, 'SG2'), 1);
 });
 
+// LIN-2934 (D1): a GENERAL (goal-only) anchor's OWN agent-status row (reported
+// under a free-form taskIdentifier — 'GOAL', matching the review's own probe —
+// that has nothing to do with the anchor's dispatch id). `_buildLoops` (T2)
+// already knows how to fall back to a dispatchId-keyed match for an anchorless
+// bucket, but only when it is GIVEN those rows: `getSessionsForIssues`
+// (issue-scoped, used by both the incremental materializer and the dashboard
+// point read) fetched agent-status per-issue by `taskIdentifier` only, so an
+// anchor's own status row was invisible on that path even though the full
+// workspace build (which reads agent-status unscoped) saw it fine — the exact
+// full-vs-incremental divergence D1 closes.
+function seedGeneralAnchorStatusFixture({ historyCollection, statusCollection }) {
+  archive(historyCollection, { id: 'SG3', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(110), resolvedAtMs: min(111) });
+  archive(historyCollection, { id: 'WG3-1', issueIdentifier: 'LIN-810', sessionId: 'SG3', dispatchedAtMs: min(112), resolvedAtMs: min(115), feedback: [{ message: '[done] shipped WG3-1', tsMs: min(115) }] });
+  status(statusCollection, { id: 'AS-sg3-w1', taskIdentifier: 'LIN-810', tsMs: min(113) });
+  // The anchor's own agent-status row: taskIdentifier is a free-form goal
+  // string unrelated to the anchor's own dispatch id, dispatchId names the
+  // anchor's own id directly — the only field `_buildLoops`' T2 fallback can
+  // match on for an anchorless bucket.
+  status(statusCollection, { id: 'AS-sg3-anchor', taskIdentifier: 'GOAL', dispatchId: 'SG3', action: 'plan', status: 'blocked', tsMs: min(110) + 30 * 1000 });
+}
+
+test('LIN-2934 (D1): a GENERAL anchor\'s own agent-status reaches the materialized session doc, byte-identical to the full build', async () => {
+  const ctx = setup();
+  seedGeneralAnchorStatusFixture(ctx);
+  const { agentStatusStore, observationSessionsStore, materializer } = ctx;
+
+  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
+  const fullSG3 = full.find(s => s.sessionId === 'SG3');
+  assert.ok(fullSG3, 'sanity: the pure full-workspace build finds the general run');
+  const fullAnchorLoop = fullSG3.loops.find(l => l.loopId === 'SG3');
+  assert.strictEqual(fullAnchorLoop.agentAction, 'plan', 'sanity: the full build already resolves the anchor\'s own agent-status row (T2)');
+  assert.strictEqual(fullAnchorLoop.agentStatus, 'blocked');
+
+  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG3' });
+
+  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
+  const sg3 = sessions.find(s => s.sessionId === 'SG3');
+  assert.ok(sg3, 'the incremental (issue-scoped) rebuild must find this session too');
+  assert.deepEqual(sg3, fullSG3, 'byte-identical to the full build, including the anchor\'s agent-status fields');
+  const incrementalAnchorLoop = sg3.loops.find(l => l.loopId === 'SG3');
+  assert.strictEqual(incrementalAnchorLoop.agentAction, 'plan');
+  assert.strictEqual(incrementalAnchorLoop.agentStatus, 'blocked');
+
+  // Confirmed reachable through the dashboard point-read path too (S6):
+  // pointReadSession calls the SAME getSessionsForIssues, so the point-read
+  // session doc must carry the same anchor fields.
+  const point = await observationSessionsStore.getSession(URL_KEY, 'SG3');
+  const pointAnchorLoop = point.loops.find(l => l.loopId === 'SG3');
+  assert.strictEqual(pointAnchorLoop.agentAction, 'plan');
+  assert.strictEqual(pointAnchorLoop.agentStatus, 'blocked');
+});
+
 // LIN-1307: autopilot session S, worker W (sessionId: S), and a reply-box
 // follow-up F that resumes W (followUpTo: W, sessionId: null, kind: 'custom',
 // target: 'cli') on its OWN distinct issue — the shape a human follow-up reply
