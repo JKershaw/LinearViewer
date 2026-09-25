@@ -75,7 +75,24 @@ test('decomposeEffort: a decision-withdrawal-reversed entry does not flip touche
     dispatchedAt: '2026-07-04T07:00:00.000Z',
     completedAt: '2026-07-04T07:00:30.000Z',
     feedback: [
-      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: '2026-07-04T07:00:10.000Z' },
+      // Review L1: the body must itself match CI_TEST_SIGNATURE, otherwise this
+      // case passes with the reversed kind removed from the stamp set and proves
+      // nothing.
+      { kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: 'd-1', reason: 'reversed — re-run npm test' }), timestamp: '2026-07-04T07:00:10.000Z' },
+      { message: '[aborted] cascade close', timestamp: '2026-07-04T07:00:30.000Z' },
+    ],
+  });
+  assert.equal(e.touchedCi, false);
+});
+
+test('decomposeEffort: a decision-answer body mentioning a CI/test word does not flip touchedCi', () => {
+  // Review L2: `decision-answer` is excluded by the same 3-kind set; pin it
+  // with a body that would otherwise match the CI/test signature.
+  const e = decomposeEffort({
+    dispatchedAt: '2026-07-04T07:00:00.000Z',
+    completedAt: '2026-07-04T07:00:30.000Z',
+    feedback: [
+      { kind: 'decision-answer', message: JSON.stringify({ decision_id: 'd-1', answer: 'yes, npm test is green' }), timestamp: '2026-07-04T07:00:10.000Z' },
       { message: '[aborted] cascade close', timestamp: '2026-07-04T07:00:30.000Z' },
     ],
   });
