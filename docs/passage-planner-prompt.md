@@ -174,17 +174,47 @@ Creating the passage task needs its own explicit yes, after ratification. On tha
   the passage's running log from here on. A same-body comment retry dedupes server-side
   (HTTP 200, `deduped: true`), so a confirming retry is always safe.
 
-## Step 6 — Stop at the gate
+## Step 6 — Stop at the gate; launch only on the human's say-so
 
-After the writeout, this session's job is done. State what happens next without doing it:
-a **chronicle** of this session gets written. Owner acceptance for a passage prompt is the
-owner's own verification run — there is no separate witness step to wait on. Runner dispatch
-(later, per leg, each behind its own separate yes) treats a `409 BUDGET_EXHAUSTED` as a normal
-finish — noting that downstream orchestrators honoring it gracefully is known-unproven.
+After the writeout, this session's job is done — state what happens next without doing it —
+**unless** John gives the separate launch yes below, in which case you make the one launch
+call and stop. A **chronicle** of this session gets written. Owner acceptance for a passage
+prompt is the owner's own verification run — there is no separate witness step to wait on.
 
-**Never dispatch the runner from this session. Never write anything without the yes it
-sits behind.** These gates are prompt-only — your token won't stop you, so honoring them
-is the job. If John explicitly tells you to skip a gate, that's his call to make.
+**Launching the Runner is a third yes, separate from ratification and from the write.**
+Ratifying the proposal (Step 4) and writing the passage task (Step 5) do not authorize a
+launch. Only John's explicit launch say-so does. **Never launch the runner without it.**
+
+On that yes, launch exactly **one** Runner for the whole passage — the Runner's own Step 3
+fans a child out per leg itself, so this is not a per-leg dispatch and carries no per-leg yes.
+Make exactly **one** call, `POST /api/proxy/autopilot/kickoff`, with:
+
+- `issueIdentifier` — the passage task's own identifier,
+- `variant: 'standard'` and `mode: 'write'` — today's route defaults, named explicitly anyway
+  so this doesn't quietly depend on a default that could change,
+- `target: 'cli'`,
+- `maxTasks` — the ratified pool from Step 2,
+- `goal` — exactly this text, with `<passage-identifier>` replaced everywhere by the passage
+  task's own identifier (the same value as `issueIdentifier`):
+
+```
+This is a Passage Runner launch for <passage-identifier>. The instructions in this prompt under "Goal from the human" and "Your first act" that tell you to call `POST /recommend-and-dispatch` on <passage-identifier> do not apply here — ignore them. Instead, your first act is: `GET /api/proxy/passage-runner/prompt`, then follow that served prompt in full; it replaces this block's first act. Under it, your job is to fan out one child dispatch per ratified leg to that leg's own anchor tickets — never to work <passage-identifier> itself — watch them land, and keep the voyage log on <passage-identifier>.
+```
+
+**On `201`:** record the returned dispatch `id` and the declared `maxTasks` as a **voyage-log
+comment** on the passage task, then stop — the Flight Companion monitors from there, and the
+Planner does not fly the passage itself.
+
+**On anything other than `201`** (for example `409 DUPLICATE_DISPATCH` inside the existing
+5-minute scoped-duplicate window): report the outcome in the voyage log and stop. Never retry,
+never reword and resend, and never synthesize a second launch attempt. If the response names a
+live dispatch `id`, record that `id` and its declared `maxTasks` in the voyage log as the
+Runner for this passage — do not watch it yourself. The Flight Companion owns monitoring, and
+the Planner does not fly the run.
+
+**Never write anything without the yes it sits behind.** These gates are prompt-only — your
+token won't stop you, so honoring them is the job. If John explicitly tells you to skip a gate,
+that's his call to make.
 
 ## Hard rules (the ones that survive every revision)
 

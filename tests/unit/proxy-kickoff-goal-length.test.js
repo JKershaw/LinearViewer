@@ -24,11 +24,35 @@ import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
 import express from 'express';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const KICKOFF = '/api/proxy/autopilot/kickoff';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Derives the Planner's `goal` from the template the Planner doc serves: the
+// fenced block introduced by the "exactly this text" marker in
+// docs/passage-planner-prompt.md, with `<passage-identifier>` substituted.
+// The test tracks the served doc instead of holding a hand-copy that can drift
+// from the template the Planner actually sends (review L1).
+function plannerLaunchGoal(passageIdentifier) {
+  const doc = readFileSync(join(__dirname, '../../docs/passage-planner-prompt.md'), 'utf8');
+  const markerIndex = doc.indexOf('exactly this text');
+  assert.ok(
+    markerIndex !== -1,
+    'docs/passage-planner-prompt.md must mark the goal template with "exactly this text"'
+  );
+  const fenceStart = doc.indexOf('```', markerIndex);
+  assert.ok(fenceStart !== -1, 'a fenced goal template must follow the "exactly this text" marker');
+  const bodyStart = doc.indexOf('\n', fenceStart) + 1;
+  const fenceEnd = doc.indexOf('```', bodyStart);
+  assert.ok(fenceEnd !== -1, 'the fenced goal template must be closed');
+  return doc.slice(bodyStart, fenceEnd).trim().replaceAll('<passage-identifier>', passageIdentifier);
+}
 
 function buildApp({ dispatchQueueStore }) {
   const app = express();
@@ -133,5 +157,84 @@ describe('LIN-2818 — scoped kickoff delivers the caller goal (LIN-2730 shape)'
     const fetched = await call(app, 'get', `/api/proxy/dispatch/${kickoff.body.id}/prompt`);
     assert.equal(fetched.status, 200, JSON.stringify(fetched.body));
     assert.ok(!fetched.body.prompt.includes('**Additional context from the human:**'));
+  });
+});
+
+describe('LIN-2175 — the documented Planner launch shape is accepted and carries its goal', () => {
+  // Derived from the served template, not hand-copied: editing the doc's fenced
+  // block now changes this input, which is the linkage review L1 asked for.
+  const goal = plannerLaunchGoal('TEST-1');
+
+  test('standard + write + maxTasks + goal → 201 echoes maxTasks, the dispatch read returns it, and the prompt carries the exact goal', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const kickoff = await call(app, 'post', KICKOFF, {
+      issueIdentifier: 'TEST-1',
+      variant: 'standard',
+      mode: 'write',
+      target: 'cli',
+      maxTasks: 13,
+      goal
+    });
+    assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
+    assert.equal(kickoff.body.maxTasks, 13, 'the ratified pool must be echoed on the kickoff response');
+
+    // The read the Runner itself makes in Step 4: GET /dispatch/{own id} → maxTasks.
+    const read = await call(app, 'get', `/api/proxy/dispatch/${kickoff.body.id}`);
+    assert.equal(read.status, 200, JSON.stringify(read.body));
+    assert.equal(read.body.maxTasks, 13, 'the dispatch read must return the declared bound');
+
+    const fetched = await call(app, 'get', `/api/proxy/dispatch/${kickoff.body.id}/prompt`);
+    assert.equal(fetched.status, 200, JSON.stringify(fetched.body));
+    assert.ok(
+      fetched.body.prompt.includes('**Additional context from the human:** ' + goal),
+      'the exact precedence-preserving goal text must survive into the served prompt verbatim'
+    );
+  });
+
+  // Review L4: the goal is only precedence-preserving if it still names the two
+  // scaffold headings it overrides and the Runner prompt it substitutes, AND the
+  // generator still renders those headings. The goal-carrying test above proves
+  // that whatever the doc says is delivered; it does not prove the override
+  // contract itself. These assertions make a dropped override sentence (doc edit)
+  // or a renamed scaffold heading (generator edit) fail loudly.
+  test('the derived goal overrides the scaffold headings, which still render (review L4)', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    assert.ok(
+      goal.includes('Goal from the human'),
+      'the goal must name the "Goal from the human" scaffold heading it overrides'
+    );
+    assert.ok(
+      goal.includes('Your first act'),
+      'the goal must name the "Your first act" scaffold heading it overrides'
+    );
+    assert.ok(
+      goal.includes('GET /api/proxy/passage-runner/prompt'),
+      'the goal must name the Runner prompt as the replacement first act'
+    );
+
+    const kickoff = await call(app, 'post', KICKOFF, {
+      issueIdentifier: 'TEST-1',
+      variant: 'standard',
+      mode: 'write',
+      target: 'cli',
+      maxTasks: 13,
+      goal
+    });
+    assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
+
+    const fetched = await call(app, 'get', `/api/proxy/dispatch/${kickoff.body.id}/prompt`);
+    assert.equal(fetched.status, 200, JSON.stringify(fetched.body));
+    assert.ok(
+      fetched.body.prompt.includes('**Goal from the human:**'),
+      'the generator must still render the "Goal from the human" heading the goal overrides'
+    );
+    assert.ok(
+      fetched.body.prompt.includes('**Your first act:**'),
+      'the generator must still render the "Your first act" heading the goal overrides'
+    );
   });
 });

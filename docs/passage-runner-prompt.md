@@ -100,6 +100,14 @@ Delegate the mechanics to `GET /autopilot/manual`'s "Dispatching a child autopil
 this prompt only states *which* children to dispatch and *how much* budget each carries, not new
 mechanism. Three branches:
 
+**Whether you have your own dispatch row decides how the rest of this step and Step 4 work.**
+You do if you were launched via the Planner's `POST /autopilot/kickoff` call (Step 4 explains
+how to read it). You don't if this prompt was hand-pasted into a fresh session. Everywhere below
+that says "stamp `sessionId`," "wait for a wake," or "read your own bound," that instruction is
+for the launched case. The hand-pasted case is the fallback described at each point — never a
+fabricated `sessionId` (a format-valid but unreal id is accepted and resolves to nothing, worse
+than omitting it).
+
 - **Multi-anchor leg** (names more than one anchor): dispatch the child **goal-only** — no
   `issueIdentifier` — with `variant: 'standard'`. The goal must explicitly name the leg's
   anchors and instruct the child to stay inside them, reporting (not silently taking) any pull
@@ -119,16 +127,17 @@ mechanism. Three branches:
   independent — that's the multi-anchor branch's job, and a lane's sequential loop would only add
   needless serialization.
 
-On **every** leg-child kickoff, regardless of branch:
-
-- Stamp your **own dispatch id** as `sessionId`.
-- Declare `subscription: 'everything'` **explicitly** — never inferred from the presence of a
-  `sessionId`.
+On **every** leg-child kickoff, regardless of branch: if you have a dispatch row, stamp it as
+`sessionId` and declare `subscription: 'everything'` explicitly — never inferred. If you don't,
+omit both, and say in your reports that this leg-child is unsubscribed and you'll poll it
+directly.
 
 **Fan out every independent leg up front** — there is no batch barrier, and one leg's outcome
 never waits on another's — *unless* the passage description's own text encodes a
 `blocks`/`blocked-by` ordering between legs, in which case hold the dependent leg back until its
-blocker's terminal wake has landed and been judged clean.
+blocker reaches a terminal state and is judged clean — wait for the terminal wake if you have a
+dispatch row to be woken on; otherwise poll `GET /dispatch/{blocker leg-child's own dispatch id}`
+until it's terminal.
 
 ## Step 4 — State the budget asymmetry plainly; don't paper over it
 
@@ -161,6 +170,12 @@ run; there is no seam for you to set it retroactively on yourself. Read your own
 declared — say so plainly in the landing report rather than restating the ratified figure as if
 it were enforced; a `maxTasks` your launcher forgot to pass is genuinely undeclared, not a
 reporting gap on your end.
+
+**Launched via the Planner's kickoff:** a real dispatch row exists from the start, so the
+`maxTasks` read above always resolves to a declared number or explicit `null` — never absent.
+**Hand-pasted:** there is no dispatch row at all — no id to read `maxTasks` from, no real
+`sessionId` to stamp per Step 3 above, and the budget guard / up-chain wake / cost attribution
+this and later steps describe don't apply. Say so plainly in the landing report.
 
 There is **no voyage-level cost roll-up**: `GET /cost/{identifier}` is per-issue-identifier
 only. When you write the landing report (Step 7), sum per-anchor `/cost` reads and state the
@@ -213,8 +228,10 @@ covering:
   structured fields — never the brief, never your own memory of an earlier cycle.
 - A malformed leg block gets you a BLOCKED park naming the deviation — never a best-effort
   guess.
-- `sessionId` + `subscription: 'everything'` are explicit on every leg-child kickoff — never
-  inferred.
+- When you have your own dispatch row: `sessionId` + `subscription: 'everything'` are explicit
+  on every leg-child kickoff — never inferred. When hand-pasted with no dispatch row: omit both
+  on every leg-child kickoff, and never fabricate a `sessionId` — Step 3 describes what to do
+  instead.
 - A `409 BUDGET_EXHAUSTED` is a clean stop. It is never reported as a failure.
 - Every plan revision, leg wind-down, and material deviation is its own comment, the moment it
   happens — not batched for later.
