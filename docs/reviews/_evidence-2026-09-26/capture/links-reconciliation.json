@@ -1,0 +1,65 @@
+{
+  "1": {
+    "appHome": 0,
+    "appWorkspaceOrNav": 0,
+    "archiveCross": 0,
+    "canonicalProductOrigin": 0,
+    "external": 0,
+    "fragment": 0,
+    "total": 0
+  },
+  "2": {
+    "appHome": 0,
+    "appWorkspaceOrNav": 0,
+    "archiveCross": 0,
+    "canonicalProductOrigin": 0,
+    "external": 0,
+    "fragment": 0,
+    "total": 0
+  },
+  "3": {
+    "appHome": 0,
+    "appWorkspaceOrNav": 0,
+    "archiveCross": 0,
+    "canonicalProductOrigin": 0,
+    "external": 0,
+    "fragment": 0,
+    "total": 0
+  },
+  "4": {
+    "appHome": 0,
+    "appWorkspaceOrNav": 0,
+    "archiveCross": 0,
+    "canonicalProductOrigin": 0,
+    "external": 0,
+    "fragment": 0,
+    "total": 0
+  },
+  "5": {
+    "appHome": 0,
+    "appWorkspaceOrNav": 0,
+    "archiveCross": 1,
+    "canonicalProductOrigin": 0,
+    "external": 23,
+    "fragment": 0,
+    "total": 24
+  },
+  "6": {
+    "appHome": 0,
+    "appWorkspaceOrNav": 0,
+    "archiveCross": 0,
+    "canonicalProductOrigin": 0,
+    "external": 0,
+    "fragment": 10,
+    "total": 10
+  },
+  "7": {
+    "appHome": 0,
+    "appWorkspaceOrNav": 0,
+    "archiveCross": 2,
+    "canonicalProductOrigin": 1,
+    "external": 54,
+    "fragment": 41,
+    "total": 98
+  }
+}
