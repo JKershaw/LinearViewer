@@ -8,7 +8,7 @@
 
 **Method.** Drift-first: every doc claim was located against the concrete thing it asserts at HEAD. Counts and enumerations were verified by **executing** the source (`lib/prompt-template-defs.js` → 17; `lib/feature-defaults.js` `EXPERIMENTAL_VIEWS` → 9; `lib/providers/` → 5; `lib/periodicals.js` `PERIODICALS` → 15; `simple-dispatcher/terminal-driver.js` `TERMINAL_DRIVERS` → 4), never by grep alone. Every class query is stated inline with its finding; the query residues that are point-in-time artifacts are named and excluded explicitly.
 
-**Ruling / process note.** Plan-review looped twice. Both verdicts — `a41d3cfe-3c7d-4b92-839e-380a55a6946e` (9 corrections) and `cdb29489-e07f-4c45-b412-032dad0e5893` (8 corrections) — are **binding**, and their finding lists are a **floor, not a ceiling**. The delegated Con ruling `9d5b7c86-c466-48db-ac57-4ab70fa5100b` ("option a — write the report now", verb override `c128261f-29d0-4641-8e10-98b88569e4f8`) waived plan approval for this ticket only; research is `003e0676-d72f-4424-94f4-4cd9910e32f6`, plan `7bbcd520-786c-409d-84d0-75f34f34b78b`, revision `90ea268f-4db0-45cf-a639-193fd3672d49`, hand-back `9fad9e30-5c97-4b30-8a43-e4ae598467c7`. This report re-ran every class query at HEAD and treats the verdict member lists as the floor it was asked to be. The PR still goes through normal review and CI.
+**Ruling / process note.** Plan-review looped twice. Both verdicts — `a41d3cfe-3c7d-4b92-839e-380a55a6946e` (9 corrections) and `cdb29489-e07f-4c45-b412-032dad0e5893` (8 corrections) — are **binding**, and their finding lists are a **floor, not a ceiling**. The delegated Con ruling `9d5b7c86-c466-48db-ac57-4ab70fa5100b` ("option a — write the report now", verb override `c128261f-29d0-4641-8e10-98b88569e4f8`) waived plan approval for this ticket only; research is `003e0676-d72f-4424-94f4-4cd9910e32f6`, plan `7bbcd520-786c-409d-84d0-75f34f34b78b`, revision `90ea268f-4db0-45cf-a639-193fd3672d49`, hand-back `9fad9e30-5c97-4b30-8a43-e4ae598467c7`. This report re-ran every class query at HEAD and treats the verdict member lists as the floor it was asked to be. The PR still goes through normal review and CI. **Follow-ups minted this run:** LIN-3115 (N2), LIN-3116 (DC-dispatch-fields + route citations), LIN-3117 (N1), each `related` to this ticket; existing-ticket measurements were posted as comments on LIN-2390/2391/2392/1856/2656/2255/2177/687/1233 and a cross-link on LIN-1653.
 
 ---
 
@@ -205,7 +205,7 @@ Root cause: text moved verbatim from root `CLAUDE.md` into `docs/architecture/`,
 
 ---
 
-## H10 · **LOW** — `docs/direction-layer-proposal.md:21`: fourth consecutive run — **not minted**
+## H10 · **LOW** — `docs/direction-layer-proposal.md:21`: fifth consecutive run — **not minted**
 
 **What.** "*There are **four** transport layers … (dispatch queue, proxy API, **Linear CLI**, llms.txt + data attributes)*" — `lib/linear-cli.js` was deleted (confirmed absent at HEAD); there are three. The same paragraph names the phantom "pipeline" view and frames Harbour's context as specifically "Linear". Cited as prior art by LIN-1647/LIN-1648, still open.
 
@@ -273,24 +273,25 @@ Per the ticket's instruction ("re-verify every seed against source at HEAD; corr
 
 | finding | severity | disposition |
 | -- | -- | -- |
-| **N1** — 4 broken relative links in `docs/architecture/` | LOW | **mint candidate** (bounded, mechanical) |
-| **N2** — template-count guard hole (`lib/render-landing.js:339`, `docs/executive-summary.md:34,55,132`) | MED | **mint candidate**; cross-link **LIN-1653** (same guard class, other surfaces) |
-| **DC-dispatch-fields + post-split route citations** | MED | **mint candidate** (widened: 3 fields + 4 doc citations + 11 inline comments + 8 test) |
-| **H1** served-catalog gaps + reverse drift | MED | **existing: LIN-2390 — comment** |
-| **H3** residual Linear-only framing | HIGH | **existing: LIN-2391 — comment** |
-| **H4** public landing copy | HIGH | **existing: LIN-2392 — comment** |
-| **F2** `view-tiers.md` 7 of 9 | MED | **existing: LIN-1856 — comment** |
-| **effort** absent from catalog | MED | **existing: LIN-2656 — comment** (cite both routes) |
-| **LIN-2255** llms.txt read-only/logout copy | LOW | **existing: LIN-2255 — comment** |
-| **LIN-2177 / LIN-2465 / LIN-2482** SD docs items | LOW | **existing — comment** |
-| **LIN-687 / LIN-1233** | LOW | **existing — recommend close** (no re-flag) |
+| **N1** — 4 broken relative links in `docs/architecture/` | LOW | **minted: LIN-3117** (related to LIN-3102) |
+| **N2** — template-count guard hole (`lib/render-landing.js:339`, `docs/executive-summary.md:34,55,132`) | MED | **minted: LIN-3115**; cross-link **LIN-1653** (same guard class, other surfaces) and **LIN-2392** |
+| **DC-dispatch-fields + post-split route citations** | MED | **minted: LIN-3116** (widened: 3 fields + 4 doc citations + 11 inline comments + 8 test); cross-link **LIN-2601**, **LIN-914** |
+| **H1** served-catalog gaps + reverse drift | MED | **existing: LIN-2390 — commented 2026-09-26** |
+| **H3** residual Linear-only framing | HIGH | **existing: LIN-2391 — commented 2026-09-26** |
+| **H4** public landing copy | HIGH | **existing: LIN-2392 — commented 2026-09-26** |
+| **F2** `view-tiers.md` 7 of 9 | MED | **existing: LIN-1856 — commented 2026-09-26** |
+| **effort** absent from catalog | MED | **existing: LIN-2656 — commented 2026-09-26** (cite both routes) |
+| **LIN-2255** llms.txt read-only/logout copy | LOW | **existing: LIN-2255 — commented 2026-09-26** |
+| **LIN-2177** SD docs items (3) | LOW | **existing — commented 2026-09-26** |
+| **LIN-2465 / LIN-2482** SD terminal doc/guard | LOW | **existing — carried** (no comment needed; report carries the measurement) |
+| **LIN-687 / LIN-1233** | LOW | **existing — close recommended** (commented 2026-09-26; no re-flag) |
 | **H6** `source-map.md` inflation | MED | **human-decision** (generate vs pin; measurements above) |
 | **CFG** code-vs-doc env drift, both repos | MED-LOW | **record only** (not minted) |
 | **H5 / H7 / H8** archive, modules-in-no-doc, discoverability | MED-LOW | **record only** (not minted) |
 | **CI-doc twin** `docs/architecture/ci.md:46` omits `secret-scan` | LOW-MED | **record only** (not minted) |
 | **H9 / H10 / H11 / H12** | LOW | **record only** (not minted) |
 
-The ~3-new cap is spent on **N1, N2, DC-dispatch-fields**; the highest-severity items (H1/H3/H4/F2/effort) already have tickets and are cross-linked, not duplicated. (Minted ids are filled by the execution beat that creates them.)
+The ~3-new cap is spent on **N2 → LIN-3115**, **DC-dispatch-fields → LIN-3116**, **N1 → LIN-3117**, each left in its default state and `related`-linked back to LIN-3102. Duplicate search before minting (`/api/proxy/search`, 2–3 phrasings each) found *overlapping* but not *owning* tickets and was resolved by cross-linking, not re-minting: LIN-1653/LIN-2302 (N2's count class), LIN-2601 (split hygiene, different surface), LIN-914 (`waitForFollowUps` removal — flagged inside LIN-3116). The highest-severity items (H1/H3/H4/F2/effort) already have tickets and were cross-linked/commented, not duplicated.
 
 ---
 
@@ -335,9 +336,9 @@ The ~3-new cap is spent on **N1, N2, DC-dispatch-fields**; the highest-severity 
 | `periodicals-stale-rationale-counts` (LIN-687) | fixed in code, ticket open | **still fixed in code; ticket still open** | **stable; recommend close** |
 | `simple-dispatcher-docs-cleanup` (LIN-2177) | three items open | **all three still hold at HEAD** | **unchanged; cross-linked** |
 | `provider-framing-production-sites` (LIN-2354) | ticket Done; 2 sites still unconditional | not re-audited this run (out of the corrected scope) | **carried** |
-| `relocation-link-relative-paths` (N1) | not previously tracked | **new**: 4 broken links in `docs/architecture/`, resolver-verified; guard covers incoming only | **new, low; mint candidate** |
-| `asymmetric-propagation` (N2) | new this run | guard reads one count site per file; 4 stale sites survive | **new, med; mint candidate (LIN-1653 cross-link)** |
-| `post-split-route-citations` (DC) | not previously tracked | **new**: 4 doc citations + 11 inline comments name the pre-split `routes/proxy.js` | **new, med; merged into the DC-dispatch-fields mint** |
+| `relocation-link-relative-paths` (N1) | not previously tracked | **new**: 4 broken links in `docs/architecture/`, resolver-verified; guard covers incoming only | **new, low; minted LIN-3117** |
+| `asymmetric-propagation` (N2) | new this run | guard reads one count site per file; 4 stale sites survive | **new, med; minted LIN-3115 (LIN-1653 cross-link)** |
+| `post-split-route-citations` (DC) | not previously tracked | **new**: 4 doc citations + 11 inline comments name the pre-split `routes/proxy.js` | **new, med; minted LIN-3116** |
 | `per-feature-single-entry-inflation` (H6 cause) | not previously tracked | 5 of 8 post-split commits rewrite one `source-map.md` line | **new; strengthens H6, human-decision** |
 | `documentation-review-second-repo-coverage` | extended to `simple-dispatcher` in 08-23 | no new SD-only high-severity finding; SD link-clean | **stable — SD's doc surface remains comparatively clean** |
 
