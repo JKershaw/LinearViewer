@@ -62,7 +62,7 @@ Ranking is strictly by stated severity — **high** before **medium** — then, 
 
 **Trajectory:** immediate — active (withdrawal program closing); recent — steady; baseline — new substrate. **Confidence: verified at HEAD** (states live; churn counts re-run; the regression's title and state confirmed).
 
-**What I would do (options).** (a) A human triage of `LIN-2766` — a named regression with 0 comments, on a just-built feed, is the single most checkable item here. (b) Confirm whether the withdrawal program's remaining Backlog steps (`LIN-2990`, `LIN-2991`-adjacent, `LIN-3029`/`3031`/`3083`/`3088`/`3091` residue) are intended to land or are being carried indefinitely.
+**What I would do (options).** (a) A human triage of `LIN-2766` — a named regression with **1 comment (09-11) and no activity since**, on a just-built feed, is the single most checkable item here. (b) Confirm whether the withdrawal program's remaining Backlog steps (`LIN-2990`, `LIN-2991`-adjacent, `LIN-3029`/`3031`/`3083`/`3088`/`3091` residue) are intended to land or are being carried indefinitely.
 
 ---
 
@@ -93,7 +93,7 @@ The wider family is active, not resolved: new adjacent credential/identity bugs 
 
 | link | grade | evidence (live) |
 |---|---|---|
-| `LIN-2297` → `LIN-2331` → `LIN-2414` | **caused-by-prior-fix** | `LIN-2331` (Done 2026-08-30, `f49d0a75` in **`LinearViewer`**, tests-only — `lib/dispatch-store.js` untouched) explicitly leaves within-class collisions; its S1 ruling assigns the sole reachable production carrier to `LIN-2414` *"carrying LIN-2331's Gap 1"*. |
+| `LIN-2297` → `LIN-2331` → `LIN-2414` | **incomplete-fix (carried gap)** | `LIN-2331` (Done 2026-08-30, `f49d0a75` in **`LinearViewer`**, tests-only — `lib/dispatch-store.js` untouched) explicitly leaves within-class collisions; its S1 ruling assigns the sole reachable production carrier to `LIN-2414` *"carrying LIN-2331's Gap 1"*. |
 | `LIN-2414` → `LIN-2468` | **adjacent-independent** | `LIN-2414` (Done 2026-09-02, `0b0732f`, PR #209) re-parks a lapsed `BLOCKED` hold; `LIN-2468` (Done 2026-09-04, `2ef854b`, PR #215) is *"latent, not a regression; independent of LIN-2414's chosen fix"*, drafted by 2414's own research. |
 | `LIN-2414` → `LIN-2474`, `LIN-2476` | **ledger follow-up (not new defects)** | `LIN-2474` (Backlog) owns 2414's review-ledger item 3; `LIN-2476` (Backlog) owns close-out items 2+4 (system-suite coverage). |
 | `LIN-2511` → `LIN-2532` | **ledger follow-up** | `LIN-2511` (Done 2026-09-04, `1da7a31`, PR #213) force-FAILed a healthy resumed session 27 ms after its wake; the post-merge runtime witness it could not discharge is `LIN-2532` (Todo). |
@@ -107,7 +107,7 @@ The wider family is active, not resolved: new adjacent credential/identity bugs 
 - **Rulings/decision substrate — deliberate build with a fix-on-fix string, not a defect chain.** The rulings feed was built inside this window (`LIN-2754`–`LIN-2780`, all Done; `routes/proxy-rulings.js` 11 all-commit touches, `lib/unanswered-decisions.js` 13 — exactly the research counts), followed by the withdrawal program (`LIN-2809` steps, `LIN-2889`–`LIN-2895`, `LIN-3034`–`LIN-3040`) and a real regression filed against its own output: `LIN-2766` *"LIN-2756 regression"* (Backlog). `LIN-2991` (Done) fixed the same finding being re-raised at every stage. This is substrate being finished and then hardening — the deliberate-build case, ranked in its own right as H3 (above the SD repair class, H5, on window footprint).
 - **`LinearViewer` proxy/server churn — deliberate LIN-679 decomposition.** `routes/proxy.js` (37 all-commit touches), `server.js` (38), `lib/proxy-instructions.js` (33) and `CLAUDE.md` (39) are high, but **9 first-parent commits are LIN-679 sub-router stages** (PR-0 plus Stages 2–6). High touch count here is a planned decomposition, not fix-on-fix; it is not ranked as a headwind.
 - **opencode harness — substrate being finished *and* generating fixes.** Ranked separately (H6) precisely because it is both.
-- **Incident/halt program — deliberate incident response, now closed.** The 2026-09-22 database-reads incident (`docs/incidents/2026-09-22-harbour-db-reads-hang.md`) produced the halt/auto-pause program: `LIN-2995` (Done 2026-09-26) and children `LIN-3041`–`LIN-3046`, `LIN-3055` (all Done), `LIN-3047` (Backlog), on top of `LIN-2994`/`LIN-2996`/`LIN-3000` (Done). That is a disciplined response to a real production fault, not churn.
+- **Incident/halt program — deliberate incident response, now closed.** The 2026-09-22 database-reads incident (`docs/incidents/2026-09-22-harbour-db-reads-hang.md`) produced the halt/auto-pause program: `LIN-2995` (Done 2026-09-26) and children `LIN-3041`–`LIN-3046`, `LIN-3055` (all Done), `LIN-3047` (Backlog), on top of `LIN-2994`/`LIN-2996`/`LIN-3000` (Done). The program's one self-fix is `LIN-3055` (`LIN-2995` S6: auto-pause could never hold a fresh launch when workspaces ≤ threshold) — created 09-25, resolved on a recorded John decision and Done 09-26. That is a disciplined response to a real production fault, not churn.
 
 **Why it matters.** The north star makes `follow-on tasks and wakes per verified task` a tracked tax and `finish transitions before starting capabilities` a sequencing rule. A runner substrate whose window output carries an elevated share of repair-on-itself under the ticket-title rule (49.2% vs 34.5% baseline; linked-only 50.8% vs 42.3%) but a flat share under the commit-subject rule (26.9% vs 27.9% pre-window), with one root-cause fix that explicitly did not bound its class, is a real **repair** drag. On the corrected evidence it is **medium, not high and not first**: the repair class is **23 tickets** (12 closed, 11 open) and **9 repair-only `reapers.js` touches** — far short of the 77-project / 22-touch framing it replaces — and the 28-day share is elevated under **one** rule only (recent/immediate legs rule-dependent). It remains the clearest *repair* drag this review surfaces and ranks within its severity band on its window footprint (23), behind the larger window classes H2 (84), H3 (83) and H4 (47). It is **not** the largest program in the window by raw ticket count — that is the `front:dispatcher-substrate` label (123), and the largest single-epic program is the Flight Companion build (84 window tickets, parent `LIN-751`, H2); the second-read surfaced that the initial draft omitted it, and H5's earlier "largest single-subsystem concentration" wording was corrected to this repair-scoped claim as a result.
 
@@ -198,13 +198,14 @@ Consuming v3's own signals (never re-deriving them): the reading finds Simple Di
 - **`parked-at-plan-review`: improved — root mechanism closed, convergence unproven/watch.** `LIN-1871` Done 2026-09-12 (PR #1459); plan-review now derives enumeration rather than hand-listing it. The close is not proof of convergence: research's 15-task sample has median 0–1 plan-review rounds, with `LIN-2802` at 2 and `LIN-3049` at 3 (both re-checked live — 2 and 3 plan-review verdicts respectively), so the root mechanism is closed but the convergence it was meant to deliver remains watch.
 - **`gate-falsification`: resolved-by-supersession.** `LIN-1661` **Canceled** 2026-09-12 — superseded by John's `LIN-1871` ruling: the follow-on-ratio read no longer gates plan-completeness; it becomes a `docs/papers/review-loops.md` query re-run as a second paper. `LIN-1873` Done 2026-09-04. The question was dropped, not answered — recorded as such.
 - **Periodical layer emitted today.** The 2026-09-26 batch (7 templates, six at ~19:00Z) ends the ~4-week silence, even though 8 templates remain `never` (H1).
-- **The 2026-09-22 incident was handled well.** A real production fault (degraded EU↔US-East DB link) was diagnosed, structurally fixed (`LIN-3000` Done — Mongo moved to the app's region), and turned into a deliberate halt/auto-pause program (`LIN-2995` Done 2026-09-26). This is incident response working, not a headwind.
+- **The 2026-09-22 incident was handled well.** A real production fault (degraded EU↔US-East DB link) was diagnosed, structurally fixed (`LIN-3000` Done — Mongo moved to the app's region), and turned into a deliberate halt/auto-pause program (`LIN-2995` Done 2026-09-26). The program's one self-fix, `LIN-3055` (auto-pause could never hold a fresh launch below threshold), was filed and closed 09-25→09-26. This is incident response working, not a headwind.
 
 ---
 
 # Clean results
 
 - **Rework / reverts:** no revert-driven rework finding in the window; the fix-on-fix that exists is concentrated in the SD runner (H5) and the rulings build (H3), both named above rather than double-counted here.
+- **Distractions / scope drift:** re-derived full census — **16 of 728** window-cohort issues (`LIN ≥ 2384`) are Canceled or Duplicate (**2.2%**; 14 Canceled, 2 Duplicate), spread thinly across `front:` labels (the most in one is `front:public-path` with 3, then `front:maintenance` 2, `front:cost-economy` 2, and one each in `front:dispatcher-substrate`/`surfaces`/`rulings`/`flight-companion`). No concentration; the one named cancellation is `LIN-1661` (gate-falsification). **Clean.**
 - **`external-injection-break`:** retired (stays retired).
 - **`cost-per-verified-task`:** stays retired, superseded into `cost-metric-denominator`; the new distinct risk is the unpriced-model gap (H7), not a resurrection.
 - **`verification-session-share`:** live session `kind` now exists; the research sweep reads implementation **20.8% incl. `wake` / 24.0% excl.** and verification 45–52% of sessions (vs 08-29's 22% impl / 54% verification). Basis changed with the new `wake` kind, so this is reported as **flat with a muddied basis**, not a movement (see false-reading signals).
@@ -243,7 +244,7 @@ Counted with `git log --first-parent` per repo under explicit `'YYYY-MM-DD 00:00
 
 # Timeliness / flow
 
-Still **0 of 3,051 issues carry a `dueDate`** (full-census re-confirmation at write time; 3,049 at research, 3,050 a few hours earlier, as new issues land). Every reading in this section is therefore **flow health, never schedule health**, as in every prior run. The two long-open in-progress epics are `LIN-751` (90d — parent of the largest single-epic program, see H2) and `LIN-2114` (41d); `LIN-1675` closed 09-21 (H8). True time-in-progress is not measurable: `lib/roadmap.js:659` computes staleness from `createdAt`, and there is no state-history endpoint, so a ticket re-touched for bookkeeping (both were, 09-21) can read as fresh without delivering.
+Still **0 of 3,054 issues carry a `dueDate`** (full-census re-page at this pass; 3,051 at the second-read, 3,049 at research, as new issues land). Every reading in this section is therefore **flow health, never schedule health**, as in every prior run. The two long-open in-progress epics are `LIN-751` (90d — parent of the largest single-epic program, see H2) and `LIN-2114` (41d); `LIN-1675` closed 09-21 (H8). True time-in-progress is not measurable: `lib/roadmap.js:659` computes staleness from `createdAt`, and there is no state-history endpoint, so a ticket re-touched for bookkeeping (both were, 09-21) can read as fresh without delivering.
 
 ---
 
@@ -257,6 +258,13 @@ Per the remit's instruction to widen discovery without inflating output, four in
 - The periodical registry itself (`/api/proxy/periodicals`), read as an instrument rather than only as a due-ness list — which is what surfaces the instrument-fixed / layer-silent split in H1.
 
 Two surfaces this remit names as in-scope could not be reached and are recorded under §11 rather than silently dropped: `lib/escalation-kpis.js` (false-escalation rate, a v3 headline KPI) and `lib/follow-on-ratio.js` / `lib/roadmap.js` velocity outputs.
+
+**Named churn files from the review, examined and dispositioned (no new headwind).** All five were re-counted at this HEAD; each maps onto an existing headwind or onto substrate-finishing, so none is ranked in its own right and none changes the ordered list:
+
+- `LinearViewer` `public/observation.js` (**19 fp / 26 all**) and `routes/dashboard.js` (**19 fp / 20 all**): the rulings/decision feed build and the scan-due surface (`LIN-2754`–`LIN-2780`, `LIN-2444`, `LIN-2666`/`2700`/`2706`/`2707`) — **folded into H3**; the residue (chat-request sweep, effort read-out) is substrate finishing.
+- `simple-dispatcher` `dispatcher.js` (**19 fp / 23 all**): the halt program (`LIN-3042`–`3046`, netted) plus the repair class (`LIN-2456`/`2457`/`2509`/`2510`/`2511`/`2515`/`2333`/`2366`) and the effort axis (`LIN-2567`) — **split across the halt program and H5**.
+- `simple-dispatcher` `hook.js` (**11 fp / 16 all**): the rulings on-answer path (`LIN-2774`, `LIN-2891`, `LIN-2991`) and the repair class (`LIN-2556`/`2560`/`2339`) — **split across H3 and H5**.
+- `simple-dispatcher` `config.js` (**13 fp / 15 all**): the halt wiring (`LIN-3045`/`3046`, netted), OpenCode launch fixes (`LIN-2839`, `LIN-2736`) and the repair class (`LIN-2446`/`2509`/`2510`/`2515`) — **split across the halt program, H6 and H5**.
 
 **A widening the second-read forced, not one this run planned.** The initial draft omitted the Flight Companion / companion-observer program entirely (the window's largest single-epic program); the required adversarial second-read surfaced it and it is now H2. See the `## Adversarial Second-Read` section for the provenance.
 
@@ -310,6 +318,12 @@ The top headwind this cycle is the review layer's own cadence (H1, high): the pe
 
 ---
 
+## Corrections after independent review
+
+The independent review of PR #1590 (comment `390473f0`, Request Changes, 8 must-fix M1–M8 and 7 non-gating N1–N7) prompted this corrective pass. The must-fixes, all applied in place against live data: **M1** periodical wording corrected (six at ~19:00Z; `documentation-review` later); **M2** the SD repair share re-derived under a consistent basis (rule A held to the merge-subject form — **flat**; rule B with the eight deliberate-work keywords dropped and both unlinked-unit bases stated — **elevated only**), superseding the prior both-rules claim and research's `48/63/64`; **M3** H1's evidence re-counted to a **23-ticket repair class** and **9-of-22 repair-only `reapers.js` touches**, with the halt/OpenCode/rulings work netted so nothing is double-counted; **M4** headwinds reordered strictly by severity with a stated footprint tie-break, H6 sized on `front:rulings` (83) like H2 (84), H2 requalified against `front:dispatcher-substrate` (123), and all H-labels renumbered; **M5** `LIN-751` children corrected to **53** by `parent.identifier` census (the detail endpoint caps its `children` array at 50); **M6** the 08-29 ledger name `wake/resume fix-induced chain` restored verbatim (stale `(new)` dropped); **M7** per-window per-repo delivery throughput added; **M8** `parked-at-plan-review` re-graded **improved (root mechanism closed; convergence unproven/watch)**. Non-gating **N1** (spine link regraded `incomplete-fix (carried gap)`), **N2** (five named churn files dispositioned), **N3** (distractions Clean-results bullet), **N4** (`LIN-2766` comment count), **N5** (`LIN-3055` recorded as the halt program's self-fix) and **N7** (second-read answer sourcing stated) are applied too.
+
+**The ranking changed.** The top finding is now `periodical-cadence` (**H1**, high), and the SD repair concentration is re-graded **medium (H5)** — no longer high and no longer first — on the corrected evidence. The three second-read fields below are **unchanged from the posted comment `c760a606`**, and "Differed from top finding: **YES**" still holds against this new top finding: the reader's answer named the Flight Companion program, which differs from `periodical-cadence` (that program is now ranked H2); the field records disagreement with the top finding, which remains true.
+
 ## Adversarial Second-Read
 
 **Tier: Tier 2** — a fresh-context sub-agent spawned with no memory of this report's drafting turns, given only the report path (`docs/reviews/recent-headwinds-review-2026-09-26.md`, PR #1590), read access to both repos at HEAD (`LinearViewer b5c528c4`, `simple-dispatcher 3b1e734`) and the live `/api/proxy` workspace API, and told to spot-check independently rather than trust the report's citations. Not Tier 3: the reader never saw this session's reasoning or chat history, and this session's own writer did not act as the reader.
@@ -318,7 +332,7 @@ The top headwind this cycle is the review layer's own cadence (H1, high): the pe
 
 > "What is the largest item in this window that this report missed or misfiled?"
 
-**Reader's answer (as returned; condensed only where it repeats its own evidence):**
+**Reader's answer (reproduced from the second-read return; the sub-agent's full transcript was not retained, so this is the fullest recoverable wording — the posted verdict comment `c760a606` carries only a one-line summary):**
 
 > The largest item in the window is the Flight Companion / companion-observer build (epic `LIN-751`) — 84 window tickets, the single largest program in the window, which the report omits entirely and whose parent epic it misfiles in H7 as merely a "stale, held" In Progress item. The report's H1 claim to be "the largest single-subsystem concentration in the window" is false.
 >
