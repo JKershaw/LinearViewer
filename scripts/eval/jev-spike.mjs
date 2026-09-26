@@ -50,14 +50,14 @@ const fixtures = readdirSync(FIXTURE_DIR)
   .filter((c) => c.identifier && (!ONLY || c.identifier.includes(ONLY)));
 
 // The recommender's vocabulary, with each action's own one-line situation as its criterion.
-// `defer` (a recommend-meta action, LIN-327) has no template entry; describe it by hand.
+// `defer` (a recommend-meta action, LIN-327) is withheld for THIS re-test: all seven frozen
+// fixtures are leaf-shaped (zero children), and the live recommender only offers `defer` when a
+// node has an open child to descend into (lib/prompts/meta-prompt-template.js). Scoped to this
+// re-test only — not a general leaf detector, and not a production change.
 const situationByName = {};
 for (const t of Object.values(PROMPT_TEMPLATES)) if (t.aiHint) situationByName[t.name] = t.aiHint.situation;
-const ACTIONS = getAIRecommendationActionNames();
-const routingCriteria = Object.fromEntries(ACTIONS.map((name) => [
-  name,
-  situationByName[name] || 'a parent task whose next step belongs to one of its own subtasks',
-]));
+const ACTIONS = getAIRecommendationActionNames().filter((name) => name !== 'defer');
+const routingCriteria = Object.fromEntries(ACTIONS.map((name) => [name, situationByName[name]]));
 // Fixture sidecars say "implementation" where the vocabulary says "implement".
 const norm = (a) => (a === 'implementation' ? 'implement' : a);
 

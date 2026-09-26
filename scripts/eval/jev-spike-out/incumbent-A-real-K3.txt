@@ -1,0 +1,33 @@
+model=openai/gpt-5.4-mini  K=3  arms=A  cases=7  (n=3/arm/case)
+vocab(17): blocked, bug, plan, look into, triage, breakdown, research, scoping, design, spike, context, plan-review, implement, review, close-out, retrospective-audit, defer
+
+• [real] HAR-697 (real (frozen at the red moment: cause refuted, HAR-707 not yet filed))  {bug | research}
+    A(baseline) [mix] 2/3  bug×2, implement×1
+• [real] LIN-420 (real (frozen at landed-awaiting-review: PR open + CI green, before the approve/merge))  {review}
+    A(baseline) [ok ] 3/3  review×3
+• [real] LIN-510 (real (frozen at the red moment: 3× Request-Changes on an unaddressed blocker, pre-merge))  {implement | blocked | plan | bug}
+    A(baseline) [MISS] 0/3  implementation×2, review×1
+• [real] LIN-537 (real (frozen after the investigation comment, before the fix landed))  {implement | plan}
+    A(baseline) [ok ] 3/3  implement×3
+• [real] LIN-571 (real (frozen at step 2 of the 2026-06-22 LIN-571 autopilot run: settled multi-session plan in description + breakdown-shaped plan comments, before decomposition into LIN-582/583/584 — zero children))  {breakdown | implementation | implement}
+    A(baseline) [ok ] 3/3  breakdown×3
+• [real] LIN-748 (real (frozen post-research, before "direction locked" — the harder real design case))  {design}
+    A(baseline) [mix] 2/3  design×2, plan×1
+• [real] LIN-813 (real (frozen pre-plan: scope narrowed by John, before the plan comment silently picked the shape))  {design}
+    A(baseline) [MISS] 0/3  plan×2, research×1
+
+========== summary ==========
+metric                     baseline (A)    
+routing accuracy           13/21 (62%)     
+research RECALL            0/3 (0%)        
+research OVER-FIRE         1/18 (6%)       
+design RECALL              2/6 (33%)       
+design OVER-FIRE           0/15 (0%)       
+scoping RECALL             0/0 (-)         
+scoping OVER-FIRE          0/21 (0%)       
+spike RECALL               0/0 (-)         
+spike OVER-FIRE            0/21 (0%)       
+off-vocabulary             2/21 (10%)      
+loop-REPEAT                2/12 (17%)      
+
+recall↑ over-fire↓ off-vocab↓ loop-repeat↓ is better. (Δ shown only in AB mode.)
