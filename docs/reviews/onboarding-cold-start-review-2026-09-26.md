@@ -1,6 +1,6 @@
-# Onboarding & Cold-Start Review — 2026-09-26 (run #2, trend vs 2026-08-29 baseline)
+# Onboarding & Cold-Start Review — 2026-09-26 (run 2, trend vs 2026-08-29 baseline)
 
-**Status: run #2.** This is the second edition of the series. It trends every journey step against the 2026-08-29 baseline (`docs/reviews/onboarding-cold-start-review-2026-08-29.md`, LIN-2382, PR #1290), which established the stable step names J1–J7/R1 and the D1 divergence. No later `onboarding-*` report exists under `docs/reviews/`.
+**Status: run 2.** This is the second edition of the series. It trends every journey step against the 2026-08-29 baseline (`docs/reviews/onboarding-cold-start-review-2026-08-29.md`, LIN-2382, PR #1290), which established the stable step names J1–J7/R1 and the D1 divergence. No later `onboarding-*` report exists under `docs/reviews/`.
 
 **Grounded at:** `LinearViewer` HEAD `b5c528c4` (`origin/main`, verified locally this beat) · `simple-dispatcher` HEAD `3b1e734` (unmoved) · live instance `https://harbour.cat` walked directly, 2026-09-26.
 
@@ -51,6 +51,14 @@ Recording vocabulary per step: `proceeded` / `had to guess` / `hard-blocked` / `
 
 **Zero state declared:** no account, no `.env`, no token, no prior session. Per the review contract, the dispatch workspace's populated `.env`/`node_modules` were **not** used — every self-host leg above ran in a fresh clone in a scratch directory.
 
+**Own-session runner / non-operator consumer — scope decision (recorded, not a performed walk).** The task description asks whether a non-operator standing up their own consumer is in remit this run — the own-session runner represented by **LIN-3080** (*"a person's own Claude Code session as their runner"*, **Done**; *"Research, design and experiment; not a build"*). **Decision: OUT of remit for this run's walk**, carried from the research close (`6993fb7f-83d8-4d57-b783-53bdfce6f94e`, *"Other consumers: none surfaced"*), for three reasons:
+
+1. **`docs/v1.md` leaves the runner open.** `docs/v1.md:91,111` places *"a runner that serves people who are not the operator"* **out of v1's scope** by design (LIN-2938): *"where a run executes stays open by design … Harbour dispatches to whatever consumer polls the workspace, and v1 does not decide it."*
+2. **No non-operator runner product exists to walk.** LIN-3080 is a completed spike (research/design/experiment, not a build); the research close found *"Other consumers: none surfaced — the MCP server is credential-delivery internals, the workspace proxy is already J5b/R1, LIN-3061 'CLI' is a Backlog feature (doesn't exist)."*
+3. **The product points a newcomer at two consumer paths, both already walked/reported.** The **Dispatch Queue** (`README.md:49`; consumer guide `docs/dispatch-integration.md`, where `simple-dispatcher` is *"the reference consumer"*, `:910`) — walked as R1; and the **Workspace API Proxy** (`README.md:50`; consumer guide `docs/proxy-integration.md`, `simple-dispatcher` named as *"the consumer (e.g. simple-dispatcher)"*, `:465`) — walked as J5b and R1.
+
+No own-session runner was stood up, and none is represented as walked. **Named for the next run's scope:** once an own-session runner ships as a product (LIN-3080's take-and-run-through-your-own-subagents path), decide whether it joins the cold-start inventory as a consumer entry path.
+
 ---
 
 ## 3 · Journey-by-journey walk log
@@ -69,14 +77,14 @@ Recording vocabulary per step: `proceeded` / `had to guess` / `hard-blocked` / `
 ### J2 — Advertised backends vs. reachable backends
 The landing page lists **5** providers as non-interactive `<li>` text with zero `href` (`lib/render-landing.js:292-296`): Linear, GitHub Issues, GitHub Projects ("boards, read-only V1"), Jira, Local ("writable, no tracker"). Linear/GitHub/Jira each have an entry point. GitHub Projects declares `No entryCta` as a deliberate absence (`lib/providers/github-projects/index.js:585`) and has no reachable entry from any surface.
 
-**Correction (adversarial second-read, §9):** the walk record's original claim that Local is "hard-blocked … no workaround discoverable from the surface" is **wrong** and is corrected here. Local declares `No entryCta` (`lib/providers/local/index.js:594`) only because its door is the form action `POST /workspace/new`, not a provider login route — and that form **is rendered pre-auth, zero-credential**, in the shared landing nav bar: `lib/components/navbar.js:97-99` emits `<form action="/workspace/new" method="POST"><button>+ local workspace</button></form>`. The homepage suppresses the bar via `minimalNav` (`navbar.js:61-62`, `lib/render-landing.js:277`), but `/swipe`, `/swim` and `/ship` call `renderNavBar({… isLanding})` **without** `minimalNav` (`lib/render-swipe.js:494`, `lib/render-swim.js:36`, `lib/render-ship.js:48`) and so render the button. The landing footer links `projects · swipe · swim` (`lib/components/footer.js:112-124`; `lib/render-landing.js:280`), making the path from `/` two clicks: `/` → footer "swipe" → `+ local workspace`. A cold `GET /workspace/new` → `302 /` only reflects that this route is POST-only, not that it is unreachable — a real `POST` creates the workspace.
+**Correction (adversarial second-read, §9):** the walk record's original claim that Local is "hard-blocked … no workaround discoverable from the surface" is **wrong** and is corrected here. Local declares `No entryCta` (`lib/providers/local/index.js:594`) only because its door is the form action `POST /workspace/new`, not a provider login route — and that form **is rendered pre-auth, zero-credential**, in the shared landing nav bar: `lib/components/navbar.js:97-99` emits `<form action="/workspace/new" method="POST"><button>+ local workspace</button></form>`. The homepage suppresses the bar via `minimalNav` (`navbar.js:61-62`, `lib/render-landing.js:276`), but `/swipe`, `/swim` and `/ship` call `renderNavBar({… isLanding})` **without** `minimalNav` (`lib/render-swipe.js:494`, `lib/render-swim.js:36`, `lib/render-ship.js:48`) and so render the button. The landing footer links `projects · swipe · swim` (`lib/components/footer.js:112-124`; `lib/render-landing.js:278`), making the path from `/` two clicks: `/` → footer "swipe" → `+ local workspace`. A cold `GET /workspace/new` → `302 /` only reflects that this route is POST-only, not that it is unreachable — a real `POST` creates the workspace.
 
-**Verdict: GitHub Projects hard-blocked** (no workaround discoverable from any surface); **Local had to guess** (reachable, but only via the nav bar on the adjacent public preview pages, never from the provider list that advertises it); **proceeded** for the other three. **Destination: NO. Delta: unchanged** — LIN-2387 still open for GitHub Projects and for the landing provider-list advertisement (see §6).
+**Verdict: GitHub Projects hard-blocked** (no workaround discoverable from any surface); **Local had to guess** (reachable, but only via the nav bar on the adjacent public preview pages, never from the provider list that advertises it); **proceeded** for the other three. **Destination: NO. Delta: GitHub Projects unchanged (LIN-2387); Local reclassified hard-blocked → had to guess.** This is a **baseline misfiling, not a product change**: the 2026-08-29 run filed Local as hard-blocked, but the `+ local workspace` nav form already rendered on `/swipe` at that run's frozen HEAD `292ac962` (`lib/components/navbar.js:86`; `lib/render-swipe.js:494` passes `isLanding` without `minimalNav`) — the baseline looked only at the landing page, not the adjacent public preview pages. LIN-2387 still open for GitHub Projects and for the landing provider-list advertisement (see §6).
 
 ### J3 — Self-hoster, README §Setup literally (fresh clone `b5c528c`)
 Clone → `cp .env.example .env` → `npm install` (106 pkgs) → `npx playwright install` (**a genuine ~100 MB cold download this run** — unlike the baseline's pre-cached caveat) → `npm start` (warns `LINEAR_CLIENT_ID`/`LINEAR_CLIENT_SECRET` missing; *"Harbour running at http://localhost:3000"*) → `GET /` `200` with the "Getting started" callout.
 
-**Verdict: proceeded end-to-end, zero guessing** beyond the documented port. One reach (§5, #1): the README never warns about the Playwright download size/time. **Destination: NO** (a rendered product, not a verified merge). **Delta: unchanged.**
+**Verdict: proceeded end-to-end, zero guessing** beyond the documented port. One reach (§5, reach 1): the README never warns about the Playwright download size/time. **Destination: NO** (a rendered product, not a verified merge). **Delta: unchanged.**
 
 **Zero-credential sub-finding:** with no OAuth configured, the hero still shows **"Log in with Linear"** and clicking it returns **503 "OAuth Not Configured / Linear OAuth is not available."** Resolved this run as objective breakage — see §4/§6 and the J3 row below.
 
@@ -94,7 +102,7 @@ Clone → `cp .env.example .env` → `npm install` (106 pkgs) → `npx playwrigh
 Runner source (`simple-dispatcher`): `dispatcher.js:1112-1113` (`usesMcpToken = usesMcpTokenExchange && token present`), `:1209-1216` (MCP-token delivery *"set only for an EXPLICIT claude-code harness"*), `:1256-1258` (`HARBOUR_LOCAL_BASE` pointer emitted only under `usesMcpToken`); `:1185-1191`/`:1300-1306` (opencode gets `item.prompt` verbatim — *"would hand an opencode launch a HARBOUR_LOCAL_BASE-pointing message it cannot resolve"*); `harnesses.js:425/432` (claude-code `{usesMcpTokenExchange:true}`) vs `:442` (opencode `{process-exit}`, no MCP). **Verdict: informational. The issue's "J5a changed shape (local proxy)" did not manifest in this session; the two harnesses receive mutually-exclusive access instructions.**
 
 ### J5b — Standalone bootstrap exchange
-`docs/proxy-integration.md` Quick Start (`:20`) sits before Bootstrap Tokens (`:88`) with **no forward pointer**; Quick Start's examples use `Authorization: Bearer YOUR_TOKEN` with no hint how to obtain it. Live probes: `GET /api/proxy/instructions` no-header → `401` *"Missing or invalid Authorization header"*; fake bearer → `401` *"Invalid, expired, or consumed token"*; `POST /api/proxy/token` fake bearer → `401` *"Invalid, expired, or already-exchanged bootstrap token"* (the only body naming "bootstrap"). `/instructions` itself is 401-gated — circular. **Verdict: had to guess** (friction, not a hard block). **Capability-gated:** minting a genuine bootstrap. **Delta: unchanged** (baseline F1); the error envelope is richer now (`category`/`stage`/`retryable`).
+`docs/proxy-integration.md` Quick Start (`:20`) sits before Bootstrap Tokens (`:88`) with **no forward pointer**; Quick Start's examples use `Authorization: Bearer YOUR_TOKEN` and say nothing about where the token comes from, though the `## Authentication` → `### Getting a Token` sections follow directly (`:42-44`) and do explain token creation. The live standalone-exchange gap is narrower but real: the doc never forward-points the Quick Start reader to Bootstrap Tokens (`:88`) for the exchange-only path they need. Live probes: `GET /api/proxy/instructions` no-header → `401` *"Missing or invalid Authorization header"*; fake bearer → `401` *"Invalid, expired, or consumed token"*; `POST /api/proxy/token` fake bearer → `401` *"Invalid, expired, or already-exchanged bootstrap token"* (the only body naming "bootstrap"). `/instructions` itself is 401-gated — circular. **Verdict: had to guess** (friction, not a hard block). **Capability-gated:** minting a genuine bootstrap. **Delta: unchanged** (baseline F1); the error envelope is richer now (`category`/`stage`/`retryable`).
 
 ### J6 — Free-tier / BYOK first useful action
 `<section data-testid="landing-try">` (free-tier branch, `lib/render-landing.js:174-175`): *"Log in and try AI Generated Prompts free — no OpenRouter connection needed to start …"*, containing **0 `<a>`, 0 `<button>`, 0 `<form>`**. Read the offer = **proceeded**; act on it = **had to guess** ("log in" must be inferred as one of the hero OAuth CTAs), then **capability-gated** at consent. **Destination: NO. Delta: unchanged** (baseline F2).
@@ -110,9 +118,11 @@ Fresh clone `b5c528c`, local `:3000`:
 2. `POST /workspace/new` → `302` + `connect.sid` — **had to guess**: the endpoint is **not named in any doc** a headless self-hoster would read (not README, not `proxy-integration.md`), though a *browser* visitor can reach it as a one-click `+ local workspace` button on the public `/swipe`/`/swim`/`/ship` nav bars (`lib/components/navbar.js:97-99`; corrected at §9). The route is `routes/workspace.js:69-126`.
 3. Re-enter by key, fresh no-cookie `GET /workspace/<key>/` → `302 /` — **hard-blocked** (LIN-3065 confirmed).
 4. Enable a feature, `POST settings/features` — **had to guess** (web-settings AJAX; `lib/feature-defaults.js:22-48`).
-5. Mint token, `POST /workspace/:urlKey/api/proxy/tokens` — **had to guess** (only Linear/proxy-UI-framed in docs).
+5. Mint token, `POST /workspace/:urlKey/api/proxy/tokens` — **proceeded (documented)**: `docs/proxy-integration.md:44-60` (*"Getting a Token"*) documents this exact API call and its session-authentication requirement, which the `connect.sid` from step 2 already yields. The residual gap is framing, not absence — the doc presents minting through the Linear Viewer proxy page and never names the local provider or the headless session path.
 
 This **refines LIN-3058**: the barrier is a plain `connect.sid` requirement, not a literal browser (curl held it fine); the real gaps are **discoverability + re-enterability**.
+
+**Credential-surface disposition (LIN-3059):** the multiple credential surfaces this walk crossed — the `connect.sid` session cookie (step 2), the proxy token (step 5), and the bootstrap that mints it (J5a/J5b) — are the finding already owned by **LIN-3059** (*"One agent credential: cover dispatch, proxy and the session-only routes (or proxy versions of them)"*, Todo, priority 2; from Lighthouse, which names the same three surfaces: dispatch token, proxy token, session cookie). It is cited here as the **existing home, with no mint** — this report does not file a duplicate.
 
 - **LIN-3068 mechanism at source:** `lib/dispatch-validation.js:224-226` requires `issueId` to match `UUID_REGEX` (*"Invalid issueId format"*), while local starter issues carry `LOCAL-1` (`routes/workspace.js:41`).
 - **LIN-3069 at source:** `routes/workspace.js:38-41` seeds a real "Getting started" project + *"Welcome to your local workspace"* (`LOCAL-1`) in state **In Progress**, indistinguishable from real work; roadmap/next-run generation is capability-gated (OpenRouter).
@@ -120,28 +130,29 @@ This **refines LIN-3058**: the barrier is a plain `connect.sid` requirement, not
 **Destination: NO. Delta: new journey.**
 
 ### R1 — `simple-dispatcher` seam (fresh clone `3b1e734`)
-**Walked, not just read:** `npm install` (5 pkgs) → `node dispatcher.js` (clean env) → `API: http://localhost:3000` (default, `config.js:17`) then `Failed to load workspaces.json: ENOENT` → **exit 1** with no further guidance. The poll leg is **capability-gated** (the dispatch token is *"created in LinearViewer's workspace settings"* — self-referential). The broker triad is documented (`README.md:152-158`; LIN-2249 remains resolved). **Verdict: baseline-clean remains; new friction: zero-config refusal with no guidance. Delta: unchanged (resolved stays resolved).**
+**Walked, not just read:** `npm install` (5 pkgs) → `node dispatcher.js` (clean env) → `API: http://localhost:3000` (default, `config.js:17`) then `Failed to load workspaces.json: ENOENT` → **exit 1** with no further guidance. The poll leg is **capability-gated** (the dispatch token is *"created in LinearViewer's workspace settings"* — self-referential). The broker triad is documented (`README.md:152-158`; LIN-2249 remains resolved). **The own-session runner / non-operator consumer (LIN-3080) is out of this run's remit — see the §2 scope decision; this R1 leg walks only the documented `simple-dispatcher` consumer seam.** **Verdict: baseline-clean remains; new friction: zero-config refusal with no guidance. Delta: unchanged (resolved stays resolved).**
 
 ### v1-promise check (new)
 Email + "Go" is **not advertised** (zero email/signup terms on the live landing) and **not reachable** (email auth absent, LIN-1892). **Advertised-before-reachable: NO. New check** (v1.md postdates the baseline).
 
 ---
 
-## 4 · Findings (severity-ranked)
+## 4 · Findings (objective first, then advisory; each by severity)
 
-Every finding from the walk is recorded here — including advisory friction and capability-gated legs — whether or not it was promoted to a follow-up task. Classification follows the review contract: *objective breakage* means a broken/dead link, a documented command that errors, a setup step that hard-blocks with no workaround, or a 404/500 mid-journey; *friction* means it eventually worked but needed guessing. Capability-gated steps are labelled, never guessed at.
+Every finding from the walk is recorded here — including advisory friction and capability-gated legs — whether or not it was promoted to a follow-up task. Classification follows the review contract: *objective breakage* means a broken/dead link, a documented command that errors, a setup step that hard-blocks with no workaround, or a 404/500 mid-journey; *friction* means it eventually worked but needed guessing. Capability-gated steps are labelled, never guessed at. Rows are ordered objective-first, then advisory, each by severity; a finding is **walk-observed** unless its Class cell is tagged **source-confirmed** (established by reading the cited source rather than by performing the failing action).
 
 | ID | Finding | Journey | Class | Severity | Treatment |
 |---|---|---|---|---|---|
 | **R2-1** | `scripts/env-check.sh`: never checks the macOS Playwright cache path (`$HOME/Library/Caches/ms-playwright`), so it reports a persistent false blocker even right after its own successful setup; and, compounding, it has **no `exit` statement at all** (154 lines, 0 `exit`) so it returns 0 on every platform no matter how many blockers it prints — nothing that trusts its status (incl. `.claude/settings.json` `SessionStart`, which chains into it) can gate on it. | J4 | Objective | **High** | Cite **LIN-2386** |
 | **R2-2** | Landing markets 5 backends as plain non-interactive `<li>` text (zero `href`): **GitHub Projects** has no reachable entry from any surface (`lib/providers/github-projects/index.js:585`); **Local**'s reachable entry (`+ local workspace`, `lib/components/navbar.js:97-99`) is not surfaced from the provider list that advertises it — only from the adjacent `/swipe`/`/swim` public nav bars. *(Corrected at §9: the original "Local hard-blocked" read was wrong — Local is reachable pre-auth, zero-credential.)* | J2 | Objective (GitHub Projects) + friction (Local) | Med-High | Cite **LIN-2387** |
 | **R2-3** | Local workspace is not re-enterable: a fresh no-cookie `GET /workspace/<key>/` → `302 /` (`routes/workspace.js:69-126`). A headless agent can create a workspace but cannot return to it without the original session cookie. | J8 | Objective | Med-High | Cite **LIN-3065** |
-| **R2-4** | Local issue ids fail the dispatch `issueId` format check: `lib/dispatch-validation.js:224-226` requires a UUID while local starter issues carry `LOCAL-1` (`routes/workspace.js:41`), so a local issue cannot be dispatched. | J8 | Objective | Med (own line) | Cite **LIN-3068** |
-| **R2-5** | Seeded starter tasks read as real work: `routes/workspace.js:38-41` seeds a real "Getting started" project and a *"Welcome to your local workspace"* (`LOCAL-1`) issue in state **In Progress**, indistinguishable from genuine backlog. | J8 | Objective | Med (own line) | Cite **LIN-3069** |
+| **R2-4** | Local issue ids fail the dispatch `issueId` format check: `lib/dispatch-validation.js:224-226` requires a UUID while local starter issues carry `LOCAL-1` (`routes/workspace.js:41`), so a local issue cannot be dispatched. | J8 | Objective (source-confirmed; ticketed dedupe) | Med (own line) | Cite **LIN-3068** |
 | **R2-6** | Zero-credential self-host advertises an **ungated** "Log in with Linear" CTA: `lib/providers/linear/index.js:2334` declares the Linear `entryCta` deliberately `isConfigured: () => true`, so with no OAuth configured the hero shows it while GitHub/Jira are hidden — and clicking `/auth/linear` returns **503 "OAuth Not Configured."** | J3 | Objective (404/500 mid-journey) | Low-Med | **Minted this run → LIN-3108** |
 | R2-7 | Destination divergence: `README.md:3` states a narrower "collapsible tree" purpose than the frozen live claim; `/llms.txt` repeats the same narrower framing on the agent-facing surface. | D1 | Divergence (advisory) | Med | Report-only; v1/email gap cites **LIN-1892** |
-| R2-8 | Headless discoverability gap: the local-workspace creation/feature-enable/token-mint **documented** path is absent. Creation exists only as browser chrome on public preview pages (`lib/components/navbar.js:97-99`), never in README or `proxy-integration.md`, so the headless persona's own documented surfaces do not lead to it (feature-enable and token-mint remain AJAX-only). *(Corrected at §9: "surfaced by nothing" overstated the gap — the control is on public web surfaces.)* | J8 | Friction (advisory) | Med | Report-only; **refines LIN-3058** |
+| R2-8 | Headless discoverability gap: **workspace creation** has no documented path — it exists only as browser chrome on the public preview pages (`lib/components/navbar.js:97-99`), and *not* in README or `proxy-integration.md`, so the headless persona's own documented surfaces do not lead to it. This is narrower than the original claim: feature-enable remains web-settings AJAX only (`lib/feature-defaults.js:22-48`), but token-mint **is** documented as an API (`docs/proxy-integration.md:44-60`, `POST /workspace/:urlKey/api/proxy/tokens`) — it requires the `connect.sid` session that workspace creation yields and does not frame the local provider. *(Corrected at §9: "surfaced by nothing" overstated the gap — the control is on public web surfaces.)* | J8 | Friction (advisory) | Med | Report-only; **refines LIN-3058** |
 | R2-9 | Ordering trap + circular discoverability in the standalone bootstrap lane: Quick Start precedes Bootstrap Tokens in `docs/proxy-integration.md` with no forward pointer; the live generic 401 gives no guidance to the exchange; `/instructions` is itself 401-gated. | J5b | Friction (advisory) | Med | Report-only (baseline F1) |
+| R2-5 | Seeded starter tasks read as real work: `routes/workspace.js:38-41` seeds a real "Getting started" project and a *"Welcome to your local workspace"* (`LOCAL-1`) issue in state **In Progress**, indistinguishable from genuine backlog. | J8 | Source-confirmed (advisory; ticketed dedupe) | Med (own line) | Cite **LIN-3069** |
+| R2-15 | Multiple credential surfaces for one agent: the J8/J5 walk crossed the `connect.sid` session cookie → proxy token → bootstrap, each a separate credential — the finding already owned by **LIN-3059** (names the dispatch token / proxy token / session cookie; Todo, priority 2). | J8/J5 | Friction (advisory) | Med | Cite **LIN-3059** (existing home; no mint) |
 | R2-10 | The free-tier CTA has no distinct actionable route of its own — it aliases to J1's OAuth requirement with nothing in between (`lib/render-landing.js:174-175`). | J6 | Friction (advisory) | Low-Med | Report-only (baseline F2) |
 | R2-11 | Error surface points nowhere: `/login` and `/docs` both 404, and error bodies (`401`/`404`) carry no navigation. Neither is reachable from the live surface without prior code knowledge. | J7/J5b | Friction (advisory) | Low | Report-only (baseline F4) |
 | R2-12 | Consumer zero-config refusal: `node dispatcher.js` with a clean env prints `Failed to load workspaces.json: ENOENT` and exits 1 with no guidance. | R1 | Friction (advisory) | Low | Report-only |
@@ -158,7 +169,7 @@ Every finding from the walk is recorded here — including advisory friction and
 
 1. J3's README never warns about the ~100 MB Playwright download size/time — logged as a reach/finding in its own right.
 2. The journey inventory and several probe targets (`/login`, `/docs`, the exact `/auth/*` hrefs, `/kpis`) were seeded by prior repo/source knowledge, not discovered by clicking the live surface alone.
-3. J8's creation/feature/token endpoints were reached via source (`routes/workspace.js`). The creation button itself *is* on public surfaces (`lib/components/navbar.js:97-99`, `/swipe`/`/swim`), so the original walk's "surfaced by nothing" framing was itself a reach artefact — caught by the adversarial second-read (§9) and corrected in R2-8.
+3. J8's **creation and feature-enable** endpoints were reached via source (`routes/workspace.js`); **token-mint is documented** (`docs/proxy-integration.md:44-60`). The creation button itself *is* on public surfaces (`lib/components/navbar.js:97-99`, `/swipe`/`/swim`), so the original walk's "surfaced by nothing" framing was itself a reach artefact — caught by the adversarial second-read (§9) and corrected in R2-8.
 
 **Capability-gated** (marked explicitly; no outcome guessed):
 
@@ -174,15 +185,19 @@ Every finding from the walk is recorded here — including advisory friction and
 
 ## 6 · Follow-up tasks (objective breakage only, capped at 3)
 
-The mint cap governs *new* tasks only; the four pre-ticketed objective classes below were deduplicated to existing tickets and consume no cap slots.
+The mint cap governs *new* tasks only; the six pre-ticketed classes below (four objective, two advisory) were deduplicated to existing tickets and consume no cap slots.
 
 **Objective classes deduplicated to existing tickets (no mint):**
 
 - **LIN-2386** — `scripts/env-check.sh` false macOS blocker + zero `exit` (R2-1; J4).
 - **LIN-2387** — landing provider list advertises Local / GitHub Projects with no reachable entry (R2-2; J2). *Note: this run's second-read corrected the Local half — Local is reachable pre-auth via `+ local workspace` on `/swipe`/`/swim`; the GitHub Projects half and the unlinked provider-list advertisement still stand, so the ticket remains the right home.*
 - **LIN-3065** — local workspace not re-enterable (R2-3; J8).
-- **LIN-3068** — local issue ids fail the `issueId` format check (R2-4; J8).
-- **LIN-3069** — seeded welcome tasks read as real work (R2-5; J8).
+- **LIN-3068** — local issue ids fail the `issueId` format check (R2-4, source-confirmed; J8).
+
+**Advisory classes deduplicated to existing tickets (no mint):**
+
+- **LIN-3069** — seeded welcome tasks read as real work (R2-5, source-confirmed; J8).
+- **LIN-3059** — one agent credential covering dispatch, proxy and the session-only routes (R2-15; J8/J5). The walk's `connect.sid` session cookie → proxy token → bootstrap surfaces are this ticket's finding; cited as its existing home here, **no mint**.
 
 **Minted this run (one, within the cap):**
 
@@ -207,15 +222,15 @@ Before minting, `GET /api/proxy/search` was run for: `auth/linear 503`, `OAuth N
 | Step | Outcome this run | Destination reached | Severity | Delta vs 2026-08-29 |
 |---|---|---|---|---|
 | J1 — hosted visitor sign-in | proceeded (redirects); consent capability-gated | NO (gated) | — | unchanged |
-| J2 — advertised vs. reachable backends | GitHub Projects hard-blocked; Local had to guess (reachable via nav bar); proceeded for 3 | NO | Med-High | unchanged (LIN-2387) |
+| J2 — advertised vs. reachable backends | GitHub Projects hard-blocked; Local had to guess (reachable via nav bar); proceeded for 3 | NO | Med-High | GitHub Projects unchanged (LIN-2387); Local reclassified hard-blocked → had to guess (baseline misfiling, not product change) |
 | J3 — README-literal self-hoster | proceeded; zero-credential CTA returns 503 | NO | Low-Med | unchanged (new R2-6 finding) |
 | J4 — repo-scripts self-hoster | had to guess (macOS); hard-blocked as enforcement (no `exit`) | NO | High | unchanged (LIN-2386) |
 | J5a — broker-delivered bootstrap | informational; harness-dependent | gated | Informational | unchanged shape; harness split recorded |
 | J5b — standalone bootstrap exchange | had to guess | gated | Med (advisory) | unchanged (F1) |
 | J6 — free-tier first action | had to guess | NO | Low-Med (advisory) | unchanged (F2) |
 | J7 — pre-auth public surfaces | proceeded | n/a | Low (advisory) | **widened** (`/kpis`, `/styleguide`, `/health`, `/archive/3..7`) |
-| J8 — headless agent local self-hoster | proceeded → had to guess → hard-blocked → had to guess ×2 | NO | Med-High | **new journey** (LIN-3065/3068/3069; refines LIN-3058) |
-| R1 — simple-dispatcher seam | proceeded setup; zero-config exit 1 | n/a | Low (advisory) | unchanged (LIN-2249 resolved); new friction R2-12 |
+| J8 — headless agent local self-hoster | proceeded → had to guess → hard-blocked → had to guess → proceeded (documented) | NO | Med-High | **new journey** (LIN-3065/3068/3069; refines LIN-3058; LIN-3059 credential surfaces) |
+| R1 — simple-dispatcher seam | proceeded setup; zero-config exit 1 | n/a | Low (advisory) | unchanged (LIN-2249 resolved); own-session runner (LIN-3080) ruled **out of remit** this run (§2); new friction R2-12 |
 | D1 — destination divergence | README + `/llms.txt` narrower than frozen claim | n/a | Med (advisory) | unchanged; `/llms.txt` echo new |
 | v1 — v1-promise check | not advertised, not reachable | n/a | — | **new check** |
 
@@ -231,7 +246,7 @@ Before minting, `GET /api/proxy/search` was run for: `auth/linear 503`, `OAuth N
 
 > **1. The largest missed/misfiled item:**
 >
-> **Misfiled: the report's #2 finding (R2-2, Med-High) that the Local backend is "hard-blocked … no workaround discoverable from the surface" — and R2-8's claim that local-workspace creation is "surfaced by nothing."** Local's entry *is* surfaced, pre-auth, zero-credential:
+> **Misfiled: the report's \#2 finding (R2-2, Med-High) that the Local backend is "hard-blocked … no workaround discoverable from the surface" — and R2-8's claim that local-workspace creation is "surfaced by nothing."** Local's entry *is* surfaced, pre-auth, zero-credential:
 >
 > - `lib/components/navbar.js:96-99` — the unauthenticated (`isLanding`) nav renders a visible `<form action="/workspace/new" method="POST"><button>+ local workspace</button></form>`.
 > - `server.js:1793-1849` serves `/swipe`, `/swim`, `/ship` to a cold visitor with `{isLanding: true}`; `lib/render-swipe.js:494`, `lib/render-swim.js:36`, `lib/render-ship.js:48` each call `renderNavBar({…, isLanding})` with **no** `minimalNav`, so the button renders.
@@ -243,14 +258,16 @@ Before minting, `GET /api/proxy/search` was run for: `auth/linear 503`, `OAuth N
 >
 > **3. Differs from top finding (R2-1): YES.** My answer is the misfiled Local reachability, not the env-check defect.
 
-**Disposition reasoning.** The correction is independently verified at HEAD and valid: `renderNavBar` emits the `+ local workspace` form in its `isLanding` branch (`lib/components/navbar.js:97-99`), the branch is suppressed only by `minimalNav` (`:61-62`) which only the homepage passes (`lib/render-landing.js:277`), `/swipe`/`/swim`/`/ship` pass only `isLanding` (`lib/render-swipe.js:494`, `lib/render-swim.js:36`, `lib/render-ship.js:48`), `server.js:1793-1849` serves those pages to cold visitors, and the landing footer links them (`lib/components/footer.js:112-124`). So Local is reachable pre-auth with zero credentials, and the original walk record — which logged the public pages as carrying only a "sign-in nav" — was wrong. One refinement to the reader: R2-8 is overstated but not wholly wrong — the control is on public *browser* surfaces, yet it is named in **no** doc (`README`, `proxy-integration.md`), so the headless doc-driven persona still has to guess. The finding was narrowed to that documented-discoverability gap rather than deleted. Corrections applied to §3 (J2, J7, J8), §4 (R2-2, R2-8), §5 (reach #3), §6 (LIN-2387 note) and §8 (J2 ledger row).
+**Disposition reasoning.** The correction is independently verified at HEAD and valid: `renderNavBar` emits the `+ local workspace` form in its `isLanding` branch (`lib/components/navbar.js:97-99`), the branch is suppressed only by `minimalNav` (`:61-62`) which only the homepage passes (`lib/render-landing.js:276`), `/swipe`/`/swim`/`/ship` pass only `isLanding` (`lib/render-swipe.js:494`, `lib/render-swim.js:36`, `lib/render-ship.js:48`), `server.js:1793-1849` serves those pages to cold visitors, and the landing footer links them (`lib/components/footer.js:112-124`). So Local is reachable pre-auth with zero credentials, and the original walk record — which logged the public pages as carrying only a "sign-in nav" — was wrong. One refinement to the reader: R2-8 is overstated but not wholly wrong — the control is on public *browser* surfaces, yet it is named in **no** doc (`README`, `proxy-integration.md`), so the headless doc-driven persona still has to guess. The finding was narrowed to that documented-discoverability gap rather than deleted. Corrections applied to §3 (J2, J7, J8), §4 (R2-2, R2-8), §5 (reach 3), §6 (LIN-2387 note) and §8 (J2 ledger row).
 
 `Adversarial second-read verdict: DISAGREE`
 `Differed from top finding: YES`
 `Disposition: fixed in place`
 
+**Post-review note (2026-09-26 implementation pass).** The post-review corrections applied in response to the PR #1592 Request Changes review did **not** touch the top finding — **R2-1** (`scripts/env-check.sh` macOS false blocker + no `exit`; High) is unchanged — so the adversarial second-read was not repeated.
+
 ---
 
 ## 10 · Scope discipline
 
-This review changed no code, config, or secrets, and no docs beyond this artifact. The fresh clones and their `npm install`/`npm start` runs were performed in isolated scratch directories authorised by the review contract (§10: *"the one periodical whose entire evidentiary basis is a walk that writes files"*); the repo under review is otherwise untouched. The one follow-up minted (LIN-3108) is a Linear task, not a repo change.
+This review changed no code, config, or secrets, and no docs beyond this artifact. The fresh clones and their `npm install`/`npm start` runs were performed in isolated scratch directories authorised by the review contract (§10: *"the one periodical whose entire evidence base is a walk that writes files"*); the repo under review is otherwise untouched. The one follow-up minted (LIN-3108) is a Linear task, not a repo change.
