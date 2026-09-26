@@ -1314,16 +1314,23 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
 
       test('the meta Review rule routes an inside item needing authored test/code to Request Changes', () => {
         const rule = reviewRule();
-        assert.ok(/a new or changed test, or a code change/i.test(rule),
-          'names the authoring examples that exceed close-out\'s bound');
         // Scoped to the LIN-3056 clause (F1): the whole rule also carries the
         // pre-existing LIN-3033 sentence "…the verdict is Request Changes back
         // to implementation, not a conditional Approve naming a vague fix", so
         // an unscoped assertion passes even when the new clause routes
-        // elsewhere. Extract the LIN-3056 clause first, then assert it ends on
-        // exactly the routing verdict.
+        // elsewhere. Extract the LIN-3056 clause first, then assert it.
         const m = rule.match(/Reserve that conditional form.*?not a conditional Approve\./is);
         assert.ok(m, 'the LIN-3056 clause is present and extractable on its own');
+        // F3: pin the trigger condition, not just the outcome. Without this the
+        // clause can be inverted to "an outside item" (M8) or to "fits within
+        // that bound" (M13) and this pin stays green.
+        assert.ok(/holds an inside item whose discharge requires authoring beyond that bound/i.test(m[0]),
+          'the trigger is an inside item whose discharge requires authoring beyond the bound');
+        assert.ok(/a new or changed test, or a code change/i.test(m[0]),
+          'names the authoring examples that exceed close-out\'s bound');
+        // F4: pin the dischargeable-route list that defines "close-out can actually discharge".
+        assert.ok(/a routed outside follow-up, or an exactly-stated trivial edit/i.test(m[0]),
+          'names the dischargeable routes the conditional form is reserved for');
         assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve\.$/i.test(m[0]),
           'the verdict for such an inside item is Request Changes, not a conditional Approve');
       });

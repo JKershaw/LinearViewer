@@ -2752,9 +2752,19 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('the handwritten review verdict routes an inside item needing authored test/code to Request Changes', () => {
       const { prompt } = generatePrompt('review', issue, context);
-      assert.ok(/a new or changed test, or a code change/i.test(prompt),
+      const m = prompt.match(/Reserve that conditional form.*?not a conditional Approve\./is);
+      assert.ok(m, 'the LIN-3056 clause is present and extractable on its own');
+      // F3: pin the trigger condition, not just the outcome. Without this the
+      // clause can be inverted to "an outside item" (M9) or to "fits within
+      // that bound" (M14) and this pin stays green.
+      assert.ok(/holds an \*\*inside\*\* item whose discharge requires authoring beyond that bound/i.test(m[0]),
+        'the trigger is an inside item whose discharge requires authoring beyond the bound');
+      assert.ok(/a new or changed test, or a code change/i.test(m[0]),
         'names the authoring examples that exceed close-out\'s bound');
-      assert.ok(/the verdict is \*\*Request Changes\*\* back to `implementation`, not a conditional Approve/i.test(prompt),
+      // F4: pin the dischargeable-route list that defines "close-out can actually discharge".
+      assert.ok(/a routed outside follow-up, or an exactly-stated trivial edit/i.test(m[0]),
+        'names the dischargeable routes the conditional form is reserved for');
+      assert.ok(/the verdict is \*\*Request Changes\*\* back to `implementation`, not a conditional Approve\.$/i.test(m[0]),
         'the verdict for such an inside item is Request Changes, not a conditional Approve');
     });
 
