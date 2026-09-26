@@ -10,13 +10,13 @@
 
 **Provenance — the 07-12 edition was never recovered.** The last persisted report before this one is `docs/reviews/drift-coherence-review-2026-08-29.md` (run task LIN-2380, PR #1291 → `cb2fbb5a`). The 2026-07-12 run (LIN-1231) was never persisted on any ref. Consistent with this edition's instruction, the 07-12 column of the trend ledger below is marked `not recovered`; no value is interpolated for it, even though a compressed comment-ledger once existed.
 
-**Headline.** Both latent `lib/`-touching cycle clusters **worsened** this window. The provider-seam SCC grew 14→15 when the new `lib/github-install-flow.js` closed a fresh return path through `render-pages.js` back to the identity barrel, and a **new** 2-node cycle formed on the feedback seam: `lib/dispatch-store.js:48` ↔ `lib/digest-feedback.js:38`. Neither is live — no module-evaluation-time peer read exists — and that latent-not-live distinction is the same test every prior edition applied. The canonical error envelope got broader adoption (importers 14→26) even as its raw inline residue widened (68→87) and `flight-companion.js` became the growing holdout (6→8). The provider-resolution incantation rose 16→17, the UI-divergence registry fell further behind (6→9 native `confirm()` sites). All clean/resolved rows held or reinforced. **None of the three standing follow-ups has moved — all Backlog, zero comments: LIN-675 (minted by the 06-25 edition) has stood unmoved across two persisted editions (08-29, 09-26), and LIN-2388 / LIN-2389 (both minted by the 08-29 edition) across one. The promotion path is still not converting.**
+**Headline.** Both latent `lib/`-touching cycle clusters **worsened** this window. The provider-seam SCC grew 13→15 when two new members joined — `lib/github-install-flow.js` and `lib/render-settings.js` — closing fresh return paths through `render-pages.js` back to the identity barrel, and a **new** 2-node cycle formed on the feedback seam: `lib/dispatch-store.js:48` ↔ `lib/digest-feedback.js:38`. Neither is live — no module-evaluation-time peer read exists — and that latent-not-live distinction is the same test every prior edition applied. The canonical error envelope's importer count rose (14→26), but that is mostly a file-count artifact of the `routes/proxy.js` split — adoption breadth is **flat**; its raw inline residue widened **76→87** at matched SHAs, and the one genuine new adopter, `flight-companion.js`, is itself a half-adopter (**0→8**). The provider-resolution incantation rose 16→17, the UI-divergence registry fell further behind (6→9 native `confirm()` sites). All clean/resolved rows held or reinforced. **None of the three standing follow-ups has moved — all Backlog, zero comments: LIN-675 (minted by the 06-25 edition) has stood unmoved across two persisted editions (08-29, 09-26), and LIN-2388 / LIN-2389 (both minted by the 08-29 edition) across one. The promotion path is still not converting.**
 
 ---
 
 ## Findings (severity-ranked)
 
-### 1. `provider-auth-router-upward-imports` — Medium — **worsened (provider SCC 14 → 15; 4 upward edges still open)**
+### 1. `provider-auth-router-upward-imports` — Medium — **worsened (provider SCC 13 → 15, two new members; 4 upward edges still open)**
 
 At HEAD there are **four** `lib/ → routes/` upward import edges (direct read of each provider's `index.js`):
 
@@ -29,9 +29,14 @@ All four sit inside **static cycles** that close through the provider identity b
 
 - `lib/providers/index.js:32` → `lib/providers/github/index.js:67` → `routes/github-auth.js:27` → `lib/render-pages.js:14` → `lib/providers/index.js`
 - `lib/providers/index.js:33` → `lib/providers/github-projects/index.js:60` → `routes/github-projects-auth.js:35` → `lib/render-pages.js:14` → `lib/providers/index.js`
-- `lib/providers/index.js:34` → `lib/providers/jira/index.js:103` → `routes/jira-auth.js:38` → `lib/render-pages.js:14` → `lib/providers/index.js`
+- `lib/providers/index.js:34` → `lib/providers/jira/index.js:103` → `routes/jira-auth.js:53` → `lib/render-pages.js:14` → `lib/providers/index.js`
 
-**New this window — the `github-install-flow` leg.** `lib/github-install-flow.js` (imports `render-pages.js:26` and `account-conflict.js:30`) is now pulled into the auth routes: `routes/github-auth.js:28` and `routes/github-projects-auth.js:36` both `import { createGitHubInstallFlowRoutes } from '../lib/github-install-flow.js'`. That adds a second return path to `render-pages.js`/the barrel, taking the provider SCC from **14 to 15 members** (11 of them in `lib/`). The prior edition's five directly-verified cycles should be read as a floor; this run cites the three canonical 4-node cycles above and the new leg rather than re-enumerating a combinatorial total.
+**New this window — two members, not one; the SCC is 13 → 15.** Re-running this series' own scratch walker (`import-graph-walk.mjs`, ESM, scope `lib routes server.js`) at both SHAs: **289 nodes / 1042 edges at HEAD**, 254 / 832 at `292ac962`; provider SCC **13 members at 08-29 → 15 at HEAD**. Two members joined, not one:
+
+- `lib/github-install-flow.js` (imports `render-pages.js:26`, `account-conflict.js:30`), pulled in because `routes/github-auth.js:28` and `routes/github-projects-auth.js:36` both `import { createGitHubInstallFlowRoutes } from '../lib/github-install-flow.js'`.
+- `lib/render-settings.js`, joined via `lib/render-pages.js:15 → import { OPENROUTER_CONSENT_BLAST_RADIUS_COPY } from './render-settings.js'` (LIN-2412, `2392a537`); it imports `lib/components/navbar.js:13`, already an SCC member.
+
+**Watch item.** `render-settings.js:34` is the first SCC member whose **module-scope `export const`** (`OPENROUTER_CONSENT_BLAST_RADIUS_COPY`) is read by a peer; `render-pages.js:563` reads it inside a function today, so the cycle is still latent — but this is exactly the module-scope-peer-read shape these reports warn about, and it should be checked each edition. The prior edition's cycle enumeration remains a floor; this run cites the three canonical 4-node cycles above plus the new legs rather than recounting the full elementary-cycle set. *(This corrects the 08-29 edition's "14 → 15": the matched-baseline SCC was 13.)*
 
 **Latent, not live (severity re-check).** Every peer use sits inside a function body. `render-pages.js`'s `getProvider()` calls are evaluated at call time, not at module scope; `github-install-flow.js` only calls its imported `renderErrorPage` inside handlers. There is no module-evaluation-time peer read, hence **Medium**, not High.
 
@@ -51,13 +56,21 @@ The LinearViewer `lib/`+`routes/`+`server.js` graph walk (289 nodes / 1042 edges
 
 **Cost.** The same unstated, untested invariant now guards a seam nobody was watching — the feedback/digest path. A module-scope const or top-level side effect added to either file turns a latent 2-node cycle into an order-dependent failure with no signal at the call site. `simple-dispatcher`'s own full walk (222 nodes / 593 edges) remains **0 SCCs**.
 
-### 3. `routes-error-envelope-fragmentation` — Medium — **importers improved (14 → 26); raw residue worsened (68 → 87)**
+### 3. `routes-error-envelope-fragmentation` — Medium — **adoption flat (the 14 → 26 rise is mostly a file-count artifact); raw residue worsened 76 → 87**
 
-`lib/errors.js` is canon. Adoption breadth improved again: **26 importers** (20 `routes/` files, 5 `lib/` files — `github-install-flow.js`, `linear-fetch.js`, `proxy-events.js`, `proxy-graphql-errors.js`, `render-pages.js` — plus `server.js`). Direct grep for `errors.js.` returns 27 files, but `lib/workspace-token-resolver.js` only *mentions* `lib/errors.js` in two comments (`:440`, `:548`) and imports nothing from it, so it is not an importer — the 26 figure holds.
+`lib/errors.js` is canon, and the raw importer count at HEAD is **26** (20 `routes/` files, 5 `lib/` files — `github-install-flow.js`, `linear-fetch.js`, `proxy-events.js`, `proxy-graphql-errors.js`, `render-pages.js` — plus `server.js`). Direct grep for `errors.js'` returns 27 files, but `lib/workspace-token-resolver.js` only *mentions* `lib/errors.js` in two comments (`:440`, `:548`) and imports nothing from it, so it is not an importer — the 26 figure holds.
 
-Raw inline residue, measured with `grep -rn "res.status(4xx|5xx)" … | grep ".json("`, `routes/test.js` excluded: **87** (up from 68), concentrated in `task-chat.js` (20), `dashboard.js` (17), `collective.js` (15), `server.js` (8), and **`flight-companion.js` (6 → 8, the growing holdout)**, then `next-run.js` 5, `legacy-redirects.js` 4, `live-console.js` 2, `ship-biscuit.js` 2, `openrouter-auth.js` 2, and one each in `dispatch`/`proxy`/`proxy-flight-companion`/`workspace-api-prompts`.
+**But 26 is not evidence of broader adoption.** Eleven of the 26 are the `routes/proxy-*.js` sub-routers split out of `routes/proxy.js` by LIN-679 Stage 2 (see the structural note below), and `proxy.js` already imported `lib/errors.js`; two more (`lib/github-install-flow.js`, `lib/proxy-graphql-errors.js`) are extractions from files that already imported it. Exactly **one** pre-existing file genuinely started using the canon this window — `routes/flight-companion.js` — and it is a new half-adopter (below). Adoption breadth is **flat**, not improved.
 
-**Cost.** A fleet-wide envelope change still lands once in `lib/errors.js` for the dominant path, but a reader still cannot tell from an import line alone whether a given handler is canonical, and `flight-companion.js` is drifting further from the canon rather than toward it. **Not promoted** — the fix direction (adopt-on-next-touch, no sweep) is unchanged across every edition; recorded for the next run to re-check `flight-companion.js`, `dashboard.js` and `task-chat.js`.
+Raw inline residue, measured with the report's stated widened metric and command —
+`grep -rnE "res\.status\(4[0-9][0-9]\)|res\.status\(5[0-9][0-9]\)" routes/*.js server.js | grep "\.json(" | grep -v routes/test.js`
+— is **87** at HEAD (79 in `routes/`, 8 in `server.js`), up from **76** at the matched window-baseline SHA `292ac962` (68 in `routes/`, 8 in `server.js`): **+11, all in code written this window**. The 08-29 edition's published "68" was routes-only; the like-for-like matched baseline is 76.
+
+The +11 is entirely new code: `flight-companion.js` **0 → 8**, `openrouter-auth.js` **0 → 2**, `proxy-flight-companion.js` **0 → 1** (a new file). `routes/flight-companion.js` grew from a 71-line stub to 989 lines (LIN-2434, `8b2be424`), imports `badRequest, unauthorized, notFound, jsonError, serverError` (`:96`) yet writes **8** raw inline `res.status(4xx|5xx).json(` sites alongside them — the same `dashboard.js` half-adopter shape 08-29 flagged, except written from scratch this window rather than inherited. *(The looser pattern `res\.status\([45][0-9][0-9]\)` counts the file's one `res.status(500).send(html)` at `:66`; that is an HTML send, not an envelope site, and must not be used for this row.)* Concentration at HEAD: `task-chat.js` 20, `dashboard.js` 17, `collective.js` 15, `server.js` 8, `flight-companion.js` 8, then `next-run.js` 5, `legacy-redirects.js` 4, `live-console.js` 2, `ship-biscuit.js` 2, `openrouter-auth.js` 2, and one each in `dispatch`/`proxy`/`proxy-flight-companion`/`workspace-api-prompts`.
+
+**Cost.** A fleet-wide envelope change still lands once in `lib/errors.js` for the dominant path, but the importer count overstates convergence — it rewards file splits, not adoption — and the one real new adopter is a fresh half-adopter. **Not promoted** — the fix direction (adopt-on-next-touch, no sweep) is unchanged; recorded for the next run to re-check `flight-companion.js`, `dashboard.js` and `task-chat.js`.
+
+**Structural note — `routes/proxy.js` decomposition (LIN-679 Stage 2), resolved.** `routes/proxy.js` went from **7,315 → 1,591 lines** this window, its handlers moved into 11 injected sub-routers (`routes/proxy.js:1273-1588`; `proxy-{agent-status,compute,dispatch,flight-companion,halt,kickoff,reads,rulings,token-exchange,tokens-admin,writes}.js`). This is a coherence improvement (dependency-injected sub-routers; the walker finds no SCC involving any `proxy-*.js`). It is named here only so its file-count side effect on the error-envelope importer metric is not misread as organic adoption next edition.
 
 ### 4. `production-to-test-fixture-imports` — Medium-low — **unchanged at 7**
 
@@ -110,6 +123,7 @@ The **grammar parsing split is clean, producer → consumer**: `simple-dispatche
 - `cross-repo-repo-list` — two independent lists (Harbour `dispatch-repo-guard.js` vs SD `workspaces.json` basename); **deliberate**, divergence documented and closed by **LIN-2974** (Done). Not re-opened.
 - `ci-convention-split-across-repos` — `LinearViewer` pins Node 20 with the single aggregate `ci-success` gate (`needs: [unit, e2e, secret-scan]`); `simple-dispatcher` pins Node ≥22 with no aggregate check. Unchanged; informational.
 - `semicolon-style-split` — still mixed, no linter, no runtime cost; unchanged and never worth a reformat.
+- `sse-frame-writer-duplication` — **Low, report-only, new this window.** `lib/sse.js:23` `sendSSE(res, type, data)` is the canonical SSE frame writer (LIN-2631), but two byte-identical local copies survive: `routes/workspace-api-roadmap.js:52` and `routes/workspace-api.js:1054`, each `function sendSSE(res, type, data) { res.write(\`event: ${type}\ndata: ${JSON.stringify(data)}\n\n\`); }`. A change to the event framing must now be made in three places, and a divergence silently breaks the client's stream parsing.
 
 ---
 
@@ -122,6 +136,7 @@ The **grammar parsing split is clean, producer → consumer**: `simple-dispatche
 | `effort` | **Clean.** Single list, Harbour-only (`lib/dispatch-validation.js:51`, warn-only never-reject); SD `resolveEffort` opaque fail-soft. |
 | `model` | **Clean.** Opaque on both sides. |
 | `repo` | **Clean / deliberate.** Two independent lists, documented, closed by LIN-2974 (Done). |
+| `target` | **Duplicated / fragmented (Low-medium, new this window).** SD owns the runner vocabulary (`simple-dispatcher/targets.js:17-18`, `cli`/`web`). LinearViewer has **no** single canonical definition and three named lists that disagree: `VALID_TARGETS = ['cli','web','dash','local']` (`routes/dispatch.js:295`), `VALID_PROXY_DISPATCH_TARGETS = ['cli','web','dash']` (`routes/proxy.js:304`), `COLLECTIVE_TARGETS = ['cli','web']` (`routes/collective.js:40`), plus inline copies (`lib/dispatch-validation.js:235`, `routes/dispatch.js:309`, `lib/chat-tools.js:1394`, `lib/pipeline-loops.js:1255/1282/1297/1347/1383`, `routes/dashboard.js:1190`, `routes/proxy-dispatch.js:789`). Same class as finding 6. |
 | halt | **Shared vocabulary, independently defined** (finding 10); residual copy LIN-3074. |
 | sentinel / `DECISION` / marker | **Grammar split is clean producer→consumer** (finding 11); only the word vocabulary is duplicated. |
 | dispatch status enum | **Clean.** Single definition on LinearViewer (`lib/dispatch-terminal.js:27`); SD's `phases.js` `PHASES`/`TRANSITIONS` is a different axis entirely. |
@@ -188,7 +203,111 @@ Research and plan records are **not** editions and are not counted. LIN-2388 and
 
 ## Adversarial Second-Read
 
-pending — filled in beat 3.
+**Tier used: Tier 1** — a wholly separate dispatched session (`POST /api/proxy/dispatch`, dispatch id `229b00f5-d4f9-48b9-9531-31d1d15719ef`, runner session `da8143e8`; claude-code / claude-opus-5-5 / high effort), given only the cold question, the report path/PR and both HEAD SHAs — no memory of this run's drafting.
+
+**Question asked (verbatim, cold):** *"What is the largest item in this window that this report missed or misfiled?"*
+
+**Reader's full answer (verbatim and in full, also captured on LIN-3100 as comment `47332c65-5ce4-470b-a528-20532ca182d0`, 9,485 chars — the D4 lesson applied):**
+
+> ### Adversarial second-read — reader's full answer
+> 
+> **Question:** "What is the largest item in this window that this report missed or misfiled?"
+> 
+> **Grounding.** I checked everything against the source, not the report's prose. SHAs: `LinearViewer` `b5c528c4807acc2222f4afd6fe2b87ded41fdf89` (I also checked `6e8bf424`) and `simple-dispatcher` `3b1e734b5496941ef5a7ecfb9497741f275d67fa`. Window baseline: `292ac962` / `7064955`. The report I read is `docs/reviews/drift-coherence-review-2026-09-26.md` on `lin-3100-drift-coherence-review-2026-09-26` at `0f68f198`.
+> 
+> ---
+> 
+> ## Answer
+> 
+> **Largest item: the `routes/proxy.js` decomposition (LIN-679 Stage 2).** It is the biggest structural change in the window, and the report never names it. It also quietly misfiles Finding 3: most of the "adoption improved (14 → 26)" figure is just the file split, not real adoption.
+> 
+> - `routes/proxy.js` went from **7,315 → 1,591 lines**. Its handlers moved into **11 new sub-routers**, all injected through `router.use(create…Routes({...}))` (`routes/proxy.js:1273–1588`):
+>   - `proxy-agent-status`, `-compute`, `-dispatch`, `-flight-companion`, `-halt`, `-kickoff`, `-reads`, `-rulings`, `-token-exchange`, `-tokens-admin`, `-writes`
+> - `proxy.js` already imported `lib/errors.js` at baseline. Each of the 11 new files now imports it too. Here is the importer set diff `292ac962 → b5c528c4`, using the same grep the report uses (`from '…errors.js'`):
+> 
+> | change | files |
+> |---|---|
+> | +11 split-out files from `proxy.js` | the 11 `routes/proxy-*.js` above |
+> | +2 extracted new modules | `lib/github-install-flow.js` (LIN-2397 "pure move"), `lib/proxy-graphql-errors.js` |
+> | −2 dropped (their code moved into `github-install-flow.js`) | `routes/github-auth.js`, `routes/github-projects-auth.js` |
+> | **+1 genuine adoption by an existing file** | `routes/flight-companion.js` |
+> 
+>   Net: 14 → 26, but **only one existing file actually started using the canon.** Adoption breadth is flat, not improved. The report's headline ("The canonical error envelope got broader adoption (importers 14→26)") and the ledger's "importers improved" direction are both artifacts of the file count.
+> - **The one real new adopter is a new half-adopter.** `routes/flight-companion.js` grew from a 71-line stub to 989 lines during the window. It imports `badRequest, unauthorized, notFound, jsonError, serverError` (`:96`, added in LIN-2434, `8b2be424`), yet it wrote **8** raw inline `res.status(4xx|5xx).json(` sites alongside them. That is exactly the `dashboard.js` half-adopter shape the 08-29 edition flagged. The difference: this one was written from scratch this window, not inherited.
+> - **The residue delta is overstated.** The report's own grep, run at the window-baseline SHA `292ac962`, gives **76**, not 68. At matched SHAs the growth is **76 → 87 (+11)**, and all of it is new code:
+>   - `flight-companion.js` 0→8
+>   - `openrouter-auth.js` 0→2
+>   - `proxy-flight-companion.js` 0→1
+> 
+>   The report's "`flight-companion.js` (6 → 8)" doesn't reproduce: the file had **0** raw sites at baseline, and no prior edition mentions it.
+> - **Corrected Finding 3 row:** *adoption flat (one real adopter, which is itself a half-adopter); raw residue +11, all in code written this window.* That is **worsened** outright, not mixed. The severity stays **Medium**, and "not promoted" stays reasonable. But the trend direction and headline sentence are wrong, and the next edition will inherit an inflated 26 baseline unless this is corrected.
+> 
+> **Does my largest item differ from the report's top finding?** Yes. The report's top finding is `provider-auth-router-upward-imports` (provider SCC 14→15). Mine is the unnamed proxy decomposition and the Finding 3 misfiling it causes.
+> 
+> **Does it outrank the top finding?** No. I ranked by consequence, the same rubric the report uses. The corrected Finding 3 is still Medium. The decomposition itself is a coherence *improvement* (dependency-injected sub-routers, no new cycles; my SCC walk finds none involving `proxy-*.js`). The misfiling is a wrong trend label on a Medium row, not a larger risk. Finding 1 is still the right #1, and I independently re-verified it (below).
+> 
+> ---
+> 
+> ## Top finding re-verified from source
+> 
+> - **SCC sizes reproduce.** My own static-import SCC walk (Tarjan over `lib/`+`routes/`+`server.js`: 289 nodes, 1,034 edges) finds exactly **3 SCCs**: provider seam **15**, KPI **3**, `dispatch-store ↔ digest-feedback` **2**. `simple-dispatcher` has **0** SCCs.
+> - **"Latent, not live" holds, with a runtime witness.** I imported every one of the 20 cycle members alone in a fresh `node` process, so each one was the evaluation entry point once:
+>   - all 15 provider-SCC members
+>   - the 3 KPI members
+>   - the 2 dispatch/digest members
+> 
+>   **All 20 loaded without error** (no TDZ `ReferenceError`). No evaluation order that starts at a member triggers a module-scope peer read today.
+> - **Misattribution inside Finding 1: two new members, not one.** The report credits all SCC growth to the `github-install-flow` leg. In my walk the provider SCC is **13** at `292ac962` and **15** at HEAD. The second new member is **`lib/render-settings.js`**. It joined through a new edge, `lib/render-pages.js:15 → import { OPENROUTER_CONSENT_BLAST_RADIUS_COPY } from './render-settings.js'` (LIN-2412, `2392a537`, 2026-08-30). `render-settings.js` then imports `components/navbar.js`, which is already in the SCC.
+>   - This matters for the watch item. `render-settings.js` is the first SCC member whose **module-scope `export const`** (`:34`) is read by a peer. `render-pages.js:563` reads it inside a function today, so it is still latent. But it is precisely the "module-scope const in a member" shape the report says to watch for, and the report doesn't name it.
+>   - LIN-675's scope note should get this leg too.
+> - **Stale citation.** `routes/jira-auth.js:38` is a comment line at HEAD. The `render-pages.js` import is at `:53`. The report carried the 08-29 line number while claiming a direct read. The other 13 Finding 1/2 citations I checked all match.
+> 
+> ---
+> 
+> ## Other misses, smaller than the above
+> 
+> 1. **The `target` field is missing from the cross-repo contract table.** The table covers `kind`, `harness`/`terminal`, `effort`, `model`, `repo`, halt, sentinel and status, but not `target`, the most basic dispatch field. `simple-dispatcher/targets.js:17-18` owns the runner-side set (`cli`, `web`, both `pollEligible`). LinearViewer has **no canonical definition**. It has three named lists that disagree:
+>    - `VALID_TARGETS = ['cli','web','dash','local']` (`routes/dispatch.js:295`)
+>    - `VALID_PROXY_DISPATCH_TARGETS = ['cli','web','dash']` (`routes/proxy.js:304`)
+>    - `COLLECTIVE_TARGETS = ['cli','web']` (`routes/collective.js:40`)
+> 
+>    On top of those there are inline copies: `lib/dispatch-validation.js:235`, `routes/dispatch.js:309`, `lib/chat-tools.js:1394`, `lib/pipeline-loops.js:1255/1282/1297/1347/1383` and `routes/dashboard.js:1190`. That is **16 literal sites in 8 server files** (15 in 7 at baseline) plus 3 `public/` files. The one added this window is `routes/proxy-dispatch.js:789`, where LIN-2869 openly mirrors `validateDispatchPayload`'s cli/web follow-up rule. Same class as Finding 6, so Low-medium.
+> 2. **`lib/sse.js` claims to be "the one" SSE frame writer (LIN-2631), but two byte-identical copies survive.** One is `routes/workspace-api-roadmap.js:51`, a file its own header names as a copy it replaced. The other is `routes/workspace-api.js:1053`. Low.
+> 
+> ---
+> 
+> ## Report claims I confirmed (no dispute)
+> 
+> - Drift verdict is correct: `6e8bf424 → b5c528c4` touches only `scripts/eval/jev-spike*`. The window is 633 commits to `b5c528c4` (631 to `6e8bf424`, matching the report) and 112 in SD.
+> - Four `lib/ → routes/` upward edges at the cited lines. The new dispatch/digest cycle is at `dispatch-store.js:48` / `digest-feedback.js:38`.
+> - Residue is 87 at HEAD with the stated per-file split. There are 26 importers (the count is right; the *reading* of it is what I dispute).
+> - 7 fixture imports: `server.js:103-105` plus 4 route files. `proxy.js:138` is dynamic.
+> - 17 incantation sites (18 raw, minus `lib/workspace.js:946`).
+> - 9 native `confirm()` call sites vs 4 in the `docs/ui-divergences.md` registry.
+> - `config.js:17` / `feedback.js:5` API-base duplication.
+> - `NO_BOOTSTRAP_KINDS` at `dispatcher.js:41`; `HALT_MODES` at `workspace-halt.js:28`; `DECISION_PREFIX` at `hook.js:508`; `parseDecision` at `session-telemetry.js:674`; `design-review` at `periodicals.js:881`.
+> - 46 `utils/html.js` importers and 24 `*-store.js` modules.
+> - CI: LinearViewer Node 20 with `ci-success needs: [unit, e2e, secret-scan]`; SD Node 22 with no aggregate check.
+> 
+> ## Suggested corrections before merge
+> 
+> 1. Finding 3, the headline and the ledger row: replace "importers improved (14 → 26)" with "adoption flat: +11 from the `proxy.js` split, +2 extractions, 1 genuine adopter (`flight-companion.js`, itself a new half-adopter)". Restate residue as 76 → 87 at matched SHAs, with `flight-companion.js` 0 → 8.
+> 2. Name the `proxy.js` decomposition (LIN-679 Stage 2) in the report, if only as a resolved/structural note, so the next edition doesn't re-read 26 as organic adoption.
+> 3. Finding 1: add the `render-pages.js:15 → render-settings.js` leg (LIN-2412) as the second new SCC member. Note `render-settings.js:34`'s module-scope export as a watch item. Fix the `jira-auth.js:38` → `:53` citation.
+> 4. Add a `target` row to the cross-repo contract table.
+> 
+> Reader verdict: AGREE
+> 
+
+**Disposition: fixed in place.** Checked against source at HEAD: the `routes/proxy.js` decomposition (7,315 → 1,591 lines, LIN-679 Stage 2) and the error-envelope misfiling it causes are real, so Finding 3, the headline and the ledger now state *adoption flat* with the matched-SHA residue 76 → 87 (`flight-companion.js` 0 → 8), the decomposition is named as a resolved structural note, Finding 1 now credits the second new SCC member `lib/render-settings.js` (via `render-pages.js:15`, LIN-2412) and corrects the SCC to 13 → 15 and the `jira-auth.js` citation to `:53`, and the `target` contract row plus the duplicated SSE frame writers were added. The reader AGREES the report's top finding (provider seam) is still #1; its item is a Medium-row misfiling, not a larger one.
+
+**Verdict fields (also posted as the single LIN-3100 comment `5b975c05-ebec-4a22-8dcc-836605e45eba`):**
+
+```
+Adversarial second-read verdict: AGREE
+Differed from top finding: YES
+Disposition: fixed in place
+```
 
 ---
 
@@ -199,8 +318,8 @@ pending — filled in beat 3.
 | finding | severity | 06-25 | 07-12 | 08-29 | 2026-09-26 | delta |
 |---|---|---|---|---|---|---|
 | `lib-import-cycles` | medium | clean | not recovered | 3 elementary cycles / 3 modules / 5 edges (latent) | kpi 3 (unchanged) + **new 2-node `dispatch-store ↔ digest-feedback`** (latent) | **worsened (new cluster)** |
-| `provider-auth-router-upward-imports` | medium | 2 edges, no cycle | not recovered | 4 edges, all inside static cycles; SCC 14 | 4 edges; **SCC 14→15** (+`github-install-flow` leg) | **worsened (SCC grew; edges unchanged)** |
-| `routes-error-envelope-fragmentation` | medium | 5 importers, ~53 residue | not recovered | 14 importers, 68 residue; `dashboard.js` half-adopter | **26 importers**, **87 residue**; `flight-companion.js` 6→8 | **importers improved; residue worsened** |
+| `provider-auth-router-upward-imports` | medium | 2 edges, no cycle | not recovered | 4 edges, all inside static cycles; SCC 13 | 4 edges; **SCC 13→15** (+`github-install-flow`, +`render-settings`) | **worsened (SCC grew; edges unchanged)** |
+| `routes-error-envelope-fragmentation` | medium | 5 importers, ~53 residue | not recovered | 14 importers, 68 residue (routes-only); `dashboard.js` half-adopter | 26 importers but **adoption flat** (11 from the `proxy.js` split); residue **76 → 87** matched-SHA; `flight-companion.js` **0 → 8** | **residue worsened; the 14→26 "improvement" was a file-count artifact** |
 | `production-to-test-fixture-imports` | medium-low | — | not recovered | 7 sites | 7 sites | unchanged |
 | `periodical-report-filename-convention-split` | medium-low | — | not recovered | id↔filename join non-mechanical | same | unchanged |
 | `dispatch-kind-vocabulary-cross-repo` | low-medium | — | not recovered | 3 hardcoded keys | 3-key subset | unchanged |
@@ -209,6 +328,9 @@ pending — filled in beat 3.
 | `simple-dispatcher-api-base-duplication` | low | — | not recovered | 2 | 2 | unchanged |
 | `cross-repo-halt-vocabulary` | low | — | not recovered | — | independently-defined `{pause,stop}` / `{mode,setAt,setBy}`; LIN-3074 | new (report-only) |
 | `cross-repo-sentinel-decision-marker-vocabulary` | low | — | not recovered | — | grammar split clean; word vocabulary duplicated | new (report-only) |
+| `target-vocabulary` | low-medium | — | not recovered | — | 3 disagreeing LinearViewer lists + inline copies; SD owns runner set | new (report-only) |
+| `sse-frame-writer-duplication` | low | — | not recovered | — | 2 byte-identical copies of canonical `lib/sse.js:23 sendSSE` | new (report-only) |
+| `routes-proxy-decomposition` | — | — | not recovered | — | `routes/proxy.js` 7,315→1,591 lines, 11 injected sub-routers | **resolved (structural; explains the importer count)** |
 | `cross-repo-repo-list` | informational | — | not recovered | deliberate | deliberate; LIN-2974 Done | unchanged |
 | `ci-convention-split-across-repos` | informational | — | not recovered | Node 20 vs 22 | same; `ci-success` `needs:[unit,e2e,secret-scan]` | unchanged |
 | `semicolon-style-split` | low (informational) | unchanged | not recovered | unchanged | unchanged | unchanged |
