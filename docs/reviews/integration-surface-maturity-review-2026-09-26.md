@@ -23,7 +23,10 @@ HEADs (`b5c528c4` / `3b1e734`); there are **no commits** past either pin, so **0
 without change. `docs/reviews/` was re-listed immediately before scoring (see Scope) and no registry
 sibling edition had landed since run 2. Ladder context: **630 commits** landed on LinearViewer `main`
 since `ea53ffc8`, **278** of them touching `lib/`, `routes/` or `server.js`; simple-dispatcher had
-**0** commits in the same window.
+**112** commits in the same review window (`git rev-list --count 7064955..3b1e734` = 112, where `7064955` is
+run 2's cited consumer HEAD; 111 from the alternative boundary `05681975`). **Careful distinction** — the
+drift check above is `3b1e734..origin/main` and is correctly empty, but the *review window since run 2* is
+**not** empty: the consumer half of the decisions/WITHDRAW lane and the halt lane both landed there.
 
 ---
 
@@ -361,6 +364,21 @@ finding.
 - `lib/suspect-credential-refresh.js` → `flow-account-connection-workspace-credential` (importers
   `routes/workspace-api.js`, `server.js`; LIN-2473).
 
+**Modified-not-added seams the added-file diff cannot see.** The added-file sweep is necessary but not
+sufficient: the window's largest **modified** surface is the decisions/withdrawal (WITHDRAW) subsystem, which
+stretches across files that already existed at `ea53ffc8` (`lib/unanswered-decisions.js`,
+`lib/pipeline-loops.js`, `routes/dashboard.js`, `routes/proxy-rulings.js`, `lib/prompt-template-defs.js`) and
+so is invisible to `--diff-filter=A`. It is folded into `flow-operator-decisions` (ledger row above) with the
+consumer half in `simple-dispatcher` (LIN-3039/3040): a new `decision-withdrawn` terminal state
+(`lib/unanswered-decisions.js:264` `isDecisionWithdrawn`), a persisted `answeredDecisions` set and a
+`withdrawal` digest field (`lib/pipeline-loops.js:63-136`, `BUILDER_VERSION` 12→16), the public
+`/rulings?includeResolved=true` contract (`routes/proxy-rulings.js:103,163,248`), a session-auth-only
+`reverse-withdrawal` route (`routes/dashboard.js:1673`), and multi-`WITHDRAW:` emission on the consumer
+side. Other modified-not-added seams in the window: `routes/workspace-api.js` (+898, **R7 still ungated**),
+`routes/flight-companion.js` (+950), `routes/task-chat.js`, `routes/dispatch.js` (halt routes + consumer-poll
+warning), `lib/chat-tools.js` (now imports `knownWorkspaceRepos`), `lib/dispatch-store.js`,
+`lib/observer-sweep.js`, `lib/terminal-marked-task-cost.js`.
+
 **The 11 proxy routes** fold into `api-workspace-proxy` (mounts in `routes/proxy.js:20-30`); three are
 dual-tagged as FLOW seams: `proxy-halt.js`→`flow-dispatch-halt`, `proxy-flight-companion.js`→
 `flow-flight-companion-turn`, `proxy-rulings.js`→`flow-operator-decisions` (existing id). Full 35-file table:
@@ -507,8 +525,14 @@ Required self-checks this run:
   LIN-2846/1629/2328/1933 open). **R5 — no, unmoved** (zero commits; third cycle). **R2 — no** (LIN-2120
   Backlog; selection half still unconsumed). **R9 — partial** (write-side stamped via LIN-2575; read side
   still drops `periodicalId`). **R3 — no** (both tracking tickets Backlog). **R8 — mixed** (`workspace-repos`
-  resolved, `observer-efficacy-signal` still dead, one new inert instance). **R6 — worsened** (no registry
-  refresh since 2026-08-29). **R4 — closed** and stays closed.
+  resolved, `observer-efficacy-signal` still dead; `opencode-liveness.js` checked and found consumed, so not an
+  instance). **R6 — worsened** (no registry refresh since 2026-08-29). **R4 — closed** and stays closed.
+- **What did this review itself miss?** The Tier 2 adversarial second-read caught that this run's own coverage
+  model — the `--diff-filter=A` added-file sweep — is necessary but **not sufficient**: the window's largest
+  **modified** surface, the decisions/WITHDRAW subsystem (~36 LinearViewer + 7 simple-dispatcher commits), is
+  invisible to that sweep and was initially filed as `flow-operator-decisions` "unchanged". Corrected in place
+  (see *Adversarial Second-Read*), and the window accounting (simple-dispatcher's 112 in-window commits, not 0)
+  was fixed. Recorded here so the next run explicitly weights modified-not-added seams.
 
 **Score holds at 4:** the run found a second live scoring-model gap in its own rated-done set (R13, plus the
 LIN-2993 caveat), caught the halt contract drift from a shipped ticket (R10), and answered the R1–R9 uptake
@@ -589,7 +613,7 @@ run's registrations. **Every changed score carries a citation and a confidence t
 | `flow-periodicals-two-stage` | Stage-1 mint → Stage-2 self-conclude contract | 3 | **3** | High | **CFG 2→3**, High — LIN-2385 `d4db6615`, LIN-2396 `3ff81245`, LIN-2575 `5b1901ae`, LIN-3022 §5 `c74d0439`; CHP held at 3 by R7/R9 |
 | `flow-account-connection-workspace-credential` | owner-credential-store → refresh → cache → gate | **3** | N/A* | High | **4→3**, High — LIN-2473 (Done, 2026-09-02) provider-lane 401/503 flapping; `credential-health` LLHW (LIN-2493); R13 |
 | `flow-cost-telemetry` | task-cost/model-pricing/weekly-budget/plan-fee lane | 3 | 3 | Medium | unchanged; `pricing-conformance-sweep.js` fold |
-| `flow-operator-decisions` | scan → task-decisions → unanswered → shelved → supersede | 4 | N/A* | High | unchanged; `dismissal-suggestions-store.js`, `scan-fingerprint.js`, `harbour-comments-store.js` folds |
+| `flow-operator-decisions` | scan → task-decisions → unanswered → shelved → supersede | 4 | N/A* | High | score unchanged (at ceiling); **large in-window WITHDRAW delta** — `isDecisionWithdrawn` `lib/unanswered-decisions.js:264`, `answeredDecisions`/`withdrawal` digest `lib/pipeline-loops.js:63-136`, `includeResolved` contract `routes/proxy-rulings.js:103,163,248`, `reverse-withdrawal` `routes/dashboard.js:1673`, published no-re-raise contract `lib/prompt-template-defs.js:1043,1202` (LIN-2891/3034/3035/3036/3038/3022), consumer half `simple-dispatcher` LIN-3039/3040 (multi-`WITHDRAW:`); plus `dismissal-suggestions-store.js`, `scan-fingerprint.js`, `harbour-comments-store.js` folds |
 | `flow-account-merge` | identity-conflict resolution lane | 4 | N/A* | High | unchanged |
 | `flow-flight-companion-turn` | agent turn core → gate → transcripts → SSE stream | 4 | N/A* | Medium | new (LIN-2631/2968) |
 | `flow-dispatch-halt` | operator halt request → store → consumer honouring | 3 | N/A* | Medium | new — Doc drift R10; LIN-3074 owner |
@@ -735,10 +759,74 @@ and test-coverage reads this review leans on are now about three months old.
 
 ## Adversarial Second-Read
 
-*[PLACEHOLDER — to be filled in beat 3 after the required Tier 1 or Tier 2 adversarial second-read. This
-section will name the tier used, the question posed verbatim, the reader's full answer, and the three-field
-verdict (`Adversarial second-read verdict:`, `Differed from top finding:`, `Disposition:`). The same three
-fields will be posted as one comment on LIN-3105.]*
+**Tier used:** **Tier 2 — a fresh-context sub-agent**, dispatched from within the report-writing session
+carrying no memory of the report-writing turn. It was given only: the report path and repo roots, the review
+window (`ea53ffc8..b5c528c4`; simple-dispatcher run-2 date → `3b1e734`), the one-line remit, and the question
+below — no dossier, no findings, no summary. It independently inspected the live tree and the Linear tickets
+rather than trusting the report's own citations.
+
+**Question posed, verbatim:** *"What is the largest item in this window that this report missed or
+misfiled?"*
+
+**Reader's full answer, verbatim:**
+
+> **## 1. The one largest item**
+>
+> **The withdrawal/decision-lifecycle (WITHDRAW) subsystem — the window's largest cross-repo contract change — is absent from the report, which scores its home surface `flow-operator-decisions` "unchanged."**
+>
+> **## 2. Cited evidence**
+>
+> **The report is silent.** `docs/reviews/integration-surface-maturity-review-2026-09-26.md:592` carries `flow-operator-decisions` as `4 / N/A* / High — unchanged`; the report contains **zero** occurrences of `withdraw`, `WITHDRAW`, `answeredDecision`, `includeResolved`, or `decision-withdrawn`.
+>
+> **LinearViewer commits in-window** (`git log --oneline ea53ffc8..b5c528c4`, all ancestry-verified): LIN-3034: `3eecd728`, `b627d9b7`, `d8236ee2`; LIN-3035: `c0dc4496`, `fa37864d`; LIN-3036: `a4255697`, `78a8973a`, `46caba41`; LIN-3038: `184553ba`, `5d8b5a89`; LIN-2891 F1: `4834be19`; LIN-2775: `67ce988c`, `d72f0470`, `27203a70`; LIN-3022: `3a77f291`, `2455178a`, `88fe7773`.
+>
+> **simple-dispatcher commits in-window** (run-2 HEAD `7064955` → `3b1e734`): `3c5fa3c`, `9c75ca2`, `f27e2e0` (LIN-3039), `cc51763` (LIN-3040), `63e0171`, `a43a9c3` (LIN-2891 F2).
+>
+> **Live at HEAD** (`b5c528c4`): `lib/unanswered-decisions.js:264` `isDecisionWithdrawn`; `lib/pipeline-loops.js:63-136` (`withdrawal` + `answeredDecisions` digest, BUILDER_VERSION 12→16); `routes/proxy-rulings.js:103,163,248` `includeResolved`; `routes/dashboard.js:16,1673` `POST …/rulings/reverse-withdrawal`; `lib/prompt-template-defs.js:1043,1202` (published `/rulings?includeResolved=true` no-re-raise contract). ~36 LV commits + 7 SD commits, several thousand lines across the rulings/decisions modules (e.g. `public/observation.js` +2612, `lib/pipeline-loops.js` +866, `lib/unanswered-decisions.js` +540, `routes/dashboard.js` +662, `routes/proxy-rulings.js` +482).
+>
+> **The enabling error:** the report (`:24-26`) states "simple-dispatcher had **0** commits in the same window." Run 2's cited consumer HEAD was `simple-dispatcher@7064955` (run-2 report `:228`); `git rev-list --count 7064955..3b1e734` = **112** (84 touching `*.js`), which is where the WITHDRAW consumer half and its `dispatcher.js` wiring landed. The report's own R10 (`:229-230`) cites consumer changes at `dispatcher.js:31,1470-1503` and `halt.js:219`, contradicting its own "0 commits."
+>
+> **## 3. Classification**
+>
+> **Coverage gap — with a misfiling.** The subsystem is a material delta on an existing registered FLOW (new `decision-withdrawn` terminal state, new persisted `answeredDecisions` set, changed public `/rulings` contract), yet `flow-operator-decisions` is filed "unchanged." The `0`-vs-`112` consumer count is a compounding **factual error**.
+>
+> **## 4. Confidence**
+>
+> **High** on the WITHDRAW omission (commit/file evidence is direct and the report is verifiably silent). **High** on the simple-dispatcher count being wrong.
+>
+> **NOT the headline (secondary note):** the single cleanest *factual* error is the window accounting itself — the report says simple-dispatcher had 0 commits since run 2; it had 112. If the grader's target is that count rather than a surface, this is the same root defect viewed as metadata rather than as a missed flow.
+
+**Verification by this report's author (B4-style, content-checked).** The reader's citations were reproduced
+independently: `git rev-list --count 7064955..3b1e734` = **112** (and 111 from `05681975`); every cited
+LinearViewer commit is `git merge-base --is-ancestor`-confirmed inside `ea53ffc8..b5c528c4`; the live lines
+exist at HEAD (`lib/unanswered-decisions.js:264` `isDecisionWithdrawn`, `routes/proxy-rulings.js:103`/`:248`
+`includeResolved`, `routes/dashboard.js:1673` `reverse-withdrawal`, `lib/pipeline-loops.js:63-136`
+`withdrawal`/`answeredDecisions`); and the report was indeed silent (no `withdraw` citation). The finding is
+accepted as accurate.
+
+**Adversarial second-read verdict: AGREE.** The report's ranked findings (R7, R1, R5, R2, R9, R13, R3, R8,
+R6, R10) and their citations were not challenged; the disagreement is a **coverage/fact gap**, and the report
+was corrected in place.
+
+**Differed from top finding: YES.** The reader's answer (the missed WITHDRAW subsystem, plus the
+simple-dispatcher window-accounting error) differs from the report's own #1-ranked finding (R7, the Done-gate
+bypass), which the reader did not dispute.
+
+**Disposition: fixed in place.** Three in-place corrections, no new recommendation minted (the finding is a
+coverage/accounting gap, not a new code defect, and this review mints no fix-work):
+1. **Window accounting corrected** — the Scope section now states simple-dispatcher's **112** in-window
+   commits (and distinguishes the empty post-pin drift check from the non-empty run-2 review window), fixing
+   the factual `0` that also contradicted R10.
+2. **`flow-operator-decisions` ledger row** now records the WITHDRAW subsystem as cited in-window delta
+   evidence (score stays 4/`N/A*` — already at ceiling — so the id does not move; the row was previously
+   "unchanged" with only fold evidence, which the reader correctly flagged as a misfiling of a large delta).
+3. **Surface registration** gains a "modified-not-added seams" note naming the WITHDRAW subsystem and the
+   other modified-in-window seams the `--diff-filter=A` sweep cannot see, since that sweep alone understates
+   the window.
+
+No scores or ids changed, so the beat-2 id-diff and 35-file self-checks are unaffected (re-run: 37→41 ids
+with exactly the 4 new; 35/35 dispositions). The report's coverage-model gap — relying on the added-file diff
+alone — is recorded in the Self-Audit below as this run's own META datum.
 
 ---
 
