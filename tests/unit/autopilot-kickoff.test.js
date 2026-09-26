@@ -576,6 +576,44 @@ describe('buildAutopilotKickoff (originNote seam, LIN-918)', () => {
   });
 });
 
+describe('buildAutopilotKickoff (scoped goal delivery, LIN-2818)', () => {
+  const issue = { identifier: 'LIN-2818', title: 'Scoped kickoff carries the goal' };
+  const GOAL = 'Also rename the `foo` helper and update its callers.';
+  const ORIGIN = '**Origin — raw feedback:** filed from the widget.';
+
+  test('a non-empty goal on a scoped run renders the pinned task line AND the context line', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, goal: GOAL });
+    assert.ok(text.includes('run on autopilot until **LIN-2818** (Scoped kickoff carries the goal)'));
+    assert.ok(text.includes('**Additional context from the human:** ' + GOAL));
+  });
+
+  test('omitted/empty/whitespace-only goal is byte-identical to the bare scoped call', () => {
+    const bare = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
+    assert.strictEqual(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, goal: undefined }), bare);
+    assert.strictEqual(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, goal: '' }), bare);
+    assert.strictEqual(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, goal: '   \n  ' }), bare);
+    assert.ok(!bare.includes('**Additional context from the human:**'));
+  });
+
+  test('goal and originNote compose on a scoped run — goal context first, then originNote', () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, goal: GOAL, originNote: ORIGIN });
+    assert.ok(text.includes(GOAL));
+    assert.ok(text.includes(ORIGIN));
+    assert.ok(
+      text.indexOf('**Additional context from the human:**') < text.indexOf(ORIGIN),
+      "goal's context note renders before the originNote framing"
+    );
+  });
+
+  test('LIN-2730 shape: scoped + stepper + multi-line goal renders all three', () => {
+    const multiline = 'line one\nline two\n- bullet three';
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, variant: 'stepper', goal: multiline });
+    assert.ok(text.includes("You're running as the STEPPER"), 'stepper disposition is present');
+    assert.ok(text.includes('run on autopilot until **LIN-2818**'), 'pinned scoped goal line is present');
+    assert.ok(text.includes('**Additional context from the human:** ' + multiline), 'the multi-line goal is carried intact');
+  });
+});
+
 describe('buildAutopilotKickoff (maxTasks budget, LIN-1751)', () => {
   const issue = { identifier: 'LIN-1751', title: 'Bounded autonomous runs' };
 

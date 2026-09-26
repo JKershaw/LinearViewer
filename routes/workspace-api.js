@@ -719,6 +719,11 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // changes the response strings; standard stays byte-identical).
     const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT
     const stepper = variant === 'stepper'
+    // LIN-2818: stays at 1000 on purpose. This general/stack-walk goal arrives in
+    // the URL query string (the dispatch page's goal textarea round-trips it via
+    // `?goal=`), and Node's default 16KB header ceiling can't reliably carry more;
+    // it is matched to the textarea's own maxlength. The scoped POST body cap
+    // (routes/proxy-kickoff.js) is the surface that rose to MAX_DESCRIPTION_LENGTH.
     const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : ''
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
@@ -3488,9 +3493,11 @@ ${goal}`
     'unfiltered user report, not a triaged or scoped task';
 
   // Feedback-origin brief injected into a feedback → autopilot kickoff (LIN-918).
-  // `buildAutopilotKickoff` pins the goal for a scoped run and ignores `goal`, so
-  // this framing is threaded in via the dedicated `originNote` seam. It tells the
-  // run the ticket is a raw, un-triaged user report whose first job is understanding.
+  // A scoped kickoff now also appends a non-empty caller `goal` as additional
+  // context (LIN-2818), but this call site passes none — it threads the framing in
+  // via the dedicated `originNote` seam, which stays the distinct, system-authored
+  // carrier. It tells the run the ticket is a raw, un-triaged user report whose
+  // first job is understanding.
   const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
     `**Origin — raw feedback:** ${FEEDBACK_ORIGIN_FRAMING}. Before driving toward a fix, ` +
     'your first job is to *understand* it: read the report closely, reproduce or ground the problem ' +
@@ -3625,7 +3632,8 @@ ${goal}`
   // Mirrors `enqueueFeedbackTriage`: it builds a SCOPED autopilot kickoff for the
   // freshly-created ticket, injects the feedback-origin brief (so the run knows the
   // ticket came straight from the widget and needs understanding — a scoped kickoff
-  // ignores `goal`, hence the dedicated `originNote` seam), mints a best-effort
+  // can also carry caller `goal` as context since LIN-2818, so this system-authored
+  // framing uses the dedicated `originNote` seam), mints a best-effort
   // readWrite proxy token, and enqueues on the SAME dispatch substrate with
   // `kind: 'autopilot'`. Non-fatal — a failure here must not fail the submission,
   // the ticket already exists. Unlike triage this is NOT flag-gated: the user chose

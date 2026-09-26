@@ -35,7 +35,8 @@
 >   [Stepper variant](#stepper-variant)) between the guide and the snapshot. `standard` is the
 >   guide as written here.
 > - **The snapshot** (after the `---`) is *per-dispatch* — assembled at kickoff: the run
->   mode, the goal (a pinned task for a scoped run, free text, or "walk the stack"), and
+>   mode, the goal (a pinned task for a scoped run, plus any caller `goal` text as additional
+>   human context since LIN-2818 — or free text / "walk the stack" for a general run), and
 >   the proxy token (injected at dispatch via the +proxy block, never committed). The block
 >   below is a **worked example**; the live generator fills it from the dispatch params and
 >   has Autopilot fetch the stack itself as its first orient action (a *computed* stack
