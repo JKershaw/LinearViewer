@@ -1,0 +1,124 @@
+{
+  "surface": "styleguide",
+  "label": "Styleguide (baseline)",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/styleguide",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "light",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "Style Guide - Harbour",
+  "headings": {
+    "h1": 3,
+    "h2": 3,
+    "h3": 20,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 26,
+    "a11y": {
+      "roleHeading": 26,
+      "levels": {
+        "h1": 3,
+        "h2": 3,
+        "h3": 20,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 1385,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 4,
+    "toRoot": 1,
+    "toWorkspace": 0,
+    "toAppNav": 3,
+    "sample": [
+      "/",
+      "/privacy",
+      "/terms",
+      "/templates"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Harbour\n  \n  \n    Style Guide\n    A stat"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "A static reference of every design token"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Harbour"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(22, 163, 74)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 3.3,
+      "text": "save"
+    },
+    {
+      "selector": ".chip",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(0,0,0)",
+      "ratio": 1.21,
+      "text": "LIN-786"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

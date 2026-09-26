@@ -1,0 +1,116 @@
+{
+  "surface": "archive-7",
+  "label": "Archive #7",
+  "kind": "cold",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/archive/7",
+  "viewport": {
+    "width": 360,
+    "height": 800
+  },
+  "expectedTheme": "dark",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "Learning While the Tools Change · Harbour Archive #7",
+  "headings": {
+    "h1": 1,
+    "h2": 12,
+    "h3": 13,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 26,
+    "a11y": {
+      "roleHeading": 26,
+      "levels": {
+        "h1": 1,
+        "h2": 12,
+        "h3": 13,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "innerWidth": 360,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 2,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": [
+      "/archive/2",
+      "/archive/5"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(232, 230, 225)",
+      "bg": "rgb(20,24,30)",
+      "ratio": 14.28,
+      "text": "Harbour Archive · Document 7 · An essay\n"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 163, 174)",
+      "bg": "rgb(20,24,30)",
+      "ratio": 6.97,
+      "text": "Harbour Archive · Document 7 · An essay"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(154, 163, 174)",
+      "bg": "rgb(20,24,30)",
+      "ratio": 6.97,
+      "text": "Harbour Archive"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "the check",
+      "standard.md",
+      "section 7",
+      "under Next",
+      "section 8",
+      "section 6",
+      "0d652fb",
+      "docs/papers/harbour/learning-while-the-tools-change.md",
+      "Current version",
+      "The papers archive",
+      "How a paper is written",
+      "document 5, The Cheap Ships"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500"
+  ]
+}

@@ -1,0 +1,154 @@
+{
+  "surface": "collective",
+  "label": "Collective (experimental, mock Yap)",
+  "kind": "auth",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/workspace/test-workspace/collective",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "light",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "Collective - Experimental",
+  "headings": {
+    "h1": 1,
+    "h2": 2,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 3,
+    "a11y": {
+      "roleHeading": 3,
+      "levels": {
+        "h1": 1,
+        "h2": 2,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 1385,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 24,
+    "toRoot": 0,
+    "toWorkspace": 20,
+    "toAppNav": 4,
+    "sample": [
+      "/workspace/test-workspace/",
+      "/workspace/test-workspace/observation?view=rulings",
+      "/workspace/test-workspace/",
+      "/workspace/test-workspace/swipe",
+      "/workspace/test-workspace/swim",
+      "/workspace/test-workspace/observation",
+      "/workspace/test-workspace/settings",
+      "/workspace/test-workspace/passage-planner",
+      "/workspace/test-workspace/ship-biscuit",
+      "/workspace/test-workspace/live-console",
+      "/workspace/test-workspace/ship-journey",
+      "/workspace/test-workspace/roadmap"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat\n        \n      workspace:\n  "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "A cross-project discussion, dispatched a"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Test Workspace"
+    },
+    {
+      "selector": ".nav-action",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "feedback"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "observation",
+      "settings",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": true,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

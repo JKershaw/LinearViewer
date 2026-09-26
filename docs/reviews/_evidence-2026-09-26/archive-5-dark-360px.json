@@ -1,0 +1,103 @@
+{
+  "surface": "archive-5",
+  "label": "Archive #5",
+  "kind": "cold",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/archive/5",
+  "viewport": {
+    "width": 360,
+    "height": 800
+  },
+  "expectedTheme": "dark",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "The Cheap Ships · Harbour Archive #5",
+  "headings": {
+    "h1": 1,
+    "h2": 7,
+    "h3": 5,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 13,
+    "a11y": {
+      "roleHeading": 13,
+      "levels": {
+        "h1": 1,
+        "h2": 7,
+        "h3": 5,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "innerWidth": 360,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 1,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": [
+      "/archive/4"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(232, 230, 225)",
+      "bg": "rgb(20,24,30)",
+      "ratio": 14.28,
+      "text": "@font-face { font-family: \"Inter\"; font-"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 163, 174)",
+      "bg": "rgb(20,24,30)",
+      "ratio": 6.97,
+      "text": "Harbour Archive · Document 5 · An essay"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(63, 150, 221)",
+      "bg": "rgb(20,24,30)",
+      "ratio": 5.61,
+      "text": "Capacity levers map, 15 August 2026"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

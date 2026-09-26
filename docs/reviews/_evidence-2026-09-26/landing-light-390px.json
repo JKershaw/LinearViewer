@@ -1,0 +1,116 @@
+{
+  "surface": "landing",
+  "label": "Landing (cold)",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "Harbour — keep human intent in command of AI execution",
+  "headings": {
+    "h1": 1,
+    "h2": 8,
+    "h3": 4,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 13,
+    "a11y": {
+      "roleHeading": 13,
+      "levels": {
+        "h1": 1,
+        "h2": 8,
+        "h3": 4,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 375,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 7,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 6,
+    "sample": [
+      "/auth/linear",
+      "/archive/2",
+      "/swipe",
+      "/swim",
+      "/privacy",
+      "/terms",
+      "/templates"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat\n    Keep human intent in com"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "Keep human intent in command of AI execu"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(4, 35, 31)",
+      "bg": "rgb(13,148,136)",
+      "ratio": 4.43,
+      "text": "Log in with Linear"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "swipe",
+      "swim",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}
