@@ -1316,7 +1316,15 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
         const rule = reviewRule();
         assert.ok(/a new or changed test, or a code change/i.test(rule),
           'names the authoring examples that exceed close-out\'s bound');
-        assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve/i.test(rule),
+        // Scoped to the LIN-3056 clause (F1): the whole rule also carries the
+        // pre-existing LIN-3033 sentence "…the verdict is Request Changes back
+        // to implementation, not a conditional Approve naming a vague fix", so
+        // an unscoped assertion passes even when the new clause routes
+        // elsewhere. Extract the LIN-3056 clause first, then assert it ends on
+        // exactly the routing verdict.
+        const m = rule.match(/Reserve that conditional form.*?not a conditional Approve\./is);
+        assert.ok(m, 'the LIN-3056 clause is present and extractable on its own');
+        assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve\.$/i.test(m[0]),
           'the verdict for such an inside item is Request Changes, not a conditional Approve');
       });
 
