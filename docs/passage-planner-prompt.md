@@ -206,9 +206,11 @@ comment** on the passage task, then stop — the Flight Companion monitors from 
 Planner does not fly the passage itself.
 
 **On anything other than `201`** (for example `409 DUPLICATE_DISPATCH` inside the existing
-5-minute scoped-duplicate window): report it in the voyage log and stop. Never retry, never
-reword and resend. Adopting the returned `id` and watching that live dispatch is fine, per the
-proxy's own duplicate-guard convention, but do not synthesize a second launch attempt.
+5-minute scoped-duplicate window): report the outcome in the voyage log and stop. Never retry,
+never reword and resend, and never synthesize a second launch attempt. If the response names a
+live dispatch `id`, record that `id` and its declared `maxTasks` in the voyage log as the
+Runner for this passage — do not watch it yourself. The Flight Companion owns monitoring, and
+the Planner does not fly the run.
 
 **Never write anything without the yes it sits behind.** These gates are prompt-only — your
 token won't stop you, so honoring them is the job. If John explicitly tells you to skip a gate,
