@@ -14,6 +14,40 @@
 
 # Findings, severity-ranked
 
+> **Adversarial second-read correction (see the appendix below).** The Tier-1 reader found one genuinely missed class — the stale "the runner does not yet honor a halt (pending LIN-2995)" copy — which is added here as **H13** and promoted to the top of the ranking. The reader's item differed from this report's previous top finding (H3).
+
+## H13 · **HIGH** — operator/agent docs still say the runner ignores a halt, but LIN-2995 is Done and `simple-dispatcher` honors halts — **existing LIN-3074** *(found by the adversarial second-read)*
+
+**What.** Harbour's halt copy is uniformly framed as "a request only — the runner does not yet honor it (pending LIN-2995)". That framing is now **false**: `LIN-2995` is **Done** ("simple-dispatcher: honour a halt without depending on Harbour …"), `LIN-2994` is Done, and `simple-dispatcher` implements and documents halt enforcement. The stale wording survives across both repos' doc surfaces at HEAD.
+
+**Evidence.**
+- `simple-dispatcher/README.md:231` — a `## Halts (pause / stop)` section: "*A halt stops new work being claimed, using the same `pause` / `stop` meaning whether it comes from Harbour (per workspace token), from the host-local file below, or automatically when polling stays unhealthy.*" `stop` sweeps cancellable sessions to `CANCELLED`; `pause` holds fresh launches. Implementation: `simple-dispatcher/halt.js` (`resolveEffectiveHalt`, precedence `stop > pause`, source `harbour > local > auto`), `simple-dispatcher/config.js:868` ("LIN-2995 S5 (LIN-3045): the host-local halt file", `SD_LOCAL_HALT_FILE`), `dispatcher.js:31`.
+- Linear: `LIN-2995` **Done**, `LIN-2994` **Done**, `LIN-3045` **Done** (via `/api/proxy/search` and `/api/proxy/issues/LIN-2995`).
+
+**Stale sites at HEAD (non-test): ~26 line occurrences across 8 docs + 5 code files.**
+
+Docs:
+- `docs/architecture/dispatch-and-proxy.md:17`, `:22`, `:60`, `:61`
+- `docs/dispatch-integration.md:129`, `:130`
+- `docs/executive-summary.md:87`
+- `docs/proxy-integration.md:2402`, `:2441`
+- `docs/runbooks/harbour-degraded.md:6`, `:24`, `:28`, `:32`, `:60`, `:204`, `:207` (including `[unbuilt: LIN-2995]`)
+
+Code / inline comments / served catalog:
+- `lib/proxy-instructions.js:624`, `:845` (the runtime-served catalog)
+- `lib/render-dispatch.js:151` (user-facing copy)
+- `public/dispatch.js:757`, `:788` (user-facing status copy)
+- `routes/dispatch.js:1002`, `:1003`
+- `routes/proxy-halt.js:8`, `:9`, `:104`
+
+Test line-sites that hardcode the old string (recorded, not part of the doc fix): `tests/e2e/dispatch-halt.spec.js:11`, `:124`; `tests/unit/dispatch-route-halt.test.js:14`, `:15`; `tests/unit/proxy-halt.test.js:11`; `tests/unit/render-dispatch-exec-controls.test.js:43`, `:49`.
+
+Point-in-time, not a member: `docs/incidents/2026-09-22-harbour-db-reads-hang.md:148` lists LIN-2995 as Backlog in a dated incident table (a historical record; note only).
+
+**Class.** Accuracy / drift, cross-repo (operator + agent-facing docs). **Confidence:** verified at HEAD, independently of the reader. **Existing ticket:** **LIN-3074** (Backlog) owns exactly this fix and explicitly asks which files beyond `tests/unit/render-dispatch-exec-controls.test.js` still carry the stale wording — this finding is that enumeration. Comment, do not re-mint. **Sibling:** none.
+
+---
+
 ## H3 · **HIGH** — residual Linear-only framing: the agent-facing twin of the fixed human-facing defect — **existing LIN-2391**
 
 **What.** `README.md`'s provider-generalisation (LIN-2248) fixed the human entry point; the same defect class survives across `CLAUDE.md`, the area docs, Settings copy, and `docs/executive-summary.md`. All sites re-read at HEAD:
@@ -273,6 +307,7 @@ Per the ticket's instruction ("re-verify every seed against source at HEAD; corr
 
 | finding | severity | disposition |
 | -- | -- | -- |
+| **H13** halt "pending LIN-2995" copy (~26 non-test sites, both repos) | HIGH | **existing: LIN-3074 — comment** (found by the adversarial second-read; not re-minted) |
 | **N1** — 4 broken relative links in `docs/architecture/` | LOW | **minted: LIN-3117** (related to LIN-3102) |
 | **N2** — template-count guard hole (`lib/render-landing.js:339`, `docs/executive-summary.md:34,55,132`) | MED | **minted: LIN-3115**; cross-link **LIN-1653** (same guard class, other surfaces) and **LIN-2392** |
 | **DC-dispatch-fields + post-split route citations** | MED | **minted: LIN-3116** (widened: 3 fields + 4 doc citations + 11 inline comments + 8 test); cross-link **LIN-2601**, **LIN-914** |
@@ -291,7 +326,7 @@ Per the ticket's instruction ("re-verify every seed against source at HEAD; corr
 | **CI-doc twin** `docs/architecture/ci.md:46` omits `secret-scan` | LOW-MED | **record only** (not minted) |
 | **H9 / H10 / H11 / H12** | LOW | **record only** (not minted) |
 
-The ~3-new cap is spent on **N2 → LIN-3115**, **DC-dispatch-fields → LIN-3116**, **N1 → LIN-3117**, each left in its default state and `related`-linked back to LIN-3102. Duplicate search before minting (`/api/proxy/search`, 2–3 phrasings each) found *overlapping* but not *owning* tickets and was resolved by cross-linking, not re-minting: LIN-1653/LIN-2302 (N2's count class), LIN-2601 (split hygiene, different surface), LIN-914 (`waitForFollowUps` removal — flagged inside LIN-3116). The highest-severity items (H1/H3/H4/F2/effort) already have tickets and were cross-linked/commented, not duplicated.
+The ~3-new cap is spent on **N2 → LIN-3115**, **DC-dispatch-fields → LIN-3116**, **N1 → LIN-3117**, each left in its default state and `related`-linked back to LIN-3102. H13 (found after minting, by the adversarial second-read) already has an owner, **LIN-3074**, so it is commented, not minted. Duplicate search before minting (`/api/proxy/search`, 2–3 phrasings each) found *overlapping* but not *owning* tickets and was resolved by cross-linking, not re-minting: LIN-1653/LIN-2302 (N2's count class), LIN-2601 (split hygiene, different surface), LIN-914 (`waitForFollowUps` removal — flagged inside LIN-3116). The highest-severity items (H1/H3/H4/F2/effort) already have tickets and were cross-linked/commented, not duplicated.
 
 ---
 
@@ -327,6 +362,7 @@ The ~3-new cap is spent on **N2 → LIN-3115**, **DC-dispatch-fields → LIN-311
 | item | 08-29 | 09-26 | movement |
 | -- | -- | -- | -- |
 | `proxy-instructions-blob-409-drift` (H1) | MED; quick-ref table 1 of 3 causes + 2 gate codes + 2 endpoints absent | **unchanged**; additionally documents `includeResolved`/`stampLoopId` that the long doc lacks (reverse drift) | **unchanged, widened; LIN-2390 owns** |
+| `halt-pending-LIN-2995-copy` (H13) | not examined by this run until the adversarial second-read | **new**: ~26 non-test sites across both repos still say the runner ignores a halt, though LIN-2995/2994/3045 are Done and simple-dispatcher enforces halts | **new, high; existing LIN-3074 owns — commented** |
 | `claude-md-jira-readonly-claim` (H2) | HIGH | **resolved-in-split** (false prose dropped, not moved) | **resolved** |
 | `claude-md-linear-only-framing` (H3) | HIGH | **unchanged**; residual now spread across `CLAUDE.md`, `docs/architecture/auth.md`, `lib/feature-defaults.js`, `docs/architecture/source-map.md`, `routes/proxy.js:2`, and 7 `docs/executive-summary.md` lines, incl. the false `:147` | **unchanged, re-bounded; LIN-2391 owns** |
 | `landing-md-backend-template-drift` (H4) | MED-HIGH | **unchanged**; LIN-2392 Todo | **unchanged; LIN-2392 owns** |
@@ -352,4 +388,20 @@ The ~3-new cap is spent on **N2 → LIN-3115**, **DC-dispatch-fields → LIN-311
 
 ## Adversarial Second-Read
 
-*pending — Tier-1, filled after the PR exists.*
+**Tier:** Tier 1 — a wholly separate dispatched session with no memory of this run. Reader dispatch id `0aa7fdef-52e3-41be-bdac-ee74e654d198` (`POST /api/proxy/dispatch`, `kind: "custom"`, `target: "cli"`, `issueIdentifier: LIN-3102`, no `sessionId`, no `followUpTo`), status `done`, completed 2026-09-26. The prompt pointed the reader at this report on the PR branch (PR #1594) and both repos at `origin/main`, stated the remit in two lines, and instructed it not to edit files, open PRs, create tickets or comment on tickets.
+
+**Question asked (verbatim):** *"What is the largest item in this window that this report missed or misfiled?"*
+
+**Reader's answer (full, from its final dispatch feedback entry):**
+
+> DONE: The read-only Tier-1 second-read of LIN-3102 is finished and verified against source. The largest miss is 21 Harbour sites that still say the runner ignores a halt, although simple-dispatcher obeys halts since LIN-2995 (Done 2026-09-26). This differs from the report's top finding, H3. Nothing was edited, posted or run: there is no PR, commit, test or CI run for this remit.
+
+*(The reader's answer reached the owning session as a single final dispatch feedback entry; its supporting working notes are not separately serialized in `feedback[]`. The central claim was independently re-derived by this session and is recorded in full above as H13: `LIN-2995`/`LIN-2994`/`LIN-3045` are Done, `simple-dispatcher/README.md:231` documents halt enforcement, and ~26 non-test line occurrences across 8 Harbour docs and 5 Harbour code files still assert the pending/unbuilt framing.)*
+
+**Disposition.** *Fixed in place.* The missed class was added to the report as **H13** (ranked HIGH and promoted to the top of the findings), the minted/not-minted table and trend ledger were updated, and the owning existing ticket **LIN-3074** was commented with the exact site enumeration it asks for. No new ticket was minted (LIN-3074 already owns the fix). The reader's item differed from the prior top finding (H3).
+
+```
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: fixed in place
+```
