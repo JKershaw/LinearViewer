@@ -1,0 +1,17 @@
+routing HAR-697  expect=["bug","research"] avoid=implement → implement/bug/bug hits=2/3 pExpect=0.317 conf=0.23 operator=0.213 in=3995tok 262ms
+routing LIN-420  expect=["review"] avoid=null → review/review/review hits=3/3 pExpect=0.943 conf=0.94 operator=0.12 in=1530tok 249ms
+routing LIN-510  expect=["implement","blocked","plan","bug"] avoid=review → review/review/review hits=0/3 pExpect=0.14 conf=0.83 operator=0.653 in=8511tok 293ms
+routing LIN-537  expect=["implement","plan"] avoid=bug → implement/implement/implement hits=3/3 pExpect=0.837 conf=0.81 operator=0.073 in=1693tok 247ms
+routing LIN-571  expect=["breakdown","implement"] avoid=plan → plan-review/breakdown/plan-review hits=1/3 pExpect=0.61 conf=0.3 operator=0.14 in=6521tok 282ms
+routing LIN-748  expect=["design"] avoid=null → design/design/design hits=3/3 pExpect=0.56 conf=0.53 operator=0.9 in=3780tok 320ms
+routing LIN-813  expect=["design"] avoid=null → scoping/scoping/scoping hits=0/3 pExpect=0 conf=0.83 operator=0.157 in=2145tok 316ms
+refusal fixture-A              gold=true lexical=true jev=0.97 → true correct
+refusal fixture-B              gold=true lexical=true jev=0.833 → true correct
+refusal benign-blocked         gold=false lexical=false jev=0.17 → false correct
+refusal done                   gold=false lexical=false jev=0.01 → false correct
+refusal meta-discussion        gold=false lexical=false jev=0.157 → false correct
+refusal fp-merging-classifier  gold=false lexical=true jev=0.357 → false correct
+refusal fp-third-party         gold=false lexical=true jev=0.04 → false correct
+refusal recall-bound-short     gold=null lexical=false jev=0.127 → false 
+
+totals {"calls":45,"inputTokens":94827,"outputTokens":3872,"costUsd":0.003982734000000002,"latencyMs":{"min":208,"median":256,"max":367},"routingHits":12,"routingRuns":21,"routingAvoidHits":4,"routingStable":5,"refusalCorrect":7,"refusalGraded":7,"lexicalCorrect":5}

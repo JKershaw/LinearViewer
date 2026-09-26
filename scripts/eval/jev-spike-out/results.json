@@ -2,7 +2,7 @@
   "model": "typesafe/jev-1.13",
   "endpoint": "https://openrouter.ai/api/alpha/decisions",
   "k": 3,
-  "ranAt": "2026-09-19T05:37:47.140Z",
+  "ranAt": "2026-09-26T19:00:48.581Z",
   "routing": [
     {
       "identifier": "HAR-697",
@@ -15,49 +15,75 @@
       "hits": 2,
       "avoidHits": 1,
       "stable": false,
-      "meanPExpect": 0.34,
-      "meanConfidence": 0.247,
-      "meanOperator": 0.21,
+      "meanPExpect": 0.317,
+      "meanConfidence": 0.243,
+      "meanOperator": 0.213,
       "runs": [
         {
           "choice": "implement",
-          "confidence": 0.22,
-          "pExpect": 0.3,
-          "pAvoid": 0.26,
+          "confidence": 0.24,
+          "pExpect": 0.29,
+          "pAvoid": 0.29000000000000004,
           "top3": [
             [
               "implement",
-              0.26
+              0.29
             ],
             [
               "bug",
-              0.26
+              0.25
             ],
             [
               "plan",
               0.11
             ]
           ],
-          "operator": 0.2,
+          "operator": 0.22,
           "hit": false,
           "avoidHit": true,
-          "inputTokens": 4021,
-          "latencyMs": 411,
+          "inputTokens": 3995,
+          "latencyMs": 353,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
           "choice": "bug",
-          "confidence": 0.25,
-          "pExpect": 0.35,
-          "pAvoid": 0.26,
+          "confidence": 0.26,
+          "pExpect": 0.33999999999999997,
+          "pAvoid": 0.24,
           "top3": [
             [
               "bug",
-              0.31
+              0.3
             ],
             [
               "implement",
-              0.26
+              0.24
+            ],
+            [
+              "plan",
+              0.11
+            ]
+          ],
+          "operator": 0.21,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 3995,
+          "latencyMs": 244,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "bug",
+          "confidence": 0.23,
+          "pExpect": 0.32,
+          "pAvoid": 0.25,
+          "top3": [
+            [
+              "bug",
+              0.28
+            ],
+            [
+              "implement",
+              0.25
             ],
             [
               "plan",
@@ -67,34 +93,8 @@
           "operator": 0.21,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 4021,
-          "latencyMs": 211,
-          "servedModel": "typesafe/jev-1.13-20260917"
-        },
-        {
-          "choice": "bug",
-          "confidence": 0.27,
-          "pExpect": 0.37,
-          "pAvoid": 0.26,
-          "top3": [
-            [
-              "bug",
-              0.32
-            ],
-            [
-              "implement",
-              0.26
-            ],
-            [
-              "plan",
-              0.1
-            ]
-          ],
-          "operator": 0.22,
-          "hit": true,
-          "avoidHit": false,
-          "inputTokens": 4021,
-          "latencyMs": 189,
+          "inputTokens": 3995,
+          "latencyMs": 262,
           "servedModel": "typesafe/jev-1.13-20260917"
         }
       ]
@@ -109,86 +109,86 @@
       "hits": 3,
       "avoidHits": 0,
       "stable": true,
-      "meanPExpect": 0.96,
-      "meanConfidence": 0.957,
-      "meanOperator": 0.123,
+      "meanPExpect": 0.943,
+      "meanConfidence": 0.933,
+      "meanOperator": 0.12,
       "runs": [
         {
           "choice": "review",
-          "confidence": 0.95,
-          "pExpect": 0.96,
+          "confidence": 0.94,
+          "pExpect": 0.95,
           "pAvoid": null,
           "top3": [
             [
               "review",
-              0.96
+              0.95
             ],
             [
               "close-out",
-              0.04
+              0.05
             ],
             [
-              "implement",
+              "retrospective-audit",
               0
             ]
           ],
-          "operator": 0.13,
+          "operator": 0.12,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 1556,
-          "latencyMs": 195,
+          "inputTokens": 1530,
+          "latencyMs": 248,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
           "choice": "review",
-          "confidence": 0.96,
-          "pExpect": 0.96,
+          "confidence": 0.92,
+          "pExpect": 0.93,
           "pAvoid": null,
           "top3": [
             [
               "review",
-              0.96
+              0.93
             ],
             [
               "close-out",
-              0.04
+              0.07
             ],
             [
-              "implement",
+              "spike",
               0
             ]
           ],
-          "operator": 0.13,
+          "operator": 0.12,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 1556,
-          "latencyMs": 149,
+          "inputTokens": 1530,
+          "latencyMs": 232,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
           "choice": "review",
-          "confidence": 0.96,
-          "pExpect": 0.96,
+          "confidence": 0.94,
+          "pExpect": 0.95,
           "pAvoid": null,
           "top3": [
             [
               "review",
-              0.96
+              0.95
             ],
             [
               "close-out",
-              0.04
+              0.05
             ],
             [
-              "blocked",
+              "scoping",
               0
             ]
           ],
-          "operator": 0.11,
+          "operator": 0.12,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 1556,
-          "latencyMs": 240,
+          "inputTokens": 1530,
+          "latencyMs": 249,
           "servedModel": "typesafe/jev-1.13-20260917"
         }
       ]
@@ -206,36 +206,10 @@
       "hits": 0,
       "avoidHits": 3,
       "stable": true,
-      "meanPExpect": 0.147,
-      "meanConfidence": 0.823,
-      "meanOperator": 0.657,
+      "meanPExpect": 0.14,
+      "meanConfidence": 0.83,
+      "meanOperator": 0.653,
       "runs": [
-        {
-          "choice": "review",
-          "confidence": 0.83,
-          "pExpect": 0.14,
-          "pAvoid": 0.85,
-          "top3": [
-            [
-              "review",
-              0.85
-            ],
-            [
-              "blocked",
-              0.13
-            ],
-            [
-              "close-out",
-              0.01
-            ]
-          ],
-          "operator": 0.68,
-          "hit": false,
-          "avoidHit": true,
-          "inputTokens": 8537,
-          "latencyMs": 187,
-          "servedModel": "typesafe/jev-1.13-20260917"
-        },
         {
           "choice": "review",
           "confidence": 0.82,
@@ -255,37 +229,63 @@
               0.01
             ]
           ],
-          "operator": 0.65,
+          "operator": 0.66,
           "hit": false,
           "avoidHit": true,
-          "inputTokens": 8537,
-          "latencyMs": 175,
+          "inputTokens": 8511,
+          "latencyMs": 282,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
           "choice": "review",
-          "confidence": 0.82,
-          "pExpect": 0.15,
-          "pAvoid": 0.84,
+          "confidence": 0.84,
+          "pExpect": 0.13,
+          "pAvoid": 0.86,
           "top3": [
             [
               "review",
-              0.84
+              0.86
+            ],
+            [
+              "blocked",
+              0.12
+            ],
+            [
+              "implement",
+              0.01
+            ]
+          ],
+          "operator": 0.63,
+          "hit": false,
+          "avoidHit": true,
+          "inputTokens": 8511,
+          "latencyMs": 275,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "review",
+          "confidence": 0.83,
+          "pExpect": 0.14,
+          "pAvoid": 0.85,
+          "top3": [
+            [
+              "review",
+              0.85
             ],
             [
               "blocked",
               0.13
             ],
             [
-              "implement",
-              0.02
+              "close-out",
+              0.01
             ]
           ],
-          "operator": 0.64,
+          "operator": 0.67,
           "hit": false,
           "avoidHit": true,
-          "inputTokens": 8537,
-          "latencyMs": 214,
+          "inputTokens": 8511,
+          "latencyMs": 293,
           "servedModel": "typesafe/jev-1.13-20260917"
         }
       ]
@@ -301,23 +301,23 @@
       "hits": 3,
       "avoidHits": 0,
       "stable": true,
-      "meanPExpect": 0.857,
-      "meanConfidence": 0.843,
-      "meanOperator": 0.07,
+      "meanPExpect": 0.837,
+      "meanConfidence": 0.81,
+      "meanOperator": 0.073,
       "runs": [
         {
           "choice": "implement",
-          "confidence": 0.85,
-          "pExpect": 0.86,
+          "confidence": 0.82,
+          "pExpect": 0.84,
           "pAvoid": 0.01,
           "top3": [
             [
               "implement",
-              0.86
+              0.83
             ],
             [
               "plan-review",
-              0.13
+              0.15
             ],
             [
               "bug",
@@ -327,19 +327,19 @@
           "operator": 0.07,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 1719,
-          "latencyMs": 186,
+          "inputTokens": 1693,
+          "latencyMs": 240,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
           "choice": "implement",
           "confidence": 0.8,
-          "pExpect": 0.8200000000000001,
+          "pExpect": 0.83,
           "pAvoid": 0.01,
           "top3": [
             [
               "implement",
-              0.81
+              0.83
             ],
             [
               "plan-review",
@@ -350,26 +350,26 @@
               0.01
             ]
           ],
-          "operator": 0.07,
+          "operator": 0.08,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 1719,
-          "latencyMs": 254,
+          "inputTokens": 1693,
+          "latencyMs": 302,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
           "choice": "implement",
-          "confidence": 0.88,
-          "pExpect": 0.89,
+          "confidence": 0.81,
+          "pExpect": 0.84,
           "pAvoid": 0.01,
           "top3": [
             [
               "implement",
-              0.89
+              0.83
             ],
             [
               "plan-review",
-              0.1
+              0.15
             ],
             [
               "bug",
@@ -379,8 +379,8 @@
           "operator": 0.07,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 1719,
-          "latencyMs": 192,
+          "inputTokens": 1693,
+          "latencyMs": 247,
           "servedModel": "typesafe/jev-1.13-20260917"
         }
       ]
@@ -393,89 +393,89 @@
       ],
       "avoid": "plan",
       "scale": "real (frozen at step 2 of the 2026-06-22 LIN-571 autopilot run: settled multi-session plan in description + breakdown-shaped plan comments, before decomposition into LIN-582/583/584 — zero children)",
-      "hits": 0,
+      "hits": 1,
       "avoidHits": 0,
-      "stable": true,
-      "meanPExpect": 0.437,
-      "meanConfidence": 0.26,
+      "stable": false,
+      "meanPExpect": 0.61,
+      "meanConfidence": 0.297,
       "meanOperator": 0.14,
       "runs": [
         {
-          "choice": "defer",
-          "confidence": 0.26,
-          "pExpect": 0.44,
+          "choice": "plan-review",
+          "confidence": 0.3,
+          "pExpect": 0.6000000000000001,
           "pAvoid": 0.04,
           "top3": [
             [
-              "defer",
-              0.31
+              "plan-review",
+              0.35
             ],
             [
               "breakdown",
-              0.26
+              0.32
             ],
             [
-              "plan-review",
-              0.21
+              "implement",
+              0.28
             ]
           ],
           "operator": 0.14,
           "hit": false,
           "avoidHit": false,
-          "inputTokens": 6547,
-          "latencyMs": 251,
+          "inputTokens": 6521,
+          "latencyMs": 367,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
-          "choice": "defer",
-          "confidence": 0.26,
-          "pExpect": 0.42000000000000004,
-          "pAvoid": 0.04,
-          "top3": [
-            [
-              "defer",
-              0.31
-            ],
-            [
-              "breakdown",
-              0.25
-            ],
-            [
-              "plan-review",
-              0.23
-            ]
-          ],
-          "operator": 0.14,
-          "hit": false,
-          "avoidHit": false,
-          "inputTokens": 6547,
-          "latencyMs": 258,
-          "servedModel": "typesafe/jev-1.13-20260917"
-        },
-        {
-          "choice": "defer",
-          "confidence": 0.26,
-          "pExpect": 0.45,
+          "choice": "breakdown",
+          "confidence": 0.29,
+          "pExpect": 0.63,
           "pAvoid": 0.03,
           "top3": [
             [
-              "defer",
-              0.31
-            ],
-            [
               "breakdown",
-              0.25
+              0.34
             ],
             [
               "plan-review",
-              0.21
+              0.34
+            ],
+            [
+              "implement",
+              0.29
+            ]
+          ],
+          "operator": 0.14,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 6521,
+          "latencyMs": 291,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "plan-review",
+          "confidence": 0.3,
+          "pExpect": 0.6000000000000001,
+          "pAvoid": 0.04,
+          "top3": [
+            [
+              "plan-review",
+              0.34
+            ],
+            [
+              "breakdown",
+              0.33
+            ],
+            [
+              "implement",
+              0.27
             ]
           ],
           "operator": 0.14,
           "hit": false,
           "avoidHit": false,
-          "inputTokens": 6547,
-          "latencyMs": 181,
+          "inputTokens": 6521,
+          "latencyMs": 282,
           "servedModel": "typesafe/jev-1.13-20260917"
         }
       ]
@@ -490,23 +490,75 @@
       "hits": 3,
       "avoidHits": 0,
       "stable": true,
-      "meanPExpect": 0.527,
-      "meanConfidence": 0.487,
+      "meanPExpect": 0.56,
+      "meanConfidence": 0.523,
       "meanOperator": 0.9,
       "runs": [
         {
           "choice": "design",
-          "confidence": 0.47,
-          "pExpect": 0.51,
+          "confidence": 0.52,
+          "pExpect": 0.56,
           "pAvoid": null,
           "top3": [
             [
               "design",
-              0.51
+              0.56
             ],
             [
               "blocked",
-              0.4
+              0.36
+            ],
+            [
+              "research",
+              0.04
+            ]
+          ],
+          "operator": 0.9,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 3780,
+          "latencyMs": 239,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "design",
+          "confidence": 0.52,
+          "pExpect": 0.56,
+          "pAvoid": null,
+          "top3": [
+            [
+              "design",
+              0.56
+            ],
+            [
+              "blocked",
+              0.36
+            ],
+            [
+              "research",
+              0.03
+            ]
+          ],
+          "operator": 0.9,
+          "hit": true,
+          "avoidHit": false,
+          "inputTokens": 3780,
+          "latencyMs": 246,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "design",
+          "confidence": 0.53,
+          "pExpect": 0.56,
+          "pAvoid": null,
+          "top3": [
+            [
+              "design",
+              0.56
+            ],
+            [
+              "blocked",
+              0.34
             ],
             [
               "research",
@@ -516,60 +568,8 @@
           "operator": 0.9,
           "hit": true,
           "avoidHit": false,
-          "inputTokens": 3806,
-          "latencyMs": 173,
-          "servedModel": "typesafe/jev-1.13-20260917"
-        },
-        {
-          "choice": "design",
-          "confidence": 0.43,
-          "pExpect": 0.48,
-          "pAvoid": null,
-          "top3": [
-            [
-              "design",
-              0.48
-            ],
-            [
-              "blocked",
-              0.41
-            ],
-            [
-              "research",
-              0.05
-            ]
-          ],
-          "operator": 0.91,
-          "hit": true,
-          "avoidHit": false,
-          "inputTokens": 3806,
-          "latencyMs": 227,
-          "servedModel": "typesafe/jev-1.13-20260917"
-        },
-        {
-          "choice": "design",
-          "confidence": 0.56,
-          "pExpect": 0.59,
-          "pAvoid": null,
-          "top3": [
-            [
-              "design",
-              0.59
-            ],
-            [
-              "blocked",
-              0.31
-            ],
-            [
-              "research",
-              0.05
-            ]
-          ],
-          "operator": 0.89,
-          "hit": true,
-          "avoidHit": false,
-          "inputTokens": 3806,
-          "latencyMs": 173,
+          "inputTokens": 3780,
+          "latencyMs": 320,
           "servedModel": "typesafe/jev-1.13-20260917"
         }
       ]
@@ -586,37 +586,11 @@
       "stable": true,
       "meanPExpect": 0,
       "meanConfidence": 0.803,
-      "meanOperator": 0.16,
+      "meanOperator": 0.157,
       "runs": [
         {
           "choice": "scoping",
-          "confidence": 0.82,
-          "pExpect": 0,
-          "pAvoid": null,
-          "top3": [
-            [
-              "scoping",
-              0.84
-            ],
-            [
-              "implement",
-              0.07
-            ],
-            [
-              "breakdown",
-              0.04
-            ]
-          ],
-          "operator": 0.16,
-          "hit": false,
-          "avoidHit": false,
-          "inputTokens": 2171,
-          "latencyMs": 254,
-          "servedModel": "typesafe/jev-1.13-20260917"
-        },
-        {
-          "choice": "scoping",
-          "confidence": 0.78,
+          "confidence": 0.79,
           "pExpect": 0,
           "pAvoid": null,
           "top3": [
@@ -625,34 +599,60 @@
               0.8
             ],
             [
-              "implement",
-              0.08
+              "breakdown",
+              0.07
             ],
             [
-              "breakdown",
-              0.04
+              "implement",
+              0.06
             ]
           ],
-          "operator": 0.16,
+          "operator": 0.15,
           "hit": false,
           "avoidHit": false,
-          "inputTokens": 2171,
-          "latencyMs": 156,
+          "inputTokens": 2145,
+          "latencyMs": 269,
           "servedModel": "typesafe/jev-1.13-20260917"
         },
         {
           "choice": "scoping",
-          "confidence": 0.81,
+          "confidence": 0.79,
           "pExpect": 0,
           "pAvoid": null,
           "top3": [
             [
               "scoping",
-              0.83
+              0.81
             ],
             [
               "implement",
-              0.07
+              0.08
+            ],
+            [
+              "breakdown",
+              0.05
+            ]
+          ],
+          "operator": 0.16,
+          "hit": false,
+          "avoidHit": false,
+          "inputTokens": 2145,
+          "latencyMs": 276,
+          "servedModel": "typesafe/jev-1.13-20260917"
+        },
+        {
+          "choice": "scoping",
+          "confidence": 0.83,
+          "pExpect": 0,
+          "pAvoid": null,
+          "top3": [
+            [
+              "scoping",
+              0.85
+            ],
+            [
+              "implement",
+              0.06
             ],
             [
               "breakdown",
@@ -662,8 +662,8 @@
           "operator": 0.16,
           "hit": false,
           "avoidHit": false,
-          "inputTokens": 2171,
-          "latencyMs": 183,
+          "inputTokens": 2145,
+          "latencyMs": 316,
           "servedModel": "typesafe/jev-1.13-20260917"
         }
       ]
@@ -682,17 +682,17 @@
       "runs": [
         {
           "noul": 0.97,
-          "latencyMs": 161,
+          "latencyMs": 223,
           "inputTokens": 521
         },
         {
           "noul": 0.97,
-          "latencyMs": 197,
+          "latencyMs": 248,
           "inputTokens": 521
         },
         {
           "noul": 0.97,
-          "latencyMs": 222,
+          "latencyMs": 232,
           "inputTokens": 521
         }
       ]
@@ -701,25 +701,25 @@
       "id": "fixture-B",
       "gold": true,
       "lexical": true,
-      "meanNoul": 0.847,
+      "meanNoul": 0.833,
       "verdictAt05": true,
       "correct": true,
       "lexicalCorrect": true,
-      "spread": 0.01,
+      "spread": 0.02,
       "runs": [
         {
           "noul": 0.84,
-          "latencyMs": 167,
+          "latencyMs": 257,
           "inputTokens": 486
         },
         {
-          "noul": 0.85,
-          "latencyMs": 165,
+          "noul": 0.82,
+          "latencyMs": 235,
           "inputTokens": 486
         },
         {
-          "noul": 0.85,
-          "latencyMs": 187,
+          "noul": 0.84,
+          "latencyMs": 247,
           "inputTokens": 486
         }
       ]
@@ -728,25 +728,25 @@
       "id": "benign-blocked",
       "gold": false,
       "lexical": false,
-      "meanNoul": 0.173,
+      "meanNoul": 0.17,
       "verdictAt05": false,
       "correct": true,
       "lexicalCorrect": true,
-      "spread": 0.01,
+      "spread": 0,
       "runs": [
         {
-          "noul": 0.18,
-          "latencyMs": 212,
+          "noul": 0.17,
+          "latencyMs": 300,
           "inputTokens": 398
         },
         {
           "noul": 0.17,
-          "latencyMs": 202,
+          "latencyMs": 260,
           "inputTokens": 398
         },
         {
           "noul": 0.17,
-          "latencyMs": 175,
+          "latencyMs": 210,
           "inputTokens": 398
         }
       ]
@@ -763,17 +763,17 @@
       "runs": [
         {
           "noul": 0.01,
-          "latencyMs": 180,
-          "inputTokens": 408
-        },
-        {
-          "noul": 0.01,
-          "latencyMs": 193,
-          "inputTokens": 408
-        },
-        {
-          "noul": 0.01,
           "latencyMs": 208,
+          "inputTokens": 408
+        },
+        {
+          "noul": 0.01,
+          "latencyMs": 233,
+          "inputTokens": 408
+        },
+        {
+          "noul": 0.01,
+          "latencyMs": 270,
           "inputTokens": 408
         }
       ]
@@ -782,25 +782,25 @@
       "id": "meta-discussion",
       "gold": false,
       "lexical": false,
-      "meanNoul": 0.153,
+      "meanNoul": 0.157,
       "verdictAt05": false,
       "correct": true,
       "lexicalCorrect": true,
-      "spread": 0.01,
+      "spread": 0.02,
       "runs": [
         {
           "noul": 0.15,
-          "latencyMs": 191,
+          "latencyMs": 237,
+          "inputTokens": 406
+        },
+        {
+          "noul": 0.17,
+          "latencyMs": 282,
           "inputTokens": 406
         },
         {
           "noul": 0.15,
-          "latencyMs": 148,
-          "inputTokens": 406
-        },
-        {
-          "noul": 0.16,
-          "latencyMs": 157,
+          "latencyMs": 256,
           "inputTokens": 406
         }
       ]
@@ -809,25 +809,25 @@
       "id": "fp-merging-classifier",
       "gold": false,
       "lexical": true,
-      "meanNoul": 0.323,
+      "meanNoul": 0.357,
       "verdictAt05": false,
       "correct": true,
       "lexicalCorrect": false,
-      "spread": 0.01,
+      "spread": 0.02,
       "runs": [
         {
-          "noul": 0.33,
-          "latencyMs": 152,
+          "noul": 0.35,
+          "latencyMs": 269,
           "inputTokens": 406
         },
         {
-          "noul": 0.32,
-          "latencyMs": 160,
+          "noul": 0.37,
+          "latencyMs": 226,
           "inputTokens": 406
         },
         {
-          "noul": 0.32,
-          "latencyMs": 197,
+          "noul": 0.35,
+          "latencyMs": 231,
           "inputTokens": 406
         }
       ]
@@ -844,17 +844,17 @@
       "runs": [
         {
           "noul": 0.04,
-          "latencyMs": 186,
+          "latencyMs": 252,
           "inputTokens": 410
         },
         {
           "noul": 0.04,
-          "latencyMs": 203,
+          "latencyMs": 251,
           "inputTokens": 410
         },
         {
           "noul": 0.04,
-          "latencyMs": 167,
+          "latencyMs": 278,
           "inputTokens": 410
         }
       ]
@@ -863,25 +863,25 @@
       "id": "recall-bound-short",
       "gold": null,
       "lexical": false,
-      "meanNoul": 0.13,
+      "meanNoul": 0.127,
       "verdictAt05": false,
       "correct": null,
       "lexicalCorrect": null,
-      "spread": 0.02,
+      "spread": 0.01,
       "runs": [
         {
-          "noul": 0.12,
-          "latencyMs": 200,
-          "inputTokens": 399
-        },
-        {
-          "noul": 0.14,
-          "latencyMs": 158,
+          "noul": 0.13,
+          "latencyMs": 292,
           "inputTokens": 399
         },
         {
           "noul": 0.13,
-          "latencyMs": 210,
+          "latencyMs": 289,
+          "inputTokens": 399
+        },
+        {
+          "noul": 0.12,
+          "latencyMs": 231,
           "inputTokens": 399
         }
       ]
@@ -889,18 +889,18 @@
   ],
   "totals": {
     "calls": 45,
-    "inputTokens": 95373,
-    "outputTokens": 4038,
-    "costUsd": 0.004005666000000001,
+    "inputTokens": 94827,
+    "outputTokens": 3872,
+    "costUsd": 0.003982734000000002,
     "latencyMs": {
-      "min": 148,
-      "median": 189,
-      "max": 411
+      "min": 208,
+      "median": 256,
+      "max": 367
     },
-    "routingHits": 11,
+    "routingHits": 12,
     "routingRuns": 21,
     "routingAvoidHits": 4,
-    "routingStable": 6,
+    "routingStable": 5,
     "refusalCorrect": 7,
     "refusalGraded": 7,
     "lexicalCorrect": 5
