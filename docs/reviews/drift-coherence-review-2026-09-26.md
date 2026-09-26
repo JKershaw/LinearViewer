@@ -10,13 +10,13 @@
 
 **Provenance — the 07-12 edition was never recovered.** The last persisted report before this one is `docs/reviews/drift-coherence-review-2026-08-29.md` (run task LIN-2380, PR #1291 → `cb2fbb5a`). The 2026-07-12 run (LIN-1231) was never persisted on any ref. Consistent with this edition's instruction, the 07-12 column of the trend ledger below is marked `not recovered`; no value is interpolated for it, even though a compressed comment-ledger once existed.
 
-**Headline.** Both latent `lib/`-touching cycle clusters **worsened** this window. The provider-seam SCC grew 14→15 when the new `lib/github-install-flow.js` closed a fresh return path through `render-pages.js` back to the identity barrel, and a **new** 2-node cycle formed on the feedback seam: `lib/dispatch-store.js:48` ↔ `lib/digest-feedback.js:38`. Neither is live — no module-evaluation-time peer read exists — and that latent-not-live distinction is the same test every prior edition applied. The canonical error envelope got broader adoption (importers 14→26) even as its raw inline residue widened (68→87) and `flight-companion.js` became the growing holdout (6→8). The provider-resolution incantation rose 16→17, the UI-divergence registry fell further behind (6→9 native `confirm()` sites). All clean/resolved rows held or reinforced. **None of the three standing follow-ups (LIN-675, LIN-2388, LIN-2389) has moved — all Backlog, zero comments, across five editions — so the promotion path itself is not converting.**
+**Headline.** Both latent `lib/`-touching cycle clusters **worsened** this window. The provider-seam SCC grew 14→15 when the new `lib/github-install-flow.js` closed a fresh return path through `render-pages.js` back to the identity barrel, and a **new** 2-node cycle formed on the feedback seam: `lib/dispatch-store.js:48` ↔ `lib/digest-feedback.js:38`. Neither is live — no module-evaluation-time peer read exists — and that latent-not-live distinction is the same test every prior edition applied. The canonical error envelope got broader adoption (importers 14→26) even as its raw inline residue widened (68→87) and `flight-companion.js` became the growing holdout (6→8). The provider-resolution incantation rose 16→17, the UI-divergence registry fell further behind (6→9 native `confirm()` sites). All clean/resolved rows held or reinforced. **None of the three standing follow-ups has moved — all Backlog, zero comments: LIN-675 (minted by the 06-25 edition) has stood unmoved across two persisted editions (08-29, 09-26), and LIN-2388 / LIN-2389 (both minted by the 08-29 edition) across one. The promotion path is still not converting.**
 
 ---
 
 ## Findings (severity-ranked)
 
-### 1. `provider-auth-router-upward-imports` — Medium — **worsened (5th consecutive run); provider SCC 14 → 15**
+### 1. `provider-auth-router-upward-imports` — Medium — **worsened (provider SCC 14 → 15; 4 upward edges still open)**
 
 At HEAD there are **four** `lib/ → routes/` upward import edges (direct read of each provider's `index.js`):
 
@@ -35,7 +35,7 @@ All four sit inside **static cycles** that close through the provider identity b
 
 **Latent, not live (severity re-check).** Every peer use sits inside a function body. `render-pages.js`'s `getProvider()` calls are evaluated at call time, not at module scope; `github-install-flow.js` only calls its imported `renderErrorPage` inside handlers. There is no module-evaluation-time peer read, hence **Medium**, not High.
 
-**Cost.** `lib/providers/index.js`, `lib/render-pages.js`, each provider `index.js`, its auth route, and now `lib/github-install-flow.js` form one closed dependency group. A future module-scope read of a peer binding in any member fails at import time with no local signal — and this is the seam the series has watched for five editions. **LIN-675** is the standing fix and is updated, not duplicated (Follow-ups); its original scope does not close the `render-pages ↔ providers/index` leg or the new `github-install-flow` leg.
+**Cost.** `lib/providers/index.js`, `lib/render-pages.js`, each provider `index.js`, its auth route, and now `lib/github-install-flow.js` form one closed dependency group. A future module-scope read of a peer binding in any member fails at import time with no local signal — and this is the seam the series has carried across the five persisted editions (06-10, 06-11, 06-25, 08-29, 09-26; the 07-12 edition was lost). **LIN-675** is the standing fix and is updated, not duplicated (Follow-ups); its original scope does not close the `render-pages ↔ providers/index` leg or the new `github-install-flow` leg.
 
 ### 2. `lib-import-cycles` — Medium — **worsened (new latent cluster)**
 
@@ -70,13 +70,13 @@ The repo states its own norm (`routes/proxy.js:282`: fixtures are "kept inline (
 
 **Cost.** Every production boot evaluates test-fixture modules and everything they transitively import becomes a production dependency. Unchanged this window; not promoted.
 
-### 5. `ui-divergences-registry-staleness` — Low — **worsened (6 → 9 native `confirm()` sites); registry still says four**
-
-`docs/ui-divergences.md` ratifies **four** native `confirm()` sites and states they must migrate together. At HEAD there are **nine** native sites (grep `confirm(` over `public/*.js`). The code-level count is this review's row; the registry-doc fix itself is routed to Documentation Review. **Not promoted** here.
-
-### 6. `periodical-report-filename-convention-split` — Medium-low — **unchanged**
+### 5. `periodical-report-filename-convention-split` — Medium-low — **unchanged**
 
 The periodical registry's id-to-filename join is still not mechanical (`lib/periodicals.js:881` registers `id: 'design-review'` while reports persist as `design-interface-review-<date>.md`; `test-coverage-gap` carries no `-review` suffix). This is mechanically how an edition becomes "lost", and it is the sibling of the LIN-694 gate's residual gap (the gate verifies a comment citation exists, not that its target survives at a discoverable path). **Not promoted.**
+
+### 6. `dispatch-kind-vocabulary-cross-repo` — Low-medium — **unchanged**
+
+`simple-dispatcher/dispatcher.js:41` hardcodes a 3-key `NO_BOOTSTRAP_KINDS` subset (`implementation`, `research`, `plan`) drawn from `LinearViewer`'s `DISPATCH_KINDS` (`lib/prompt-templates.js:181`), duplicated across the repo boundary with no shared source and no cross-repo test. *Boundary: API Quality owns the wire contract; this row is the duplicated vocabulary representation only.* **Not promoted.**
 
 ### 7. `provider-resolution-incantation` — Low — **worsened (16 → 17 sites)**
 
@@ -89,17 +89,17 @@ The hand-rolled `w => w.urlKey === urlKey` lookup, 4 sites at 06-25, is now **17
 
 **Root cause unchanged: a signature mismatch.** The canonical `getWorkspaceByUrlKey(session, urlKey)` (`lib/workspace.js:946`) takes a `session`; resolvers hold `data.workspaces`, renderers hold a bare `workspaces` array. Neither can call the canon without unwrapping to a session that doesn't exist at the call site, so each re-derives the lookup. **The fix is the helper's shape (accept a workspaces array), not 17 call-site edits.** Three renderers also carry the byte-identical `?.ui?.displayName || 'Linear'` fallback tail — with five providers live, changing that default is a 3-place edit. **LIN-2389** is the standing fix; updated, not duplicated (Follow-ups).
 
-### 8. `simple-dispatcher-api-base-duplication` — Low — **unchanged**
+### 8. `ui-divergences-registry-staleness` — Low — **worsened (6 → 9 native `confirm()` sites); registry still says four**
+
+`docs/ui-divergences.md` ratifies **four** native `confirm()` sites and states they must migrate together. At HEAD there are **nine** native sites (grep `confirm(` over `public/*.js`). The code-level count is this review's row; the registry-doc fix itself is routed to Documentation Review. **Not promoted** here.
+
+### 9. `simple-dispatcher-api-base-duplication` — Low — **unchanged**
 
 `simple-dispatcher/config.js:17` and `simple-dispatcher/feedback.js:5` each independently declare the API base. `config.js` is canonical (required by 10 modules); `feedback.js` re-derives it rather than import it. **Cost:** any future normalization silently diverges in the path that reports outcomes back to Harbour. **Not promoted.**
 
-### 9. `dispatch-kind-vocabulary-cross-repo` — Low-medium — **unchanged**
-
-`simple-dispatcher/dispatcher.js:41` hardcodes a 3-key `NO_BOOTSTRAP_KINDS` subset (`implementation`, `research`, `plan`) drawn from `LinearViewer`'s `DISPATCH_KINDS` (`lib/prompt-templates.js:181`), duplicated across the repo boundary with no shared source and no cross-repo test. *Boundary: API Quality owns the wire contract; this row is the duplicated vocabulary representation only.* **Not promoted.**
-
 ### 10. `cross-repo-halt-vocabulary` — Low, **report-only — new this window**
 
-Halt modes + the halt record shape are defined independently on each side: `LinearViewer/lib/workspace-halt.js:28` `HALT_MODES = ['pause','stop']` and a `{mode,setAt,setBy}` record vs `simple-dispatcher/halt.js:231-251`'s `'pause'`/`'stop'` literals and `dispatcher.js:1525` rebuilding the same record. The series is fully-wired and Done (LIN-2994/2995/3041/3043/3044); only the vocabulary copies remain, tracked by **LIN-3074**. Same class as finding 9.
+Halt modes + the halt record shape are defined independently on each side: `LinearViewer/lib/workspace-halt.js:28` `HALT_MODES = ['pause','stop']` and a `{mode,setAt,setBy}` record vs `simple-dispatcher/halt.js:231-251`'s `'pause'`/`'stop'` literals and `dispatcher.js:1525` rebuilding the same record. The series is fully-wired and Done (LIN-2994/2995/3041/3043/3044); only the vocabulary copies remain, tracked by **LIN-3074**. Same class as finding 6.
 
 ### 11. `cross-repo-sentinel-decision-marker-vocabulary` — Low, **report-only — new this window**
 
@@ -117,7 +117,7 @@ The **grammar parsing split is clean, producer → consumer**: `simple-dispatche
 
 | field | verdict |
 |---|---|
-| `kind` | **Duplicated** (finding 9): LinearViewer `DISPATCH_KINDS` (`lib/prompt-templates.js:181`, 17 step-kinds + autopilot/defer/periodical/custom) vs SD 3-key subset (`dispatcher.js:41`). |
+| `kind` | **Duplicated** (finding 6): LinearViewer `DISPATCH_KINDS` (`lib/prompt-templates.js:181`, 17 step-kinds + autopilot/defer/periodical/custom) vs SD 3-key subset (`dispatcher.js:41`). |
 | `harness` / `terminal` | **Clean.** SD owns the vocabulary (`harnesses.js` claude-code\|opencode; `terminal-driver.js` iterm\|terminal\|kitty\|tmux); Harbour treats both as opaque ("runner-owned"). |
 | `effort` | **Clean.** Single list, Harbour-only (`lib/dispatch-validation.js:51`, warn-only never-reject); SD `resolveEffort` opaque fail-soft. |
 | `model` | **Clean.** Opaque on both sides. |
@@ -174,7 +174,15 @@ The **grammar parsing split is clean, producer → consumer**: `simple-dispatche
 
 ## Ticket trend — the promotion path is not converting
 
-**LIN-675** (provider seam), **LIN-2388** (lib cycles), and **LIN-2389** (incantation): all three remain **Backlog with zero comments, across five editions** (06-25, 07-12, 08-29, and the two research/plan records for this edition). This review **updates** them with the new legs/counts and **changes no workflow state and mints no duplicate**. Stated plainly: the standing follow-ups have been recited for five editions without a single comment or state change, so the promotion path itself is not converting new findings into movement — that is a trend fact about the process, not a reason to escalate ticket state or widen the ≤3 follow-up policy.
+All three remain **Backlog with zero comments**. Their ages differ, so the "five editions" shorthand of prior editions is wrong and is corrected here per ticket (ages from each ticket's `createdAt` via the workspace API):
+
+| ticket | finding | `createdAt` | minted by edition | persisted editions carried unmoved |
+|---|---|---|---|---|
+| **LIN-675** | provider seam | `2026-06-25T11:29:50Z` | 06-25 | **2** (08-29, 09-26); the 07-12 edition was lost and cannot be checked |
+| **LIN-2388** | lib cycles | `2026-08-29T19:46:00Z` | 08-29 | **1** (09-26) |
+| **LIN-2389** | incantation | `2026-08-29T19:46:01Z` | 08-29 | **1** (09-26) |
+
+Research and plan records are **not** editions and are not counted. LIN-2388 and LIN-2389 were minted *by* the 08-29 edition, so they cannot have stood for more than the one persisted edition since. This review **updates** all three with the new legs/counts and **changes no workflow state and mints no duplicate**. Stated plainly: LIN-675 has now been recited for two persisted editions and LIN-2388/LIN-2389 for one, with zero comments and no state change, so the promotion path is still not converting new findings into movement — that is a trend fact about the process, not a reason to escalate ticket state or widen the ≤3 follow-up policy.
 
 ---
 
@@ -191,7 +199,7 @@ pending — filled in beat 3.
 | finding | severity | 06-25 | 07-12 | 08-29 | 2026-09-26 | delta |
 |---|---|---|---|---|---|---|
 | `lib-import-cycles` | medium | clean | not recovered | 3 elementary cycles / 3 modules / 5 edges (latent) | kpi 3 (unchanged) + **new 2-node `dispatch-store ↔ digest-feedback`** (latent) | **worsened (new cluster)** |
-| `provider-auth-router-upward-imports` | medium | 2 edges, no cycle | not recovered | 4 edges, all inside static cycles; SCC 14 | 4 edges; **SCC 14→15** (+`github-install-flow` leg) | **worsened (5th run)** |
+| `provider-auth-router-upward-imports` | medium | 2 edges, no cycle | not recovered | 4 edges, all inside static cycles; SCC 14 | 4 edges; **SCC 14→15** (+`github-install-flow` leg) | **worsened (SCC grew; edges unchanged)** |
 | `routes-error-envelope-fragmentation` | medium | 5 importers, ~53 residue | not recovered | 14 importers, 68 residue; `dashboard.js` half-adopter | **26 importers**, **87 residue**; `flight-companion.js` 6→8 | **importers improved; residue worsened** |
 | `production-to-test-fixture-imports` | medium-low | — | not recovered | 7 sites | 7 sites | unchanged |
 | `periodical-report-filename-convention-split` | medium-low | — | not recovered | id↔filename join non-mechanical | same | unchanged |
