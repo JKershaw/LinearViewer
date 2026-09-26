@@ -20,8 +20,8 @@ simple-dispatcher: git log --oneline 3b1e734..origin/main       →  (empty)
 **First finding — drift re-check: zero hits.** Both repos' `origin/main` still equals the plan's pinned
 HEADs (`b5c528c4` / `3b1e734`); there are **no commits** past either pin, so **0 included-class hits and
 0 excluded-class hits**. The approved plan's class/bound/member tables therefore map to the current tree
-without change. `docs/reviews/` was re-listed immediately before scoring (see Scope) and no registry
-sibling edition had landed since run 2. Ladder context: **630 commits** landed on LinearViewer `main`
+without change. `docs/reviews/` was re-listed immediately before scoring (see Scope); it found no registry
+sibling edition landed since run 2. Two landed after scoring — see the revision note in *Scope*. Ladder context: **630 commits** landed on LinearViewer `main`
 since `ea53ffc8`, **278** of them touching `lib/`, `routes/` or `server.js`; simple-dispatcher had
 **112** commits in the same review window (`git rev-list --count 7064955..3b1e734` = 112, where `7064955` is
 run 2's cited consumer HEAD; 111 from the alternative boundary `05681975`). **Careful distinction** — the
@@ -39,20 +39,27 @@ forever — retired, never deleted; none retired this run), scores each surface'
 confidence mark, frames everything as a **delta** against run 2, and **mints no follow-up work**.
 
 **Sibling re-list (authoritative source for a landed edition).** Immediately before scoring, `docs/reviews/`
-was re-listed. **No registry sibling landed since 2026-08-29.** The newest registry editions are all
-2026-08-29 (`documentation-review` `8cac8e79`, `code-quality-review` `96dca752`, `drift-coherence-review`
+was re-listed and found no registry sibling landed since 2026-08-29. **Revision note (2026-09-26):**
+`origin/main` has since moved past the scoring pin `b5c528c4` by exactly two commits — `08257bd3` and
+`90193471` — each adding only its own `docs/reviews/*-2026-09-26.md` registry edition
+(`drift-coherence-review-2026-09-26` `08257bd3`, #1591; `onboarding-cold-start-review-2026-09-26`
+`90193471`, #1592). That is not a hit in any class the drift check reconciles (not `lib/`, `routes/`,
+`server.js`, `public/`, or non-review `docs/*.md`), so the first finding stands. Neither new sibling owns a
+dimension this review aggregates, so no score moves. PR #1594 (documentation, LIN-3102) was still **open and
+unmerged** at revision time (checked `2026-09-26T21:34:22Z`). The newest registry editions at scoring were
+all 2026-08-29 (`documentation-review` `8cac8e79`, `code-quality-review` `96dca752`, `drift-coherence-review`
 `cb2fbb5a`, `recent-headwinds-review` `8c9c3b08`, `design-interface-review` `c343449f`,
 `onboarding-cold-start-review` `b78c4499`). The newest files in the directory are non-registry:
 `proposal-red-team-2026-09-18` `4919ec0a`, `pre-ramp-harness-run-2026-09-14` `778f87b1`,
 `cheap-implementer-bakeoff-2026-09-13` `2f73fed4`, `model-effort-routing-proposal-2026-09-11` `4fa4bc50`.
 `GET /api/proxy/periodicals` reports **dispatch** recency, not report freshness, and was not read as
-freshness. R6 therefore **worsens** (see Findings).
+freshness. R6 therefore **worsens** for the five stale 2026-06-25 owners (see Findings).
 
 **Behavior-based added-file sweep.** `git diff --diff-filter=A --name-only ea53ffc8..b5c528c4 -- lib routes`
 → **35 files (24 lib / 11 routes), 0 renamed, 0 deleted**. The 11 proxy sub-routers fold into
-`api-workspace-proxy`; three open new seams (halt, Flight Companion turn, rulings). Four files across the
-new-id set are registered as new ids; the other 24 lib files fold into existing ids or are dispositioned
-explicitly (full table in *Surface registration*).
+`api-workspace-proxy`; three open new seams (halt, Flight Companion turn, rulings). Ten lib files
+are registered under the four new ids; the other 14 lib files fold into existing ids (full table in
+*Surface registration*).
 
 ---
 
@@ -112,7 +119,8 @@ Three threads carry forward, and two are new this run:
    (`Backlog`), and it is now contract *drift*, not just stale wording (R10, §Halt-copy class).
 
 Reliability ([LIN-1040]) and Observability ([LIN-1041]) reviews still do not exist; **no** registry sibling
-has refreshed since 2026-08-29, and the five 2026-06-25 reports (security, API quality, test coverage,
+that owns an aggregated dimension has refreshed since 2026-08-29 (two non-owning siblings landed 2026-09-26 —
+see Scope), and the five 2026-06-25 reports (security, API quality, test coverage,
 dependency/supply-chain, stability) are now ~13 weeks stale (R6, worsened).
 
 [LIN-1040]: https://linear.app/linearviewer/issue/LIN-1040
@@ -278,17 +286,18 @@ The behavioral sweep is re-run. Movement:
 
 No sibling review owns this class (each module is tested; it is visible only portfolio-wide).
 
-### R6 — Sibling evidence: no registry refresh since 2026-08-29 · **Impact: M (portfolio-wide legibility) · Effort: — (scheduling call) · carried, worsened**
+### R6 — Sibling evidence: no owning registry refresh since 2026-08-29 · **Impact: M (portfolio-wide legibility) · Effort: — (scheduling call) · carried, worsened**
 
 *Surface: META / portfolio · Confidence: High*
 
-Run 2 recorded five current and five 2026-06-25 siblings. This run records **zero** new registry editions in
-the ~4 weeks since (the newest registry editions remain 2026-08-29). The five 2026-06-25 reports —
-`security-review`, `api-quality-review`, `test-coverage-gap`, `dependency-supply-chain-review`,
-`stability-review` — are now ~13 weeks stale; `comprehension-debt-review` is 2026-07-01. **Security** is the
-most consequential: two new credential/auth surfaces (`api-jira-rest`,
-`flow-account-connection-workspace-credential`) have no fresh sibling read. Five LIN-3099 siblings are being
-re-run in this same passage but none had landed at this report's HEAD.
+Run 2 recorded five current and five 2026-06-25 siblings. This run recorded **zero** new registry editions at
+scoring; **two landed on 2026-09-26 after scoring** (`drift-coherence-review-2026-09-26` `08257bd3`,
+`onboarding-cold-start-review-2026-09-26` `90193471`), but neither owns a dimension this review aggregates.
+The five 2026-06-25 reports — `security-review`, `api-quality-review`, `test-coverage-gap`,
+`dependency-supply-chain-review`, `stability-review` — remain the stale owners and are now ~13 weeks stale;
+`comprehension-debt-review` is 2026-07-01. **Security** is the most consequential: two new credential/auth
+surfaces (`api-jira-rest`, `flow-account-connection-workspace-credential`) have no fresh sibling read. Five
+LIN-3099 siblings are being re-run in this same passage; two landed after this report's scoring HEAD.
 
 **Action (for a human to weigh):** refresh the five still-stale correctives, prioritizing Security and Test
 Coverage Gap (owns R5).
@@ -355,7 +364,7 @@ finding.
 - `lib/github-install-flow.js` → `api-github-app` (importers `routes/github-auth.js`,
   `routes/github-projects-auth.js`; LIN-2397, a pure move).
 - `lib/harbour-comments-store.js` → `flow-operator-decisions` (importer `server.js`; LIN-2648).
-- `lib/observer-pass.js` → `mod-scheduler` (importers `server.js`, `routes/flight-companion.js`).
+- `lib/observer-pass.js` → `mod-observer-lane` (+ `mod-scheduler` job) (importers `server.js`, `routes/flight-companion.js`).
 - `lib/pricing-conformance-sweep.js` → `mod-scheduler` + `flow-cost-telemetry` (importer `server.js`; LIN-2384).
 - `lib/providers/jira/adf.js` → `api-jira-rest`.
 - `lib/proxy-graphql-errors.js` → `api-workspace-proxy` (importers `proxy-kickoff`, `proxy`, `proxy-compute`,
@@ -412,7 +421,7 @@ dual-tagged as FLOW seams: `proxy-halt.js`→`flow-dispatch-halt`, `proxy-flight
 | 25 | `lib/dispatch-repo-guard.js` | fold → `api-workspace-proxy` | `proxy-reads`, `proxy-dispatch` |
 | 26 | `lib/github-install-flow.js` | fold → `api-github-app` | `github-auth`, `github-projects-auth` |
 | 27 | `lib/harbour-comments-store.js` | fold → `flow-operator-decisions` | `server.js` |
-| 28 | `lib/observer-pass.js` | fold → `mod-scheduler` | `server.js`, `flight-companion` |
+| 28 | `lib/observer-pass.js` | fold → `mod-observer-lane` (+ `mod-scheduler` job) | `server.js`, `flight-companion` |
 | 29 | `lib/pricing-conformance-sweep.js` | fold → `mod-scheduler`/`flow-cost-telemetry` | `server.js` |
 | 30 | `lib/providers/jira/adf.js` | fold → `api-jira-rest` | Jira provider |
 | 31 | `lib/proxy-graphql-errors.js` | fold → `api-workspace-proxy` | 6 importers |
@@ -526,7 +535,7 @@ Required self-checks this run:
   Backlog; selection half still unconsumed). **R9 — partial** (write-side stamped via LIN-2575; read side
   still drops `periodicalId`). **R3 — no** (both tracking tickets Backlog). **R8 — mixed** (`workspace-repos`
   resolved, `observer-efficacy-signal` still dead; `opencode-liveness.js` checked and found consumed, so not an
-  instance). **R6 — worsened** (no registry refresh since 2026-08-29). **R4 — closed** and stays closed.
+  instance). **R6 — worsened** (no owning registry refresh since 2026-08-29; two non-owning siblings landed 2026-09-26). **R4 — closed** and stays closed.
 - **What did this review itself miss?** The Tier 2 adversarial second-read caught that this run's own coverage
   model — the `--diff-filter=A` added-file sweep — is necessary but **not sufficient**: the window's largest
   **modified** surface, the decisions/WITHDRAW subsystem (~36 LinearViewer + 7 simple-dispatcher commits), is
@@ -577,7 +586,7 @@ run's registrations. **Every changed score carries a citation and a confidence t
 | `mod-kpi-audit` | Public KPI aggregation + workspace audit | 4 / 3 | N/A* | Medium | unchanged |
 | `mod-live-console` | Ambient cross-workspace activity feed | 4 | N/A* | Medium | unchanged |
 | `mod-scheduler` | Leader-safe CAS-lease job substrate (4 jobs) | 4 | N/A* | Medium | unchanged score; R11 roster note (`server.js:3954`, `lib/http-keepalive.js:29` bare intervals) |
-| `mod-observer-lane` | Observer signal modules | **3** | N/A* | Medium | **2→3**, High — `lib/observer-pass.js` consumed by `routes/flight-companion.js`+`server.js`; `observer-efficacy-signal.js` still dead (R8) |
+| `mod-observer-lane` | Observer signal modules | **3** | N/A* | Medium | **2→3**, Medium — `lib/observer-pass.js` consumed by `routes/flight-companion.js`+`server.js`; `observer-efficacy-signal.js` still dead (R8) |
 | `mod-ship-journey` | Waypoint-trail derivation + playback view | 4 | N/A* | Medium | unchanged |
 | `mod-passage-planner` | Kickoff-prompt copy view | 4 | N/A* | Medium | unchanged |
 | `mod-task-edit` | Dedicated task-edit drill-down | 4 | N/A* | Medium | unchanged |
@@ -826,7 +835,7 @@ coverage/accounting gap, not a new code defect, and this review mints no fix-wor
 
 No scores or ids changed, so the beat-2 id-diff and 35-file self-checks are unaffected (re-run: 37→41 ids
 with exactly the 4 new; 35/35 dispositions). The report's coverage-model gap — relying on the added-file diff
-alone — is recorded in the Self-Audit below as this run's own META datum.
+alone — is recorded in the Self-Audit above as this run's own META datum.
 
 ---
 
