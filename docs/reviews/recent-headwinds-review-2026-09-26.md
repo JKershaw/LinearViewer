@@ -262,9 +262,9 @@ Two surfaces this remit names as in-scope could not be reached and are recorded 
 **Named churn files from the review, examined and dispositioned (no new headwind).** All five were re-counted at this HEAD; each maps onto an existing headwind or onto substrate-finishing, so none is ranked in its own right and none changes the ordered list:
 
 - `LinearViewer` `public/observation.js` (**19 fp / 26 all**) and `routes/dashboard.js` (**19 fp / 20 all**): the rulings/decision feed build and the scan-due surface (`LIN-2754`–`LIN-2780`, `LIN-2444`, `LIN-2666`/`2700`/`2706`/`2707`) — **folded into H3**; the residue (chat-request sweep, effort read-out) is substrate finishing.
-- `simple-dispatcher` `dispatcher.js` (**19 fp / 23 all**): the halt program (`LIN-3042`–`3046`, netted) plus the repair class (`LIN-2456`/`2457`/`2509`/`2510`/`2511`/`2515`/`2333`/`2366`) and the effort axis (`LIN-2567`) — **split across the halt program and H5**.
+- `simple-dispatcher` `dispatcher.js` (**19 fp / 23 all**): the halt program (`LIN-3042`–`3046`, netted), the H5 repair class (`LIN-2510`/`2511`/`2515`), terminal-driver/launch work (`LIN-2446`/`2452`/`2457`/`2509`, not repair — netted as in the `reapers.js` split above), held-queue-head routing (`LIN-2456`), rootItemId threading (`LIN-2333`/`2366`), clone-root trust (`LIN-2361`), the docs split (`LIN-2897`) and the effort axis (`LIN-2567`) — **split across the halt program and H5; the rest is substrate finishing**.
 - `simple-dispatcher` `hook.js` (**11 fp / 16 all**): the rulings on-answer path (`LIN-2774`, `LIN-2891`, `LIN-2991`) and the repair class (`LIN-2556`/`2560`/`2339`) — **split across H3 and H5**.
-- `simple-dispatcher` `config.js` (**13 fp / 15 all**): the halt wiring (`LIN-3045`/`3046`, netted), OpenCode launch fixes (`LIN-2839`, `LIN-2736`) and the repair class (`LIN-2446`/`2509`/`2510`/`2515`) — **split across the halt program, H6 and H5**.
+- `simple-dispatcher` `config.js` (**13 fp / 15 all**): the halt wiring (`LIN-3045`/`3046`, netted), OpenCode work (`LIN-2839`, `LIN-2736`, `LIN-2837`) and the H5 repair class (`LIN-2510`/`2515`); the remainder (`LIN-2446`/`2458`/`2509` launch and breaker, `LIN-2423` lane markers, `LIN-2361`/`2393` clone-root) is substrate finishing — **split across the halt program, H6 and H5**.
 
 **A widening the second-read forced, not one this run planned.** The initial draft omitted the Flight Companion / companion-observer program entirely (the window's largest single-epic program); the required adversarial second-read surfaced it and it is now H2. See the `## Adversarial Second-Read` section for the provenance.
 
@@ -295,7 +295,7 @@ The top headwind this cycle is the review layer's own cadence (H1, high): the pe
 | `cost-metric-denominator` | 1% zero-lineage (n=92); coverage share unpublished | substantially fixed + published; residual `LIN-1960`/`LIN-2477` + unpriced gap | **substantially fixed** |
 | `verification-session-share` | 22% impl, flat; 3.8 sessions/ticket | 20.8% impl incl. `wake` / 24.0% excl.; 8.0 incl. / 6.9 excl. sessions/ticket — basis muddied by the new kind | **flat, basis changed** |
 | `parked-at-plan-review` | 3 of 5 Done; LIN-1871 root mechanism Todo | `LIN-1871` Done 09-12 (PR #1459) | **improved (root mechanism closed; convergence unproven/watch)** |
-| `output-composition` | unchanged, flat-high (61–67%) | testShare 56–70% (research sweep) | **unchanged** |
+| `output-composition` | not re-measured (08-23: flat-high 61–67%) | testShare 56–70% (research sweep) | **unchanged vs 08-23 (08-29 did not measure)** |
 | `backlog-conversion` | 134 created / 60 Done (45%) / 62 Backlog | 723 created → 43% Done / 53% Backlog-Todo | **flat, right-censored** |
 | `untraceable-completions` | 4/61 = 7% (window cohort) | 48/314 = 15% (subject-citation, over-counts) | **new baseline** |
 | `external-injection-break` | retired | — | retired, stays retired |
