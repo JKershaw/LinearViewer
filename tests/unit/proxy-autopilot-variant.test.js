@@ -390,15 +390,18 @@ test('POST kickoff (LIN-2075): a non-string goal is rejected with 400', async ()
   assert.equal(added.length, 0);
 });
 
-test('POST kickoff (LIN-2075): an over-length goal is rejected naming the cap and received length', async () => {
+test('POST kickoff (LIN-2075/LIN-2818): an over-length goal is rejected naming the raised cap and received length', async () => {
   const { app, added, events } = buildApp();
-  const goal = 'x'.repeat(1247);
+  // ASCII-only and just past the new 100000 cap, so the JSON body stays well
+  // under express.json()'s default 100kb limit and reaches route validation
+  // (a multibyte-heavy fixture of the same unit-length would 413 first).
+  const goal = 'x'.repeat(100001);
   const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
     method: 'POST',
     body: { goal },
   });
   assert.equal(status, 400);
-  assert.equal(body.error, 'goal exceeds maximum length of 1000 (got 1247)');
+  assert.equal(body.error, 'goal exceeds maximum length of 100000 (got 100001)');
   assert.equal(added.length, 0);
   // the reject-branch logEvent(req, '/api/proxy/autopilot/kickoff', 400) call
   // must survive the swap onto the shared helper — this is the regression the
@@ -409,18 +412,19 @@ test('POST kickoff (LIN-2075): an over-length goal is rejected naming the cap an
   );
 });
 
-test('POST kickoff (LIN-2075): the received length counts UTF-16 code units, not visible characters', async () => {
-  // 501 x 🚀 is 1002 UTF-16 code units (each emoji is a surrogate pair) —
-  // rejected at 501 visible characters, and the reported length must say
-  // 1002, or the number contradicts what a caller can count.
+test('POST kickoff (LIN-2075/LIN-2818): the received length counts UTF-16 code units, not visible characters', async () => {
+  // 99999 x + 1 🚀 is 100000 visible glyphs but 100001 UTF-16 code units (the
+  // emoji is a surrogate pair), so it is rejected only if the cap counts code
+  // units. Kept ASCII-heavy (~100k bytes) to stay under express.json()'s 100kb
+  // limit — an all-emoji string of comparable unit-length would 413 first.
   const { app, added } = buildApp();
-  const goal = '\u{1F680}'.repeat(501);
+  const goal = 'x'.repeat(99999) + '\u{1F680}';
   const { status, body } = await request(app, '/api/proxy/autopilot/kickoff', {
     method: 'POST',
     body: { goal },
   });
   assert.equal(status, 400);
-  assert.equal(body.error, 'goal exceeds maximum length of 1000 (got 1002)');
+  assert.equal(body.error, 'goal exceeds maximum length of 100000 (got 100001)');
   assert.equal(added.length, 0);
 });
 

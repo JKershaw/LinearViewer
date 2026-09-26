@@ -6,7 +6,7 @@
  */
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, classifyUpstreamError } from '../lib/errors.js';
-import { MAX_NAME_LENGTH } from '../lib/issue-write-validation.js';
+import { MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../lib/issue-write-validation.js';
 import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -77,6 +77,11 @@ export function createKickoffRoutes({
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
     const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
+    // LIN-2818: unlike the POST body's goal cap (now 100000), this preview-only
+    // GET slices at 1000 on purpose. Its `goal` arrives in the URL query string,
+    // and Node's default 16KB header ceiling means a larger value can't reliably
+    // round-trip; raising it here would advertise a preview capability the
+    // transport can't carry. The GET never enqueues, so nothing real is dropped.
     const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : '';
 
     logEvent(req, '/api/proxy/autopilot/kickoff', 200);
@@ -98,8 +103,10 @@ export function createKickoffRoutes({
    *
    * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext?, sessionId?, subscription? }
    *   - issueIdentifier present → SCOPED run ("autopilot until THIS task is
-   *     done"): the issue's title is resolved for the goal line and its project
-   *     `repo=` is inherited (an explicit caller `repo` wins, mirroring /prompt).
+   *     done"): the issue's title is resolved for the goal line, a non-empty
+   *     `goal` is appended as additional human context (LIN-2818), and its
+   *     project `repo=` is inherited (an explicit caller `repo` wins, mirroring
+   *     /prompt).
    *   - issueIdentifier absent  → GENERAL run; `goal` focuses the stack walk.
    *   - mode: 'write' (default) | 'readonly'.
    *   - variant: 'standard' (default) | 'stepper' (warm beat-stepping disposition,
@@ -136,8 +143,12 @@ export function createKickoffRoutes({
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`);
       }
+      // LIN-2818: `goal` is caller-authored prose, so its POST cap is the
+      // goal-specific MAX_DESCRIPTION_LENGTH (100000), NOT the shared opaque-field
+      // default (MAX_NAME_LENGTH, 1000). Raised at this call site only — `repo`,
+      // `model`, `harness`, and `effort` below keep the shared 1000 cap.
       const kickoffGoalValidationError = validateOpaqueDispatchField(goal, 'goal', {
-        maxLength: MAX_NAME_LENGTH,
+        maxLength: MAX_DESCRIPTION_LENGTH,
         reportReceivedLength: true,
       });
       if (kickoffGoalValidationError) {

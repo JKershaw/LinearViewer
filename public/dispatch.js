@@ -384,6 +384,9 @@ function initDispatchPagePrompt() {
   if (goalInput) {
     try {
       const goalParam = new URLSearchParams(window.location.search).get('goal')
+      // LIN-2818: mirrors the textarea's own maxlength="1000". This prefill is
+      // URL-bound (it IS the `?goal=` value), so it stays at 1000 rather than the
+      // scoped POST body cap — the query-string transport can't carry more.
       if (goalParam) goalInput.value = goalParam.slice(0, 1000)
     } catch (e) {
       // Non-fatal: just don't prefill
