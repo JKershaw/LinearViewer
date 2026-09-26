@@ -192,4 +192,49 @@ describe('LIN-2175 — the documented Planner launch shape is accepted and carri
       'the exact precedence-preserving goal text must survive into the served prompt verbatim'
     );
   });
+
+  // Review L4: the goal is only precedence-preserving if it still names the two
+  // scaffold headings it overrides and the Runner prompt it substitutes, AND the
+  // generator still renders those headings. The goal-carrying test above proves
+  // that whatever the doc says is delivered; it does not prove the override
+  // contract itself. These assertions make a dropped override sentence (doc edit)
+  // or a renamed scaffold heading (generator edit) fail loudly.
+  test('the derived goal overrides the scaffold headings, which still render (review L4)', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    assert.ok(
+      goal.includes('Goal from the human'),
+      'the goal must name the "Goal from the human" scaffold heading it overrides'
+    );
+    assert.ok(
+      goal.includes('Your first act'),
+      'the goal must name the "Your first act" scaffold heading it overrides'
+    );
+    assert.ok(
+      goal.includes('GET /api/proxy/passage-runner/prompt'),
+      'the goal must name the Runner prompt as the replacement first act'
+    );
+
+    const kickoff = await call(app, 'post', KICKOFF, {
+      issueIdentifier: 'TEST-1',
+      variant: 'standard',
+      mode: 'write',
+      target: 'cli',
+      maxTasks: 13,
+      goal
+    });
+    assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
+
+    const fetched = await call(app, 'get', `/api/proxy/dispatch/${kickoff.body.id}/prompt`);
+    assert.equal(fetched.status, 200, JSON.stringify(fetched.body));
+    assert.ok(
+      fetched.body.prompt.includes('**Goal from the human:**'),
+      'the generator must still render the "Goal from the human" heading the goal overrides'
+    );
+    assert.ok(
+      fetched.body.prompt.includes('**Your first act:**'),
+      'the generator must still render the "Your first act" heading the goal overrides'
+    );
+  });
 });
