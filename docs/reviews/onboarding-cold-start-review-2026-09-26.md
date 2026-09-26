@@ -57,7 +57,7 @@ Recording vocabulary per step: `proceeded` / `had to guess` / `hard-blocked` / `
 2. **No non-operator runner product exists to walk.** LIN-3080 is a completed spike (research/design/experiment, not a build); the research close found *"Other consumers: none surfaced — the MCP server is credential-delivery internals, the workspace proxy is already J5b/R1, LIN-3061 'CLI' is a Backlog feature (doesn't exist)."*
 3. **The product points a newcomer at two consumer paths, both already walked/reported.** The **Dispatch Queue** (`README.md:49`; consumer guide `docs/dispatch-integration.md`, where `simple-dispatcher` is *"the reference consumer"*, `:910`) — walked as R1; and the **Workspace API Proxy** (`README.md:50`; consumer guide `docs/proxy-integration.md`, `simple-dispatcher` named as *"the consumer (e.g. simple-dispatcher)"*, `:465`) — walked as J5b and R1.
 
-No own-session runner was stood up, and none is represented as walked. **Named for the next run's scope:** once an own-session runner ships as a product (LIN-3080's take-and-run-through-your-own-subagents path), decide whether it joins the cold-start inventory as a consumer entry path.
+No own-session runner was stood up, and none is represented as walked. **Named for the next run's scope:** once an own-session runner ships as a product (LIN-3080's take-and-run-through-your-own-subagents path — since 26 Sep on v1's path as the runner prompt LIN-3098, blocked by LIN-3059 and blocking LIN-2942), decide whether it joins the cold-start inventory as a consumer entry path.
 
 ---
 
@@ -246,7 +246,7 @@ Before minting, `GET /api/proxy/search` was run for: `auth/linear 503`, `OAuth N
 
 > **1. The largest missed/misfiled item:**
 >
-> **Misfiled: the report's \#2 finding (R2-2, Med-High) that the Local backend is "hard-blocked … no workaround discoverable from the surface" — and R2-8's claim that local-workspace creation is "surfaced by nothing."** Local's entry *is* surfaced, pre-auth, zero-credential:
+> **Misfiled: the report's #&#8288;2 finding (R2-2, Med-High) that the Local backend is "hard-blocked … no workaround discoverable from the surface" — and R2-8's claim that local-workspace creation is "surfaced by nothing."** Local's entry *is* surfaced, pre-auth, zero-credential:
 >
 > - `lib/components/navbar.js:96-99` — the unauthenticated (`isLanding`) nav renders a visible `<form action="/workspace/new" method="POST"><button>+ local workspace</button></form>`.
 > - `server.js:1793-1849` serves `/swipe`, `/swim`, `/ship` to a cold visitor with `{isLanding: true}`; `lib/render-swipe.js:494`, `lib/render-swim.js:36`, `lib/render-ship.js:48` each call `renderNavBar({…, isLanding})` with **no** `minimalNav`, so the button renders.
