@@ -40,9 +40,10 @@ import { PULSE_MAX_WINDOW_MS } from '../../lib/live-console.js';
 let digestFeedback = null;
 let _findDecisionWithdrawal = null;
 let isDecisionLifecycleStampEntry = null;
+let deriveLoopFacingFacts = null;
 let digestFeedbackImportError = null;
 try {
-  ({ digestFeedback, _findDecisionWithdrawal, isDecisionLifecycleStampEntry } = await import('../../lib/digest-feedback.js'));
+  ({ digestFeedback, _findDecisionWithdrawal, isDecisionLifecycleStampEntry, deriveLoopFacingFacts } = await import('../../lib/digest-feedback.js'));
 } catch (err) {
   digestFeedbackImportError = err;
 }
@@ -777,14 +778,32 @@ describe('isDecisionLifecycleStampEntry (LIN-2891/LIN-3037)', () => {
   });
 });
 
-describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
-  test('returns the last decision-withdrawn entry (backward scan, last entry wins)', () => {
+describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, decision-aware backward scan)', () => {
+  test('returns the last decision-withdrawn entry for the requested decision_id (backward scan, last entry wins)', () => {
     requireFindDecisionWithdrawal();
     const feedback = [
       withdrawnEntry('d-1', 'first reason', 't1'),
-      withdrawnEntry('d-2', 'second reason', 't2'),
+      withdrawnEntry('d-1', 'second reason', 't2'),
     ];
-    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-2', reason: 'second reason', timestamp: 't2' });
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback, 'd-1'), { decisionId: 'd-1', reason: 'second reason', timestamp: 't2' });
+  });
+
+  test('scopes to the requested decision_id: a later withdrawal of a DIFFERENT id is not returned', () => {
+    requireFindDecisionWithdrawal();
+    const feedback = [
+      withdrawnEntry('d-2', 'live ruling withdrawn', 't1'),
+      withdrawnEntry('d-1', 'moot older ruling withdrawn later', 't2'),
+    ];
+    assert.deepStrictEqual(
+      _findDecisionWithdrawal(feedback, 'd-2'),
+      { decisionId: 'd-2', reason: 'live ruling withdrawn', timestamp: 't1' },
+      'the row\'s CURRENT decision (d-2) keeps its own live withdrawal despite a later moot d-1 withdrawal'
+    );
+    assert.deepStrictEqual(
+      _findDecisionWithdrawal(feedback, 'd-1'),
+      { decisionId: 'd-1', reason: 'moot older ruling withdrawn later', timestamp: 't2' },
+      'the moot d-1 withdrawal is still live and independently addressable/reversible for its own id'
+    );
   });
 
   test('a malformed withdrawal message (not JSON) is skipped, scanning backwards to an earlier valid one', () => {
@@ -793,35 +812,37 @@ describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
       withdrawnEntry('d-1', 'valid reason', 't1'),
       { kind: 'decision-withdrawn', message: 'not-json', timestamp: 't2' },
     ];
-    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback, 'd-1'), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
   });
 
   test('a missing reason is skipped, scanning backwards to an earlier valid one', () => {
     requireFindDecisionWithdrawal();
     const feedback = [
       withdrawnEntry('d-1', 'valid reason', 't1'),
-      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-2' }), timestamp: 't2' },
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1' }), timestamp: 't2' },
     ];
-    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback, 'd-1'), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
   });
 
   test('an empty-string reason is skipped, scanning backwards to an earlier valid one', () => {
     requireFindDecisionWithdrawal();
     const feedback = [
       withdrawnEntry('d-1', 'valid reason', 't1'),
-      withdrawnEntry('d-2', '', 't2'),
+      withdrawnEntry('d-1', '', 't2'),
     ];
-    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback, 'd-1'), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't1' });
   });
 
   test('no decision-withdrawn entries at all yields null', () => {
     requireFindDecisionWithdrawal();
-    assert.strictEqual(_findDecisionWithdrawal([textEntry('A'), { kind: 'status', message: '[done]' }]), null);
+    assert.strictEqual(_findDecisionWithdrawal([textEntry('A'), { kind: 'status', message: '[done]' }], 'd-1'), null);
   });
 
   test('non-array feedback is tolerated, never throws', () => {
     requireFindDecisionWithdrawal();
-    assert.strictEqual(_findDecisionWithdrawal(undefined), null);
+    assert.strictEqual(_findDecisionWithdrawal(undefined, 'd-1'), null);
+    assert.strictEqual(_findDecisionWithdrawal([], undefined), null, 'no decision id → nothing to match');
+    assert.strictEqual(_findDecisionWithdrawal([], ''), null, 'empty decision id → nothing to match');
   });
 
   test('terminal reversal: null when the reversal entry comes AFTER the withdrawal', () => {
@@ -830,7 +851,7 @@ describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
       withdrawnEntry('d-1', 'valid reason', 't1'),
       withdrawalReversedEntry('d-1', 't2'),
     ];
-    assert.strictEqual(_findDecisionWithdrawal(feedback), null);
+    assert.strictEqual(_findDecisionWithdrawal(feedback, 'd-1'), null);
   });
 
   test('terminal reversal: null when the reversal entry comes BEFORE the withdrawal (order-independent)', () => {
@@ -839,7 +860,7 @@ describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
       withdrawalReversedEntry('d-1', 't1'),
       withdrawnEntry('d-1', 'valid reason', 't2'),
     ];
-    assert.strictEqual(_findDecisionWithdrawal(feedback), null);
+    assert.strictEqual(_findDecisionWithdrawal(feedback, 'd-1'), null);
   });
 
   test('a reversal only cancels the SAME decision_id — an unrelated withdrawal survives', () => {
@@ -848,7 +869,8 @@ describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
       withdrawnEntry('d-1', 'reason one', 't1'),
       withdrawalReversedEntry('d-2', 't2'),
     ];
-    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'reason one', timestamp: 't1' });
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback, 'd-1'), { decisionId: 'd-1', reason: 'reason one', timestamp: 't1' });
+    assert.strictEqual(_findDecisionWithdrawal(feedback, 'd-2'), null, 'the reversed pair is not live for d-2');
   });
 
   test('a malformed reversal entry is skipped fail-closed — its decision_id is NOT treated as reversed', () => {
@@ -857,13 +879,44 @@ describe('_findDecisionWithdrawal (LIN-2891/LIN-3034, backward scan)', () => {
       { kind: 'decision-withdrawal-reversed', message: 'not-json', timestamp: 't1' },
       withdrawnEntry('d-1', 'valid reason', 't2'),
     ];
-    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't2' });
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback, 'd-1'), { decisionId: 'd-1', reason: 'valid reason', timestamp: 't2' });
   });
 
   test('timestamp defaults to null when absent on the withdrawal entry', () => {
     requireFindDecisionWithdrawal();
     const feedback = [{ kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'r' }) }];
-    assert.deepStrictEqual(_findDecisionWithdrawal(feedback), { decisionId: 'd-1', reason: 'r', timestamp: null });
+    assert.deepStrictEqual(_findDecisionWithdrawal(feedback, 'd-1'), { decisionId: 'd-1', reason: 'r', timestamp: null });
+  });
+});
+
+// LIN-2891 F1: the reproduced reopen sequence. A row raises d1 then d2, withdraws
+// d2 (the live ruling), then withdraws the now-MOOT d1. The row's effective
+// withdrawal must stay d2's, and d2 must NOT reopen.
+describe('deriveLoopFacingFacts: decision-aware withdrawal (LIN-2891 F1)', () => {
+  test('a later withdrawal of a moot d1 does not replace the live withdrawal of the current d2', () => {
+    const decisionEntry = (id) => ({ kind: 'decision', message: `[decision] ${JSON.stringify({ decision_id: id, options: [] })}`, timestamp: 't0' });
+    const facts = deriveLoopFacingFacts([
+      decisionEntry('d1'),
+      decisionEntry('d2'),
+      withdrawnEntry('d2', 'd2 retracted', 't1'),
+      withdrawnEntry('d1', 'd1 moot retracted later', 't2'),
+    ], null);
+    assert.strictEqual(facts.decision?.decision_id, 'd2', 'sanity: the current decision is d2');
+    assert.deepStrictEqual(
+      facts.withdrawal,
+      { decisionId: 'd2', reason: 'd2 retracted', timestamp: 't1' },
+      'the withheld scalar names d2, never the later moot d1 withdrawal'
+    );
+  });
+
+  test('without the trailing moot d1 withdrawal the current d2 withdrawal is unchanged', () => {
+    const decisionEntry = (id) => ({ kind: 'decision', message: `[decision] ${JSON.stringify({ decision_id: id, options: [] })}`, timestamp: 't0' });
+    const facts = deriveLoopFacingFacts([
+      decisionEntry('d1'),
+      decisionEntry('d2'),
+      withdrawnEntry('d2', 'd2 retracted', 't1'),
+    ], null);
+    assert.deepStrictEqual(facts.withdrawal, { decisionId: 'd2', reason: 'd2 retracted', timestamp: 't1' });
   });
 });
 
@@ -875,12 +928,25 @@ describe('digestFeedback: carries withdrawal (LIN-2891/LIN-3034)', () => {
     assert.strictEqual(digest.withdrawal, null);
   });
 
-  test('withdrawal carries {decisionId, reason, timestamp} when a decision-withdrawn entry exists', () => {
+  test('withdrawal carries {decisionId, reason, timestamp} for the row\'s current decision', () => {
     requireDigestFeedback();
     const doc = rawDoc({ feedback: [
+      { kind: 'decision', message: `[decision] ${JSON.stringify({ decision_id: 'd-1', options: [] })}`, timestamp: at(0) },
       { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd-1', reason: 'no longer needed' }), timestamp: at(0) },
     ] });
     const digest = digestFeedback(doc, { now: Date.now() });
     assert.deepStrictEqual(digest.withdrawal, { decisionId: 'd-1', reason: 'no longer needed', timestamp: at(0).toISOString() });
+  });
+
+  test('decision-aware: a withdrawal of a moot older decision does not become the digest\'s withdrawal', () => {
+    requireDigestFeedback();
+    const doc = rawDoc({ feedback: [
+      { kind: 'decision', message: `[decision] ${JSON.stringify({ decision_id: 'd1', options: [] })}`, timestamp: at(0) },
+      { kind: 'decision', message: `[decision] ${JSON.stringify({ decision_id: 'd2', options: [] })}`, timestamp: at(0) },
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd2', reason: 'd2 retracted' }), timestamp: at(0) },
+      { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd1', reason: 'd1 moot retracted later' }), timestamp: at(0) },
+    ] });
+    const digest = digestFeedback(doc, { now: Date.now() });
+    assert.strictEqual(digest.withdrawal?.decisionId, 'd2', 'the digest withdrawal names the current decision, never the later moot d1');
   });
 });

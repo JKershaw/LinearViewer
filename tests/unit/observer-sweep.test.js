@@ -632,7 +632,7 @@ describe('observer-sweep: withdrawal discharge (LIN-2891/LIN-3036 Surface 6)', (
     const loops = _buildLoops({ historyItems: [hist], now: NOW, lean: true });
     const loop = loops[0];
     assert.strictEqual(loop.decision.decision_id, 'wdec-new', 'sanity: the CURRENT decision is the new one');
-    assert.strictEqual(loop.withdrawal?.decisionId, 'wdec-old', 'sanity: the withdrawal names the OLD decision');
+    assert.strictEqual(loop.withdrawal, null, 'sanity (LIN-2891 F1): the decision-aware read drops the mismatched wdec-old withdrawal entirely');
     assert.strictEqual(isDecisionWithdrawn(loop), false);
 
     assert.strictEqual(
