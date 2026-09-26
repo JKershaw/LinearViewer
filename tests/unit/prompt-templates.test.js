@@ -2725,6 +2725,57 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     });
   });
 
+  // LIN-3056: review's conditional-Approve wording is reserved for a ledger every
+  // item of which close-out can actually discharge within LIN-3033's trivial,
+  // review-named-edit bound. An inside ledger item whose discharge requires
+  // authoring beyond that bound — a new or changed test, or a code change —
+  // routes straight to Request Changes, instead of a conditional Approve that
+  // close-out would only hold and bounce back anyway. These pins fail against the
+  // pre-LIN-3056 wording, which forced the conditional form for any non-empty
+  // ledger and said nothing about an inside item needing authored test/code.
+  describe('review reserves conditional Approve for a dischargeable ledger (LIN-3056)', () => {
+    test('the pre-existing conditional-Approve sentence is preserved verbatim, not replaced', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(prompt),
+        'the original conditional-Approve wording survives the LIN-3056 addition');
+      assert.ok(/only an explicitly empty ledger may carry a plain \*\*Approve\*\*/i.test(prompt),
+        'the plain-Approve-only-for-an-empty-ledger half is preserved');
+    });
+
+    test('the handwritten review verdict reserves the conditional form for a ledger close-out can discharge', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      assert.ok(/close-out can actually discharge/i.test(prompt),
+        'states the reservation: only a ledger close-out can discharge gets the conditional form');
+      assert.ok(/within its own trivial, review-named-edit bound/i.test(prompt),
+        'names LIN-3033\'s trivial review-named-edit bound as the reservation boundary');
+    });
+
+    test('the handwritten review verdict routes an inside item needing authored test/code to Request Changes', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      const m = prompt.match(/Reserve that conditional form.*?not a conditional Approve\./is);
+      assert.ok(m, 'the LIN-3056 clause is present and extractable on its own');
+      // F3: pin the trigger condition, not just the outcome. Without this the
+      // clause can be inverted to "an outside item" (M9) or to "fits within
+      // that bound" (M14) and this pin stays green.
+      assert.ok(/holds an \*\*inside\*\* item whose discharge requires authoring beyond that bound/i.test(m[0]),
+        'the trigger is an inside item whose discharge requires authoring beyond the bound');
+      assert.ok(/a new or changed test, or a code change/i.test(m[0]),
+        'names the authoring examples that exceed close-out\'s bound');
+      // F4: pin the dischargeable-route list that defines "close-out can actually discharge".
+      assert.ok(/a routed outside follow-up, or an exactly-stated trivial edit/i.test(m[0]),
+        'names the dischargeable routes the conditional form is reserved for');
+      assert.ok(/the verdict is \*\*Request Changes\*\* back to `implementation`, not a conditional Approve\.$/i.test(m[0]),
+        'the verdict for such an inside item is Request Changes, not a conditional Approve');
+    });
+
+    test('the LIN-3056 clause introduces no literal "Linear" of its own (scoped extraction)', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      const m = prompt.match(/Reserve that conditional form.*?not a conditional Approve\./is);
+      assert.ok(m, 'the new clause is present and extractable on its own');
+      assert.ok(!m[0].includes('Linear'), 'the new LIN-3056 clause introduces no literal "Linear"');
+    });
+  });
+
   // LIN-2991/LIN-3022 §5: two idempotency clauses inserted immediately after
   // LIN-3006's own "file is offered only for an outside item" eligibility
   // clause, at each of review, close-out step 8, and Follow-up Triage —

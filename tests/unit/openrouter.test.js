@@ -1289,6 +1289,59 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
         assert.ok(/"file" is offered only for an outside item/i.test(closeout), 'close-out still limits ruling options to outside-only filing');
       });
     });
+
+    // LIN-3056: mirrors the handwritten pin. The meta Review rule reserves the
+    // conditional form for a ledger close-out can actually discharge within
+    // LIN-3033's trivial review-named-edit bound, and routes an inside item
+    // needing authored test/code to Request Changes. Fails against the
+    // pre-LIN-3056 rule, which forced the conditional form for any non-empty
+    // ledger and said nothing about an inside item needing authored test/code.
+    describe('review reserves conditional Approve for a dischargeable ledger (LIN-3056)', () => {
+      test('the pre-existing conditional-Approve sentence is preserved verbatim, not replaced', () => {
+        const rule = reviewRule();
+        assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(rule),
+          'the original conditional-Approve wording survives the LIN-3056 addition');
+        assert.ok(/never a bare Approve/i.test(rule), 'the never-a-bare-Approve half is preserved');
+      });
+
+      test('the meta Review rule reserves the conditional form for a ledger close-out can discharge', () => {
+        const rule = reviewRule();
+        assert.ok(/close-out can actually discharge/i.test(rule),
+          'states the reservation: only a ledger close-out can discharge gets the conditional form');
+        assert.ok(/within its own trivial, review-named-edit bound/i.test(rule),
+          'names LIN-3033\'s trivial review-named-edit bound as the reservation boundary');
+      });
+
+      test('the meta Review rule routes an inside item needing authored test/code to Request Changes', () => {
+        const rule = reviewRule();
+        // Scoped to the LIN-3056 clause (F1): the whole rule also carries the
+        // pre-existing LIN-3033 sentence "…the verdict is Request Changes back
+        // to implementation, not a conditional Approve naming a vague fix", so
+        // an unscoped assertion passes even when the new clause routes
+        // elsewhere. Extract the LIN-3056 clause first, then assert it.
+        const m = rule.match(/Reserve that conditional form.*?not a conditional Approve\./is);
+        assert.ok(m, 'the LIN-3056 clause is present and extractable on its own');
+        // F3: pin the trigger condition, not just the outcome. Without this the
+        // clause can be inverted to "an outside item" (M8) or to "fits within
+        // that bound" (M13) and this pin stays green.
+        assert.ok(/holds an inside item whose discharge requires authoring beyond that bound/i.test(m[0]),
+          'the trigger is an inside item whose discharge requires authoring beyond the bound');
+        assert.ok(/a new or changed test, or a code change/i.test(m[0]),
+          'names the authoring examples that exceed close-out\'s bound');
+        // F4: pin the dischargeable-route list that defines "close-out can actually discharge".
+        assert.ok(/a routed outside follow-up, or an exactly-stated trivial edit/i.test(m[0]),
+          'names the dischargeable routes the conditional form is reserved for');
+        assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve\.$/i.test(m[0]),
+          'the verdict for such an inside item is Request Changes, not a conditional Approve');
+      });
+
+      test('the LIN-3056 clause introduces no literal "Linear" of its own (scoped extraction)', () => {
+        const rule = reviewRule();
+        const m = rule.match(/Reserve that conditional form.*?not a conditional Approve\./is);
+        assert.ok(m, 'the new clause is present and extractable on its own');
+        assert.ok(!m[0].includes('Linear'), 'the new LIN-3056 clause introduces no literal "Linear"');
+      });
+    });
   });
 
   test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {
