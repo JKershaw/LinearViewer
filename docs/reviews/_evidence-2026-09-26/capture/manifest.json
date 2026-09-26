@@ -4,2687 +4,4699 @@
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "landing--light--390px": {
     "surface": "landing",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "landing--light--360px": {
     "surface": "landing",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs landing",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs landing"
   },
   "landing--light--320px": {
     "surface": "landing",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs landing",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs landing"
   },
   "landing--dark--1400px": {
     "surface": "landing",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "landing--dark--390px": {
     "surface": "landing",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "landing--dark--360px": {
     "surface": "landing",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs landing",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs landing"
   },
   "landing--dark--320px": {
     "surface": "landing",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs landing",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs landing"
   },
   "swipe-public--light--1400px": {
     "surface": "swipe-public",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--light--390px": {
     "surface": "swipe-public",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--light--360px": {
     "surface": "swipe-public",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--light--320px": {
     "surface": "swipe-public",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--1400px": {
     "surface": "swipe-public",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--390px": {
     "surface": "swipe-public",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--360px": {
     "surface": "swipe-public",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--320px": {
     "surface": "swipe-public",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
   },
   "swim-public--light--1400px": {
     "surface": "swim-public",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--light--390px": {
     "surface": "swim-public",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--light--360px": {
     "surface": "swim-public",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--light--320px": {
     "surface": "swim-public",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--1400px": {
     "surface": "swim-public",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--390px": {
     "surface": "swim-public",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--360px": {
     "surface": "swim-public",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--320px": {
     "surface": "swim-public",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim-public"
   },
   "ship-public--light--1400px": {
     "surface": "ship-public",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "ship-public--light--390px": {
     "surface": "ship-public",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "ship-public--light--360px": {
     "surface": "ship-public",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs ship-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "ship-public--light--320px": {
     "surface": "ship-public",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs ship-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "ship-public--dark--1400px": {
     "surface": "ship-public",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "ship-public--dark--390px": {
     "surface": "ship-public",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "ship-public--dark--360px": {
     "surface": "ship-public",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs ship-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "ship-public--dark--320px": {
     "surface": "ship-public",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs ship-public",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-public"
   },
   "privacy--light--1400px": {
     "surface": "privacy",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs privacy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs privacy"
   },
   "privacy--light--390px": {
     "surface": "privacy",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs privacy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs privacy"
   },
   "privacy--dark--1400px": {
     "surface": "privacy",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs privacy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs privacy"
   },
   "privacy--dark--390px": {
     "surface": "privacy",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs privacy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs privacy"
   },
   "terms--light--1400px": {
     "surface": "terms",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs terms",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs terms"
   },
   "terms--light--390px": {
     "surface": "terms",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs terms",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs terms"
   },
   "terms--dark--1400px": {
     "surface": "terms",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs terms",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs terms"
   },
   "terms--dark--390px": {
     "surface": "terms",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs terms",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs terms"
   },
   "styleguide--light--1400px": {
     "surface": "styleguide",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs styleguide"
   },
   "styleguide--light--390px": {
     "surface": "styleguide",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs styleguide"
   },
   "styleguide--dark--1400px": {
     "surface": "styleguide",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs styleguide"
   },
   "styleguide--dark--390px": {
     "surface": "styleguide",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs styleguide"
   },
   "templates--light--1400px": {
     "surface": "templates",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs templates",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs templates"
   },
   "templates--light--390px": {
     "surface": "templates",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs templates",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs templates"
   },
   "templates--dark--1400px": {
     "surface": "templates",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs templates",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs templates"
   },
   "templates--dark--390px": {
     "surface": "templates",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs templates",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs templates"
   },
   "kpis--light--1400px": {
     "surface": "kpis",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs kpis",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs kpis"
   },
   "kpis--light--390px": {
     "surface": "kpis",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs kpis",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs kpis"
   },
   "kpis--dark--1400px": {
     "surface": "kpis",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs kpis",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs kpis"
   },
   "kpis--dark--390px": {
     "surface": "kpis",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs kpis",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs kpis"
   },
   "archive-1--light--1400px": {
     "surface": "archive-1",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-1--light--390px": {
     "surface": "archive-1",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-1--light--360px": {
     "surface": "archive-1",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-1",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-1--light--320px": {
     "surface": "archive-1",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-1",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-1--dark--1400px": {
     "surface": "archive-1",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs archive-1",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-1--dark--390px": {
     "surface": "archive-1",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs archive-1",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-1--dark--360px": {
     "surface": "archive-1",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-1",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-1--dark--320px": {
     "surface": "archive-1",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-1",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-1"
   },
   "archive-2--light--1400px": {
     "surface": "archive-2",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-2--light--390px": {
     "surface": "archive-2",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-2--light--360px": {
     "surface": "archive-2",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-2",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-2--light--320px": {
     "surface": "archive-2",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-2",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-2--dark--1400px": {
     "surface": "archive-2",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs archive-2",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-2--dark--390px": {
     "surface": "archive-2",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs archive-2",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-2--dark--360px": {
     "surface": "archive-2",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-2",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-2--dark--320px": {
     "surface": "archive-2",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-2",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-2"
   },
   "archive-3--light--1400px": {
     "surface": "archive-3",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-3--light--390px": {
     "surface": "archive-3",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-3--light--360px": {
     "surface": "archive-3",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-3",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-3--light--320px": {
     "surface": "archive-3",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-3",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-3--dark--1400px": {
     "surface": "archive-3",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs archive-3",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-3--dark--390px": {
     "surface": "archive-3",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs archive-3",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-3--dark--360px": {
     "surface": "archive-3",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-3",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-3--dark--320px": {
     "surface": "archive-3",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-3",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-3"
   },
   "archive-4--light--1400px": {
     "surface": "archive-4",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-4--light--390px": {
     "surface": "archive-4",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-4--light--360px": {
     "surface": "archive-4",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-4",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-4--light--320px": {
     "surface": "archive-4",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-4",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-4--dark--1400px": {
     "surface": "archive-4",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs archive-4",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-4--dark--390px": {
     "surface": "archive-4",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs archive-4",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-4--dark--360px": {
     "surface": "archive-4",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-4",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-4--dark--320px": {
     "surface": "archive-4",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-4",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-4"
   },
   "archive-5--light--1400px": {
     "surface": "archive-5",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-5--light--390px": {
     "surface": "archive-5",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-5--light--360px": {
     "surface": "archive-5",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-5",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-5--light--320px": {
     "surface": "archive-5",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-5",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-5--dark--1400px": {
     "surface": "archive-5",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs archive-5",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-5--dark--390px": {
     "surface": "archive-5",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs archive-5",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-5--dark--360px": {
     "surface": "archive-5",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-5",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-5--dark--320px": {
     "surface": "archive-5",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-5",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-5"
   },
   "archive-6--light--1400px": {
     "surface": "archive-6",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-6--light--390px": {
     "surface": "archive-6",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-6--light--360px": {
     "surface": "archive-6",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-6",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-6--light--320px": {
     "surface": "archive-6",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-6",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-6--dark--1400px": {
     "surface": "archive-6",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs archive-6",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-6--dark--390px": {
     "surface": "archive-6",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs archive-6",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-6--dark--360px": {
     "surface": "archive-6",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-6",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-6--dark--320px": {
     "surface": "archive-6",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-6",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-6"
   },
   "archive-7--light--1400px": {
     "surface": "archive-7",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "archive-7--light--390px": {
     "surface": "archive-7",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "archive-7--light--360px": {
     "surface": "archive-7",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-7",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "archive-7--light--320px": {
     "surface": "archive-7",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-7",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "archive-7--dark--1400px": {
     "surface": "archive-7",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs archive-7",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "archive-7--dark--390px": {
     "surface": "archive-7",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs archive-7",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "archive-7--dark--360px": {
     "surface": "archive-7",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs archive-7",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "archive-7--dark--320px": {
     "surface": "archive-7",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs archive-7",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-7"
   },
   "tree--light--1400px": {
     "surface": "tree",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "tree--light--390px": {
     "surface": "tree",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "tree--dark--1400px": {
     "surface": "tree",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "tree--dark--390px": {
     "surface": "tree",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "swipe--light--1400px": {
     "surface": "swipe",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swipe",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe"
   },
   "swipe--light--390px": {
     "surface": "swipe",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swipe",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe"
   },
   "swipe--dark--1400px": {
     "surface": "swipe",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swipe",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe"
   },
   "swipe--dark--390px": {
     "surface": "swipe",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swipe",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swipe"
   },
   "swim--light--1400px": {
     "surface": "swim",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swim",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim"
   },
   "swim--light--390px": {
     "surface": "swim",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swim",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim"
   },
   "swim--dark--1400px": {
     "surface": "swim",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs swim",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim"
   },
   "swim--dark--390px": {
     "surface": "swim",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs swim",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs swim"
   },
   "ship--light--1400px": {
     "surface": "ship",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "ship--light--390px": {
     "surface": "ship",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "ship--light--360px": {
     "surface": "ship",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs ship",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "ship--light--320px": {
     "surface": "ship",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs ship",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "ship--dark--1400px": {
     "surface": "ship",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "ship--dark--390px": {
     "surface": "ship",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "ship--dark--360px": {
     "surface": "ship",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs ship",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "ship--dark--320px": {
     "surface": "ship",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs ship",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship"
   },
   "roadmap--light--1400px": {
     "surface": "roadmap",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs roadmap"
   },
   "roadmap--light--390px": {
     "surface": "roadmap",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs roadmap"
   },
   "roadmap--dark--1400px": {
     "surface": "roadmap",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs roadmap"
   },
   "roadmap--dark--390px": {
     "surface": "roadmap",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs roadmap"
   },
   "audit--light--1400px": {
     "surface": "audit",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs audit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs audit"
   },
   "audit--light--390px": {
     "surface": "audit",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs audit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs audit"
   },
   "audit--dark--1400px": {
     "surface": "audit",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs audit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs audit"
   },
   "audit--dark--390px": {
     "surface": "audit",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs audit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs audit"
   },
   "settings--light--1400px": {
     "surface": "settings",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs settings"
   },
   "settings--light--390px": {
     "surface": "settings",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs settings"
   },
   "settings--dark--1400px": {
     "surface": "settings",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs settings"
   },
   "settings--dark--390px": {
     "surface": "settings",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs settings"
   },
   "prompts--light--1400px": {
     "surface": "prompts",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs prompts"
   },
   "prompts--light--390px": {
     "surface": "prompts",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs prompts"
   },
   "prompts--dark--1400px": {
     "surface": "prompts",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs prompts"
   },
   "prompts--dark--390px": {
     "surface": "prompts",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs prompts"
   },
   "custom-prompts--light--1400px": {
     "surface": "custom-prompts",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
   },
   "custom-prompts--light--390px": {
     "surface": "custom-prompts",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
   },
   "custom-prompts--dark--1400px": {
     "surface": "custom-prompts",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
   },
   "custom-prompts--dark--390px": {
     "surface": "custom-prompts",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
   },
   "dispatch--light--1400px": {
     "surface": "dispatch",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dispatch"
   },
   "dispatch--light--390px": {
     "surface": "dispatch",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dispatch"
   },
   "dispatch--dark--1400px": {
     "surface": "dispatch",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dispatch"
   },
   "dispatch--dark--390px": {
     "surface": "dispatch",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dispatch"
   },
   "proxy--light--1400px": {
     "surface": "proxy",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs proxy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs proxy"
   },
   "proxy--light--390px": {
     "surface": "proxy",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs proxy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs proxy"
   },
   "proxy--dark--1400px": {
     "surface": "proxy",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs proxy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs proxy"
   },
   "proxy--dark--390px": {
     "surface": "proxy",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs proxy",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs proxy"
   },
   "observation--light--1400px": {
     "surface": "observation",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation"
   },
   "observation--light--390px": {
     "surface": "observation",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation"
   },
   "observation--dark--1400px": {
     "surface": "observation",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation"
   },
   "observation--dark--390px": {
     "surface": "observation",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation"
   },
   "observation-session--light--1400px": {
     "surface": "observation-session",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation-session"
   },
   "observation-session--light--390px": {
     "surface": "observation-session",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation-session"
   },
   "observation-session--dark--1400px": {
     "surface": "observation-session",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation-session"
   },
   "observation-session--dark--390px": {
     "surface": "observation-session",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs observation-session"
   },
   "dashboard--light--1400px": {
     "surface": "dashboard",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dashboard"
   },
   "dashboard--light--390px": {
     "surface": "dashboard",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dashboard"
   },
   "dashboard--dark--1400px": {
     "surface": "dashboard",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dashboard"
   },
   "dashboard--dark--390px": {
     "surface": "dashboard",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs dashboard"
   },
   "escalation-kpis--light--1400px": {
     "surface": "escalation-kpis",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs escalation-kpis"
   },
   "escalation-kpis--light--390px": {
     "surface": "escalation-kpis",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs escalation-kpis"
   },
   "escalation-kpis--dark--1400px": {
     "surface": "escalation-kpis",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs escalation-kpis"
   },
   "escalation-kpis--dark--390px": {
     "surface": "escalation-kpis",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs escalation-kpis"
   },
   "effort-readout--light--1400px": {
     "surface": "effort-readout",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs effort-readout"
   },
   "effort-readout--light--390px": {
     "surface": "effort-readout",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs effort-readout"
   },
   "effort-readout--dark--1400px": {
     "surface": "effort-readout",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs effort-readout"
   },
   "effort-readout--dark--390px": {
     "surface": "effort-readout",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs effort-readout"
   },
   "flight-companion--light--1400px": {
     "surface": "flight-companion",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
   },
   "flight-companion--light--390px": {
     "surface": "flight-companion",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
   },
   "flight-companion--dark--1400px": {
     "surface": "flight-companion",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
   },
   "flight-companion--dark--390px": {
     "surface": "flight-companion",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
   },
   "live-console--light--1400px": {
     "surface": "live-console",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs live-console"
   },
   "live-console--light--390px": {
     "surface": "live-console",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs live-console"
   },
   "live-console--dark--1400px": {
     "surface": "live-console",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs live-console"
   },
   "live-console--dark--390px": {
     "surface": "live-console",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs live-console"
   },
   "next-run--light--1400px": {
     "surface": "next-run",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs next-run",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs next-run"
   },
   "next-run--light--390px": {
     "surface": "next-run",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs next-run",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs next-run"
   },
   "next-run--dark--1400px": {
     "surface": "next-run",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs next-run",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs next-run"
   },
   "next-run--dark--390px": {
     "surface": "next-run",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs next-run",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs next-run"
   },
   "passage-planner--light--1400px": {
     "surface": "passage-planner",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
   },
   "passage-planner--light--390px": {
     "surface": "passage-planner",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
   },
   "passage-planner--dark--1400px": {
     "surface": "passage-planner",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
   },
   "passage-planner--dark--390px": {
     "surface": "passage-planner",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
   },
   "ship-biscuit--light--1400px": {
     "surface": "ship-biscuit",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-biscuit--light--390px": {
     "surface": "ship-biscuit",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-biscuit--dark--1400px": {
     "surface": "ship-biscuit",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-biscuit--dark--390px": {
     "surface": "ship-biscuit",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-journey--light--1400px": {
     "surface": "ship-journey",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
   },
   "ship-journey--light--390px": {
     "surface": "ship-journey",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
   },
   "ship-journey--dark--1400px": {
     "surface": "ship-journey",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
   },
   "ship-journey--dark--390px": {
     "surface": "ship-journey",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
   },
   "task-chat--light--1400px": {
     "surface": "task-chat",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-chat"
   },
   "task-chat--light--390px": {
     "surface": "task-chat",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-chat"
   },
   "task-chat--dark--1400px": {
     "surface": "task-chat",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-chat"
   },
   "task-chat--dark--390px": {
     "surface": "task-chat",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-chat"
   },
   "task-new--light--1400px": {
     "surface": "task-new",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs task-new",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-new"
   },
   "task-new--light--390px": {
     "surface": "task-new",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs task-new",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-new"
   },
   "task-new--dark--1400px": {
     "surface": "task-new",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs task-new",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-new"
   },
   "task-new--dark--390px": {
     "surface": "task-new",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs task-new",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-new"
   },
   "task-edit--light--1400px": {
     "surface": "task-edit",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-edit"
   },
   "task-edit--light--390px": {
     "surface": "task-edit",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-edit"
   },
   "task-edit--dark--1400px": {
     "surface": "task-edit",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-edit"
   },
   "task-edit--dark--390px": {
     "surface": "task-edit",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs task-edit"
   },
   "collective--light--1400px": {
     "surface": "collective",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs collective",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs collective"
   },
   "collective--light--390px": {
     "surface": "collective",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs collective",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs collective"
   },
   "collective--dark--1400px": {
     "surface": "collective",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs collective",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs collective"
   },
   "collective--dark--390px": {
     "surface": "collective",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs collective",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs collective"
   },
   "local-tree--light--1400px": {
     "surface": "local-tree",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "local-tree--light--390px": {
     "surface": "local-tree",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "local-tree--dark--1400px": {
     "surface": "local-tree",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "local-tree--dark--390px": {
     "surface": "local-tree",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "kept"
   },
   "local-roadmap--light--1400px": {
     "surface": "local-roadmap",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
   },
   "local-roadmap--light--390px": {
     "surface": "local-roadmap",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
   },
   "local-roadmap--dark--1400px": {
     "surface": "local-roadmap",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
   },
   "local-roadmap--dark--390px": {
     "surface": "local-roadmap",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
   },
   "github-tree--light--1400px": {
     "surface": "github-tree",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs github-tree"
   },
   "github-tree--light--390px": {
     "surface": "github-tree",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs github-tree"
   },
   "github-tree--dark--1400px": {
     "surface": "github-tree",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs github-tree"
   },
   "github-tree--dark--390px": {
     "surface": "github-tree",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs github-tree"
   },
   "ghp-tree--light--1400px": {
     "surface": "ghp-tree",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
   },
   "ghp-tree--light--390px": {
     "surface": "ghp-tree",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
   },
   "ghp-tree--dark--1400px": {
     "surface": "ghp-tree",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
   },
   "ghp-tree--dark--390px": {
     "surface": "ghp-tree",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
   },
   "jira-tree--light--1400px": {
     "surface": "jira-tree",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-tree--light--390px": {
     "surface": "jira-tree",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-tree--dark--1400px": {
     "surface": "jira-tree",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-tree--dark--390px": {
     "surface": "jira-tree",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-settings--light--1400px": {
     "surface": "jira-settings",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
   },
   "jira-settings--light--390px": {
     "surface": "jira-settings",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
   },
   "jira-settings--dark--1400px": {
     "surface": "jira-settings",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
   },
   "jira-settings--dark--390px": {
     "surface": "jira-settings",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
   },
   "err-merge-confirm--light--1400px": {
     "surface": "err-merge-confirm",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-confirm--light--390px": {
     "surface": "err-merge-confirm",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-confirm--light--360px": {
     "surface": "err-merge-confirm",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-confirm",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-confirm--light--320px": {
     "surface": "err-merge-confirm",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-confirm",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-confirm--dark--1400px": {
     "surface": "err-merge-confirm",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-confirm--dark--390px": {
     "surface": "err-merge-confirm",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-confirm--dark--360px": {
     "surface": "err-merge-confirm",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-confirm",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-confirm--dark--320px": {
     "surface": "err-merge-confirm",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-confirm",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-confirm"
   },
   "err-merge-reauth--light--1400px": {
     "surface": "err-merge-reauth",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-merge-reauth--light--390px": {
     "surface": "err-merge-reauth",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-merge-reauth--light--360px": {
     "surface": "err-merge-reauth",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-merge-reauth--light--320px": {
     "surface": "err-merge-reauth",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-merge-reauth--dark--1400px": {
     "surface": "err-merge-reauth",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-merge-reauth--dark--390px": {
     "surface": "err-merge-reauth",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-merge-reauth--dark--360px": {
     "surface": "err-merge-reauth",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-merge-reauth--dark--320px": {
     "surface": "err-merge-reauth",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-merge-reauth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-merge-reauth"
   },
   "err-generic--light--1400px": {
     "surface": "err-generic",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-generic--light--390px": {
     "surface": "err-generic",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-generic--light--360px": {
     "surface": "err-generic",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-generic",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-generic--light--320px": {
     "surface": "err-generic",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-generic",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-generic--dark--1400px": {
     "surface": "err-generic",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-generic--dark--390px": {
     "surface": "err-generic",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-generic--dark--360px": {
     "surface": "err-generic",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-generic",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-generic--dark--320px": {
     "surface": "err-generic",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-generic",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-generic"
   },
   "err-workspace-notfound--light--1400px": {
     "surface": "err-workspace-notfound",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-workspace-notfound--light--390px": {
     "surface": "err-workspace-notfound",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-workspace-notfound--light--360px": {
     "surface": "err-workspace-notfound",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-workspace-notfound",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-workspace-notfound--light--320px": {
     "surface": "err-workspace-notfound",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-workspace-notfound",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-workspace-notfound--dark--1400px": {
     "surface": "err-workspace-notfound",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-workspace-notfound--dark--390px": {
     "surface": "err-workspace-notfound",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-workspace-notfound--dark--360px": {
     "surface": "err-workspace-notfound",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-workspace-notfound",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-workspace-notfound--dark--320px": {
     "surface": "err-workspace-notfound",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-workspace-notfound",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-workspace-notfound"
   },
   "err-upstream-auth--light--1400px": {
     "surface": "err-upstream-auth",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-auth--light--390px": {
     "surface": "err-upstream-auth",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-auth--light--360px": {
     "surface": "err-upstream-auth",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-auth--light--320px": {
     "surface": "err-upstream-auth",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-auth--dark--1400px": {
     "surface": "err-upstream-auth",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-auth--dark--390px": {
     "surface": "err-upstream-auth",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-auth--dark--360px": {
     "surface": "err-upstream-auth",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-auth--dark--320px": {
     "surface": "err-upstream-auth",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-auth",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-auth"
   },
   "err-upstream-5xx--light--1400px": {
     "surface": "err-upstream-5xx",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-5xx--light--390px": {
     "surface": "err-upstream-5xx",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-5xx--light--360px": {
     "surface": "err-upstream-5xx",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-5xx",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-5xx--light--320px": {
     "surface": "err-upstream-5xx",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-5xx",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-5xx--dark--1400px": {
     "surface": "err-upstream-5xx",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-5xx--dark--390px": {
     "surface": "err-upstream-5xx",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-5xx--dark--360px": {
     "surface": "err-upstream-5xx",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-5xx",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-5xx--dark--320px": {
     "surface": "err-upstream-5xx",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-5xx",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-5xx"
   },
   "err-upstream-429--light--1400px": {
     "surface": "err-upstream-429",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-429--light--390px": {
     "surface": "err-upstream-429",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-429--light--360px": {
     "surface": "err-upstream-429",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-429",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-429--light--320px": {
     "surface": "err-upstream-429",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-429",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-429--dark--1400px": {
     "surface": "err-upstream-429",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-429--dark--390px": {
     "surface": "err-upstream-429",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-429--dark--360px": {
     "surface": "err-upstream-429",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-429",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-429--dark--320px": {
     "surface": "err-upstream-429",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-429",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-429"
   },
   "err-upstream-net--light--1400px": {
     "surface": "err-upstream-net",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-net--light--390px": {
     "surface": "err-upstream-net",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-net--light--360px": {
     "surface": "err-upstream-net",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-net--light--320px": {
     "surface": "err-upstream-net",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-net--dark--1400px": {
     "surface": "err-upstream-net",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-net--dark--390px": {
     "surface": "err-upstream-net",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-net--dark--360px": {
     "surface": "err-upstream-net",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-net--dark--320px": {
     "surface": "err-upstream-net",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-net",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-net"
   },
   "err-upstream-internal--light--1400px": {
     "surface": "err-upstream-internal",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "err-upstream-internal--light--390px": {
     "surface": "err-upstream-internal",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "err-upstream-internal--light--360px": {
     "surface": "err-upstream-internal",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "err-upstream-internal--light--320px": {
     "surface": "err-upstream-internal",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "err-upstream-internal--dark--1400px": {
     "surface": "err-upstream-internal",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "err-upstream-internal--dark--390px": {
     "surface": "err-upstream-internal",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "err-upstream-internal--dark--360px": {
     "surface": "err-upstream-internal",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "err-upstream-internal--dark--320px": {
     "surface": "err-upstream-internal",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs err-upstream-internal",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs err-upstream-internal"
   },
   "gh-repo-picker--light--1400px": {
     "surface": "gh-repo-picker",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-repo-picker--light--390px": {
     "surface": "gh-repo-picker",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-repo-picker--light--360px": {
     "surface": "gh-repo-picker",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs gh-repo-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-repo-picker--light--320px": {
     "surface": "gh-repo-picker",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs gh-repo-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-repo-picker--dark--1400px": {
     "surface": "gh-repo-picker",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-repo-picker--dark--390px": {
     "surface": "gh-repo-picker",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-repo-picker--dark--360px": {
     "surface": "gh-repo-picker",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs gh-repo-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-repo-picker--dark--320px": {
     "surface": "gh-repo-picker",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs gh-repo-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-repo-picker"
   },
   "gh-projects-picker--light--1400px": {
     "surface": "gh-projects-picker",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "gh-projects-picker--light--390px": {
     "surface": "gh-projects-picker",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "gh-projects-picker--light--360px": {
     "surface": "gh-projects-picker",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "gh-projects-picker--light--320px": {
     "surface": "gh-projects-picker",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "gh-projects-picker--dark--1400px": {
     "surface": "gh-projects-picker",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "gh-projects-picker--dark--390px": {
     "surface": "gh-projects-picker",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "gh-projects-picker--dark--360px": {
     "surface": "gh-projects-picker",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "gh-projects-picker--dark--320px": {
     "surface": "gh-projects-picker",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs gh-projects-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs gh-projects-picker"
   },
   "jira-site-picker--light--1400px": {
     "surface": "jira-site-picker",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-site-picker--light--390px": {
     "surface": "jira-site-picker",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-site-picker--light--360px": {
     "surface": "jira-site-picker",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-site-picker--light--320px": {
     "surface": "jira-site-picker",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-site-picker--dark--1400px": {
     "surface": "jira-site-picker",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-site-picker--dark--390px": {
     "surface": "jira-site-picker",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-site-picker--dark--360px": {
     "surface": "jira-site-picker",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-site-picker--dark--320px": {
     "surface": "jira-site-picker",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs jira-site-picker",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-site-picker"
   },
   "jira-link-form--light--1400px": {
     "surface": "jira-link-form",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "jira-link-form--light--390px": {
     "surface": "jira-link-form",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "jira-link-form--light--360px": {
     "surface": "jira-link-form",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs jira-link-form",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "jira-link-form--light--320px": {
     "surface": "jira-link-form",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs jira-link-form",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "jira-link-form--dark--1400px": {
     "surface": "jira-link-form",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "jira-link-form--dark--390px": {
     "surface": "jira-link-form",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "jira-link-form--dark--360px": {
     "surface": "jira-link-form",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs jira-link-form",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "jira-link-form--dark--320px": {
     "surface": "jira-link-form",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs jira-link-form",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs jira-link-form"
   },
   "openrouter-consent--light--1400px": {
     "surface": "openrouter-consent",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "openrouter-consent--light--390px": {
     "surface": "openrouter-consent",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "openrouter-consent--light--360px": {
     "surface": "openrouter-consent",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs openrouter-consent",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "openrouter-consent--light--320px": {
     "surface": "openrouter-consent",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs openrouter-consent",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "openrouter-consent--dark--1400px": {
     "surface": "openrouter-consent",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "openrouter-consent--dark--390px": {
     "surface": "openrouter-consent",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "openrouter-consent--dark--360px": {
     "surface": "openrouter-consent",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs openrouter-consent",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "openrouter-consent--dark--320px": {
     "surface": "openrouter-consent",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs openrouter-consent",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs openrouter-consent"
   },
   "raw-openrouter-cb-nocode--light--1400px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-openrouter-cb-nocode--light--390px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-openrouter-cb-nocode--light--360px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-openrouter-cb-nocode--light--320px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-openrouter-cb-nocode--dark--1400px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-openrouter-cb-nocode--dark--390px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-openrouter-cb-nocode--dark--360px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-openrouter-cb-nocode--dark--320px": {
     "surface": "raw-openrouter-cb-nocode",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-openrouter-cb-nocode"
   },
   "raw-jira-nows--light--1400px": {
     "surface": "raw-jira-nows",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-jira-nows--light--390px": {
     "surface": "raw-jira-nows",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-jira-nows--light--360px": {
     "surface": "raw-jira-nows",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs raw-jira-nows",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-jira-nows--light--320px": {
     "surface": "raw-jira-nows",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs raw-jira-nows",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-jira-nows--dark--1400px": {
     "surface": "raw-jira-nows",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-jira-nows--dark--390px": {
     "surface": "raw-jira-nows",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-jira-nows--dark--360px": {
     "surface": "raw-jira-nows",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs raw-jira-nows",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-jira-nows--dark--320px": {
     "surface": "raw-jira-nows",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs raw-jira-nows",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-jira-nows"
   },
   "raw-auth-callback--light--1400px": {
     "surface": "raw-auth-callback",
     "theme": "light",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "raw-auth-callback--light--390px": {
     "surface": "raw-auth-callback",
     "theme": "light",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "raw-auth-callback--light--360px": {
     "surface": "raw-auth-callback",
     "theme": "light",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "raw-auth-callback--light--320px": {
     "surface": "raw-auth-callback",
     "theme": "light",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "raw-auth-callback--dark--1400px": {
     "surface": "raw-auth-callback",
     "theme": "dark",
     "viewport": 1400,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "raw-auth-callback--dark--390px": {
     "surface": "raw-auth-callback",
     "theme": "dark",
     "viewport": 390,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "raw-auth-callback--dark--360px": {
     "surface": "raw-auth-callback",
     "theme": "dark",
     "viewport": 360,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "raw-auth-callback--dark--320px": {
     "surface": "raw-auth-callback",
     "theme": "dark",
     "viewport": 320,
     "status": "pruned — regenerable via capture/capture.mjs raw-auth-callback",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs raw-auth-callback"
   },
   "archive-404--light--1400px": {
     "surface": "archive-404",
     "theme": "light",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
   },
   "archive-404--light--390px": {
     "surface": "archive-404",
     "theme": "light",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
   },
   "archive-404--light--360px": {
     "surface": "archive-404",
     "theme": "light",
     "viewport": 360,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
   },
   "archive-404--light--320px": {
     "surface": "archive-404",
     "theme": "light",
     "viewport": 320,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
   },
   "archive-404--dark--1400px": {
     "surface": "archive-404",
     "theme": "dark",
     "viewport": 1400,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
   },
   "archive-404--dark--390px": {
     "surface": "archive-404",
     "theme": "dark",
     "viewport": 390,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
   },
   "archive-404--dark--360px": {
     "surface": "archive-404",
     "theme": "dark",
     "viewport": 360,
     "status": "kept",
-    "json": "kept"
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
   },
   "archive-404--dark--320px": {
     "surface": "archive-404",
     "theme": "dark",
     "viewport": 320,
     "status": "kept",
+    "json": "kept",
+    "captureMode": "viewport",
+    "png": "pruned — regenerable via capture/capture.mjs archive-404"
+  },
+  "styleguide--light--1400px--fp": {
+    "surface": "styleguide",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 8343,
+    "png": "kept",
+    "json": "kept"
+  },
+  "styleguide--light--390px--fp": {
+    "surface": "styleguide",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 12376,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship-public--light--1400px--fp": {
+    "surface": "ship-public",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1133,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship-public--light--390px--fp": {
+    "surface": "ship-public",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 949,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship-public--dark--1400px--fp": {
+    "surface": "ship-public",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1133,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship-public--dark--390px--fp": {
+    "surface": "ship-public",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 949,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship--light--1400px--fp": {
+    "surface": "ship",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1161,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship--light--390px--fp": {
+    "surface": "ship",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 974,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship--dark--1400px--fp": {
+    "surface": "ship",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1161,
+    "png": "kept",
+    "json": "kept"
+  },
+  "ship--dark--390px--fp": {
+    "surface": "ship",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 974,
+    "png": "kept",
+    "json": "kept"
+  },
+  "effort-readout--light--1400px--fp": {
+    "surface": "effort-readout",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "effort-readout--light--390px--fp": {
+    "surface": "effort-readout",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 890,
+    "png": "kept",
+    "json": "kept"
+  },
+  "effort-readout--dark--1400px--fp": {
+    "surface": "effort-readout",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "effort-readout--dark--390px--fp": {
+    "surface": "effort-readout",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 890,
+    "png": "kept",
+    "json": "kept"
+  },
+  "escalation-kpis--light--1400px--fp": {
+    "surface": "escalation-kpis",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "escalation-kpis--light--390px--fp": {
+    "surface": "escalation-kpis",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 957,
+    "png": "kept",
+    "json": "kept"
+  },
+  "escalation-kpis--dark--1400px--fp": {
+    "surface": "escalation-kpis",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "escalation-kpis--dark--390px--fp": {
+    "surface": "escalation-kpis",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 957,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-confirm--light--1400px--fp": {
+    "surface": "err-merge-confirm",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-confirm--light--390px--fp": {
+    "surface": "err-merge-confirm",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-confirm--dark--1400px--fp": {
+    "surface": "err-merge-confirm",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-confirm--dark--390px--fp": {
+    "surface": "err-merge-confirm",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-reauth--light--1400px--fp": {
+    "surface": "err-merge-reauth",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-reauth--light--390px--fp": {
+    "surface": "err-merge-reauth",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-reauth--dark--1400px--fp": {
+    "surface": "err-merge-reauth",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-merge-reauth--dark--390px--fp": {
+    "surface": "err-merge-reauth",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-generic--light--1400px--fp": {
+    "surface": "err-generic",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-generic--light--390px--fp": {
+    "surface": "err-generic",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-generic--dark--1400px--fp": {
+    "surface": "err-generic",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-generic--dark--390px--fp": {
+    "surface": "err-generic",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-workspace-notfound--light--1400px--fp": {
+    "surface": "err-workspace-notfound",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-workspace-notfound--light--390px--fp": {
+    "surface": "err-workspace-notfound",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-workspace-notfound--dark--1400px--fp": {
+    "surface": "err-workspace-notfound",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-workspace-notfound--dark--390px--fp": {
+    "surface": "err-workspace-notfound",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-auth--light--1400px--fp": {
+    "surface": "err-upstream-auth",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-auth--light--390px--fp": {
+    "surface": "err-upstream-auth",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-auth--dark--1400px--fp": {
+    "surface": "err-upstream-auth",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-auth--dark--390px--fp": {
+    "surface": "err-upstream-auth",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-5xx--light--1400px--fp": {
+    "surface": "err-upstream-5xx",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-5xx--light--390px--fp": {
+    "surface": "err-upstream-5xx",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-5xx--dark--1400px--fp": {
+    "surface": "err-upstream-5xx",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-5xx--dark--390px--fp": {
+    "surface": "err-upstream-5xx",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-429--light--1400px--fp": {
+    "surface": "err-upstream-429",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-429--light--390px--fp": {
+    "surface": "err-upstream-429",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-429--dark--1400px--fp": {
+    "surface": "err-upstream-429",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-429--dark--390px--fp": {
+    "surface": "err-upstream-429",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-net--light--1400px--fp": {
+    "surface": "err-upstream-net",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-net--light--390px--fp": {
+    "surface": "err-upstream-net",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-net--dark--1400px--fp": {
+    "surface": "err-upstream-net",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-net--dark--390px--fp": {
+    "surface": "err-upstream-net",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-internal--light--1400px--fp": {
+    "surface": "err-upstream-internal",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-internal--light--390px--fp": {
+    "surface": "err-upstream-internal",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-internal--dark--1400px--fp": {
+    "surface": "err-upstream-internal",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "err-upstream-internal--dark--390px--fp": {
+    "surface": "err-upstream-internal",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-repo-picker--light--1400px--fp": {
+    "surface": "gh-repo-picker",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-repo-picker--light--390px--fp": {
+    "surface": "gh-repo-picker",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-repo-picker--dark--1400px--fp": {
+    "surface": "gh-repo-picker",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-repo-picker--dark--390px--fp": {
+    "surface": "gh-repo-picker",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-projects-picker--light--1400px--fp": {
+    "surface": "gh-projects-picker",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-projects-picker--light--390px--fp": {
+    "surface": "gh-projects-picker",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-projects-picker--dark--1400px--fp": {
+    "surface": "gh-projects-picker",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "gh-projects-picker--dark--390px--fp": {
+    "surface": "gh-projects-picker",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-site-picker--light--1400px--fp": {
+    "surface": "jira-site-picker",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-site-picker--light--390px--fp": {
+    "surface": "jira-site-picker",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-site-picker--dark--1400px--fp": {
+    "surface": "jira-site-picker",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-site-picker--dark--390px--fp": {
+    "surface": "jira-site-picker",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-link-form--light--1400px--fp": {
+    "surface": "jira-link-form",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-link-form--light--390px--fp": {
+    "surface": "jira-link-form",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-link-form--dark--1400px--fp": {
+    "surface": "jira-link-form",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "jira-link-form--dark--390px--fp": {
+    "surface": "jira-link-form",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "openrouter-consent--light--1400px--fp": {
+    "surface": "openrouter-consent",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "openrouter-consent--light--390px--fp": {
+    "surface": "openrouter-consent",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "openrouter-consent--dark--1400px--fp": {
+    "surface": "openrouter-consent",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "openrouter-consent--dark--390px--fp": {
+    "surface": "openrouter-consent",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-openrouter-cb-nocode--light--1400px--fp": {
+    "surface": "raw-openrouter-cb-nocode",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-openrouter-cb-nocode--light--390px--fp": {
+    "surface": "raw-openrouter-cb-nocode",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-openrouter-cb-nocode--dark--1400px--fp": {
+    "surface": "raw-openrouter-cb-nocode",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-openrouter-cb-nocode--dark--390px--fp": {
+    "surface": "raw-openrouter-cb-nocode",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-jira-nows--light--1400px--fp": {
+    "surface": "raw-jira-nows",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-jira-nows--light--390px--fp": {
+    "surface": "raw-jira-nows",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-jira-nows--dark--1400px--fp": {
+    "surface": "raw-jira-nows",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-jira-nows--dark--390px--fp": {
+    "surface": "raw-jira-nows",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-auth-callback--light--1400px--fp": {
+    "surface": "raw-auth-callback",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-auth-callback--light--390px--fp": {
+    "surface": "raw-auth-callback",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-auth-callback--dark--1400px--fp": {
+    "surface": "raw-auth-callback",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "raw-auth-callback--dark--390px--fp": {
+    "surface": "raw-auth-callback",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "status": "kept",
+    "pixelHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-1--light--1400px--pe": {
+    "surface": "archive-1",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 19072,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-1--light--390px--pe": {
+    "surface": "archive-1",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 24994,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-1--dark--1400px--pe": {
+    "surface": "archive-1",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 19072,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-1",
+    "json": "kept"
+  },
+  "archive-1--dark--390px--pe": {
+    "surface": "archive-1",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 24994,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-1",
+    "json": "kept"
+  },
+  "archive-2--light--1400px--pe": {
+    "surface": "archive-2",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 21320,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-2--light--390px--pe": {
+    "surface": "archive-2",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 28234,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-2--dark--1400px--pe": {
+    "surface": "archive-2",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 21320,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-2",
+    "json": "kept"
+  },
+  "archive-2--dark--390px--pe": {
+    "surface": "archive-2",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 28234,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-2",
+    "json": "kept"
+  },
+  "archive-3--light--1400px--pe": {
+    "surface": "archive-3",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 14468,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-3--light--390px--pe": {
+    "surface": "archive-3",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 23881,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-3--dark--1400px--pe": {
+    "surface": "archive-3",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 14468,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-3",
+    "json": "kept"
+  },
+  "archive-3--dark--390px--pe": {
+    "surface": "archive-3",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 23881,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-3",
+    "json": "kept"
+  },
+  "archive-4--light--1400px--pe": {
+    "surface": "archive-4",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 12593,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-4--light--390px--pe": {
+    "surface": "archive-4",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 18146,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-4--dark--1400px--pe": {
+    "surface": "archive-4",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 12593,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-4",
+    "json": "kept"
+  },
+  "archive-4--dark--390px--pe": {
+    "surface": "archive-4",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 18146,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-4",
+    "json": "kept"
+  },
+  "archive-5--light--1400px--pe": {
+    "surface": "archive-5",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 8852,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-5--light--390px--pe": {
+    "surface": "archive-5",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 13859,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-5--dark--1400px--pe": {
+    "surface": "archive-5",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 8852,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-5",
+    "json": "kept"
+  },
+  "archive-5--dark--390px--pe": {
+    "surface": "archive-5",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 13859,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-5",
+    "json": "kept"
+  },
+  "archive-6--light--1400px--pe": {
+    "surface": "archive-6",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 13401,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-6--light--390px--pe": {
+    "surface": "archive-6",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 28871,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-6--dark--1400px--pe": {
+    "surface": "archive-6",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 13401,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-6",
+    "json": "kept"
+  },
+  "archive-6--dark--390px--pe": {
+    "surface": "archive-6",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 28871,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-6",
+    "json": "kept"
+  },
+  "archive-7--light--1400px--pe": {
+    "surface": "archive-7",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 23422,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-7--light--390px--pe": {
+    "surface": "archive-7",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 32896,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-7--dark--1400px--pe": {
+    "surface": "archive-7",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 23422,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-7",
+    "json": "kept"
+  },
+  "archive-7--dark--390px--pe": {
+    "surface": "archive-7",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 32896,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-7",
+    "json": "kept"
+  },
+  "archive-404--light--1400px--pe": {
+    "surface": "archive-404",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 1000,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-404--light--390px--pe": {
+    "surface": "archive-404",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 844,
+    "png": "kept",
+    "json": "kept"
+  },
+  "archive-404--dark--1400px--pe": {
+    "surface": "archive-404",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "scrollHeight": 1000,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-404",
+    "json": "kept"
+  },
+  "archive-404--dark--390px--pe": {
+    "surface": "archive-404",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "pixelHeight": 844,
+    "scrollHeight": 844,
+    "png": "pruned — regenerable via capture/capture-full.mjs archive-404",
     "json": "kept"
   }
 }

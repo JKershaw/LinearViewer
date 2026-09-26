@@ -1,0 +1,25 @@
+{
+  "surface": "archive-4",
+  "theme": "light",
+  "viewport": 390,
+  "captureMode": "pageEnd",
+  "darkMode": "cookie",
+  "title": "The Harbour Archive · The August Wing",
+  "headings": {
+    "h1": 1,
+    "h2": 5,
+    "h3": 16,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 22,
+    "a11yRoleHeading": 22
+  },
+  "scrollHeight": 18146,
+  "capturedPixelHeight": 844,
+  "clip": {
+    "y": 17295,
+    "height": 844
+  },
+  "footerCount": 0
+}

@@ -1,0 +1,22 @@
+{
+  "surface": "ship",
+  "theme": "dark",
+  "viewport": 1400,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "title": "Ship",
+  "headings": {
+    "h1": 0,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 0,
+    "a11yRoleHeading": 0
+  },
+  "scrollHeight": 1161,
+  "capturedPixelHeight": 1161,
+  "clip": null,
+  "footerCount": 1
+}

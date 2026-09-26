@@ -1,0 +1,25 @@
+{
+  "surface": "archive-6",
+  "theme": "dark",
+  "viewport": 1400,
+  "captureMode": "pageEnd",
+  "darkMode": "cookie",
+  "title": "Harbour from the Bridge · Harbour Archive #6",
+  "headings": {
+    "h1": 1,
+    "h2": 10,
+    "h3": 12,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 23,
+    "a11yRoleHeading": 23
+  },
+  "scrollHeight": 13401,
+  "capturedPixelHeight": 1000,
+  "clip": {
+    "y": 12401,
+    "height": 1000
+  },
+  "footerCount": 0
+}

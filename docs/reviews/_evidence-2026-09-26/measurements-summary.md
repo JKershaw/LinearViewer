@@ -89,7 +89,7 @@ Convention counts (66 distinct `<title>` values grouped):
 
 ## 8 · Evidence-set size (curated, beat 4)
 
-`docs/reviews/_evidence-2026-09-26/` = **7.9 MB total** — **110 PNGs** (6.3 MB, viewport-height; short error/consent pages are effectively full-page) + **384 JSONs** (1.5 MB) + tools/manifest (~0.16 MB). All 384 measurement JSONs are kept (they back every number, including the 360/320 sweeps); PNGs are pruned to verdict/observation surfaces + a lean baseline, and every pruned entry is marked `pruned — regenerable via capture/capture.mjs <key>` in `capture/manifest.json`. 2026-08-29 was 6.6 MB / 60 artifacts; this is 7.9 MB over a ~6.4× larger measured scope.
+`docs/reviews/_evidence-2026-09-26/` = **9.5 MB total** — **114 PNGs** (86 `fullPage`, 16 `pageEnd` light, 12 `viewport`) + **502 JSONs** (2.0 MB) + tools/manifest (~0.2 MB). Capture mode is recorded per entry in `capture/manifest.json` (`viewport` | `fullPage` | `pageEnd`). All measurement JSONs are kept (they back every number, including the 360/320 sweeps); PNGs are pruned to verdict/observation surfaces + three lean family representatives (`landing`, `tree`, `local-tree`) + `fullPage` verdict captures + `pageEnd` archives (final-viewport capture of the page end incl. footer/colophon — but see the `pageEnd` dark variants dropped to meet the budget). Every pruned entry is marked `pruned — regenerable via capture/{capture,capture-full}.mjs <key>`. 2026-08-29 was 6.6 MB / 60 artifacts; this is 9.5 MB over a ~6.4× larger measured scope.
 
 ## 9 · Adversarial self-review (beat 4)
 

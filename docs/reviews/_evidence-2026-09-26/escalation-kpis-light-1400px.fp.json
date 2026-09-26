@@ -1,0 +1,22 @@
+{
+  "surface": "escalation-kpis",
+  "theme": "light",
+  "viewport": 1400,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "title": "Test Workspace - Escalation KPIs",
+  "headings": {
+    "h1": 1,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 1,
+    "a11yRoleHeading": 1
+  },
+  "scrollHeight": 1000,
+  "capturedPixelHeight": 1000,
+  "clip": null,
+  "footerCount": 1
+}
