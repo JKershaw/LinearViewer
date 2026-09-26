@@ -80,7 +80,7 @@ describe('DispatchQueueStore#markDecisionWithdrawalReversed', () => {
     assert.ok(reversal, 'a decision-withdrawal-reversed entry must be appended');
     assert.deepEqual(JSON.parse(reversal.message), { decision_id: 'd-1' });
     assert.equal(stored.feedbackVersion, 2, 'feedbackVersion must $inc alongside the $push, same as addFeedback/markDecisionAnswered');
-    assert.equal(_findDecisionWithdrawal(stored.feedback), null, 'the withdrawal must no longer read as live after reversal');
+    assert.equal(_findDecisionWithdrawal(stored.feedback, 'd-1'), null, 'the withdrawal must no longer read as live after reversal');
   });
 
   test('never-withdrawn: an unrelated decisionId returns null, no append', async () => {
@@ -118,7 +118,7 @@ describe('DispatchQueueStore#markDecisionWithdrawalReversed', () => {
       'no reversal entry must be appended for the mismatched decisionId'
     );
     assert.equal(
-      _findDecisionWithdrawal(stored.feedback)?.decisionId,
+      _findDecisionWithdrawal(stored.feedback, 'd-1')?.decisionId,
       'd-1',
       'the original d-1 withdrawal must still read as live'
     );
@@ -351,6 +351,50 @@ describe('read-side adversarial: item-scoped withdrawal discharge (LIN-3036)', (
     const ids = rows.map((r) => r.decision.decision_id);
     assert.ok(ids.includes('d-Y'), "Y's row must still be unanswered — a forged stamp on X cannot discharge it");
     assert.ok(ids.includes('d-X'), "X's own d-X row is likewise untouched — the forgery discharges nothing");
+  });
+
+  test('multi-decision row (LIN-2891 F1): a later withdrawal of a moot d1 does not reopen the withdrawn current d2, and each live withdrawal reverses independently', async () => {
+    const { store } = makeStore();
+
+    // One item raises d1, then d2 (the CURRENT ruling), withdraws d2, then
+    // withdraws the now-moot d1. Under the pre-F1 scalar read the last write
+    // (d1) became the row's `withdrawal`, reopening d2.
+    const item = await store.addItem(URL_KEY, { prompt: 'multi', kind: 'implementation', issueIdentifier: 'LIN-60' });
+    await store.takeItem(item._id, URL_KEY, 'token-a');
+    await store.addFeedback(item._id, URL_KEY, { kind: 'decision', message: decisionMessage('d1') }, 'token-a');
+    await store.addFeedback(item._id, URL_KEY, { kind: 'decision', message: decisionMessage('d2') }, 'token-a');
+    await store.addFeedback(item._id, URL_KEY, { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd2', reason: 'd2 retracted' }) }, 'token-a');
+    await store.addFeedback(item._id, URL_KEY, { kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: 'd1', reason: 'd1 moot, retracted later' }) }, 'token-a');
+
+    let loops = await loopsForWorkspace(store);
+    const loop = () => loops.find((l) => l.loopId === String(item._id));
+    assert.strictEqual(loop()?.decision?.decision_id, 'd2', 'sanity: the current decision is d2');
+    assert.strictEqual(loop()?.withdrawal?.decisionId, 'd2', 'the row\'s withdrawal names the current d2, never the later moot d1');
+    assert.strictEqual(isDecisionWithdrawn(loop()), true, 'the current d2 stays withdrawn — the moot d1 withdrawal must not reopen it');
+    assert.deepStrictEqual(
+      collectUnansweredDecisions({ loops }, { now: new Date() }),
+      [],
+      'd2 is discharged, so the row is not unanswered'
+    );
+    const resolved = collectUnansweredDecisions({ loops }, { now: new Date(), includeResolved: true });
+    assert.strictEqual(resolved.length, 1);
+    assert.strictEqual(resolved[0].resolution.outcome, 'withdrawn');
+    assert.strictEqual(resolved[0].resolution.reason, 'd2 retracted', 'the surfaced reason is d2\'s, not the moot d1\'s');
+
+    // Reversal of the CURRENT live withdrawal (d2) succeeds and reopens the row.
+    const reversedD2 = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd2');
+    assert.ok(reversedD2?.success, 'the current live withdrawal (d2) must be reversible');
+    loops = await loopsForWorkspace(store);
+    assert.strictEqual(isDecisionWithdrawn(loop()), false, 'reversing d2 reopens the row');
+    const rows = collectUnansweredDecisions({ loops }, { now: new Date() });
+    assert.strictEqual(rows.length, 1, 'd2 is open again after reversal');
+    assert.strictEqual(rows[0].decision.decision_id, 'd2');
+
+    // The moot d1 withdrawal is ALSO still independently reversible (its own pair),
+    // even though it was never the row's current decision — LIN-3035 ledger L6.
+    const reversedD1 = await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd1');
+    assert.ok(reversedD1?.success, 'the moot d1 withdrawal is still live and independently reversible');
+    assert.strictEqual(await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd1'), null, 'a second reversal of d1 is terminal-rejected');
   });
 
   test('sibling after reversal: a reversed withdrawal on loop A does not block a fresh, independently-reasoned withdrawal on loop B for the same decision id; A\'s own pair stays discharged-false forever', async () => {

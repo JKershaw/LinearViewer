@@ -94,9 +94,10 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   await store.upsertSession(URL_KEY, makeSession('S1'));
 
   // The pin tracks the CURRENT version (LIN-3022 moved it 12 → 13, LIN-2934 moved
-  // it 13 → 14, LIN-2891/LIN-3034 moved it 14 → 15); a lingering v3 archive doc
+  // it 13 → 14, LIN-2891/LIN-3034 moved it 14 → 15, LIN-2891 F1 moved it 15 → 16
+  // for the decision-aware `withdrawal` derivation); a lingering v3 archive doc
   // from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 15, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 16, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 
@@ -398,4 +399,21 @@ test('a v14 doc (pre-withdrawal loops, LIN-2891/LIN-3034) read-misses on both li
 
   assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v14 doc');
   assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v14 doc -> route reconstructs');
+});
+
+// LIN-2891 F1: the `withdrawal` field's SHAPE is unchanged but its DERIVATION
+// became decision-aware (`_findDecisionWithdrawal(feedback, decision.decision_id)`),
+// so a v15 doc's value — computed under the old "last live withdrawal on the
+// row, whatever its decision" rule — can be wrong for its own current decision
+// and must not be served. Same version-agnostic style as the tests above.
+test('a v15 doc (pre-decision-aware withdrawal, LIN-2891 F1) read-misses on both list and point reads', async () => {
+  const collection = createMockCollection();
+  const store = new ObservationSessionsStore({ collection });
+  await store.upsertSession(URL_KEY, makeSession('S1'));
+
+  const doc = collection._docs.find(d => d.type === 'session');
+  doc.builderVersion = 15;
+
+  assert.equal((await store.findByWorkspace(URL_KEY)).sessions.length, 0, 'list read skips the v15 doc');
+  assert.equal(await store.getSession(URL_KEY, 'S1'), null, 'point read misses the v15 doc -> route reconstructs');
 });
