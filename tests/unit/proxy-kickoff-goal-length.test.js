@@ -135,3 +135,39 @@ describe('LIN-2818 — scoped kickoff delivers the caller goal (LIN-2730 shape)'
     assert.ok(!fetched.body.prompt.includes('**Additional context from the human:**'));
   });
 });
+
+describe('LIN-2175 — the documented Planner launch shape is accepted and carries its goal', () => {
+  // The exact `goal` template from docs/passage-planner-prompt.md Step 6, with
+  // <passage-identifier> substituted by the passage task's own identifier. This
+  // is the literal the Planner sends; the test pins it verbatim so the served
+  // prompt's precedence-preserving wording can't silently drift.
+  const goal = `This is a Passage Runner launch for TEST-1. The instructions in this prompt under "Goal from the human" and "Your first act" that tell you to call \`POST /recommend-and-dispatch\` on TEST-1 do not apply here — ignore them. Instead, your first act is: \`GET /api/proxy/passage-runner/prompt\`, then follow that served prompt in full; it replaces this block's first act. Under it, your job is to fan out one child dispatch per ratified leg to that leg's own anchor tickets — never to work TEST-1 itself — watch them land, and keep the voyage log on TEST-1.`;
+
+  test('standard + write + maxTasks + goal → 201 echoes maxTasks, the dispatch read returns it, and the prompt carries the exact goal', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const kickoff = await call(app, 'post', KICKOFF, {
+      issueIdentifier: 'TEST-1',
+      variant: 'standard',
+      mode: 'write',
+      target: 'cli',
+      maxTasks: 13,
+      goal
+    });
+    assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
+    assert.equal(kickoff.body.maxTasks, 13, 'the ratified pool must be echoed on the kickoff response');
+
+    // The read the Runner itself makes in Step 4: GET /dispatch/{own id} → maxTasks.
+    const read = await call(app, 'get', `/api/proxy/dispatch/${kickoff.body.id}`);
+    assert.equal(read.status, 200, JSON.stringify(read.body));
+    assert.equal(read.body.maxTasks, 13, 'the dispatch read must return the declared bound');
+
+    const fetched = await call(app, 'get', `/api/proxy/dispatch/${kickoff.body.id}/prompt`);
+    assert.equal(fetched.status, 200, JSON.stringify(fetched.body));
+    assert.ok(
+      fetched.body.prompt.includes('**Additional context from the human:** ' + goal),
+      'the exact precedence-preserving goal text must survive into the served prompt verbatim'
+    );
+  });
+});
