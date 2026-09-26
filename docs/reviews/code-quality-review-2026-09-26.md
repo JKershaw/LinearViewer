@@ -134,12 +134,12 @@ Three of the seven already have a decomposition ticket (LIN-2246, LIN-1249's sib
 
 **Condition 5 — the largest request handlers, named.** The ≥200-line bound counts **named functions only**, so the closures above hide their handlers. Measured at HEAD, the largest request handlers are:
 
-| handler | span | lines |
-|---|---|---|
-| `POST /api/proxy/recommend-and-dispatch` (`routes/proxy-dispatch.js:660`) | `:660–1349` | **690** |
-| `POST /workspace/:urlKey/api/dispatch` (`routes/dispatch.js:273`) | `:273–751` | 479 |
-| `POST /api/proxy/dispatch` (`routes/proxy-dispatch.js:218`) | `:218–621` | 404 |
-| `POST /api/proxy/autopilot/kickoff` (`routes/proxy-kickoff.js:124`) | `:124–524` | 401 |
+| handler | span | lines | disposition |
+|---|---|---|---|
+| `POST /api/proxy/recommend-and-dispatch` (`routes/proxy-dispatch.js:660`) | `:660–1349` | **690** | cross-link **LIN-679 follow-on set** |
+| `POST /workspace/:urlKey/api/dispatch` (`routes/dispatch.js:273`) | `:273–751` | 479 | recorded-not-promoted — 08-29 F7 deferral upheld |
+| `POST /api/proxy/dispatch` (`routes/proxy-dispatch.js:218`) | `:218–621` | 404 | cross-link **LIN-679 follow-on set** |
+| `POST /api/proxy/autopilot/kickoff` (`routes/proxy-kickoff.js:124`) | `:124–524` | 401 | recorded-not-promoted |
 
 A single 690-line handler — a dispatch verb that computes a recommendation and then dispatches — is larger than any single named non-closure function in the repo except the biggest route factories. It informs the "is the largest unit smaller?" question: the closures shrank, but the handlers inside the two largest proxy sub-routers did not.
 
@@ -153,17 +153,18 @@ A single 690-line handler — a dispatch verb that computes a recommendation and
 
 | rank | finding | severity | surface | disposition |
 |---|---|---|---|---|
-| 1 | **F-obs** | HIGH | `public/observation.js:3201–3565` `deliverRulingReply` (365 lines) | **mint** — cross-link LIN-2793, LIN-2784 |
-| 2 | **F-gate** | HIGH (correctness-adjacent) | `lib/periodical-report-gate.js:117–119` | **mint** |
-| 3 | **F-json** | MED | 7-site loose-JSON extraction | **mint** — cross-link LIN-1674, LIN-1672 |
-| 4 | **F-workspace-api** | MED | `routes/workspace-api.js` (275,210) | cross-link **LIN-2246** |
-| 5 | **F-server-auth** | MED | `server.js` auth-refresh ladder | cross-link **LIN-1249** |
-| 6 | **F-dispatch-store** | MED | `lib/dispatch-store.js:2008–2293` `addFeedback` (286) | cross-link **LIN-2398** |
-| 7 | **F-mock** | MED | mock/test-mode decision written many times | cross-link **LIN-2847** |
-| 8 | **F-mockbuilders** | MED | mock-fixture builders written 3× | recorded-not-promoted (§3d) |
-| 9 | **F-proxy-dispatch** | MED-LOW | `routes/proxy-dispatch.js:56` `formatDispatchWatch` | cross-link **LIN-3016** |
+| 1 | **F-sd-stall** | HIGH | `simple-dispatcher/reapers.js:1575–2503` `runStallFailsafe` (930) | recorded-not-promoted (cap spent); cross-link LIN-2568, LIN-2470 |
+| 2 | **F-obs** | HIGH | `public/observation.js:3201–3565` `deliverRulingReply` (365 lines) | **mint** — cross-link LIN-2793, LIN-2784 |
+| 3 | **F-gate** | HIGH (correctness-adjacent) | `lib/periodical-report-gate.js:117–119` | **mint** |
+| 4 | **F-json** | MED | 7-site loose-JSON extraction | **mint** — cross-link LIN-1674, LIN-1672 |
+| 5 | **F-workspace-api** | MED | `routes/workspace-api.js` (275,210) | cross-link **LIN-2246** |
+| 6 | **F-server-auth** | MED | `server.js` auth-refresh ladder | cross-link **LIN-1249** |
+| 7 | **F-dispatch-store** | MED | `lib/dispatch-store.js:2008–2293` `addFeedback` (286) | cross-link **LIN-2398** |
+| 8 | **F-mock** | MED | mock/test-mode decision written many times | cross-link **LIN-2847** |
+| 9 | **F-mockbuilders** | MED | mock-fixture builders written 3× | recorded-not-promoted (§3d) |
+| 10 | **F-proxy-dispatch** | MED-LOW | `routes/proxy-dispatch.js:56` `formatDispatchWatch` | cross-link **LIN-3016** |
 
-**Why the mint set is F-obs, F-gate, F-json.** F-obs and F-gate are HIGH on live-production-behaviour and correctness-adjacent surfaces; F-json is a production LLM-response-parsing risk across 7 live sites with an open ticket (LIN-1674) about to deliberately diverge one copy. F-workspace-api, F-server-auth, F-dispatch-store, F-mock and F-proxy-dispatch all have live owners and are cross-linked rather than rivalled. F-mockbuilders is unowned but confined to the `mockAi`/test-mode path and dormant per its git history, so it does not displace the mint set (full ranking reason in §3d).
+**Why the mint set is F-obs, F-gate, F-json.** F-obs and F-gate are HIGH on live-production-behaviour and correctness-adjacent surfaces; F-json is a production LLM-response-parsing risk across 7 live sites with an open ticket (LIN-1674) about to deliberately diverge one copy. F-workspace-api, F-server-auth, F-dispatch-store, F-mock and F-proxy-dispatch all have live owners and are cross-linked rather than rivalled. F-mockbuilders is unowned but confined to the `mockAi`/test-mode path and dormant per its git history, so it does not displace the mint set (full ranking reason in §3d). F-sd-stall outranks F-obs on size, branch count, churn and open defects; it was surfaced by the Tier-1 second read after the mint cap was spent, so it is recorded, not minted. The mint set (LIN-3112/3113/3114) is unchanged.
 
 ---
 
@@ -188,11 +189,11 @@ A single 690-line handler — a dispatch verb that computes a recommendation and
 
 ## F-gate · **HIGH (correctness-adjacent)** — the report gate's adversarial predicate is satisfied by a comment that merely *quotes* it, and it has now gone unrecorded twice
 
-**What.** `lib/periodical-report-gate.js:117–119` defines the three predicates that gate this task's own Done transition — the verdict, differed-from-top-finding, and disposition matchers, exported through `hasAdversarialReadEvidenceComment`. Each is an **unguarded alternation with a trailing `\b`**. In the verdict matcher's alternation, the `\b` holds between the `E` of the first alternative and the following `|` — a word char followed by a non-word char — so a comment that merely **quotes the three field patterns verbatim** (a natural thing for a research or planning pass to do while describing the gate) satisfies `hasAdversarialReadEvidenceComment` before any second read exists. The 08-29 run demonstrated this empirically: its own Step-1 research comment matched all three predicates, and calling the exported function with only a quotation as input returned `true`. *(This report describes the predicates by name only and does not reproduce their patterns — see the operational note below.)*
+**What.** `lib/periodical-report-gate.js:117–119` defines the three predicates that gate this task's own Done transition — the verdict, differed-from-top-finding, and disposition matchers, exported through `hasAdversarialReadEvidenceComment`. Each is an **unguarded alternation with a trailing `\b`**. The three predicates are unanchored: any occurrence of a field label followed by an accepted value matches, whether in a pipe-separated field template, in the ticket-description form (one value, then "or … <other value>"), or in negated prose (a field line followed by "is not yet given"). A quotation of the regex *source* does not match. A lookahead against a following alternation bar closes only the first of these forms. The 08-29 run demonstrated this empirically: its own Step-1 research comment matched all three predicates, and calling the exported function with only a quotation as input returned `true`. *(This report describes the predicates by name only and does not reproduce their patterns — see the operational note below.)*
 
 **Second site / delta.** This is the second consecutive edition to find it. The 08-29 report recorded it in full but did not mint it (cap spent on product findings; module owners LIN-694/LIN-2323 both Done). Nothing has changed since: `lib/periodical-report-gate.js` has only 3 commits ever, the regexes at `:117–119` are unchanged since LIN-2323 (#1263), and the last touch (LIN-2896) was an unrelated prose repoint.
 
-**Concrete maintainability cost.** Any periodical whose research or planning pass quotes its own Done-gate pre-satisfies that gate, so the gate can pass with **no second opinion at all** — the exact failure it exists to prevent. A `(?!\s*\|)` guard on each alternation, or requiring the match outside a code span, closes it. It gates *this* task's own eventual Done transition, so deferring it again is self-undermining.
+**Concrete maintainability cost.** Any periodical whose research or planning pass quotes its own Done-gate pre-satisfies that gate, so the gate can pass with **no second opinion at all** — the exact failure it exists to prevent. A `(?!\s*\|)` guard on each alternation closes only the pipe-template form; the ticket-description form and negated prose would still pass. Closing all three needs the predicates anchored or made to require the full field structure, or the match required outside a code span. It gates *this* task's own eventual Done transition, so deferring it again is self-undermining.
 
 **Negative search.** No ticket names `ADVERSARIAL_VERDICT_RE`, `hasAdversarialReadEvidenceComment`, `periodical-report-gate` or the regex defect. LIN-2328 (Todo) is a watch/monitor of the gate's branches, not the defect; LIN-2576 (Todo) widens the gate to the session-auth write path. LIN-694 and LIN-2323 are Done. **Unowned.**
 
@@ -391,6 +392,8 @@ Every member returned by every class bound below receives exactly one dispositio
 
 **The named pair below this threshold, dispositioned anyway (condition 2).** `lib/render-settings.js:61` ↔ `public/common.js:991` — `DISPATCH_HARNESS_SUGGESTIONS` and `DEFAULT_HARNESS` are written twice (server-rendered settings and the client helper). My window scan measures it **below** the ≥5 threshold because the shared run is short, but it is real by direct read: this is the client↔server mirror class, so its disposition is **cross-link LIN-2071** (the class owner), not a new mint.
 
+**The named validation-duplication pair below this threshold, dispositioned anyway (condition 2).** `routes/dispatch.js:273` ↔ `routes/proxy-dispatch.js:218` — dispatch-request validation (`abortTo`/`cascade`/`maxTasks`/`maxSessionsPerTask`/`queueIfBusy`/`waitForFollowUps`/`periodicalId` checks) written twice, ≈104 by the Tier-1 reader's count; **87** exact trimmed-line matches by the author's re-measure. Missed by 8-line windows because the checks are interleaved differently. Recorded-not-promoted; adjacent **LIN-1760**.
+
 **The mock-builder cluster (condition 2's headline pair set) is dispositioned in §3d.** The two loose-JSON pairs are marked covered by F-json above. The remaining 14 pairs are store/log/cache/config boilerplate or client mirrors: each is real duplication, but each is shallow (a repeated CRUD or mirror idiom) and overlaps an existing owner class (Drift & Coherence for the store/config boilerplate; LIN-2071 for the client mirrors), so none outranks the mint set and all are recorded-not-promoted.
 
 ### 3c. Loose-JSON parsing duplication — 7 sites
@@ -420,11 +423,11 @@ Bound and dispositioned in full in **F-json** (§ findings, part 1): `lib/recap.
 
 The `swim.js` pair is a real near-twin (both 375 lines, sharing a large verbatim body) but is client-rendering duplication under near-zero churn, so it sits below the mint set. `public/observation.js` is the one client member that is **not** clean, and it is minted.
 
-### 3f. simple-dispatcher observation row (observe-only)
+### 3f. simple-dispatcher row (graded; recorded-not-promoted)
 
 **Same method at SD HEAD `3b1e734`** (tests included): `reapers.js` 3,513/74 = 259,962; `dispatcher.js` 2,148/82 = 176,136; `test/stall-failsafe.test.js` 3,763/38 = 142,994; `test/opencode-runner.test.js` 4,038/34 = 137,292; `hook.js` 2,101/62 = 130,262; `opencode-runner.js` 1,695/42 = 71,190; `config.js` 1,303/47 = 61,241; `test/hook-decision.test.js` 1,400/31 = 43,400; `executors.js` 773/43 = 33,239; `e2e-smoke.js` 2,076/16 = 33,216; `terminal-driver.js` 1,568/21 = 32,928; `test/e2e-smoke.test.js` 2,053/14 = 28,742. Its mega-functions (regex-sized, verified at research time) are `runStallFailsafe` ~930, `processPolledItem` ~744, `runOpenCode` ~677, `main()` ~577, `runOnce` ~500.
 
-**Disposition — observation only — not graded, not minted, for every member above.** Rationale: no dedicated simple-dispatcher lane exists yet. **LIN-1933** (Todo — *"Periodicals: target-repo selection at dispatch"*) is the routed-around contract gap; this dispatch ran the default `repo: null` lane, and minting SD findings into the LinearViewer queue would create items that cannot be dispositioned. SD's two largest files are themselves test files, and its largest units are each smaller than LinearViewer's top closures.
+**Disposition — graded; recorded-not-promoted (cap spent).** simple-dispatcher is in this review's remit (ticket §4) and its tickets are routinely filed and dispositioned in the LIN queue (LIN-514 `dispatcher.js` split, Done; LIN-2720, LIN-2738, both Done; LIN-1456), so LIN-1933's missing lane does not prevent grading or minting. It only means simple-dispatcher is not auto-dispatched as a separate periodical target. **F-sd-stall — HIGH — `reapers.js:1575–2503 runStallFailsafe`**: 930 lines (≈417 code, ≈481 comment), ≈96 branch points, 36 commits touching its body in 90 days (12 since 08-29), grown 454 → 930 since 08-29. It hosts two open behavioural defects: LIN-2568 (`:1969`, the generic stall-refire else-arm overwrites an opencode resume) and LIN-2470 (the terminal-health cache `:1772–1775` lacks its dispatcher sibling's shape guard). No ticket owns its structure. **Batch, same reasoning, recorded-not-promoted:** `dispatcher.js:595 processPolledItem` 744, `opencode-runner.js:978 runOpenCode` 677, `hook.js:1515 main` 577, `dispatcher.js:1450 runOnce` 500, `hook.js:1100 decideHookActionInner` 379. **First promotion candidate for the next edition**, to be minted in LIN whether or not LIN-1933 has landed.
 
 **SD CI observation (record only).** `simple-dispatcher/.github/workflows/ci.yml` now exists (`npm ci` + `npm test` unit job, `on: pull_request` + push to main), which makes **LIN-1456** (*"simple-dispatcher has no CI"*, Backlog) **stale**. Its disposition is not this review's to execute.
 
@@ -446,6 +449,8 @@ The `swim.js` pair is a real near-twin (both 375 lines, sharing a large verbatim
 
 Per the ticket's "record everything" rule, nothing found is lost. The following findings did not receive a ticket, with the reason stated:
 
+- **F-sd-stall — `simple-dispatcher/reapers.js:1575–2503 runStallFailsafe` (§3f).** HIGH, ranked #1, unowned structurally, with two open behavioural defects inside it (LIN-2568, LIN-2470). Recorded-not-promoted **solely** because the 3-ticket mint cap was spent on LIN-3112/3113/3114 before the Tier-1 read surfaced it. **First promotion candidate for the next edition**, to be minted in LIN. The sibling SD batch (`processPolledItem` 744, `runOpenCode` 677, `hook.js main` 577, `runOnce` 500, `decideHookActionInner` 379) is recorded-not-promoted on the same reasoning.
+- **Validation-duplication pair — `routes/dispatch.js:273` ↔ `routes/proxy-dispatch.js:218` (§3b).** Dispatch-request validation written twice, ≈104 by the Tier-1 reader's count (**87** exact trimmed-line matches by the author's re-measure); missed by the 8-line-window scan because the checks are interleaved differently. Recorded-not-promoted; adjacent LIN-1760.
 - **F-mockbuilders — the mock-fixture-builder cluster (§3d).** MED, unowned, dormant, test-mode-only blast radius. Available to a future run if its severity profile changes.
 - **F-store — the store `clear(urlKey)` family.** **17** `lib/` files define `clear(urlKey)` (16 `async`, plus one sync in `lib/sessions-feed-cache.js`), each hand-writing a `deleteMany({ urlKey })` wrapper with no shared store base. Recorded-not-promoted: each is an ~8-line wrapper (breadth without per-instance depth), and the canonical-store-convention angle overlaps Drift & Coherence.
 - **F-fixture — `tests/unit/prompt-templates.test.js`.** 4,876 lines / 46 commits (224,296, #4), with **30** inline `const issue = {` fixture literals and no issue/context factory in `tests/fixtures/`. The 08-29 run's top unpromoted candidate; still unpromoted. Concrete cost: adding a field to the recommendation-context contract means hand-editing ~30 fixtures in one file.
@@ -482,7 +487,7 @@ Every ticket below was re-`GET`-ed from the workspace API during this session.
 
 ## 7. Scope decisions
 
-- **`simple-dispatcher` — observation only.** Decided in §3f: no dedicated lane exists (LIN-1933 Todo), so it rides this run as an observation and mints nothing. The cost of leaving it ungraded another cycle (`runStallFailsafe` ~454 → ~930 since 08-29) is real and is recorded rather than acted on, because this lane's queue is the wrong home for it.
+- **`simple-dispatcher` — graded, not minted this run (cap spent).** The lane argument does not hold: simple-dispatcher tickets live in LIN. Graded in §3f (F-sd-stall ranked #1); recorded-not-promoted solely because the cap was spent before the Tier-1 read.
 - **Test-file maintainability — IN SCOPE, whole tree on the board.** §1's board includes tests; the bounded test findings are F-fixture (`prompt-templates.test.js`) and F10 (`proxy.spec.js`), both recorded-not-promoted. Test *adequacy* remains Test Coverage Gap's.
 - **Client-side `public/*.js` structure — IN SCOPE, all 8 sub-board members dispositioned (§3e).** `public/observation.js` is re-graded from scratch (the 08-29 clean verdict is invalidated) and yields F-obs.
 - **08-29 F6/F7/F8 re-decided.** `routes/dashboard.js`, `routes/dispatch.js`, `lib/pipeline-loops.js`: LIN-679 shipped end-to-end, testing the "bottleneck is capacity, not coverage" premise; history shows no structural follow-through from the split onto these files, and each remains a single large factory/loop. **Deferral upheld** — recorded-not-promoted, none unowned-and-severe enough to displace the mint set.
@@ -531,4 +536,17 @@ Search-before-mint results (re-run immediately before minting): F-obs — no str
 
 ## Adversarial Second-Read
 
-*Reserved. This section will be completed by a genuinely separate reader (Tier 1 or Tier 2; Tier 3 — this session re-reading its own report — is not accepted) after the report and follow-ups exist. It will record the tier used, the cold question, the reader's answer in full, and the three required fields.*
+**Tier:** Tier 1. A separately dispatched review session (dispatch `f49348e1`, `eee71d37`, `c2bcb026`) with no memory of the authoring run. Caveat: the research and plan are embedded in the LIN-3103 description, which the reader read for the §0–§7 remit. The reader did not read any comment (research, plan or plan-review) before forming the cold answer.
+
+**Cold question:** What is the largest item in this review window that this report missed or misfiled?
+
+**Answer:** `simple-dispatcher/reapers.js:1575–2503 runStallFailsafe`, misfiled as observation-only. It is 930 lines (≈417 code), ≈96 branch points, with 36 commits touching its body in 90 days (12 since 08-29), grown 454 → 930 since 08-29. Two open behavioural defects sit inside it (LIN-2568 at `:1969`, LIN-2470 at `:1772–1775`), and no ticket owns its structure. Against F-obs (`deliverRulingReply`: 365 lines, ≈172 code, ≈25 branch points, 13 commits touching its body in 90 days), it is larger on every measure. The report's reason for not grading it is contradicted by the workspace: simple-dispatcher tickets are filed and closed in LIN routinely (LIN-514, LIN-2720, LIN-2738, LIN-1456). The claim that its largest units are smaller than LinearViewer's top closures compares an imperative function with route-factory containers. It is in remit (ticket §4) and inside the §3f class the report bounded. The same reasoning covers `processPolledItem` 744, `runOpenCode` 677, `hook.js main` 577, `runOnce` 500 and `decideHookActionInner` 379.
+
+Secondary items: (1) dispatch-request validation is duplicated between `routes/dispatch.js:273` and `routes/proxy-dispatch.js:218` (≈104 shared distinct lines; adjacent LIN-1760), and the §2 handlers had no disposition. (2) F-gate's mechanism is broader than described: unanchored predicates match the ticket-description form and negated prose, not only the pipe template, so LIN-3113's lookahead remedy is incomplete.
+
+**Resolution:** the report was corrected before merge. F-sd-stall is graded as rank 1 and recorded-not-promoted because the cap was spent, and it is the first candidate for the next edition. The mint set (LIN-3112/3113/3114) is unchanged.
+
+**Gate fields (copied literally from the gate comment `a8eb57d2`):**
+Adversarial second-read verdict: DISAGREE
+Differed from top finding: YES
+Disposition: fixed in place
