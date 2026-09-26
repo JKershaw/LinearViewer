@@ -1,0 +1,16 @@
+{
+  "surface": "archive-1",
+  "theme": "light",
+  "viewport": 1400,
+  "captureMode": "pageEnd",
+  "settleMs": 1500,
+  "darkMode": "media",
+  "scrollY": 18072,
+  "scrollHeight": 19072,
+  "revealInViewport": [
+    {
+      "opacity": "1",
+      "cls": "exhibit amber reveal in"
+    }
+  ]
+}

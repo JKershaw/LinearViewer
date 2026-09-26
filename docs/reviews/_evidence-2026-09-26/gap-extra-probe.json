@@ -1,0 +1,268 @@
+{
+  "err-workspace-notfound--light--390px": {
+    "htmlClass": "",
+    "probe": {
+      "ul a": {
+        "text": "Demo Workspace (demo)",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 9.4,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(0, 0, 238)"
+      },
+      "ul": {
+        "text": "Demo Workspace (demo)",
+        "color": "rgb(26, 26, 26)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 17.4,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(26, 26, 26)"
+      },
+      "li": {
+        "text": "Demo Workspace (demo)",
+        "color": "rgb(26, 26, 26)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 17.4,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(26, 26, 26)"
+      }
+    }
+  },
+  "err-workspace-notfound--dark--390px": {
+    "htmlClass": "theme-dark",
+    "probe": {
+      "ul a": {
+        "text": "Demo Workspace (demo)",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(22,24,29)",
+        "ratio": 1.89,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(0, 0, 238)"
+      },
+      "ul": {
+        "text": "Demo Workspace (demo)",
+        "color": "rgb(230, 230, 230)",
+        "bg": "rgb(22,24,29)",
+        "ratio": 14.23,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(230, 230, 230)"
+      },
+      "li": {
+        "text": "Demo Workspace (demo)",
+        "color": "rgb(230, 230, 230)",
+        "bg": "rgb(22,24,29)",
+        "ratio": 14.23,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(230, 230, 230)"
+      }
+    }
+  },
+  "jira-link-form--light--390px": {
+    "htmlClass": "",
+    "probe": {
+      "input[type=\"url\"], input[name*=\"site\" i]": {
+        "text": "https://yourteam.atlassian.net",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "2px inset rgb(118, 118, 118)"
+      },
+      "input[type=\"email\"]": {
+        "text": "you@example.com",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "2px inset rgb(118, 118, 118)"
+      },
+      "input[type=\"password\"]": {
+        "text": "",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "2px inset rgb(118, 118, 118)"
+      },
+      "form a": {
+        "text": "id.atlassian.com",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 9.4,
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(0, 0, 238)"
+      },
+      "label": {
+        "text": "Jira site",
+        "color": "rgb(102, 102, 102)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 5.74,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(102, 102, 102)"
+      }
+    }
+  },
+  "jira-link-form--dark--390px": {
+    "htmlClass": "theme-dark",
+    "probe": {
+      "input[type=\"url\"], input[name*=\"site\" i]": {
+        "text": "https://yourteam.atlassian.net",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "2px inset rgb(118, 118, 118)"
+      },
+      "input[type=\"email\"]": {
+        "text": "you@example.com",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "2px inset rgb(118, 118, 118)"
+      },
+      "input[type=\"password\"]": {
+        "text": "",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "2px inset rgb(118, 118, 118)"
+      },
+      "form a": {
+        "text": "id.atlassian.com",
+        "color": "rgb(0, 0, 238)",
+        "bg": "rgb(22,24,29)",
+        "ratio": 1.89,
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(0, 0, 238)"
+      },
+      "label": {
+        "text": "Jira site",
+        "color": "rgb(154, 160, 166)",
+        "bg": "rgb(22,24,29)",
+        "ratio": 6.73,
+        "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+        "fontSize": "13px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(154, 160, 166)"
+      }
+    }
+  },
+  "gh-projects-picker--light--390px": {
+    "htmlClass": "",
+    "probe": {
+      "select": {
+        "text": "Roadmap board (acme/4)",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(118, 118, 118)"
+      }
+    }
+  },
+  "gh-projects-picker--dark--390px": {
+    "htmlClass": "theme-dark",
+    "probe": {
+      "select": {
+        "text": "Roadmap board (acme/4)",
+        "color": "rgb(0, 0, 0)",
+        "bg": "rgb(255,255,255)",
+        "ratio": 21,
+        "fontFamily": "Arial",
+        "fontSize": "13.3333px",
+        "background": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(118, 118, 118)"
+      }
+    }
+  },
+  "archive-1--light--1400px--signoff": {
+    "probe": {
+      "[data-probe-signoff]": {
+        "text": "THE HARBOUR ARCHIVE · compiled by Claude for John ",
+        "color": "rgb(139, 147, 160)",
+        "bg": "rgb(250,249,246)",
+        "ratio": 2.94,
+        "fontFamily": "ui-monospace, \"SF Mono\", \"JetBrains Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+        "fontSize": "12px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(139, 147, 160)"
+      }
+    }
+  },
+  "archive-4--light--1400px--signoff": {
+    "probe": {
+      "[data-probe-signoff]": {
+        "text": "THE HARBOUR ARCHIVE · THE AUGUST WING · compiled b",
+        "color": "rgb(139, 147, 160)",
+        "bg": "rgb(250,249,246)",
+        "ratio": 2.94,
+        "fontFamily": "ui-monospace, \"SF Mono\", \"JetBrains Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+        "fontSize": "12px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(139, 147, 160)"
+      }
+    }
+  },
+  "archive-5--light--1400px--signoff": {
+    "probe": {
+      "[data-probe-signoff]": {
+        "text": "Harbour Archive · document 5 · filed 2026-09-05 · ",
+        "color": "rgb(139, 147, 160)",
+        "bg": "rgb(250,249,246)",
+        "ratio": 2.94,
+        "fontFamily": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+        "fontSize": "12px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(139, 147, 160)"
+      }
+    }
+  },
+  "archive-7--light--1400px--signoff": {
+    "probe": {
+      "[data-probe-signoff]": {
+        "text": "Harbour Archive · document 7 · filed 2026-09-22 · ",
+        "color": "rgb(139, 147, 160)",
+        "bg": "rgb(250,249,246)",
+        "ratio": 2.94,
+        "fontFamily": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+        "fontSize": "12px",
+        "background": "rgba(0, 0, 0, 0)",
+        "border": "0px none rgb(139, 147, 160)"
+      }
+    }
+  }
+}

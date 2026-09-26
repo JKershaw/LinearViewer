@@ -1230,7 +1230,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs settings"
+    "png": "superseded by settings--light--1400px--fp (impl beat 1)"
   },
   "settings--light--390px": {
     "surface": "settings",
@@ -1239,7 +1239,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs settings"
+    "png": "superseded by settings--light--390px--fp (impl beat 1)"
   },
   "settings--dark--1400px": {
     "surface": "settings",
@@ -1248,7 +1248,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs settings"
+    "png": "superseded by settings--dark--1400px--fp (impl beat 1)"
   },
   "settings--dark--390px": {
     "surface": "settings",
@@ -1257,7 +1257,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs settings"
+    "png": "superseded by settings--dark--390px--fp (impl beat 1)"
   },
   "prompts--light--1400px": {
     "surface": "prompts",
@@ -1338,7 +1338,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dispatch"
+    "png": "superseded by dispatch--light--1400px--fp (impl beat 1)"
   },
   "dispatch--light--390px": {
     "surface": "dispatch",
@@ -1347,7 +1347,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dispatch"
+    "png": "superseded by dispatch--light--390px--fp (impl beat 1)"
   },
   "dispatch--dark--1400px": {
     "surface": "dispatch",
@@ -1356,7 +1356,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dispatch"
+    "png": "superseded by dispatch--dark--1400px--fp (impl beat 1)"
   },
   "dispatch--dark--390px": {
     "surface": "dispatch",
@@ -1365,7 +1365,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dispatch"
+    "png": "superseded by dispatch--dark--390px--fp (impl beat 1)"
   },
   "proxy--light--1400px": {
     "surface": "proxy",
@@ -1374,7 +1374,7 @@
     "status": "pruned — regenerable via capture/capture.mjs proxy",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs proxy"
+    "png": "superseded by proxy--light--1400px--fp (impl beat 1)"
   },
   "proxy--light--390px": {
     "surface": "proxy",
@@ -1383,7 +1383,7 @@
     "status": "pruned — regenerable via capture/capture.mjs proxy",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs proxy"
+    "png": "superseded by proxy--light--390px--fp (impl beat 1)"
   },
   "proxy--dark--1400px": {
     "surface": "proxy",
@@ -1392,7 +1392,7 @@
     "status": "pruned — regenerable via capture/capture.mjs proxy",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs proxy"
+    "png": "superseded by proxy--dark--1400px--fp (impl beat 1)"
   },
   "proxy--dark--390px": {
     "surface": "proxy",
@@ -1401,7 +1401,7 @@
     "status": "pruned — regenerable via capture/capture.mjs proxy",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs proxy"
+    "png": "superseded by proxy--dark--390px--fp (impl beat 1)"
   },
   "observation--light--1400px": {
     "surface": "observation",
@@ -4325,7 +4325,8 @@
     "pixelHeight": 1000,
     "scrollHeight": 19072,
     "png": "kept",
-    "json": "kept"
+    "json": "kept",
+    "note": "captured mid .reveal fade (200ms after jump, 0.5s transition) — final section renders washed out; see archive-1--light--1400px--pe-settled"
   },
   "archive-1--light--390px--pe": {
     "surface": "archive-1",
@@ -4469,7 +4470,8 @@
     "pixelHeight": 1000,
     "scrollHeight": 12593,
     "png": "kept",
-    "json": "kept"
+    "json": "kept",
+    "note": "captured mid .reveal fade (200ms after jump, 0.5s transition) — final section renders washed out; see archive-4--light--1400px--pe-settled"
   },
   "archive-4--light--390px--pe": {
     "surface": "archive-4",
@@ -4481,7 +4483,8 @@
     "pixelHeight": 844,
     "scrollHeight": 18146,
     "png": "kept",
-    "json": "kept"
+    "json": "kept",
+    "note": "captured mid .reveal fade (200ms after jump, 0.5s transition) — final section renders washed out; see archive-4--light--390px--pe-settled"
   },
   "archive-4--dark--1400px--pe": {
     "surface": "archive-4",
@@ -4698,5 +4701,247 @@
     "scrollHeight": 844,
     "png": "pruned — regenerable via capture/capture-full.mjs archive-404",
     "json": "kept"
+  },
+  "observation-due--light--1400px--fp": {
+    "surface": "observation-due",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs (Scan-due tab click)"
+  },
+  "observation-due--light--390px--fp": {
+    "surface": "observation-due",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 860,
+    "source": "capture/capture-gap.mjs (Scan-due tab click)"
+  },
+  "observation-due--dark--1400px--fp": {
+    "surface": "observation-due",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs (Scan-due tab click)"
+  },
+  "observation-due--dark--390px--fp": {
+    "surface": "observation-due",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 860,
+    "source": "capture/capture-gap.mjs (Scan-due tab click)"
+  },
+  "dispatch-settled--light--1400px--fp": {
+    "surface": "dispatch-settled",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 3294,
+    "source": "capture/capture-gap.mjs (6s settle; async sections loaded)"
+  },
+  "dispatch-settled--light--390px--fp": {
+    "surface": "dispatch-settled",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 3640,
+    "source": "capture/capture-gap.mjs (6s settle; async sections loaded)"
+  },
+  "dispatch-settled--dark--1400px--fp": {
+    "surface": "dispatch-settled",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 3294,
+    "source": "capture/capture-gap.mjs (6s settle; async sections loaded)"
+  },
+  "dispatch-settled--dark--390px--fp": {
+    "surface": "dispatch-settled",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 3640,
+    "source": "capture/capture-gap.mjs (6s settle; async sections loaded)"
+  },
+  "settings--light--1400px--fp": {
+    "surface": "settings",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 4165,
+    "themeAssertion": "(none)",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "settings--light--390px--fp": {
+    "surface": "settings",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 5621,
+    "themeAssertion": "(none)",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "settings--dark--1400px--fp": {
+    "surface": "settings",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 4165,
+    "themeAssertion": "theme-dark",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "settings--dark--390px--fp": {
+    "surface": "settings",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 5621,
+    "themeAssertion": "theme-dark",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "dispatch--light--1400px--fp": {
+    "surface": "dispatch",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1743,
+    "themeAssertion": "(none)",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "dispatch--light--390px--fp": {
+    "surface": "dispatch",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1913,
+    "themeAssertion": "(none)",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "dispatch--dark--1400px--fp": {
+    "surface": "dispatch",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1743,
+    "themeAssertion": "theme-dark",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "dispatch--dark--390px--fp": {
+    "surface": "dispatch",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1913,
+    "themeAssertion": "theme-dark",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "proxy--light--1400px--fp": {
+    "surface": "proxy",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1519,
+    "themeAssertion": "(none)",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "proxy--light--390px--fp": {
+    "surface": "proxy",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1606,
+    "themeAssertion": "(none)",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "proxy--dark--1400px--fp": {
+    "surface": "proxy",
+    "theme": "dark",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1519,
+    "themeAssertion": "theme-dark",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "proxy--dark--390px--fp": {
+    "surface": "proxy",
+    "theme": "dark",
+    "viewport": 390,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1606,
+    "themeAssertion": "theme-dark",
+    "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
+  },
+  "archive-1--light--1400px--pe-settled": {
+    "surface": "archive-1",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "scrollHeight": 19072,
+    "source": "capture/capture-gap.mjs archives (1.5s settle past the .reveal fade)"
+  },
+  "archive-4--light--1400px--pe-settled": {
+    "surface": "archive-4",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "scrollHeight": 12583,
+    "source": "capture/capture-gap.mjs archives (1.5s settle past the .reveal fade)"
+  },
+  "archive-4--light--390px--pe-settled": {
+    "surface": "archive-4",
+    "theme": "light",
+    "viewport": 390,
+    "captureMode": "pageEnd",
+    "darkMode": "media",
+    "status": "kept",
+    "scrollHeight": 18136,
+    "source": "capture/capture-gap.mjs archives (1.5s settle past the .reveal fade)"
   }
 }
