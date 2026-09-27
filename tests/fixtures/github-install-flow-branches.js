@@ -405,7 +405,7 @@ export const STATELESS_REQUEST_SHAPES = {
 
 /**
  * LIN-2882 — stateless shapes the classifier must NOT widen to: these still
- * 400 at the `:291` state guard. `installation_id-only` is the golden
+ * 400 at the `:372` state guard. `installation_id-only` is the golden
  * `callback:missing-state` boundary (see the branch above).
  */
 export const STATELESS_STILL_400_SHAPES = {
