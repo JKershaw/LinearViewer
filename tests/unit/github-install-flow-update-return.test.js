@@ -519,4 +519,54 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
     await get(router, s.basePath, {}, session);
     assert.equal(session.oauthIntent.fresh, true, 'the re-entered begin handler re-derives fresh');
   });
+
+  // LIN-2882 review B2-1: every retry-site `actionUrl` that can see an
+  // add-source intent carries it (restartUrl swap), one forced failure per
+  // site (fe5190e8 line numbers). :741/:805 are omitted by design: they run
+  // only after session.regenerate() on the mode=new arm, where restartUrl(req)
+  // is provably bare basePath (same reasoning as reauthUrl at :785).
+  for (const s of SURFACES) {
+    const callbackPath = `${s.basePath}/callback`;
+    const linkPath = `${s.basePath}/link`;
+    const want = `${s.basePath}?mode=add-source&workspace=acme`;
+    const boom = async () => { throw new Error('boom'); };
+    const listReboundable = s.providerName === 'github' ? 'listReboundableRepos' : 'listReboundableBoards';
+    const listChoices = s.providerName === 'github' ? 'listRepos' : 'listBoards';
+    const cbSession = () => makeSession({
+      oauthState: 'live',
+      oauthIntent: { mode: 'add-source', provider: s.providerName, workspaceUrlKey: 'acme' },
+    });
+    const linkSession = (pending) => makeSession({
+      [s.pendingKey]: { mode: 'add-source', workspaceUrlKey: 'acme', ...pending },
+      githubHumanId: 'human-42',
+      workspaces: [{ id: 'ws-acme', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' }],
+      activeWorkspaceId: 'ws-acme',
+    });
+    const install = { state: 'live', installation_id: INSTALLATION_ID, setup_action: 'install' };
+    const SITES = [
+      [':325 error=', {}, () => get, { error: 'access_denied' }, cbSession],
+      [':377 state guard', {}, () => get, { state: 'wrong', installation_id: INSTALLATION_ID, setup_action: 'update' }, cbSession],
+      [':399 completeAuth', { completeAuth: boom }, () => get, { state: 'live', code: 'c' }, cbSession],
+      [':417 fetchViewer', { fetchViewer: boom }, () => get, { state: 'live', code: 'c' }, cbSession],
+      [':428 listReboundable', { [listReboundable]: boom }, () => get, { state: 'live', code: 'c' }, cbSession],
+      [':491 stateful request', {}, () => get, { state: 'live', setup_action: 'request' }, cbSession],
+      [':508 completeInstallation', { completeInstallation: boom }, () => get, install, cbSession],
+      [':520 listChoices', { [listChoices]: boom }, () => get, install, cbSession],
+      [':546 callback catch', {}, () => get, install, () => Object.assign(cbSession(), { save() { throw new Error('save boom'); } })],
+      [':569 link no pending', {}, () => post, {}, () => linkSession({})],
+      [':576 link invalid slug', {}, () => post, { [s.bodyField]: 'not a slug!!' }, () => linkSession({ token: 'ghs_inst' })],
+      [':593 link slug not in map', {}, () => post, { [s.bodyField]: s.newSlug }, () => linkSession({ rebind: true, [s.rebindMapKey]: {} })],
+      [':816 link catch', {}, () => post, { [s.bodyField]: s.newSlug }, () => linkSession({ token: 'ghs_inst', login: 'octocat', userId: '42', installationId: INSTALLATION_ID, tokenExpiresAt: 'not-a-date' })],
+    ];
+    for (const [site, overrides, verb, input, session] of SITES) {
+      test(`${s.basePath} retry site ${site}: actionUrl carries the add-source intent`, async () => {
+        const provider = { ...spyProvider(s.providerName), ...overrides };
+        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const path = verb() === post ? linkPath : callbackPath;
+        const res = await verb()(router, path, input, session());
+        assert.ok(res.body, `expected an error page, got ${res.statusCode} redirect=${res.redirectedTo}`);
+        assert.equal(actionUrlOf(res), want);
+      });
+    }
+  }
 });
