@@ -260,7 +260,7 @@ behaviour.
 **LIN-1040** (Reliability) and **LIN-1041** (Observability) are both still `Backlog`; neither appears in the
 registry. Five of this review's twelve dimensions — error handling, resilience, rate limits & pagination,
 idempotency & consistency (Reliability's remit) and observability (Observability's remit) — remain unowned by
-any systematic review, ~13 weeks on from baseline. This review names the gap; it does not build them.
+any systematic review, ~10 weeks on from baseline (2026-07-17). This review names the gap; it does not build them.
 
 ### R11 — `mod-scheduler`: the registered-job roster is not the full recurring-work set · **Impact: L · Effort: L · new**
 
@@ -521,9 +521,9 @@ Required self-checks this run:
 
 - **How many surfaces are stuck at Low confidence, and why?** Two carried: `mod-roadmap-trajectory`
   (Medium/Low, unchanged) and `mod-task-create` (Low/Medium, unchanged). New this run: `mod-secret-scan`
-  (Low-Medium — a CLI/CI-consumed module with no server-route read to deepen). Portfolio-wide, six of ten
-  aggregated dimensions remain Low because their owning sibling is ~13 weeks stale (R6), not a first-party
-  weakness. Read-side `periodicalId` presence remains unverifiable from source (R9).
+  (Low-Medium — a CLI/CI-consumed module with no server-route read to deepen).
+  Portfolio-wide, three of ten aggregated dimensions (auth & credentials, input & schema validation, testing) remain Low because their owning sibling is ~13 weeks stale (R6), not a first-party weakness; a fourth (security) shares a stale owner but holds Medium on H1's re-verification, and five more are unowned (R3).
+  Read-side `periodicalId` presence remains unverifiable from source (R9).
 - **Did a real finding elsewhere land on a surface this review had rated as done?** **Yes — twice.** (1)
   **LIN-2473** (Done) hit `flow-account-connection-workspace-credential`, which run 2 rated 4/High — the
   R5/R7-shaped scoring-model gap; corrected down to 3 this run (R13). (2) **LIN-2993** (Done, 2026-09-22)
