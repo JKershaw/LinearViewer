@@ -137,8 +137,15 @@ describe('email-transport', () => {
   });
 
   test('Resend: a hung request is aborted by the timeout and resolves { ok: false }', async () => {
+    // AbortSignal.timeout's timer is unref'd, so a hung fake request must hold
+    // the event loop open itself, as a real in-flight socket would; otherwise
+    // the runner can see an empty loop and cancel the test (Node 20, CI).
     const fetchImpl = (url, init) => new Promise((resolve, reject) => {
-      init.signal.addEventListener('abort', () => reject(init.signal.reason));
+      const inFlight = setInterval(() => {}, 1000);
+      init.signal.addEventListener('abort', () => {
+        clearInterval(inFlight);
+        reject(init.signal.reason);
+      });
     });
     const logger = recordingLogger();
     const transport = createResendTransport({ apiKey: KEY, from: FROM, fetchImpl, logger, timeoutMs: 20 });
