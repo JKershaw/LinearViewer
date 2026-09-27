@@ -32,14 +32,18 @@
  *   ARMS       1 | 2 | 3 | 12 | 123               (default 123)
  *   MODEL      incumbent model                    (default openai/gpt-5.4-mini)
  *   JEV_MODEL  Jev model                          (default typesafe/jev-1.13)
- *   DRY        1 = deterministic stub answers, no network (pipeline verification)
+ *   DRY        1 = deterministic stub answers, no network (pipeline verification). Writes to a
+ *                  temp dir unless OUT_DIR is set, so it can never overwrite the canonical
+ *                  scripts/eval/jev-routing-out artifacts.
  *   SELFTEST   1 = stub fetch + call the real getRecommendation once to verify recorder
  *                  correlation, then exit (no spend)
- *   OUT_DIR    output dir                          (default scripts/eval/jev-routing-out)
+ *   OUT_DIR    output dir                          (default scripts/eval/jev-routing-out;
+ *                  a temp dir for DRY runs when OUT_DIR is unset)
  *
  * Output: jev-routing-out/results.json + report.md (+ a compact stdout summary).
  */
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join } from 'path';
 import { getRecommendation, setLlmCallRecorder, setPromptTraceRecorder, setFetchImpl, DEFAULT_MODEL } from '../../lib/openrouter.js';
@@ -57,7 +61,18 @@ const K = Number(process.env.K || 3);
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const ARMS = process.env.ARMS || '123';
 const DRY = !!process.env.DRY;
-const OUT_DIR = process.env.OUT_DIR || join(HERE, 'jev-routing-out');
+
+/**
+ * Resolve the output directory. An explicit OUT_DIR always wins; otherwise a DRY run uses a
+ * temp dir so the advertised `DRY=1` pipeline check can never overwrite the canonical
+ * `scripts/eval/jev-routing-out` evidence, and a non-DRY run keeps its canonical default.
+ * Exported so the output-dir safety is unit-testable (LIN-3107 ledger item 9).
+ */
+export function resolveOutDir(dry, outDir, here = HERE) {
+  if (outDir) return outDir;
+  return dry ? join(tmpdir(), `jev-routing-dry-${process.pid}`) : join(here, 'jev-routing-out');
+}
+const OUT_DIR = resolveOutDir(DRY, process.env.OUT_DIR);
 const CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DECISIONS_URL = 'https://openrouter.ai/api/alpha/decisions';
 
@@ -331,7 +346,9 @@ async function armIncumbentDistilled(state, offerDefer) {
  */
 async function armIncumbentRaw(bundle, evalCallId, recorders) {
   if (DRY) {
-    // Simulate a recorder record so the correlation assertion is exercised in dry runs too.
+    // Stub arm-3 output: push one placeholder record per recorder kind so the run shape matches
+    // a live run. This branch RETURNS BEFORE the correlation assertion below, so it does NOT
+    // exercise that assertion; SELFTEST is the no-spend check that does.
     recorders.llm.push({ evalCallId, durationMs: 1, cost: 0 });
     recorders.trace.push({ evalCallId, metaPrompt: 'dry' });
     return { action: norm(bundle.__goldDry), deferTo: null, latencyMs: 1, cost: 0, inputTokens: 0, outputTokens: 0, promptChars: 0 };
@@ -740,7 +757,7 @@ function writeReport(r, corpus, path) {
   L.push('## Reproduce');
   L.push('```');
   L.push('OPENROUTER_API_KEY=<key> node scripts/eval/jev-routing-eval.mjs');
-  L.push('DRY=1 ONLY=LIN-571 node scripts/eval/jev-routing-eval.mjs   # no-network pipeline check');
+  L.push('DRY=1 ONLY=LIN-571 OUT_DIR=/tmp/jev-dry node scripts/eval/jev-routing-eval.mjs   # no-network pipeline check (non-canonical dir)');
   L.push('SELFTEST=1 node scripts/eval/jev-routing-eval.mjs            # recorder-correlation check, no spend');
   L.push('```');
   writeFileSync(path, L.join('\n') + '\n');

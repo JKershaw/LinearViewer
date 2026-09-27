@@ -147,6 +147,6 @@ Verb-override corpus: `GET https://harbour.cat/api/proxy/search?q=verb%20overrid
 ## Reproduce
 ```
 OPENROUTER_API_KEY=<key> node scripts/eval/jev-routing-eval.mjs
-DRY=1 ONLY=LIN-571 node scripts/eval/jev-routing-eval.mjs   # no-network pipeline check
+DRY=1 ONLY=LIN-571 OUT_DIR=/tmp/jev-dry node scripts/eval/jev-routing-eval.mjs   # no-network pipeline check (non-canonical dir)
 SELFTEST=1 node scripts/eval/jev-routing-eval.mjs            # recorder-correlation check, no spend
 ```

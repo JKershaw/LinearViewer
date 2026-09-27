@@ -10,8 +10,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildDistilledState, summarizeTrail } from './jev-routing-state.mjs';
-import { gradeAnswer, applyOverrides, loadCases, wilson, mcNemar, newcombeDifference, GOLD_OVERRIDES, assertNoServerImport } from './jev-routing-eval.mjs';
+import { gradeAnswer, applyOverrides, loadCases, wilson, mcNemar, newcombeDifference, GOLD_OVERRIDES, assertNoServerImport, resolveOutDir } from './jev-routing-eval.mjs';
 
 const STARTED = { name: 'In Progress', type: 'started' };
 const DONE = { name: 'Done', type: 'completed' };
@@ -153,6 +155,21 @@ test('fixture loader yields the full 66-strong widened population', () => {
 
 test('harness never imports server.js', () => {
   assert.equal(assertNoServerImport(), true);
+});
+
+test('output dir: DRY cannot default to the canonical jev-routing-out evidence', () => {
+  const here = '/repo/scripts/eval';
+  const canonical = join(here, 'jev-routing-out');
+  // Non-DRY default stays canonical.
+  assert.equal(resolveOutDir(false, undefined, here), canonical);
+  // DRY default must leave the canonical dir alone.
+  const dry = resolveOutDir(true, undefined, here);
+  assert.notEqual(dry, canonical);
+  assert.ok(dry.startsWith(tmpdir()), `dry default should be under tmpdir, got ${dry}`);
+  assert.ok(!dry.endsWith('jev-routing-out'), `dry default must not be the canonical dir, got ${dry}`);
+  // An explicit OUT_DIR always wins, DRY or not.
+  assert.equal(resolveOutDir(true, '/tmp/explicit', here), '/tmp/explicit');
+  assert.equal(resolveOutDir(false, '/tmp/explicit', here), '/tmp/explicit');
 });
 
 test('statistics: wilson bounds a proportion, McNemar/Newcombe behave on a known 2x2', () => {

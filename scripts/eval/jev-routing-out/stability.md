@@ -5,6 +5,12 @@ not fully deterministic; Jev exposes probabilities/confidence but samples an ans
 full widened-set runs were taken. The **K=5 run is canonical** (`results.json` / `report.md`);
 the two K=3 runs are recorded here as a stability check.
 
+**Provenance.** Only the canonical K=5 run has committed raw data (`results.json` / `report.md`,
+`dryRun:false`, K=5). The two K=3 rows below are **recorded summaries only** — their raw per-run
+results are not committed, so beyond the summary rows shown here they are not independently
+reproducible from this repo. They are a stability check on the decision-rule branch, not a second
+canonical run.
+
 | run | K | arm1 (Jev) | arm2 (incumbent+distilled) | arm3 (incumbent+raw) | arm1-vs-arm3 McNemar p | go/no-go |
 |---|---|---|---|---|---|---|
 | 1 | 3 | 132/198 (66.7%) | 133/198 (67.2%) | 158/198 (79.8%) | 0.006 | **NO-GO** (worse) |
@@ -20,6 +26,15 @@ agrees with the first K=3 run; the marginal K=3 pass does not survive more data.
 
 A consistent, more useful signal sits alongside the headline: **arm1 ≈ arm2** across all runs
 (K=5: 66.1% vs 65.5%, McNemar p = 0.579, Δ = +0.045 [−0.06, +0.149]). The incumbent *model* on
-the distilled state performs about as well as Jev on it; the incumbent's ~13-pt advantage comes
-from the **raw-state representation**, not from the model. Jev does not close that representation
-gap, so the routing-only split is not supported on this evidence.
+the distilled state performs about as well as Jev on it. But arms 2 and 3 differ in **two** ways
+at once — the state format (distilled vs raw) **and** the whole live routing procedure: arm 3's
+prompt carries `lib/prompts/meta-prompt-template.js`'s Steps 0–4 ("CRITICAL: Sequential Workflow
+Decision"), while arms 1 and 2 receive only the per-action `aiHint` criteria. Eight of the twelve
+cases where arm 1 missed and arm 3 hit are also arm-2 misses, and they are mostly Step-0/Step-1
+review and research-vs-plan calls — the missing procedure explains those as well as the state
+format does. This design therefore cannot separate a model-only from a representation-only from a
+procedure-only cause. The supported statement is narrower: the incumbent's ~13-pt advantage belongs
+to the **live meta-prompt package — raw state plus its Step 0–4 routing procedure — not the model**.
+Jev does not close that gap, so the routing-only split is not supported on this evidence. (A
+variant giving Jev the Step 0–4 procedure is untested and is John's call; only a GO would have
+opened that follow-up.)

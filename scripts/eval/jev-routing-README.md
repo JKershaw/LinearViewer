@@ -94,13 +94,36 @@ The fresh tracker-history class is bounded by one recorded query:
 implementation. Real, clean misses excluded by the cap (notably `LIN-812`'s own two
 2026-06-29 overrides) are named in their rows and the cap is disclosed.
 
+## Independent census and sensitivity disclosure
+
+The committed corpus is bounded by the 50-hit search cap, and that slice is **not** a random
+sample of the real class. An independent census (recorded on the ticket, 2026-09-26T22:43Z) swept
+**all 3,057 issues** (paged `GET /issues?limit=250`, each fetched with its comments) against an
+override-record regex and found **414 candidate comments across 295 issues**, of which **~105 are
+clean, contract-consistent real misses** under the same exclusion logic used here. The 50-hit
+corpus is therefore a capped, non-random slice of a larger class; 72 of the 105 clean misses are
+one pattern (the engine re-picked `implement`/`close-out` on work that had landed and was pinned to
+`review`).
+
+The census also flagged four ambiguous golds under contract rules added after their golds were
+written, which the canonical run does **not** regrade: **SYN-14** and **SYN-20** (approach settled
+but no files/surfaces pinned → Step 3 "no committed scope ⇒ never `implement`"); **SYN-10**
+(blocked stated by label, not relation → Step 2 detects blocked from the relationship); and
+**FIX-830-neg** (a one-session plan that writes proxy token values into the DOM/clipboard → gate
+(d) credential surfaces). A sensitivity regrade applying them — SYN-14 and SYN-20 → `[plan]`;
+LIN-830@implement accepting `implement` **or** `plan`; SYN-10 and FIX-830-neg dropped — yields
+**arm 1 63.4% vs arm 3 75.3%** (McNemar b=2, c=12, **p=0.016**). This is a **sensitivity check
+separate from the canonical 66-fixture result**; it **does not change the NO-GO conclusion**.
+
 ## Run
 
 ```sh
 OPENROUTER_API_KEY=... node scripts/eval/jev-routing-eval.mjs
 
-# no-network pipeline check (stub answers; exercises loading, overrides, grading, report):
-DRY=1 K=1 ONLY=LIN-571 node scripts/eval/jev-routing-eval.mjs
+# no-network pipeline check (stub answers; exercises loading, overrides, grading, report).
+# OUT_DIR points somewhere non-canonical; with OUT_DIR unset a DRY run uses a temp dir,
+# so the committed jev-routing-out/ evidence can never be overwritten:
+DRY=1 K=1 ONLY=LIN-571 OUT_DIR=/tmp/jev-dry node scripts/eval/jev-routing-eval.mjs
 
 # recorder-correlation check, no spend:
 SELFTEST=1 node scripts/eval/jev-routing-eval.mjs
@@ -117,7 +140,9 @@ Env knobs: `K` (default 3), `ONLY` (comma-separated id substrings), `ARMS` (`123
 
 ## Limitations
 
-- The verb-override corpus query is capped at 50 results; the true population may be larger.
+- The verb-override corpus query is capped at 50 results, so it is a non-random slice, not the
+  full population; an independent census measured ~105 clean misses across 295 issues from a
+  3,057-issue sweep (see the disclosure above).
 - `divergenceMarker` is an extractive lexical proxy for a semantic "a later finding refutes an
   earlier one" read, not a model summary.
 - The `defer` rule is an eval construct (above), not the live prompt-time contract.
