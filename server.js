@@ -57,6 +57,7 @@ import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from 
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
+import { ConnectionStore } from './lib/connection-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { createObserverPassRun } from './lib/observer-pass.js'
@@ -579,6 +580,16 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 // collection.
 const ownerCredentialsCollection = db.collection('owner-credentials')
 const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredentialsCollection })
+
+// Durable, write-only Connection record (LIN-3127, Session 1 of LIN-2149).
+// Dual-written alongside every existing binding/owner-credential write through
+// the shared writeConnection helper; no read path wired yet (LIN-3124 owns the
+// read cutover). No delete path this ticket — deletion is deferred whole to
+// LIN-3124 (see the module doc + the recorded obligation on that ticket).
+// Threaded into the flow-layer seams in a following change; instantiated here
+// first, next to ownerCredentialStore.
+const connectionsCollection = db.collection('connections')
+const connectionStore = new ConnectionStore({ collection: connectionsCollection })
 
 // Credential-lifecycle event log (LIN-2236, L5.1 of the LIN-2231 design):
 // durable, append-only record of refresh_skip/refresh_fail/refresh_success/
@@ -1184,7 +1195,7 @@ app.use((req, res, next) => {
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
@@ -1196,7 +1207,7 @@ for (const provider of getAllProviders()) {
 // per-provider (every provider router mounts at root too, so a per-provider
 // registration of these same paths would be shadowed by whichever router
 // mounts first).
-app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore }))
+app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
 app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
