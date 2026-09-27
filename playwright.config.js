@@ -52,7 +52,19 @@ export default defineConfig({
     // presence-only: inert unless NODE_ENV=test AND the var is set, so it is
     // strictly a test-only widening of the OAuth token/accessible-resources
     // call sites, never the authorize host or the REST-gateway guard.
-    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian node server.js',
+    //
+    // EMAIL_TRANSPORT=capture (LIN-1892): turns the email magic-link door on
+    // with the in-memory capture transport, so specs read sign-in links back
+    // from GET /test/email-outbox — nothing is ever sent. Like JIRA_* above it
+    // is inert outside NODE_ENV=test: lib/email-availability.js resolves
+    // `capture` only under test. Set on this command line, it beats a
+    // developer's .env (server.js runs `import 'dotenv/config'`, and dotenv
+    // never overrides a variable that is already set), so a local
+    // EMAIL_TRANSPORT=console can't switch Playwright to the console transport,
+    // and local Resend keys can't send real mail (capture wins over Resend).
+    // EMAIL_LINK_ORIGIN= (empty, which counts as unset) pins captured links to
+    // this server's own origin, whatever a developer's .env points it at.
+    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN= node server.js',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
