@@ -103,4 +103,5 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 - This file must stay ≤110 lines / ≤12,000 bytes (bytes binding); the `docs/architecture/` citations above must resolve to real content, not just to an existing file.
 - `ci-success` must be green on a PR before merging (it aggregates the unit and e2e jobs).
 - A PAT-mode session still supports OAuth if OAuth vars are configured; see `docs/architecture/auth.md`.
+- Workspace owner = its `role:'owner'` edge (first binder, LIN-1892); read via `getWorkspaceOwnerAccountId`. Not the credential-scope `ownerAccountId`; see `docs/architecture/auth.md`.
 - The scheduler's registered-job roster and the prompt-template count are hand-written in `docs/architecture/source-map.md`, but checked against source at test time, never trusted as written.

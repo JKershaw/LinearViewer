@@ -108,3 +108,31 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
   the free tier: workspaces with no stored preference keep getting `DEFAULT_MODEL`, so the
   two can diverge (e.g. a cheaper free tier than the paid default).
 
+
+### Workspace ownership (LIN-1892)
+
+A workspace's **owner** is its `role: 'owner'` edge in `account-workspaces`. It is
+written by `bindAccountToWorkspace` (`lib/account-workspace-store.js`), only for the edge
+that is both a fresh insert and the workspace's first edge by `(createdAt, _id)`; the
+`account_workspaces_one_owner` partial unique index (`lib/db-indexes.js`) keeps
+concurrent first binders to one. Read it with `getWorkspaceOwnerAccountId(workspaceId,
+accountStore)`, which resolves a merged owner to its survivor and returns `null` when there's
+no owner edge. This is unrelated to the credential-scope `ownerAccountId`.
+
+Workspaces bound before this landed get **no** owner automatically; assigning them is an
+operator decision (LIN-1892 Open decision 2). To see the numbers, run the read-only dry-run
+against the store (`MONGODB_URI`, else the MangoDB dir `HARBOUR_DATA_DIR`/`./data`):
+
+    node scripts/dry-run-workspace-ownership.mjs --s1-deployed-at 2026-10-01T00:00:00Z
+
+It prints a summary, then JSON:
+
+- (a) workspaces with one canonical account;
+- (b) workspaces with more than one;
+- (c) workspace ids seen in sessions with no edge. This is a lower bound, since sessions last 30 days;
+- (d) accounts with only local identities;
+- (e) workspaces first bound after the given deploy instant that still have no owner, i.e.
+  a crash between the insert and the owner mark. (e) is only computed with `--s1-deployed-at`.
+
+It uses only `find`/`countDocuments`, and never prints a session id, token or identity
+credential.
