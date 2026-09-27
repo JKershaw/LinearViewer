@@ -1707,6 +1707,10 @@ describe('GitHub auth routes', () => {
 
     const ws = session.workspaces.find(w => w.urlKey === 'octocat');
 
+    const afterStep1 = await connectionStore.collection.find({ accountId, provider: 'github', unitId: '99' }).toArray();
+    assert.equal(afterStep1.length, 1, 'new-container seam #6 wrote after step 1');
+    assert.equal(afterStep1[0].credentials.token, 'gho_a', 'step-1 record carries the step-1 token');
+
     // Step 2 — add-source bind of repo B on the SAME installation (99).
     session.githubHumanId = 'human-42';
     session.githubPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'octocat' };
