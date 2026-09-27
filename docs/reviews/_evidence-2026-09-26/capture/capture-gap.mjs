@@ -21,6 +21,8 @@
  *      a longer settle, plus every >=400 / failed request, so a stuck placeholder
  *      can be attributed to the test seam or to the product.
  *
+ *   7. `fullsweep` / `keep24` (impl beat 4): full <4.5:1 census both themes
+ *      (gap-full-sweep.json); one kept light full-page PNG per auth surface.
  *   6. `darksweep`: V1 blast radius — every authenticated surface in dark
  *      (writes gap-dark-sweep.json).
  *   5. `extra`: computed colour/font reads for the workspace-not-found link,
@@ -31,7 +33,7 @@
  *
  * Docs-only research tool; run with the keyless NODE_ENV=test server up:
  *   PLAYWRIGHT_BROWSERS_PATH=… BASE_URL=http://localhost:3199 \
- *     node docs/reviews/_evidence-2026-09-26/capture/capture-gap.mjs [archives|extra|darksweep]
+ *     node docs/reviews/_evidence-2026-09-26/capture/capture-gap.mjs [archives|extra|darksweep|fullsweep|keep24]
  */
 
 import { chromium } from 'playwright';
@@ -324,8 +326,80 @@ async function darkSweep(browser) {
   return out;
 }
 
+// `fullsweep` (impl beat 4, after the independent second-read): the full
+// census the beat-2 darksweep was not — every group under 4.5:1 (not just
+// under 3:1), on the same 24 authenticated surfaces, in BOTH themes. The light
+// pass closes the second-read's point that beat 1's light sweep reached only 8
+// surfaces (Swim/Swipe/Roadmap/Audit consume --yellow and were unmeasured).
+async function fullSweep(browser) {
+  const out = {};
+  for (const theme of ['light', 'dark']) {
+    for (const p of DARK_SWEEP) {
+      const { ctx, page, themeAssertion } = await open(browser, { path: ws(p) }, theme, D1400, { settleMs: p === '/dispatch' || p === '/collective' ? 4000 : 1200 });
+      const groups = await page.evaluate(SWEEP_JS);
+      out[`${p}--${theme}`] = { themeAssertion: themeAssertion.passed, groups: groups.map(g => ({ element: g.element, color: g.color, bg: g.bg, ratio: g.ratio, fontSize: g.fontSize, fontWeight: g.fontWeight, count: g.count, samples: g.samples })) };
+      await ctx.close();
+    }
+  }
+  return out;
+}
+
+// `keep24` (impl beat 4): one kept light 1400 full-page PNG per authenticated
+// surface that beat 2 viewed but did not keep, so every verdict is citable.
+const KEEP24 = { audit: '/audit', collective: '/collective', 'custom-prompts': '/prompts/custom', dashboard: '/dashboard',
+  'flight-companion': '/flight-companion', 'live-console': '/live-console', 'next-run': '/next-run', observation: '/observation',
+  'observation-session': '/observation/session/none', 'passage-planner': '/passage-planner', prompts: '/prompts', roadmap: '/roadmap',
+  'ship-biscuit': '/ship-biscuit', 'ship-journey': '/ship-journey', swim: '/swim', swipe: '/swipe', 'task-chat': '/task-chat',
+  'task-new': '/task/new', 'task-edit': '/task/123/edit' };
+const KEEP24_PROVIDERS = { 'github-tree': ['/test/set-github-session', '/workspace/github-workspace/'],
+  'ghp-tree': ['/test/set-github-projects-session', '/workspace/github-projects-workspace/'],
+  'jira-tree': ['/test/set-jira-session', '/workspace/jira-workspace/'], 'jira-settings': ['/test/set-jira-session', '/workspace/jira-workspace/settings'],
+  'local-roadmap': ['/test/set-local-session', '/workspace/local-workspace/roadmap'] };
+
+async function keep24(browser) {
+  const rows = [];
+  const jobs = [...Object.entries(KEEP24).map(([k, p]) => [k, SEED, ws(p)]), ...Object.entries(KEEP24_PROVIDERS).map(([k, [seed, p]]) => [k, seed, p])];
+  for (const [key, seed, p] of jobs) {
+    const ctx = await browser.newContext({ viewport: D1400 });
+    await ctx.addCookies([{ name: 'theme', value: 'light', url: BASE }]);
+    const page = await ctx.newPage();
+    await page.goto(`${BASE}${seed}`, { waitUntil: 'load' }).catch(() => {});
+    const r = await page.goto(`${BASE}${p}`, { waitUntil: 'load' }).catch(() => null);
+    await page.waitForTimeout(key === 'collective' ? 1500 : 800);
+    const state = await page.evaluate(() => {
+      const c = { h1: 0, h2: 0, h3: 0, h4: 0, h5: 0, h6: 0 };
+      document.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => c[h.tagName.toLowerCase()]++);
+      const de = document.documentElement;
+      return { title: document.title, htmlClass: de.className, headings: c, scrollWidth: de.scrollWidth, clientWidth: de.clientWidth, scrollHeight: de.scrollHeight };
+    });
+    const name = `${key}-light-1400px.fp`;
+    await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage: true });
+    await writeFile(path.join(OUT, `${name}.json`), JSON.stringify({ surface: key, theme: 'light', viewport: 1400, captureMode: 'fullPage', darkMode: 'cookie', status: r ? r.status() : null, url: p, ...state }, null, 2));
+    rows.push({ key, status: r ? r.status() : null, pixelHeight: state.scrollHeight, title: state.title, themeOk: !state.htmlClass.includes('theme-dark') });
+    await ctx.close();
+  }
+  return rows;
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  if (process.argv.includes('fullsweep')) {
+    const out = await fullSweep(browser);
+    await browser.close();
+    await writeFile(path.join(OUT, 'gap-full-sweep.json'), JSON.stringify({ note: 'Full AA census (every text group <4.5:1) on 24 authenticated app surfaces @1400, cookie light and cookie dark (theme asserted), composited backgrounds. Test-workspace seed, all flags on; Collective on mock Yap. Impl beat 4.', surfaces: out }, null, 2));
+    for (const [k, v] of Object.entries(out)) console.log(k, v.themeAssertion, v.groups.map(g => `${g.element}@${g.ratio}x${g.count}`).join(' | '));
+    return;
+  }
+  if (process.argv.includes('keep24')) {
+    const rows = await keep24(browser);
+    await browser.close();
+    const manifestPath = path.join(__dirname, 'manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    for (const r of rows) manifest[`${r.key}--light--1400px--fp`] = { surface: r.key, theme: 'light', viewport: 1400, captureMode: 'fullPage', darkMode: 'cookie', status: 'kept', pixelHeight: r.pixelHeight, source: 'capture/capture-gap.mjs keep24 (impl beat 4)' };
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
+    console.log(JSON.stringify(rows, null, 1));
+    return;
+  }
   if (process.argv.includes('darksweep')) {
     const out = await darkSweep(browser);
     await browser.close();

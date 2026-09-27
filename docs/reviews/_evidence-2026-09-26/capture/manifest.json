@@ -1014,7 +1014,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
+    "png": "superseded by swipe--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "swipe--light--390px": {
     "surface": "swipe",
@@ -1023,7 +1023,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe; a kept light 1400 full-page render of this surface is swipe--light--1400px--fp (impl beat 4)"
   },
   "swipe--dark--1400px": {
     "surface": "swipe",
@@ -1032,7 +1032,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe; a kept light 1400 full-page render of this surface is swipe--light--1400px--fp (impl beat 4)"
   },
   "swipe--dark--390px": {
     "surface": "swipe",
@@ -1041,7 +1041,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe; a kept light 1400 full-page render of this surface is swipe--light--1400px--fp (impl beat 4)"
   },
   "swim--light--1400px": {
     "surface": "swim",
@@ -1050,7 +1050,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
+    "png": "superseded by swim--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "swim--light--390px": {
     "surface": "swim",
@@ -1059,7 +1059,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim; a kept light 1400 full-page render of this surface is swim--light--1400px--fp (impl beat 4)"
   },
   "swim--dark--1400px": {
     "surface": "swim",
@@ -1068,7 +1068,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim; a kept light 1400 full-page render of this surface is swim--light--1400px--fp (impl beat 4)"
   },
   "swim--dark--390px": {
     "surface": "swim",
@@ -1077,7 +1077,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim; a kept light 1400 full-page render of this surface is swim--light--1400px--fp (impl beat 4)"
   },
   "ship--light--1400px": {
     "surface": "ship",
@@ -1158,7 +1158,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
+    "png": "superseded by roadmap--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "roadmap--light--390px": {
     "surface": "roadmap",
@@ -1167,7 +1167,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap; a kept light 1400 full-page render of this surface is roadmap--light--1400px--fp (impl beat 4)"
   },
   "roadmap--dark--1400px": {
     "surface": "roadmap",
@@ -1176,7 +1176,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap; a kept light 1400 full-page render of this surface is roadmap--light--1400px--fp (impl beat 4)"
   },
   "roadmap--dark--390px": {
     "surface": "roadmap",
@@ -1185,7 +1185,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap; a kept light 1400 full-page render of this surface is roadmap--light--1400px--fp (impl beat 4)"
   },
   "audit--light--1400px": {
     "surface": "audit",
@@ -1194,7 +1194,7 @@
     "status": "pruned — regenerable via capture/capture.mjs audit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit"
+    "png": "superseded by audit--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "audit--light--390px": {
     "surface": "audit",
@@ -1203,7 +1203,7 @@
     "status": "pruned — regenerable via capture/capture.mjs audit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit; a kept light 1400 full-page render of this surface is audit--light--1400px--fp (impl beat 4)"
   },
   "audit--dark--1400px": {
     "surface": "audit",
@@ -1221,7 +1221,7 @@
     "status": "pruned — regenerable via capture/capture.mjs audit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit; a kept light 1400 full-page render of this surface is audit--light--1400px--fp (impl beat 4)"
   },
   "settings--light--1400px": {
     "surface": "settings",
@@ -1266,7 +1266,7 @@
     "status": "pruned — regenerable via capture/capture.mjs prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts"
+    "png": "superseded by prompts--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "prompts--light--390px": {
     "surface": "prompts",
@@ -1275,7 +1275,7 @@
     "status": "pruned — regenerable via capture/capture.mjs prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts; a kept light 1400 full-page render of this surface is prompts--light--1400px--fp (impl beat 4)"
   },
   "prompts--dark--1400px": {
     "surface": "prompts",
@@ -1293,7 +1293,7 @@
     "status": "pruned — regenerable via capture/capture.mjs prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts; a kept light 1400 full-page render of this surface is prompts--light--1400px--fp (impl beat 4)"
   },
   "custom-prompts--light--1400px": {
     "surface": "custom-prompts",
@@ -1302,7 +1302,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
+    "png": "superseded by custom-prompts--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "custom-prompts--light--390px": {
     "surface": "custom-prompts",
@@ -1311,7 +1311,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts; a kept light 1400 full-page render of this surface is custom-prompts--light--1400px--fp (impl beat 4)"
   },
   "custom-prompts--dark--1400px": {
     "surface": "custom-prompts",
@@ -1320,7 +1320,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts; a kept light 1400 full-page render of this surface is custom-prompts--light--1400px--fp (impl beat 4)"
   },
   "custom-prompts--dark--390px": {
     "surface": "custom-prompts",
@@ -1329,7 +1329,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts; a kept light 1400 full-page render of this surface is custom-prompts--light--1400px--fp (impl beat 4)"
   },
   "dispatch--light--1400px": {
     "surface": "dispatch",
@@ -1410,7 +1410,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
+    "png": "superseded by observation--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "observation--light--390px": {
     "surface": "observation",
@@ -1419,7 +1419,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation; a kept light 1400 full-page render of this surface is observation--light--1400px--fp (impl beat 4)"
   },
   "observation--dark--1400px": {
     "surface": "observation",
@@ -1428,7 +1428,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation; a kept light 1400 full-page render of this surface is observation--light--1400px--fp (impl beat 4)"
   },
   "observation--dark--390px": {
     "surface": "observation",
@@ -1437,7 +1437,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation; a kept light 1400 full-page render of this surface is observation--light--1400px--fp (impl beat 4)"
   },
   "observation-session--light--1400px": {
     "surface": "observation-session",
@@ -1446,7 +1446,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
+    "png": "superseded by observation-session--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "observation-session--light--390px": {
     "surface": "observation-session",
@@ -1455,7 +1455,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session; a kept light 1400 full-page render of this surface is observation-session--light--1400px--fp (impl beat 4)"
   },
   "observation-session--dark--1400px": {
     "surface": "observation-session",
@@ -1464,7 +1464,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session; a kept light 1400 full-page render of this surface is observation-session--light--1400px--fp (impl beat 4)"
   },
   "observation-session--dark--390px": {
     "surface": "observation-session",
@@ -1473,7 +1473,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session; a kept light 1400 full-page render of this surface is observation-session--light--1400px--fp (impl beat 4)"
   },
   "dashboard--light--1400px": {
     "surface": "dashboard",
@@ -1482,7 +1482,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
+    "png": "superseded by dashboard--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "dashboard--light--390px": {
     "surface": "dashboard",
@@ -1491,7 +1491,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard; a kept light 1400 full-page render of this surface is dashboard--light--1400px--fp (impl beat 4)"
   },
   "dashboard--dark--1400px": {
     "surface": "dashboard",
@@ -1500,7 +1500,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard; a kept light 1400 full-page render of this surface is dashboard--light--1400px--fp (impl beat 4)"
   },
   "dashboard--dark--390px": {
     "surface": "dashboard",
@@ -1509,7 +1509,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard; a kept light 1400 full-page render of this surface is dashboard--light--1400px--fp (impl beat 4)"
   },
   "escalation-kpis--light--1400px": {
     "surface": "escalation-kpis",
@@ -1590,7 +1590,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
+    "png": "superseded by flight-companion--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "flight-companion--light--390px": {
     "surface": "flight-companion",
@@ -1599,7 +1599,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion; a kept light 1400 full-page render of this surface is flight-companion--light--1400px--fp (impl beat 4)"
   },
   "flight-companion--dark--1400px": {
     "surface": "flight-companion",
@@ -1608,7 +1608,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion; a kept light 1400 full-page render of this surface is flight-companion--light--1400px--fp (impl beat 4)"
   },
   "flight-companion--dark--390px": {
     "surface": "flight-companion",
@@ -1617,7 +1617,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion; a kept light 1400 full-page render of this surface is flight-companion--light--1400px--fp (impl beat 4)"
   },
   "live-console--light--1400px": {
     "surface": "live-console",
@@ -1626,7 +1626,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
+    "png": "superseded by live-console--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "live-console--light--390px": {
     "surface": "live-console",
@@ -1635,7 +1635,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console; a kept light 1400 full-page render of this surface is live-console--light--1400px--fp (impl beat 4)"
   },
   "live-console--dark--1400px": {
     "surface": "live-console",
@@ -1644,7 +1644,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console; a kept light 1400 full-page render of this surface is live-console--light--1400px--fp (impl beat 4)"
   },
   "live-console--dark--390px": {
     "surface": "live-console",
@@ -1653,7 +1653,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console; a kept light 1400 full-page render of this surface is live-console--light--1400px--fp (impl beat 4)"
   },
   "next-run--light--1400px": {
     "surface": "next-run",
@@ -1662,7 +1662,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
+    "png": "superseded by next-run--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "next-run--light--390px": {
     "surface": "next-run",
@@ -1671,7 +1671,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run; a kept light 1400 full-page render of this surface is next-run--light--1400px--fp (impl beat 4)"
   },
   "next-run--dark--1400px": {
     "surface": "next-run",
@@ -1680,7 +1680,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run; a kept light 1400 full-page render of this surface is next-run--light--1400px--fp (impl beat 4)"
   },
   "next-run--dark--390px": {
     "surface": "next-run",
@@ -1689,7 +1689,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run; a kept light 1400 full-page render of this surface is next-run--light--1400px--fp (impl beat 4)"
   },
   "passage-planner--light--1400px": {
     "surface": "passage-planner",
@@ -1698,7 +1698,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
+    "png": "superseded by passage-planner--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "passage-planner--light--390px": {
     "surface": "passage-planner",
@@ -1707,7 +1707,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner; a kept light 1400 full-page render of this surface is passage-planner--light--1400px--fp (impl beat 4)"
   },
   "passage-planner--dark--1400px": {
     "surface": "passage-planner",
@@ -1716,7 +1716,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner; a kept light 1400 full-page render of this surface is passage-planner--light--1400px--fp (impl beat 4)"
   },
   "passage-planner--dark--390px": {
     "surface": "passage-planner",
@@ -1725,7 +1725,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner; a kept light 1400 full-page render of this surface is passage-planner--light--1400px--fp (impl beat 4)"
   },
   "ship-biscuit--light--1400px": {
     "surface": "ship-biscuit",
@@ -1734,7 +1734,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "superseded by ship-biscuit--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "ship-biscuit--light--390px": {
     "surface": "ship-biscuit",
@@ -1743,7 +1743,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit; a kept light 1400 full-page render of this surface is ship-biscuit--light--1400px--fp (impl beat 4)"
   },
   "ship-biscuit--dark--1400px": {
     "surface": "ship-biscuit",
@@ -1752,7 +1752,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit; a kept light 1400 full-page render of this surface is ship-biscuit--light--1400px--fp (impl beat 4)"
   },
   "ship-biscuit--dark--390px": {
     "surface": "ship-biscuit",
@@ -1761,7 +1761,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit; a kept light 1400 full-page render of this surface is ship-biscuit--light--1400px--fp (impl beat 4)"
   },
   "ship-journey--light--1400px": {
     "surface": "ship-journey",
@@ -1770,7 +1770,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
+    "png": "superseded by ship-journey--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "ship-journey--light--390px": {
     "surface": "ship-journey",
@@ -1779,7 +1779,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey; a kept light 1400 full-page render of this surface is ship-journey--light--1400px--fp (impl beat 4)"
   },
   "ship-journey--dark--1400px": {
     "surface": "ship-journey",
@@ -1788,7 +1788,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey; a kept light 1400 full-page render of this surface is ship-journey--light--1400px--fp (impl beat 4)"
   },
   "ship-journey--dark--390px": {
     "surface": "ship-journey",
@@ -1797,7 +1797,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey; a kept light 1400 full-page render of this surface is ship-journey--light--1400px--fp (impl beat 4)"
   },
   "task-chat--light--1400px": {
     "surface": "task-chat",
@@ -1806,7 +1806,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
+    "png": "superseded by task-chat--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "task-chat--light--390px": {
     "surface": "task-chat",
@@ -1815,7 +1815,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat; a kept light 1400 full-page render of this surface is task-chat--light--1400px--fp (impl beat 4)"
   },
   "task-chat--dark--1400px": {
     "surface": "task-chat",
@@ -1824,7 +1824,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat; a kept light 1400 full-page render of this surface is task-chat--light--1400px--fp (impl beat 4)"
   },
   "task-chat--dark--390px": {
     "surface": "task-chat",
@@ -1833,7 +1833,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat; a kept light 1400 full-page render of this surface is task-chat--light--1400px--fp (impl beat 4)"
   },
   "task-new--light--1400px": {
     "surface": "task-new",
@@ -1842,7 +1842,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
+    "png": "superseded by task-new--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "task-new--light--390px": {
     "surface": "task-new",
@@ -1851,7 +1851,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new; a kept light 1400 full-page render of this surface is task-new--light--1400px--fp (impl beat 4)"
   },
   "task-new--dark--1400px": {
     "surface": "task-new",
@@ -1860,7 +1860,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new; a kept light 1400 full-page render of this surface is task-new--light--1400px--fp (impl beat 4)"
   },
   "task-new--dark--390px": {
     "surface": "task-new",
@@ -1869,7 +1869,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new; a kept light 1400 full-page render of this surface is task-new--light--1400px--fp (impl beat 4)"
   },
   "task-edit--light--1400px": {
     "surface": "task-edit",
@@ -1878,7 +1878,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
+    "png": "superseded by task-edit--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "task-edit--light--390px": {
     "surface": "task-edit",
@@ -1887,7 +1887,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit; a kept light 1400 full-page render of this surface is task-edit--light--1400px--fp (impl beat 4)"
   },
   "task-edit--dark--1400px": {
     "surface": "task-edit",
@@ -1896,7 +1896,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit; a kept light 1400 full-page render of this surface is task-edit--light--1400px--fp (impl beat 4)"
   },
   "task-edit--dark--390px": {
     "surface": "task-edit",
@@ -1905,7 +1905,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit; a kept light 1400 full-page render of this surface is task-edit--light--1400px--fp (impl beat 4)"
   },
   "collective--light--1400px": {
     "surface": "collective",
@@ -1914,7 +1914,7 @@
     "status": "pruned — regenerable via capture/capture.mjs collective",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective"
+    "png": "superseded by collective--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "collective--light--390px": {
     "surface": "collective",
@@ -1923,7 +1923,7 @@
     "status": "pruned — regenerable via capture/capture.mjs collective",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective; a kept light 1400 full-page render of this surface is collective--light--1400px--fp (impl beat 4)"
   },
   "collective--dark--1400px": {
     "surface": "collective",
@@ -1941,7 +1941,7 @@
     "status": "pruned — regenerable via capture/capture.mjs collective",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective; a kept light 1400 full-page render of this surface is collective--light--1400px--fp (impl beat 4)"
   },
   "local-tree--light--1400px": {
     "surface": "local-tree",
@@ -1986,7 +1986,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
+    "png": "superseded by local-roadmap--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "local-roadmap--light--390px": {
     "surface": "local-roadmap",
@@ -1995,7 +1995,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap; a kept light 1400 full-page render of this surface is local-roadmap--light--1400px--fp (impl beat 4)"
   },
   "local-roadmap--dark--1400px": {
     "surface": "local-roadmap",
@@ -2004,7 +2004,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap; a kept light 1400 full-page render of this surface is local-roadmap--light--1400px--fp (impl beat 4)"
   },
   "local-roadmap--dark--390px": {
     "surface": "local-roadmap",
@@ -2013,7 +2013,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap; a kept light 1400 full-page render of this surface is local-roadmap--light--1400px--fp (impl beat 4)"
   },
   "github-tree--light--1400px": {
     "surface": "github-tree",
@@ -2022,7 +2022,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
+    "png": "superseded by github-tree--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "github-tree--light--390px": {
     "surface": "github-tree",
@@ -2031,7 +2031,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree; a kept light 1400 full-page render of this surface is github-tree--light--1400px--fp (impl beat 4)"
   },
   "github-tree--dark--1400px": {
     "surface": "github-tree",
@@ -2040,7 +2040,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree; a kept light 1400 full-page render of this surface is github-tree--light--1400px--fp (impl beat 4)"
   },
   "github-tree--dark--390px": {
     "surface": "github-tree",
@@ -2049,7 +2049,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree; a kept light 1400 full-page render of this surface is github-tree--light--1400px--fp (impl beat 4)"
   },
   "ghp-tree--light--1400px": {
     "surface": "ghp-tree",
@@ -2058,7 +2058,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
+    "png": "superseded by ghp-tree--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "ghp-tree--light--390px": {
     "surface": "ghp-tree",
@@ -2067,7 +2067,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree; a kept light 1400 full-page render of this surface is ghp-tree--light--1400px--fp (impl beat 4)"
   },
   "ghp-tree--dark--1400px": {
     "surface": "ghp-tree",
@@ -2076,7 +2076,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree; a kept light 1400 full-page render of this surface is ghp-tree--light--1400px--fp (impl beat 4)"
   },
   "ghp-tree--dark--390px": {
     "surface": "ghp-tree",
@@ -2085,7 +2085,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree; a kept light 1400 full-page render of this surface is ghp-tree--light--1400px--fp (impl beat 4)"
   },
   "jira-tree--light--1400px": {
     "surface": "jira-tree",
@@ -2094,7 +2094,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
+    "png": "superseded by jira-tree--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "jira-tree--light--390px": {
     "surface": "jira-tree",
@@ -2103,7 +2103,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree; a kept light 1400 full-page render of this surface is jira-tree--light--1400px--fp (impl beat 4)"
   },
   "jira-tree--dark--1400px": {
     "surface": "jira-tree",
@@ -2112,7 +2112,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree; a kept light 1400 full-page render of this surface is jira-tree--light--1400px--fp (impl beat 4)"
   },
   "jira-tree--dark--390px": {
     "surface": "jira-tree",
@@ -2121,7 +2121,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree; a kept light 1400 full-page render of this surface is jira-tree--light--1400px--fp (impl beat 4)"
   },
   "jira-settings--light--1400px": {
     "surface": "jira-settings",
@@ -2130,7 +2130,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
+    "png": "superseded by jira-settings--light--1400px--fp (kept, impl beat 4, full page)"
   },
   "jira-settings--light--390px": {
     "surface": "jira-settings",
@@ -2139,7 +2139,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings; a kept light 1400 full-page render of this surface is jira-settings--light--1400px--fp (impl beat 4)"
   },
   "jira-settings--dark--1400px": {
     "surface": "jira-settings",
@@ -2148,7 +2148,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings; a kept light 1400 full-page render of this surface is jira-settings--light--1400px--fp (impl beat 4)"
   },
   "jira-settings--dark--390px": {
     "surface": "jira-settings",
@@ -2157,7 +2157,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings; a kept light 1400 full-page render of this surface is jira-settings--light--1400px--fp (impl beat 4)"
   },
   "err-merge-confirm--light--1400px": {
     "surface": "err-merge-confirm",
@@ -4944,5 +4944,245 @@
     "scrollHeight": 18136,
     "source": "capture/capture-gap.mjs archives (1.5s settle past the .reveal fade)"
   },
-  "_note_png_encoding": "All PNGs palette-quantised (256 colours, no dither) in impl beat 2 to hold the evidence budget; every colour/contrast number in the report comes from the paired JSON, never from PNG pixels."
+  "_note_png_encoding": "All PNGs palette-quantised (256 colours, no dither) in impl beat 2 to hold the evidence budget; every colour/contrast number in the report comes from the paired JSON, never from PNG pixels.",
+  "audit--light--1400px--fp": {
+    "surface": "audit",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "collective--light--1400px--fp": {
+    "surface": "collective",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1676,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "custom-prompts--light--1400px--fp": {
+    "surface": "custom-prompts",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "dashboard--light--1400px--fp": {
+    "surface": "dashboard",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "flight-companion--light--1400px--fp": {
+    "surface": "flight-companion",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1372,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "live-console--light--1400px--fp": {
+    "surface": "live-console",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1004,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "next-run--light--1400px--fp": {
+    "surface": "next-run",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "observation--light--1400px--fp": {
+    "surface": "observation",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "observation-session--light--1400px--fp": {
+    "surface": "observation-session",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "passage-planner--light--1400px--fp": {
+    "surface": "passage-planner",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1408,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "prompts--light--1400px--fp": {
+    "surface": "prompts",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 9317,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "roadmap--light--1400px--fp": {
+    "surface": "roadmap",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1179,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "ship-biscuit--light--1400px--fp": {
+    "surface": "ship-biscuit",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "ship-journey--light--1400px--fp": {
+    "surface": "ship-journey",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "swim--light--1400px--fp": {
+    "surface": "swim",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 2013,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "swipe--light--1400px--fp": {
+    "surface": "swipe",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "task-chat--light--1400px--fp": {
+    "surface": "task-chat",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "task-new--light--1400px--fp": {
+    "surface": "task-new",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1326,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "task-edit--light--1400px--fp": {
+    "surface": "task-edit",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "github-tree--light--1400px--fp": {
+    "surface": "github-tree",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "ghp-tree--light--1400px--fp": {
+    "surface": "ghp-tree",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "jira-tree--light--1400px--fp": {
+    "surface": "jira-tree",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "jira-settings--light--1400px--fp": {
+    "surface": "jira-settings",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 3785,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  },
+  "local-roadmap--light--1400px--fp": {
+    "surface": "local-roadmap",
+    "theme": "light",
+    "viewport": 1400,
+    "captureMode": "fullPage",
+    "darkMode": "cookie",
+    "status": "kept",
+    "pixelHeight": 1000,
+    "source": "capture/capture-gap.mjs keep24 (impl beat 4)"
+  }
 }

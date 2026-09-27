@@ -222,3 +222,5 @@ Theme/viewport/mode is `theme · width · captureMode`. "media" marks media-emul
 - **Scan-due** moves from "Settings tab, JSON-only" to "Observation tab, previously unmeasured, now rendered (empty state)" (C1).
 - The **dark-theme contrast** reading of Settings/Dispatch/Proxy changes from implied-pass (first-match JSON samples) to **fail** (C2/C3, V1/V2).
 - **D7-refined** gains a qualifier: the sign-off it counts as the colophon exists, but fails contrast (V3).
+
+**Reclassified after the independent second-read (impl beat 4):** the `tree--light--1400px` row's "◐ amber glyph + 'In Progress' header 2.27:1 … a pre-existing palette choice (§ advisory)" was wrong to set aside. The report then dropped it entirely. It is now **objective finding F8** (light-theme status/action colours used as text below AA, 16 of 24 auth surfaces; `gap-full-sweep.json`), follow-up **LIN-3123**.

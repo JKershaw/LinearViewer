@@ -1,0 +1,1203 @@
+{
+  "note": "Full AA census (every text group <4.5:1) on 24 authenticated app surfaces @1400, cookie light and cookie dark (theme asserted), composited backgrounds. Test-workspace seed, all flags on; Collective on mock Yap. Impl beat 4.",
+  "surfaces": {
+    "/--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "div.in-progress-header",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 1,
+          "samples": [
+            "▼ In Progress"
+          ]
+        },
+        {
+          "element": "span.status-pill__char",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 10,
+          "samples": [
+            "◐",
+            "◐",
+            "◐"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/swipe--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.swipe-arrow.swipe-arrow-left",
+          "color": "rgb(238, 238, 238)",
+          "bg": "rgb(248,249,250)",
+          "ratio": 1.1,
+          "fontSize": "15px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "←"
+          ]
+        },
+        {
+          "element": "span.swipe-accordion-toggle",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(248,249,250)",
+          "ratio": 3.55,
+          "fontSize": "9px",
+          "fontWeight": "600",
+          "count": 1,
+          "samples": [
+            "▶"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/swim--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(248,249,250)",
+          "ratio": 2.15,
+          "fontSize": "13px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "◐"
+          ]
+        },
+        {
+          "element": "span.swim-fc-prio.p3",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(248,249,250)",
+          "ratio": 2.15,
+          "fontSize": "11px",
+          "fontWeight": "700",
+          "count": 1,
+          "samples": [
+            "Medium"
+          ]
+        },
+        {
+          "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "13px",
+          "fontWeight": "400",
+          "count": 4,
+          "samples": [
+            "◐",
+            "◐",
+            "◐"
+          ]
+        },
+        {
+          "element": "span.swim-fc-prio.p3",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "11px",
+          "fontWeight": "700",
+          "count": 2,
+          "samples": [
+            "Medium",
+            "Medium"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/ship--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "13px",
+          "fontWeight": "400",
+          "count": 5,
+          "samples": [
+            "◐",
+            "◐",
+            "◐"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        },
+        {
+          "element": "button.ship-mode-btn.active",
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(13,148,136)",
+          "ratio": 3.74,
+          "fontSize": "11px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "project"
+          ]
+        }
+      ]
+    },
+    "/roadmap--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.status-pill__char",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.3,
+          "fontSize": "14.4px",
+          "fontWeight": "600",
+          "count": 8,
+          "samples": [
+            "✓",
+            "✓",
+            "✓"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/audit--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/settings--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.feature-note",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 2.12,
+          "fontSize": "12.8px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Recommended — the agent reaches the tracker throug"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 3,
+          "samples": [
+            "save",
+            "save model overrides",
+            "save dispatch defaults"
+          ]
+        },
+        {
+          "element": "button.action-btn.save.dispatch-preset-create-btn",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "save preset"
+          ]
+        },
+        {
+          "element": "button.action-btn.provider-add-btn",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "add",
+            "API token"
+          ]
+        },
+        {
+          "element": "span.toggle-state",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.3,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 16,
+          "samples": [
+            "● on",
+            "● on",
+            "● on"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/prompts--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.stat-separator",
+          "color": "rgb(238, 238, 238)",
+          "bg": "rgb(250,250,250)",
+          "ratio": 1.11,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "·",
+            "·"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/prompts/custom--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.save.custom-prompt-new-btn",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.3,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "+ new prompt"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/dispatch--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.save.dispatch-toggle",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Dispatch ▾"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "generate"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/proxy--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "generate"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(248,249,250)",
+          "ratio": 3.13,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "generate & copy"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/observation--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.obs-poll-status",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.3,
+          "fontSize": "12.8px",
+          "fontWeight": "600",
+          "count": 1,
+          "samples": [
+            "● live"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/dashboard--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.obs-poll-status",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.3,
+          "fontSize": "12.8px",
+          "fontWeight": "600",
+          "count": 1,
+          "samples": [
+            "● live"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/escalation-kpis--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/effort-readout--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/flight-companion--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.save.fc-start-btn",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "start"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "send",
+            "copy prompt"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/live-console--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        },
+        {
+          "element": "span.lc-section-mark",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "11.52px",
+          "fontWeight": "400",
+          "count": 3,
+          "samples": [
+            "▤",
+            "◐",
+            "≡"
+          ]
+        }
+      ]
+    },
+    "/next-run--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "p.next-run-warning",
+          "color": "rgb(255, 178, 36)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 1.68,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "⚠ AI is not configured on the server (connect Open"
+          ]
+        },
+        {
+          "element": "code",
+          "color": "rgb(255, 178, 36)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 1.68,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "OPENROUTER_API_KEY"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "generate suggestions"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/passage-planner--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "copy prompt"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/ship-biscuit--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "p.ship-biscuit-warning",
+          "color": "rgb(255, 178, 36)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 1.68,
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "⚠ AI is not configured on the server (connect Open"
+          ]
+        },
+        {
+          "element": "code",
+          "color": "rgb(255, 178, 36)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 1.68,
+          "fontSize": "16px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "OPENROUTER_API_KEY"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "run the presses"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/ship-journey--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/task-chat--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "ask"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/task/new--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        },
+        {
+          "element": "button.task-create-submit",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "15.2px",
+          "fontWeight": "600",
+          "count": 1,
+          "samples": [
+            "Create task"
+          ]
+        }
+      ]
+    },
+    "/collective--light": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "start discussion",
+            "say"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ]
+    },
+    "/--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/swipe--dark": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.swipe-arrow.swipe-arrow-left",
+          "color": "rgb(44, 49, 58)",
+          "bg": "rgb(22,24,29)",
+          "ratio": 1.36,
+          "fontSize": "15px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "←"
+          ]
+        }
+      ]
+    },
+    "/swim--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/ship--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/roadmap--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/audit--dark": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.audit-button",
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(110,168,254)",
+          "ratio": 2.42,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Run Audit"
+          ]
+        }
+      ]
+    },
+    "/settings--dark": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "make active",
+            "refresh / test"
+          ]
+        },
+        {
+          "element": "a.settings-action",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 12,
+          "samples": [
+            "open the discussion page",
+            "open the task chat page",
+            "open the radial view"
+          ]
+        }
+      ]
+    },
+    "/prompts--dark": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.stat-separator",
+          "color": "rgb(44, 49, 58)",
+          "bg": "rgb(22,24,28)",
+          "ratio": 1.36,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "·",
+            "·"
+          ]
+        },
+        {
+          "element": "a.stat-link",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(22,24,28)",
+          "ratio": 1.89,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "custom prompts →"
+          ]
+        }
+      ]
+    },
+    "/prompts/custom--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/dispatch--dark": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.dispatch-load-autopilot",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "load Autopilot",
+            "load Autopilot · stepped"
+          ]
+        },
+        {
+          "element": "button.action-btn.dispatch-continue-until-stopped",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "continue until stopped"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-pause",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Pause"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-stop",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Stop"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-resume",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Resume"
+          ]
+        },
+        {
+          "element": "a.settings-action.dispatch-preset-create-link",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "create a preset →"
+          ]
+        }
+      ]
+    },
+    "/proxy--dark": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.proxy-events-prev",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "11.56px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "prev"
+          ]
+        },
+        {
+          "element": "button.action-btn.proxy-events-next",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "11.56px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "next"
+          ]
+        }
+      ]
+    },
+    "/observation--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/dashboard--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/escalation-kpis--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/effort-readout--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/flight-companion--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/live-console--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/next-run--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/passage-planner--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/ship-biscuit--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/ship-journey--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/task-chat--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/task/new--dark": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/collective--dark": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.collective-preset-launch",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 6,
+          "samples": [
+            "launch",
+            "launch",
+            "launch"
+          ]
+        },
+        {
+          "element": "button.action-btn",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "add character",
+            "view prompt"
+          ]
+        }
+      ]
+    }
+  }
+}
