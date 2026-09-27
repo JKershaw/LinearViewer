@@ -14,7 +14,8 @@ const QUEUE_POLL_INTERVAL_MS = 1000
 // Proxy-toggle logic (state, token mint/cache, block append) now lives in a
 // single shared module: window.ProxyToggle in common.js (LIN-525 #7). The
 // copy/download/dispatch call sites below use the back-compat global
-// maybeAppendProxyBlock(text, urlKey) that common.js exposes.
+// maybeAppendProxyBlock(text, urlKey, opts) that common.js exposes; `opts.force`
+// forces the append (LIN-3079).
 
 /**
  * Strip markdown code block fences from prompt text.

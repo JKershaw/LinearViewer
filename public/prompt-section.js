@@ -140,10 +140,12 @@
 
   function renderFresh(state, opts) {
     const { name, html, reasoning, warning } = state.result;
-    // LIN-3079: an autopilot result is always forced, so its +proxy toggle would
-    // be inert — suppress it for that result only. The cluster is rebuilt on every
-    // render, so switching to another result restores the toggle.
-    const isForced = !!(state.result && state.result.kind === 'autopilot');
+    // LIN-3079 (review N1): key the suppression on the SAME `proxyForce` flag
+    // the force paths use (common.js dispatchPrompt, ProxyToggle.maybeAppend) —
+    // one source of truth. An autopilot entry sets it (:297); ordinary results
+    // do not. The cluster is rebuilt on every render, so switching to another
+    // result restores the toggle.
+    const isForced = !!(state.result && state.result.proxyForce);
     const actions = renderActionCluster(isForced ? { ...opts, proxyEnabled: false } : opts);
     const reasoningToggle = reasoning
       ? `<div class="swipe-reasoning-toggle" data-action="reasoning-toggle">\u25B8 reasoning</div>
