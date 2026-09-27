@@ -39,11 +39,12 @@ const REPO_SLUG_REGEX = /^[\w.-]+\/[\w.-]+$/
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @param {Object} [options.userPreferencesStore] - LIN-1353: rehydrates durable preferences (features, theme, OpenRouter key, north star) onto the fresh-login regenerated session, mirroring routes/auth.js.
+ * @param {Object} [options.connectionStore] - LIN-3127: optional write-only Connection store, dual-written after a successful link (best-effort; absent is a no-op).
  * @returns {Router} Express router
  */
-export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore } = {}) {
+export function createGitHubAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore } = {}) {
   return createGitHubInstallFlowRoutes({
-    sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore,
+    sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore,
 
     basePath: '/auth/github',
     providerOkKey: 'github',

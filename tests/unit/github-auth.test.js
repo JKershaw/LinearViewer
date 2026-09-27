@@ -27,6 +27,8 @@ import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountMergeLogStore } from '../../lib/account-merge-log.js';
 import { createAccountMergeRoutes } from '../../routes/account-merge.js';
+import { ConnectionStore } from '../../lib/connection-store.js';
+import { getWorkspaceCallScope, resolveIssueBinding } from '../../lib/workspace.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing (mintAppJwt)
 // runs for real against a valid PEM — generated, never on disk.
@@ -427,6 +429,7 @@ describe('GitHub auth routes', () => {
     return {
       accountStore: new AccountStore({ collection: db.collection('accounts') }),
       accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+      connectionStore: new ConnectionStore({ collection: db.collection('connections') }),
     };
   }
 
@@ -1677,6 +1680,90 @@ describe('GitHub auth routes', () => {
     assert.match(res.redirectedTo, /installations\/new\?state=real/, 'the install hop carries the same nonce');
     assert.equal(session.oauthState, 'real', 'the nonce survives for the return trip');
     assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github' });
+  });
+
+  // -------------------------------------------------------------------------
+  // LIN-3127 — the write-only Connection dual-write and its no-read-switch proof.
+  // -------------------------------------------------------------------------
+
+  // Acceptance witness, literally as the ticket writes it: a fresh account
+  // completes ONE install and binds TWO repos on that installation.
+  test('LIN-3127 witness: one install + two repos writes exactly one Connection record; reads are store-independent', async () => {
+    const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+
+    // Step 1 — fresh account, new-container login, repo A on installation 99.
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_a', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res1 = makeRes();
+    await handler({ body: { repo: 'octocat/repo-a' }, session }, res1);
+    assert.equal(res1.redirectedTo, '/workspace/octocat/');
+    const accountId = session.accountId;
+    assert.ok(accountId, 'the fresh account was established');
+
+    const ws = session.workspaces.find(w => w.urlKey === 'octocat');
+
+    // Step 2 — add-source bind of repo B on the SAME installation (99).
+    session.githubHumanId = 'human-42';
+    session.githubPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'octocat' };
+    session.activeWorkspaceId = 'github:42';
+    const res2 = makeRes();
+    await handler({ body: { repo: 'octocat/repo-b' }, session }, res2);
+    assert.equal(res2.redirectedTo, '/workspace/octocat/settings?provider_ok=github');
+
+    // Exactly ONE durable Connection record for (account, github, installationId),
+    // carrying the MOST RECENTLY written binding's credentials — a rebind mints a
+    // fresh token, so the record reflects whichever bound last (N8).
+    const all = await connectionStore.collection.find({ accountId, provider: 'github', unitId: '99' }).toArray();
+    assert.equal(all.length, 1, 'exactly one Connection record for the installation');
+    assert.equal(all[0]._id, `${accountId}::github::99`);
+    const expectedExpiry = Date.parse('2026-06-25T21:00:00Z');
+    assert.deepEqual(all[0].credentials, { installationId: '99', token: 'gho_b', tokenExpiresAt: expectedExpiry },
+      'the record equals the most recently written binding credentials');
+    // Same-unit sibling safety: repo B's write did not delete or duplicate the
+    // single record (no delete path ships in this ticket).
+    assert.equal(typeof connectionStore.delete, 'undefined');
+
+    // No read switch: with the Connection store's reads stubbed to throw,
+    // getWorkspaceCallScope/resolveIssueBinding are byte-identical. State is held
+    // fixed across the stub, so this isolates the Connection store — the binding
+    // mirror that moves the token between steps is upstream and pre-existing.
+    const scopeLive = getWorkspaceCallScope(ws);
+    const bindingLive = resolveIssueBinding(ws, 'github');
+    connectionStore.get = async () => { throw new Error('read path touched the Connection store'); };
+    connectionStore.collection.findOne = async () => { throw new Error('read path touched the connections collection'); };
+    assert.deepEqual(getWorkspaceCallScope(ws), scopeLive, 'getWorkspaceCallScope unchanged');
+    assert.deepEqual(resolveIssueBinding(ws, 'github'), bindingLive, 'resolveIssueBinding unchanged');
+    assert.equal(getWorkspaceCallScope(ws).token, 'gho_b', 'resolution is from the binding, not the store');
+  });
+
+  // Existing-container arm: a second repo re-added to an already-connected
+  // container upserts the same single record (covers the third GitHub write seam).
+  test('LIN-3127: a second repo on an existing container upserts the same single Connection record', async () => {
+    const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+
+    const existing = {
+      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      bindings: [{ provider: 'github', scope: 'octocat/repo-a', credentials: { installationId: '99', token: 'gho_a' } }],
+    };
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_b', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z' },
+      workspaces: [existing],
+    });
+    const res = makeRes();
+    await handler({ body: { repo: 'octocat/repo-b' }, session }, res);
+    assert.equal(res.redirectedTo, '/workspace/octocat/');
+
+    const all = await connectionStore.collection.find({ accountId: session.accountId, provider: 'github', unitId: '99' }).toArray();
+    assert.equal(all.length, 1, 'still exactly one Connection record for the installation');
+    assert.deepEqual(all[0].credentials, { installationId: '99', token: 'gho_b', tokenExpiresAt: Date.parse('2026-06-25T21:00:00Z') });
   });
 });
 

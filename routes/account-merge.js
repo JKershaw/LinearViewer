@@ -41,7 +41,7 @@ const MERGE_FAILURE_COPY = {
  * @param {Object} [options.userPreferencesStore] - LIN-2304: the confirm-completion step is now uniform across every provider (including Linear), so it needs the same preferences rehydration every non-conflict success path already performs.
  * @returns {Router}
  */
-export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore }) {
+export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }) {
   const router = Router()
 
   /**

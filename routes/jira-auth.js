@@ -151,7 +151,7 @@ export function deriveJiraUrlKey(site, existingWorkspaces = []) {
  * @param {Object} [options.userPreferencesStore] - LIN-1890 N1: rehydrates durable preferences onto the regenerated session of a `mode: 'new'` Jira login, mirroring routes/github-auth.js. `server.js`'s auth-mount loop has always passed this and `getAuthRouter` has always spread it through — this router simply dropped it on the floor until the bootstrap needed it.
  * @returns {import('express').Router}
  */
-export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore } = {}) {
+export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore, connectionStore } = {}) {
   const router = Router()
 
   const notConfigured = (res) => res.status(503).send(renderErrorPage(

@@ -25,6 +25,8 @@ import { createFakeGitHubProjectsClient } from '../../lib/providers/github-proje
 import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { ConnectionStore } from '../../lib/connection-store.js';
+import { getWorkspaceCallScope, resolveIssueBinding } from '../../lib/workspace.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing runs for real
 // against a valid PEM — generated, never on disk.
@@ -291,6 +293,7 @@ describe('GitHub Projects auth routes', () => {
     return {
       accountStore: new AccountStore({ collection: db.collection('accounts') }),
       accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+      connectionStore: new ConnectionStore({ collection: db.collection('connections') }),
     };
   }
 
@@ -1287,4 +1290,52 @@ describe('GitHub Projects auth routes', () => {
     assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github-projects' });
   });
 
+  // -------------------------------------------------------------------------
+  // LIN-3127 — write-only Connection dual-write (github-projects arm).
+  // -------------------------------------------------------------------------
+
+  test('LIN-3127 witness (github-projects): one install + two boards writes exactly one Connection record; reads are store-independent', async () => {
+    const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const handler = getHandler(router, 'post', '/auth/github-projects/link');
+
+    // Step 1 — fresh account, new-container login, board 5 on installation 99.
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubProjectsPending: { token: 'gho_a', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res1 = makeRes();
+    await handler({ body: { board: 'octocat/5' }, session }, res1);
+    assert.equal(res1.redirectedTo, '/workspace/octocat/');
+    const accountId = session.accountId;
+    assert.ok(accountId, 'the fresh account was established');
+
+    const ws = session.workspaces.find(w => w.urlKey === 'octocat');
+
+    // Step 2 — add-source bind of board 6 on the SAME installation (99).
+    session.githubHumanId = 'human-42';
+    session.githubProjectsPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'octocat' };
+    session.activeWorkspaceId = 'github:42';
+    const res2 = makeRes();
+    await handler({ body: { board: 'octocat/6' }, session }, res2);
+    assert.equal(res2.redirectedTo, '/workspace/octocat/settings?provider_ok=github-projects');
+
+    const all = await connectionStore.collection.find({ accountId, provider: 'github-projects', unitId: '99' }).toArray();
+    assert.equal(all.length, 1, 'exactly one Connection record for the installation');
+    assert.equal(all[0]._id, `${accountId}::github-projects::99`);
+    assert.deepEqual(all[0].credentials, {
+      installationId: '99',
+      token: 'gho_b',
+      tokenExpiresAt: Date.parse('2026-06-25T21:00:00Z')
+    }, 'the record equals the most recently written binding credentials');
+
+    // No read switch: reads are byte-identical with the store stubbed to throw.
+    const scopeLive = getWorkspaceCallScope(ws);
+    const bindingLive = resolveIssueBinding(ws, 'github-projects');
+    connectionStore.get = async () => { throw new Error('read path touched the Connection store'); };
+    connectionStore.collection.findOne = async () => { throw new Error('read path touched the connections collection'); };
+    assert.deepEqual(getWorkspaceCallScope(ws), scopeLive, 'getWorkspaceCallScope unchanged');
+    assert.deepEqual(resolveIssueBinding(ws, 'github-projects'), bindingLive, 'resolveIssueBinding unchanged');
+  });
 });
