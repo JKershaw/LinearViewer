@@ -5,12 +5,14 @@ import { test, expect } from '../fixtures/test-base.js';
 // bootstrap token is "supplied alongside this prompt (the +proxy block)", so with
 // the `proxy` feature flag ON the copy MUST force-append (feature-gated, no user
 // toggle), mirroring Passage Planner. With the flag OFF the copy is bare and no
-// mint is ever attempted (a mint would 403) — a recorded known residual, since the
-// route gates on `flightCompanion` alone.
+// mint is ever attempted (a mint would 403), and the page now surfaces a
+// degradation notice so the token-promising kickoff is never presented as
+// complete.
 //
-// The route redirects to /settings unless BOTH `flightCompanion` and `proxy`
-// feature flags are on (plan-review finding F3) — a spec that sets only one
-// would have every case redirect and pass vacuously.
+// The route gates on `flightCompanion` ALONE (routes/flight-companion.js:487) —
+// it does NOT require `proxy`. The proxy-off cases below genuinely render the
+// page; correcting an earlier header that wrongly claimed both flags were
+// required (review finding C2).
 
 let URL_KEY;
 const FEATS_ON = encodeURIComponent(JSON.stringify({ flightCompanion: true, proxy: true }));
@@ -94,6 +96,11 @@ test.describe('Flight Companion copy — feature-gated forced append', () => {
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toBe('__SENTINEL__');
   });
+
+  test('no proxy-off degradation notice renders when the feature is on', async ({ page }) => {
+    await openCompanion(page, FEATS_ON);
+    await expect(page.locator('#flight-companion-proxy-degraded')).toHaveCount(0);
+  });
 });
 
 test.describe('Flight Companion proxy gate — feature off', () => {
@@ -106,6 +113,14 @@ test.describe('Flight Companion proxy gate — feature off', () => {
 
     await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
     await expect(page.locator('body')).not.toHaveAttribute('data-proxy-feature', 'true');
+  });
+
+  test('renders the proxy-off degradation notice — the token-promising kickoff is not presented as complete (F1)', async ({ page }) => {
+    await openCompanion(page, FEATS_OFF);
+
+    const notice = page.locator('#flight-companion-proxy-degraded');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('workspace API access');
   });
 
   test('copy skips the mint entirely and copies the bare prompt when the proxy feature is off', async ({ page }) => {

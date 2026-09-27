@@ -34,6 +34,23 @@ describe('renderFlightCompanionPage — proxy feature gate', () => {
   });
 });
 
+// LIN-3079 review finding F1. buildFlightCompanionKickoff always promises a
+// bootstrap token "supplied alongside this prompt (the +proxy block)", but with
+// the proxy feature OFF the copy is bare (no block, no mint). The page must not
+// present that token-promising prompt as complete — it degrades explicitly,
+// mirroring the Passage Planner notice (lib/render-passage-planner.js:65-67).
+describe('renderFlightCompanionPage — LIN-3079 F1: proxy-off degradation notice', () => {
+  test('renders the degradation notice when the proxy feature is off', () => {
+    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: false } });
+    assert.ok(html.includes('id="flight-companion-proxy-degraded"'), 'expected the proxy-off degradation notice');
+  });
+
+  test('does NOT render the degradation notice when the proxy feature is on', () => {
+    const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
+    assert.ok(!html.includes('flight-companion-proxy-degraded'), 'the proxy-on page is complete');
+  });
+});
+
 describe('renderFlightCompanionPage — LIN-2435 Commit 2: chat-thread render + asset ordering', () => {
   const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
 
