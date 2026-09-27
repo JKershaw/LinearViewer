@@ -10,7 +10,10 @@
  *   - `lib/email-availability.js` has zero imports (a leaf, so the navbar and
  *     settings cycle members can import it without growing the cycle);
  *   - `lib/email-auth.js` and `lib/email-transport.js` import no cycle member,
- *     directly or transitively, and nothing beyond their planned imports.
+ *     directly or transitively, and nothing beyond their planned imports;
+ *   - no cycle member imports an email module other than the leaf predicate
+ *     (the router and renderers import downward into the cycle, which is
+ *     allowed, because nothing in the cycle imports them back).
  * It also runs the plan's Q15 sweep: only `lib/email-availability.js` and
  * `lib/email-transport.js` may read the four email environment variables.
  *
@@ -24,12 +27,13 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-// The new S2 modules. Beats 2–3 add routes/email-auth.js,
-// lib/render-email-auth.js and lib/render-account-home.js here.
+// The new S2 modules. Beat 3 adds lib/render-account-home.js here.
 const EMAIL_MODULES = [
   'lib/email-availability.js',
   'lib/email-transport.js',
   'lib/email-auth.js',
+  'routes/email-auth.js',
+  'lib/render-email-auth.js',
 ];
 
 // Q13 at 2c00dee3 (reproduced by verdict 0def5b66): the provider/auth SCC.
@@ -53,7 +57,8 @@ const PROVIDER_AUTH_SCC_Q13 = [
   'routes/jira-auth.js',
 ];
 
-const EMAIL_ENV_VARS = ['EMAIL_TRANSPORT', 'EMAIL_PROMPT_STEP', 'RESEND_API_KEY', 'EMAIL_FROM'];
+// Q15's four, plus EMAIL_LINK_ORIGIN (the link-origin guard added in beat 2).
+const EMAIL_ENV_VARS = ['EMAIL_TRANSPORT', 'EMAIL_PROMPT_STEP', 'RESEND_API_KEY', 'EMAIL_FROM', 'EMAIL_LINK_ORIGIN'];
 const EMAIL_ENV_READERS = ['lib/email-availability.js', 'lib/email-transport.js'];
 
 function listJsFiles(dir) {
@@ -168,6 +173,13 @@ describe('email import boundary (LIN-1892 N6)', () => {
     }
   });
 
+  test('no cycle member imports an email module (so none can be pulled into a cycle)', () => {
+    for (const member of cycleMembers) {
+      const imported = (graph.get(member) || []).filter(f => EMAIL_MODULES.includes(f) && f !== 'lib/email-availability.js');
+      assert.deepStrictEqual(imported, [], `${member} imports ${imported.join(', ')}`);
+    }
+  });
+
   test('every email module exists and is in no import cycle', () => {
     for (const file of EMAIL_MODULES) {
       assert.ok(existsSync(join(ROOT, file)), `${file} exists`);
@@ -190,8 +202,11 @@ describe('email import boundary (LIN-1892 N6)', () => {
     }
   });
 
-  test('no email module reaches a cycle member, directly or transitively', () => {
-    for (const file of EMAIL_MODULES) {
+  // The router and renderers may import DOWNWARD into the cycle (e.g.
+  // routes/email-auth.js → lib/account-conflict.js); no cycle member imports
+  // them, so they sit below it. The three lib/email-* modules may not.
+  test('the lib/email-* modules reach no cycle member, directly or transitively', () => {
+    for (const file of EMAIL_MODULES.filter(f => f.startsWith('lib/email-'))) {
       const reached = [...transitiveImports(graph, file)].filter(f => cycleMembers.has(f));
       assert.deepStrictEqual(reached, [], `${file} reaches cycle members`);
     }

@@ -18,6 +18,8 @@ import {
   isEmailSignInAvailable,
   resolvePromptStepMode,
   resolveEmailTransportRefusal,
+  resolveEmailLinkOrigin,
+  resolveEmailLinkOriginWarning,
 } from '../../lib/email-availability.js';
 import { createEmailTransport } from '../../lib/email-transport.js';
 
@@ -123,5 +125,30 @@ describe('email-availability', () => {
     assert.doesNotMatch(source, /^\s*import\b/m);
     assert.doesNotMatch(source, /\bimport\s*\(/);
     assert.doesNotMatch(source, /\brequire\s*\(/);
+  });
+});
+
+describe('email link origin (Host-header poisoning guard)', () => {
+  test('EMAIL_LINK_ORIGIN resolves to a bare http(s) origin, or null', () => {
+    assert.strictEqual(resolveEmailLinkOrigin({}), null);
+    assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: '' }), null);
+    assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'https://harbour.example' }), 'https://harbour.example');
+    assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'https://harbour.example/some/path?q=1' }), 'https://harbour.example', 'path and query dropped');
+    assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'http://localhost:3000' }), 'http://localhost:3000');
+    assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'javascript:alert(1)' }), null);
+    assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'not a url' }), null);
+  });
+
+  test('warns when links reach real inboxes (resend) with no origin, or when the origin is unusable', () => {
+    const resend = { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM };
+    assert.match(resolveEmailLinkOriginWarning(resend), /EMAIL_LINK_ORIGIN is not set/);
+    assert.strictEqual(resolveEmailLinkOriginWarning({ ...resend, EMAIL_LINK_ORIGIN: 'https://harbour.example' }), null);
+    assert.match(resolveEmailLinkOriginWarning({ EMAIL_LINK_ORIGIN: 'nope' }), /not an http\(s\) URL/);
+    assert.strictEqual(resolveEmailLinkOriginWarning({ EMAIL_TRANSPORT: 'console' }), null, 'dev: links only reach the log');
+    assert.strictEqual(resolveEmailLinkOriginWarning({}), null);
+  });
+
+  test('the origin does not affect availability (the matrix above is unchanged by it)', () => {
+    assert.strictEqual(isEmailSignInAvailable({ EMAIL_LINK_ORIGIN: 'https://harbour.example' }), false);
   });
 });

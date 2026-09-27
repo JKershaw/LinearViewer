@@ -22,6 +22,7 @@ import { MangoClient } from '@jkershaw/mangodb'
 import { ensureIndexes } from './lib/db-indexes.js'
 import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
+import { createSessionOptions, SESSION_TTL_SECONDS } from './lib/session-options.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
@@ -94,6 +95,10 @@ import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/j
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createAccountMergeRoutes } from './routes/account-merge.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
+import { createEmailAuthRoutes } from './routes/email-auth.js'
+import { createEmailTransport } from './lib/email-transport.js'
+import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
+import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning } from './lib/email-availability.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
@@ -191,8 +196,8 @@ if (process.env.LINEAR_ACCESS_TOKEN) {
 // =============================================================================
 // Constants
 // =============================================================================
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
-const SESSION_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// SESSION_TTL_SECONDS and the cookie maxAge live in lib/session-options.js
+// (LIN-1892 S2-2), shared with the tests that run real express-session.
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
 
 // =============================================================================
@@ -567,6 +572,19 @@ const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
 
+// Email magic-link sign-in (LIN-1892 S2). The transport exists exactly when
+// email sign-in is available (lib/email-availability.js — the one predicate;
+// this file reads none of the email variables itself, S2-4). Off by default
+// on every server, whatever NODE_ENV is.
+const emailTransport = createEmailTransport({ env: process.env })
+const magicLinkStore = new MagicLinkStore({ collection: db.collection(MAGIC_LINK_COLLECTION) })
+const emailLinkOrigin = resolveEmailLinkOrigin(process.env)
+console.log(`Email sign-in: ${resolveEmailTransportKind(process.env) || 'off'}`)
+const emailTransportRefusal = resolveEmailTransportRefusal(process.env)
+if (emailTransportRefusal) console.warn(`Warning: ${emailTransportRefusal}`)
+const emailLinkOriginWarning = resolveEmailLinkOriginWarning(process.env)
+if (emailLinkOriginWarning) console.warn(`Warning: ${emailLinkOriginWarning}`)
+
 // Durable owner-scoped Linear credential (LIN-1523, Session 1 of LIN-1501).
 // Additive-only in this session: dual-written alongside the session-only
 // credential (never instead of it) via persistOwnerCredential (OAuth
@@ -830,22 +848,11 @@ app.use(express.static('public'))
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json({ limit: '250kb' }))
 
-// Session middleware configuration:
-// - resave: false - don't save session if unmodified
-// - saveUninitialized: false - don't create session until something is stored
-// - secure cookies only in production (requires HTTPS)
-// - sameSite: 'lax' - CSRF protection (prevents cookies on cross-origin POST)
-app.use(session({
-  store: sessionStore,
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: SESSION_COOKIE_MAX_AGE_MS,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
-  }
-}))
+// Session middleware configuration: no resave, no session until something is
+// stored, secure cookies in production, sameSite 'lax'. The options object
+// comes from lib/session-options.js so the email login-CSRF tests run real
+// express-session with exactly these options (LIN-1892 S2-2).
+app.use(session(createSessionOptions({ store: sessionStore, secret: process.env.SESSION_SECRET })))
 
 // =============================================================================
 // Test Mode Setup
@@ -1208,6 +1215,8 @@ for (const provider of getAllProviders()) {
 // registration of these same paths would be shadowed by whichever router
 // mounts first).
 app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
+// LIN-1892 S2: the email magic-link door. Every route 503s when emailTransport is null.
+app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin }))
 app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
