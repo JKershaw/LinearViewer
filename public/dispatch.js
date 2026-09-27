@@ -171,6 +171,9 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
     // Custom prompts are not anchored to a Linear issue — opt out of the
     // issue-link contract explicitly. A loaded Autopilot kickoff carries an
     // explicit kind ('autopilot') and name so it's tagged as the meta-loop.
+    // LIN-3079: the autopilot kickoff promises a proxy token, so force the
+    // server-side attach for that kind only (the boundary F3: an edited/reloaded
+    // textarea clears dataset.kind, so it falls back to the ordinary toggle).
     await dispatchPrompt({
       urlKey,
       prompt,
@@ -181,7 +184,8 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       issueless: true,
       model,
       harness,
-      presetId
+      presetId,
+      proxyForce: kind === 'autopilot'
     })
 
     btn.textContent = 'dispatched!'
