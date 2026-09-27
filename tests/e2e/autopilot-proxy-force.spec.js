@@ -270,10 +270,12 @@ test.describe('LIN-3079 dispatch-page loaded Autopilot — forced dispatch', () 
 // after a successful dispatch, a favourite refill and a recent refill — and a
 // `.value =` assignment does NOT fire `input`, so the stale kind survived and
 // forced a `readWrite` bootstrap onto an ORDINARY prompt with the +proxy toggle
-// OFF. These are the two reviewed refill flows; both must send neither
-// `attachProxy` nor an Autopilot `kind`.
+// OFF. These cover the three reviewed setters — the favourite refill, the recent
+// refill and the post-dispatch clear — and each must send neither `attachProxy`
+// nor an Autopilot `kind`.
 test.describe('LIN-3079 dispatch-page refill — ordinary prompts stay toggle-driven (D1)', () => {
   const ORDINARY_PROMPT = 'ORDINARY review probe prompt - list open issues';
+  const ORDINARY_FAVOURITE = 'ORDINARY review favourite probe - list open issues';
 
   /** Fresh session, queue + recents cleared, one ordinary recent seeded, on /dispatch. */
   async function setupDispatchPageWithOrdinaryRecent(page) {
@@ -297,6 +299,23 @@ test.describe('LIN-3079 dispatch-page refill — ordinary prompts stay toggle-dr
     await page.locator('.dispatch-recents-container .queue-recent-item')
       .filter({ hasText: ORDINARY_PROMPT }).first().click();
     await expect(page.locator('.dispatch-prompt-input')).toHaveValue(ORDINARY_PROMPT);
+  }
+
+  /** Fresh session, favourites + queue cleared, one ordinary favourite seeded, on /dispatch. */
+  async function setupDispatchPageWithOrdinaryFavourite(page) {
+    await setSession(page);
+    await page.goto('/test/clear-favorite-prompts');
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
+    const seed = await page.request.post(`/workspace/${URL_KEY}/api/dispatch/favorite-prompts`, {
+      data: { prompt: ORDINARY_FAVOURITE },
+    });
+    expect(seed.ok()).toBeTruthy();
+
+    await page.goto(`/workspace/${URL_KEY}/dispatch`);
+    await page.waitForLoadState('networkidle');
+    await expect(
+      page.locator('.dispatch-favorites-container .queue-favorite-item').filter({ hasText: ORDINARY_FAVOURITE })
+    ).toBeVisible({ timeout: 10000 });
   }
 
   test('(a) load Autopilot then refill an ordinary recent — no attachProxy, no kind', async ({ page }) => {
@@ -351,6 +370,28 @@ test.describe('LIN-3079 dispatch-page refill — ordinary prompts stay toggle-dr
     expect(bodies[1].prompt).toBe(ORDINARY_PROMPT);
     expect(bodies[1].kind).toBeUndefined();
     expect(bodies[1].attachProxy).toBeUndefined();
+  });
+
+  test('(c) load Autopilot then refill an ordinary favourite — no attachProxy, no kind', async ({ page }) => {
+    await setupDispatchPageWithOrdinaryFavourite(page);
+
+    await page.locator('.dispatch-load-autopilot').first().click();
+    await expect(page.locator('.dispatch-prompt-input')).not.toHaveValue('', { timeout: 10000 });
+
+    await page.locator('.dispatch-favorites-container .queue-favorite-item')
+      .filter({ hasText: ORDINARY_FAVOURITE }).first().click();
+    await expect(page.locator('.dispatch-prompt-input')).toHaveValue(ORDINARY_FAVOURITE);
+
+    const bodies = captureDispatchBodies(page);
+    await page.locator('.dispatch-toggle').click();
+    const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
+    await dispatchBtn.click();
+    await expect(dispatchBtn).toHaveText('dispatched!', { timeout: 10000 });
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].prompt).toBe(ORDINARY_FAVOURITE);
+    expect(bodies[0].kind).toBeUndefined();
+    expect(bodies[0].attachProxy).toBeUndefined();
   });
 });
 
