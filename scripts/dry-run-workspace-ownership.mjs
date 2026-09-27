@@ -214,7 +214,7 @@ export async function computeOwnershipReport({ db, s1DeployedAt } = {}) {
     b_multiAccount: { count: multiAccount.length, rows: sortById(multiAccount) },
     c_sessionOnlyNoEdge: {
       count: sessionOnly.length,
-      caveat: 'lower bound: only workspaces in session rows still in the store; sessions expire after 30 days (server.js SESSION_TTL_SECONDS), so older session-only workspaces are not visible',
+      caveat: 'lower bound: only workspaces in session rows still in the store; sessions expire after 30 days (server.js SESSION_TTL_SECONDS), so older session-only workspaces are not visible; each is owned by its first binder once S1 is deployed, so only a pre-deploy run lists them all',
       rows: sortById(sessionOnly)
     },
     d_localOnlyAccounts: { count: localOnlyAccounts },

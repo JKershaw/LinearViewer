@@ -112,15 +112,21 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
 ### Workspace ownership (LIN-1892)
 
 A workspace's **owner** is its `role: 'owner'` edge in `account-workspaces`. It is
-written by `bindAccountToWorkspace` (`lib/account-workspace-store.js`), only for the edge
-that is both a fresh insert and the workspace's first edge by `(createdAt, _id)`; the
-`account_workspaces_one_owner` partial unique index (`lib/db-indexes.js`) keeps
-concurrent first binders to one. Read it with `getWorkspaceOwnerAccountId(workspaceId,
+written by `bindAccountToWorkspace` (`lib/account-workspace-store.js`), only for an edge
+that is a fresh insert and, when its own lookup runs, sorts first among the workspace's edges
+by `(createdAt, _id)`; the `account_workspaces_one_owner` partial unique index
+(`lib/db-indexes.js`) keeps concurrent first binders to one. Under a race the owner is
+whichever of them marks first, which need not be the earliest `createdAt` (it is stamped
+before the write lands). Read it with `getWorkspaceOwnerAccountId(workspaceId,
 accountStore)`, which resolves a merged owner to its survivor and returns `null` when there's
 no owner edge. This is unrelated to the credential-scope `ownerAccountId`.
 
-Workspaces bound before this landed get **no** owner automatically; assigning them is an
-operator decision (LIN-1892 Open decision 2). To see the numbers, run the read-only dry-run
+Workspaces that already have an edge when this lands get **no** owner automatically;
+assigning them is an operator decision (LIN-1892 Open decision 2). A workspace with **no**
+edge at all (seen only in sessions: the dry-run's bucket (c)) can't be told apart from a new
+one, so the first sign-in after deploy that binds it makes that account its owner, and it
+leaves bucket (c). Run the dry-run **before** deploying to see that population.
+To see the numbers, run the read-only dry-run
 against the store (`MONGODB_URI`, else the MangoDB dir `HARBOUR_DATA_DIR`/`./data`):
 
     node scripts/dry-run-workspace-ownership.mjs --s1-deployed-at 2026-10-01T00:00:00Z

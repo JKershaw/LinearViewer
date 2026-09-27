@@ -381,5 +381,31 @@ describe('account-workspace-store', () => {
       assert.strictEqual(await collection.countDocuments({ workspaceId, role: 'owner' }), 0);
       assert.strictEqual(await store.getWorkspaceOwnerAccountId(workspaceId, accountStore), null);
     });
+
+    test('a losing owner mark (E11000 from the owner index) is swallowed: the bind resolves with a plain edge and nothing is logged', async () => {
+      const logged = [];
+      const { collection, store } = await freshStoreWith({ logger: { error: (...args) => logged.push(args.join(' ')) } });
+      const workspaceId = randomUUID();
+
+      // An owner edge dated an hour ahead: the newcomer's fresh edge sorts
+      // first by createdAt, so it attempts the mark, and the index rejects it.
+      // Deterministic stand-in for a lost first-binder race (LIN-1892 F3).
+      await collection.insertOne({
+        _id: randomUUID(),
+        accountId: randomUUID(),
+        workspaceId,
+        createdAt: new Date(Date.now() + 60 * 60 * 1000),
+        role: 'owner'
+      });
+
+      const newcomer = randomUUID();
+      const edge = await store.bindAccountToWorkspace(newcomer, workspaceId);
+
+      assert.ok(!('role' in edge), 'the returned losing edge is plain');
+      const stored = await collection.findOne({ accountId: newcomer, workspaceId });
+      assert.ok(!('role' in stored), 'the stored losing edge is plain');
+      assert.strictEqual(await collection.countDocuments({ workspaceId, role: 'owner' }), 1);
+      assert.deepStrictEqual(logged, [], 'a duplicate-key loss is expected, not logged');
+    });
   });
 });
