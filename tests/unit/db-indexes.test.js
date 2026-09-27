@@ -190,6 +190,31 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the partial unique one-owner-per-workspace index on account-workspaces (LIN-1892)', () => {
+    const spec = INDEX_SPECS.find(s => s.options.name === 'account_workspaces_one_owner');
+    assert.ok(spec, 'expected an account_workspaces_one_owner spec');
+    assert.strictEqual(spec.collection, 'account-workspaces');
+    assert.deepStrictEqual(spec.keySpec, { workspaceId: 1, role: 1 });
+    assert.deepStrictEqual(spec.options, {
+      unique: true,
+      partialFilterExpression: { role: 'owner' },
+      name: 'account_workspaces_one_owner'
+    });
+    assert.ok(spec.reason, 'the spec carries a reason line');
+  });
+
+  test('no two account-workspaces specs share a key spec (LIN-1892 collision guard)', () => {
+    // MangoDB's createIndex early-returns on a matching keySpec whatever the
+    // options, so a second spec on an existing key (e.g. the owner index on
+    // plain `{workspaceId: 1}`) silently never builds there. Scoped to
+    // account-workspaces on purpose: `accounts` declares the same key twice
+    // by design (LIN-1338's unique spec plus the retained LIN-1327 one).
+    const keys = INDEX_SPECS
+      .filter(s => s.collection === 'account-workspaces')
+      .map(s => JSON.stringify(s.keySpec));
+    assert.deepStrictEqual(keys, [...new Set(keys)], `duplicate account-workspaces key spec in ${keys.join(', ')}`);
+  });
+
   test('unique option is honoured for tokenHash indexes', async () => {
     const db = freshDb();
     await ensureIndexes(db);
