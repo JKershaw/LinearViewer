@@ -128,7 +128,7 @@ JSON (identifier, title, state, labels, description, comments) was the `state`; 
 criteria were each action's `aiHint.situation` from `PROMPT_TEMPLATES`, with `defer` described
 by hand; "implementation" in a sidecar was read as "implement". A run is a hit when the returned
 `choice` is in `expect`. The refusal `noul` was read at 0.5. Per-run answers, probabilities,
-confidence, token usage, cost and latency are in `scripts/eval/jev-spike-out/results.json`;
+confidence, token usage, cost and latency are in `scripts/eval/jev-spike-out/results.json@6e8bf424`;
 no body text is stored there.
 
 ```sh
