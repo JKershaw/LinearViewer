@@ -9,7 +9,7 @@
 | **Method** | Fresh renders on a keyless `NODE_ENV=test` server (`:3199`), programmatic measurement (JSON beside every capture), **plus an image-capable read of every rendered surface** (§1.4). Both themes; dark comes from the real `theme` cookie, with `theme-dark` asserted in the same read. Viewports 1400 and 390, with 360/320 sweeps where geometry was in doubt. |
 | **Scope (not shrunk)** | **All 40 page-GET destinations** from the route table, the **7 archive pages** plus the `/archive/:n` 404 state, **all 9 experimental views**, and the **error/consent family** (merge confirm/reauth, 3 provider pickers, Jira link form, OpenRouter consent, workspace-not-found, 5 `renderUpstreamAwareErrorPage` branches, 3 raw callback failures). Research measured 70 surface keys in 376 captures, and every one of them is rendered. **Every surface was viewed as an image in this stage.** Surfaces with a kept PNG: 38 from research and beat 1, plus 10 kept from the 30-surface re-render in beat 2 (§1.4). |
 | **Evidence** | `docs/reviews/_evidence-2026-09-26/`, **7.9 MB**: 141 PNGs, 529 JSONs, `capture/manifest.json` (every key, with `status` for kept or pruned), the capture tools, `visual-pass.md` (a per-image record of 137 PNGs), `gap-contrast-sweep.json`, `gap-dark-sweep.json`, `gap-extra-probe.json`, `lighthouse-cold.json` |
-| **Result** | **31 findings: 7 objective breakage, 24 advisory** (§2 and §3). All three named re-measures **hold** (§5). **The top finding is new this run and is visual-only**: in dark theme the Workspace Halt Pause / Stop / Resume render black on a near-black card at 1.35:1 (§2 F1). Follow-up candidates: **3** (§9, minted in the next stage after a duplicate check). |
+| **Result** | **31 findings: 7 objective breakage, 24 advisory** (§2 and §3). All three named re-measures **hold** (§5). **The top finding is new this run and is visual-only**: in dark theme the Workspace Halt Pause / Stop / Resume render black on a near-black card at 1.35:1 (§2 F1). Follow-ups minted: **3**: LIN-3119, LIN-3120, LIN-3121 (§9, each dup-checked immediately before minting). |
 
 > **Review-only.** No product code, stylesheet, config or document under review was modified. This report and its evidence directory are the only artifacts committed.
 
@@ -323,17 +323,17 @@ Per the brief, these were captured live, and the gap is **handed to the test/cod
 
 ---
 
-## 9. Follow-up candidates (≤ 3, objective breakage only)
+## 9. Follow-ups minted: 3 (at the cap)
 
-These are drafted here and **minted in the next stage**. Each is dup-checked immediately before minting via `/api/proxy/search` and `/relations`. Cite-only IDs are never re-minted.
+All three are objective breakage. Each is left in its default state (**Backlog**), unassigned, with a `related` link to LIN-3101. The duplicate check was re-run **immediately before minting** (2026-09-27): `/api/proxy/search` on the concept and on the file/selector, plus `/api/proxy/issues/LIN-3101/relations`, which was empty. No cite-only ID was re-minted.
 
-| rank | finding | proposed scope | dup-check status |
-|---|---|---|---|
-| 1 | **F1**: dark-theme unthemed `.action-btn` / `.settings-action` / `.stat-link` (incl. Workspace Halt Pause/Stop/Resume, 1.35:1) | give `.action-btn` a themed `color`, style `a.settings-action` / `a.stat-link` from tokens, fix the `.audit-button` dark fill; add the bare variants to `/styleguide` | beat-1 search: **none found**. Re-check before minting. |
-| 2 | **F2**: `/ship` and `/workspace/:urlKey/ship` render zero headings | a real page `<h1>` (visually hidden if the radial must stay chromeless) + a non-bare `<title>` | **LIN-266** is related, not exact. Verify before minting. |
-| 3 | **F3**: upstream error prose contradicts its diagnostic on 5xx/429 | branch the sentence on the classified code | research search: **none**. Re-check before minting. |
+| ticket | finding | dup-check result |
+|---|---|---|
+| **LIN-3119** | **F1**: in dark theme, bare `.action-btn` / `a.settings-action` / `a.stat-link` render UA black or blue on the dark card. This includes Workspace Halt Pause/Stop/Resume at 1.35:1, on 6 of 24 auth surfaces. | Searched "action-btn", "settings-action", "common-actions", "dark theme contrast", "dark mode button", "unstyled button dark", "Workspace Halt", "halt pause stop resume". **No existing ticket names these controls.** Adjacent, different elements: LIN-738 (`+proxy` toggle, Done), LIN-2251 (escalation-KPI `<select>`, Done), LIN-2222 (`.login-button-jira`), LIN-2711 (Scan-due bulk-bar classes with no CSS), LIN-3074 (halt *copy*, not contrast). |
+| **LIN-3120** | **F2**: `/ship` and `/workspace/:urlKey/ship` render zero headings, with a bare `<title>` | Searched "ship heading(s)", "render-ship", "ship accessibility", "ship title". **LIN-266 (Canceled) was read in full.** It concerns the Ship view's nautical *heading* label convention (north-star tagging), not HTML heading elements, so it is **not a duplicate**. LIN-2401 (Done) covered `render-pages.js` only. |
+| **LIN-3121** | **F3**: upstream error prose contradicts its own diagnostic on 5xx/429 | Searched "renderUpstreamAwareErrorPage", "connection closed before it responded", "upstream error copy", "rate-limited error page", "503 error page", "Trouble Reaching Linear". **None names the copy contradiction.** LIN-2351 and LIN-2363 concern "Linear" naming in the proxy and autopilot, which is F5's class, not this. |
 
-**Next in line, not minted (cap):** F4 (UA controls on the consent family), F5 (error renderer says "Linear"), F6 (archive sign-off contrast). **Cite-only:** F7 → LIN-739 / LIN-849. LIN-2402's guard → LIN-2491.
+**Next in line, not minted (cap):** F4 (UA controls on the consent family), F5 (error renderer says "Linear"; LIN-2351/2354/2370/2371/561 don't reach `render-pages.js`), F6 (archive sign-off contrast). **Cite-only:** F7 → LIN-739 / LIN-849. LIN-2402's guard → LIN-2491.
 
 ---
 
