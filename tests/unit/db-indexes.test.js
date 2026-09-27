@@ -26,6 +26,13 @@ const EXCLUDED_COLLECTIONS = [
   'run-summary-cache',
   'session-summary-cache',
   'brief-cache',
+  // connections (LIN-3127): a pure composite-`_id` point lookup/upsert
+  // (`${accountId}::${provider}::${unitId}`), served by the automatic `_id_`
+  // index — deliberately NOT indexed via INDEX_SPECS. This entry is the
+  // enforcement for that decision: it relies on THIS test staying red until
+  // the exclusion lands, not on manual review, to catch a future contributor
+  // adding an INDEX_SPECS entry here.
+  'connections',
   // scheduler-locks (LIN-2128): the plan relies on THIS test staying red until
   // the exclusion lands, not on manual review, to catch a future contributor
   // adding an INDEX_SPECS entry here (plan-review F2; PR #1149 review F-B).

@@ -57,6 +57,7 @@ import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from 
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
+import { ConnectionStore } from './lib/connection-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { createObserverPassRun } from './lib/observer-pass.js'
@@ -579,6 +580,16 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 // collection.
 const ownerCredentialsCollection = db.collection('owner-credentials')
 const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredentialsCollection })
+
+// Durable, write-only Connection record (LIN-3127, Session 1 of LIN-2149).
+// Dual-written alongside every existing binding/owner-credential write through
+// the shared writeConnection helper; no read path wired yet (LIN-3124 owns the
+// read cutover). No delete path this ticket — deletion is deferred whole to
+// LIN-3124 (see the module doc + the recorded obligation on that ticket).
+// Threaded into the flow-layer seams in a following change; instantiated here
+// first, next to ownerCredentialStore.
+const connectionsCollection = db.collection('connections')
+const connectionStore = new ConnectionStore({ collection: connectionsCollection })
 
 // Credential-lifecycle event log (LIN-2236, L5.1 of the LIN-2231 design):
 // durable, append-only record of refresh_skip/refresh_fail/refresh_success/
