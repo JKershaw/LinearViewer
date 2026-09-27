@@ -75,19 +75,19 @@
     "surface": "swipe-public",
     "theme": "light",
     "viewport": 1400,
-    "status": "pruned — regenerable via capture/capture.mjs swipe-public",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "swipe-public--light--390px": {
     "surface": "swipe-public",
     "theme": "light",
     "viewport": 390,
-    "status": "pruned — regenerable via capture/capture.mjs swipe-public",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "swipe-public--light--360px": {
     "surface": "swipe-public",
@@ -96,7 +96,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--light--320px": {
     "surface": "swipe-public",
@@ -105,7 +105,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--1400px": {
     "surface": "swipe-public",
@@ -114,7 +114,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--390px": {
     "surface": "swipe-public",
@@ -123,7 +123,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--360px": {
     "surface": "swipe-public",
@@ -132,7 +132,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe-public"
   },
   "swipe-public--dark--320px": {
     "surface": "swipe-public",
@@ -141,16 +141,16 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe-public"
   },
   "swim-public--light--1400px": {
     "surface": "swim-public",
     "theme": "light",
     "viewport": 1400,
-    "status": "pruned — regenerable via capture/capture.mjs swim-public",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "swim-public--light--390px": {
     "surface": "swim-public",
@@ -159,7 +159,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--light--360px": {
     "surface": "swim-public",
@@ -168,7 +168,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--light--320px": {
     "surface": "swim-public",
@@ -177,7 +177,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--1400px": {
     "surface": "swim-public",
@@ -186,7 +186,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--390px": {
     "surface": "swim-public",
@@ -195,7 +195,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--360px": {
     "surface": "swim-public",
@@ -204,7 +204,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim-public"
   },
   "swim-public--dark--320px": {
     "surface": "swim-public",
@@ -213,7 +213,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim-public",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim-public"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim-public"
   },
   "ship-public--light--1400px": {
     "surface": "ship-public",
@@ -294,16 +294,16 @@
     "status": "pruned — regenerable via capture/capture.mjs privacy",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs privacy"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs privacy"
   },
   "privacy--light--390px": {
     "surface": "privacy",
     "theme": "light",
     "viewport": 390,
-    "status": "pruned — regenerable via capture/capture.mjs privacy",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs privacy"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "privacy--dark--1400px": {
     "surface": "privacy",
@@ -312,7 +312,7 @@
     "status": "pruned — regenerable via capture/capture.mjs privacy",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs privacy"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs privacy"
   },
   "privacy--dark--390px": {
     "surface": "privacy",
@@ -321,7 +321,7 @@
     "status": "pruned — regenerable via capture/capture.mjs privacy",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs privacy"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs privacy"
   },
   "terms--light--1400px": {
     "surface": "terms",
@@ -330,7 +330,7 @@
     "status": "pruned — regenerable via capture/capture.mjs terms",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs terms"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs terms"
   },
   "terms--light--390px": {
     "surface": "terms",
@@ -339,7 +339,7 @@
     "status": "pruned — regenerable via capture/capture.mjs terms",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs terms"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs terms"
   },
   "terms--dark--1400px": {
     "surface": "terms",
@@ -348,7 +348,7 @@
     "status": "pruned — regenerable via capture/capture.mjs terms",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs terms"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs terms"
   },
   "terms--dark--390px": {
     "surface": "terms",
@@ -357,7 +357,7 @@
     "status": "pruned — regenerable via capture/capture.mjs terms",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs terms"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs terms"
   },
   "styleguide--light--1400px": {
     "surface": "styleguide",
@@ -399,19 +399,19 @@
     "surface": "templates",
     "theme": "light",
     "viewport": 1400,
-    "status": "pruned — regenerable via capture/capture.mjs templates",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs templates"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "templates--light--390px": {
     "surface": "templates",
     "theme": "light",
     "viewport": 390,
-    "status": "pruned — regenerable via capture/capture.mjs templates",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs templates"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "templates--dark--1400px": {
     "surface": "templates",
@@ -420,7 +420,7 @@
     "status": "pruned — regenerable via capture/capture.mjs templates",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs templates"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs templates"
   },
   "templates--dark--390px": {
     "surface": "templates",
@@ -429,16 +429,16 @@
     "status": "pruned — regenerable via capture/capture.mjs templates",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs templates"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs templates"
   },
   "kpis--light--1400px": {
     "surface": "kpis",
     "theme": "light",
     "viewport": 1400,
-    "status": "pruned — regenerable via capture/capture.mjs kpis",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs kpis"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "kpis--light--390px": {
     "surface": "kpis",
@@ -447,7 +447,7 @@
     "status": "pruned — regenerable via capture/capture.mjs kpis",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs kpis"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs kpis"
   },
   "kpis--dark--1400px": {
     "surface": "kpis",
@@ -456,7 +456,7 @@
     "status": "pruned — regenerable via capture/capture.mjs kpis",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs kpis"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs kpis"
   },
   "kpis--dark--390px": {
     "surface": "kpis",
@@ -465,7 +465,7 @@
     "status": "pruned — regenerable via capture/capture.mjs kpis",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs kpis"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs kpis"
   },
   "archive-1--light--1400px": {
     "surface": "archive-1",
@@ -1014,7 +1014,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
   },
   "swipe--light--390px": {
     "surface": "swipe",
@@ -1023,7 +1023,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
   },
   "swipe--dark--1400px": {
     "surface": "swipe",
@@ -1032,7 +1032,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
   },
   "swipe--dark--390px": {
     "surface": "swipe",
@@ -1041,7 +1041,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swipe",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swipe"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swipe"
   },
   "swim--light--1400px": {
     "surface": "swim",
@@ -1050,7 +1050,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
   },
   "swim--light--390px": {
     "surface": "swim",
@@ -1059,7 +1059,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
   },
   "swim--dark--1400px": {
     "surface": "swim",
@@ -1068,7 +1068,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
   },
   "swim--dark--390px": {
     "surface": "swim",
@@ -1077,7 +1077,7 @@
     "status": "pruned — regenerable via capture/capture.mjs swim",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs swim"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs swim"
   },
   "ship--light--1400px": {
     "surface": "ship",
@@ -1158,7 +1158,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
   },
   "roadmap--light--390px": {
     "surface": "roadmap",
@@ -1167,7 +1167,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
   },
   "roadmap--dark--1400px": {
     "surface": "roadmap",
@@ -1176,7 +1176,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
   },
   "roadmap--dark--390px": {
     "surface": "roadmap",
@@ -1185,7 +1185,7 @@
     "status": "pruned — regenerable via capture/capture.mjs roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs roadmap"
   },
   "audit--light--1400px": {
     "surface": "audit",
@@ -1194,7 +1194,7 @@
     "status": "pruned — regenerable via capture/capture.mjs audit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs audit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit"
   },
   "audit--light--390px": {
     "surface": "audit",
@@ -1203,16 +1203,16 @@
     "status": "pruned — regenerable via capture/capture.mjs audit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs audit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit"
   },
   "audit--dark--1400px": {
     "surface": "audit",
     "theme": "dark",
     "viewport": 1400,
-    "status": "pruned — regenerable via capture/capture.mjs audit",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs audit"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "audit--dark--390px": {
     "surface": "audit",
@@ -1221,7 +1221,7 @@
     "status": "pruned — regenerable via capture/capture.mjs audit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs audit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs audit"
   },
   "settings--light--1400px": {
     "surface": "settings",
@@ -1266,7 +1266,7 @@
     "status": "pruned — regenerable via capture/capture.mjs prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts"
   },
   "prompts--light--390px": {
     "surface": "prompts",
@@ -1275,16 +1275,16 @@
     "status": "pruned — regenerable via capture/capture.mjs prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts"
   },
   "prompts--dark--1400px": {
     "surface": "prompts",
     "theme": "dark",
     "viewport": 1400,
-    "status": "pruned — regenerable via capture/capture.mjs prompts",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs prompts"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "prompts--dark--390px": {
     "surface": "prompts",
@@ -1293,7 +1293,7 @@
     "status": "pruned — regenerable via capture/capture.mjs prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs prompts"
   },
   "custom-prompts--light--1400px": {
     "surface": "custom-prompts",
@@ -1302,7 +1302,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
   },
   "custom-prompts--light--390px": {
     "surface": "custom-prompts",
@@ -1311,7 +1311,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
   },
   "custom-prompts--dark--1400px": {
     "surface": "custom-prompts",
@@ -1320,7 +1320,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
   },
   "custom-prompts--dark--390px": {
     "surface": "custom-prompts",
@@ -1329,7 +1329,7 @@
     "status": "pruned — regenerable via capture/capture.mjs custom-prompts",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs custom-prompts"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs custom-prompts"
   },
   "dispatch--light--1400px": {
     "surface": "dispatch",
@@ -1410,7 +1410,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
   },
   "observation--light--390px": {
     "surface": "observation",
@@ -1419,7 +1419,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
   },
   "observation--dark--1400px": {
     "surface": "observation",
@@ -1428,7 +1428,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
   },
   "observation--dark--390px": {
     "surface": "observation",
@@ -1437,7 +1437,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation"
   },
   "observation-session--light--1400px": {
     "surface": "observation-session",
@@ -1446,7 +1446,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation-session"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
   },
   "observation-session--light--390px": {
     "surface": "observation-session",
@@ -1455,7 +1455,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation-session"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
   },
   "observation-session--dark--1400px": {
     "surface": "observation-session",
@@ -1464,7 +1464,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation-session"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
   },
   "observation-session--dark--390px": {
     "surface": "observation-session",
@@ -1473,7 +1473,7 @@
     "status": "pruned — regenerable via capture/capture.mjs observation-session",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs observation-session"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs observation-session"
   },
   "dashboard--light--1400px": {
     "surface": "dashboard",
@@ -1482,7 +1482,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dashboard"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
   },
   "dashboard--light--390px": {
     "surface": "dashboard",
@@ -1491,7 +1491,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dashboard"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
   },
   "dashboard--dark--1400px": {
     "surface": "dashboard",
@@ -1500,7 +1500,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dashboard"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
   },
   "dashboard--dark--390px": {
     "surface": "dashboard",
@@ -1509,7 +1509,7 @@
     "status": "pruned — regenerable via capture/capture.mjs dashboard",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs dashboard"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs dashboard"
   },
   "escalation-kpis--light--1400px": {
     "surface": "escalation-kpis",
@@ -1590,7 +1590,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
   },
   "flight-companion--light--390px": {
     "surface": "flight-companion",
@@ -1599,7 +1599,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
   },
   "flight-companion--dark--1400px": {
     "surface": "flight-companion",
@@ -1608,7 +1608,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
   },
   "flight-companion--dark--390px": {
     "surface": "flight-companion",
@@ -1617,7 +1617,7 @@
     "status": "pruned — regenerable via capture/capture.mjs flight-companion",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs flight-companion"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs flight-companion"
   },
   "live-console--light--1400px": {
     "surface": "live-console",
@@ -1626,7 +1626,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs live-console"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
   },
   "live-console--light--390px": {
     "surface": "live-console",
@@ -1635,7 +1635,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs live-console"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
   },
   "live-console--dark--1400px": {
     "surface": "live-console",
@@ -1644,7 +1644,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs live-console"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
   },
   "live-console--dark--390px": {
     "surface": "live-console",
@@ -1653,7 +1653,7 @@
     "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs live-console"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs live-console"
   },
   "next-run--light--1400px": {
     "surface": "next-run",
@@ -1662,7 +1662,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs next-run"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
   },
   "next-run--light--390px": {
     "surface": "next-run",
@@ -1671,7 +1671,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs next-run"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
   },
   "next-run--dark--1400px": {
     "surface": "next-run",
@@ -1680,7 +1680,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs next-run"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
   },
   "next-run--dark--390px": {
     "surface": "next-run",
@@ -1689,7 +1689,7 @@
     "status": "pruned — regenerable via capture/capture.mjs next-run",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs next-run"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs next-run"
   },
   "passage-planner--light--1400px": {
     "surface": "passage-planner",
@@ -1698,7 +1698,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
   },
   "passage-planner--light--390px": {
     "surface": "passage-planner",
@@ -1707,7 +1707,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
   },
   "passage-planner--dark--1400px": {
     "surface": "passage-planner",
@@ -1716,7 +1716,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
   },
   "passage-planner--dark--390px": {
     "surface": "passage-planner",
@@ -1725,7 +1725,7 @@
     "status": "pruned — regenerable via capture/capture.mjs passage-planner",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs passage-planner"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs passage-planner"
   },
   "ship-biscuit--light--1400px": {
     "surface": "ship-biscuit",
@@ -1734,7 +1734,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-biscuit--light--390px": {
     "surface": "ship-biscuit",
@@ -1743,7 +1743,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-biscuit--dark--1400px": {
     "surface": "ship-biscuit",
@@ -1752,7 +1752,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-biscuit--dark--390px": {
     "surface": "ship-biscuit",
@@ -1761,7 +1761,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-biscuit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-biscuit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-biscuit"
   },
   "ship-journey--light--1400px": {
     "surface": "ship-journey",
@@ -1770,7 +1770,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
   },
   "ship-journey--light--390px": {
     "surface": "ship-journey",
@@ -1779,7 +1779,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
   },
   "ship-journey--dark--1400px": {
     "surface": "ship-journey",
@@ -1788,7 +1788,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
   },
   "ship-journey--dark--390px": {
     "surface": "ship-journey",
@@ -1797,7 +1797,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ship-journey",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ship-journey"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ship-journey"
   },
   "task-chat--light--1400px": {
     "surface": "task-chat",
@@ -1806,7 +1806,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-chat"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
   },
   "task-chat--light--390px": {
     "surface": "task-chat",
@@ -1815,7 +1815,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-chat"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
   },
   "task-chat--dark--1400px": {
     "surface": "task-chat",
@@ -1824,7 +1824,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-chat"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
   },
   "task-chat--dark--390px": {
     "surface": "task-chat",
@@ -1833,7 +1833,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-chat",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-chat"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-chat"
   },
   "task-new--light--1400px": {
     "surface": "task-new",
@@ -1842,7 +1842,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-new"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
   },
   "task-new--light--390px": {
     "surface": "task-new",
@@ -1851,7 +1851,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-new"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
   },
   "task-new--dark--1400px": {
     "surface": "task-new",
@@ -1860,7 +1860,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-new"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
   },
   "task-new--dark--390px": {
     "surface": "task-new",
@@ -1869,7 +1869,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-new",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-new"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-new"
   },
   "task-edit--light--1400px": {
     "surface": "task-edit",
@@ -1878,7 +1878,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-edit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
   },
   "task-edit--light--390px": {
     "surface": "task-edit",
@@ -1887,7 +1887,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-edit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
   },
   "task-edit--dark--1400px": {
     "surface": "task-edit",
@@ -1896,7 +1896,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-edit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
   },
   "task-edit--dark--390px": {
     "surface": "task-edit",
@@ -1905,7 +1905,7 @@
     "status": "pruned — regenerable via capture/capture.mjs task-edit",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs task-edit"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs task-edit"
   },
   "collective--light--1400px": {
     "surface": "collective",
@@ -1914,7 +1914,7 @@
     "status": "pruned — regenerable via capture/capture.mjs collective",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs collective"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective"
   },
   "collective--light--390px": {
     "surface": "collective",
@@ -1923,16 +1923,16 @@
     "status": "pruned — regenerable via capture/capture.mjs collective",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs collective"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective"
   },
   "collective--dark--1400px": {
     "surface": "collective",
     "theme": "dark",
     "viewport": 1400,
-    "status": "pruned — regenerable via capture/capture.mjs collective",
+    "status": "kept",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs collective"
+    "png": "re-rendered impl beat 2 (viewport capture, capture.mjs); JSON from research kept"
   },
   "collective--dark--390px": {
     "surface": "collective",
@@ -1941,7 +1941,7 @@
     "status": "pruned — regenerable via capture/capture.mjs collective",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs collective"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs collective"
   },
   "local-tree--light--1400px": {
     "surface": "local-tree",
@@ -1986,7 +1986,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
   },
   "local-roadmap--light--390px": {
     "surface": "local-roadmap",
@@ -1995,7 +1995,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
   },
   "local-roadmap--dark--1400px": {
     "surface": "local-roadmap",
@@ -2004,7 +2004,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
   },
   "local-roadmap--dark--390px": {
     "surface": "local-roadmap",
@@ -2013,7 +2013,7 @@
     "status": "pruned — regenerable via capture/capture.mjs local-roadmap",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs local-roadmap"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs local-roadmap"
   },
   "github-tree--light--1400px": {
     "surface": "github-tree",
@@ -2022,7 +2022,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs github-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
   },
   "github-tree--light--390px": {
     "surface": "github-tree",
@@ -2031,7 +2031,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs github-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
   },
   "github-tree--dark--1400px": {
     "surface": "github-tree",
@@ -2040,7 +2040,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs github-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
   },
   "github-tree--dark--390px": {
     "surface": "github-tree",
@@ -2049,7 +2049,7 @@
     "status": "pruned — regenerable via capture/capture.mjs github-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs github-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs github-tree"
   },
   "ghp-tree--light--1400px": {
     "surface": "ghp-tree",
@@ -2058,7 +2058,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
   },
   "ghp-tree--light--390px": {
     "surface": "ghp-tree",
@@ -2067,7 +2067,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
   },
   "ghp-tree--dark--1400px": {
     "surface": "ghp-tree",
@@ -2076,7 +2076,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
   },
   "ghp-tree--dark--390px": {
     "surface": "ghp-tree",
@@ -2085,7 +2085,7 @@
     "status": "pruned — regenerable via capture/capture.mjs ghp-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs ghp-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs ghp-tree"
   },
   "jira-tree--light--1400px": {
     "surface": "jira-tree",
@@ -2094,7 +2094,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-tree--light--390px": {
     "surface": "jira-tree",
@@ -2103,7 +2103,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-tree--dark--1400px": {
     "surface": "jira-tree",
@@ -2112,7 +2112,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-tree--dark--390px": {
     "surface": "jira-tree",
@@ -2121,7 +2121,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-tree",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-tree"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-tree"
   },
   "jira-settings--light--1400px": {
     "surface": "jira-settings",
@@ -2130,7 +2130,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
   },
   "jira-settings--light--390px": {
     "surface": "jira-settings",
@@ -2139,7 +2139,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
   },
   "jira-settings--dark--1400px": {
     "surface": "jira-settings",
@@ -2148,7 +2148,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
   },
   "jira-settings--dark--390px": {
     "surface": "jira-settings",
@@ -2157,7 +2157,7 @@
     "status": "pruned — regenerable via capture/capture.mjs jira-settings",
     "json": "kept",
     "captureMode": "viewport",
-    "png": "pruned — regenerable via capture/capture.mjs jira-settings"
+    "png": "viewed impl beat 2 (re-rendered, image-capable read), not kept — regenerable via capture/capture.mjs jira-settings"
   },
   "err-merge-confirm--light--1400px": {
     "surface": "err-merge-confirm",
@@ -4321,7 +4321,7 @@
     "viewport": 1400,
     "captureMode": "pageEnd",
     "darkMode": "media",
-    "status": "kept",
+    "status": "pruned — regenerable via capture/capture-full.mjs; superseded by archive-1--light--1400px--pe-settled (impl beat 2); JSON kept",
     "pixelHeight": 1000,
     "scrollHeight": 19072,
     "png": "kept",
@@ -4466,7 +4466,7 @@
     "viewport": 1400,
     "captureMode": "pageEnd",
     "darkMode": "media",
-    "status": "kept",
+    "status": "pruned — regenerable via capture/capture-full.mjs; superseded by archive-4--light--1400px--pe-settled (impl beat 2); JSON kept",
     "pixelHeight": 1000,
     "scrollHeight": 12593,
     "png": "kept",
@@ -4832,7 +4832,7 @@
     "viewport": 1400,
     "captureMode": "fullPage",
     "darkMode": "cookie",
-    "status": "kept",
+    "status": "pruned — regenerable via capture/capture.mjs; superseded by dispatch-settled (impl beat 2); JSON kept",
     "pixelHeight": 1743,
     "themeAssertion": "(none)",
     "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
@@ -4843,7 +4843,7 @@
     "viewport": 390,
     "captureMode": "fullPage",
     "darkMode": "cookie",
-    "status": "kept",
+    "status": "pruned — regenerable via capture/capture.mjs; superseded by dispatch-settled (impl beat 2); JSON kept",
     "pixelHeight": 1913,
     "themeAssertion": "(none)",
     "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
@@ -4854,7 +4854,7 @@
     "viewport": 1400,
     "captureMode": "fullPage",
     "darkMode": "cookie",
-    "status": "kept",
+    "status": "pruned — regenerable via capture/capture.mjs; superseded by dispatch-settled (impl beat 2); JSON kept",
     "pixelHeight": 1743,
     "themeAssertion": "theme-dark",
     "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
@@ -4865,7 +4865,7 @@
     "viewport": 390,
     "captureMode": "fullPage",
     "darkMode": "cookie",
-    "status": "kept",
+    "status": "pruned — regenerable via capture/capture.mjs; superseded by dispatch-settled (impl beat 2); JSON kept",
     "pixelHeight": 1913,
     "themeAssertion": "theme-dark",
     "source": "capture/capture.mjs --fullpage (impl beat 1; 300ms settle)"
@@ -4943,5 +4943,6 @@
     "status": "kept",
     "scrollHeight": 18136,
     "source": "capture/capture-gap.mjs archives (1.5s settle past the .reveal fade)"
-  }
+  },
+  "_note_png_encoding": "All PNGs palette-quantised (256 colours, no dither) in impl beat 2 to hold the evidence budget; every colour/contrast number in the report comes from the paired JSON, never from PNG pixels."
 }

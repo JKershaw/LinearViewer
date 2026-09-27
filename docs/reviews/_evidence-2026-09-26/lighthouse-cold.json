@@ -1,0 +1,79 @@
+{
+  "note": "Lighthouse accessibility category, cold/session-free, keyless NODE_ENV=test server :3199, light, default mobile emulation (impl beat 2).",
+  "results": {
+    "/": {
+      "lighthouseVersion": "12.8.2",
+      "accessibility": 0.96,
+      "failing": [
+        {
+          "id": "color-contrast",
+          "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+          "items": 14,
+          "sample": [
+            "<a href=\"/auth/linear\" class=\"landing-cta landing-cta-linear\" data-testid=\"landing-cta-linear\">",
+            "<span class=\"lx-step__n\">",
+            "<span class=\"lx-step__n\">"
+          ]
+        }
+      ]
+    },
+    "/archive/7": {
+      "lighthouseVersion": "12.8.2",
+      "accessibility": 0.96,
+      "failing": [
+        {
+          "id": "color-contrast",
+          "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+          "items": 26,
+          "sample": [
+            "<a href=\"#r12\" id=\"c12-1\" aria-label=\"Reading list entry 12\">",
+            "<a href=\"#r12\" id=\"c12-2\" aria-label=\"Reading list entry 12\">",
+            "<a href=\"#r11\" id=\"c11-1\" aria-label=\"Reading list entry 11\">"
+          ]
+        },
+        {
+          "id": "label-content-name-mismatch",
+          "title": "Elements with visible text labels do not have matching accessible names.",
+          "items": 14,
+          "sample": [
+            "<a class=\"back\" href=\"#c1-1\" aria-label=\"Back to the citation in \u00a71\">",
+            "<a class=\"back\" href=\"#c2-1\" aria-label=\"Back to the citation in \u00a71\">",
+            "<a class=\"back\" href=\"#c3-1\" aria-label=\"Back to the citation in \u00a73\">"
+          ]
+        }
+      ]
+    },
+    "/kpis": {
+      "lighthouseVersion": "12.8.2",
+      "accessibility": 1,
+      "failing": []
+    },
+    "/ship": {
+      "lighthouseVersion": "12.8.2",
+      "accessibility": 0.95,
+      "failing": [
+        {
+          "id": "color-contrast",
+          "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+          "items": 1,
+          "sample": [
+            "<button class=\"ship-mode-btn active\" id=\"ship-mode-project\" type=\"button\" data-mode=\"project\" aria-pressed=\"true\">"
+          ]
+        },
+        {
+          "id": "label-content-name-mismatch",
+          "title": "Elements with visible text labels do not have matching accessible names.",
+          "items": 1,
+          "sample": [
+            "<button class=\"ship-zoom-btn ship-zoom-reset\" id=\"ship-zoom-reset\" type=\"button\" aria-label=\"Reset view\">"
+          ]
+        }
+      ]
+    },
+    "/templates": {
+      "lighthouseVersion": "12.8.2",
+      "accessibility": 1,
+      "failing": []
+    }
+  }
+}

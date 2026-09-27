@@ -21,6 +21,8 @@
  *      a longer settle, plus every >=400 / failed request, so a stuck placeholder
  *      can be attributed to the test seam or to the product.
  *
+ *   6. `darksweep`: V1 blast radius — every authenticated surface in dark
+ *      (writes gap-dark-sweep.json).
  *   5. `extra`: computed colour/font reads for the workspace-not-found link,
  *      the Jira API-token form controls, the GitHub Projects <select>, and the
  *      archive sign-offs (writes gap-extra-probe.json).
@@ -29,7 +31,7 @@
  *
  * Docs-only research tool; run with the keyless NODE_ENV=test server up:
  *   PLAYWRIGHT_BROWSERS_PATH=… BASE_URL=http://localhost:3199 \
- *     node docs/reviews/_evidence-2026-09-26/capture/capture-gap.mjs [archives|extra]
+ *     node docs/reviews/_evidence-2026-09-26/capture/capture-gap.mjs [archives|extra|darksweep]
  */
 
 import { chromium } from 'playwright';
@@ -304,8 +306,33 @@ async function extraProbe(browser) {
   return out;
 }
 
+// `darksweep` (impl beat 2): the same composited sweep over EVERY authenticated
+// app surface in cookie dark, to size V1 (unthemed .action-btn / links) beyond
+// the three pages beat 1 swept. Records groups under 3:1 only.
+const DARK_SWEEP = ['/', '/swipe', '/swim', '/ship', '/roadmap', '/audit', '/settings', '/prompts', '/prompts/custom',
+  '/dispatch', '/proxy', '/observation', '/dashboard', '/escalation-kpis', '/effort-readout', '/flight-companion',
+  '/live-console', '/next-run', '/passage-planner', '/ship-biscuit', '/ship-journey', '/task-chat', '/task/new', '/collective'];
+
+async function darkSweep(browser) {
+  const out = {};
+  for (const p of DARK_SWEEP) {
+    const { ctx, page, themeAssertion } = await open(browser, { path: ws(p) }, 'dark', D1400, { settleMs: p === '/dispatch' || p === '/collective' ? 4000 : 1200 });
+    const groups = (await page.evaluate(SWEEP_JS)).filter(g => g.ratio < 3);
+    out[p] = { themeAssertion: themeAssertion.passed, groups: groups.map(g => ({ element: g.element, color: g.color, bg: g.bg, ratio: g.ratio, count: g.count, samples: g.samples })) };
+    await ctx.close();
+  }
+  return out;
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  if (process.argv.includes('darksweep')) {
+    const out = await darkSweep(browser);
+    await browser.close();
+    await writeFile(path.join(OUT, 'gap-dark-sweep.json'), JSON.stringify({ note: 'Cookie-dark (theme-dark asserted) composited contrast sweep of 24 authenticated app surfaces @1400; groups <3:1 only. Test-workspace seed with all flags on; Collective against the in-process mock Yap.', surfaces: out }, null, 2));
+    for (const [k, v] of Object.entries(out)) console.log(k, v.themeAssertion, v.groups.map(g => `${g.element}@${g.ratio}x${g.count}`).join(' | '));
+    return;
+  }
   if (process.argv.includes('extra')) {
     const out = await extraProbe(browser);
     await browser.close();
