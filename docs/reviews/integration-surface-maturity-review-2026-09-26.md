@@ -11,17 +11,18 @@ a triageable maturity read framed as a **trend**, not a snapshot, and leaves the
 **Re-grounding (staleness check; B6).** `git fetch` was run in **both** repos before any comparison.
 
 ```
+# at scoring (pre-revision)
 LinearViewer:      git fetch origin  →  HEAD = origin/main = b5c528c4807acc2222f4afd6fe2b87ded41fdf89
 simple-dispatcher: git fetch origin  →  HEAD = origin/main = 3b1e734b5496941ef5a7ecfb9497741f275d67fa
 LinearViewer:      git log --oneline b5c528c4..origin/main       →  (empty)
 simple-dispatcher: git log --oneline 3b1e734..origin/main       →  (empty)
 ```
 
-**First finding — drift re-check: zero hits.** Both repos' `origin/main` still equals the plan's pinned
-HEADs (`b5c528c4` / `3b1e734`); there are **no commits** past either pin, so **0 included-class hits and
-0 excluded-class hits**. The approved plan's class/bound/member tables therefore map to the current tree
+**First finding — drift re-check: zero hits.** At scoring, both repos' `origin/main` equalled the plan's pinned
+HEADs (`b5c528c4` / `3b1e734`); there were **no commits** past either pin, so **0 included-class hits and
+0 excluded-class hits**. Commits that landed after scoring are `docs/reviews/`-only apart from one excluded-class citation pin, and all are recorded in the revision note in *Scope*; they do not change this finding. The approved plan's class/bound/member tables therefore map to the current tree
 without change. `docs/reviews/` was re-listed immediately before scoring (see Scope); it found no registry
-sibling edition landed since run 2. Two landed after scoring — see the revision note in *Scope*. Ladder context: **630 commits** landed on LinearViewer `main`
+sibling edition landed since run 2. Four landed after scoring, none owning an aggregated dimension — see the revision note in *Scope*. Ladder context: **630 commits** landed on LinearViewer `main`
 since `ea53ffc8`, **278** of them touching `lib/`, `routes/` or `server.js`; simple-dispatcher had
 **112** commits in the same review window (`git rev-list --count 7064955..3b1e734` = 112, where `7064955` is
 run 2's cited consumer HEAD; 111 from the alternative boundary `05681975`). **Careful distinction** — the
@@ -39,14 +40,17 @@ forever — retired, never deleted; none retired this run), scores each surface'
 confidence mark, frames everything as a **delta** against run 2, and **mints no follow-up work**.
 
 **Sibling re-list (authoritative source for a landed edition).** Immediately before scoring, `docs/reviews/`
-was re-listed and found no registry sibling landed since 2026-08-29. **Revision note (2026-09-26):**
-`origin/main` has since moved past the scoring pin `b5c528c4` by exactly two commits — `08257bd3` and
-`90193471` — each adding only its own `docs/reviews/*-2026-09-26.md` registry edition
-(`drift-coherence-review-2026-09-26` `08257bd3`, #1591; `onboarding-cold-start-review-2026-09-26`
-`90193471`, #1592). That is not a hit in any class the drift check reconciles (not `lib/`, `routes/`,
-`server.js`, `public/`, or non-review `docs/*.md`), so the first finding stands. Neither new sibling owns a
+was re-listed and found no registry sibling landed since 2026-08-29. **Revision note (re-listed 2026-09-27T07:24:11Z):**
+`origin/main` has since moved past the scoring pin `b5c528c4`; every commit in `b5c528c4..origin/main` is
+`docs/reviews/`-only except a single excluded-class citation pin (recorded below), adding four registry
+editions: `code-quality-review-2026-09-26` (#1595), `drift-coherence-review-2026-09-26` (`08257bd3`, #1591),
+`onboarding-cold-start-review-2026-09-26` (`90193471`, #1592) and `recent-headwinds-review-2026-09-26`
+(`eb228315`, #1590). That is not a hit in any class the drift check reconciles (not `lib/`, `routes/`,
+`server.js`, `public/`, or non-review `docs/*.md`), so the first finding stands. None of the four owns a
 dimension this review aggregates, so no score moves. PR #1594 (documentation, LIN-3102) was still **open and
-unmerged** at revision time (checked `2026-09-26T21:34:22Z`). The newest registry editions at scoring were
+unmerged** at that re-list. Also checked: `dce2a1d6` (LIN-3097, #1596), one-line citation pin in
+`docs/papers/harbour/jev-decision-model.md`; eval-paper citation for the excluded `scripts/eval` lineage; no
+bearing on any scored surface. The newest registry editions at scoring were
 all 2026-08-29 (`documentation-review` `8cac8e79`, `code-quality-review` `96dca752`, `drift-coherence-review`
 `cb2fbb5a`, `recent-headwinds-review` `8c9c3b08`, `design-interface-review` `c343449f`,
 `onboarding-cold-start-review` `b78c4499`). The newest files in the directory are non-registry:
@@ -119,7 +123,7 @@ Three threads carry forward, and two are new this run:
    (`Backlog`), and it is now contract *drift*, not just stale wording (R10, §Halt-copy class).
 
 Reliability ([LIN-1040]) and Observability ([LIN-1041]) reviews still do not exist; **no** registry sibling
-that owns an aggregated dimension has refreshed since 2026-08-29 (two non-owning siblings landed 2026-09-26 —
+that owns an aggregated dimension has refreshed since 2026-08-29 (four non-owning siblings landed 2026-09-26 —
 see Scope), and the five 2026-06-25 reports (security, API quality, test coverage,
 dependency/supply-chain, stability) are now ~13 weeks stale (R6, worsened).
 
@@ -291,13 +295,12 @@ No sibling review owns this class (each module is tested; it is visible only por
 *Surface: META / portfolio · Confidence: High*
 
 Run 2 recorded five current and five 2026-06-25 siblings. This run recorded **zero** new registry editions at
-scoring; **two landed on 2026-09-26 after scoring** (`drift-coherence-review-2026-09-26` `08257bd3`,
-`onboarding-cold-start-review-2026-09-26` `90193471`), but neither owns a dimension this review aggregates.
+scoring; **four landed on 2026-09-26 after scoring** (code quality, drift & coherence, onboarding & cold-start, recent headwinds — see the revision note in *Scope*), but none owns a dimension this review aggregates.
 The five 2026-06-25 reports — `security-review`, `api-quality-review`, `test-coverage-gap`,
 `dependency-supply-chain-review`, `stability-review` — remain the stale owners and are now ~13 weeks stale;
 `comprehension-debt-review` is 2026-07-01. **Security** is the most consequential: two new credential/auth
 surfaces (`api-jira-rest`, `flow-account-connection-workspace-credential`) have no fresh sibling read. Five
-LIN-3099 siblings are being re-run in this same passage; two landed after this report's scoring HEAD.
+LIN-3099 siblings are being re-run in this same passage; four landed after this report's scoring HEAD; documentation (#1594) had not.
 
 **Action (for a human to weigh):** refresh the five still-stale correctives, prioritizing Security and Test
 Coverage Gap (owns R5).
@@ -345,7 +348,7 @@ finding.
 | `mod-effort-readout` | MOD | `lib/effort-readout.js`, `lib/render-effort-readout.js` | both ← `routes/dashboard.js:48,49`; routes `GET /workspace/:urlKey/effort-readout` (`:2134`) and `/api/effort-readout` (`:2160`) (LIN-2641) | 4 / N/A* / Medium |
 | `mod-secret-scan` | MOD | `lib/secret-scan.js`, `lib/scan-public-pages.js` | `secret-scan.js` ← `lib/scan-public-pages.js` + `scripts/secret-scan.mjs` (npm `secret-scan`); `scan-public-pages.js` ← `scripts/scan-public-pages.mjs` (npm `scan:public-pages`); CI `.github/workflows/secret-scan-scheduled.yml` (LIN-2573) | 3 / N/A* / Low-Medium |
 
-**Folded into existing ids (24 lib files, 14 dispositions; the 11 routes fold as below):**
+**Folded into existing ids (14 lib files; the 11 routes fold as below):**
 
 - `lib/chat-request.js` (LIN-2970 `ede3a6d4`, LIN-2978 `51103548`) — **dual evidence, not Flight-Companion-only**:
   8 production importers (`ship-biscuit`, `workspace-api-roadmap`, `next-run`, `task-chat`,
@@ -535,7 +538,7 @@ Required self-checks this run:
   Backlog; selection half still unconsumed). **R9 — partial** (write-side stamped via LIN-2575; read side
   still drops `periodicalId`). **R3 — no** (both tracking tickets Backlog). **R8 — mixed** (`workspace-repos`
   resolved, `observer-efficacy-signal` still dead; `opencode-liveness.js` checked and found consumed, so not an
-  instance). **R6 — worsened** (no owning registry refresh since 2026-08-29; two non-owning siblings landed 2026-09-26). **R4 — closed** and stays closed.
+  instance). **R6 — worsened** (no owning registry refresh since 2026-08-29; four non-owning siblings landed 2026-09-26). **R4 — closed** and stays closed.
 - **What did this review itself miss?** The Tier 2 adversarial second-read caught that this run's own coverage
   model — the `--diff-filter=A` added-file sweep — is necessary but **not sufficient**: the window's largest
   **modified** surface, the decisions/WITHDRAW subsystem (~36 LinearViewer + 7 simple-dispatcher commits), is
