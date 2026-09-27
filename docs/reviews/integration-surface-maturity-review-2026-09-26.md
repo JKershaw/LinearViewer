@@ -22,7 +22,7 @@ simple-dispatcher: git log --oneline 3b1e734..origin/main       →  (empty)
 HEADs (`b5c528c4` / `3b1e734`); there were **no commits** past either pin, so **0 included-class hits and
 0 excluded-class hits**. Commits that landed after scoring are `docs/reviews/`-only apart from one excluded-class citation pin, and all are recorded in the revision note in *Scope*; they do not change this finding. The approved plan's class/bound/member tables therefore map to the current tree
 without change. `docs/reviews/` was re-listed immediately before scoring (see Scope); it found no registry
-sibling edition landed since run 2. Four landed after scoring, none owning an aggregated dimension — see the revision note in *Scope*. Ladder context: **630 commits** landed on LinearViewer `main`
+sibling edition landed since run 2. Five landed after scoring; one of them, `documentation-review-2026-09-26` (#1594), owns the aggregated Documentation dimension — see the revision note in *Scope*. Ladder context: **630 commits** landed on LinearViewer `main`
 since `ea53ffc8`, **278** of them touching `lib/`, `routes/` or `server.js`; simple-dispatcher had
 **112** commits in the same review window (`git rev-list --count 7064955..3b1e734` = 112, where `7064955` is
 run 2's cited consumer HEAD; 111 from the alternative boundary `05681975`). **Careful distinction** — the
@@ -40,15 +40,16 @@ forever — retired, never deleted; none retired this run), scores each surface'
 confidence mark, frames everything as a **delta** against run 2, and **mints no follow-up work**.
 
 **Sibling re-list (authoritative source for a landed edition).** Immediately before scoring, `docs/reviews/`
-was re-listed and found no registry sibling landed since 2026-08-29. **Revision note (re-listed 2026-09-27T07:24:11Z):**
+was re-listed and found no registry sibling landed since 2026-08-29. **Revision note (re-listed 2026-09-27T07:55:23Z):**
 `origin/main` has since moved past the scoring pin `b5c528c4`; every commit in `b5c528c4..origin/main` is
-`docs/reviews/`-only except a single excluded-class citation pin (recorded below), adding four registry
-editions: `code-quality-review-2026-09-26` (#1595), `drift-coherence-review-2026-09-26` (`08257bd3`, #1591),
+`docs/reviews/`-only except a single excluded-class citation pin (recorded below), adding five registry
+editions: `code-quality-review-2026-09-26` (#1595), `documentation-review-2026-09-26` (`27aaf08a`, #1594),
+`drift-coherence-review-2026-09-26` (`08257bd3`, #1591),
 `onboarding-cold-start-review-2026-09-26` (`90193471`, #1592) and `recent-headwinds-review-2026-09-26`
 (`eb228315`, #1590). That is not a hit in any class the drift check reconciles (not `lib/`, `routes/`,
-`server.js`, `public/`, or non-review `docs/*.md`), so the first finding stands. None of the four owns a
-dimension this review aggregates, so no score moves. PR #1594 (documentation, LIN-3102) was still **open and
-unmerged** at that re-list. Also checked: `dce2a1d6` (LIN-3097, #1596), one-line citation pin in
+`server.js`, `public/`, or non-review `docs/*.md`), so the first finding stands. Four of the five own no
+dimension this review aggregates. `documentation-review-2026-09-26` owns Documentation and is folded into
+dimension 11 and the Documentation coverage row. Also checked: `dce2a1d6` (LIN-3097, #1596), one-line citation pin in
 `docs/papers/harbour/jev-decision-model.md`; eval-paper citation for the excluded `scripts/eval` lineage; no
 bearing on any scored surface. The newest registry editions at scoring were
 all 2026-08-29 (`documentation-review` `8cac8e79`, `code-quality-review` `96dca752`, `drift-coherence-review`
@@ -122,8 +123,9 @@ Three threads carry forward, and two are new this run:
    LIN-2995)" in fourteen files. This is the **halt-copy stale-contract class**, owned by **LIN-3074**
    (`Backlog`), and it is now contract *drift*, not just stale wording (R10, §Halt-copy class).
 
-Reliability ([LIN-1040]) and Observability ([LIN-1041]) reviews still do not exist; **no** registry sibling
-that owns an aggregated dimension has refreshed since 2026-08-29 (four non-owning siblings landed 2026-09-26 —
+Reliability ([LIN-1040]) and Observability ([LIN-1041]) reviews still do not exist; the only registry sibling
+that owns an aggregated dimension and has refreshed since 2026-08-29 is the Documentation Review (2026-09-26,
+landed after scoring; four non-owning siblings also landed 2026-09-26 —
 see Scope), and the five 2026-06-25 reports (security, API quality, test coverage,
 dependency/supply-chain, stability) are now ~13 weeks stale (R6, worsened).
 
@@ -290,17 +292,17 @@ The behavioral sweep is re-run. Movement:
 
 No sibling review owns this class (each module is tested; it is visible only portfolio-wide).
 
-### R6 — Sibling evidence: no owning registry refresh since 2026-08-29 · **Impact: M (portfolio-wide legibility) · Effort: — (scheduling call) · carried, worsened**
+### R6 — Sibling evidence: only one owning registry refresh since 2026-08-29 (Documentation, after scoring) · **Impact: M (portfolio-wide legibility) · Effort: — (scheduling call) · carried, worsened**
 
 *Surface: META / portfolio · Confidence: High*
 
 Run 2 recorded five current and five 2026-06-25 siblings. This run recorded **zero** new registry editions at
-scoring; **four landed on 2026-09-26 after scoring** (code quality, drift & coherence, onboarding & cold-start, recent headwinds — see the revision note in *Scope*), but none owns a dimension this review aggregates.
+scoring; **five landed on 2026-09-26 after scoring** (code quality, documentation, drift & coherence, onboarding & cold-start, recent headwinds — see the revision note in *Scope*). Only documentation owns a dimension this review aggregates (dimension 11); the other four own none.
 The five 2026-06-25 reports — `security-review`, `api-quality-review`, `test-coverage-gap`,
 `dependency-supply-chain-review`, `stability-review` — remain the stale owners and are now ~13 weeks stale;
 `comprehension-debt-review` is 2026-07-01. **Security** is the most consequential: two new credential/auth
 surfaces (`api-jira-rest`, `flow-account-connection-workspace-credential`) have no fresh sibling read. Five
-LIN-3099 siblings are being re-run in this same passage; four landed after this report's scoring HEAD; documentation (#1594) had not.
+LIN-3099 siblings are being re-run in this same passage; all five landed after this report's scoring HEAD.
 
 **Action (for a human to weigh):** refresh the five still-stale correctives, prioritizing Security and Test
 Coverage Gap (owns R5).
@@ -482,7 +484,7 @@ portfolio-level, with the owning review named. This is the full twelve-dimension
 | 8 | Observability | unowned | **Observability — LIN-1041 (not built)** | — | unchanged |
 | 9 | Security | stale sibling (2026-06-25); H1 re-verified fixed | **Security Review** | Medium | unchanged (R4 closed) |
 | 10 | Testing | stale sibling (2026-06-25) | **Test Coverage Gap Review** | Low | unchanged (R5 unconfirmed) |
-| 11 | Documentation | sibling fresh 2026-08-29, but halt/text drift | **Documentation Review** | Medium | worsened — halt-copy drift (R10/R12) |
+| 11 | Documentation | sibling fresh 2026-09-26 (landed after scoring), halt/text drift confirmed (its H13) | **Documentation Review** | High | worsened — halt-copy drift (R10/R12), confirmed by `documentation-review-2026-09-26` H13 |
 | 12 | Configuration | first-party + sibling-owned mix | **this review + siblings** | Medium | changed — R1 CFG up, scheduler roster note (R11) |
 
 ---
@@ -498,7 +500,7 @@ does not re-derive their findings.
 | Security | **Security Review** | 2026-06-25, ~13wk stale | Medium | H1 stored-XSS re-verified fixed (R4); M2/M3 status unknown |
 | Input & schema validation | **API Quality Review** | 2026-06-25, ~13wk stale | Low | Unrefreshed; `lib/issue-write-validation.js` shared seam (R7) is incidental first-party evidence, not a substitute |
 | Testing | **Test Coverage Gap Review** | 2026-06-25, ~13wk stale | Low | R5's Critical defect unconfirmed fixed or unfixed; zero commits to the affected file rules out an accidental fix |
-| Documentation | **Documentation Review** | **2026-08-29 — fresh (registry)**, but ~4wk old | Medium | Halt contract text now contradicts shipped behaviour (R10) and a broader stale-contract-text class exists (R12) |
+| Documentation | **Documentation Review** | **2026-09-26 — fresh (registry)**, landed after scoring | High | Halt contract text contradicts shipped behaviour (R10) and a broader stale-contract-text class exists (R12); `documentation-review-2026-09-26` H13 (HIGH, ~26 non-test sites) confirms it and its H3 (HIGH) adds residual Linear-only framing |
 | Error handling | **Reliability — LIN-1040 (not built)** | no report exists | — | Unowned; R2/R9 incidental |
 | Resilience | **Reliability — LIN-1040 (not built)** | no report exists | — | Unowned |
 | Rate limits & pagination | **Reliability — LIN-1040 (not built)** | no report exists | — | Unowned |
@@ -538,7 +540,7 @@ Required self-checks this run:
   Backlog; selection half still unconsumed). **R9 — partial** (write-side stamped via LIN-2575; read side
   still drops `periodicalId`). **R3 — no** (both tracking tickets Backlog). **R8 — mixed** (`workspace-repos`
   resolved, `observer-efficacy-signal` still dead; `opencode-liveness.js` checked and found consumed, so not an
-  instance). **R6 — worsened** (no owning registry refresh since 2026-08-29; four non-owning siblings landed 2026-09-26). **R4 — closed** and stays closed.
+  instance). **R6 — worsened** (only owning registry refresh since 2026-08-29 is Documentation, 2026-09-26 after scoring; four non-owning siblings also landed 2026-09-26). **R4 — closed** and stays closed.
 - **What did this review itself miss?** The Tier 2 adversarial second-read caught that this run's own coverage
   model — the `--diff-filter=A` added-file sweep — is necessary but **not sufficient**: the window's largest
   **modified** surface, the decisions/WITHDRAW subsystem (~36 LinearViewer + 7 simple-dispatcher commits), is
