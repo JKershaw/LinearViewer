@@ -13,11 +13,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderFlightCompanionPage } from '../../lib/render-flight-companion.js';
 
-describe('renderFlightCompanionPage — +proxy toggle gating', () => {
-  test('renders the +proxy toggle and data-proxy-feature attribute when featureFlags.proxy === true', () => {
+describe('renderFlightCompanionPage — proxy feature gate', () => {
+  test('emits data-proxy-feature but NO +proxy toggle when featureFlags.proxy === true (LIN-3079: forced, toggle removed)', () => {
     const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
     assert.ok(html.includes('data-proxy-feature="true"'));
-    assert.match(html, /<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">\+proxy<\/button>/);
+    assert.ok(!html.includes('prompt-proxy-toggle'));
   });
 
   test('omits the +proxy toggle and data-proxy-feature attribute when featureFlags.proxy is false', () => {
@@ -72,10 +72,10 @@ describe('renderFlightCompanionPage — LIN-2435 Commit 2: chat-thread render + 
     assert.ok(markedIdx < fcJsIdx, 'marked.min.js must load before flight-companion.js');
   });
 
-  test('every pre-existing +proxy gating assertion still passes unchanged (re-run against the extended markup)', () => {
+  test('every pre-existing proxy-gate assertion still passes unchanged (re-run against the extended markup)', () => {
     const onHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
     assert.ok(onHtml.includes('data-proxy-feature="true"'));
-    assert.match(onHtml, /<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">\+proxy<\/button>/);
+    assert.ok(!onHtml.includes('prompt-proxy-toggle'));
 
     const offHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: false } });
     assert.ok(!offHtml.includes('data-proxy-feature'));
@@ -128,17 +128,17 @@ describe('renderFlightCompanionPage — LIN-2443: section order, prompt collapse
     assert.doesNotMatch(html.slice(detailsOpenIdx, detailsTagEnd + 1), /\bopen\b/, 'the disclosure must render collapsed by default (no `open` attribute)');
   });
 
-  test('#flight-companion-copy / #flight-companion-copy-feedback / .prompt-proxy-toggle render outside the <details>', () => {
+  test('#flight-companion-copy / #flight-companion-copy-feedback render outside the <details> (LIN-3079: toggle gone)', () => {
     const detailsOpenIdx = html.indexOf('<details class="disclosure"');
     const copyIdx = html.indexOf('id="flight-companion-copy"');
     const feedbackIdx = html.indexOf('id="flight-companion-copy-feedback"');
     assert.ok(copyIdx > -1 && copyIdx < detailsOpenIdx, '#flight-companion-copy must render before the <details>');
     assert.ok(feedbackIdx > -1 && feedbackIdx < detailsOpenIdx, '#flight-companion-copy-feedback must render before the <details>');
 
+    // LIN-3079: the inert +proxy toggle is removed even when the feature is on.
     const proxyHtml = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws', featureFlags: { proxy: true } });
-    const proxyDetailsOpenIdx = proxyHtml.indexOf('<details class="disclosure"');
-    const toggleIdx = proxyHtml.indexOf('prompt-proxy-toggle');
-    assert.ok(toggleIdx > -1 && toggleIdx < proxyDetailsOpenIdx, '.prompt-proxy-toggle must render before the <details>');
+    assert.ok(proxyHtml.includes('data-proxy-feature="true"'));
+    assert.ok(!proxyHtml.includes('prompt-proxy-toggle'));
   });
 
   test('renders the check-in status mount: present, empty, hidden, aria-live="polite"', () => {
