@@ -38,6 +38,7 @@ import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
+import { computeOwnershipReport } from '../../scripts/dry-run-workspace-ownership.mjs';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -265,6 +266,42 @@ describe(
 
       const edges = await collection.find({ accountId, workspaceId }).toArray();
       assert.strictEqual(edges.length, 1, 'exactly one edge should exist for this pair');
+    });
+
+    test('the ownership dry-run counts every workspace of a multi-workspace session and returns no identity on real MongoDB (LIN-1892 S1-1, S1-2)', async () => {
+      // Its own db: the dry-run reads the bare `sessions`/`accounts`/
+      // `account-workspaces` collections, not this suite's suffixed ones.
+      const dryRunDb = client.db(`${db.databaseName}_dryrun`);
+      try {
+        await dryRunDb.collection('accounts').insertMany([
+          { _id: 'acct-local', identities: [{ provider: 'local', scope: 'l', credentials: { token: 'SECRET-CRED-1' } }] },
+          { _id: 'acct-mixed', identities: [{ provider: 'local', scope: 'm' }, { provider: 'linear', scope: 'm', credentials: { token: 'SECRET-CRED-2' } }] }
+        ]);
+        await dryRunDb.collection('account-workspaces').insertOne({ _id: 'e1', accountId: 'acct-mixed', workspaceId: 'org-a', createdAt: new Date() });
+        await dryRunDb.collection('sessions').insertOne({
+          _id: 'sid-SECRET',
+          expires: new Date(Date.now() + 60_000),
+          session: {
+            workspaces: [
+              { id: 'org-a', urlKey: 'a', accessToken: 'SECRET-AT-1' },
+              { id: 'org-b', urlKey: 'b', accessToken: 'SECRET-AT-2' },
+              { id: 'org-c', urlKey: 'c', refreshToken: 'SECRET-RT-3' }
+            ]
+          }
+        });
+
+        const report = await computeOwnershipReport({ db: dryRunDb });
+
+        assert.strictEqual(report.totals.sessionWorkspaceEntries, 3, 'all three workspaces of the session are counted');
+        assert.deepStrictEqual(report.c_sessionOnlyNoEdge.rows.map((r) => r.workspaceId), ['org-b', 'org-c']);
+        assert.strictEqual(report.d_localOnlyAccounts.count, 1, 'only acct-local; acct-mixed also has linear');
+        const json = JSON.stringify(report);
+        for (const value of ['sid-SECRET', 'SECRET-AT-1', 'SECRET-AT-2', 'SECRET-RT-3', 'SECRET-CRED-1', 'SECRET-CRED-2']) {
+          assert.ok(!json.includes(value), `the report must not contain ${value}`);
+        }
+      } finally {
+        await dryRunDb.dropDatabase();
+      }
     });
 
     // --- LIN-1338: linkIdentity cross-document race + unique backstop ---
