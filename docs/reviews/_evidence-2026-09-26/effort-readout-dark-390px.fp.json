@@ -1,0 +1,22 @@
+{
+  "surface": "effort-readout",
+  "theme": "dark",
+  "viewport": 390,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "title": "Test Workspace - Effort Self-Assessment",
+  "headings": {
+    "h1": 1,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 1,
+    "a11yRoleHeading": 1
+  },
+  "scrollHeight": 890,
+  "capturedPixelHeight": 890,
+  "clip": null,
+  "footerCount": 1
+}

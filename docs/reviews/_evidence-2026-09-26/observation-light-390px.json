@@ -1,0 +1,154 @@
+{
+  "surface": "observation",
+  "label": "Observation",
+  "kind": "auth",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/workspace/test-workspace/observation",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "expectedTheme": "light",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "Observation",
+  "headings": {
+    "h1": 1,
+    "h2": 5,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 6,
+    "a11y": {
+      "roleHeading": 4,
+      "levels": {
+        "h1": 1,
+        "h2": 3,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 375,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 25,
+    "toRoot": 0,
+    "toWorkspace": 21,
+    "toAppNav": 4,
+    "sample": [
+      "/workspace/test-workspace/",
+      "/workspace/test-workspace/observation?view=rulings",
+      "/workspace/test-workspace/",
+      "/workspace/test-workspace/swipe",
+      "/workspace/test-workspace/swim",
+      "/workspace/test-workspace/settings",
+      "/workspace/test-workspace/roadmap",
+      "/workspace/test-workspace/dispatch",
+      "/workspace/test-workspace/proxy",
+      "/workspace/test-workspace/collective",
+      "/workspace/test-workspace/task-chat",
+      "/workspace/test-workspace/ship"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat\n        \n      workspace:\n  "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "○ nothing running right now"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "harbour.cat"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Test Workspace"
+    },
+    {
+      "selector": ".nav-action",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "feedback"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "harbour.cat",
+      "0 waiting on you",
+      "tasks",
+      "swipe",
+      "swim",
+      "settings",
+      "roadmap",
+      "dispatch",
+      "proxy",
+      "collective",
+      "task chat",
+      "ship",
+      "next run",
+      "flight companion",
+      "passage planner",
+      "ship's biscuit",
+      "live console",
+      "ship journey"
+    ],
+    "footerLinks": [
+      "ai: ○",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates",
+      "theme: light",
+      "feedback"
+    ],
+    "hasThemeToggle": true,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": true,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

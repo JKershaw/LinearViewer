@@ -1,0 +1,22 @@
+{
+  "surface": "raw-openrouter-cb-nocode",
+  "theme": "dark",
+  "viewport": 390,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "title": "Authorization Failed - Projects",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 2,
+    "a11yRoleHeading": 2
+  },
+  "scrollHeight": 844,
+  "capturedPixelHeight": 844,
+  "clip": null,
+  "footerCount": 0
+}

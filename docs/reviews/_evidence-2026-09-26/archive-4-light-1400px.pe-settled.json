@@ -1,0 +1,16 @@
+{
+  "surface": "archive-4",
+  "theme": "light",
+  "viewport": 1400,
+  "captureMode": "pageEnd",
+  "settleMs": 1500,
+  "darkMode": "media",
+  "scrollY": 11583,
+  "scrollHeight": 12583,
+  "revealInViewport": [
+    {
+      "opacity": "1",
+      "cls": "colophon reveal in"
+    }
+  ]
+}

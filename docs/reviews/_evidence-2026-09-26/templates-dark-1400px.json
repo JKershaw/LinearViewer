@@ -1,0 +1,108 @@
+{
+  "surface": "templates",
+  "label": "Templates",
+  "kind": "cold",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/templates",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "Templates - Harbour",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 3,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 5,
+    "a11y": {
+      "roleHeading": 5,
+      "levels": {
+        "h1": 1,
+        "h2": 1,
+        "h3": 3,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 1385,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 3,
+    "toRoot": 1,
+    "toWorkspace": 0,
+    "toAppNav": 2,
+    "sample": [
+      "/",
+      "/privacy",
+      "/terms"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour\n  \n  \n    \n      \n        17 tem"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(31,34,42)",
+      "ratio": 12.74,
+      "text": "copy"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

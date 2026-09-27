@@ -1,0 +1,25 @@
+{
+  "surface": "archive-2",
+  "theme": "light",
+  "viewport": 390,
+  "captureMode": "pageEnd",
+  "darkMode": "cookie",
+  "title": "The Harbour Archive",
+  "headings": {
+    "h1": 1,
+    "h2": 11,
+    "h3": 40,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 52,
+    "a11yRoleHeading": 52
+  },
+  "scrollHeight": 28234,
+  "capturedPixelHeight": 844,
+  "clip": {
+    "y": 27390,
+    "height": 844
+  },
+  "footerCount": 1
+}

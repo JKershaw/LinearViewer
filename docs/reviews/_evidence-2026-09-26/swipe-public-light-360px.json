@@ -1,0 +1,133 @@
+{
+  "surface": "swipe-public",
+  "label": "Public Swipe preview",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/swipe/LV-2",
+  "viewport": {
+    "width": 360,
+    "height": 800
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "Swipe - LV-2 The control plane for your coding agents",
+  "headings": {
+    "h1": 1,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 1,
+    "a11y": {
+      "roleHeading": 1,
+      "levels": {
+        "h1": 1,
+        "h2": 0,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 345,
+    "clientWidth": 360,
+    "innerWidth": 360,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 7,
+    "toRoot": 2,
+    "toWorkspace": 0,
+    "toAppNav": 5,
+    "sample": [
+      "/",
+      "/auth/linear",
+      "/",
+      "/swim",
+      "/privacy",
+      "/terms",
+      "/templates"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "← projects\n      \n        + local worksp"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "Triage tasks one card at a time."
+    },
+    {
+      "selector": "a",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "← projects"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "+ local workspace"
+    },
+    {
+      "selector": ".nav-action",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "← projects"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "← projects",
+      "Sign in →"
+    ],
+    "footerLinks": [
+      "projects",
+      "swim",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

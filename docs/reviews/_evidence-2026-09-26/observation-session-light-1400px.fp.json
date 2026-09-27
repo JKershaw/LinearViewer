@@ -1,0 +1,22 @@
+{
+  "surface": "observation-session",
+  "theme": "light",
+  "viewport": 1400,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "status": 404,
+  "url": "/workspace/test-workspace/observation/session/none",
+  "title": "Session not found",
+  "htmlClass": "",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0
+  },
+  "scrollWidth": 1385,
+  "clientWidth": 1400,
+  "scrollHeight": 1000
+}

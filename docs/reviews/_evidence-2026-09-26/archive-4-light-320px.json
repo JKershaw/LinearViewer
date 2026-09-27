@@ -1,0 +1,93 @@
+{
+  "surface": "archive-4",
+  "label": "Archive #4",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/archive/4",
+  "viewport": {
+    "width": 320,
+    "height": 720
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "The Harbour Archive · The August Wing",
+  "headings": {
+    "h1": 1,
+    "h2": 5,
+    "h3": 16,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 22,
+    "a11y": {
+      "roleHeading": 22,
+      "levels": {
+        "h1": 1,
+        "h2": 5,
+        "h3": 16,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 320,
+    "clientWidth": 320,
+    "innerWidth": 320,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 0,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": []
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(28, 36, 48)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 14.84,
+      "text": ":root {\n    --paper: #faf9f6;\n    --card"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(92, 102, 114)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 5.54,
+      "text": "The Project Archive · The August Wing · "
+    },
+    {
+      "selector": ".chip",
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(255,254,251)",
+      "ratio": 3.07,
+      "text": "orientation — the evidence starts below"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": []
+}

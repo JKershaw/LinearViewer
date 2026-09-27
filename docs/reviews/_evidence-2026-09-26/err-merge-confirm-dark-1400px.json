@@ -1,0 +1,114 @@
+{
+  "surface": "err-merge-confirm",
+  "label": "Account-merge confirm (LIN-2400)",
+  "kind": "intercept",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/__intercept__",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "Confirm account merge - Projects",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 2,
+    "a11y": {
+      "roleHeading": 2,
+      "levels": {
+        "h1": 1,
+        "h2": 1,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 1385,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 0,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": []
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour\n  \n  \n    Merge these accounts?\n"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "This Linear account is already connected"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(22, 24, 29)",
+      "bg": "rgb(45,212,191)",
+      "ratio": 9.54,
+      "text": "Yes, merge these accounts"
+    },
+    {
+      "selector": ".error-title",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Merge these accounts?"
+    },
+    {
+      "selector": ".error-message",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "This Linear account is already connected"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

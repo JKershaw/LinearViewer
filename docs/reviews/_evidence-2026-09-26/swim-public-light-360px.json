@@ -1,0 +1,133 @@
+{
+  "surface": "swim-public",
+  "label": "Public Swim preview",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/swim",
+  "viewport": {
+    "width": 360,
+    "height": 800
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "Swim - Lanes",
+  "headings": {
+    "h1": 1,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 1,
+    "a11y": {
+      "roleHeading": 1,
+      "levels": {
+        "h1": 1,
+        "h2": 0,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 345,
+    "clientWidth": 360,
+    "innerWidth": 360,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 7,
+    "toRoot": 2,
+    "toWorkspace": 0,
+    "toAppNav": 5,
+    "sample": [
+      "/",
+      "/auth/linear",
+      "/",
+      "/swipe",
+      "/privacy",
+      "/terms",
+      "/templates"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "← projects\n      \n        + local worksp"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "Dependency-ordered lanes across your wor"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "← projects"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "+ local workspace"
+    },
+    {
+      "selector": ".nav-action",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "← projects"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "← projects",
+      "Sign in →"
+    ],
+    "footerLinks": [
+      "projects",
+      "swipe",
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

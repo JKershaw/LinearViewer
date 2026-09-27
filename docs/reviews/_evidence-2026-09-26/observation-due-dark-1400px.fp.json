@@ -1,0 +1,29 @@
+{
+  "surface": "observation-due",
+  "settleMs": 1500,
+  "theme": "dark",
+  "viewport": 1400,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "Observation",
+  "activeTab": "Scan-due",
+  "dueSectionVisible": true,
+  "dueSectionText": "SCAN-DUE\n\nDue-check results come from a provider-content fingerprint comparison, not an LLM judgement — it can only tell you a task's scanned content changed, never whether the change matters. It is a backstop, not a guarantee.\n\nChecking due-ness reads live task content but never calls a model — scanning does.\n\nThe estimate below is a 30-day historical mean, not a quote — actual per-scan cost can vary. Abort stops the queue and releases the browser; scans already sent will finish, bill, and may still raise a ruling. Scans this queue runs are judged behind the same Principle 0 gate as any other",
+  "haltStatus": null,
+  "headings": {
+    "h1": 1,
+    "h2": 5,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0
+  },
+  "scrollWidth": 1385,
+  "clientWidth": 1400,
+  "scrollHeight": 1000
+}

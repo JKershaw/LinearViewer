@@ -1,0 +1,122 @@
+{
+  "surface": "ship-public",
+  "label": "Public Ship preview (cold, D8 #1)",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/ship",
+  "viewport": {
+    "width": 1400,
+    "height": 1000
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "Ship",
+  "headings": {
+    "h1": 0,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 0,
+    "a11y": {
+      "roleHeading": 0,
+      "levels": {
+        "h1": 0,
+        "h2": 0,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 1385,
+    "clientWidth": 1400,
+    "innerWidth": 1400,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 5,
+    "toRoot": 1,
+    "toWorkspace": 0,
+    "toAppNav": 4,
+    "sample": [
+      "/",
+      "/auth/linear",
+      "/privacy",
+      "/terms",
+      "/templates"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "← projects\n      \n        + local worksp"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "← projects"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "+ local workspace"
+    },
+    {
+      "selector": ".nav-action",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "← projects"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [
+      "← projects",
+      "Sign in →"
+    ],
+    "footerLinks": [
+      "github.com/JKershaw/LinearViewer",
+      "privacy",
+      "terms",
+      "templates"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

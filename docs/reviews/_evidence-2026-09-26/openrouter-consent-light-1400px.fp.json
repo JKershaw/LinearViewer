@@ -1,0 +1,22 @@
+{
+  "surface": "openrouter-consent",
+  "theme": "light",
+  "viewport": 1400,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "title": "Connect OpenRouter - Projects",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 2,
+    "a11yRoleHeading": 2
+  },
+  "scrollHeight": 1000,
+  "capturedPixelHeight": 1000,
+  "clip": null,
+  "footerCount": 0
+}

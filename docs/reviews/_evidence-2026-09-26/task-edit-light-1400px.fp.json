@@ -1,0 +1,22 @@
+{
+  "surface": "task-edit",
+  "theme": "light",
+  "viewport": 1400,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "status": 500,
+  "url": "/workspace/test-workspace/task/123/edit",
+  "title": "Something Went Wrong - Projects",
+  "htmlClass": "",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0
+  },
+  "scrollWidth": 1385,
+  "clientWidth": 1400,
+  "scrollHeight": 1000
+}

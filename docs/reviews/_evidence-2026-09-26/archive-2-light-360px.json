@@ -1,0 +1,93 @@
+{
+  "surface": "archive-2",
+  "label": "Archive #2",
+  "kind": "cold",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/archive/2",
+  "viewport": {
+    "width": 360,
+    "height": 800
+  },
+  "expectedTheme": "light",
+  "darkMode": "media",
+  "themeAssertion": {
+    "expected": "media-emulated (prefers-color-scheme: dark)",
+    "actual": "",
+    "passed": true,
+    "note": "media dark, not cookie"
+  },
+  "title": "The Harbour Archive",
+  "headings": {
+    "h1": 1,
+    "h2": 11,
+    "h3": 40,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 52,
+    "a11y": {
+      "roleHeading": 52,
+      "levels": {
+        "h1": 1,
+        "h2": 11,
+        "h3": 40,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "innerWidth": 360,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 0,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": []
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(28, 36, 48)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 14.84,
+      "text": ":root {\n    --paper: #faf9f6;\n    --card"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(92, 102, 114)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 5.54,
+      "text": "The Project Archive · Permanent Collecti"
+    },
+    {
+      "selector": ".chip",
+      "color": "rgb(139, 147, 160)",
+      "bg": "rgb(250,249,246)",
+      "ratio": 2.94,
+      "text": "4d1cb366"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": true
+  },
+  "fonts": []
+}

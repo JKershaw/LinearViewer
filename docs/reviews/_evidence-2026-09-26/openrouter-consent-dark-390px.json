@@ -1,0 +1,123 @@
+{
+  "surface": "openrouter-consent",
+  "label": "OpenRouter consent interstitial (LIN-2412/2497)",
+  "kind": "intercept",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/__intercept__",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "Connect OpenRouter - Projects",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 2,
+    "a11y": {
+      "roleHeading": 2,
+      "levels": {
+        "h1": 1,
+        "h2": 1,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 375,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 1,
+    "toRoot": 0,
+    "toWorkspace": 1,
+    "toAppNav": 0,
+    "sample": [
+      "/workspace/test-workspace/settings"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour\n  \n  \n    Connect OpenRouter\n   "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "Connecting here lets Harbour use your Op"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "Cancel"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(22, 24, 29)",
+      "bg": "rgb(45,212,191)",
+      "ratio": 9.54,
+      "text": "Connect and enable unattended use"
+    },
+    {
+      "selector": ".error-title",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Connect OpenRouter"
+    },
+    {
+      "selector": ".error-message",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "Connecting here lets Harbour use your Op"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

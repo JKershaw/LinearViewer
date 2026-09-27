@@ -1,0 +1,121 @@
+{
+  "surface": "gh-repo-picker",
+  "label": "GitHub repo picker (LIN-2820)",
+  "kind": "intercept",
+  "theme": "light",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/__intercept__",
+  "viewport": {
+    "width": 320,
+    "height": 720
+  },
+  "expectedTheme": "light",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "Choose a repository - Projects",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 2,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 4,
+    "a11y": {
+      "roleHeading": 4,
+      "levels": {
+        "h1": 1,
+        "h2": 1,
+        "h3": 2,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "",
+  "overflow": {
+    "scrollWidth": 305,
+    "clientWidth": 320,
+    "innerWidth": 320,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 0,
+    "toRoot": 0,
+    "toWorkspace": 0,
+    "toAppNav": 0,
+    "sample": []
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Harbour\n  \n  \n    Choose a GitHub reposi"
+    },
+    {
+      "selector": "p",
+      "color": "rgb(102, 102, 102)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 5.74,
+      "text": "Signed in as octocat. Below are the repo"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(13, 148, 136)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 3.74,
+      "text": "Don't see the repo? Add it to the Harbou"
+    },
+    {
+      "selector": "button",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(13,148,136)",
+      "ratio": 3.74,
+      "text": "Connect repository"
+    },
+    {
+      "selector": ".error-title",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "Choose a GitHub repository"
+    },
+    {
+      "selector": ".repo-picker-slug",
+      "color": "rgb(26, 26, 26)",
+      "bg": "rgb(255,255,255)",
+      "ratio": 17.4,
+      "text": "acme/repo-1 (private)"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

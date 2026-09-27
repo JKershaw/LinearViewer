@@ -1,0 +1,276 @@
+{
+  "note": "Cookie-dark (theme-dark asserted) composited contrast sweep of 24 authenticated app surfaces @1400; groups <3:1 only. Test-workspace seed with all flags on; Collective against the in-process mock Yap.",
+  "surfaces": {
+    "/": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/swipe": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.swipe-arrow.swipe-arrow-left",
+          "color": "rgb(44, 49, 58)",
+          "bg": "rgb(22,24,29)",
+          "ratio": 1.36,
+          "count": 1,
+          "samples": [
+            "←"
+          ]
+        }
+      ]
+    },
+    "/swim": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/ship": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/roadmap": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/audit": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.audit-button",
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(110,168,254)",
+          "ratio": 2.42,
+          "count": 1,
+          "samples": [
+            "Run Audit"
+          ]
+        }
+      ]
+    },
+    "/settings": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 2,
+          "samples": [
+            "make active",
+            "refresh / test"
+          ]
+        },
+        {
+          "element": "a.settings-action",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "count": 12,
+          "samples": [
+            "open the discussion page",
+            "open the task chat page",
+            "open the radial view"
+          ]
+        }
+      ]
+    },
+    "/prompts": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "span.stat-separator",
+          "color": "rgb(44, 49, 58)",
+          "bg": "rgb(22,24,28)",
+          "ratio": 1.36,
+          "count": 2,
+          "samples": [
+            "·",
+            "·"
+          ]
+        },
+        {
+          "element": "a.stat-link",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(22,24,28)",
+          "ratio": 1.89,
+          "count": 1,
+          "samples": [
+            "custom prompts →"
+          ]
+        }
+      ]
+    },
+    "/prompts/custom": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/dispatch": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.dispatch-load-autopilot",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 2,
+          "samples": [
+            "load Autopilot",
+            "load Autopilot · stepped"
+          ]
+        },
+        {
+          "element": "button.action-btn.dispatch-continue-until-stopped",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 1,
+          "samples": [
+            "continue until stopped"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-pause",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 1,
+          "samples": [
+            "Pause"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-stop",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 1,
+          "samples": [
+            "Stop"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-resume",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 1,
+          "samples": [
+            "Resume"
+          ]
+        },
+        {
+          "element": "a.settings-action.dispatch-preset-create-link",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "count": 1,
+          "samples": [
+            "create a preset →"
+          ]
+        }
+      ]
+    },
+    "/proxy": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.proxy-events-prev",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 1,
+          "samples": [
+            "prev"
+          ]
+        },
+        {
+          "element": "button.action-btn.proxy-events-next",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 1,
+          "samples": [
+            "next"
+          ]
+        }
+      ]
+    },
+    "/observation": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/dashboard": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/escalation-kpis": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/effort-readout": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/flight-companion": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/live-console": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/next-run": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/passage-planner": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/ship-biscuit": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/ship-journey": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/task-chat": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/task/new": {
+      "themeAssertion": true,
+      "groups": []
+    },
+    "/collective": {
+      "themeAssertion": true,
+      "groups": [
+        {
+          "element": "button.action-btn.collective-preset-launch",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 6,
+          "samples": [
+            "launch",
+            "launch",
+            "launch"
+          ]
+        },
+        {
+          "element": "button.action-btn",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "count": 2,
+          "samples": [
+            "add character",
+            "view prompt"
+          ]
+        }
+      ]
+    }
+  }
+}

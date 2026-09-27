@@ -1,0 +1,117 @@
+{
+  "surface": "raw-openrouter-cb-nocode",
+  "label": "OpenRouter callback — no code (400 Authorization Failed)",
+  "kind": "auth",
+  "theme": "dark",
+  "persisted": false,
+  "status": 400,
+  "url": "http://localhost:3199/auth/openrouter/callback",
+  "viewport": {
+    "width": 320,
+    "height": 720
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "Authorization Failed - Projects",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 2,
+    "a11y": {
+      "roleHeading": 2,
+      "levels": {
+        "h1": 1,
+        "h2": 1,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 305,
+    "clientWidth": 320,
+    "innerWidth": 320,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 2,
+    "toRoot": 1,
+    "toWorkspace": 0,
+    "toAppNav": 1,
+    "sample": [
+      "/auth/openrouter",
+      "/"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour\n  \n  \n    Authorization Failed\n "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "No authorization code received from Open"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(22, 24, 29)",
+      "bg": "rgb(45,212,191)",
+      "ratio": 9.54,
+      "text": "Try again"
+    },
+    {
+      "selector": ".error-title",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Authorization Failed"
+    },
+    {
+      "selector": ".error-message",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "No authorization code received from Open"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

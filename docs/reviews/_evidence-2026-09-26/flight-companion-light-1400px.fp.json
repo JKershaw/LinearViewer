@@ -1,0 +1,22 @@
+{
+  "surface": "flight-companion",
+  "theme": "light",
+  "viewport": 1400,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "status": 200,
+  "url": "/workspace/test-workspace/flight-companion",
+  "title": "Flight Companion - Experimental",
+  "htmlClass": "",
+  "headings": {
+    "h1": 1,
+    "h2": 4,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0
+  },
+  "scrollWidth": 1385,
+  "clientWidth": 1400,
+  "scrollHeight": 1372
+}

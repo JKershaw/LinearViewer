@@ -1,0 +1,108 @@
+{
+  "surface": "privacy",
+  "label": "Privacy",
+  "kind": "cold",
+  "theme": "dark",
+  "persisted": false,
+  "status": 200,
+  "url": "http://localhost:3199/privacy",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "Privacy Policy - Harbour",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 6,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 8,
+    "a11y": {
+      "roleHeading": 8,
+      "levels": {
+        "h1": 1,
+        "h2": 1,
+        "h3": 6,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 375,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 1,
+  "mainCount": 1,
+  "linksIntoProduct": {
+    "total": 3,
+    "toRoot": 1,
+    "toWorkspace": 0,
+    "toAppNav": 2,
+    "sample": [
+      "/",
+      "/terms",
+      "/templates"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour\n  \n  \n    Privacy Policy\n\n    \n "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "When you sign in with Linear, we receive"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [
+      "github.com/JKershaw/LinearViewer",
+      "terms",
+      "templates"
+    ],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "surface": "archive-7",
+  "theme": "dark",
+  "viewport": 1400,
+  "captureMode": "pageEnd",
+  "darkMode": "cookie",
+  "title": "Learning While the Tools Change · Harbour Archive #7",
+  "headings": {
+    "h1": 1,
+    "h2": 12,
+    "h3": 13,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 26,
+    "a11yRoleHeading": 26
+  },
+  "scrollHeight": 23422,
+  "capturedPixelHeight": 1000,
+  "clip": {
+    "y": 22422,
+    "height": 1000
+  },
+  "footerCount": 1
+}

@@ -1,0 +1,1498 @@
+{
+  "titleCensus": [
+    {
+      "title": "Something Went Wrong - Projects",
+      "count": 3
+    },
+    {
+      "title": "Trouble Reaching Linear - Projects",
+      "count": 3
+    },
+    {
+      "title": "The Harbour Archive",
+      "count": 2
+    },
+    {
+      "title": "Observation",
+      "count": 2
+    },
+    {
+      "title": "Local Workspace - Projects",
+      "count": 2
+    },
+    {
+      "title": "Ship",
+      "count": 2
+    },
+    {
+      "title": "Swim - Lanes",
+      "count": 2
+    },
+    {
+      "title": "Harbour — Project Brief · 3 August 2026",
+      "count": 1
+    },
+    {
+      "title": "The Harbour Archive · The August Wing",
+      "count": 1
+    },
+    {
+      "title": "The Cheap Ships · Harbour Archive #5",
+      "count": 1
+    },
+    {
+      "title": "Harbour from the Bridge · Harbour Archive #6",
+      "count": 1
+    },
+    {
+      "title": "Learning While the Tools Change · Harbour Archive #7",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Operator Dashboard",
+      "count": 1
+    },
+    {
+      "title": "Collective - Experimental",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Custom Prompts",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Dispatch",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Effort Self-Assessment",
+      "count": 1
+    },
+    {
+      "title": "Confirm account merge - Projects",
+      "count": 1
+    },
+    {
+      "title": "Sign in again to confirm - Projects",
+      "count": 1
+    },
+    {
+      "title": "Re-authentication Needed - Projects",
+      "count": 1
+    },
+    {
+      "title": "Workspace Not Found - Projects",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Escalation KPIs",
+      "count": 1
+    },
+    {
+      "title": "Flight Companion - Experimental",
+      "count": 1
+    },
+    {
+      "title": "Choose a project board - Projects",
+      "count": 1
+    },
+    {
+      "title": "Choose a repository - Projects",
+      "count": 1
+    },
+    {
+      "title": "GitHub Projects Workspace - Projects",
+      "count": 1
+    },
+    {
+      "title": "GitHub Workspace - Projects",
+      "count": 1
+    },
+    {
+      "title": "Connect Jira",
+      "count": 1
+    },
+    {
+      "title": "Jira Workspace - Settings",
+      "count": 1
+    },
+    {
+      "title": "Choose a Jira site",
+      "count": 1
+    },
+    {
+      "title": "Jira Workspace - Projects",
+      "count": 1
+    },
+    {
+      "title": "KPIs - Harbour",
+      "count": 1
+    },
+    {
+      "title": "Harbour — keep human intent in command of AI execution",
+      "count": 1
+    },
+    {
+      "title": "Live Console - Experimental",
+      "count": 1
+    },
+    {
+      "title": "Suggested Next Run - Experimental",
+      "count": 1
+    },
+    {
+      "title": "Session not found",
+      "count": 1
+    },
+    {
+      "title": "Connect OpenRouter - Projects",
+      "count": 1
+    },
+    {
+      "title": "Passage Planner - Experimental",
+      "count": 1
+    },
+    {
+      "title": "Privacy Policy - Harbour",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Prompts",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Proxy",
+      "count": 1
+    },
+    {
+      "title": "Authentication Failed - Projects",
+      "count": 1
+    },
+    {
+      "title": "No Workspace Selected - Projects",
+      "count": 1
+    },
+    {
+      "title": "Authorization Failed - Projects",
+      "count": 1
+    },
+    {
+      "title": "Roadmap - Test Workspace",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Settings",
+      "count": 1
+    },
+    {
+      "title": "The Ship's Biscuit - Experimental",
+      "count": 1
+    },
+    {
+      "title": "Ship Journey - Experimental",
+      "count": 1
+    },
+    {
+      "title": "Style Guide - Harbour",
+      "count": 1
+    },
+    {
+      "title": "Swipe - TEST-13 Login fails with special characters in password",
+      "count": 1
+    },
+    {
+      "title": "Swipe - LV-2 The control plane for your coding agents",
+      "count": 1
+    },
+    {
+      "title": "Task Chat - Experimental",
+      "count": 1
+    },
+    {
+      "title": "New task",
+      "count": 1
+    },
+    {
+      "title": "Templates - Harbour",
+      "count": 1
+    },
+    {
+      "title": "Terms of Service - Harbour",
+      "count": 1
+    },
+    {
+      "title": "Test Workspace - Projects",
+      "count": 1
+    }
+  ],
+  "conventionCounts": {
+    "archive (document titles)": 6,
+    "landing (one-off)": 2,
+    "<Workspace> - <Page>": 10,
+    "- Experimental": 8,
+    "bare": 7,
+    "- Projects": 22,
+    "- Harbour": 5,
+    "other": 1,
+    "one-off (Swim - Lanes)": 2,
+    "one-off (Swipe <issue>)": 2
+  },
+  "archiveTable": [
+    {
+      "archive": 1,
+      "title": "The Harbour Archive",
+      "footerCount": 1,
+      "colophon": true,
+      "overflowsAt320": false,
+      "scrollW320": 320,
+      "clientW320": 320,
+      "offenders320": [],
+      "overflowsAt390": false,
+      "linksTotal": 0,
+      "linksToRoot": 0,
+      "linksToWorkspace": 0,
+      "linksToAppNav": 0,
+      "linksSample": []
+    },
+    {
+      "archive": 2,
+      "title": "The Harbour Archive",
+      "footerCount": 1,
+      "colophon": true,
+      "overflowsAt320": false,
+      "scrollW320": 320,
+      "clientW320": 320,
+      "offenders320": [],
+      "overflowsAt390": false,
+      "linksTotal": 0,
+      "linksToRoot": 0,
+      "linksToWorkspace": 0,
+      "linksToAppNav": 0,
+      "linksSample": []
+    },
+    {
+      "archive": 3,
+      "title": "Harbour — Project Brief · 3 August 2026",
+      "footerCount": 1,
+      "colophon": true,
+      "overflowsAt320": false,
+      "scrollW320": 320,
+      "clientW320": 320,
+      "offenders320": [],
+      "overflowsAt390": false,
+      "linksTotal": 0,
+      "linksToRoot": 0,
+      "linksToWorkspace": 0,
+      "linksToAppNav": 0,
+      "linksSample": []
+    },
+    {
+      "archive": 4,
+      "title": "The Harbour Archive · The August Wing",
+      "footerCount": 0,
+      "colophon": false,
+      "overflowsAt320": false,
+      "scrollW320": 320,
+      "clientW320": 320,
+      "offenders320": [],
+      "overflowsAt390": false,
+      "linksTotal": 0,
+      "linksToRoot": 0,
+      "linksToWorkspace": 0,
+      "linksToAppNav": 0,
+      "linksSample": []
+    },
+    {
+      "archive": 5,
+      "title": "The Cheap Ships · Harbour Archive #5",
+      "footerCount": 0,
+      "colophon": false,
+      "overflowsAt320": false,
+      "scrollW320": 320,
+      "clientW320": 320,
+      "offenders320": [],
+      "overflowsAt390": false,
+      "linksTotal": 1,
+      "linksToRoot": 0,
+      "linksToWorkspace": 0,
+      "linksToAppNav": 0,
+      "linksSample": [
+        "/archive/4"
+      ]
+    },
+    {
+      "archive": 6,
+      "title": "Harbour from the Bridge · Harbour Archive #6",
+      "footerCount": 0,
+      "colophon": false,
+      "overflowsAt320": false,
+      "scrollW320": 320,
+      "clientW320": 320,
+      "offenders320": [],
+      "overflowsAt390": false,
+      "linksTotal": 0,
+      "linksToRoot": 0,
+      "linksToWorkspace": 0,
+      "linksToAppNav": 0,
+      "linksSample": []
+    },
+    {
+      "archive": 7,
+      "title": "Learning While the Tools Change · Harbour Archive #7",
+      "footerCount": 1,
+      "colophon": false,
+      "overflowsAt320": false,
+      "scrollW320": 320,
+      "clientW320": 320,
+      "offenders320": [],
+      "overflowsAt390": false,
+      "linksTotal": 2,
+      "linksToRoot": 0,
+      "linksToWorkspace": 0,
+      "linksToAppNav": 0,
+      "linksSample": [
+        "/archive/2",
+        "/archive/5"
+      ]
+    }
+  ],
+  "archiveOverflow": [],
+  "shipPublicHeadings": {
+    "h1": 0,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 0,
+    "a11y": {
+      "roleHeading": 0,
+      "levels": {
+        "h1": 0,
+        "h2": 0,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "shipAuthHeadings": {
+    "h1": 0,
+    "h2": 0,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 0,
+    "a11y": {
+      "roleHeading": 0,
+      "levels": {
+        "h1": 0,
+        "h2": 0,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "errHeadings": [
+    {
+      "surface": "err-merge-confirm",
+      "title": "Confirm account merge - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    },
+    {
+      "surface": "err-generic",
+      "title": "Something Went Wrong - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    },
+    {
+      "surface": "err-upstream-auth",
+      "title": "Re-authentication Needed - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    },
+    {
+      "surface": "err-upstream-5xx",
+      "title": "Trouble Reaching Linear - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    },
+    {
+      "surface": "err-workspace-notfound",
+      "title": "Workspace Not Found - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    },
+    {
+      "surface": "raw-jira-nows",
+      "title": "No Workspace Selected - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    },
+    {
+      "surface": "raw-openrouter-cb-nocode",
+      "title": "Authorization Failed - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    },
+    {
+      "surface": "gh-repo-picker",
+      "title": "Choose a repository - Projects",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 4,
+      "a11yRoleHeading": 4
+    },
+    {
+      "surface": "jira-site-picker",
+      "title": "Choose a Jira site",
+      "h1": 1,
+      "h2": 1,
+      "totalDom": 2,
+      "a11yRoleHeading": 2
+    }
+  ],
+  "providerTrees": [
+    {
+      "surface": "local-tree",
+      "title": "Local Workspace - Projects"
+    },
+    {
+      "surface": "github-tree",
+      "title": "GitHub Workspace - Projects"
+    },
+    {
+      "surface": "ghp-tree",
+      "title": "GitHub Projects Workspace - Projects"
+    },
+    {
+      "surface": "jira-tree",
+      "title": "Jira Workspace - Projects"
+    },
+    {
+      "surface": "tree",
+      "title": "Test Workspace - Projects"
+    },
+    {
+      "surface": "local-roadmap",
+      "title": "Local Workspace - Projects"
+    }
+  ],
+  "navFoot": [
+    {
+      "surface": "audit",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "collective",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "custom-prompts",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "dashboard",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "dispatch",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "effort-readout",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "escalation-kpis",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "flight-companion",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "ghp-tree",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": true,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "search",
+        "swipe",
+        "swim",
+        "observation",
+        "settings"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "github-tree",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": true,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "search",
+        "swipe",
+        "swim",
+        "observation",
+        "settings"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "jira-settings",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "jira-tree",
+      "hasThemeToggle": true,
+      "hasTeamSelector": true,
+      "hasAssigneeSelector": true,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "search",
+        "swipe",
+        "swim",
+        "observation",
+        "settings"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "live-console",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "flight companion",
+        "passage planner",
+        "ship's biscuit",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "local-roadmap",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "search",
+        "swipe",
+        "swim",
+        "observation",
+        "settings"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "local-tree",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "search",
+        "swipe",
+        "swim",
+        "observation",
+        "settings"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "next-run",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "observation",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "observation-session",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "settings",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "passage-planner",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "flight companion",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "prompts",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "proxy",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "raw-auth-callback",
+      "hasThemeToggle": false,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "raw-jira-nows",
+      "hasThemeToggle": false,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "raw-openrouter-cb-nocode",
+      "hasThemeToggle": false,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "roadmap",
+      "hasThemeToggle": true,
+      "hasTeamSelector": true,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "settings",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "ship-biscuit",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "flight companion",
+        "passage planner",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "ship-journey",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "flight companion",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "ship",
+      "hasThemeToggle": true,
+      "hasTeamSelector": true,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "next run",
+        "flight companion",
+        "passage planner",
+        "ship's biscuit"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "swim",
+      "hasThemeToggle": true,
+      "hasTeamSelector": true,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "observation",
+        "settings",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion",
+        "passage planner",
+        "ship's biscuit"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "swipe",
+      "hasThemeToggle": true,
+      "hasTeamSelector": true,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "task-chat",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "0 waiting on you",
+        "tasks",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "task-edit",
+      "hasThemeToggle": false,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "task-new",
+      "hasThemeToggle": true,
+      "hasTeamSelector": false,
+      "hasAssigneeSelector": false,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "search",
+        "0 waiting on you",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    },
+    {
+      "surface": "tree",
+      "hasThemeToggle": true,
+      "hasTeamSelector": true,
+      "hasAssigneeSelector": true,
+      "hasNavFeedback": false,
+      "navLinks": [
+        "harbour.cat",
+        "search",
+        "0 waiting on you",
+        "swipe",
+        "swim",
+        "observation",
+        "settings",
+        "passage planner",
+        "ship's biscuit",
+        "live console",
+        "ship journey",
+        "roadmap",
+        "dispatch",
+        "proxy",
+        "collective",
+        "task chat",
+        "ship",
+        "next run",
+        "flight companion"
+      ],
+      "footerHasColophon": false
+    }
+  ],
+  "mergeButtons": {
+    "390": {
+      "primary": {
+        "background": "rgb(13, 148, 136)",
+        "color": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(13, 148, 136)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 255,
+        "height": 46
+      },
+      "secondary": {
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(26, 26, 26)",
+        "border": "1px solid rgb(221, 221, 221)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 231,
+        "height": 46
+      }
+    },
+    "1400": {
+      "primary": {
+        "background": "rgb(13, 148, 136)",
+        "color": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(13, 148, 136)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 255,
+        "height": 46
+      },
+      "secondary": {
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(26, 26, 26)",
+        "border": "1px solid rgb(221, 221, 221)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 231,
+        "height": 46
+      }
+    }
+  },
+  "openrouterButtons": {
+    "390": {
+      "primary": {
+        "background": "rgb(13, 148, 136)",
+        "color": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(13, 148, 136)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 324,
+        "height": 46
+      },
+      "secondary": {
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(26, 26, 26)",
+        "border": "1px solid rgb(221, 221, 221)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 297,
+        "height": 46
+      }
+    },
+    "1400": {
+      "primary": {
+        "background": "rgb(13, 148, 136)",
+        "color": "rgb(255, 255, 255)",
+        "border": "1px solid rgb(13, 148, 136)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 324,
+        "height": 46
+      },
+      "secondary": {
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(26, 26, 26)",
+        "border": "1px solid rgb(221, 221, 221)",
+        "borderRadius": "4px",
+        "padding": "12px 24px",
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+        "cursor": "pointer",
+        "width": 297,
+        "height": 46
+      }
+    }
+  },
+  "upstreamCopy": {
+    "429": {
+      "title": "Trouble Reaching Linear - Projects",
+      "errorMessage": "We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.",
+      "diagnostic": [
+        "Reason Linear rate-limited the request; it should recover shortly.",
+        "Type upstream · retryable",
+        "Code LINEAR_RATE_LIMITED",
+        "Time 2026-09-26T00:00:00.000Z"
+      ]
+    },
+    "5xx": {
+      "title": "Trouble Reaching Linear - Projects",
+      "errorMessage": "We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.",
+      "diagnostic": [
+        "Reason Linear returned a 503 server error.",
+        "Type upstream · retryable",
+        "Code LINEAR_UPSTREAM_5XX",
+        "Time 2026-09-26T00:00:00.000Z"
+      ]
+    },
+    "net": {
+      "title": "Trouble Reaching Linear - Projects",
+      "errorMessage": "We couldn't reach Linear's API just now — the connection closed before it responded. This is usually temporary; try again in a moment.",
+      "diagnostic": [
+        "Reason The connection to Linear closed before a response arrived — usually transient.",
+        "Type upstream · retryable",
+        "Code LINEAR_UNREACHABLE",
+        "Time 2026-09-26T00:00:00.000Z"
+      ]
+    },
+    "auth": {
+      "title": "Re-authentication Needed - Projects",
+      "errorMessage": "Linear rejected your session as unauthenticated — your sign-in has expired or been revoked. Log out and sign in again to continue.",
+      "diagnostic": [
+        "Reason Linear rejected the request as unauthenticated.",
+        "Type auth",
+        "Code LINEAR_AUTH",
+        "Time 2026-09-26T00:00:00.000Z"
+      ]
+    }
+  }
+}

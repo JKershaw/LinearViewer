@@ -1,0 +1,757 @@
+{
+  "note": "Full-page low-contrast sweep (<4.5:1) grouped by element+colour+effective-bg; cookie theme; 1400px. Effective bg = translucent ancestor backgrounds alpha-composited down to the first opaque one (fixes capture.mjs stopping at the first alpha>0 layer). Still blind to background-image, pseudo-elements and text over non-ancestor layers.",
+  "surfaces": {
+    "settings--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "span.feature-note",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 2.12,
+          "fontSize": "12.8px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Recommended — the agent reaches the tracker throug"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 3,
+          "samples": [
+            "save",
+            "save model overrides",
+            "save dispatch defaults"
+          ]
+        },
+        {
+          "element": "button.action-btn.save.dispatch-preset-create-btn",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "save preset"
+          ]
+        },
+        {
+          "element": "button.action-btn.provider-add-btn",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "add",
+            "API token"
+          ]
+        },
+        {
+          "element": "span.toggle-state",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.3,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 16,
+          "samples": [
+            "● on",
+            "● on",
+            "● on"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Settings"
+        },
+        ".section-header": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "16px",
+          "color": "rgb(26, 26, 26)",
+          "text": "AI"
+        }
+      }
+    },
+    "settings--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "button.action-btn",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "make active",
+            "refresh / test"
+          ]
+        },
+        {
+          "element": "a.settings-action",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 12,
+          "samples": [
+            "open the discussion page",
+            "open the task chat page",
+            "open the radial view"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Settings"
+        },
+        ".section-header": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "16px",
+          "color": "rgb(230, 230, 230)",
+          "text": "AI"
+        }
+      }
+    },
+    "dispatch--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "button.action-btn.save.dispatch-toggle",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Dispatch ▾"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "generate"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ],
+      "fonts": {
+        ".guide-halt-note": {
+          "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+          "fontSize": "16px",
+          "color": "rgb(26, 26, 26)",
+          "text": "A poll response may also carry a top-level halt key when an "
+        },
+        ".halt-status": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "14.4px",
+          "color": "rgb(26, 26, 26)",
+          "text": "No halt requested."
+        },
+        ".halt-disclaimer": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "13.6px",
+          "color": "rgb(102, 102, 102)",
+          "text": "This page can load slowly when Linear or the database is deg"
+        },
+        ".halt-pause": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "13.6px",
+          "color": "rgb(0, 0, 0)",
+          "text": "Pause"
+        },
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Dispatch"
+        },
+        ".section-header": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "16px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Send Prompt"
+        }
+      },
+      "asyncSectionsAfter6s": {
+        "haltStatus": "No halt requested.",
+        "loadingTexts": []
+      },
+      "network": []
+    },
+    "dispatch--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "button.action-btn.dispatch-load-autopilot",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 2,
+          "samples": [
+            "load Autopilot",
+            "load Autopilot · stepped"
+          ]
+        },
+        {
+          "element": "button.action-btn.dispatch-continue-until-stopped",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "continue until stopped"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-pause",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Pause"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-stop",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Stop"
+          ]
+        },
+        {
+          "element": "button.action-btn.halt-resume",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "Resume"
+          ]
+        },
+        {
+          "element": "a.settings-action.dispatch-preset-create-link",
+          "color": "rgb(0, 0, 238)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.65,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "create a preset →"
+          ]
+        }
+      ],
+      "fonts": {
+        ".guide-halt-note": {
+          "fontFamily": "\"JetBrains Mono\", \"SF Mono\", \"Fira Code\", Consolas, monospace",
+          "fontSize": "16px",
+          "color": "rgb(230, 230, 230)",
+          "text": "A poll response may also carry a top-level halt key when an "
+        },
+        ".halt-status": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "14.4px",
+          "color": "rgb(230, 230, 230)",
+          "text": "No halt requested."
+        },
+        ".halt-disclaimer": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "13.6px",
+          "color": "rgb(154, 160, 166)",
+          "text": "This page can load slowly when Linear or the database is deg"
+        },
+        ".halt-pause": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "13.6px",
+          "color": "rgb(0, 0, 0)",
+          "text": "Pause"
+        },
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Dispatch"
+        },
+        ".section-header": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "16px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Send Prompt"
+        }
+      },
+      "asyncSectionsAfter6s": {
+        "haltStatus": "No halt requested.",
+        "loadingTexts": []
+      },
+      "network": []
+    },
+    "proxy--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(247,247,247)",
+          "ratio": 3.08,
+          "fontSize": "12.24px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "generate"
+          ]
+        },
+        {
+          "element": "button.action-btn.save",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(248,249,250)",
+          "ratio": 3.13,
+          "fontSize": "13.6px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "generate & copy"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Proxy"
+        },
+        ".section-header": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "16px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Agent Prompt"
+        }
+      }
+    },
+    "proxy--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "button.action-btn.proxy-events-prev",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "11.56px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "prev"
+          ]
+        },
+        {
+          "element": "button.action-btn.proxy-events-next",
+          "color": "rgb(0, 0, 0)",
+          "bg": "rgb(34,36,40)",
+          "ratio": 1.35,
+          "fontSize": "11.56px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "next"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Proxy"
+        },
+        ".section-header": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "16px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Agent Prompt"
+        }
+      }
+    },
+    "observation-due--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "span.obs-poll-status",
+          "color": "rgb(22, 163, 74)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.3,
+          "fontSize": "12.8px",
+          "fontWeight": "600",
+          "count": 1,
+          "samples": [
+            "● live"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "22.4px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Observation ● live"
+        }
+      }
+    },
+    "observation-due--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "22.4px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Observation ● live"
+        }
+      }
+    },
+    "tree--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "div.in-progress-header",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 1,
+          "samples": [
+            "▼ In Progress"
+          ]
+        },
+        {
+          "element": "span.status-pill__char",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "14.4px",
+          "fontWeight": "400",
+          "count": 10,
+          "samples": [
+            "◐",
+            "◐",
+            "◐"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Test Workspace"
+        }
+      }
+    },
+    "tree--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Test Workspace"
+        }
+      }
+    },
+    "effort-readout--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Effort Self-Assessment"
+        }
+      }
+    },
+    "effort-readout--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Effort Self-Assessment"
+        }
+      }
+    },
+    "escalation-kpis--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        }
+      ],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(26, 26, 26)",
+          "text": "Escalation KPIs"
+        }
+      }
+    },
+    "escalation-kpis--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [],
+      "fonts": {
+        "h1": {
+          "fontFamily": "Inter, -apple-system, \"system-ui\", \"Segoe UI\", sans-serif",
+          "fontSize": "32px",
+          "color": "rgb(230, 230, 230)",
+          "text": "Escalation KPIs"
+        }
+      }
+    },
+    "ship--light--1400px": {
+      "themeAssertion": {
+        "expected": "(no theme-dark)",
+        "actual": "",
+        "passed": true
+      },
+      "lowContrast": [
+        {
+          "element": "span.swim-box-state.in-progress.status-pill__char.status-pill--in-progress",
+          "color": "rgb(212, 166, 0)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 2.27,
+          "fontSize": "13px",
+          "fontWeight": "400",
+          "count": 5,
+          "samples": [
+            "◐",
+            "◐",
+            "◐"
+          ]
+        },
+        {
+          "element": "span.wordmark-accent",
+          "color": "rgb(13, 148, 136)",
+          "bg": "rgb(255,255,255)",
+          "ratio": 3.74,
+          "fontSize": "16px",
+          "fontWeight": "600",
+          "count": 2,
+          "samples": [
+            ".cat",
+            ".cat"
+          ]
+        },
+        {
+          "element": "button.ship-mode-btn.active",
+          "color": "rgb(255, 255, 255)",
+          "bg": "rgb(13,148,136)",
+          "ratio": 3.74,
+          "fontSize": "11px",
+          "fontWeight": "400",
+          "count": 1,
+          "samples": [
+            "project"
+          ]
+        }
+      ],
+      "fonts": {}
+    },
+    "ship--dark--1400px": {
+      "themeAssertion": {
+        "expected": "theme-dark",
+        "actual": "theme-dark",
+        "passed": true
+      },
+      "lowContrast": [],
+      "fonts": {}
+    }
+  }
+}

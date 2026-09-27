@@ -1,0 +1,117 @@
+{
+  "surface": "task-edit",
+  "label": "Task edit",
+  "kind": "auth",
+  "theme": "dark",
+  "persisted": false,
+  "status": 500,
+  "url": "http://localhost:3199/workspace/test-workspace/task/123/edit",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "expectedTheme": "dark",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "theme-dark",
+    "actual": "theme-dark",
+    "passed": true
+  },
+  "title": "Something Went Wrong - Projects",
+  "headings": {
+    "h1": 1,
+    "h2": 1,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0,
+    "totalDom": 2,
+    "a11y": {
+      "roleHeading": 2,
+      "levels": {
+        "h1": 1,
+        "h2": 1,
+        "h3": 0,
+        "h4": 0,
+        "h5": 0,
+        "h6": 0
+      }
+    }
+  },
+  "htmlClass": "theme-dark",
+  "overflow": {
+    "scrollWidth": 375,
+    "clientWidth": 390,
+    "innerWidth": 390,
+    "overflows": false,
+    "offenders": []
+  },
+  "footerCount": 0,
+  "mainCount": 0,
+  "linksIntoProduct": {
+    "total": 2,
+    "toRoot": 1,
+    "toWorkspace": 1,
+    "toAppNav": 0,
+    "sample": [
+      "/workspace/test-workspace/",
+      "/"
+    ]
+  },
+  "contrast": [
+    {
+      "selector": "body",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Harbour\n  \n  \n    Something Went Wrong\n "
+    },
+    {
+      "selector": "p",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "Could not load this task for editing. Pl"
+    },
+    {
+      "selector": "a",
+      "color": "rgb(22, 24, 29)",
+      "bg": "rgb(45,212,191)",
+      "ratio": 9.54,
+      "text": "Back to tasks"
+    },
+    {
+      "selector": ".error-title",
+      "color": "rgb(230, 230, 230)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 14.23,
+      "text": "Something Went Wrong"
+    },
+    {
+      "selector": ".error-message",
+      "color": "rgb(154, 160, 166)",
+      "bg": "rgb(22,24,29)",
+      "ratio": 6.73,
+      "text": "Could not load this task for editing. Pl"
+    }
+  ],
+  "clip": [],
+  "navFoot": {
+    "navLinks": [],
+    "footerLinks": [],
+    "hasThemeToggle": false,
+    "hasTeamSelector": false,
+    "hasAssigneeSelector": false,
+    "hasNavFeedback": false,
+    "footerHasColophon": false
+  },
+  "fonts": [
+    "Inter 400",
+    "Inter 500",
+    "Inter 600",
+    "Inter 700",
+    "JetBrains Mono 400",
+    "JetBrains Mono 500",
+    "JetBrains Mono 600"
+  ]
+}

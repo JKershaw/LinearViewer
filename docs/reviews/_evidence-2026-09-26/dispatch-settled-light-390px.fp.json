@@ -1,0 +1,29 @@
+{
+  "surface": "dispatch-settled",
+  "settleMs": 6000,
+  "theme": "light",
+  "viewport": 390,
+  "captureMode": "fullPage",
+  "darkMode": "cookie",
+  "themeAssertion": {
+    "expected": "(no theme-dark)",
+    "actual": "",
+    "passed": true
+  },
+  "title": "Test Workspace - Dispatch",
+  "activeTab": null,
+  "dueSectionVisible": null,
+  "dueSectionText": null,
+  "haltStatus": "No halt requested.",
+  "headings": {
+    "h1": 1,
+    "h2": 6,
+    "h3": 0,
+    "h4": 0,
+    "h5": 0,
+    "h6": 0
+  },
+  "scrollWidth": 375,
+  "clientWidth": 390,
+  "scrollHeight": 3640
+}
