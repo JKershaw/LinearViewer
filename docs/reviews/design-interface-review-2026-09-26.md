@@ -61,7 +61,7 @@ The research worker had **no image input** (research-notes §6d and §7.7). Ever
 1. **Viewed every kept PNG.** That is 137 images, one row each in `visual-pass.md`, set against the paired JSON verdict.
 2. **Filled the capture gap.** Settings, Dispatch and Proxy (full page, both themes, 1400 and 390), the Scan-due tab, settled Dispatch, and settled archive page-ends.
 3. **Re-rendered the 30 surfaces that research had kept as JSON only** and viewed all 120 frames (both themes, 1400 and 390). Beat 2 kept the ten frames it cited. **After the second-read** (its ask 3), one light 1400 **full-page** render was also kept for each of the 24 authenticated surfaces among them (`<surface>-light-1400px.fp.png`, via `capture/capture-gap.mjs keep24`), so every verdict below is citable. The other frames are recorded in the manifest as regenerable.
-4. **Replaced the first-match contrast sample with a composited full-page sweep.** The research tool read only the **first** element per selector and stopped at the first translucent background. That is how it reported `button` / `a` at 14.23:1 on pages whose halt controls sit at 1.35:1 (§8.5). The new sweep composites alpha layers down to an opaque background and checks **every** text-bearing element. It was run on 8 surfaces × 2 themes (`gap-contrast-sweep.json`), then on all 24 authenticated app surfaces in dark with a <3:1 cut-off (`gap-dark-sweep.json`). **After the second-read** it was run as a full AA census: every group under 4.5:1, on all 24 surfaces, in **both** themes (`gap-full-sweep.json`). The dark census matched the <3:1 pass exactly, so F1's "6 of 24" is a full census. The light census produced F8.
+4. **Replaced the first-match contrast sample with a composited full-page sweep.** The research tool read only the **first** element per selector and stopped at the first translucent background. That is how it reported `button` / `a` at 14.23:1 on pages whose halt controls sit at 1.35:1 (§8.5). The new sweep composites translucent **ancestor** layers down to an opaque background and checks **every** text-bearing element. *(Close-out erratum: it does **not** composite the element's **own** background. A text element that paints its own translucent tint, such as `.action-btn.save` at `color-mix(… 12%, transparent)`, is measured against the ancestor surface, which overstates its ratio. See §7.5 and the Erratum section.)* It was run on 8 surfaces × 2 themes (`gap-contrast-sweep.json`), then on all 24 authenticated app surfaces in dark with a <3:1 cut-off (`gap-dark-sweep.json`). **After the second-read** it was run as a full AA census: every group under 4.5:1, on all 24 surfaces, in **both** themes (`gap-full-sweep.json`). The dark census matched the <3:1 pass exactly, so F1's "6 of 24" is a full census. The light census produced F8.
 5. **Ran Lighthouse** (12.8.2, accessibility) on five cold surfaces (`lighthouse-cold.json`). Research had planned this but never run it.
 
 **Evidence budget.** Beat 1 left the directory at 12 MB. This stage pruned 6 superseded PNGs (the 300 ms Dispatch shots and two mid-fade archive ends; their JSON is kept). It kept only the ten beat-2 re-renders this report cites, and palette-quantised every PNG (256 colours, no dither; the defect colours were checked after quantising). The result was 7.9 MB. The second-read's ask to keep one PNG per authenticated surface added 24 full-page renders (1.6 MB), for **9.8 MB** in total, about 1.5× the 08-29 set over a scope roughly 6× wider. Quantising is safe because every colour or contrast figure below comes from JSON, never from PNG pixels.
@@ -110,12 +110,16 @@ The token layer already ships AA-safe text companions: `--green-dim: #15803d` ("
 | `--yellow` | "Recommended — the agent reaches the tracker…" (`span.feature-note`) | Settings | **2.12:1** |
 | `--yellow` | **▼ In Progress** header and every **◐** in-progress glyph (`div.in-progress-header`, `span.status-pill__char`) | **Tree (the default page after sign-in)**, Swim, Ship | **2.15–2.27:1** |
 | `--yellow` | priority "Medium" (`span.swim-fc-prio.p3`) | Swim | 2.15–2.27:1 |
-| `--green` | every `.action-btn.save`: save · save preset · add · generate · generate & copy · Dispatch ▾ · start · send · ask · copy prompt · run the presses · generate suggestions · start discussion · + new prompt | Settings, Dispatch, Proxy, Flight Companion, Next Run, Passage Planner, Ship's Biscuit, Task Chat, Collective, Custom Prompts | **3.08–3.3:1** |
+| `--green` | every `.action-btn.save`: save · save preset · add · generate · generate & copy · Dispatch ▾ · start · send · ask · copy prompt · run the presses · generate suggestions · start discussion · + new prompt | Settings, Dispatch, Proxy, Flight Companion, Next Run, Passage Planner, Ship's Biscuit, Task Chat, Collective, Custom Prompts | **≈2.71:1** as rendered on the button's own 12% tint (`rgb(220,237,226)`); ≈2.89:1 for the one instance on white (Custom Prompts). *Corrected at close-out; the sweep recorded 3.08–3.3:1 against the ancestor surface.* |
+| `--blue` | `.action-btn.connect` ("connect", "connect for unlimited") on its 12% tint | Settings | ≈4.10:1 *(added at close-out)* |
+| `--red` | `.action-btn.logout` on its 12% tint | Settings | ≈4.41:1 *(added at close-out)* |
 | `--green` | "● on" toggle states (16), "● live", the ✓ done glyph | Settings, Observation, Roadmap | 3.3:1 |
 
 **Why it ranks #2, above F2 and F3, and below F1.**
 * **Above F2/F3:** it breaks AA in the theme every user gets, on the first screen after sign-in, and across 16 of 24 authenticated surfaces. F2 is one view (an experimental radial plus its cold preview). F3 is copy on an error path.
 * **Below F1:** F1's 1.35:1 is effectively invisible, on incident controls. F8's worst text (1.68:1, the AI-not-configured warning) is faint but readable, and its most-seen instance (2.27:1) is legible. The second-read ranked it the same way.
+
+**Close-out erratum (independent review `c7c286b5`).** The `--green` save row originally read 3.08–3.3:1. The sweep dropped the button's own translucent background, and the rendered pixels of `next-run-light-1400px.fp.png` confirm ≈2.71:1, so the finding is worse than first written. The same blind spot hid the marginal, small-text `connect` (≈4.10:1) and `logout` (≈4.41:1) instances, both visible in `settings-light-1400px.fp.png`. The reviewer also saw the same tinted fills in `jira-settings-light-1400px.fp.png` and `prompts-light-1400px.fp.png`. They are not in `gap-full-sweep.json`. Every other tinted variant in `common-actions.css` (`disconnect`, `token-revoke`) uses the same construction. None of this changes the surface count: Settings is already one of the 16.
 
 It is also the same failure type as F6 (2.94:1) and F7 (3.74:1), in a worse and wider instance. The dark theme is unaffected: the full census finds none of these under 4.5:1 in dark.
 
@@ -282,7 +286,7 @@ The cold previews show the product itself, not screenshots of it. **`/swipe`** r
 * `/ship`: headless and unreadable at the default zoom.
 * the error/consent family: plain "Harbour" wordmark (A14), UA-default form controls on the Jira credential form (F4), and white-on-teal buttons below AA (F7).
 
-Once signed in, the impression is strong but not clean in **either** theme. In light (the default), the first screen's **In Progress** header and every ◐ glyph are pale amber at 2.27:1, and the green save/generate buttons across 10 operator pages sit at about 3.1:1 (F8; the second-read caught this). In dark, three high-use operator pages (Settings, Dispatch, Collective) show near-invisible controls (F1). Together they are the largest hit to "polished" in this run.
+Once signed in, the impression is strong but not clean in **either** theme. In light (the default), the first screen's **In Progress** header and every ◐ glyph are pale amber at 2.27:1, and the green save/generate buttons across 10 operator pages sit at about 2.7:1 (F8; the second-read caught this). In dark, three high-use operator pages (Settings, Dispatch, Collective) show near-invisible controls (F1). Together they are the largest hit to "polished" in this run.
 
 **Lighthouse (12.8.2, accessibility, cold, light, default mobile emulation):**
 
@@ -335,7 +339,7 @@ There is zero document-level horizontal overflow at 320, 360 and 390 on all 7 ar
 2. **The unresolved-provider "Linear" fallbacks are source-only.** Every seed resolves a display name, so that branch is unreachable without injecting a provider with no `ui.displayName` (F5).
 3. **Upstream outages are synthetic.** They are rendered by calling the production renderer with `{status: 401/429/503}`, `{code: 'ECONNRESET'}` and `Error('boom')`, not from a live outage.
 4. **Archive dark is media-emulated and JSON-only.** It has no PNG. Archives 1–4 carry no `prefers-color-scheme` rules, so their "dark" is identical to light.
-5. **Contrast heuristics.** The composited sweep fixes the translucent-layer mis-resolution. It is still blind to `background-image`, pseudo-elements and text over non-ancestor layers. Individual ratios are heuristic; the V1 and V2 numbers were cross-checked against the rendered PNGs.
+5. **Contrast heuristics.** The composited sweep fixes the translucent-layer mis-resolution. It is still blind to `background-image`, pseudo-elements, text over non-ancestor layers, and **the element's own translucent background** (found by the independent review: `.action-btn.save` / `.connect` / `.logout` paint a 12% tint of their text colour, so their real ratios are ≈2.71 / ≈4.10 / ≈4.41:1, not the sweep's figures; F8 is corrected). Individual ratios are heuristic; the V1 and V2 numbers were cross-checked against the rendered PNGs.
 6. **Sparse seeded data.** Effort-readout, escalation-KPIs, Scan-due, Observation, Live Console, Ship Journey and Ship's Biscuit render their empty or zero states. No capture shows a populated effort read-out, a due-row list, or a busy Live Console.
 7. **Carried advisory items not re-driven:**
    * the Collective status-dot state colours (A22), which need the offline flip
@@ -381,7 +385,7 @@ All four are objective breakage. Each is left in its default state (**Backlog**)
 | ticket | finding | dup-check result |
 |---|---|---|
 | **LIN-3119** | **F1**: in dark theme, bare `.action-btn` / `a.settings-action` / `a.stat-link` render UA black or blue on the dark card. This includes Workspace Halt Pause/Stop/Resume at 1.35:1, on 6 of 24 auth surfaces. | Searched "action-btn", "settings-action", "common-actions", "dark theme contrast", "dark mode button", "unstyled button dark", "Workspace Halt", "halt pause stop resume". **No existing ticket names these controls.** Adjacent, different elements: LIN-738 (`+proxy` toggle, Done), LIN-2251 (escalation-KPI `<select>`, Done), LIN-2222 (`.login-button-jira`), LIN-2711 (Scan-due bulk-bar classes with no CSS), LIN-3074 (halt *copy*, not contrast). |
-| **LIN-3123** | **F8**: light theme status/action colours used as text below AA (◐ / In Progress 2.27:1, AI-not-configured warning 1.68:1, save/generate 3.08:1) on 16 of 24 auth surfaces | Minted **after the second-read**. Duplicate check re-run immediately before minting: amber / yellow / green contrast, status-pill contrast, save button contrast, in-progress contrast, `--yellow`, `green-dim`, `amber-dim`, state indicator contrast, `toggle-state`, `next-run-warning`, and LIN-3101 relations. **None names this.** LIN-786 (Done) built the AA-safe `-dim` companions that these call sites never adopted. LIN-738 and LIN-570 fixed other elements with the same token-misuse class. LIN-739 and LIN-849 cover the teal CTA and focus rings. |
+| **LIN-3123** | **F8**: light theme status/action colours used as text below AA (◐ / In Progress 2.27:1, AI-not-configured warning 1.68:1, save/generate ≈2.71:1, corrected at close-out from 3.08:1; plus marginal `connect` ≈4.10:1 / `logout` ≈4.41:1) on 16 of 24 auth surfaces | Minted **after the second-read**. Duplicate check re-run immediately before minting: amber / yellow / green contrast, status-pill contrast, save button contrast, in-progress contrast, `--yellow`, `green-dim`, `amber-dim`, state indicator contrast, `toggle-state`, `next-run-warning`, and LIN-3101 relations. **None names this.** LIN-786 (Done) built the AA-safe `-dim` companions that these call sites never adopted. LIN-738 and LIN-570 fixed other elements with the same token-misuse class. LIN-739 and LIN-849 cover the teal CTA and focus rings. |
 | **LIN-3120** | **F2**: `/ship` and `/workspace/:urlKey/ship` render zero headings, with a bare `<title>` | Searched "ship heading(s)", "render-ship", "ship accessibility", "ship title". **LIN-266 (Canceled) was read in full.** It concerns the Ship view's nautical *heading* label convention (north-star tagging), not HTML heading elements, so it is **not a duplicate**. LIN-2401 (Done) covered `render-pages.js` only. |
 | **LIN-3121** | **F3**: upstream error prose contradicts its own diagnostic on 5xx/429 | Searched "renderUpstreamAwareErrorPage", "connection closed before it responded", "upstream error copy", "rate-limited error page", "503 error page", "Trouble Reaching Linear". **None names the copy contradiction.** LIN-2351 and LIN-2363 concern "Linear" naming in the proxy and autopilot, which is F5's class, not this. |
 
@@ -399,7 +403,7 @@ Each item is before → after within the CLI idiom, measured against `/styleguid
    *Before:* 6 of 24 app pages have UA-black buttons and UA-blue links in dark.
    *After:* `.action-btn` inherits `var(--text)`, links use the app's link token, and `/styleguide` gets an "action buttons" row in both themes. **Top item: the largest polish gain for the least change.**
 2. **Route status text to the AA-safe companions** (pairs with follow-up LIN-3123).
-   *Before:* `--yellow`, `--green` and `--amber` fills used as text (◐ 2.27:1, save 3.08:1, warning 1.68:1).
+   *Before:* `--yellow`, `--green` and `--amber` fills used as text (◐ 2.27:1, save ≈2.71:1, warning 1.68:1; the tinted `connect` / `logout` variants ≈4.10 / ≈4.41:1).
    *After:* text uses `--amber-dim` / `--green-dim` (plus a `--yellow` text companion if the in-progress hue must stay distinct from amber). Fills and dots keep the fill tokens, and `/styleguide` shows each status token as fill *and* text.
 3. **Make Ship open readable.**
    *Before:* 15–45% fit-zoom, no title.
@@ -533,3 +537,17 @@ Each item is before → after within the CLI idiom, measured against `/styleguid
 | — | Whether F8 should displace LIN-3121 is "a call for whoever merges" | **Orchestrator decision: mint as a fourth follow-up; keep LIN-3121.** The rationale is in §9. | — |
 
 **Adversarial second-read verdict: DISAGREE** · **Differed from top finding: NO** · **Disposition: fixed in place**
+
+---
+
+## Erratum: close-out (independent review `c7c286b5`)
+
+The independent review of PR #1597 at `595b677b` approved the report on condition that three ledger items were discharged. The two report corrections are applied in place above. The quoted second-read keeps its original figures verbatim.
+
+| ledger item | correction | where |
+|---|---|---|
+| 5 | F8's `--green` `.action-btn.save` ratio is **≈2.71:1** as rendered, not 3.08:1. The sweep measured the text against the ancestor surface and ignored the button's own `color-mix(in srgb, var(--green) 12%, transparent)` fill. The claim that the sweep "composites alpha layers down to an opaque background" was overstated: it composites **ancestor** layers only. | §1.4 item 4, F8 table and note, §4, §7.5, §9, §10.2 |
+| 6 | Two light-theme AA failures were not recorded before: `.action-btn.connect` (≈4.10:1) and `.action-btn.logout` (≈4.41:1). Both are marginal and small-text only, and both are on Settings. They are added as F8 instances. No new ticket; LIN-3123 is annotated. | F8 table, §7.5, §9, §10.2 |
+| 7 | Merge only on a `ci-success`-green head that includes this erratum. | PR #1597 |
+
+The headline counts are unchanged: 32 findings, 8 objective, and F8 still covers 16 of 24 auth surfaces.
