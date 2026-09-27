@@ -374,3 +374,42 @@ export function buildBranches(d) {
     },
   ];
 }
+
+/**
+ * LIN-2882 — the stateless return shapes the callback classifier must
+ * distinguish. Deliberately NOT part of `buildBranches`: that list is pinned
+ * against the golden byte-parity fixture (LIN-2397), so extending it here
+ * would break `github-install-flow-golden.test.js`. These tables are consumed
+ * by `tests/unit/github-install-flow-update-return.test.js`.
+ *
+ * GitHub itself starts these: after an install/update, the back-half returns
+ * `installation_id` + `setup_action` (often with an OAuth `code`) and NO
+ * Harbour-minted `state`.
+ */
+export const STATELESS_RETURN_SHAPES = {
+  'installation_id+setup_action=update': { installation_id: '142745078', setup_action: 'update' },
+  'code+installation_id+setup_action=update': { code: 'github-initiated-code', installation_id: '142745078', setup_action: 'update' },
+  'installation_id+setup_action=install': { installation_id: '142745078', setup_action: 'install' },
+  'code+installation_id+setup_action=install': { code: 'github-initiated-code', installation_id: '142745078', setup_action: 'install' },
+  'code+installation_id (no setup_action)': { code: 'github-initiated-code', installation_id: '142745078' },
+};
+
+/**
+ * LIN-2882 — a stateless `setup_action=request` (+/- a `code`) must reach the
+ * existing admin-approval response, never the code-exchange branch.
+ */
+export const STATELESS_REQUEST_SHAPES = {
+  'setup_action=request': { setup_action: 'request' },
+  'code+setup_action=request': { code: 'github-initiated-code', setup_action: 'request' },
+};
+
+/**
+ * LIN-2882 — stateless shapes the classifier must NOT widen to: these still
+ * 400 at the `:372` state guard. `installation_id-only` is the golden
+ * `callback:missing-state` boundary (see the branch above).
+ */
+export const STATELESS_STILL_400_SHAPES = {
+  'installation_id-only (golden boundary)': { installation_id: '42' },
+  'code-only': { code: 'github-initiated-code' },
+  'bare empty query': {},
+};
