@@ -1,0 +1,317 @@
+{
+  "query": "GET https://harbour.cat/api/proxy/search?q=verb%20override",
+  "runAt": "2026-09-26T21:16:42Z",
+  "groundedAt": "b5c528c4",
+  "hitCount": 50,
+  "cap": 50,
+  "capNote": "The search endpoint caps at 50 results, so the true population of tickets carrying an autopilot verb-override note may exceed the 50 enumerated. Per the delegated ruling, the labelling budget is capped at this one reproducible query; real clean misses excluded by the cap (notably LIN-812's own two 2026-06-29 overrides) are named in their rows.",
+  "dispositions": [
+    {
+      "identifier": "LIN-2921",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-3020",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-2915",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-812",
+      "disposition": "excluded",
+      "rule": "RULING LABELLING CAP",
+      "reason": "CORRECTED (review): rule 3 is not the ground. Its only committed gold is the synthetic FIX-812-*; its own 2 real overrides (2026-06-29) are excluded under the delegated ruling's 'cap the case count and say where you cut' \u2014 a bounded labelling budget, stated plainly, not 'already covered'.",
+      "corrected": "was rule 3 (already covered)"
+    },
+    {
+      "identifier": "LIN-2991",
+      "disposition": "excluded",
+      "rule": "5 too entangled",
+      "reason": "Multiple overlapping override events / multi-PR / cross-repo / an aborted dispatch \u2014 no unambiguous single red moment."
+    },
+    {
+      "identifier": "LIN-830",
+      "disposition": "included",
+      "rule": "7 real, clean, reconstructable, novel",
+      "reason": "Two recorded outcomes on its own trail; description authored once and never edited. Yields LIN-830@implement (override #1, 15:59:54Z) and LIN-830@review (override #2, 16:52:21Z)."
+    },
+    {
+      "identifier": "LIN-977",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the committed LIN-420-landed-review.json / SYN-16 shape already exercises 'landed + CI-green + unmerged \u2192 review'",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-1279",
+      "disposition": "excluded",
+      "rule": "6 not reconstructable",
+      "reason": "Description edited in place after the override moment; the Linear API exposes no description revision history, so a byte-accurate freeze of what the engine saw is not reconstructable."
+    },
+    {
+      "identifier": "LIN-2649",
+      "disposition": "excluded",
+      "rule": "5 too entangled",
+      "reason": "Multiple overlapping override events / multi-PR / cross-repo / an aborted dispatch \u2014 no unambiguous single red moment."
+    },
+    {
+      "identifier": "LIN-596",
+      "disposition": "excluded",
+      "rule": "3 already covered",
+      "reason": "Gold already committed (fixtures/recommend/linearviewer.json LIN-596@implement)."
+    },
+    {
+      "identifier": "LIN-976",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the committed LIN-420-landed-review.json / SYN-16 shape already exercises 'landed + CI-green + unmerged \u2192 review'",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-2382",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 matches the 'research redo' CASES entry (scripts/eval-research-routing.mjs:447), already exercised",
+      "reason": "CORRECTED (review): rule 6 refuted \u2014 the research section (19:27) precedes the override (2026-08-29T19:30:38Z `research`\u2192`implementation`), so the red-moment description is reconstructable; it is a real miss of the research-redo shape already exercised.",
+      "corrected": "was rule 6 (not reconstructable)"
+    },
+    {
+      "identifier": "LIN-978",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the committed LIN-420-landed-review.json / SYN-16 shape already exercises 'landed + CI-green + unmerged \u2192 review'",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-541",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-2720",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss (first override) / 6 not reconstructable (second)",
+      "reason": "CORRECTED (review): first override is an operator pin ('not evidence of an engine miss'); the second, 2026-09-11T06:56:38Z, is a confirmed rule 6 (description pruned from 69,687 to 9,332 chars). Exclusion stands on those grounds.",
+      "corrected": "was flat rule 6"
+    },
+    {
+      "identifier": "LIN-1110",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-2361",
+      "disposition": "excluded",
+      "rule": "6 not reconstructable",
+      "reason": "Description edited in place after the override moment; the Linear API exposes no description revision history, so a byte-accurate freeze of what the engine saw is not reconstructable."
+    },
+    {
+      "identifier": "LIN-2324",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 matches the 'research redo' CASES entry (scripts/eval-research-routing.mjs:447), already exercised",
+      "reason": "CORRECTED (review): rule 6 refuted \u2014 the research section (06:18) precedes the override (2026-08-28T06:22:29Z `research`\u2192`review`); real miss of the research-redo shape already exercised.",
+      "corrected": "was rule 6 (not reconstructable)"
+    },
+    {
+      "identifier": "LIN-2621",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-1656",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-1038",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the committed LIN-420-landed-review.json / SYN-16 shape already exercises 'landed + CI-green + unmerged \u2192 review'",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-1197",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-1298",
+      "disposition": "excluded",
+      "rule": "no override event",
+      "reason": "ADDED (review): false-positive search hit \u2014 no comment contains 'verb override'; the only 'override' matches are CSS ('small overrides' 19:59:22Z; 'density override' 20:13:16Z)."
+    },
+    {
+      "identifier": "LIN-973",
+      "disposition": "excluded",
+      "rule": "6 not reconstructable",
+      "reason": "Confirmed (review): description was rewritten at 17:46, after the 17:41:54Z override."
+    },
+    {
+      "identifier": "LIN-1377",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-1206",
+      "disposition": "excluded",
+      "rule": "4 shape-duplicate / 6 not reconstructable",
+      "reason": "Rule 4 stale-blocked-edge shape, and the description carries a later '## Implementation Plan (LIN-1206) \u2014 planned 2026-07-10' appended after the override."
+    },
+    {
+      "identifier": "LIN-1739",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-2713",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-2197",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss (first) / 4 shape-duplicate (second)",
+      "reason": "First override 2026-08-22T11:29Z: 'not a demonstrable engine miss \u2014 the engine was not consulted'. Second 15:01Z is the stale-blocked-edge shape."
+    },
+    {
+      "identifier": "LIN-2773",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the same shape is already exercised by another corpus member",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-1026",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the committed LIN-420-landed-review.json / SYN-16 shape already exercises 'landed + CI-green + unmerged \u2192 review'",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-2212",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the same shape is already exercised by another corpus member",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-777",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-1336",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "CORRECTED (review): this is rule 2, not rule 6 \u2014 at 2026-07-17T10:04:30Z the comment says 'human-authorised cap, not an engine miss'; its plan was appended before the override.",
+      "corrected": "was rule 6"
+    },
+    {
+      "identifier": "LIN-2127",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-2215",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-962",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the committed LIN-420-landed-review.json / SYN-16 shape already exercises 'landed + CI-green + unmerged \u2192 review'",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-2214",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-827",
+      "disposition": "excluded",
+      "rule": "5 too entangled",
+      "reason": "Multiple overlapping override events / multi-PR / cross-repo / an aborted dispatch \u2014 no unambiguous single red moment."
+    },
+    {
+      "identifier": "LIN-2667",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "CORRECTED (review): rule 2 \u2014 the first override was pinned on a 403 outage; the second is not a miss (PR merged 00:54:08, Done 00:55:07; the 01:01 comment says the override 'was written against a stale read').",
+      "corrected": "was rule 6"
+    },
+    {
+      "identifier": "LIN-1684",
+      "disposition": "excluded",
+      "rule": "2 explicit non-miss \u2014 the override comment states the engine was unavailable/failed, was not consulted, or was an operator/policy pin not correcting an observed miss",
+      "reason": "Override was a proactive/operator pin or the engine never got to choose."
+    },
+    {
+      "identifier": "LIN-873",
+      "disposition": "excluded",
+      "rule": "6 not reconstructable",
+      "reason": "Description edited in place after the override moment; the Linear API exposes no description revision history, so a byte-accurate freeze of what the engine saw is not reconstructable."
+    },
+    {
+      "identifier": "LIN-1725",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the same shape is already exercised by another corpus member",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-1025",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 the committed LIN-420-landed-review.json / SYN-16 shape already exercises 'landed + CI-green + unmerged \u2192 review'",
+      "reason": "Shape-duplicate of an already-committed member."
+    },
+    {
+      "identifier": "LIN-573",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-1766",
+      "disposition": "excluded",
+      "rule": "4 real engine miss, shape-duplicate \u2014 matches the LIN-596@implement / LIN-571 re-plan shape, already exercised",
+      "reason": "CORRECTED (review): rule 6 refuted \u2014 the plan has been the description since filing and precedes the override (2026-08-01T08:02:10Z `plan`\u2192`implementation`); real miss of the re-plan shape already exercised.",
+      "corrected": "was rule 6 (not reconstructable)"
+    },
+    {
+      "identifier": "LIN-1702",
+      "disposition": "excluded",
+      "rule": "no nameable state",
+      "reason": "No ticket identifiers named for the affected tasks; no frozen red moment is recoverable."
+    },
+    {
+      "identifier": "LIN-2385",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-776",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    },
+    {
+      "identifier": "LIN-275",
+      "disposition": "excluded",
+      "rule": "1 mechanism/meta \u2014 discusses the override protocol, dispatch wire contract, or narration/rulings machinery itself, not a routing decision on that ticket",
+      "reason": "No routing decision recorded on the ticket itself."
+    }
+  ]
+}

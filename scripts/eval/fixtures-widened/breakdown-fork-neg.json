@@ -1,0 +1,48 @@
+{
+  "name": "breakdown-fork-neg",
+  "note": "Synthetic LIN-3107 class D. The LIN-838-recipe negative (a genuine multi-session plan with enumerated arrows → breakdown), built contract-safe: it carries a recorded plan-review Approve verdict on its trail, so criterion (a) is already discharged and `breakdown` is unambiguous under today's LIN-1603 contract. Recipe source: LIN-838 description (2026-06-30T15:02:18.930Z) plus the LIN-3107 plan §6 D.4 contract-safety amendment.",
+  "targets": [
+    {
+      "id": "breakdown-fork-neg",
+      "role": "genuine multi-session plan + dependency arrows + plan-review Approve → expect breakdown",
+      "expect": [
+        "breakdown"
+      ],
+      "descentExpect": "breakdown-fork-neg",
+      "labelledBy": "plan LIN-3107 (§6 D.4)",
+      "goldSourceComment": "LIN-838 description (\"Negative (must STILL pick `breakdown`): a genuine multi-session task with an enumerated plan + arrows\") + LIN-3107 plan §6 D.4 (contract-safety: attach a recorded plan-review Approve so LIN-1603 criterion (a) does not re-route to plan-review)."
+    }
+  ],
+  "bundles": {
+    "breakdown-fork-neg": {
+      "issue": {
+        "id": "breakdown-fork-neg-uuid",
+        "identifier": "breakdown-fork-neg",
+        "title": "Split the workspace provider layer into independently-landable phases",
+        "description": "## Implementation Plan\n\n- Surfaces: `lib/provider/adapter.js` (the interface), `lib/provider/linear.js` and\n  `lib/provider/github.js` (the two implementations), the workspace resolver, and the\n  credential store.\n- Arrows: adapter interface → both implementations (blocked-by the interface landing);\n  resolver wiring → adapter (blocked-by both implementations); credential-store scoping →\n  resolver (blocked-by resolver wiring).\n- This is a genuine multi-session migration: the interface landing, each provider port, and\n  the resolver/credential re-scoping each land independently with their own acceptance.\n\n**Session fit:** needs multiple sessions — five surfaces with dependency arrows; no single\nfocused pass can land them coherently.\n\n**plan-review due:** yes — (d) the credential-store re-scoping touches a credential surface.",
+        "state": {
+          "name": "In Progress",
+          "type": "started"
+        },
+        "createdAt": "2026-07-01T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": {
+        "name": "Product",
+        "description": null
+      },
+      "children": [],
+      "comments": [
+        {
+          "user": "reviewer",
+          "createdAt": "2026-07-01T01:00:00.000Z",
+          "body": "### Plan Review Verdict\n\n1. Completeness — the surface list matches the tree (`lib/provider/`, the resolver, the\n   credential store are the only seams).\n2. Strategy framing — no routed-around contract gap.\n3. History — checked; nothing protects an invariant the plan misses.\n4. Session fit — the five dependency-arrowed surfaces genuinely span sessions.\n5. Relaxation guard — the credential-surface change is named.\n6. Prerequisite refactor — none claimed.\n\n**Verdict: Approve.** Proceed; decompose into per-surface subtasks."
+        }
+      ],
+      "focusedChild": null
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "name": "all-terminal-node",
+  "note": "Synthetic LIN-3107 class D. A node whose children are ALL terminal — the defer-must-NOT-fire case no committed bundle covers. Under the eval defer rule (eligible only with a real non-terminal child) `defer` is withheld at prompt time for arms 1/2 and graded a miss for arm 3, so the graded action is review/close-out.",
+  "targets": [
+    {
+      "id": "all-terminal-node",
+      "role": "node with all-terminal children — defer ineligible; terminal-completion routes to review/close",
+      "expect": [
+        "review",
+        "close-out"
+      ],
+      "descentExpect": "all-terminal-node",
+      "labelledBy": "plan LIN-3107 (§6 D node/`defer` coverage)",
+      "goldSourceComment": "Synthetic. Live contract (meta-prompt Step 0, LIN-353): a task whose own state is terminal OR whose every subtask is terminal routes to review/close, never a no-op. No committed fixture has an all-terminal-children node; constructed to exercise the defer-ineligibility branch."
+    }
+  ],
+  "bundles": {
+    "all-terminal-node": {
+      "issue": {
+        "id": "all-terminal-node-uuid",
+        "identifier": "all-terminal-node",
+        "title": "Provider migration (subtasks all completed)",
+        "description": "Parent task whose child subtasks have all been completed. Verify the aggregate result and close it out.",
+        "state": {
+          "name": "In Progress",
+          "type": "started"
+        },
+        "createdAt": "2026-07-02T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": {
+        "name": "Product",
+        "description": null
+      },
+      "children": [
+        {
+          "id": "atn-c1",
+          "identifier": "ATN-1",
+          "title": "Phase 1 — interface",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        },
+        {
+          "id": "atn-c2",
+          "identifier": "ATN-2",
+          "title": "Phase 2 — port",
+          "state": {
+            "name": "Done",
+            "type": "completed"
+          }
+        }
+      ],
+      "comments": [
+        {
+          "user": "agent",
+          "createdAt": "2026-07-02T01:00:00.000Z",
+          "body": "Both phases completed and merged (PR #901, CI green). Nothing open on either child."
+        }
+      ],
+      "focusedChild": null
+    }
+  }
+}
