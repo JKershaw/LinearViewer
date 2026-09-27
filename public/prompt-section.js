@@ -140,7 +140,11 @@
 
   function renderFresh(state, opts) {
     const { name, html, reasoning, warning } = state.result;
-    const actions = renderActionCluster(opts);
+    // LIN-3079: an autopilot result is always forced, so its +proxy toggle would
+    // be inert — suppress it for that result only. The cluster is rebuilt on every
+    // render, so switching to another result restores the toggle.
+    const isForced = !!(state.result && state.result.kind === 'autopilot');
+    const actions = renderActionCluster(isForced ? { ...opts, proxyEnabled: false } : opts);
     const reasoningToggle = reasoning
       ? `<div class="swipe-reasoning-toggle" data-action="reasoning-toggle">\u25B8 reasoning</div>
          <div class="swipe-reasoning-content hidden">${renderReasoning(reasoning)}</div>`
@@ -287,7 +291,10 @@
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           // Carry kind through so the dispatch tags the item as the autopilot meta-loop.
-          const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html };
+          // LIN-3079: the kickoff body promises a `readWrite` proxy token, so only
+          // this autopilot result forces proxy context (copy/download/dispatch) and
+          // suppresses the now-inert +proxy toggle. Every other result stays unforced.
+          const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true };
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
           state.phase = 'fresh';
@@ -487,7 +494,9 @@
       try {
         // Append the proxy block (if +proxy is on) inside the try so a failed
         // token mint surfaces as "failed" instead of copying a bare prompt.
-        const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey);
+        // LIN-3079: an autopilot result forces the append regardless of the toggle.
+        const force = !!(state.result && state.result.proxyForce);
+        const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
         await navigator.clipboard.writeText(text);
         btn.textContent = 'copied!';
         btn.classList.add('copied');
@@ -509,7 +518,9 @@
       const raw = state.result && state.result.raw;
       if (!raw) return;
       try {
-        const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey);
+        // LIN-3079: same forced append as handleCopy for the autopilot result.
+        const force = !!(state.result && state.result.proxyForce);
+        const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
         const filename = buildPromptFilename(issue.identifier, (state.result && state.result.name) || 'prompt');
         downloadMarkdown(text, filename);
         btn.textContent = 'saved!';
@@ -546,7 +557,9 @@
           issue,
           target,
           model,
-          harness
+          harness,
+          // LIN-3079: server-side attach forced for the autopilot result only.
+          proxyForce: !!(state.result && state.result.proxyForce)
         });
         btn.textContent = '\u2713';
       } catch {

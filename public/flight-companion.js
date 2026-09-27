@@ -73,7 +73,13 @@
     if (!pre || !btn) return;
     var text = pre.textContent || '';
     try {
-      text = await window.ProxyToggle.maybeAppend(text, urlKey);
+      // LIN-3079: feature-gated forced append. When the proxy feature is on the
+      // kickoff promises a proxy token, so force the append unconditionally
+      // (fail-closed: maybeAppend throws on a mint error). When off, copy the
+      // bare prompt and never attempt a mint the server would 403.
+      if (document.body.dataset.proxyFeature === 'true') {
+        text = await window.ProxyToggle.maybeAppend(text, urlKey, { force: true });
+      }
       await navigator.clipboard.writeText(text);
       btn.textContent = 'copied ✓';
       if (feedback) feedback.textContent = 'prompt copied to clipboard';
