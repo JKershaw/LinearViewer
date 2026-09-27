@@ -393,9 +393,13 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
     test(`${callbackPath} mandatory: an add-source picker restart binds to the SAME intended workspace`, async () => {
       const provider = spyProvider(s.providerName);
-      const router = s.createRoutes({ provider, ...freshAccountStores() });
+      // A real signed-in account: `establishAccount`/`linkIdentity` reject a
+      // session.accountId with no matching account, so the fixture must mint one.
+      const stores = freshAccountStores();
+      const signedInAccount = await stores.accountStore.createAccount();
+      const router = s.createRoutes({ provider, ...stores });
       const session = makeSession({
-        accountId: 'acct-1',
+        accountId: signedInAccount._id,
         workspaces: [
           { id: 'ws-tangle', name: 'Tangle', urlKey: 'tangle', provider: 'linear', accessToken: 'lin_tok' },
           { id: 'ws-other', name: 'Other', urlKey: 'other', provider: 'linear', accessToken: 'lin2' },

@@ -82,6 +82,8 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
       regenerateError: 'GitHub Projects session regeneration error:',
       postRegenerateCatch: 'GitHub Projects post-regenerate callback error:',
       linkCatch: 'GitHub Projects link error:',
+      statelessRestart: 'GitHub Projects stateless-return restart:',
+      guardRejected: 'GitHub Projects session guard rejected:',
     },
 
     copy: {
