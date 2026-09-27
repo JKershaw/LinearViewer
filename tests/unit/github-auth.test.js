@@ -1765,6 +1765,108 @@ describe('GitHub auth routes', () => {
     assert.equal(all.length, 1, 'still exactly one Connection record for the installation');
     assert.deepEqual(all[0].credentials, { installationId: '99', token: 'gho_b', tokenExpiresAt: Date.parse('2026-06-25T21:00:00Z') });
   });
+
+  // === LIN-3127 refusal paths: no Connection residue =========================
+
+  function recordingConnectionStore() {
+    const calls = [];
+    return {
+      calls,
+      put: async (accountId, provider, unitId, credentials) => {
+        calls.push({ accountId, provider, unitId, credentials });
+        return true;
+      },
+    };
+  }
+
+  test('LIN-3127 refusal: GitHub add-source 409 writes NO Connection record', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
+    const myAccount = await accountStore.createAccount();
+    const connectionStore = recordingConnectionStore();
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const session = makeSession({
+      accountId: myAccount._id,
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [{ id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear' }],
+      activeWorkspaceId: 'org-1',
+    });
+
+    await handler({ body: { repo: 'octocat/repo-a' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue on a refused add-source');
+  });
+
+  test('LIN-3127 refusal: GitHub existing-container 409 writes NO Connection record', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
+    const myAccount = await accountStore.createAccount();
+    const connectionStore = recordingConnectionStore();
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const existing = { id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github', bindings: [{ provider: 'github', scope: 'octocat/repo-a', credentials: { token: 'gho_a' } }] };
+    const session = makeSession({
+      accountId: myAccount._id,
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_b', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z' },
+      workspaces: [existing],
+    });
+
+    await handler({ body: { repo: 'octocat/repo-b' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue on a refused existing-container bind');
+  });
+
+  test('LIN-3127 refusal: GitHub new-container conflict (merge offer) writes NO Connection record', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+    const connectionStore = recordingConnectionStore();
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      identityAuthenticatedAt: Date.now(),
+      githubHumanId: 'human-other',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+
+    await handler({ body: { repo: 'octocat/repo-a' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.ok(session.pendingMerge, 'a merge offer is stored');
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue while a merge is only OFFERED');
+  });
+
+  test('LIN-3127 best-effort: a throwing Connection store put does not fail the GitHub link (redirect still happens)', async () => {
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores(), connectionStore: { put: async () => { throw new Error('connection store down'); } } });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+
+    await handler({ body: { repo: 'octocat/repo-a' }, session }, res);
+
+    assert.equal(res.redirectedTo, '/workspace/octocat/', 'the link completes despite the Connection write failing');
+    assert.ok(session.workspaces[0].bindings.some(b => b.scope === 'octocat/repo-a'), 'the binding still lands');
+  });
 });
 
 describe('githubErrorDiagnostic (LIN-746)', () => {

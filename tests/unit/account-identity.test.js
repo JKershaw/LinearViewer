@@ -364,6 +364,62 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     });
   });
 
+  // --- refusal paths: no Connection residue ---------------------------------
+
+  test('LIN-3127 refusal: merge-confirm failure (500) writes NO Connection record', async () => {
+    const stores = freshStores();
+    const connectionStore = recordingConnectionStore();
+    const mergeRouter = createAccountMergeRoutes({ ...stores, connectionStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
+    // canonicalAccountId names no real account → mergeAccounts fails before the write.
+    const session = mergeConfirmSession('does-not-exist', 'also-missing',
+      { id: 'org-other', urlKey: 'other', bindings: [{ provider: 'linear', scope: 'org-other', credentials: { token: 'lin_tok' } }] },
+      'linear', 'refresh-1');
+
+    const res = makeRes();
+    await confirmHandler({ session }, res);
+
+    assert.strictEqual(res.statusCode, 500);
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue on a failed merge');
+  });
+
+  test('LIN-3127 refusal: merge-confirm at the workspace limit (400) writes NO Connection record', async () => {
+    const stores = freshStores();
+    const canonical = await stores.accountStore.createAccount();
+    const merged = await stores.accountStore.createAccount();
+    const connectionStore = recordingConnectionStore();
+    const mergeRouter = createAccountMergeRoutes({ ...stores, connectionStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
+    const session = mergeConfirmSession(canonical._id, merged._id,
+      { id: 'org-other', urlKey: 'other', bindings: [{ provider: 'linear', scope: 'org-other', credentials: { token: 'lin_tok' } }] },
+      'linear', 'refresh-1');
+    session.workspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, urlKey: `ws-${i}` }));
+
+    const res = makeRes();
+    await confirmHandler({ session }, res);
+
+    assert.strictEqual(res.statusCode, 400);
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue when the merge confirm is refused at the limit');
+  });
+
+  test('LIN-3127: merge DECLINE writes NO Connection record', async () => {
+    const stores = freshStores();
+    const canonical = await stores.accountStore.createAccount();
+    const merged = await stores.accountStore.createAccount();
+    const connectionStore = recordingConnectionStore();
+    const mergeRouter = createAccountMergeRoutes({ ...stores, connectionStore });
+    const declineHandler = getHandler(mergeRouter, 'post', '/auth/merge/decline');
+    const session = mergeConfirmSession(canonical._id, merged._id,
+      { id: 'org-other', urlKey: 'other', bindings: [{ provider: 'linear', scope: 'org-other', credentials: { token: 'lin_tok' } }] },
+      'linear', 'refresh-1');
+
+    const res = makeRes();
+    await declineHandler({ session }, res);
+
+    assert.strictEqual(session.pendingMerge, undefined);
+    assert.strictEqual(connectionStore.calls.length, 0, 'declining never writes a Connection');
+  });
+
   // === Amendment A1: fresh dual-authentication is required ======================
 
   test('amendment A1: a live-but-STALE canonical session is refused a one-click merge — re-auth required, no pending merge stored', async () => {

@@ -1121,4 +1121,54 @@ describe('LIN-3127 — Jira OAuth Connection dual-write', () => {
     assert.equal(credentials.email, 'jira.only@example.com', 'the merged binding kept email (post-linkProvider read, not the call literal)');
     assert.equal(credentials.authType, 'oauth');
   });
+
+  // --- refusal paths: no Connection residue ---------------------------------
+
+  test('refusal: OAuth add-source 409 writes NO Connection record', async () => {
+    const connectionStore = recordingConnectionStore();
+    const session = withLinearSession();
+    const stores = makeAccountStores();
+    stores.accountStore.findAccountByIdentity = async () => ({ _id: 'acct-B' });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores, fetches: stubs(ONE_SITE), connectionStore });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 409);
+    assert.equal(connectionStore.calls.length, 0, 'no Connection residue on a refused OAuth add-source');
+  });
+
+  test('refusal: OAuth new-login existing-container 409 writes NO Connection record', async () => {
+    const connectionStore = recordingConnectionStore();
+    const containerId = `jira:${MYSELF.accountId}`;
+    const session = makeSession({
+      accountId: 'acct-1',
+      workspaces: [{ id: containerId, name: 'Acme', urlKey: 'jira-acme', provider: 'jira' }],
+      activeWorkspaceId: containerId,
+    });
+    const stores = makeAccountStores();
+    stores.accountStore.findAccountByIdentity = async () => ({ _id: 'acct-B' });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores, fetches: stubs(ONE_SITE), connectionStore });
+
+    await request(app, { path: '/auth/jira/oauth?mode=new' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 409);
+    assert.equal(connectionStore.calls.length, 0, 'no Connection residue on a refused existing-container bind');
+  });
+
+  test('refusal: OAuth new-login fresh-arm conflict (merge offer) writes NO Connection record', async () => {
+    const connectionStore = recordingConnectionStore();
+    const stores = makeAccountStores();
+    await stores.accountStore.linkIdentity('acct-other', 'jira', MYSELF.accountId);
+    const session = makeSession({ accountId: 'acct-canonical', identityAuthenticatedAt: Date.now(), workspaces: [] });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores, fetches: stubs(ONE_SITE), connectionStore });
+
+    await request(app, { path: '/auth/jira/oauth?mode=new' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 409);
+    assert.ok(session.pendingMerge, 'a merge offer is stored');
+    assert.equal(connectionStore.calls.length, 0, 'no Connection residue while a merge is only OFFERED');
+  });
 });

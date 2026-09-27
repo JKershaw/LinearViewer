@@ -255,6 +255,23 @@ describe('routes/jira-auth.js', () => {
       assert.equal(credentials.email, 'ada@acme.com')
     })
 
+    test('LIN-3127 refusal: Basic 409 (identity owned by another account) writes NO Connection record', async () => {
+      const { accountStore, accountWorkspaceStore } = freshAccountStores()
+      const otherAccount = await accountStore.createAccount()
+      await accountStore.linkIdentity(otherAccount._id, 'jira', 'jira-acct-1', {})
+      const myAccount = await accountStore.createAccount()
+      const connectionStore = recordingConnectionStore()
+      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      const session = makeSession({ accountId: myAccount._id, workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
+
+      await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'tok-123', site: SITE }, session }, res)
+
+      assert.equal(res.statusCode, 409)
+      assert.equal(connectionStore.calls.length, 0, 'no Connection residue on a refused Basic link')
+    })
+
     test('a returning Jira identity (fresh session, previously-seen accountId) lands on their EXISTING account', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
       const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
