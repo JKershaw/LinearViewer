@@ -149,7 +149,7 @@ after(async () => {
   await new Promise(resolve => server.close(resolve));
 });
 
-function makeApp({ session, store, provider, prefsStore, stores = makeAccountStores(), fetches = {} }) {
+function makeApp({ session, store, provider, prefsStore, stores = makeAccountStores(), fetches = {}, connectionStore }) {
   const app = express();
   app.use(express.urlencoded({ extended: false }));
   app.use((req, _res, next) => { req.session = session; next(); });
@@ -165,6 +165,7 @@ function makeApp({ session, store, provider, prefsStore, stores = makeAccountSto
     accountWorkspaceStore: stores.accountWorkspaceStore,
     ownerCredentialStore: store,
     userPreferencesStore: prefsStore,
+    connectionStore,
   }));
   return app;
 }
@@ -1020,5 +1021,104 @@ describe('LIN-2340 — the add-source 409 exit drops a carried token regardless'
     assert.equal(picked.status, 302, 'the pick succeeds');
     assert.equal(session.jiraPending, undefined, 'pending state cleared wholesale on success');
     assert.equal(JSON.stringify(session).includes('atlassian-refresh-ROTATING'), false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3127 — Jira OAuth Connection dual-write (seams #8 add-source and #9
+// new-login, both arms). `completeJiraOAuthLink` writes at the add-source arm;
+// `completeJiraNewLogin` writes beside each `persistRefresh` call, using the
+// correct workspace object already in scope (N1 — never through the closure).
+// ---------------------------------------------------------------------------
+describe('LIN-3127 — Jira OAuth Connection dual-write', () => {
+  function recordingConnectionStore() {
+    const calls = [];
+    return {
+      calls,
+      put: async (accountId, provider, unitId, credentials) => {
+        calls.push({ accountId, provider, unitId, credentials });
+        return true;
+      },
+    };
+  }
+
+  const SITE_URL = 'https://acme.atlassian.net';
+
+  test('add-source (#8) writes one record (account, jira, site) with the OAuth token', async () => {
+    const connectionStore = recordingConnectionStore();
+    const session = withLinearSession();
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(ONE_SITE), connectionStore });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme-linear' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 302);
+    assert.equal(connectionStore.calls.length, 1, 'exactly one Connection write');
+    const call = connectionStore.calls[0];
+    assert.equal(call.provider, 'jira');
+    assert.equal(call.unitId, SITE_URL);
+    assert.equal(call.credentials.token, 'jira-access-1');
+    assert.equal(call.credentials.authType, 'oauth');
+    assert.equal(call.credentials.cloudId, 'cid-1');
+  });
+
+  test('new-login existing-container arm (#9) writes one record and completes its redirect (no hang)', async () => {
+    const connectionStore = recordingConnectionStore();
+    const containerId = `jira:${MYSELF.accountId}`;
+    const session = makeSession({
+      accountId: 'acct-1',
+      workspaces: [{ id: containerId, name: 'Acme', urlKey: 'jira-acme', provider: 'jira' }],
+      activeWorkspaceId: containerId,
+    });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(ONE_SITE), connectionStore });
+
+    await request(app, { path: '/auth/jira/oauth?mode=new' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 302, 'the existing-container arm completes — no TDZ ReferenceError/hang');
+    assert.equal(callback.location, '/workspace/jira-acme/');
+    assert.equal(connectionStore.calls.length, 1);
+    assert.equal(connectionStore.calls[0].unitId, SITE_URL);
+    assert.equal(connectionStore.calls[0].credentials.token, 'jira-access-1');
+  });
+
+  test('new-login fresh arm (#9) writes one record', async () => {
+    const connectionStore = recordingConnectionStore();
+    const session = jiraOnlySession();
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(ONE_SITE), connectionStore });
+
+    await request(app, { path: '/auth/jira/oauth?mode=new' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 302);
+    assert.equal(connectionStore.calls.length, 1);
+    assert.equal(connectionStore.calls[0].unitId, SITE_URL);
+    assert.equal(connectionStore.calls[0].credentials.token, 'jira-access-1');
+  });
+
+  test('Basic -> OAuth upgrade-in-place writes the OAuth token AND keeps the non-secret email', async () => {
+    const connectionStore = recordingConnectionStore();
+    const session = makeSession({
+      accountId: 'acct-1',
+      workspaces: [{
+        id: 'ws-1', urlKey: 'acme', provider: 'jira',
+        bindings: [{
+          provider: 'jira', scope: SITE_URL,
+          credentials: { token: 'basic-old', email: 'jira.only@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER },
+        }],
+      }],
+      activeWorkspaceId: 'ws-1',
+    });
+    const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(ONE_SITE), connectionStore });
+
+    await request(app, { path: '/auth/jira/oauth?mode=add-source&workspace=acme' });
+    const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
+
+    assert.equal(callback.status, 302);
+    assert.equal(connectionStore.calls.length, 1);
+    const credentials = connectionStore.calls[0].credentials;
+    assert.equal(credentials.token, 'jira-access-1', 'the OAuth token replaces the Basic one');
+    assert.equal(credentials.email, 'jira.only@example.com', 'the merged binding kept email (post-linkProvider read, not the call literal)');
+    assert.equal(credentials.authType, 'oauth');
   });
 });

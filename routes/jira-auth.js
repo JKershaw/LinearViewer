@@ -60,6 +60,7 @@ import {
 } from '../lib/workspace.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { respondToAccountConflict } from '../lib/account-conflict.js'
+import { writeConnection } from '../lib/connection-store.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import {
@@ -290,6 +291,15 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       email,
       tokenExpiresAt: Number.MAX_SAFE_INTEGER,
     })
+
+    // LIN-3127: additive, write-only Connection dual-write (best-effort), after
+    // the establishAccount conflict return above and after linkProvider. This is
+    // the BASIC seam, so it passes { omitToken: true } unconditionally:
+    // linkProvider MERGES credentials, so a Basic link onto a site that already
+    // holds an OAuth binding would otherwise inherit `authType: 'oauth'` and
+    // slip the Basic API token past the helper's authType check
+    // (lin3127-jira-basic-retention — the token is never persisted).
+    if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', normalizedSite, { omitToken: true })
 
     // One-shot session flash (LIN-2803): Basic add binds onto the viewed
     // workspace exactly like every other add-source arm — it just isn't an
@@ -610,6 +620,11 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       tokenExpiresAt: calculateExpiresAt(pending.expiresIn),
     })
 
+    // LIN-3127 (#8): additive, write-only Connection dual-write (best-effort),
+    // after this arm's own establishAccount conflict return above and after
+    // linkProvider. Unit id is the site (binding scope).
+    if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', site.url)
+
     // One-shot session flash (LIN-2803) — see the Basic add-source arm above.
     req.session.providerAdded = { provider: 'jira', scope: site.url }
     delete req.session.jiraPending
@@ -699,6 +714,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       }
       linkProvider(existing, 'jira', site.url, credentials)
       req.session.activeWorkspaceId = existing.id
+      // LIN-3127 (#9a): direct Connection write beside persistRefresh — the
+      // `existing` workspace object is already in scope (never the closure, N1).
+      if (connectionStore) await writeConnection(connectionStore, established.accountId, existing, 'jira', site.url)
       await persistRefresh(established.accountId, existing.urlKey)
       return finish(existing)
     }
@@ -799,6 +817,11 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
                 applyUserPreferencesToSession(req.session, savedPrefs)
               }
 
+              // LIN-3127 (#9b): direct Connection write beside persistRefresh,
+              // after the conflict check resolved ok. `workspace` is already in
+              // scope here (declared for the fresh container above, N1) — not
+              // routed through the closure.
+              if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', site.url)
               await persistRefresh(established.accountId, workspace.urlKey)
 
               req.session.activeWorkspaceId = workspace.id

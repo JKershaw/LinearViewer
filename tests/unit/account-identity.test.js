@@ -266,6 +266,104 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     assert.ok(events[0].workspaceIds.includes('org-legacy'));
   });
 
+  // === LIN-3127: merge-confirm Connection dual-write (N2) ======================
+  // The merge container is keyed (account, provider, unitId); `pendingMerge`
+  // carries no `scope`, so it is derived from the container's single binding
+  // for `pending.provider`. Runs for EVERY provider, including the
+  // no-refreshToken GitHub-family path (it is not gated on refreshToken).
+
+  function recordingConnectionStore() {
+    const calls = [];
+    return {
+      calls,
+      put: async (accountId, provider, unitId, credentials) => {
+        calls.push({ accountId, provider, unitId, credentials });
+        return true;
+      },
+    };
+  }
+
+  function mergeConfirmSession(canonicalAccountId, mergedAccountId, workspace, provider, refreshToken) {
+    return makeSession({
+      accountId: canonicalAccountId,
+      identityAuthenticatedAt: Date.now(),
+      pendingMerge: {
+        canonicalAccountId,
+        mergedAccountId,
+        workspace,
+        refreshToken: refreshToken ?? null,
+        mode: 'new',
+        returnUrlKey: workspace.urlKey,
+        provider,
+        createdAt: Date.now(),
+      },
+    });
+  }
+
+  test('LIN-3127: merge-confirm writes one Connection record for the arriving linear binding (N2)', async () => {
+    const stores = freshStores();
+    const canonical = await stores.accountStore.createAccount();
+    const merged = await stores.accountStore.createAccount();
+    const connectionStore = recordingConnectionStore();
+    const mergeRouter = createAccountMergeRoutes({ ...stores, connectionStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
+    const session = mergeConfirmSession(canonical._id, merged._id,
+      { id: 'org-other', urlKey: 'other', bindings: [{ provider: 'linear', scope: 'org-other', credentials: { token: 'lin_tok' } }] },
+      'linear', 'refresh-1');
+
+    const res = makeRes();
+    await confirmHandler({ session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/other/');
+    assert.strictEqual(connectionStore.calls.length, 1, 'exactly one Connection write');
+    assert.deepStrictEqual(connectionStore.calls[0], {
+      accountId: canonical._id, provider: 'linear', unitId: 'org-other', credentials: { token: 'lin_tok' },
+    });
+  });
+
+  test('LIN-3127: merge-confirm writes one Connection record for the arriving jira binding (site scope as unit id)', async () => {
+    const stores = freshStores();
+    const canonical = await stores.accountStore.createAccount();
+    const merged = await stores.accountStore.createAccount();
+    const connectionStore = recordingConnectionStore();
+    const mergeRouter = createAccountMergeRoutes({ ...stores, connectionStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
+    const session = mergeConfirmSession(canonical._id, merged._id,
+      { id: 'jira:acct', urlKey: 'acme', bindings: [{ provider: 'jira', scope: 'https://acme.atlassian.net', credentials: { token: 'oauth-tok', authType: 'oauth', cloudId: 'cid-1' } }] },
+      'jira', 'atlassian-refresh');
+
+    const res = makeRes();
+    await confirmHandler({ session }, res);
+
+    assert.strictEqual(connectionStore.calls.length, 1);
+    assert.deepStrictEqual(connectionStore.calls[0], {
+      accountId: canonical._id,
+      provider: 'jira',
+      unitId: 'https://acme.atlassian.net',
+      credentials: { token: 'oauth-tok', authType: 'oauth', cloudId: 'cid-1' },
+    });
+  });
+
+  test('LIN-3127: merge-confirm writes for the no-refreshToken GitHub path too (not gated on refreshToken)', async () => {
+    const stores = freshStores();
+    const canonical = await stores.accountStore.createAccount();
+    const merged = await stores.accountStore.createAccount();
+    const connectionStore = recordingConnectionStore();
+    const mergeRouter = createAccountMergeRoutes({ ...stores, connectionStore });
+    const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
+    const session = mergeConfirmSession(canonical._id, merged._id,
+      { id: 'github:42', urlKey: 'octocat', bindings: [{ provider: 'github', scope: 'octocat/repo-a', credentials: { installationId: '99', token: 'gho_tok' } }] },
+      'github', null);
+
+    const res = makeRes();
+    await confirmHandler({ session }, res);
+
+    assert.strictEqual(connectionStore.calls.length, 1, 'the GitHub merge still dual-writes');
+    assert.deepStrictEqual(connectionStore.calls[0], {
+      accountId: canonical._id, provider: 'github', unitId: '99', credentials: { installationId: '99', token: 'gho_tok' },
+    });
+  });
+
   // === Amendment A1: fresh dual-authentication is required ======================
 
   test('amendment A1: a live-but-STALE canonical session is refused a one-click merge — re-auth required, no pending merge stored', async () => {

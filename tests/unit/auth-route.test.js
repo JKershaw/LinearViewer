@@ -566,4 +566,58 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(session.oauthState, undefined);
     assert.strictEqual(session.oauthIntent, undefined);
   });
+
+  // -------------------------------------------------------------------------
+  // LIN-3127 — write-only Connection dual-write from the two Linear seams.
+  // A recording double stands in for the store: the route under test is the
+  // seam, and writeConnection only calls `put`.
+  // -------------------------------------------------------------------------
+
+  function recordingConnectionStore() {
+    const calls = [];
+    return {
+      calls,
+      put: async (accountId, provider, unitId, credentials) => {
+        calls.push({ accountId, provider, unitId, credentials });
+        return true;
+      },
+    };
+  }
+
+  test('LIN-3127: new-login callback dual-writes one Connection record keyed (account, linear, org.id)', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const connectionStore = recordingConnectionStore();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real' });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(connectionStore.calls.length, 1, 'exactly one Connection write');
+    const call = connectionStore.calls[0];
+    assert.strictEqual(call.accountId, session.accountId);
+    assert.strictEqual(call.provider, 'linear');
+    assert.strictEqual(call.unitId, 'org-1');
+    assert.strictEqual(call.credentials.token, 'lin_tok');
+  });
+
+  test('LIN-3127: add-source callback dual-writes one Connection record for the second org', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+    const connectionStore = recordingConnectionStore();
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = addSourceSession(myAccount._id);
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, makeRes());
+
+    assert.strictEqual(connectionStore.calls.length, 1, 'exactly one Connection write');
+    assert.strictEqual(connectionStore.calls[0].accountId, myAccount._id);
+    assert.strictEqual(connectionStore.calls[0].provider, 'linear');
+    assert.strictEqual(connectionStore.calls[0].unitId, 'org-2');
+    assert.strictEqual(connectionStore.calls[0].credentials.token, 'lin_tok');
+  });
 });

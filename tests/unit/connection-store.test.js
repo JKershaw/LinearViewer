@@ -376,4 +376,25 @@ describe('writeConnection', () => {
     store.put = async () => { throw new Error('put boom'); };
     await assert.doesNotReject(writeConnection(store, 'acct-1', workspace, 'github', 'acme/repo-a'));
   });
+
+  // WC10 — explicit omitToken override (the Jira Basic bypass hardening,
+  // lin3127-jira-basic-retention). A Basic add-source onto a site that already
+  // holds an OAuth binding keeps `authType: 'oauth'` from the old credentials
+  // via linkProvider's merge, so the authType check alone would let the Basic
+  // API token through. The seam passes { omitToken: true } unconditionally.
+  test('omits the token when { omitToken: true } is passed, even when the binding looks OAuth', async () => {
+    const workspace = sampleWorkspace('jira', 'https://acme.atlassian.net', {
+      token: 'basic-api-token',
+      email: 'me@acme.test',
+      authType: 'oauth'
+    });
+    const store = new ConnectionStore({ collection: { async updateOne() {} } });
+    let written;
+    store.put = async (accountId, provider, unitId, credentials) => { written = credentials; return true; };
+
+    await writeConnection(store, 'acct-1', workspace, 'jira', 'https://acme.atlassian.net', { omitToken: true });
+
+    assert.deepStrictEqual(written, { email: 'me@acme.test', authType: 'oauth' });
+    assert.strictEqual(written.token, undefined);
+  });
 });
