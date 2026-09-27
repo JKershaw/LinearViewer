@@ -171,6 +171,9 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
     // Custom prompts are not anchored to a Linear issue — opt out of the
     // issue-link contract explicitly. A loaded Autopilot kickoff carries an
     // explicit kind ('autopilot') and name so it's tagged as the meta-loop.
+    // LIN-3079: the autopilot kickoff promises a proxy token, so force the
+    // server-side attach for that kind only (the boundary F3: an edited/reloaded
+    // textarea clears dataset.kind, so it falls back to the ordinary toggle).
     await dispatchPrompt({
       urlKey,
       prompt,
@@ -181,7 +184,8 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       issueless: true,
       model,
       harness,
-      presetId
+      presetId,
+      proxyForce: kind === 'autopilot'
     })
 
     btn.textContent = 'dispatched!'
@@ -203,8 +207,14 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       // Best-effort
     }
 
-    // Clear textarea
-    if (textarea) textarea.value = ''
+    // Clear textarea. Clearing from code does NOT fire `input`, so strip the
+    // Autopilot metadata too (LIN-3079 D1): otherwise the next refilled ordinary
+    // prompt inherits kind=autopilot and gets a forced proxy attach.
+    if (textarea) {
+      textarea.value = ''
+      delete textarea.dataset.kind
+      delete textarea.dataset.promptName
+    }
 
     // Refresh recents
     if (recentsContainer) {
@@ -571,26 +581,33 @@ function initDispatchPagePrompt() {
     }
 
     // LIN-1011: clicking a favourite refills the textarea (same as a recent
-    // item). The input listener strips dataset.kind, so it behaves as a
-    // hand-typed custom prompt — correct for scope A.
+    // item). Setting `.value` from code does NOT fire the `input` listener, so
+    // the Autopilot metadata must be stripped here explicitly — otherwise a
+    // refilled ordinary prompt inherits kind=autopilot (LIN-3079 D1).
     const favItem = e.target.closest('.dispatch-favorites-container .queue-favorite-item')
     if (favItem) {
       e.preventDefault()
       const prompt = favItem.dataset.prompt
       if (prompt) {
         textarea.value = prompt
+        delete textarea.dataset.kind
+        delete textarea.dataset.promptName
         textarea.focus()
       }
       return
     }
 
-    // Handle recent prompt clicks
+    // Handle recent prompt clicks. Same as the favourite refill: setting
+    // `.value` from code skips the `input` listener, so strip the Autopilot
+    // metadata explicitly (LIN-3079 D1).
     const item = e.target.closest('.dispatch-recents-container .queue-recent-item')
     if (item) {
       e.preventDefault()
       const prompt = item.dataset.prompt
       if (prompt) {
         textarea.value = prompt
+        delete textarea.dataset.kind
+        delete textarea.dataset.promptName
         textarea.focus()
       }
     }

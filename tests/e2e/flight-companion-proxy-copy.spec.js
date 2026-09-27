@@ -1,16 +1,22 @@
 import { test, expect } from '../fixtures/test-base.js';
 
-// LIN-1764: Flight Companion's one-click +proxy append. Mirrors the
-// tests/e2e/proxy-toggle-copy.spec.js idiom (same "+proxy silent-drop" guard),
-// applied to the Flight Companion copy button instead of the dashboard/swipe
-// prompt-copy buttons.
+// LIN-1764 introduced Flight Companion's one-click +proxy append as a
+// USER-TOGGLED feature. LIN-3079 reclassifies it: the kickoff copy path states a
+// bootstrap token is "supplied alongside this prompt (the +proxy block)", so with
+// the `proxy` feature flag ON the copy MUST force-append (feature-gated, no user
+// toggle), mirroring Passage Planner. With the flag OFF the copy is bare and no
+// mint is ever attempted (a mint would 403), and the page now surfaces a
+// degradation notice so the token-promising kickoff is never presented as
+// complete.
 //
-// The route redirects to /settings unless BOTH `flightCompanion` and `proxy`
-// feature flags are on (plan-review finding F3) — a spec that sets only one
-// would have every case redirect and pass vacuously.
+// The route gates on `flightCompanion` ALONE (routes/flight-companion.js:487) —
+// it does NOT require `proxy`. The proxy-off cases below genuinely render the
+// page; correcting an earlier header that wrongly claimed both flags were
+// required (review finding C2).
 
 let URL_KEY;
-const FEATS = encodeURIComponent(JSON.stringify({ flightCompanion: true, proxy: true }));
+const FEATS_ON = encodeURIComponent(JSON.stringify({ flightCompanion: true, proxy: true }));
+const FEATS_OFF = encodeURIComponent(JSON.stringify({ flightCompanion: true, proxy: false }));
 const PROXY_MARKER = 'Workspace API access';
 
 test.beforeEach(({ workerUrlKey }) => {
@@ -27,18 +33,32 @@ async function failTokenMint(page) {
   });
 }
 
-test.describe('Flight Companion +proxy copy', () => {
+/** Count POSTs to the token-mint endpoint, to prove a skipped mint is never attempted. */
+function countTokenMintRequests(page) {
+  let count = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/api/proxy/tokens')) count++;
+  });
+  return () => count;
+}
+
+async function openCompanion(page, feats) {
+  await page.goto(`/test/set-session?features=${feats}&urlKey=${URL_KEY}`);
+  await page.goto(`/workspace/${URL_KEY}/flight-companion`);
+  await page.waitForLoadState('networkidle');
+}
+
+test.describe('Flight Companion copy — feature-gated forced append', () => {
   test.beforeEach(async ({ context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   });
 
-  test('copy appends the proxy block when +proxy is enabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${FEATS}&urlKey=${URL_KEY}`);
-    await page.goto(`/workspace/${URL_KEY}/flight-companion`);
-    await page.waitForLoadState('networkidle');
+  test('copy force-appends the proxy block when the feature is on (no toggle click)', async ({ page }) => {
+    await openCompanion(page, FEATS_ON);
 
-    await page.locator('.prompt-proxy-toggle').click();
-    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+    // The now-inert user toggle is gone; the feature gate alone drives the append.
+    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-feature', 'true');
 
     await page.locator('#flight-companion-copy').click();
     await expect(page.locator('#flight-companion-copy')).toHaveText('copied ✓');
@@ -48,49 +68,74 @@ test.describe('Flight Companion +proxy copy', () => {
     expect(clip).toContain('/api/proxy/instructions');
   });
 
-  test('copy does NOT append when +proxy is disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${FEATS}&urlKey=${URL_KEY}`);
-    await page.goto(`/workspace/${URL_KEY}/flight-companion`);
-    await page.waitForLoadState('networkidle');
+  test('the +proxy toggle is absent with the feature on, yet copy still force-appends', async ({ page }) => {
+    await openCompanion(page, FEATS_ON);
 
-    // Leave +proxy off (default).
+    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
+
     await page.locator('#flight-companion-copy').click();
     await expect(page.locator('#flight-companion-copy')).toHaveText('copied ✓');
 
     const clip = await page.evaluate(() => navigator.clipboard.readText());
-    expect(clip.length).toBeGreaterThan(0);
-    expect(clip).not.toContain(PROXY_MARKER);
+    expect(clip).toContain(PROXY_MARKER);
   });
 
-  test('copy surfaces failure (does not silently drop) when token mint fails', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${FEATS}&urlKey=${URL_KEY}`);
-    await page.goto(`/workspace/${URL_KEY}/flight-companion`);
-    await page.waitForLoadState('networkidle');
+  test('copy surfaces failure (does not silently drop) when the forced mint fails', async ({ page }) => {
+    await openCompanion(page, FEATS_ON);
     await failTokenMint(page);
-
-    await page.locator('.prompt-proxy-toggle').click();
-    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
 
     // Seed the clipboard so we can prove nothing was written on failure.
     await page.evaluate(() => navigator.clipboard.writeText('__SENTINEL__'));
 
     await page.locator('#flight-companion-copy').click();
 
-    // The toggle still shows active, but the copy must visibly report failure...
+    // The copy must visibly report failure...
     await expect(page.locator('#flight-companion-copy-feedback')).not.toHaveText('');
     await expect(page.locator('#flight-companion-copy')).not.toHaveText('copied ✓');
     // ...and must NOT have silently copied a bare (proxy-less) prompt.
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toBe('__SENTINEL__');
   });
+
+  test('no proxy-off degradation notice renders when the feature is on', async ({ page }) => {
+    await openCompanion(page, FEATS_ON);
+    await expect(page.locator('#flight-companion-proxy-degraded')).toHaveCount(0);
+  });
 });
 
-test.describe('Flight Companion +proxy gate — flag off', () => {
-  test('no +proxy toggle renders when the proxy feature flag is off', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ flightCompanion: true }))}&urlKey=${URL_KEY}`);
+test.describe('Flight Companion proxy gate — feature off', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  });
+
+  test('no +proxy toggle and no data-proxy-feature attribute renders when the proxy feature flag is off', async ({ page }) => {
+    await openCompanion(page, FEATS_OFF);
+
+    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
+    await expect(page.locator('body')).not.toHaveAttribute('data-proxy-feature', 'true');
+  });
+
+  test('renders the proxy-off degradation notice — the token-promising kickoff is not presented as complete (F1)', async ({ page }) => {
+    await openCompanion(page, FEATS_OFF);
+
+    const notice = page.locator('#flight-companion-proxy-degraded');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('workspace API access');
+  });
+
+  test('copy skips the mint entirely and copies the bare prompt when the proxy feature is off', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${FEATS_OFF}&urlKey=${URL_KEY}`);
+    const getMintCount = countTokenMintRequests(page);
     await page.goto(`/workspace/${URL_KEY}/flight-companion`);
     await page.waitForLoadState('networkidle');
 
-    await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
+    await page.locator('#flight-companion-copy').click();
+    await expect(page.locator('#flight-companion-copy')).toHaveText('copied ✓');
+
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip.length).toBeGreaterThan(0);
+    expect(clip).not.toContain(PROXY_MARKER);
+    // The bare-copy path must never attempt a mint it knows would 403.
+    expect(getMintCount()).toBe(0);
   });
 });
