@@ -171,4 +171,57 @@ describe('createEnsurePATSession', () => {
       assert.strictEqual(req.session.workspaces, undefined, `no PAT session created for ${path}`);
     }
   });
+
+  // LIN-1892 (N1): an email-only signed-in session (accountId, zero
+  // workspaces) is not a signed-out visitor. Keep the guard if S2 is reverted.
+  describe('N1: a signed-in account with zero workspaces is never auto-logged-in (LIN-1892)', () => {
+    class CountingLinearProvider extends ProviderInterface {
+      constructor() { super(); this.name = 'linear'; this.calls = 0; }
+      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
+      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
+    }
+    let counting;
+    beforeEach(() => { counting = new CountingLinearProvider(); registerProvider(counting); });
+    afterEach(() => { registerProvider(new FakeLinearProvider()); });
+
+    for (const path of ['/', '/account']) {
+      for (const initial of [{ accountId: 'A', workspaces: [] }, { accountId: 'A' }]) {
+        test(`${path} with ${JSON.stringify(initial)}: next(), no provider call, no workspace, no account write`, async () => {
+          const stores = freshStores();
+          const session = makeSession(initial);
+          const { req, res } = makeReqRes({ path, session });
+          let nextCalled = false;
+          await createEnsurePATSession(stores)(req, res, () => { nextCalled = true; });
+
+          assert.strictEqual(nextCalled, true);
+          assert.strictEqual(counting.calls, 0, 'fetchOrganization/fetchViewer never called');
+          assert.deepStrictEqual(req.session.workspaces, initial.workspaces, 'workspaces untouched');
+          assert.strictEqual(req.session.accountId, 'A');
+          assert.strictEqual(await stores.accountStore.collection.countDocuments({}), 0, 'the account store is unchanged');
+          assert.strictEqual(await stores.accountWorkspaceStore.collection.countDocuments({}), 0);
+        });
+      }
+    }
+
+    test('sessions WITHOUT an accountId behave exactly as before: the PAT workspace and account are created', async () => {
+      for (const initial of [{}, { workspaces: [] }, { accountId: undefined, workspaces: [] }, { accountId: '' }]) {
+        const stores = freshStores();
+        const { req, res } = makeReqRes({ session: makeSession(initial) });
+        let nextCalled = false;
+        await createEnsurePATSession(stores)(req, res, () => { nextCalled = true; });
+
+        assert.strictEqual(nextCalled, true);
+        assert.strictEqual(counting.calls > 0, true, `${JSON.stringify(initial)}: PAT auto-login ran`);
+        assert.strictEqual(req.session.workspaces.length, 1);
+        assert.strictEqual(req.session.workspaces[0].id, 'org-1');
+        assert.strictEqual(req.session.activeWorkspaceId, 'org-1');
+        assert.ok(req.session.accountId, 'the account seam ran');
+        assert.deepStrictEqual(
+          Object.keys(req.session).filter(k => typeof req.session[k] !== 'function').sort(),
+          ['accountId', 'activeWorkspaceId', 'identityAuthenticatedAt', 'workspaces'],
+          'the same session fields as before LIN-1892'
+        );
+      }
+    });
+  });
 });

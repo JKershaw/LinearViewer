@@ -201,6 +201,25 @@ describe('link origin', () => {
     }
   });
 
+  test('a Resend transport with no configured origin sends nothing (never a Host-derived link), and the page is unchanged', async () => {
+    const sent = [];
+    const resendLike = { kind: 'resend', async send(message) { sent.push(message); return { ok: true }; } };
+    const harness = await startEmailAuthHarness({ transport: resendLike });
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args.map(String).join(' '));
+    try {
+      const res = await harness.browser().requestLink('resend@x.io');
+      assert.strictEqual(res.status, 200);
+      assert.match(res.text, /data-testid="email-check-inbox"/);
+      assert.deepStrictEqual(sent, []);
+      assert.ok(errors.some(line => line.includes('[email-auth]')), 'the refusal is logged');
+    } finally {
+      console.error = originalError;
+      await harness.close();
+    }
+  });
+
   test('with no configured origin, the link uses the request\'s own origin (dev/test)', async () => {
     const harness = await startEmailAuthHarness();
     try {

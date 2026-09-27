@@ -28,6 +28,7 @@ const SOURCE_PATH = join(__dirname, '../../lib/email-availability.js');
 
 const KEY = 're_test_secret_key_value';
 const FROM = 'Harbour <sign-in@example.test>';
+const ORIGIN = 'https://harbour.example';
 
 // `NODE_ENV` / email variables → kind, step mode, refused-combination warning.
 // The two S2-3 rows (verdict 0def5b66, G3-a) are marked.
@@ -51,9 +52,17 @@ const MATRIX = [
   { name: 'S2-3: test / EMAIL_TRANSPORT=capture + RESEND_API_KEY + EMAIL_FROM', env: { NODE_ENV: 'test', EMAIL_TRANSPORT: 'capture', RESEND_API_KEY: KEY, EMAIL_FROM: FROM }, kind: 'capture', step: 'opt-in', warns: false },
   { name: 'production / key only', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY }, kind: null, step: 'off', warns: false },
   { name: 'production / from only', env: { NODE_ENV: 'production', EMAIL_FROM: FROM }, kind: null, step: 'off', warns: false },
-  { name: 'production / key + from', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM }, kind: 'resend', step: 'on', warns: false },
-  { name: 'production / key + from + EMAIL_TRANSPORT=resend', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_TRANSPORT: 'resend' }, kind: 'resend', step: 'on', warns: false },
-  { name: 'unset / key + from (self-hosted with a real key)', env: { RESEND_API_KEY: KEY, EMAIL_FROM: FROM }, kind: 'resend', step: 'on', warns: false },
+  // EMAIL_LINK_ORIGIN is required for resend (S2 beat 3 decision: Host-header
+  // link poisoning). Without a valid one the door stays off, with a warning.
+  { name: 'production / key + from + origin', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: ORIGIN }, kind: 'resend', step: 'on', warns: false },
+  { name: 'production / key + from, no origin', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM }, kind: null, step: 'off', warns: true },
+  { name: 'production / key + from + an invalid origin', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: 'harbour.example' }, kind: null, step: 'off', warns: true },
+  { name: 'production / key + from + origin + EMAIL_TRANSPORT=resend', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: ORIGIN, EMAIL_TRANSPORT: 'resend' }, kind: 'resend', step: 'on', warns: false },
+  { name: 'production / key + from + EMAIL_TRANSPORT=resend, no origin', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_TRANSPORT: 'resend' }, kind: null, step: 'off', warns: true },
+  { name: 'unset / key + from + origin (self-hosted with a real key)', env: { RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: ORIGIN }, kind: 'resend', step: 'on', warns: false },
+  { name: 'unset / key + from, no origin (self-hosted)', env: { RESEND_API_KEY: KEY, EMAIL_FROM: FROM }, kind: null, step: 'off', warns: true },
+  { name: 'unset / origin only', env: { EMAIL_LINK_ORIGIN: ORIGIN }, kind: null, step: 'off', warns: false },
+  { name: 'unset / EMAIL_TRANSPORT=console + origin', env: { EMAIL_TRANSPORT: 'console', EMAIL_LINK_ORIGIN: ORIGIN }, kind: 'console', step: 'off', warns: false },
   { name: 'production / key + from + EMAIL_TRANSPORT=console', env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_TRANSPORT: 'console' }, kind: null, step: 'off', warns: true },
   { name: 'production / EMAIL_TRANSPORT=resend without key + from', env: { NODE_ENV: 'production', EMAIL_TRANSPORT: 'resend' }, kind: null, step: 'off', warns: true },
   { name: 'unset / EMAIL_PROMPT_STEP=on only', env: { EMAIL_PROMPT_STEP: 'on' }, kind: null, step: 'off', warns: false },
@@ -84,9 +93,13 @@ describe('email-availability env matrix', () => {
       const reason = resolveEmailTransportRefusal(env);
       if (row.warns) {
         assert.strictEqual(typeof reason, 'string', 'refused combination has a reason');
-        assert.match(reason, /EMAIL_TRANSPORT/, 'the reason names the variable');
+        assert.match(reason, /EMAIL_TRANSPORT|EMAIL_LINK_ORIGIN/, 'the reason names the variable');
       } else {
         assert.strictEqual(reason, null, 'no warning');
+      }
+      // Every refused row names what to set: the transport, or the origin Resend needs.
+      if (row.warns && (row.env.RESEND_API_KEY && row.env.EMAIL_FROM && [undefined, 'resend'].includes(row.env.EMAIL_TRANSPORT))) {
+        assert.match(reason, /EMAIL_LINK_ORIGIN/);
       }
     });
   }
@@ -139,16 +152,18 @@ describe('email link origin (Host-header poisoning guard)', () => {
     assert.strictEqual(resolveEmailLinkOrigin({ EMAIL_LINK_ORIGIN: 'not a url' }), null);
   });
 
-  test('warns when links reach real inboxes (resend) with no origin, or when the origin is unusable', () => {
-    const resend = { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM };
-    assert.match(resolveEmailLinkOriginWarning(resend), /EMAIL_LINK_ORIGIN is not set/);
-    assert.strictEqual(resolveEmailLinkOriginWarning({ ...resend, EMAIL_LINK_ORIGIN: 'https://harbour.example' }), null);
-    assert.match(resolveEmailLinkOriginWarning({ EMAIL_LINK_ORIGIN: 'nope' }), /not an http\(s\) URL/);
-    assert.strictEqual(resolveEmailLinkOriginWarning({ EMAIL_TRANSPORT: 'console' }), null, 'dev: links only reach the log');
+  test('the link-origin warning: only an unusable origin under a dev/test transport (Resend refuses instead)', () => {
+    assert.strictEqual(resolveEmailLinkOriginWarning({ EMAIL_TRANSPORT: 'console' }), null, 'unset is fine for dev: links only reach the log');
+    assert.match(resolveEmailLinkOriginWarning({ EMAIL_TRANSPORT: 'console', EMAIL_LINK_ORIGIN: 'nope' }), /not an http\(s\) URL/);
+    assert.match(resolveEmailLinkOriginWarning({ NODE_ENV: 'test', EMAIL_TRANSPORT: 'capture', EMAIL_LINK_ORIGIN: 'nope' }), /not an http\(s\) URL/);
+    assert.strictEqual(resolveEmailLinkOriginWarning({ NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: 'nope' }), null, 'Resend: the refusal reason covers it (no double warning)');
+    assert.match(resolveEmailTransportRefusal({ NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: 'nope' }), /EMAIL_LINK_ORIGIN/);
+    assert.strictEqual(resolveEmailLinkOriginWarning({ EMAIL_LINK_ORIGIN: 'nope' }), null, 'email off: nothing to warn about');
     assert.strictEqual(resolveEmailLinkOriginWarning({}), null);
   });
 
-  test('the origin does not affect availability (the matrix above is unchanged by it)', () => {
-    assert.strictEqual(isEmailSignInAvailable({ EMAIL_LINK_ORIGIN: 'https://harbour.example' }), false);
+  test('the origin alone never turns email on', () => {
+    assert.strictEqual(isEmailSignInAvailable({ EMAIL_LINK_ORIGIN: ORIGIN }), false);
   });
+
 });

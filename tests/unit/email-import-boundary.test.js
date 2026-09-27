@@ -27,13 +27,14 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-// The new S2 modules. Beat 3 adds lib/render-account-home.js here.
+// The new S2 modules.
 const EMAIL_MODULES = [
   'lib/email-availability.js',
   'lib/email-transport.js',
   'lib/email-auth.js',
   'routes/email-auth.js',
   'lib/render-email-auth.js',
+  'lib/render-account-home.js',
 ];
 
 // Q13 at 2c00dee3 (reproduced by verdict 0def5b66): the provider/auth SCC.

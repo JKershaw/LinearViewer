@@ -70,12 +70,14 @@ describe('email-transport', () => {
     assert.strictEqual(createEmailTransport({ env: {} }), null);
     assert.strictEqual(createEmailTransport({ env: { NODE_ENV: 'production' } }), null);
     assert.strictEqual(createEmailTransport({ env: { NODE_ENV: 'test' } }), null);
+    // Resend keys without EMAIL_LINK_ORIGIN: off (fail closed, Host-header link poisoning).
+    assert.strictEqual(createEmailTransport({ env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM } }), null);
   });
 
   test('Resend: POSTs the message JSON with a Bearer key and a timeout signal, via the injected fetch only', async () => {
     const { calls, fetchImpl } = recordingFetch(() => new Response('{"id":"e1"}', { status: 200 }));
     const logger = recordingLogger();
-    const transport = createEmailTransport({ env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM }, fetchImpl, logger });
+    const transport = createEmailTransport({ env: { NODE_ENV: 'production', RESEND_API_KEY: KEY, EMAIL_FROM: FROM, EMAIL_LINK_ORIGIN: 'https://harbour.example' }, fetchImpl, logger });
 
     assert.strictEqual(transport.kind, 'resend');
     const result = await transport.send(MESSAGE);

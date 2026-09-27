@@ -95,7 +95,7 @@ import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/j
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createAccountMergeRoutes } from './routes/account-merge.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
-import { createEmailAuthRoutes } from './routes/email-auth.js'
+import { createEmailAuthRoutes, accountHomeRedirect } from './routes/email-auth.js'
 import { createEmailTransport } from './lib/email-transport.js'
 import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
 import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning } from './lib/email-availability.js'
@@ -1791,6 +1791,9 @@ app.get('/', (req, res) => {
   if (workspace) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
   }
+  // LIN-1892 (N1): a signed-in account with no workspaces (email-only) goes to
+  // its account home, not the sign-in landing.
+  if (accountHomeRedirect(req, res)) return
 
   // Show setup notice on localhost when nothing is configured
   const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h))
@@ -1808,7 +1811,8 @@ app.get('/', (req, res) => {
  * Renders the swipe view with static landing page data so visitors can
  * explore the UI before signing in.
  *
- * For authenticated users: Redirects to their workspace swipe page.
+ * For authenticated users: Redirects to their workspace swipe page; a
+ * signed-in account with no workspaces goes to /account (LIN-1892 N1).
  */
 app.get('/swipe/:identifier?', (req, res) => {
   const workspace = req.session.workspaces?.[0]
@@ -1819,6 +1823,7 @@ app.get('/swipe/:identifier?', (req, res) => {
       : `/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`
     return res.redirect(dest)
   }
+  if (accountHomeRedirect(req, res)) return
 
   const html = renderSwipePage(
     { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
@@ -1833,7 +1838,8 @@ app.get('/swipe/:identifier?', (req, res) => {
  * Renders the swim view with static landing page data so visitors can
  * explore the UI before signing in.
  *
- * For authenticated users: Redirects to their workspace swim page.
+ * For authenticated users: Redirects to their workspace swim page; a
+ * signed-in account with no workspaces goes to /account (LIN-1892 N1).
  */
 app.get('/swim', (req, res) => {
   const workspace = req.session.workspaces?.[0]
@@ -1841,6 +1847,7 @@ app.get('/swim', (req, res) => {
   if (workspace) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/swim`)
   }
+  if (accountHomeRedirect(req, res)) return
 
   const html = renderSwimPage(
     { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
@@ -1851,7 +1858,8 @@ app.get('/swim', (req, res) => {
 
 /**
  * Landing ship page — unauthenticated preview of the radial Ship view.
- * For authenticated users: redirects to their workspace ship page.
+ * For authenticated users: redirects to their workspace ship page; a
+ * signed-in account with no workspaces goes to /account (LIN-1892 N1).
  * Prototype: not linked from navigation.
  */
 app.get('/ship', (req, res) => {
@@ -1860,6 +1868,7 @@ app.get('/ship', (req, res) => {
   if (workspace) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/ship`)
   }
+  if (accountHomeRedirect(req, res)) return
 
   const html = renderShipPage(
     { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },

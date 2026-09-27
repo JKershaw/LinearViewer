@@ -6,9 +6,11 @@
  *   POST /auth/email/send     → one "check your inbox" page for every address
  *   GET  /auth/email/confirm  → the confirm page (confirm nonce minted); NEVER consumes
  *   POST /auth/email/confirm  → login-CSRF checks, N2 guard, consume, sign in
+ *   GET  /account             → the account home for a signed-in, zero-workspace session
  *
- * Every route answers 503 when email sign-in is off (`transport === null`,
- * i.e. `isEmailSignInAvailable()` is false).
+ * Every /auth/email* route answers 503 when email sign-in is off
+ * (`transport === null`, i.e. `isEmailSignInAvailable()` is false).
+ * `/account` does not: it belongs to the account, not to the email door.
  *
  * The login-CSRF defence (plan §G1): the session cookie is `sameSite:'lax'`
  * (lib/session-options.js), so a cross-site POST carries no cookie and so no
@@ -49,8 +51,24 @@ import {
   renderEmailSendRefusedPage,
   renderEmailUnavailablePage,
 } from '../lib/render-email-auth.js';
+import { renderAccountHomePage } from '../lib/render-account-home.js';
 
 const WELL_FORMED_TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * N1 (LIN-1892): a signed-in account with zero workspaces is not a signed-out
+ * visitor. `/` and the unauthenticated previews (`/swipe`, `/swim`, `/ship`)
+ * call this AFTER their own "has a workspace" redirect; it sends such a
+ * session to its account home instead of the sign-in CTAs.
+ * @returns {boolean} true when it redirected (the caller returns)
+ */
+export function accountHomeRedirect(req, res) {
+  if (req.session?.accountId && !(req.session.workspaces?.length > 0)) {
+    res.redirect('/account');
+    return true;
+  }
+  return false;
+}
 
 // Per-IP send limit, the same shape as routes/proxy.js's
 // proxyTokenCreationLimiter. Module scope, so its budget is process-global
@@ -89,7 +107,7 @@ function sha256Hex(value) {
  * @param {import('../lib/user-preferences.js').UserPreferencesStore} [options.userPreferencesStore]
  * @param {import('../lib/email-auth.js').MagicLinkStore} options.magicLinkStore
  * @param {Object|null} options.transport - from createEmailTransport; null = email sign-in off
- * @param {string|null} [options.linkOrigin] - canonical origin for links in emails; null = the request's own
+ * @param {string|null} [options.linkOrigin] - canonical origin for links in emails (required for a Resend transport); null = the request's own (console/capture only)
  * @param {Function} [options.sendLimiter] - defaults to the module-scope per-IP limiter
  * @param {() => number} [options.now] - clock for nonce ages (tests)
  * @returns {Router}
@@ -128,9 +146,27 @@ export function createEmailAuthRoutes({
   }
 
   function linkUrl(req, token) {
+    // Resend links reach real inboxes: never from the (forgeable) Host header.
+    // lib/email-availability.js already keeps Resend off without an origin;
+    // this refuses a mis-wired router too. Console/capture may fall back.
+    if (!linkOrigin && transport.kind === 'resend') {
+      throw new Error('a configured link origin is required to send Resend sign-in links');
+    }
     const origin = linkOrigin || `${req.protocol}://${req.get('host')}`;
     return `${origin}/auth/email/confirm?t=${token}`;
   }
+
+  router.get('/account', async (req, res) => {
+    if (!req.session.accountId) return res.redirect('/');
+    // Only the zero-workspace state lives here; `/` takes a session with
+    // workspaces to its first one (and sends this state back here — no loop,
+    // the two conditions are exclusive).
+    if (req.session.workspaces?.length > 0) return res.redirect('/');
+    const account = await accountStore.getAccount(await canonical(req.session.accountId));
+    const emails = (account?.identities || []).filter(i => i.provider === 'email').map(i => i.scope);
+    res.set('Cache-Control', 'no-store');
+    res.send(renderAccountHomePage({ emails }));
+  });
 
   router.get('/auth/email', async (req, res) => {
     if (!transport) return unavailable(res);
