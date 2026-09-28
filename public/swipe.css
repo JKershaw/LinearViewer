@@ -842,6 +842,223 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
 }
 
 /* ==========================================================================
+   Opened-task component (LIN-2944). Swipe's Prompts accordion renders the
+   shared PromptSection. These styles cover the ✦ primary, the one-line why,
+   the ladder, "other prompts", the generated-age line, the visible reasoning
+   block and the disabled-primary reason. Colours come ONLY from the shared
+   semantic tokens plus --green-dim/--amber-dim/--blue (LIN-3123 owns contrast
+   work; no new colour values here). Both light and .theme-dark inherit the
+   tokens, so one block covers both themes. The face split follows CLAUDE.md:
+   sans (--font-content) for human labels/prose, mono (--font-structural) for
+   machine facts.
+   ========================================================================== */
+
+/* One-line ranking reason — human prose, so sans. */
+.opened-task-why {
+  margin: 0.15rem 0 var(--space-2);
+  font-family: var(--font-content);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* The ✦ primary action: the most prominent control on the surface. */
+.opened-task-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.opened-task-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1rem;
+  min-height: 40px;
+  border: 1px solid var(--blue);
+  border-radius: var(--radius-md);
+  background: var(--blue);
+  /* --bg is white in light and near-black in dark, so the label stays legible
+     on the blue fill in BOTH themes without a new colour value. */
+  color: var(--bg);
+  font-family: var(--font-content);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.opened-task-go:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.opened-task-go:disabled {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.opened-task-primary-reason {
+  font-family: var(--font-content);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--amber-dim);
+}
+
+/* The ladder: a sequence of rungs, copy -> run this step -> run the whole task. */
+.opened-task-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: var(--space-2) 0;
+}
+
+.opened-task-rung {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.opened-task-rung--ready {
+  border-color: var(--green-dim);
+  color: var(--green-dim);
+}
+
+.opened-task-rung--ready:hover {
+  background: var(--card);
+}
+
+/* Not-yet-ready rungs are SHOWN, dashed and muted — available, not broken. */
+.opened-task-rung--setup {
+  border-style: dashed;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.opened-task-setup {
+  color: var(--amber-dim);
+  font-size: 11px;
+}
+
+/* Templates grouped under "other prompts" — human label, sans. */
+.opened-task-other-prompts {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-soft);
+}
+
+.opened-task-other-prompts-label {
+  font-family: var(--font-content);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin-bottom: var(--space-1);
+}
+
+/* "generated 2h ago · regenerate" — an age fact (mono) plus an action. */
+.opened-task-generated {
+  font-family: var(--font-structural);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.opened-task-regenerate {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  color: var(--blue);
+  font-family: var(--font-content);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.opened-task-regenerate:hover:not(:disabled) {
+  background: var(--card);
+}
+
+.opened-task-regenerate:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Visible reasoning (LIN-2944 reverses LIN-70): secondary to, but readable
+   beside, the prompt body. */
+.opened-task-reasoning {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-family: var(--font-content);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.opened-task-reasoning p { margin: 0 0 0.4rem; }
+.opened-task-reasoning ul,
+.opened-task-reasoning ol { margin: 0 0 0.4rem; padding-left: var(--space-4); }
+
+/* Notice shown when a not-yet-enabled rung is pressed. */
+.opened-task-setup-notice {
+  margin: var(--space-1) 0;
+  font-family: var(--font-content);
+  font-size: 11px;
+  color: var(--amber-dim);
+}
+
+/* Edit slot (hidden on Swipe until P1 supplies editUrl). */
+.swipe-prompt-edit {
+  margin-left: auto;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  color: var(--muted);
+  font-family: var(--font-content);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.swipe-prompt-edit:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* The ticket asks for a PROMINENT copy in the action cluster. */
+.swipe-prompt-actions .swipe-prompt-copy {
+  padding: 0.3rem 0.6rem;
+  border-color: var(--blue);
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.swipe-prompt-actions .swipe-prompt-copy.copied {
+  background: var(--card);
+  border-color: var(--green-dim);
+  color: var(--green-dim);
+}
+
+/* ==========================================================================
    Responsive - Desktop
    ========================================================================== */
 
