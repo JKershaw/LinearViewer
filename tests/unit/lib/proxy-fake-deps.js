@@ -89,6 +89,25 @@ export const BASE_DEPS = () => ({
     setWorkspaceHalt: async () => {},
     clearWorkspaceHalt: async () => {},
   },
+  // LIN-3130 S2a: routes/proxy-runner.js's dispatch deps. The first slice that
+  // needs them, so they are added here rather than hand-wired per row. A dispatch
+  // row that needs specific results (e.g. an empty fold or a by-id 404) still
+  // overrides the relevant method, exactly as before.
+  dispatchQueueStore: {
+    listItems: async () => [],
+    listHistory: async () => ({ items: [], total: 0 }),
+    getItemStatus: async () => null,
+    historyTtl: 30 * 24 * 60 * 60, // seconds
+    pollAvailable: async () => [],
+    takeItem: async () => null,
+    addFeedback: async () => null,
+  },
+  dispatchTokenStore: {
+    listTokens: async () => [],
+  },
+  sessionsFeedCache: {
+    clear: () => {},
+  },
 });
 
 /**
