@@ -37,10 +37,10 @@ describe('N2: a sign-in link never attaches an email to a live account', () => {
     return tokenFromOutbox(harness.transport, email);
   }
 
-  // The attacker already owns an email account A for `email`.
-  async function attackerAccount(email) {
+  // The attacker already owns an email account A for `email`. Pass `browser`
+  // to keep the confirming session (the stale-session witness needs it).
+  async function attackerAccount(email, browser = harness.browser()) {
     const t = await attackerLink(email);
-    const browser = harness.browser();
     const { nonce } = await browser.openConfirm(t);
     assert.strictEqual((await browser.confirm(t, nonce)).status, 302);
     return (await browser.session()).accountId;
@@ -231,6 +231,39 @@ describe('N2: a sign-in link never attaches an email to a live account', () => {
     assert.strictEqual((await victim.session()).accountId, P, 'still P');
     assert.deepStrictEqual(await identities(P), pBefore, 'P gained no duplicate email identity');
     assert.deepStrictEqual(await identities(E), [`email:${email}`], 'E keeps the address (canonicalised, not re-linked)');
+  });
+
+  test('positive control (stale session): a session still holding an id merged into P is treated as P\'s — GET shows the confirm, POST self-heals to P, nothing new linked', async () => {
+    const email = `stale${counter++}@x.io`;
+    // The phone signs in by email as X — its own account — and keeps the
+    // browser, so its session goes stale when X is later merged away.
+    const phone = harness.browser();
+    const X = await attackerAccount(email, phone);
+    assert.strictEqual((await phone.session()).accountId, X);
+
+    // P signs in on a second browser and absorbs X. `mergeAccounts` updates
+    // only the confirming session, so the phone still holds X.
+    const desktop = harness.browser();
+    const P = await signInAsLinear(desktop);
+    const pBefore = await identities(P);
+    const merged = await harness.stores.accountStore.mergeAccounts(P, X, {
+      accountWorkspaceStore: harness.stores.accountWorkspaceStore,
+    });
+    assert.ok(merged.ok, 'X merged into P');
+    assert.deepStrictEqual(await identities(X), [`email:${email}`], 'X keeps its email identity');
+    assert.strictEqual((await phone.session()).accountId, X, 'the phone session is still stale on X');
+
+    const t = await attackerLink(email); // requested from a signed-out browser
+    const { res: page, nonce } = await phone.openConfirm(t);
+    assert.strictEqual(page.status, 200, 'the stale session\'s own (merged) address gets the confirm page');
+    assert.doesNotMatch(page.text, /data-testid="email-confirm-signed-in-refused"/);
+    assert.match(page.text, /data-testid="email-confirm-already-signed-in"/);
+
+    const post = await phone.confirm(t, nonce);
+    assert.strictEqual(post.status, 302, 'the confirm self-heals the stale session to P, not refused');
+    assert.strictEqual((await phone.session()).accountId, P, 'the session self-heals to canonical P');
+    assert.deepStrictEqual(await identities(P), pBefore, 'P gained no duplicate email identity');
+    assert.deepStrictEqual(await identities(X), [`email:${email}`], 'X keeps the address (canonicalised, not re-linked)');
   });
 
   test('signed-in send: POST /auth/email/send from P\'s session shows "You\'re signed in" and issues no token', async () => {
