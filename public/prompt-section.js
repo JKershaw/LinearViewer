@@ -442,13 +442,23 @@
         proxyForce: memory.proxyForce,
         generatedAt: memory.generatedAt
       };
-      state.phase = 'fresh';
+      enterPhase('fresh'); // restored-from-memory fresh starts with no notice
       state.result = hydrated;
       state.activeLabel = hydrated.label;
       if (hydrated.label) {
         promptCache.set(`${issueId}:${hydrated.label}`, hydrated);
         lastPromptLabel.set(issueId, hydrated.label);
       }
+    }
+
+    // Every phase transition clears the press-raised setup notice (LIN-2944 N3):
+// the notice's truth is tied to the state it was raised in, so it must not
+// outlive a transition (idle -> generating -> fresh -> error, and a new
+// request). `render()` alone does NOT clear it, so a press's own re-render
+// keeps the notice visible until the next transition (N1).
+    function enterPhase(phase) {
+      state.phase = phase;
+      state.setupNotice = null;
     }
 
     function render() {
@@ -465,12 +475,11 @@
     }
 
     function goIdle() {
-      state.phase = 'idle';
+      enterPhase('idle');
       state.result = null;
       state.activeLabel = null;
       state.activeLabelName = null;
       state.error = null;
-      state.setupNotice = null;
       render();
     }
 
@@ -479,7 +488,7 @@
       abortController = new AbortController();
       const ac = abortController;
 
-      state.phase = 'generating';
+      enterPhase('generating'); // a new request clears any press notice
       state.activeLabel = label;
       if (label === '__ai__') {
         state.activeLabelName = 'AI Recommend';
@@ -537,7 +546,7 @@
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
           savePromptMemory(opts.urlKey, issueId, entry);
-          state.phase = 'fresh';
+          enterPhase('fresh');
           state.result = entry;
           render();
         } else {
@@ -554,14 +563,14 @@
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
           savePromptMemory(opts.urlKey, issueId, entry);
-          state.phase = 'fresh';
+          enterPhase('fresh');
           state.result = entry;
           render();
         }
       } catch (err) {
         if (err.name === 'AbortError' || destroyed) return;
         container.classList.remove('streaming');
-        state.phase = 'error';
+        enterPhase('error');
         state.error = err.message || 'Failed to load prompt';
         render();
       }
@@ -579,7 +588,7 @@
       let truncated = false;
 
       // First render: swap to fresh with empty body so the stream animates inline
-      state.phase = 'fresh';
+      enterPhase('fresh');
       state.result = { label, name: 'AI thinking\u2026', raw: '', html: '', reasoning: '' };
       render();
       container.classList.add('streaming');
@@ -673,7 +682,7 @@
       promptCache.set(`${issueId}:${label}`, entry);
       lastPromptLabel.set(issueId, label);
       savePromptMemory(opts.urlKey, issueId, entry);
-      state.phase = 'fresh';
+      enterPhase('fresh');
       state.result = entry;
       render();
     }

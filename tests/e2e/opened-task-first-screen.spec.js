@@ -361,5 +361,27 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await rung.click();
       await expect(component.locator('.opened-task-setup-notice')).toContainText(/generate a prompt first/i);
     });
+
+    // N3 (class closure): a notice raised in idle must not survive into fresh,
+    // and must never sit beside an ENABLED run-step.
+    test('an idle setup notice is cleared once a prompt lands, with dispatch enabled (N3)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+
+      const component = page.locator('.prompt-section').first();
+      const notice = component.locator('.opened-task-setup-notice');
+
+      // Idle: press the run-step set-up rung; it says a prompt is needed.
+      await component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]').click();
+      await expect(notice).toContainText(/generate a prompt first/i);
+
+      // Pick a template -> fresh, run-step becomes enabled.
+      await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
+      await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+      await expect(component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]')).toHaveAttribute('data-action', 'run-step');
+      await expect(notice).toHaveCount(0);
+    });
   });
 });

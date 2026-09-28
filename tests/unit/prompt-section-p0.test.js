@@ -552,3 +552,140 @@ describe('P0 re-review N2: the rendered idle run-step stays a set-up rung (R7)',
     assert.equal(/data-action="run-step"/.test(rung[0]), false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// P0 re-review round 3 (verdict b5b5843e): N3 is one face of a CLASS — a press
+// notice whose truth is not tied to the component's phase transitions. These
+// table-driven cases cover every phase × rung/setup-need × dispatch/proxy flag
+// combination and the transitions between them. Asserted invariants:
+//   * a notice appears ONLY after a press (never on init, incl. memory restore);
+//   * a notice never survives a phase transition / a new prompt request;
+//   * a notice raised in fresh renders until the next transition (N1);
+//   * no setup notice sits beside an ENABLED run-step (the N3 contradiction).
+// ---------------------------------------------------------------------------
+
+describe('P0 re-review N3: the setup notice is tied to phase transitions (class closure)', () => {
+  const COMBOS = [
+    { dispatch: false, proxy: false },
+    { dispatch: true, proxy: false },
+    { dispatch: false, proxy: true },
+    { dispatch: true, proxy: true },
+  ];
+  const noticeCount = (html) => (html.match(/opened-task-setup-notice/g) || []).length;
+
+  function optsFor(combo, opts = {}) {
+    return baseOpts(
+      { id: `issue-${combo.dispatch}-${combo.proxy}`, identifier: 'LIN-60' },
+      { dispatchEnabled: combo.dispatch, proxyEnabled: combo.proxy, hasAutopilot: combo.proxy, ...opts }
+    );
+  }
+
+  // The setup rungs currently rendered, with the need each advertises.
+  function setupRungs(html) {
+    const ladder = (html.split('data-testid="opened-task-ladder"')[1] || '').split('</div>')[0];
+    return [...ladder.matchAll(/data-rung="([^"]+)"[^>]*data-action="setup"[^>]*data-setup-needs="([^"]+)"/g)]
+      .map((m) => ({ rung: m[1], needs: m[2] }));
+  }
+  function hasEnabledRunStep(html) {
+    return /data-rung="run-step"[^>]*data-action="run-step"/.test(html);
+  }
+
+  for (const combo of COMBOS) {
+    const label = `dispatch=${combo.dispatch} proxy=${combo.proxy}`;
+
+    test(`[${label}] idle starts clean; each rendered setup rung raises a notice`, async () => {
+      const { PromptSection } = loadPromptSection();
+      const container = makeContainer();
+      PromptSection.init(container, optsFor(combo));
+
+      assert.equal(noticeCount(container.innerHTML), 0, 'init renders no notice');
+      const rungs = setupRungs(container.innerHTML);
+      assert.ok(rungs.length > 0, 'idle has at least one setup rung');
+      for (const rung of rungs) {
+        await container.click({ action: 'setup', setupNeeds: rung.needs });
+        assert.equal(noticeCount(container.innerHTML), 1, `exactly one notice after pressing ${rung.rung}`);
+      }
+    });
+
+    test(`[${label}] a notice raised in idle does not survive the template transition into fresh`, async () => {
+      const { PromptSection } = loadPromptSection();
+      const container = makeContainer();
+      PromptSection.init(container, optsFor(combo));
+
+      await container.click({ action: 'setup', setupNeeds: 'prompt' });
+      assert.match(container.innerHTML, /generate a prompt first/);
+
+      await container.click({ prompt: 'implementation' });
+      await flush();
+
+      assert.equal(container.getAttribute('data-phase'), 'fresh');
+      assert.equal(noticeCount(container.innerHTML), 0, 'stale notice cleared on the transition');
+      assert.equal(hasEnabledRunStep(container.innerHTML), combo.dispatch, 'no notice beside an enabled run-step');
+    });
+
+    test(`[${label}] a fresh setup-rung press shows its notice, and the next request clears it`, async () => {
+      const { PromptSection } = loadPromptSection();
+      const container = makeContainer();
+      PromptSection.init(container, optsFor(combo));
+      await container.click({ prompt: 'implementation' });
+      await flush();
+      assert.equal(container.getAttribute('data-phase'), 'fresh');
+
+      const freshRungs = setupRungs(container.innerHTML);
+      if (freshRungs.length > 0) {
+        await container.click({ action: 'setup', setupNeeds: freshRungs[0].needs });
+        assert.equal(noticeCount(container.innerHTML), 1, 'fresh press shows its notice (N1)');
+      }
+
+      await container.click({ prompt: 'implementation' });
+      await flush();
+      assert.equal(noticeCount(container.innerHTML), 0, 'the next request cleared the notice');
+    });
+  }
+
+  test('a notice raised in idle does not survive the AI-stream transition to fresh', async () => {
+    const { PromptSection } = loadPromptSection({
+      readSSEStream: async (response, onEvent) => {
+        onEvent('message', { section: 'prompt', content: 'STREAMED' });
+      },
+      fetchImpl: async () => emptyStreamResponse(),
+    });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-stream', identifier: 'LIN-61' }, { dispatchEnabled: true }));
+
+    await container.click({ action: 'setup', setupNeeds: 'prompt' });
+    assert.match(container.innerHTML, /generate a prompt first/);
+
+    await container.click({ prompt: '__ai__' });
+    await flush();
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh');
+    assert.equal(noticeCount(container.innerHTML), 0, 'AI stream transition clears the notice');
+  });
+
+  test('a notice raised in idle does not survive the error transition', async () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-err', identifier: 'LIN-62' }, { dispatchEnabled: true }));
+
+    await container.click({ action: 'setup', setupNeeds: 'prompt' });
+    await container.click({ prompt: '__ai__' }); // default fetch returns { ok: false } -> error
+    await flush();
+
+    assert.equal(container.getAttribute('data-phase'), 'error');
+    assert.equal(noticeCount(container.innerHTML), 0, 'error phase renders no notice');
+  });
+
+  test('a remembered prompt restoring into fresh starts with no notice', () => {
+    const ls = makeLocalStorage();
+    ls.setItem('harbour:prompt-memory:ws:issue-mem', JSON.stringify({
+      v: 1, label: '__ai__', name: 'AI Recommendation', raw: 'REMEMBERED', generatedAt: Date.now()
+    }));
+    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-mem', identifier: 'LIN-63' }, { aiState: 'off' }));
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh');
+    assert.equal(noticeCount(container.innerHTML), 0);
+  });
+});
