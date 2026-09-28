@@ -149,6 +149,17 @@ describe('LIN-3129 — createToken structurally refuses grants', () => {
     assert.equal(docs.length, 2);
     assert.deepEqual(docs.map(d => d.grants), [[], []]);
   });
+
+  test('createToken forces parentTokenId and workspaceId to null (lineage is internal-only)', async () => {
+    // LIN-3129 beat-3 carry-in: the wrapper spreads ...options into #mint, so
+    // without this a public caller could stamp lineage that revoke then follows.
+    await store.createToken('acme', {
+      createdBy: 'account-A', parentTokenId: 'a-root-id', workspaceId: 'ws-9'
+    });
+    const doc = collection._docs()[0];
+    assert.equal(doc.parentTokenId, null, 'a public mint may not stamp a lineage parent');
+    assert.equal(doc.workspaceId, null, 'a public mint may not stamp a workspace');
+  });
 });
 
 describe('LIN-3129 — validateToken returns grants, zeroed for ownerless documents', () => {

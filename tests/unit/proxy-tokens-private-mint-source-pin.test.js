@@ -6,12 +6,12 @@
  * cannot reach it, and nothing outside lib/proxy-tokens.js calls the new grant
  * API (`mintGrantBootstrap` / `setOwnerCheck`) in S1 — it is inert until S2b.
  *
- * Note the current `this.#mint(` set is {createToken, mintGrantBootstrap}:
- * `createToken` is the grant-less wrapper (it passes grants: []), and
- * `exchangeBootstrapToken` still routes through it until beat 3 redirects it
- * onto `#mint` for the grant-copy semantics. The allowed set below already
- * includes `exchangeBootstrapToken` so beat 3 only ADDS a caller, never widens
- * the permission — any other method referencing `#mint` fails this pin.
+ * Note the `this.#mint(` set is now exactly {createToken, mintGrantBootstrap,
+ * exchangeBootstrapToken}: `createToken` is the grant-less wrapper (it passes
+ * grants: []), and from beat 3 `exchangeBootstrapToken` calls `#mint` directly
+ * for the grant-copy/lineage semantics. Any other method referencing `#mint`
+ * fails the pin. A companion assertion ensures the exchange no longer routes
+ * through the public `createToken` (which would bypass the grant copy).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -59,14 +59,14 @@ describe('LIN-3129 — #mint is a true private method with an allow-listed calle
   });
 
   test('only createToken, mintGrantBootstrap and exchangeBootstrapToken reference this.#mint', () => {
-    const allowed = new Set(['createToken', 'mintGrantBootstrap', 'exchangeBootstrapToken']);
-    const refs = methodsReferencing(storeSource, 'this.#mint(');
-    assert.ok(refs.length >= 2, 'expected the wrapper and the grant mint to call #mint');
-    for (const name of refs) {
-      assert.ok(allowed.has(name), `unexpected method references #mint: ${name}`);
-    }
-    assert.ok(refs.includes('createToken'), 'createToken is the grant-less public wrapper');
-    assert.ok(refs.includes('mintGrantBootstrap'), 'mintGrantBootstrap is an internal #mint caller');
+    const expected = ['createToken', 'exchangeBootstrapToken', 'mintGrantBootstrap'];
+    const refs = [...new Set(methodsReferencing(storeSource, 'this.#mint('))].sort();
+    assert.deepEqual(refs, expected, 'the #mint caller set must be exactly the allow-listed three');
+  });
+
+  test('exchangeBootstrapToken no longer routes through the public createToken wrapper', () => {
+    assert.ok(!/this\.createToken\(/.test(storeSource),
+      'exchange must call #mint directly so grant copy + lineage cannot be bypassed by the wrapper');
   });
 });
 
