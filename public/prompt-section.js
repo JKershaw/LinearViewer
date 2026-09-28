@@ -326,7 +326,7 @@
       : '';
     return `
       <div class="swipe-prompt-header">
-        <span class="swipe-prompt-name">${esc(name || 'prompt')}${generatedLine}</span>
+        <span class="swipe-prompt-name">${esc(name || 'prompt')}</span>${generatedLine}
         <div class="swipe-prompt-actions">${actions}</div>
       </div>
       ${warningBanner}
