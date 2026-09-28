@@ -349,6 +349,7 @@ export function createKickoffRoutes({
         workspacePreferencesStore,
         dispatchPresetsStore,
         dispatchTokenStore,
+        proxyTokenStore,
         presetId: presetId || null,
         kind: 'autopilot',
         model,

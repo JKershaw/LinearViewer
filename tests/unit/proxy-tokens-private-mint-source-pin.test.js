@@ -85,9 +85,36 @@ describe('LIN-3129 — the grant API is inert in S1 (no production caller)', () 
     });
   }
 
-  test('no router file mounts requireGrant yet (S1 adds no mount; LIN-2884 does)', () => {
+  // NARROWED (LIN-3130 S2a, autopilot ruling; the approved LIN-3059 plan
+  // supersedes the S1-era "no mount yet" pin): S2a mounts requireGrant('take')
+  // at the runner sub-router, so the file set is no longer empty — but it must
+  // be EXACTLY routes/proxy-runner.js, and the only grant name mounted anywhere
+  // under routes/ must be 'take'. requireGrant('dispatch') is LIN-2884's mount,
+  // gated on its own merge order (S2b + #1601 deployed + the LIN-1892 backfill),
+  // and must not exist yet. This is narrower than the old empty-set assertion,
+  // not looser: a second take mount, or any dispatch mount, still fails.
+  test('S2a mounts requireGrant(\'take\') in routes/proxy-runner.js only; LIN-2884 owns dispatch', () => {
     // Match an actual mount call, requireGrant('<name>') — not a passing mention.
-    const routers = walk(join(REPO, 'routes')).filter(f => /requireGrant\s*\(\s*['"]/.test(readFileSync(f, 'utf8')));
-    assert.deepEqual(routers, [], 'requireGrant must not be mounted by any router in S1');
+    const mounts = [];
+    for (const file of walk(join(REPO, 'routes'))) {
+      const src = readFileSync(file, 'utf8');
+      for (const m of src.matchAll(/requireGrant\s*\(\s*['"]([^'"]+)['"]/g)) {
+        mounts.push({ file: file.slice(REPO.length + 1), grant: m[1] });
+      }
+    }
+
+    const files = [...new Set(mounts.map((m) => m.file))].sort();
+    assert.deepEqual(
+      files,
+      ['routes/proxy-runner.js'],
+      'S2a mounts requireGrant only in routes/proxy-runner.js; any additional/other mount fails this pin'
+    );
+
+    const grants = [...new Set(mounts.map((m) => m.grant))].sort();
+    assert.deepEqual(
+      grants,
+      ['take'],
+      'S2a mounts only the take grant; requireGrant(\'dispatch\') is LIN-2884\'s and must not exist yet'
+    );
   });
 });

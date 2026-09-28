@@ -3589,6 +3589,7 @@ ${goal}`
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
+        proxyTokenStore,
         kind: 'triage',
         // Optional per-dispatch override from the feedback widget (LIN-1132).
         // Blank/absent falls through to the factory's default resolution
@@ -3672,6 +3673,7 @@ ${goal}`
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
+        proxyTokenStore,
         kind: 'autopilot',
         // Optional per-dispatch override from the feedback widget (LIN-1132).
         // Blank/absent falls through to the factory's default resolution

@@ -943,6 +943,7 @@ export function createFlightCompanionRoutes({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
+        proxyTokenStore,
         applyDefaultHarness: false,
         prompt,
         // Byte-for-byte mirror of send_follow_up's own finalizePrompt
