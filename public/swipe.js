@@ -422,7 +422,7 @@ function renderCard(direction) {
   // the anchor of the Work group. Only available when authenticated.
   if (urlKey) {
     const cached = window.PromptSection && window.PromptSection.getCached
-      ? window.PromptSection.getCached(issue.id)
+      ? window.PromptSection.getCached(issue.id, urlKey)
       : null;
     const hint = cached ? ` <span class="swipe-prompts-cache-hint">· ${_esc(cached.name || cached.label)} cached</span>` : '';
     groups.work.push(`

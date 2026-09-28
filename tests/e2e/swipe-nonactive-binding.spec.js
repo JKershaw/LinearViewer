@@ -27,10 +27,11 @@ import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
 // as `extraBindings`.
 
 test.describe('Swipe recap / brief / recommend on a non-active (Jira) binding (LIN-2046)', () => {
-  async function seedAndGoto(page, seedLocal, identifier) {
+  async function seedAndGoto(page, seedLocal, identifier, features) {
     await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
     const { urlKey } = await seedLocal(null, {
       openRouterConnected: true, // hasAI, so the __ai__ (AI Recommend) button renders
+      features,
       extraBindings: [
         { provider: 'jira', scope: JIRA_SITE, credentials: { token: 'jira-api-token', email: 'ada@example.com', tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
       ],
@@ -77,6 +78,29 @@ test.describe('Swipe recap / brief / recommend on a non-active (Jira) binding (L
       page.locator('[data-prompt="__ai__"]').first().click(),
     ]);
     expect(recommendReq.url()).toContain('source=jira');
+  });
+
+  // LIN-2944 P0 addendum 1 — discharges exactly two LIN-1916 rows: the TEMPLATE
+  // prompt fetch and the Autopilot kickoff now thread `source` like the
+  // recommend stream does. (The swipe.js comments fetch stays LIN-1916's.)
+  test('template-prompt and Autopilot requests for a Jira row carry source=jira (LIN-1916 rows 1-2)', async ({ page, seedLocal }) => {
+    // The proxy feature enables the ladder's "run the whole task" (Autopilot) rung.
+    await seedAndGoto(page, seedLocal, 'ENG-1', { proxy: true });
+    await expect(page.locator('.swipe-card-title')).toContainText('Jira task to do');
+
+    await page.locator('.swipe-accordion-header[data-accordion="prompts"]').first().click();
+
+    const [templateReq] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/prompt/')),
+      page.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click(),
+    ]);
+    expect(templateReq.url()).toContain('source=jira');
+
+    const [autopilotReq] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/autopilot-prompt/')),
+      page.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').first().click(),
+    ]);
+    expect(autopilotReq.url()).toContain('source=jira');
   });
 
   // Regression control: the ACTIVE (local) binding's own row still resolves

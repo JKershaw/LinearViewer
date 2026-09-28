@@ -258,6 +258,17 @@ describe('P0 addendum 2: prompt memory persists proxyForce/kind across a reload'
     const persisted = Object.values(ls.dump()).join('\n');
     assert.equal(persisted.includes('## Workspace API access'), false);
   });
+
+  test('a fresh result shows "generated <age> · regenerate"', async () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-11', identifier: 'LIN-11' }));
+    await container.click({ prompt: 'implementation' });
+    await flush();
+
+    assert.match(container.innerHTML, /generated/i);
+    assert.match(container.innerHTML, /regenerate/i);
+  });
 });
 
 // ---------------------------------------------------------------------------

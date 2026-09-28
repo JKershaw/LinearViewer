@@ -15,6 +15,73 @@
   const promptCache = new Map(); // `${issueId}:${label}` -> {label, name, raw, html, reasoning}
   const lastPromptLabel = new Map(); // issueId -> label
 
+  // Per-task prompt memory (LIN-2944 F11 / addendum 2). The durable record is the
+  // SAME shape as the in-memory cache entry, minus `html` (re-rendered from `raw`
+  // on hydrate) and with `generatedAt` added; it also keeps the LIN-3079 fields
+  // (`kind`/`proxyForce`) and `warning`. Keyed by `urlKey` + `issueId` (never
+  // global). The appended proxy block is NEVER persisted — tokens are minted
+  // fresh per copy (LIN-1140). All storage access is try/catch'd so a storage
+  // that throws (private mode, quota) downgrades to no memory, never a crash.
+  const MEMORY_PREFIX = 'harbour:prompt-memory:';
+  const MEMORY_VERSION = 1;
+
+  function memoryKey(urlKey, issueId) {
+    return `${MEMORY_PREFIX}${urlKey || ''}:${issueId}`;
+  }
+
+  // Read compatibility: an old-shape/foreign record that is malformed or lacks a
+  // usable `raw` is treated as absent (no crash, no partial hydrate). A record
+  // missing the newer fields (generatedAt/kind/proxyForce/warning) still
+  // restores — those fields simply stay undefined.
+  function loadPromptMemory(urlKey, issueId) {
+    try {
+      if (!window.localStorage) return null;
+      const stored = window.localStorage.getItem(memoryKey(urlKey, issueId));
+      if (!stored) return null;
+      const parsed = JSON.parse(stored);
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.raw !== 'string') return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function savePromptMemory(urlKey, issueId, entry) {
+    if (!entry || typeof entry.raw !== 'string') return;
+    try {
+      if (!window.localStorage) return;
+      const record = {
+        v: MEMORY_VERSION,
+        label: entry.label,
+        name: entry.name,
+        raw: entry.raw,
+        reasoning: entry.reasoning,
+        warning: entry.warning,
+        kind: entry.kind,
+        proxyForce: entry.proxyForce,
+        generatedAt: entry.generatedAt
+      };
+      for (const key of Object.keys(record)) {
+        if (record[key] === undefined) delete record[key];
+      }
+      window.localStorage.setItem(memoryKey(urlKey, issueId), JSON.stringify(record));
+    } catch {
+      // Best-effort: memory is an optimisation, never load-bearing.
+    }
+  }
+
+  // "generated 2h ago · regenerate" age label (LIN-2944).
+  function formatGeneratedAge(generatedAt) {
+    if (!generatedAt) return null;
+    const seconds = Math.max(0, Math.round((Date.now() - generatedAt) / 1000));
+    if (seconds < 60) return 'just now';
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.round(hours / 24)}d ago`;
+  }
+
   // Canonical client escaper lives in common.js (window.escapeHtml, LIN-422),
   // guaranteed loaded before this file wherever it runs (swipe page).
   const esc = window.escapeHtml;
@@ -214,8 +281,12 @@
     if (dispatchEnabled) {
       // Shared dispatch disclosure (LIN-1137): composes the toggle, exec controls,
       // and target buttons with swipe-specific class names and data-action delegation.
+      // LIN-732 / LIN-2944 addendum 3: the disclosure id prefix is caller-supplied
+      // so two mounts of the same issue (e.g. Home's In Progress row AND its
+      // project-tree row in P1) get disjoint ids. Default stays `swipe-<id>` so
+      // Swipe output is byte-identical.
       html += window.renderDispatchDisclosure({
-        idPrefix: `swipe-${issue && issue.id}`,
+        idPrefix: opts.idPrefix || `swipe-${issue && issue.id}`,
         isLocalhost,
         toggleClass: 'swipe-prompt-dispatch-toggle disclosure-toggle',
         panelClass: 'swipe-prompt-options',
@@ -228,7 +299,7 @@
   }
 
   function renderFresh(state, opts) {
-    const { name, html, reasoning, warning } = state.result;
+    const { name, html, reasoning, warning, label } = state.result;
     // LIN-3079 (review N1): key the suppression on the SAME `proxyForce` flag
     // the force paths use (common.js dispatchPrompt, ProxyToggle.maybeAppend) —
     // one source of truth. An autopilot entry sets it (:297); ordinary results
@@ -236,6 +307,14 @@
     // result restores the toggle.
     const isForced = !!(state.result && state.result.proxyForce);
     const actions = renderActionCluster(isForced ? { ...opts, proxyEnabled: false } : opts);
+    // LIN-2944: the remembered prompt shows its age ("generated 2h ago") with a
+    // one-click regenerate (re-runs the same label). Only rendered once the
+    // entry carries a `generatedAt` (always true for a freshly built entry and
+    // for a hydrated memory record).
+    const age = formatGeneratedAge(state.result.generatedAt);
+    const generatedLine = age
+      ? ` <span class="opened-task-generated">generated ${esc(age)} \u00b7 <button class="opened-task-regenerate" data-prompt="${esc(label || '')}">regenerate</button></span>`
+      : '';
     // LIN-2944 reverses LIN-70: the reasoning STAYS visible beside the prompt
     // rather than collapsing behind a "▸ reasoning" toggle. The `hidden` class
     // is deliberately never applied; `data-testid` is the witness hook.
@@ -247,7 +326,7 @@
       : '';
     return `
       <div class="swipe-prompt-header">
-        <span class="swipe-prompt-name">${esc(name || 'prompt')}</span>
+        <span class="swipe-prompt-name">${esc(name || 'prompt')}${generatedLine}</span>
         <div class="swipe-prompt-actions">${actions}</div>
       </div>
       ${warningBanner}
@@ -308,13 +387,30 @@
     let abortController = null;
     let destroyed = false;
 
-    // Restore from cache if available
-    const lastLabel = lastPromptLabel.get(issueId);
-    const cached = lastLabel ? promptCache.get(`${issueId}:${lastLabel}`) : null;
-    if (cached) {
+    // Restore from durable per-task memory (F11): the in-memory-only Cache is
+    // replaced by the persisted record, so a mount hydrates from storage, not
+    // from a process-global Map. Durable restore re-renders `html` from `raw`
+    // (the record never carries markup) and re-seeds the in-session hint maps.
+    const memory = loadPromptMemory(opts.urlKey, issueId);
+    if (memory) {
+      const hydrated = {
+        label: memory.label,
+        name: memory.name,
+        raw: memory.raw,
+        html: renderMarkdown(memory.raw),
+        reasoning: memory.reasoning,
+        warning: memory.warning,
+        kind: memory.kind,
+        proxyForce: memory.proxyForce,
+        generatedAt: memory.generatedAt
+      };
       state.phase = 'fresh';
-      state.result = cached;
-      state.activeLabel = cached.label;
+      state.result = hydrated;
+      state.activeLabel = hydrated.label;
+      if (hydrated.label) {
+        promptCache.set(`${issueId}:${hydrated.label}`, hydrated);
+        lastPromptLabel.set(issueId, hydrated.label);
+      }
     }
 
     function render() {
@@ -382,10 +478,14 @@
           // ?variant=stepper; standard (`__autopilot__`) is byte-identical to before.
           // Shared fetch helper (LIN-1137) replaces the raw GET.
           const variant = label === '__autopilot_stepper__' ? 'stepper' : undefined;
+          // LIN-2944 addendum 1 (LIN-1916 row 2): thread `source` so the kickoff
+          // grounds on the row's OWN binding (fetchAutopilotKickoff already
+          // accepts it, common.js). Omitted entirely when the issue has none.
           const result = await window.fetchAutopilotKickoff({
             urlKey: opts.urlKey,
             issueId,
             variant,
+            source: issue.source || undefined,
             signal: ac.signal,
             on401: false
           });
@@ -395,25 +495,34 @@
           // LIN-3079: the kickoff body promises a `readWrite` proxy token, so only
           // this autopilot result forces proxy context (copy/download/dispatch) and
           // suppresses the now-inert +proxy toggle. Every other result stays unforced.
-          const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true };
+          const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, generatedAt: Date.now() };
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
+          savePromptMemory(opts.urlKey, issueId, entry);
           state.phase = 'fresh';
           state.result = entry;
           render();
         } else {
-          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}`, { signal: ac.signal, on401: false });
+          // LIN-2944 addendum 1 (LIN-1916 row 1): thread `source` on the template
+          // fetch too, via URLSearchParams (the LIN-2046 shape). The URL is
+          // unchanged when the issue has no source.
+          const params = new URLSearchParams();
+          if (issue.source) params.set('source', issue.source);
+          const query = params.toString() ? `?${params.toString()}` : '';
+          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
-          const entry = { label, name: result.promptName || '', raw: result.prompt, html };
+          const entry = { label, name: result.promptName || '', raw: result.prompt, html, generatedAt: Date.now() };
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
+          savePromptMemory(opts.urlKey, issueId, entry);
           state.phase = 'fresh';
           state.result = entry;
           render();
         }
       } catch (err) {
         if (err.name === 'AbortError' || destroyed) return;
+        container.classList.remove('streaming');
         state.phase = 'error';
         state.error = err.message || 'Failed to load prompt';
         render();
@@ -421,12 +530,12 @@
     }
 
     async function handleStreamingResponse(response, label, ac) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      // The body is consumed by the shared window.readSSEStream reader
+      // (LIN-2969/LIN-2980) via the onEvent handler below — this module no
+      // longer owns a getReader/TextDecoder pair (F5).
       let promptRaw = '';
       let reasoningRaw = '';
       let currentField = null;
-      let sseBuffer = '';
       let renderPending = false;
       let prevChildCount = 0;
       let truncated = false;
@@ -447,6 +556,9 @@
           const nameEl = container.querySelector('.swipe-prompt-name');
           body = container.querySelector('[data-prompt-body]');
           if (!body) return;
+          // LIN-2987: sample the pinned-bottom predicate BEFORE the render pass
+          // mutates body.innerHTML — the mutation itself grows the body, so
+          // sampling after would measure the already-grown gap.
           const wasPinned = window.isPinnedToBottom(body);
           if (currentField === 'reasoning') {
             if (nameEl) nameEl.textContent = 'AI thinking\u2026';
@@ -467,50 +579,41 @@
         });
       }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (abortController !== ac || destroyed) return;
-
-        sseBuffer += decoder.decode(value, { stream: true });
-        const lines = sseBuffer.split('\n');
-        sseBuffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6);
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.phase) {
-              if (parsed.phase === 'prompt' && currentField === 'reasoning') {
-                prevChildCount = 0;
-              }
-              currentField = parsed.phase;
-              continue;
-            }
-            if (parsed.section === 'reasoning' && parsed.content) {
-              reasoningRaw += parsed.content;
-              currentField = 'reasoning';
-              scheduleRender();
-            } else if (parsed.section === 'prompt' && parsed.content) {
-              promptRaw += parsed.content;
-              currentField = 'prompt';
-              scheduleRender();
-            }
-            // The `done` event carries truncation metadata (finish_reason === 'length').
-            if (parsed.truncated === true) {
-              truncated = true;
-            }
-            if (parsed.error) {
-              throw new Error(parsed.error);
-            }
-          } catch (parseErr) {
-            if (parseErr instanceof SyntaxError) continue;
-            throw parseErr;
+      // Shared SSE reader (LIN-2944 addendum 4 / F5; the fifth hand-rolled reader
+      // consolidated onto window.readSSEStream, LIN-2969). Two contract points:
+      //   * non-object payloads are SSE sentinels — the raw string '[DONE]' has
+      //     no fields and is ignored;
+      //   * `payload.error` is THROWN so it propagates out of readSSEStream and
+      //     drives fetchPrompt's error state (LIN-2980 exception propagation).
+      function onEvent(type, payload) {
+        if (destroyed || abortController !== ac) return;
+        if (!payload || typeof payload !== 'object') return;
+        if (payload.error) {
+          throw new Error(payload.error);
+        }
+        if (payload.phase) {
+          if (payload.phase === 'prompt' && currentField === 'reasoning') {
+            prevChildCount = 0;
           }
+          currentField = payload.phase;
+          return;
+        }
+        if (payload.section === 'reasoning' && payload.content) {
+          reasoningRaw += payload.content;
+          currentField = 'reasoning';
+          scheduleRender();
+        } else if (payload.section === 'prompt' && payload.content) {
+          promptRaw += payload.content;
+          currentField = 'prompt';
+          scheduleRender();
+        }
+        // The `done` event carries truncation metadata (finish_reason === 'length').
+        if (payload.truncated === true) {
+          truncated = true;
         }
       }
+
+      await window.readSSEStream(response, onEvent);
 
       if (destroyed || abortController !== ac) return;
       container.classList.remove('streaming');
@@ -527,10 +630,11 @@
       }
       const entry = {
         label, name: 'AI Recommendation', raw: displayText,
-        html: finalHtml, reasoning: reasoningRaw, warning
+        html: finalHtml, reasoning: reasoningRaw, warning, generatedAt: Date.now()
       };
       promptCache.set(`${issueId}:${label}`, entry);
       lastPromptLabel.set(issueId, label);
+      savePromptMemory(opts.urlKey, issueId, entry);
       state.phase = 'fresh';
       state.result = entry;
       render();
@@ -726,6 +830,10 @@
     return {
       destroy() {
         destroyed = true;
+        // Aborting the controller aborts the in-flight fetch/recommend stream;
+        // window.readSSEStream's read() then rejects with AbortError, which
+        // fetchPrompt's catch swallows (and onEvent already no-ops once
+        // `destroyed`). The container listener is the only DOM teardown.
         if (abortController) abortController.abort();
         container.removeEventListener('click', handleClick);
       },
@@ -739,13 +847,19 @@
 
   /**
    * Look up any cached prompt for an issue (used by the accordion header hint).
+   * Reads the in-session map first, then durable per-task memory (so the hint
+   * survives a reload). `urlKey` is optional for backward compatibility; without
+   * it only the in-session hint is available.
    * @param {string} issueId
+   * @param {string} [urlKey]
    * @returns {{label: string, name: string} | null}
    */
-  function getCached(issueId) {
+  function getCached(issueId, urlKey) {
     const l = lastPromptLabel.get(issueId);
     const entry = l ? promptCache.get(`${issueId}:${l}`) : null;
-    return entry ? { label: l, name: entry.name } : null;
+    if (entry) return { label: l, name: entry.name };
+    const memory = urlKey ? loadPromptMemory(urlKey, issueId) : null;
+    return memory ? { label: memory.label, name: memory.name } : null;
   }
 
   window.PromptSection = { init, getCached };

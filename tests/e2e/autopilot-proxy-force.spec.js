@@ -216,6 +216,30 @@ test.describe('LIN-3079 Swipe Autopilot — proxy forced with toggle OFF', () =>
     expect(captured.body.attachProxy).toBe(true);
     expect(captured.body.kind).toBe('autopilot');
   });
+
+  // LIN-2944 P0 addendum 2 (F11): the remembered prompt survives a reload with
+  // `proxyForce`/`kind` intact, so the forced proxy block is still appended on
+  // copy after the entry is restored from per-task memory rather than regenerated.
+  test('a reloaded Swipe card restores the remembered Autopilot prompt and still forces the proxy on copy', async ({ page }) => {
+    await setSession(page);
+    await revealSwipeAutopilot(page); // generates and persists the entry
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.locator('.swipe-accordion-header[data-accordion="prompts"]').click();
+
+    const section = page.locator('.prompt-section');
+    await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+    await expect(section.locator('[data-prompt-body]')).not.toContainText('Loading');
+    // Restored proxyForce suppresses the now-inert +proxy toggle.
+    await expect(section.locator('.prompt-proxy-toggle')).toHaveCount(0);
+
+    const copyBtn = section.locator('.swipe-prompt-copy');
+    await copyBtn.click();
+    await expect(copyBtn).toHaveText('copied!');
+
+    await assertClipboardHasProxyBlock(page);
+  });
 });
 
 test.describe('LIN-3079 periodical Mint + Autopilot — copy/download forced', () => {
