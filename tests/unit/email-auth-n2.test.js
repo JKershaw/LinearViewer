@@ -148,6 +148,40 @@ describe('N2: a sign-in link never attaches an email to a live account', () => {
     assert.ok((await harness.db.collection('email-magic-links').findOne({ _id: sha256(t) })).consumedAt, 'the token is spent (harmless: nothing attached)');
   });
 
+  test('race closure (c′), unowned after consume: refused, nothing attached', async () => {
+    const email = `attacker${counter++}@evil.test`;
+    const t = await attackerLink(email); // no attacker account: the address is unowned
+    const victim = harness.browser();
+    const { nonce } = await victim.openConfirm(t);
+    const P = await signInAsLinear(victim);
+    const pBefore = await identities(P);
+
+    const store = harness.stores.accountStore;
+    const real = store.findAccountByIdentity;
+    let emailLookups = 0;
+    store.findAccountByIdentity = async function (provider, scope) {
+      if (provider === 'email' && scope === email && emailLookups++ === 0) {
+        return { _id: P }; // (b′) sees P as the owner…
+      }
+      return real.call(this, provider, scope); // …(c′) sees nobody: the address stayed unowned.
+    };
+    try {
+      const res = await victim.confirm(t, nonce);
+      assert.strictEqual(res.status, 409);
+      assert.match(res.text, /data-testid="email-confirm-signed-in-refused"/);
+    } finally {
+      store.findAccountByIdentity = real;
+    }
+    assert.strictEqual(emailLookups, 2, 'the owner was checked before and after consume');
+    assert.deepStrictEqual(await identities(P), pBefore);
+    assert.deepStrictEqual((await identities(P)).filter(s => s.startsWith('email:')), [], 'no email on P');
+    assert.strictEqual(await store.findAccountByIdentity('email', email), null, 'no account holds the address');
+    const session = await victim.session();
+    assert.strictEqual(session.accountId, P);
+    assert.strictEqual(session.pendingMerge, undefined);
+    assert.ok((await harness.db.collection('email-magic-links').findOne({ _id: sha256(t) })).consumedAt, 'the token is spent (harmless: nothing attached)');
+  });
+
   test('positive control: P already holds p@x.io — confirming its sign-in link re-stamps freshness and links nothing new', async () => {
     const email = `p${counter++}@x.io`;
     const victim = harness.browser();
