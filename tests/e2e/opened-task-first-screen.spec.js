@@ -31,13 +31,14 @@ import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 //   [data-testid="opened-task-ladder"] [data-rung="run-task"]
 //   [data-testid="other-prompts"]                    templates under "other prompts"
 //
-// NOTE ON THE GITHUB WHY (settled in P0 beat 2): GitHub REST has no priority,
-// so the opened-task "why" was structurally always empty for a GitHub-shaped
-// issue and the one-line-why assertion was carried only by the local case. The
-// settlement is a SEED gap: the default GitHub seed's bug now carries
-// `priority: 1` (a fixture-only field the provider passes through, defaulting to
-// 0 for real GitHub), so `buildWhy()` legitimately reports ["bug"] for it. Both
-// connected cases now assert a real one-line why.
+// NOTE ON THE GITHUB WHY (settled in P0 beat 2, corrected): GitHub REST returns
+// no priority and no typed relations, so `buildWhy()` is STRUCTURALLY empty for
+// a GitHub-shaped issue. That is a real product fact, not a seed accident: on a
+// real GitHub workspace the opened task shows NO one-line why because the source
+// carries nothing `buildWhy()` reads. The GitHub-connected case therefore
+// asserts that honest behaviour EXPLICITLY (no why line), and the local-connected
+// case remains the positive why witness. No production code path is reachable
+// only from a fixture.
 
 // Any request that would SPEND AI on the recommend path (the `/status` probe is
 // not a spend and is excluded).
@@ -138,10 +139,11 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
 
       const { component, go } = await assertOpenedTaskShell(page);
 
-      // The one-line why is visible and names the ranking reason (bug).
-      const why = component.locator('[data-testid="opened-task-why"]');
-      await expect(why).toBeVisible();
-      await expect(why).toContainText(/bug/i);
+      // Honest behaviour for an empty buildWhy(): GitHub issues carry no priority
+      // or relations, so there is no ranking reason to advertise and the
+      // component renders NO why line (it never invents one). Asserted
+      // explicitly, not by omission.
+      await expect(component.locator('[data-testid="opened-task-why"]')).toHaveCount(0);
 
       await go.click();
 
