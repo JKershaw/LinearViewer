@@ -71,14 +71,14 @@ const OWNER = async () => ({ status: 'owner' });
 async function seedDoc(collection, {
   plain, kind = 'bootstrap', grants = [], createdBy = 'account-A',
   workspaceId = 'ws-1', scope = 'readWrite', expiresAt = null,
-  label = 'runner-bootstrap', consumed = false
+  label = 'runner-bootstrap', consumed = false, parentTokenId = null
 }) {
   const doc = {
     _id: crypto.randomUUID(),
     urlKey: 'acme',
     tokenHash: crypto.createHash('sha256').update(plain).digest('hex'),
     label, scope, kind, singleUse: kind === 'bootstrap',
-    createdBy, grants: grants.slice(), parentTokenId: null, workspaceId,
+    createdBy, grants: grants.slice(), parentTokenId, workspaceId,
     createdAt: new Date(), lastUsedAt: null, expiresAt, consumed
   };
   await collection.insertOne(doc);
@@ -276,6 +276,26 @@ describe('LIN-3129 — interleaved revoke race after insert', () => {
     assert.equal(await store.exchangeBootstrapToken(plain), null, 'the race fails closed');
     assert.equal(collection._docs().length, 0, 'neither the revoked bootstrap nor the orphaned working token remains');
   });
+
+  test('a GRANT-LESS exchange whose bootstrap is deleted between insert and re-read still succeeds', async () => {
+    // Scoping invariant: the post-insert re-read is a grant-bearing concern only.
+    // An ordinary worker bootstrap exchange must not gain the near-expiry window
+    // (nor the race failure) that the grant path deliberately carries.
+    const { store, collection } = newStore(); // unwired seam: grant-less path
+    const plain = 'boot-' + crypto.randomUUID();
+    const boot = await seedDoc(collection, { plain, grants: [] });
+
+    const originalInsert = collection.insertOne.bind(collection);
+    collection.insertOne = async (doc) => {
+      const r = await originalInsert(doc);
+      if (doc.kind === 'standard') await collection.deleteOne({ _id: boot._id });
+      return r;
+    };
+
+    const working = await store.exchangeBootstrapToken(plain);
+    assert.ok(working?.token, 'a grant-less exchange is unaffected by the revoke race');
+    assert.ok(docById(collection, working.tokenId), 'the working token is kept');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -343,6 +363,44 @@ describe('LIN-3129 — revokeToken lineage semantics', () => {
 
     assert.equal(await store.revokeToken('other-workspace', boot._id), false);
     assert.equal(collection._docs().length, 2, 'both the bootstrap and working token survive');
+  });
+});
+
+describe('LIN-3129 — revoke stays single-row for grant-less tokens (no behaviour change)', () => {
+  test('revoking a grant-less bootstrap after exchange leaves its working token intact and validating', async () => {
+    const { store, collection } = newStore(); // grant-less, unwired seam
+    const plain = 'boot-' + crypto.randomUUID();
+    const boot = await seedDoc(collection, { plain, grants: [] });
+    const working = await store.exchangeBootstrapToken(plain);
+    assert.ok(working?.token, 'setup: the grant-less exchange succeeded');
+
+    assert.equal(await store.revokeToken('acme', boot._id), true);
+    assert.equal(docById(collection, boot._id), undefined);
+    assert.ok(docById(collection, working.tokenId), 'a grant-less working token is NOT swept up by lineage');
+    assert.ok(await store.validateToken(working.token), 'and it still authenticates');
+  });
+
+  test('revoking a grant-less working token leaves its (consumed) bootstrap row in place', async () => {
+    const { store, collection } = newStore();
+    const plain = 'boot-' + crypto.randomUUID();
+    const boot = await seedDoc(collection, { plain, grants: [] });
+    const working = await store.exchangeBootstrapToken(plain);
+
+    assert.equal(await store.revokeToken('acme', working.tokenId), true);
+    assert.equal(docById(collection, working.tokenId), undefined);
+    assert.ok(docById(collection, boot._id), 'the grant-less bootstrap row survives a single-row revoke');
+  });
+
+  test('revoking a missing id whose grant-less child names it returns false and leaves the child intact', async () => {
+    const { store, collection } = newStore();
+    const missingRoot = crypto.randomUUID();
+    const plain = 'std-' + crypto.randomUUID();
+    const child = await seedDoc(collection, {
+      plain, kind: 'standard', grants: [], parentTokenId: missingRoot
+    });
+
+    assert.equal(await store.revokeToken('acme', missingRoot), false, 'a missing id with only grant-less children is a no-op');
+    assert.ok(docById(collection, child._id), 'the grant-less child is left alone');
   });
 });
 
