@@ -255,4 +255,72 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(seen).toEqual([]);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // P0 review fix-up (verdict d4b4adf7): F1 ladder ready state, F2 regenerate
+  // gate, F4/M16 promptButtons. Each was observed failing against the unfixed
+  // behaviour or an equivalent mutation (excerpts in the fix-up report).
+  // ---------------------------------------------------------------------------
+  test.describe('fix-up: ladder ready state, regenerate gate, promptButtons', () => {
+    test('with dispatch enabled, "run this step" sends the dispatch request for the top task', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+
+      const component = page.locator('.prompt-section').first();
+      // Get a prompt without AI spend (template) so the rung is enabled.
+      await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
+      await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+
+      const identifier = (await page.locator('.swipe-card-identifier').textContent()).trim();
+      const [dispatchReq] = await Promise.all([
+        page.waitForRequest((req) => req.url().includes('/api/dispatch') && req.method() === 'POST'),
+        component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]').click(),
+      ]);
+      const body = dispatchReq.postDataJSON();
+      expect(body.issueIdentifier).toBe(identifier);
+      expect(body.target).toBe('cli');
+      expect(body.prompt).toBeTruthy();
+    });
+
+    test('a remembered AI prompt disables regenerate and spends nothing when AI is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const seen = recommendSpy(page);
+      // 1. AI on: generate and persist a tailored prompt for the top card.
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+      await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+      await page.locator('.prompt-section').first().locator('[data-testid="opened-task-go"]').click();
+      await expect(page.locator('.prompt-section').first().locator('[data-testid="opened-task-reasoning"]')).toBeVisible({ timeout: 10000 });
+      const spent = seen.length;
+      expect(spent).toBeGreaterThan(0);
+
+      // 2. Re-seed with AI off by choice and reload; the card hydrates from memory.
+      await seedLocal(workspaceApiLocalSeed, { features: { aiRecommendations: false } });
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+
+      const component = page.locator('.prompt-section').first();
+      await expect(component).toHaveAttribute('data-phase', 'fresh');
+      const regenerate = component.locator('.opened-task-regenerate');
+      await expect(regenerate).toBeVisible();
+      await expect(regenerate).toBeDisabled();
+      await regenerate.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(200);
+      expect(seen.length).toBe(spent);
+    });
+
+    test('promptButtons=false hides "other prompts" while the AI primary stays', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { promptButtons: false } });
+      await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+
+      const component = page.locator('.prompt-section').first();
+      await expect(component.locator('[data-testid="other-prompts"]')).toHaveCount(0);
+      await expect(component.locator('[data-testid="opened-task-go"]')).toBeVisible();
+    });
+  });
 });

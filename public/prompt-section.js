@@ -189,10 +189,25 @@
    * deliberately out of P0).
    */
   function renderLadder(opts, state) {
+    // A rung can only act on a prompt once one exists. `hasResult` distinguishes
+    // the fresh state from idle/generating.
+    const hasResult = !!(state.result && state.result.raw);
     const rungs = [];
-    rungs.push('<button class="opened-task-rung" data-rung="copy" data-action="copy">copy</button>');
-    if (opts.dispatchEnabled) {
-      rungs.push('<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step">run this step</button>');
+    // copy: with no prompt there is nothing to copy, and generating on a press
+    // labelled "copy" would spend AI behind a non-AI label. So the idle rung is
+    // SHOWN disabled with a reason (the ✦ primary is the explicit AI ask). In
+    // the fresh state the action cluster already carries the prominent copy, so
+    // the rung is not re-rendered — no duplicate copy affordance (F1/F3).
+    if (!hasResult) {
+      rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="copy" data-action="setup" data-setup-needs="prompt" title="generate a prompt first">copy <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
+    }
+    if (opts.dispatchEnabled && hasResult) {
+      // Enabled run-step: dispatches the current prompt through the SAME path the
+      // dispatch disclosure uses (window.dispatchPrompt, default target cli). The
+      // press is not recorded (LIN-2942).
+      rungs.push('<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli">run this step</button>');
+    } else if (opts.dispatchEnabled) {
+      rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="prompt" title="generate a prompt first">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     } else {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="dispatch">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
@@ -202,6 +217,16 @@
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-task" data-action="setup" data-setup-needs="proxy">run the whole task <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
     return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>`;
+  }
+
+  /**
+   * Edit slot promoted to the header (LIN-2944). Swipe has no edit route in P0,
+   * so rather than ship a dead visible control the slot is HIDDEN unless the
+   * caller supplies `editUrl` — Home provides its inline-edit hook in P1.
+   */
+  function renderEditSlot(opts) {
+    if (!opts.editUrl) return '';
+    return `<a class="swipe-prompt-edit" href="${esc(opts.editUrl)}" target="_blank" rel="noopener">Edit</a>`;
   }
 
   /**
@@ -254,9 +279,8 @@
    */
   function renderIdle(opts, state) {
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">next step</span>';
-    // Edit slot promoted to the header (LIN-2944). Swipe has no edit route in P0,
-    // so this is the placement slot Home fills in P1.
-    html += '<button class="swipe-prompt-edit" data-action="edit" title="Edit this task">Edit</button></div>';
+    html += renderEditSlot(opts);
+    html += '</div>';
     html += renderWhy(opts);
     html += renderPrimary(opts, state);
     html += renderLadder(opts, state);
@@ -311,9 +335,14 @@
     // one-click regenerate (re-runs the same label). Only rendered once the
     // entry carries a `generatedAt` (always true for a freshly built entry and
     // for a hydrated memory record).
+    // F2: regenerate is a second `__ai__` entry point, so it obeys the SAME
+    // disabled gate as the primary — AI-off-by-choice / unconfigured /
+    // free-tier-exhausted disable it and it sends zero recommend requests.
     const age = formatGeneratedAge(state.result.generatedAt);
+    const gateReason = primaryDisabledReason(opts, state);
+    const regenerateDisabled = label === '__ai__' ? gateReason : null;
     const generatedLine = age
-      ? ` <span class="opened-task-generated">generated ${esc(age)} \u00b7 <button class="opened-task-regenerate" data-prompt="${esc(label || '')}">regenerate</button></span>`
+      ? ` <span class="opened-task-generated">generated ${esc(age)} \u00b7 <button class="opened-task-regenerate" data-prompt="${esc(label || '')}"${regenerateDisabled ? ` disabled title="${esc(regenerateDisabled)}"` : ''}>regenerate</button></span>`
       : '';
     // LIN-2944 reverses LIN-70: the reasoning STAYS visible beside the prompt
     // rather than collapsing behind a "▸ reasoning" toggle. The `hidden` class
@@ -667,14 +696,18 @@
         const needs = btn.dataset.setupNeeds;
         state.setupNotice = needs === 'dispatch'
           ? 'running this step needs the dispatch runner set up'
-          : 'running the whole task needs the proxy set up';
+          : needs === 'prompt'
+            ? 'generate a prompt first'
+            : 'running the whole task needs the proxy set up';
         render();
         return;
       }
 
-      if (action === 'edit') {
-        // Edit slot (LIN-2944). Swipe has no edit route in P0; Home fills this
-        // in P1, so the press is inert here.
+      if (action === 'run-step') {
+        // F1: the enabled run-step rung runs the CURRENT prompt through the same
+        // dispatch path as the disclosure (target read from data-target=cli). It
+        // is only enabled in the fresh state (renderLadder), so `raw` exists.
+        handleDispatch(btn);
         return;
       }
 

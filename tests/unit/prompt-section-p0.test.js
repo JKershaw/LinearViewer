@@ -360,3 +360,136 @@ describe('P0 addendum 4: PromptSection adopts window.readSSEStream', () => {
     assert.match(container.innerHTML, /OK PROMPT/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// P0 review fix-up (verdict d4b4adf7): F1 dead controls, F2 regenerate gate,
+// and ledger 7 (a throwing storage). Each assertion was observed failing against
+// the unfixed behaviour (stashed prompt-section.js) or an equivalent mutation,
+// per the fix-up discipline; excerpts are recorded in the fix-up report.
+// ---------------------------------------------------------------------------
+
+describe('P0 fix-up F1: the ladder rungs act, and the Edit slot is not dead', () => {
+  test('the enabled run-step rung dispatches the current prompt to cli', async () => {
+    const { PromptSection, calls } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts(
+      { id: 'issue-20', identifier: 'LIN-20', url: 'https://x/20' },
+      { dispatchEnabled: true }
+    ));
+    // Generate a prompt first (the rung only acts on an existing prompt).
+    await container.click({ prompt: 'implementation' });
+    await flush();
+    await container.click({ action: 'run-step', target: 'cli' });
+    await flush();
+
+    assert.equal(calls.dispatch.length, 1);
+    assert.equal(calls.dispatch[0].target, 'cli');
+    assert.equal(calls.dispatch[0].prompt, 'TEMPLATE PROMPT');
+    assert.equal(calls.dispatch[0].issue.identifier, 'LIN-20');
+  });
+
+  test('an idle run-step rung says it needs a prompt and dispatches nothing', async () => {
+    const { PromptSection, calls } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-21', identifier: 'LIN-21' }, { dispatchEnabled: true }));
+
+    await container.click({ action: 'setup', setupNeeds: 'prompt' });
+    await flush();
+
+    assert.equal(calls.dispatch.length, 0);
+    assert.match(container.innerHTML, /generate a prompt first/);
+  });
+
+  test('the idle copy rung is shown disabled with a reason (no silent no-op)', () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-22', identifier: 'LIN-22' }));
+
+    assert.match(container.innerHTML, /data-rung="copy"/);
+    assert.match(container.innerHTML, /data-setup-needs="prompt"/);
+  });
+
+  test('the fresh ladder does not duplicate the action cluster copy', async () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-23', identifier: 'LIN-23' }));
+    await container.click({ prompt: 'implementation' });
+    await flush();
+
+    const ladder = container.innerHTML.split('data-testid="opened-task-ladder"')[1] || '';
+    assert.equal(ladder.includes('data-rung="copy"'), false);
+    // The cluster copy is still there.
+    assert.match(container.innerHTML, /class="swipe-prompt-copy"/);
+  });
+
+  test('the Swipe Edit slot is hidden unless a caller supplies editUrl', () => {
+    const { PromptSection } = loadPromptSection();
+    const plain = makeContainer();
+    PromptSection.init(plain, baseOpts({ id: 'issue-24', identifier: 'LIN-24' }));
+    assert.equal(plain.innerHTML.includes('swipe-prompt-edit'), false);
+
+    const wired = makeContainer();
+    PromptSection.init(wired, baseOpts({ id: 'issue-25', identifier: 'LIN-25' }, { editUrl: 'https://x/25' }));
+    assert.match(wired.innerHTML, /class="swipe-prompt-edit"/);
+  });
+});
+
+describe('P0 fix-up F2: regenerate obeys the same gate as the primary', () => {
+  function seededAiMemory(issueId) {
+    const ls = makeLocalStorage();
+    ls.setItem(`harbour:prompt-memory:ws:${issueId}`, JSON.stringify({
+      v: 1, label: '__ai__', name: 'AI Recommendation', raw: 'AI PROMPT',
+      reasoning: 'because', generatedAt: Date.now()
+    }));
+    return ls;
+  }
+
+  for (const [name, opts] of [
+    ['AI off by choice', { aiState: 'off' }],
+    ['unconfigured', { aiState: 'unconfigured' }],
+  ]) {
+    test(`a remembered AI prompt disables regenerate when ${name}`, () => {
+      const ls = seededAiMemory('issue-30');
+      const { PromptSection } = loadPromptSection({ localStorage: ls });
+      const container = makeContainer();
+      PromptSection.init(container, baseOpts({ id: 'issue-30', identifier: 'LIN-30' }, opts));
+
+      assert.equal(container.getAttribute('data-phase'), 'fresh');
+      assert.match(container.innerHTML, /<button class="opened-task-regenerate" data-prompt="__ai__" disabled/);
+    });
+  }
+
+  test('a non-AI remembered prompt keeps regenerate enabled', () => {
+    const ls = makeLocalStorage();
+    ls.setItem('harbour:prompt-memory:ws:issue-31', JSON.stringify({
+      v: 1, label: 'implementation', name: 'Implementation', raw: 'TEMPLATE', generatedAt: Date.now()
+    }));
+    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-31', identifier: 'LIN-31' }, { aiState: 'off' }));
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh');
+    assert.equal(/<button class="opened-task-regenerate"[^>]* disabled/.test(container.innerHTML), false);
+  });
+});
+
+describe('P0 fix-up ledger 7: a throwing localStorage is recovered from gracefully', () => {
+  test('init, generate and persist survive getItem/setItem throwing', async () => {
+    const throwing = {
+      getItem() { throw new Error('storage denied'); },
+      setItem() { throw new Error('quota exceeded'); },
+      removeItem() { throw new Error('storage denied'); },
+    };
+    const { PromptSection } = loadPromptSection({ localStorage: throwing });
+    const container = makeContainer();
+
+    PromptSection.init(container, baseOpts({ id: 'issue-40', identifier: 'LIN-40' }));
+    assert.equal(container.getAttribute('data-phase'), 'idle');
+
+    await container.click({ prompt: 'implementation' });
+    await flush();
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh');
+    assert.match(container.innerHTML, /TEMPLATE PROMPT/);
+  });
+});
