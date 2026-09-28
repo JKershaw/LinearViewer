@@ -51,6 +51,7 @@ function makeRunnerApp({
   taken = null,
   feedbackResult = { success: true, feedbackCount: 1 },
   dispatchTokens = [],
+  proxyTokens = [],
   halt = null,
   sessionsFeedCache = null,
   composerOverrides = {},
@@ -73,7 +74,7 @@ function makeRunnerApp({
   };
   const proxyTokenStore = {
     validateToken: async (bearer) => { calls.validateToken.push(bearer); return token; },
-    listTokens: async () => [],
+    listTokens: async () => proxyTokens,
     describeRejectionCause: async () => null,
   };
   const app = buildApp({
@@ -200,6 +201,24 @@ describe('LIN-3130 S2a — GET /api/proxy/runner/poll', () => {
     const res = await call(app, 'GET', RUNNER_POLL);
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal(res.body.otherConsumerLastSeenAt, '2026-02-02T00:00:00.000Z');
+  });
+
+  test('otherConsumerLastSeenAt counts dispatch tokens ONLY — a take-grant runner token with recent activity does not count', async () => {
+    // L1 (review f444705e): the runner poll's `otherConsumerLastSeenAt` must
+    // stay dispatch-token-only (it is what detects a separate Simple
+    // Dispatcher). The runner's OWN take-grant proxy token carrying a recent
+    // lastUsedAt must NOT leak in — so with no dispatch token the answer is
+    // null even though the proxy token store is active.
+    const { app } = makeRunnerApp({
+      token: runnerToken({ grants: ['take'] }),
+      dispatchTokens: [],
+      proxyTokens: [
+        { tokenId: 'runner-tok-1', label: 'runner', grants: ['take', 'dispatch'], lastUsedAt: '2026-03-03T00:00:00.000Z' },
+      ],
+    });
+    const res = await call(app, 'GET', RUNNER_POLL);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.otherConsumerLastSeenAt, null, 'the runner token must not count as another consumer');
   });
 
   test('pollAvailable rejection still 500s (halt read is independently bounded)', async () => {
