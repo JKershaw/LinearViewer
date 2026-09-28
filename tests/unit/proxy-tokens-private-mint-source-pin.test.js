@@ -84,4 +84,10 @@ describe('LIN-3129 — the grant API is inert in S1 (no production caller)', () 
       assert.deepEqual(offenders, [], `${name} must have no production caller in S1`);
     });
   }
+
+  test('no router file mounts requireGrant yet (S1 adds no mount; LIN-2884 does)', () => {
+    // Match an actual mount call, requireGrant('<name>') — not a passing mention.
+    const routers = walk(join(REPO, 'routes')).filter(f => /requireGrant\s*\(\s*['"]/.test(readFileSync(f, 'utf8')));
+    assert.deepEqual(routers, [], 'requireGrant must not be mounted by any router in S1');
+  });
 });

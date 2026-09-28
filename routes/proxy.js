@@ -576,6 +576,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       req.proxyTokenLabel = result.label;
       req.proxyTokenScope = result.scope;
       req.proxyCreatedBy = result.createdBy;
+      // LIN-3129: the token's grant set, additively. Nothing reads it until a
+      // mount uses requireGrant (LIN-2884) — S1 adds no mount.
+      req.proxyTokenGrants = result.grants || [];
       next();
     } catch (err) {
       console.error('Proxy token validation error:', err.message);
