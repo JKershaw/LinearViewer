@@ -205,6 +205,34 @@ describe('N2: a sign-in link never attaches an email to a live account', () => {
     assert.strictEqual(session.workspaces.length, 1, 'carried workspaces survive the regenerate');
   });
 
+  test('positive control (canonical): an address on an account merged into P counts as P\'s — GET shows the confirm, POST signs in as P, nothing new linked', async () => {
+    const email = `merged${counter++}@x.io`;
+    // E is a separate, email-only account created through the real door.
+    const E = await attackerAccount(email);
+    const victim = harness.browser();
+    const P = await signInAsLinear(victim);
+    const pBefore = await identities(P);
+
+    // Fold E into P. `mergeAccounts` moves only `mergedInto`; E keeps the
+    // email identity, so a raw comparison would see the address as foreign.
+    const merged = await harness.stores.accountStore.mergeAccounts(P, E, {
+      accountWorkspaceStore: harness.stores.accountWorkspaceStore,
+    });
+    assert.ok(merged.ok, 'E merged into P');
+
+    const t = await attackerLink(email); // requested from a signed-out browser
+    const { res: page, nonce } = await victim.openConfirm(t);
+    assert.strictEqual(page.status, 200, 'P\'s own (merged) address gets the confirm page');
+    assert.doesNotMatch(page.text, /data-testid="email-confirm-signed-in-refused"/);
+    assert.match(page.text, /data-testid="email-confirm-already-signed-in"/);
+
+    const post = await victim.confirm(t, nonce);
+    assert.strictEqual(post.status, 302, 'the confirm signs in as P, not refused');
+    assert.strictEqual((await victim.session()).accountId, P, 'still P');
+    assert.deepStrictEqual(await identities(P), pBefore, 'P gained no duplicate email identity');
+    assert.deepStrictEqual(await identities(E), [`email:${email}`], 'E keeps the address (canonicalised, not re-linked)');
+  });
+
   test('signed-in send: POST /auth/email/send from P\'s session shows "You\'re signed in" and issues no token', async () => {
     const victim = harness.browser();
     const { nonce } = await victim.openForm(); // form opened while signed out
