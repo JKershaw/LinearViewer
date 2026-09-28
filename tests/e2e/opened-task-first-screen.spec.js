@@ -322,5 +322,44 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await expect(component.locator('[data-testid="other-prompts"]')).toHaveCount(0);
       await expect(component.locator('[data-testid="opened-task-go"]')).toBeVisible();
     });
+
+    // N1: a `○ set up ›` rung in the FRESH state must say what it needs (the
+    // set-up notice was only rendered in idle). Default flags leave both rungs
+    // in set-up state, and fresh is where a remembered prompt restores.
+    test('a set-up rung pressed in the fresh state says what it needs (N1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+      await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+
+      const component = page.locator('.prompt-section').first();
+      // Get a prompt without AI spend so we are in the fresh state.
+      await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
+      await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+
+      const notice = component.locator('.opened-task-setup-notice');
+      await expect(notice).toHaveCount(0);
+      await component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]').click();
+      await expect(notice).toContainText(/dispatch runner set up/i);
+      await expect(component).toHaveAttribute('data-phase', 'fresh');
+    });
+
+    // N2: with dispatch ENABLED, the idle run-step must STAY a set-up rung
+    // (kills mutant R7, which enabled it before a prompt exists — a dead
+    // control that silently did nothing because handleDispatch has no raw).
+    test('with dispatch enabled, the rendered idle run-step stays a set-up rung (N2)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+
+      const component = page.locator('.prompt-section').first();
+      const rung = component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]');
+      await expect(rung).toHaveAttribute('data-action', 'setup');
+      await expect(rung).toContainText(/set up/i);
+
+      await rung.click();
+      await expect(component.locator('.opened-task-setup-notice')).toContainText(/generate a prompt first/i);
+    });
   });
 });

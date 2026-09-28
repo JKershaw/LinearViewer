@@ -493,3 +493,62 @@ describe('P0 fix-up ledger 7: a throwing localStorage is recovered from graceful
     assert.match(container.innerHTML, /TEMPLATE PROMPT/);
   });
 });
+// ---------------------------------------------------------------------------
+// P0 re-review fix-up (verdict fdbefe3d): N1 (a set-up rung in fresh must say
+// what it needs) and N2 (the rendered idle run-step stays a set-up rung when
+// dispatch is enabled — kills mutant R7). Each observed red first (stashed
+// prompt-section.js for N1; the R7 mutation for N2), then restored.
+// ---------------------------------------------------------------------------
+
+describe('P0 re-review N1: the set-up notice renders in the fresh state too', () => {
+  test('pressing a set-up rung after a prompt lands shows the notice in fresh', async () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts(
+      { id: 'issue-27', identifier: 'LIN-27' },
+      { dispatchEnabled: false, proxyEnabled: false }
+    ));
+
+    await container.click({ prompt: 'implementation' });
+    await flush();
+    assert.equal(container.getAttribute('data-phase'), 'fresh');
+    assert.equal(/opened-task-setup-notice/.test(container.innerHTML), false);
+
+    await container.click({ action: 'setup', setupNeeds: 'dispatch' });
+    await flush();
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh');
+    assert.match(container.innerHTML, /opened-task-setup-notice/);
+    assert.match(container.innerHTML, /dispatch runner set up/);
+  });
+
+  test('a remembered prompt restored into fresh says what a set-up rung needs', async () => {
+    const ls = makeLocalStorage();
+    ls.setItem('harbour:prompt-memory:ws:issue-28', JSON.stringify({
+      v: 1, label: 'implementation', name: 'Implementation', raw: 'REMEMBERED', generatedAt: Date.now()
+    }));
+    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-28', identifier: 'LIN-28' }, { dispatchEnabled: false, proxyEnabled: false }));
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh');
+    // Drive the shared handler the same way the delegated click does.
+    await container.click({ action: 'setup', setupNeeds: 'proxy' });
+    assert.match(container.innerHTML, /opened-task-setup-notice/);
+    assert.match(container.innerHTML, /proxy set up/);
+  });
+});
+
+describe('P0 re-review N2: the rendered idle run-step stays a set-up rung (R7)', () => {
+  test('with dispatch enabled, the rendered idle run-step carries data-action="setup"', () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-29', identifier: 'LIN-29' }, { dispatchEnabled: true }));
+
+    const rung = container.innerHTML.match(/<button[^>]*data-rung="run-step"[^>]*>[\s\S]*?<\/button>/);
+    assert.ok(rung, 'the run-step rung is rendered');
+    assert.match(rung[0], /data-action="setup"/);
+    assert.match(rung[0], /set up/);
+    assert.equal(/data-action="run-step"/.test(rung[0]), false);
+  });
+});

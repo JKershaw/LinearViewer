@@ -274,6 +274,16 @@
   }
 
   /**
+   * The notice a not-yet-enabled rung shows when pressed ("what it needs").
+   * Shared by BOTH states — idle AND fresh — so a `○ set up ›` rung is never a
+   * dead control, including for a remembered prompt restored into fresh (N1).
+   */
+  function renderSetupNotice(state) {
+    if (!state.setupNotice) return '';
+    return `<div class="opened-task-setup-notice">${esc(state.setupNotice)}</div>`;
+  }
+
+  /**
    * Build the idle opened-task shell: the one-line why, the ✦ primary action,
    * the ladder, and the templates under "other prompts" (LIN-2944).
    */
@@ -284,9 +294,7 @@
     html += renderWhy(opts);
     html += renderPrimary(opts, state);
     html += renderLadder(opts, state);
-    if (state.setupNotice) {
-      html += `<div class="opened-task-setup-notice">${esc(state.setupNotice)}</div>`;
-    }
+    html += renderSetupNotice(state);
     html += renderOtherPrompts(opts, state);
     return html;
   }
@@ -361,6 +369,7 @@
       ${warningBanner}
       ${reasoningBlock}
       ${renderLadder(opts, state)}
+      ${renderSetupNotice(state)}
       <div class="swipe-prompt-text" data-prompt-body>${html}</div>`;
   }
 
