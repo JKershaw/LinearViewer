@@ -30,6 +30,7 @@ import { createDispatchRoutes } from './proxy-dispatch.js';
 import { createProxyFlightCompanionRoutes } from './proxy-flight-companion.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
+import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName } from '../lib/proxy-graphql-errors.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
@@ -575,6 +576,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       req.proxyTokenLabel = result.label;
       req.proxyTokenScope = result.scope;
       req.proxyCreatedBy = result.createdBy;
+      // LIN-3129: the token's grant set, additively. Nothing reads it until a
+      // mount uses requireGrant (LIN-2884) — S1 adds no mount.
+      req.proxyTokenGrants = result.grants || [];
       next();
     } catch (err) {
       console.error('Proxy token validation error:', err.message);
@@ -586,7 +590,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * Middleware to require write scope.
    */
   function requireWriteScope(req, res, next) {
-    if (req.proxyTokenScope !== 'readWrite') {
+    if (req.proxyTokenScope !== READ_WRITE) {
       return jsonError(res, 403, 'This endpoint requires a read-write token');
     }
     next();

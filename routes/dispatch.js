@@ -36,6 +36,7 @@ import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.
 import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE } from '../lib/workspace.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
@@ -1522,7 +1523,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     try {
       minted = await proxyTokenStore.createToken(req.dispatchUrlKey, {
         kind: 'bootstrap',
-        scope: 'readWrite',
+        scope: READ_WRITE,
         label: 'refire-broker',
         ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
         createdBy: req.dispatchTokenOwner
