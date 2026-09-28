@@ -125,7 +125,7 @@ export function createProxyRunnerRoutes({
     }
 
     try {
-      const item = await dispatchQueueStore.takeItem(id, req.proxyUrlKey, req.proxyTokenLabel);
+      const item = await dispatchQueueStore.takeItem(id, req.proxyUrlKey, req.proxyTokenLabel, req.proxyTokenId);
 
       if (!item) {
         logEvent(req, TAKE_ROUTE, 404);
@@ -180,7 +180,8 @@ export function createProxyRunnerRoutes({
         req.proxyUrlKey,
         feedback,
         req.proxyTokenLabel,
-        provisionWakeCredential
+        provisionWakeCredential,
+        { takenByTokenId: req.proxyTokenId }
       );
 
       if (!result) {

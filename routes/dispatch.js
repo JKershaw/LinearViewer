@@ -475,6 +475,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         terminal,
         effort,
         dispatchTokenStore,
+        proxyTokenStore,
         // LIN-2775 Area 8: threaded straight through, unvalidated here — the
         // marker's own validation and the terminal-anchor guard it gates
         // both live inside createDispatchItem (the one reusable, testable
