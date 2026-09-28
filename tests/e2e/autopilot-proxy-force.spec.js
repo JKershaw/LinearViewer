@@ -58,7 +58,10 @@ async function revealSwipeAutopilot(page) {
   await page.waitForLoadState('networkidle');
 
   await page.locator('.swipe-accordion-header[data-accordion="prompts"]').click();
-  await page.locator('.swipe-prompt-buttons .swipe-prompt-btn.autopilot-btn[data-prompt="__autopilot__"]').first().click();
+  // LIN-2944 P0: the Autopilot kickoff is now the ladder's "run the whole task"
+  // rung (the old `.swipe-prompt-btn.autopilot-btn` pill retired). Same truth
+  // condition: an Autopilot result renders fresh and forces the proxy append.
+  await page.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').first().click();
   const section = page.locator('.prompt-section');
   await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
   return section;

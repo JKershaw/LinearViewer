@@ -71,27 +71,96 @@
   }
 
   /**
-   * Build the picker (idle state): prompt pill row.
+   * The one-line "why" header (LIN-2944): the compact reasons from `buildWhy()`
+   * that explain why Harbour would take this task first. An empty list means the
+   * order had no ranking reason to advertise, so NO line is rendered — the
+   * component never invents a claim (LIN-391's "explainable, not opaque").
    */
-  function renderPicker(opts, state) {
-    const { hasAI, hasAutopilot, defaultPromptKeys, morePromptKeys, promptMeta, customPrompts } = opts;
+  function renderWhy(opts) {
+    const why = opts.why;
+    if (!why || why.length === 0) return '';
+    return `<div class="opened-task-why" data-testid="opened-task-why">${esc(why.join(' \u00b7 '))}</div>`;
+  }
+
+  /**
+   * Why the ✦ primary action is disabled, in plain words — or null when it can
+   * run. Distinguishes the three states addendum 5 requires: AI off by the
+   * person's choice, unconfigured (no OpenRouter), and free-tier exhausted
+   * (429/quota). The action is SHOWN in every state, never hidden (F9).
+   */
+  function primaryDisabledReason(opts, state) {
+    if (state.quotaExhausted) return 'daily free-tier limit reached \u00b7 resets at midnight UTC';
+    if (state.quotaChecking) return 'checking free-tier allowance\u2026';
+    if (opts.aiState === 'off') return 'AI suggestions are off \u00b7 turn on in settings';
+    if (opts.aiState === 'unconfigured') return 'needs OpenRouter';
+    if (opts.aiState === 'ready') return null;
+    // Legacy callers that only pass hasAI keep the old gate.
+    return opts.hasAI === false ? 'needs OpenRouter' : null;
+  }
+
+  /**
+   * The ✦ next-step primary action ("Go", docs/v1.md step 4). It is the AI-tailored
+   * prompt request (`__ai__`), shown disabled with its plain-words reason rather
+   * than hidden when AI cannot run.
+   */
+  function renderPrimary(opts, state) {
+    const reason = primaryDisabledReason(opts, state);
+    let html = '<div class="opened-task-primary">';
+    html += `<button class="opened-task-go" data-testid="opened-task-go" data-prompt="__ai__"${reason ? ' disabled' : ''}>\u2726 next step</button>`;
+    if (reason) {
+      html += `<span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(reason)}</span>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  /**
+   * The ladder beside the primary: copy \u2192 run this step \u2192 run the whole
+   * task. A rung not yet enabled is SHOWN as "\u25CB set up \u203A", never hidden,
+   * and keyed on `featureFlags.dispatch` / `featureFlags.proxy`. Pressing a
+   * not-yet-enabled rung says what it needs (recording that press is LIN-2942,
+   * deliberately out of P0).
+   */
+  function renderLadder(opts, state) {
+    const rungs = [];
+    rungs.push('<button class="opened-task-rung" data-rung="copy" data-action="copy">copy</button>');
+    if (opts.dispatchEnabled) {
+      rungs.push('<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step">run this step</button>');
+    } else {
+      rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="dispatch">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
+    }
+    if (opts.proxyEnabled && opts.hasAutopilot) {
+      rungs.push('<button class="opened-task-rung opened-task-rung--ready" data-rung="run-task" data-prompt="__autopilot__">run the whole task</button>');
+    } else {
+      rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-task" data-action="setup" data-setup-needs="proxy">run the whole task <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
+    }
+    return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>`;
+  }
+
+  /**
+   * The handwritten templates, grouped under "other prompts" (docs/v1.md step 4:
+   * "The handwritten templates stay available under 'other prompts'."). The
+   * `.swipe-prompt-buttons` / `.swipe-prompt-btn` classes are kept so the
+   * established Swipe selectors keep resolving these controls. Honours
+   * `promptButtons === false` by hiding the group (F9).
+   */
+  function renderOtherPrompts(opts, state) {
+    if (opts.promptButtons === false) return '';
+    const { defaultPromptKeys = [], morePromptKeys = [], promptMeta = {}, customPrompts = [] } = opts;
     const moreVisible = state.moreVisible;
-    let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">prompt</span></div>';
+    const hasMore = morePromptKeys.length > 0 || (customPrompts && customPrompts.length > 0);
+    let html = '<div class="opened-task-other-prompts" data-testid="other-prompts">';
+    html += '<div class="opened-task-other-prompts-label">other prompts</div>';
     html += '<div class="swipe-prompt-buttons">';
-    if (hasAI) {
-      html += `<button class="swipe-prompt-btn ai-btn" data-prompt="__ai__">\u2726 AI Recommend</button>`;
-    }
-    if (hasAutopilot) {
-      html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot__" title="Run on autopilot until this task is done — dispatches work to a separate worker and watches the loop">Autopilot</button>`;
-      // LIN-836: sibling stepper button (LIN-791 variant). Same kickoff endpoint,
-      // fetched with ?variant=stepper; dispatch contract stays kind:autopilot.
-      html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot_stepper__" title="Run on autopilot in stepped mode — drips ordered beats into one warm session, judging each before advancing">Autopilot · stepped</button>`;
-    }
     for (const key of defaultPromptKeys) {
       const name = promptMeta[key] || key;
       html += `<button class="swipe-prompt-btn" data-prompt="${esc(key)}">${esc(name)}</button>`;
     }
-    const hasMore = morePromptKeys.length > 0 || (customPrompts && customPrompts.length > 0);
+    if (opts.hasAutopilot) {
+      // LIN-836: sibling stepper variant of the run-whole-task rung. Same kickoff
+      // endpoint fetched with ?variant=stepper; dispatch contract stays kind:autopilot.
+      html += `<button class="swipe-prompt-btn autopilot-btn" data-prompt="__autopilot_stepper__" title="Run on autopilot in stepped mode — drips ordered beats into one warm session, judging each before advancing">Autopilot · stepped</button>`;
+    }
     if (hasMore) {
       html += `<button class="swipe-prompt-btn swipe-prompt-btn-more" data-prompt="__more__">${moreVisible ? 'less \u25B4' : 'more \u25BE'}</button>`;
     }
@@ -108,6 +177,26 @@
       }
       html += '</div>';
     }
+    html += '</div>';
+    return html;
+  }
+
+  /**
+   * Build the idle opened-task shell: the one-line why, the ✦ primary action,
+   * the ladder, and the templates under "other prompts" (LIN-2944).
+   */
+  function renderIdle(opts, state) {
+    let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">next step</span>';
+    // Edit slot promoted to the header (LIN-2944). Swipe has no edit route in P0,
+    // so this is the placement slot Home fills in P1.
+    html += '<button class="swipe-prompt-edit" data-action="edit" title="Edit this task">Edit</button></div>';
+    html += renderWhy(opts);
+    html += renderPrimary(opts, state);
+    html += renderLadder(opts, state);
+    if (state.setupNotice) {
+      html += `<div class="opened-task-setup-notice">${esc(state.setupNotice)}</div>`;
+    }
+    html += renderOtherPrompts(opts, state);
     return html;
   }
 
@@ -147,9 +236,11 @@
     // result restores the toggle.
     const isForced = !!(state.result && state.result.proxyForce);
     const actions = renderActionCluster(isForced ? { ...opts, proxyEnabled: false } : opts);
-    const reasoningToggle = reasoning
-      ? `<div class="swipe-reasoning-toggle" data-action="reasoning-toggle">\u25B8 reasoning</div>
-         <div class="swipe-reasoning-content hidden">${renderReasoning(reasoning)}</div>`
+    // LIN-2944 reverses LIN-70: the reasoning STAYS visible beside the prompt
+    // rather than collapsing behind a "▸ reasoning" toggle. The `hidden` class
+    // is deliberately never applied; `data-testid` is the witness hook.
+    const reasoningBlock = reasoning
+      ? `<div class="swipe-reasoning opened-task-reasoning" data-testid="opened-task-reasoning">${renderReasoning(reasoning)}</div>`
       : '';
     const warningBanner = warning
       ? `<div class="swipe-prompt-warning">\u26A0 ${esc(warning)}</div>`
@@ -160,7 +251,8 @@
         <div class="swipe-prompt-actions">${actions}</div>
       </div>
       ${warningBanner}
-      ${reasoningToggle}
+      ${reasoningBlock}
+      ${renderLadder(opts, state)}
       <div class="swipe-prompt-text" data-prompt-body>${html}</div>`;
   }
 
@@ -205,7 +297,13 @@
       result: null,
       activeLabel: null,
       activeLabelName: null,
-      error: null
+      error: null,
+      setupNotice: null,
+      // Load-time free-tier signal (addendum 5). Only fetched when the caller
+      // marks the workspace as free-tier, so ordinary units never hit the
+      // network here.
+      quotaChecking: false,
+      quotaExhausted: false
     };
     let abortController = null;
     let destroyed = false;
@@ -222,7 +320,7 @@
     function render() {
       if (destroyed) return;
       if (state.phase === 'idle') {
-        applyState(container, renderPicker(opts, state), 'idle');
+        applyState(container, renderIdle(opts, state), 'idle');
       } else if (state.phase === 'generating') {
         applyState(container, renderGenerating(state), 'generating');
       } else if (state.phase === 'fresh') {
@@ -238,6 +336,7 @@
       state.activeLabel = null;
       state.activeLabelName = null;
       state.error = null;
+      state.setupNotice = null;
       render();
     }
 
@@ -440,6 +539,9 @@
     function handleClick(e) {
       const btn = e.target.closest('button, .swipe-reasoning-toggle');
       if (!btn || !container.contains(btn)) return;
+      // A disabled primary (AI off/unconfigured/quota-exhausted) must never fire
+      // a recommend request, even on a synthetic click (addendum 5).
+      if (btn.disabled) return;
 
       const action = btn.dataset.action;
       const promptLabel = btn.dataset.prompt;
@@ -452,6 +554,23 @@
 
       if (promptLabel) {
         fetchPrompt(promptLabel);
+        return;
+      }
+
+      if (action === 'setup') {
+        // A not-yet-enabled rung says what it needs. It does NOT spend and does
+        // NOT record the press — recording is LIN-2942, out of P0.
+        const needs = btn.dataset.setupNeeds;
+        state.setupNotice = needs === 'dispatch'
+          ? 'running this step needs the dispatch runner set up'
+          : 'running the whole task needs the proxy set up';
+        render();
+        return;
+      }
+
+      if (action === 'edit') {
+        // Edit slot (LIN-2944). Swipe has no edit route in P0; Home fills this
+        // in P1, so the press is inert here.
         return;
       }
 
@@ -577,6 +696,32 @@
 
     container.addEventListener('click', handleClick);
     render();
+
+    // Addendum 5: the free-tier-exhausted state must be known at load. The
+    // authoritative quota signal is the EXISTING GET /api/recommend/status
+    // endpoint (routes/workspace-api.js), whose `freeTier` block (remaining/limit)
+    // is the same one app.js's footer already consumes. It is a read, never a
+    // spend. Only consulted when the caller marks the workspace free-tier, so
+    // other consumers/units never touch the network from init.
+    if (opts.freeTier) {
+      state.quotaChecking = true;
+      render();
+      const statusPrefix = opts.urlKey ? `/workspace/${encodeURIComponent(opts.urlKey)}` : '';
+      Promise.resolve()
+        .then(() => window.api(`${statusPrefix}/api/recommend/status`, { on401: false }))
+        .then((data) => {
+          if (destroyed) return;
+          state.quotaChecking = false;
+          const ft = data && data.freeTier;
+          state.quotaExhausted = !!(ft && typeof ft.remaining === 'number' && ft.remaining <= 0);
+          render();
+        })
+        .catch(() => {
+          if (destroyed) return;
+          state.quotaChecking = false;
+          render();
+        });
+    }
 
     return {
       destroy() {

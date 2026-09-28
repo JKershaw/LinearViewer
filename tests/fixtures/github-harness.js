@@ -46,6 +46,11 @@ export const defaultGitHubSeed = {
       number: 1, title: 'GitHub open task', body: 'An open GitHub issue', state: 'open',
       html_url: `https://github.com/${GITHUB_REPO}/issues/1`, created_at: '2026-01-01T00:00:00Z',
       user: { login: 'octocat' }, assignee: { login: 'octocat' },
+      // LIN-2944: GitHub REST has no priority, so `priority` is a fixture-only
+      // field the provider now passes through (default 0). It gives the bug an
+      // actionable priority so `buildWhy()` reports the ranking reason the
+      // opened-task component shows as its one-line why.
+      priority: 1,
       labels: [{ name: 'bug' }], milestone: { number: 1, title: 'Sprint 1' },
       comments: [
         { id: 101, body: 'First comment with **markdown**.', created_at: '2026-01-02T10:00:00Z', user: { login: 'octocat' } },

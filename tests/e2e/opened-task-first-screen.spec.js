@@ -31,11 +31,13 @@ import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 //   [data-testid="opened-task-ladder"] [data-rung="run-task"]
 //   [data-testid="other-prompts"]                    templates under "other prompts"
 //
-// NOTE ON THE GITHUB WHY: the default GitHub seed's only open issue maps to
-// priority 0 with no typed relations (lib/providers/github/index.js:245,260), so
-// `buildWhy()` returns [] and — per the plan — the component renders no reason
-// line. The GitHub-connected case therefore does NOT assert a why line; the
-// local-connected case (TEST-13, a boostable bug) does. See the beat-1 report.
+// NOTE ON THE GITHUB WHY (settled in P0 beat 2): GitHub REST has no priority,
+// so the opened-task "why" was structurally always empty for a GitHub-shaped
+// issue and the one-line-why assertion was carried only by the local case. The
+// settlement is a SEED gap: the default GitHub seed's bug now carries
+// `priority: 1` (a fixture-only field the provider passes through, defaulting to
+// 0 for real GitHub), so `buildWhy()` legitimately reports ["bug"] for it. Both
+// connected cases now assert a real one-line why.
 
 // Any request that would SPEND AI on the recommend path (the `/status` probe is
 // not a spend and is excluded).
@@ -104,11 +106,19 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
   // established /test/set-session seam; set-github-session then replaces the
   // active workspace without clearing that key (it never touches
   // session.openRouterApiKey). The recommend stream is stubbed — no real spend.
+  //
+  // GAP-2 SETTLEMENT: this seam is ACCEPTED, not worked around. Per CLAUDE.md the
+  // provider SEEDING seam (github-harness.js) owns provider data and the
+  // SESSION seam (helpers.js / /test/set-session) owns session facts; an
+  // OpenRouter credential is a session fact, not GitHub provider data, so it
+  // belongs here rather than in `seedGitHubWorkspace`.
   // ---------------------------------------------------------------------------
   test.describe('GitHub-connected', () => {
     test('top task, Go, tailored prompt with visible reasoning, ladder, other prompts', async ({ page }) => {
       const seen = recommendSpy(page);
-      await page.route('**/api/recommend/*/stream', (route) =>
+      // The stream URL carries `?source=github` (LIN-2046 threads provenance),
+      // so the glob must allow a query suffix or the stub never intercepts.
+      await page.route('**/api/recommend/*/stream*', (route) =>
         route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_BODY })
       );
 
@@ -127,6 +137,11 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(seen).toEqual([]);
 
       const { component, go } = await assertOpenedTaskShell(page);
+
+      // The one-line why is visible and names the ranking reason (bug).
+      const why = component.locator('[data-testid="opened-task-why"]');
+      await expect(why).toBeVisible();
+      await expect(why).toContainText(/bug/i);
 
       await go.click();
 

@@ -29,6 +29,11 @@ const hasAutopilot = data.hasAutopilot || false;
 const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
 const isLocalhost = data.isLocalhost || false;
+// LIN-2944: AI state + free-tier flag drive the shared component's disabled
+// primary-action wording (F9 / addendum 5); promptButtons hides templates.
+const aiState = data.aiState || null;
+const freeTier = data.freeTier === true;
+const promptButtons = data.promptButtons !== false;
 const initialIdentifier = data.initialIdentifier || null;
 
 // Build reverse lookup: issueId → array of issues that block it (non-terminal only)
@@ -799,7 +804,13 @@ function handleAccordionClick(e) {
         activePromptHandle = window.PromptSection.init(placeholder, {
           urlKey,
           issue,
+          // LIN-2944: the card's own one-line ranking reason (buildWhy, stamped
+          // server-side) so the shared component can render "why this first".
+          why: issue.why,
           hasAI,
+          aiState,
+          freeTier,
+          promptButtons,
           hasAutopilot,
           dispatchEnabled,
           proxyEnabled,
