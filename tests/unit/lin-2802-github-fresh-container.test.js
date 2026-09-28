@@ -122,7 +122,11 @@ describe('LIN-2802 — GET /auth/github captures intent.fresh at flow start', ()
     const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
-    const session = makeSession({ accountId: 'acct-1' });
+    // LIN-1892 S2-1 (stated setup change, assertion unchanged): the switcher
+    // click this pins comes from a session that holds a workspace. accountId
+    // with ZERO workspaces (an email-only sign-in) is a different state, pinned
+    // in tests/unit/lin-1892-github-from-account.test.js.
+    const session = makeSession({ accountId: 'acct-1', workspaces: [{ id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github', bindings: [] }] });
     await handler({ query: { mode: 'new' }, session }, res);
     assert.equal(session.oauthIntent.fresh, true);
   });

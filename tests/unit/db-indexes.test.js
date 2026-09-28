@@ -197,6 +197,32 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the email-magic-links throttle and TTL-cleanup indexes (LIN-1892 S2 item 8)', async () => {
+    // {emailNorm:1, createdAt:-1} backs MagicLinkStore.recentCountForEmail (the
+    // per-email send throttle); the TTL on expiresAt is cleanup only — expiry
+    // itself is enforced by the peek/consume query, never by the TTL daemon.
+    const specs = INDEX_SPECS.filter(s => s.collection === 'email-magic-links');
+    assert.deepStrictEqual(
+      specs.map(s => ({ keySpec: s.keySpec, options: s.options })),
+      [
+        { keySpec: { emailNorm: 1, createdAt: -1 }, options: {} },
+        { keySpec: { expiresAt: 1 }, options: { expireAfterSeconds: 86400 } }
+      ]
+    );
+
+    const db = freshDb();
+    await ensureIndexes(db);
+    const list = await db.collection('email-magic-links').indexes();
+    const ttl = list.find(idx => JSON.stringify(idx.key) === JSON.stringify({ expiresAt: 1 }));
+    assert.ok(ttl, 'the TTL index is built');
+    assert.strictEqual(ttl.expireAfterSeconds, 86400);
+  });
+
+  test('email-magic-links is the only collection with a TTL index (the LIN-610 no-TTL rule\'s one exception)', () => {
+    const ttlCollections = INDEX_SPECS.filter(s => s.options && s.options.expireAfterSeconds !== undefined).map(s => s.collection);
+    assert.deepStrictEqual(ttlCollections, ['email-magic-links']);
+  });
+
   test('unique option is honoured for tokenHash indexes', async () => {
     const db = freshDb();
     await ensureIndexes(db);

@@ -58,6 +58,7 @@ Several ways to sign in or connect a workspace source:
 - **Personal Access Token (PAT)** - Set `LINEAR_ACCESS_TOKEN` for zero-config local development; you're logged in automatically.
 - **GitHub App** - Sign in with GitHub, or add a GitHub repository (Issues or Projects v2) as a workspace source. Optional — disabled until configured. See [GitHub App (optional)](#github-app-optional) below.
 - **Jira Cloud** - Sign in with Jira via OAuth 2.0, or link a Jira site as a workspace source via an API token or OAuth 2.0. Reads, plus writes (title/description/status edits, comments, labels) — creating new issues isn't supported yet. See [Jira Cloud (optional)](#jira-cloud-optional) below.
+- **Email (magic link)** - Sign in with just an email address: Harbour emails a one-time link (15 minutes, single use) and the confirm page signs you in on the device where you open it. No password. Off by default on every server. See [Email sign-in (optional)](#email-sign-in-optional) below.
 - **OpenRouter OAuth (PKCE)** - Optionally connect an OpenRouter account for AI features; returns a permanent API key stored alongside your session.
 
 ### GitHub App (optional)
@@ -93,6 +94,28 @@ JIRA_CLIENT_ID=your-jira-client-id
 JIRA_CLIENT_SECRET=your-jira-client-secret
 JIRA_REDIRECT_URI=https://yourdomain.com/auth/jira/oauth/callback
 ```
+
+### Email sign-in (optional)
+
+Email is an account identity, not a workspace source: a person signs in with an address and lands on their account home (`/account`), where they connect Linear, GitHub, Jira or a local workspace. It is **off by default on every server, whatever `NODE_ENV` is** — until it is configured, the "Continue with email" CTAs are hidden and `/auth/email*` answers 503. The startup log says which mode is active (`Email sign-in: resend|console|capture|off`) and warns about a refused combination.
+
+**Production (Resend)** — all three are required; without a valid `EMAIL_LINK_ORIGIN` the door stays off:
+
+```
+RESEND_API_KEY=re_...
+EMAIL_FROM=Harbour <sign-in@yourdomain.com>
+EMAIL_LINK_ORIGIN=https://yourdomain.com
+```
+
+- `EMAIL_FROM` must be on a domain verified with [Resend](https://resend.com), with SPF, DKIM and DMARC records in DNS.
+- `EMAIL_LINK_ORIGIN` is this server's public origin. Sign-in links are built from it, never from the request's `Host` header, which a direct request can forge to point a victim's link at another host.
+
+**Local development** — `EMAIL_TRANSPORT=console` prints each sign-in link to the server log instead of sending mail. It is refused when `NODE_ENV=production`. (The Playwright server uses `EMAIL_TRANSPORT=capture`, which only works under `NODE_ENV=test`.)
+
+Known limits of this first version:
+- Workspaces don't follow you to a new device yet: after an email sign-in on a new device, reconnect each source from `/account` (cross-device restore is follow-up work).
+- On a PAT server (`LINEAR_ACCESS_TOKEN`), an email sign-in doesn't pick up the PAT workspace; add sources from `/account`, or log out to let PAT auto-login run.
+- Losing an account's last workspace still signs you out; sign back in by email to return to `/account`.
 
 ## Setup
 
