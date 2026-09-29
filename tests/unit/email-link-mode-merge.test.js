@@ -250,6 +250,33 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
     assert.strictEqual((await harness.stores.accountStore.getAccount(F)).mergedInto, undefined, 'F untouched');
   });
 
+  test('H1: a stale local P whose only email lives on merged E is offered the working email re-proof (chain-aware has-email)', async () => {
+    const browser = harness.browser();
+    const scope = `h1-p-${counter++}`;
+    const P = await signIn(browser, { provider: 'local', scope, workspaceId: 'ws-h1', urlKey: 'ws-h1' });
+    // E holds P's only email; it is merged INTO P. `mergeAccounts` never moves
+    // identities[], so a canonical-only has-email read cannot see it.
+    const e = `h1-e-${counter}@x.io`;
+    const E = await accountOwningEmail(e);
+    assert.strictEqual((await harness.stores.accountStore.mergeAccounts(P, E, {})).ok, true);
+    await browser.post('/__test/sign-in', { provider: 'local', scope, workspaceId: 'ws-h1', urlKey: 'ws-h1', staleAuth: '1' });
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, 0);
+
+    const y = `h1-owned-${counter}@x.io`;
+    const F = await accountOwningEmail(y);
+    const t = await requestLinkMode(browser, y);
+    const { nonce } = await browser.openConfirm(t);
+    const res = await browser.confirm(t, nonce);
+
+    assert.strictEqual(res.status, 409);
+    assert.match(res.text, /data-testid="merge-reauth-required-page"/);
+    assert.match(res.text, /href="\/auth\/email\/reproof"/, 'the address on merged E makes the email re-proof a working offer');
+    assert.doesNotMatch(res.text, /can't be re-proved here/i, 'not the local-only no-re-proof copy');
+    const session = await browser.session();
+    assert.strictEqual(session.pendingMerge, undefined, 'no merge offered while P is stale');
+    assert.strictEqual((await harness.stores.accountStore.getAccount(F)).mergedInto, undefined, 'F untouched');
+  });
+
   // ---------------------------------------------------------------------------
   // within-window: fresh conflict offers the null-workspace merge, end to end
   // ---------------------------------------------------------------------------
