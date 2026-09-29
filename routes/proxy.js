@@ -1574,11 +1574,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
+  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
 
   // LIN-3130 S2a: the runner proxy surface (routes/proxy-runner.js) over the
   // runner credential. Mounted PATH-LESS like the halt/kickoff/dispatch

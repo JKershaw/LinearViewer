@@ -24,6 +24,7 @@ import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
  * @param {Function} deps.proxyLimiter - Per-IP rate limiter middleware (module-scope in routes/proxy.js, shared as-is; injected here rather than redeclared so that lifetime is preserved)
  * @param {Function} deps.authenticateProxyToken - Consumer-token auth middleware (closure-local in createProxyRoutes)
  * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
+ * @param {Function} deps.requireGrant - The dispatch grant gate middleware factory (module-scope in routes/proxy.js; declared here, not yet applied)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local)
  * @param {Object} deps.dispatchQueueStore - Dispatch queue storage instance
  * @param {Object} [deps.dispatchTokenStore] - Consumer-token store (LIN-2885):
@@ -46,6 +47,7 @@ export function createKickoffRoutes({
   proxyLimiter,
   authenticateProxyToken,
   requireWriteScope,
+  requireGrant,
   logEvent,
   dispatchQueueStore,
   dispatchTokenStore = null,
