@@ -8,7 +8,7 @@
  */
 import { Router } from 'express';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
+import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
@@ -491,6 +491,36 @@ export function createDispatchRoutes({
         effort,
         finalizePrompt: async (resolvedHarness) => {
           const baseUrl = `${req.protocol}://${req.get('host')}`;
+          // LIN-3134 T2-ii (Decisions 1, 7): a follow-up's credential comes from
+          // the persisted parent record via the one resume helper — declared or
+          // plain, owner and workspace are the RECORDED ones, never the poster's.
+          // The old guards move into `mint` (LIN-1429: keyed on the RESOLVED
+          // harness, an explicit opt-out mints nothing) and into attach-mode
+          // selection (LIN-805: the prose re-appends only on an explicit
+          // appendProxyContext:true). A record never turns a non-minting call
+          // into a mint. Code below the gate is the launch arm only.
+          if (isFollowUp) {
+            return provisionResumeCredential({
+              proxyTokenStore,
+              dispatchStore: dispatchQueueStore,
+              urlKey: req.proxyUrlKey,
+              baseUrl,
+              label: 'dispatch-bootstrap',
+              harness: resolvedHarness,
+              followUpTo,
+              createdBy: req.proxyCreatedBy || null,
+              prompt,
+              mint: !!prompt && !explicitOptOut && shouldUseMcpTokenField(resolvedHarness),
+              attach: prompt && shouldAppendProxyContext
+                ? {
+                    issueIdentifier: issueIdentifier || null,
+                    prompt,
+                    providerDisplayName: declaredProviderDisplayName(req),
+                    providerUi: resolvedProviderUi(req)
+                  }
+                : null
+            });
+          }
           if (prompt && shouldAppendProxyContext) {
             // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
             // LIN-1155: claude-code harness -> token stripped from prose, returned here.
@@ -534,22 +564,11 @@ export function createDispatchRoutes({
               providerUi: resolvedProviderUi(req)
             });
           }
-          // LIN-1429: the prose block may be suppressed for a warm follow-up
-          // (LIN-805), but a broker-dependent harness still needs a LIVE
-          // credential — the original died with the window that held it
-          // (LIN-1375/1362). Provision without appending. Keyed on the RESOLVED
-          // harness, never on isFollowUp.
-          if (prompt && !explicitOptOut && shouldUseMcpTokenField(resolvedHarness)) {
-            const bootstrapToken = await provisionBootstrapToken({
-              proxyTokenStore,
-              urlKey: req.proxyUrlKey,
-              baseUrl,
-              label: 'dispatch-bootstrap',
-              harness: resolvedHarness,
-              createdBy: req.proxyCreatedBy || null
-            });
-            return { prompt: finalPrompt, bootstrapToken };
-          }
+          // Launch with the append opted out (or an abort, which has no prompt):
+          // nothing to attach and nothing to mint. The former launch-arm
+          // provision-without-append branch was unreachable here (its selector
+          // implied the attach above) and now lives in the follow-up gate as
+          // the helper's pbt mode (LIN-3134 Decision 7).
           return { prompt: finalPrompt, bootstrapToken: null };
         },
         fields: {
@@ -616,6 +635,12 @@ export function createDispatchRoutes({
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/dispatch', 503);
         return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+      }
+      // A declared resume whose grant cannot be re-issued (LIN-3134): relay the
+      // coded refusal's own status and code; a retry cannot help.
+      if (isStructuralGrantRefusal(err)) {
+        logEvent(req, '/api/proxy/dispatch', err.status);
+        return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
       }
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch error:', err.message);
@@ -929,6 +954,32 @@ export function createDispatchRoutes({
             harness,
             effort,
             finalizePrompt: async (resolvedHarness) => {
+              // LIN-3134 T2-ii (Decisions 1, 7): a follow-up resumes through the one
+              // resume helper, from the persisted parent record — see POST /dispatch.
+              // `mint` is this arm's old LIN-1429 guard; attach mode is its LIN-805
+              // selector. Code below the gate is the launch arm only.
+              if (isFollowUp) {
+                return provisionResumeCredential({
+                  proxyTokenStore,
+                  dispatchStore: dispatchQueueStore,
+                  urlKey: req.proxyUrlKey,
+                  baseUrl: `${req.protocol}://${req.get('host')}`,
+                  label: 'dispatch-bootstrap',
+                  harness: resolvedHarness,
+                  followUpTo,
+                  createdBy: req.proxyCreatedBy || null,
+                  prompt: generated.prompt,
+                  mint: !explicitOptOut && shouldUseMcpTokenField(resolvedHarness),
+                  attach: shouldAppendProxyContext
+                    ? {
+                        issueIdentifier,
+                        prompt: generated.prompt,
+                        providerDisplayName: declaredProviderDisplayName(req),
+                        providerUi: resolvedProviderUi(req)
+                      }
+                    : null
+                });
+              }
               if (shouldAppendProxyContext) {
                 const baseUrl = `${req.protocol}://${req.get('host')}`;
                 // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
@@ -950,24 +1001,9 @@ export function createDispatchRoutes({
                   providerUi: resolvedProviderUi(req)
                 });
               }
-              // LIN-1429: the prose block may be suppressed for a warm follow-up
-              // (LIN-805), but a broker-dependent (claude-code/MCP) harness still
-              // needs a LIVE credential — the original died with the window that
-              // held it (LIN-1375/1362). Provision without appending, mirroring
-              // POST /dispatch's identical branch. Keyed on the RESOLVED harness,
-              // never on isFollowUp; an explicit appendProxyContext:false opts out
-              // of both the prose AND the credential.
-              if (!explicitOptOut && shouldUseMcpTokenField(resolvedHarness)) {
-                const bootstrapToken = await provisionBootstrapToken({
-                  proxyTokenStore,
-                  urlKey: req.proxyUrlKey,
-                  baseUrl: `${req.protocol}://${req.get('host')}`,
-                  label: 'dispatch-bootstrap',
-                  harness: resolvedHarness,
-                  createdBy: req.proxyCreatedBy || null
-                });
-                return { prompt: generated.prompt, bootstrapToken };
-              }
+              // Launch opted out of the append: nothing to attach or mint (the
+              // former provision-without-append branch was unreachable on a
+              // launch and is the gate's pbt mode now).
               return { prompt: generated.prompt, bootstrapToken: null };
             },
             fields: {
@@ -1050,6 +1086,12 @@ export function createDispatchRoutes({
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
             return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+          }
+          // A declared resume whose grant cannot be re-issued (LIN-3134): relay
+          // the coded refusal ahead of graphqlErrorStatus, which would 500 it.
+          if (isStructuralGrantRefusal(err)) {
+            logEvent(req, '/api/proxy/recommend-and-dispatch', err.status);
+            return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
           }
           // LIN-2260: classify an upstream provider-auth failure the same way
           // the read path (and GET /recommend via recommendErrorResponse)
@@ -1200,6 +1242,32 @@ export function createDispatchRoutes({
           harness,
           effort,
           finalizePrompt: async (resolvedHarness) => {
+            // LIN-3134 T2-ii (Decisions 1, 7): a follow-up resumes through the one
+            // resume helper, from the persisted parent record — see POST /dispatch.
+            // `mint` is this arm's old LIN-1429 guard; attach mode is its LIN-805
+            // selector. Code below the gate is the launch arm only.
+            if (isFollowUp) {
+              return provisionResumeCredential({
+                proxyTokenStore,
+                dispatchStore: dispatchQueueStore,
+                urlKey: req.proxyUrlKey,
+                baseUrl: `${req.protocol}://${req.get('host')}`,
+                label: 'dispatch-bootstrap',
+                harness: resolvedHarness,
+                followUpTo,
+                createdBy: req.proxyCreatedBy || null,
+                prompt: rec.prompt,
+                mint: !explicitOptOut && shouldUseMcpTokenField(resolvedHarness),
+                attach: shouldAppendProxyContext
+                  ? {
+                      issueIdentifier: terminalIdentifier,
+                      prompt: rec.prompt,
+                      providerDisplayName: declaredProviderDisplayName(req),
+                      providerUi: resolvedProviderUi(req)
+                    }
+                  : null
+              });
+            }
             if (shouldAppendProxyContext) {
               const baseUrl = `${req.protocol}://${req.get('host')}`;
               // LIN-376: embed a fresh single-use bootstrap, never the caller's own token.
@@ -1221,24 +1289,9 @@ export function createDispatchRoutes({
                 providerUi: resolvedProviderUi(req)
               });
             }
-            // LIN-1429: the prose block may be suppressed for a warm follow-up
-            // (LIN-805), but a broker-dependent (claude-code/MCP) harness still
-            // needs a LIVE credential — the original died with the window that
-            // held it (LIN-1375/1362). Provision without appending, mirroring
-            // POST /dispatch's identical branch. Keyed on the RESOLVED harness,
-            // never on isFollowUp; an explicit appendProxyContext:false opts out
-            // of both the prose AND the credential.
-            if (!explicitOptOut && shouldUseMcpTokenField(resolvedHarness)) {
-              const bootstrapToken = await provisionBootstrapToken({
-                proxyTokenStore,
-                urlKey: req.proxyUrlKey,
-                baseUrl: `${req.protocol}://${req.get('host')}`,
-                label: 'dispatch-bootstrap',
-                harness: resolvedHarness,
-                createdBy: req.proxyCreatedBy || null
-              });
-              return { prompt: rec.prompt, bootstrapToken };
-            }
+            // Launch opted out of the append: nothing to attach or mint (the
+            // former provision-without-append branch was unreachable on a
+            // launch and is the gate's pbt mode now).
             return { prompt: rec.prompt, bootstrapToken: null };
           },
           fields: {
@@ -1331,6 +1384,12 @@ export function createDispatchRoutes({
         if (err && err.proxyAttachFailed) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
           return keepalive.send(503, { error: PROXY_ATTACH_FAILED_MESSAGE });
+        }
+        // A declared resume whose grant cannot be re-issued (LIN-3134): relay
+        // the coded refusal on the armed keepalive, same as the 503 above.
+        if (isStructuralGrantRefusal(err)) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', err.status);
+          return keepalive.send(err.status, { error: err.message, code: err.code, retryable: false });
         }
         // LIN-2260: classify an upstream provider-auth failure (retryable
         // 503/LINEAR_AUTH) the same way GET /recommend's recommendErrorResponse
