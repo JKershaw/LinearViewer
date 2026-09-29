@@ -12,6 +12,7 @@ import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey, persistOwnerCredential } from '../lib/workspace.js'
 import { writeConnection } from '../lib/connection-store.js'
+import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from '../lib/connection-credential.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
@@ -211,10 +212,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
       // binding, the scalar mirror), and Linear's rotating credential is
       // durable-store-only now. `data.refresh_token` is threaded straight to
       // persistOwnerCredential below instead, once accountId is known.
-      linkProvider(workspace, authProvider.name, org.id, {
+      const linearCredentials = {
         token: data.access_token,
         tokenExpiresAt: calculateExpiresAt(data.expires_in || 86400)
-      })
+      }
+      linkProvider(workspace, authProvider.name, org.id, linearCredentials)
 
       // Intent (new container vs. add-source) is carried server-side in the
       // session (LIN-562). LIN-1351: an add-source callback links a SECOND Linear
@@ -278,19 +280,32 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
           return respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'add-source', returnUrlKey, identityLabel: 'Linear', reauthUrl: '/auth/linear', provider: 'linear' })
         }
 
-        // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
-        // above — never before, or a refused workspace would leave a durable
-        // credential behind. `workspace` was already fully populated by
-        // linkProvider earlier in this handler; there is no updateWorkspaceTokens
-        // call to wrap here, so this reaches persistOwnerCredential directly.
-        // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
-        // longer carries one (linkProvider above was deliberately not given it).
-        await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
+        // LIN-3124 PR3 (D2a phase B): a new Linear binding becomes
+        // connection-backed here, after the limit-check + establishAccount
+        // refusals above, on the session-resident workspace. A re-link of a
+        // legacy binding, or a failed conversion, takes the legacy writes below
+        // unchanged.
+        const conversion = await convertToConnectionBacked({
+          connectionStore, ownerCredentialStore, session: req.session, accountId: established.accountId,
+          workspaceId: workspace.id, provider: 'linear', scope: org.id,
+          credentials: linearCredentials, refreshToken: data.refresh_token,
+          prior: bindingShapeAt(workspacesBeforeAddSource.find(w => w.id === workspace.id), 'linear', org.id),
+        })
+        if (!conversion.connectionBacked) {
+          // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
+          // above — never before, or a refused workspace would leave a durable
+          // credential behind. `workspace` was already fully populated by
+          // linkProvider earlier in this handler; there is no updateWorkspaceTokens
+          // call to wrap here, so this reaches persistOwnerCredential directly.
+          // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
+          // longer carries one (linkProvider above was deliberately not given it).
+          await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
 
-        // LIN-3127: additive, write-only Connection dual-write (best-effort),
-        // after the limit-check + establishAccount conflict return above and
-        // after linkProvider. Linear's unit id is its binding scope (org.id).
-        if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'linear', org.id)
+          // LIN-3127: additive, write-only Connection dual-write (best-effort),
+          // after the limit-check + establishAccount conflict return above and
+          // after linkProvider. Linear's unit id is its binding scope (org.id).
+          if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'linear', org.id)
+        }
 
         // Success: clear the OAuth state/intent, save the session, and return to
         // the initiating workspace's settings. Do NOT set activeWorkspaceId — the
@@ -311,6 +326,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
           intent.workspaceUrlKey ||
           (getActiveWorkspace(req.session) || {}).urlKey ||
           workspace.urlKey
+        if (conversion.error) {
+          return res.status(503).send(renderErrorPage(CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE, {
+            action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(returnUrlKey)}/settings`
+          }))
+        }
         return res.redirect(`/workspace/${encodeURIComponent(returnUrlKey)}/settings?provider_ok=linear`)
       }
 
@@ -391,20 +411,29 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
               return await respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'new', returnUrlKey: workspace.urlKey, identityLabel: 'Linear', reauthUrl: '/auth/linear', provider: 'linear' })
             }
 
-            // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
-            // above — never before, or a refused workspace would leave a durable
-            // credential behind. `workspace` was already fully populated by
-            // linkProvider earlier in this handler; there is no
-            // updateWorkspaceTokens call to wrap here, so this reaches
-            // persistOwnerCredential directly.
-            // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
-            // longer carries one (linkProvider above was deliberately not given it).
-            await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
+            // LIN-3124 PR3 (D2a phase B): see the add-source arm above.
+            const conversion = await convertToConnectionBacked({
+              connectionStore, ownerCredentialStore, session: req.session, accountId: established.accountId,
+              workspaceId: workspace.id, provider: 'linear', scope: org.id,
+              credentials: linearCredentials, refreshToken: data.refresh_token,
+              prior: bindingShapeAt(workspacesBeforeLogin.find(w => w.id === workspace.id), 'linear', org.id),
+            })
+            if (!conversion.connectionBacked) {
+              // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
+              // above — never before, or a refused workspace would leave a durable
+              // credential behind. `workspace` was already fully populated by
+              // linkProvider earlier in this handler; there is no
+              // updateWorkspaceTokens call to wrap here, so this reaches
+              // persistOwnerCredential directly.
+              // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
+              // longer carries one (linkProvider above was deliberately not given it).
+              await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
 
-            // LIN-3127: additive, write-only Connection dual-write (best-effort),
-            // after the limit-check + establishAccount conflict return above and
-            // after linkProvider. Linear's unit id is its binding scope (org.id).
-            if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'linear', org.id)
+              // LIN-3127: additive, write-only Connection dual-write (best-effort),
+              // after the limit-check + establishAccount conflict return above and
+              // after linkProvider. Linear's unit id is its binding scope (org.id).
+              if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'linear', org.id)
+            }
 
             // Load saved user preferences and apply to session.
             // regenerate() wiped the session, so rehydrate every durable field
@@ -425,6 +454,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // preference so a returning/cross-device user's dark choice applies on the
             // very first page after login (the cookie is this device's transport).
             if (req.session.theme) setThemeCookie(res, req.session.theme)
+            if (conversion.error) {
+              return res.status(503).send(renderErrorPage(CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE, {
+                action: 'Try again', actionUrl: '/auth/linear'
+              }))
+            }
             res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
           } catch (err) {
             console.error('Post-regenerate callback error:', err)

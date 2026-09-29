@@ -48,11 +48,21 @@ const STORE_ALLOWED_IMPORTERS = [
   'lib/connection-lifecycle.js',
 ];
 // LIN-3124 PR2 (S2/S8): the seam, imported by the server (hydration wiring) and
-// by the session store (the persist sanitizer). Exact at this tree.
-const CREDENTIAL_ALLOWED_IMPORTERS = ['server.js', 'lib/session-store.js'];
-// LIN-3124 PR2 (S6): the release functions, called at the 7 unwired-by-others
-// census sites plus the account merge. Exact at this tree.
-const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'routes/workspace.js', 'routes/account-merge.js'];
+// by the session store (the persist sanitizer). LIN-3124 PR3 checkpoint E (F1):
+// extended by EXACTLY the four modules holding the 10 `writeConnection`
+// conversion seams (auth ×2, GitHub install flow ×3, Jira ×4, merge ×1).
+const CREDENTIAL_ALLOWED_IMPORTERS = [
+  'server.js',
+  'lib/session-store.js',
+  'routes/auth.js',
+  'lib/github-install-flow.js',
+  'routes/jira-auth.js',
+  'routes/account-merge.js',
+];
+// LIN-3124 PR2 (S6): the release functions, called at the census sites plus the
+// account merge. LIN-3124 PR3 checkpoint E: + the converter's D18 step-1/2
+// orphan release (`releaseOrphanOwnerRecord`, arm f6). Exact at this tree.
+const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'routes/workspace.js', 'routes/account-merge.js', 'lib/connection-credential.js'];
 // LIN-3124 PR3 (C): `lib/connection-access.js` is the arm's pure selection
 // helpers. It imports none of the three connection modules and is imported only
 // by the single credential seam. Exact at this tree.
@@ -322,6 +332,8 @@ const METHOD_CLASSES = {
   // LIN-3124 PR2 (S1): the connection-first read/delete lifecycle.
   link: 'WRITE',
   readConnectionById: 'READ',
+  // LIN-3124 PR3 checkpoint E: the D18 ambiguous-acknowledgement re-read.
+  readConnectionOutcome: 'READ',
   readConnectionsByIds: 'READ',
   readConnectionsByReferent: 'READ',
   readReferencedConnections: 'READ',

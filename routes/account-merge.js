@@ -7,9 +7,10 @@
  */
 import { Router } from 'express'
 import { renderErrorPage } from '../lib/render-pages.js'
-import { upsertWorkspace, saveSession, persistOwnerCredential } from '../lib/workspace.js'
+import { upsertWorkspace, saveSession, persistOwnerCredential, getBindingCredentials } from '../lib/workspace.js'
 import { writeConnection } from '../lib/connection-store.js'
 import { onAccountMerged } from '../lib/connection-lifecycle.js'
+import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from '../lib/connection-credential.js'
 import { isFreshlyAuthenticated, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 
@@ -122,6 +123,9 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     // stays and keeps resolving; a LIN-3127-born row (no origin) is never
     // deleted. Inert until PR3 writes connection-backed bindings.
     await onAccountMerged({ connectionStore, ownerCredentialStore, mergedAccountId: pending.mergedAccountId })
+    // LIN-3124 PR3 (D2a): the binding shape before this upsert decides whether
+    // the arriving binding is new (converts) or a re-link of a legacy one.
+    const workspaceBeforeMerge = (req.session.workspaces || []).find(w => w.id === pending.workspace.id)
     try {
       upsertWorkspace(req.session, pending.workspace)
     } catch (limitError) {
@@ -143,21 +147,37 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     // respondToAccountConflict callers pass a freshly-built container with
     // exactly one binding); if it is not exactly one, skip and log — never
     // guess (N2).
-    if (connectionStore) {
-      const matches = (pending.workspace.bindings || []).filter(b => b.provider === pending.provider)
-      if (matches.length === 1) {
-        await writeConnection(connectionStore, canonicalAccountId, pending.workspace, pending.provider, matches[0].scope)
-      } else {
-        console.warn(`LIN-3127 merge-confirm: expected exactly one binding for provider "${pending.provider}", found ${matches.length}; skipping Connection write`)
+    const matches = (pending.workspace.bindings || []).filter(b => b.provider === pending.provider)
+    // LIN-3124 PR3 (D2a phase B): the arriving binding becomes connection-backed
+    // on the canonical account (after both refusal returns above). The legacy
+    // writes below are the fallback, unchanged. The merge has no call-site
+    // credentials of its own: the arriving container's single binding was
+    // built by the originating flow's phase A from ITS call-site credentials,
+    // and is read through the accessor (legacy: the same object).
+    const conversion = matches.length === 1
+      ? await convertToConnectionBacked({
+        connectionStore, ownerCredentialStore, session: req.session, accountId: canonicalAccountId,
+        workspaceId: pending.workspace.id, provider: pending.provider, scope: matches[0].scope,
+        credentials: getBindingCredentials(matches[0]), refreshToken: pending.refreshToken,
+        prior: bindingShapeAt(workspaceBeforeMerge, pending.provider, matches[0].scope),
+      })
+      : { connectionBacked: false, error: null }
+    if (!conversion.connectionBacked) {
+      if (connectionStore) {
+        if (matches.length === 1) {
+          await writeConnection(connectionStore, canonicalAccountId, pending.workspace, pending.provider, matches[0].scope)
+        } else {
+          console.warn(`LIN-3127 merge-confirm: expected exactly one binding for provider "${pending.provider}", found ${matches.length}; skipping Connection write`)
+        }
       }
-    }
-    // LIN-2304: conditional on pending.refreshToken — persistOwnerCredential
-    // itself has no internal skip-on-missing-refreshToken guard, so gating
-    // the CALL is what keeps GitHub/GitHub Projects (which pass no
-    // refreshToken into the offer) from gaining an owner-credential write
-    // they never had on their normal sign-in path.
-    if (pending.refreshToken) {
-      await persistOwnerCredential(canonicalAccountId, pending.workspace, ownerCredentialStore, pending.refreshToken)
+      // LIN-2304: conditional on pending.refreshToken — persistOwnerCredential
+      // itself has no internal skip-on-missing-refreshToken guard, so gating
+      // the CALL is what keeps GitHub/GitHub Projects (which pass no
+      // refreshToken into the offer) from gaining an owner-credential write
+      // they never had on their normal sign-in path.
+      if (pending.refreshToken) {
+        await persistOwnerCredential(canonicalAccountId, pending.workspace, ownerCredentialStore, pending.refreshToken)
+      }
     }
 
     // LIN-2304: uniform confirm-completion, run identically for every
@@ -184,6 +204,11 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     delete req.session.pendingMerge
     await saveSession(req.session)
 
+    if (conversion.error) {
+      return res.status(503).send(renderErrorPage(CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE, {
+        action: 'Go to homepage', actionUrl: '/'
+      }))
+    }
     if (pending.mode === 'add-source') {
       return res.redirect(`/workspace/${encodeURIComponent(pending.returnUrlKey)}/settings?provider_ok=${encodeURIComponent(pending.provider)}`)
     }

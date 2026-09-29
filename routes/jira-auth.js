@@ -62,6 +62,7 @@ import { establishAccount, clearUnresolvableAccountSession } from '../lib/accoun
 import { respondToAccountConflict } from '../lib/account-conflict.js'
 import { writeConnection } from '../lib/connection-store.js'
 import { isConnectionBacked } from '../lib/connection-binding.js'
+import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from '../lib/connection-credential.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import {
@@ -305,10 +306,20 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // mirror — sees it too). `site` is the binding's `scope` (third arg),
     // exactly like a GitHub binding's `scope` is its repo — not duplicated
     // into `credentials`, so there is only one place it can drift from.
-    linkProvider(workspace, 'jira', normalizedSite, {
+    const basicCredentials = {
       token: apiToken,
       email,
       tokenExpiresAt: Number.MAX_SAFE_INTEGER,
+    }
+    const priorBinding = bindingShapeAt(workspace, 'jira', normalizedSite)
+    linkProvider(workspace, 'jira', normalizedSite, basicCredentials)
+
+    // LIN-3124 PR3 (D2a phase B): Jira Basic is never connection-backed (its
+    // token is omitted, ruling 04461f8f), so this always takes the legacy write
+    // below; it is called so every writeConnection seam converges on one rule.
+    const conversion = await convertToConnectionBacked({
+      connectionStore, ownerCredentialStore, session: req.session, accountId: established.accountId,
+      workspaceId: workspace.id, provider: 'jira', scope: normalizedSite, credentials: basicCredentials, prior: priorBinding,
     })
 
     // LIN-3127: additive, write-only Connection dual-write (best-effort), after
@@ -318,7 +329,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // holds an OAuth binding would otherwise inherit `authType: 'oauth'` and
     // slip the Basic API token past the helper's authType check
     // (lin3127-jira-basic-retention — the token is never persisted).
-    if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', normalizedSite, { omitToken: true })
+    if (!conversion.connectionBacked && connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', normalizedSite, { omitToken: true })
 
     // One-shot session flash (LIN-2803): Basic add binds onto the viewed
     // workspace exactly like every other add-source arm — it just isn't an
@@ -575,6 +586,10 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       return completeJiraNewLogin(req, res, site, myself, refreshToken)
     }
 
+    // LIN-3124 PR3 (D8): the account the callback's staging write used, captured
+    // BEFORE establishAccount (which can canonicalize session.accountId). Copy
+    // and finalize key the staged record on it.
+    const stagingAccountId = req.session.accountId
     const established = await establishAccount(
       req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
       { email: myself.emailAddress, displayName: myself.displayName }, workspace.id
@@ -632,24 +647,45 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // shapes cannot coexist on one site — `authType` is what stops the merged
     // result from being read as Basic and sending the OAuth access token to the
     // tenant in a Basic header.
-    linkProvider(workspace, 'jira', site.url, {
+    const oauthCredentials = {
       token: pending.accessToken,
       authType: 'oauth',
       cloudId: site.cloudId,
       tokenExpiresAt: calculateExpiresAt(pending.expiresIn),
+    }
+    const priorBinding = bindingShapeAt(workspace, 'jira', site.url)
+    linkProvider(workspace, 'jira', site.url, oauthCredentials)
+
+    // LIN-3124 PR3 (D8/D18 phase B): copy the staged refresh token onto the
+    // connection-keyed record, link, rewrite the binding. The step-0 gate keeps
+    // the site legacy while a legacy OAuth Jira binding here reads the staged
+    // record; the staged record is deleted only by `finalize()` below, after
+    // the session save resolves.
+    const conversion = await convertToConnectionBacked({
+      connectionStore, ownerCredentialStore, session: req.session, accountId: established.accountId,
+      workspaceId: workspace.id, provider: 'jira', scope: site.url, credentials: oauthCredentials, prior: priorBinding,
+      staged: { accountId: stagingAccountId, urlKey: workspace.urlKey },
     })
 
     // LIN-3127 (#8): additive, write-only Connection dual-write (best-effort),
     // after this arm's own establishAccount conflict return above and after
-    // linkProvider. Unit id is the site (binding scope).
-    if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', site.url)
+    // linkProvider. Unit id is the site (binding scope). The legacy fallback
+    // never calls persistOwnerCredential: the staged record already holds the
+    // refresh token, and the legacy binding reads it as today.
+    if (!conversion.connectionBacked && connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', site.url)
 
     // One-shot session flash (LIN-2803) — see the Basic add-source arm above.
-    req.session.providerAdded = { provider: 'jira', scope: site.url }
+    if (!conversion.error) req.session.providerAdded = { provider: 'jira', scope: site.url }
     delete req.session.jiraPending
     delete req.session.oauthState
     delete req.session.oauthIntent
     await saveSession(req.session)
+    await conversion.finalize()
+    if (conversion.error) {
+      return res.status(503).send(renderErrorPage(CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE, {
+        action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`
+      }))
+    }
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings?provider_ok=jira`)
   }
 
@@ -705,13 +741,27 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       })
     }
 
-    const finish = async (workspace) => {
+    const finish = async (workspace, conversion) => {
       delete req.session.jiraPending
       delete req.session.oauthState
       delete req.session.oauthIntent
       await saveSession(req.session)
+      if (conversion.error) {
+        return res.status(503).send(renderErrorPage(CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE, {
+          action: 'Try again', actionUrl: '/auth/jira/oauth?mode=new'
+        }))
+      }
       res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
     }
+
+    // LIN-3124 PR3 (D2a phase B): the converter REPLACES persistRefresh for a
+    // new binding — a direct putByConnection of this login's own grant, so the
+    // legacy key is never written and a co-resident legacy site keeps its own
+    // grant (no gate needed on this seam). The fallback is today's writes.
+    const convert = (accountId, workspace, prior) => convertToConnectionBacked({
+      connectionStore, ownerCredentialStore, session: req.session, accountId,
+      workspaceId: workspace.id, provider: 'jira', scope: site.url, credentials, refreshToken, prior,
+    })
 
     // Returning user, same session: the container already exists, so this is a
     // binding add — no regenerate (the session is already theirs, and wiping it
@@ -731,13 +781,17 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
           action: 'Go to homepage', actionUrl: '/'
         }))
       }
+      const priorBinding = bindingShapeAt(existing, 'jira', site.url)
       linkProvider(existing, 'jira', site.url, credentials)
       req.session.activeWorkspaceId = existing.id
-      // LIN-3127 (#9a): direct Connection write beside persistRefresh — the
-      // `existing` workspace object is already in scope (never the closure, N1).
-      if (connectionStore) await writeConnection(connectionStore, established.accountId, existing, 'jira', site.url)
-      await persistRefresh(established.accountId, existing.urlKey)
-      return finish(existing)
+      const conversion = await convert(established.accountId, existing, priorBinding)
+      if (!conversion.connectionBacked) {
+        // LIN-3127 (#9a): direct Connection write beside persistRefresh — the
+        // `existing` workspace object is already in scope (never the closure, N1).
+        if (connectionStore) await writeConnection(connectionStore, established.accountId, existing, 'jira', site.url)
+        await persistRefresh(established.accountId, existing.urlKey)
+      }
+      return finish(existing, conversion)
     }
 
     // Fresh container. `deriveJiraUrlKey` reads the CURRENT session workspaces,
@@ -840,11 +894,14 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
               // after the conflict check resolved ok. `workspace` is already in
               // scope here (declared for the fresh container above, N1) — not
               // routed through the closure.
-              if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', site.url)
-              await persistRefresh(established.accountId, workspace.urlKey)
+              const conversion = await convert(established.accountId, workspace, bindingShapeAt(workspacesBeforeLogin.find(w => w.id === workspace.id), 'jira', site.url))
+              if (!conversion.connectionBacked) {
+                if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'jira', site.url)
+                await persistRefresh(established.accountId, workspace.urlKey)
+              }
 
               req.session.activeWorkspaceId = workspace.id
-              await finish(workspace)
+              await finish(workspace, conversion)
             } catch (err) {
               console.error('Jira post-regenerate callback error:', err)
               if (!res.headersSent) {

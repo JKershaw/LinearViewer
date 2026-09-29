@@ -297,6 +297,16 @@ describe('GitHub Projects auth routes', () => {
     };
   }
 
+  // LIN-3124 PR3 checkpoint E: a NEW github-projects binding is connection-backed;
+  // the LIN-711 shape lives on the Connection row (see github-auth.test.js).
+  async function assertConnectionBackedLin711(connectionStore, session, binding, { urlKey, scope, installationId, token, tokenExpiresAt }) {
+    const connectionId = `${session.accountId}::github-projects::${installationId}`;
+    assert.deepEqual(binding, { provider: 'github-projects', scope, connectionId });
+    const row = await connectionStore.readConnectionById(connectionId);
+    assert.deepEqual(row.credentials, { installationId, token, tokenExpiresAt });
+    assert.deepEqual(row.referents, [{ urlKey, provider: 'github-projects', scope }]);
+  }
+
   test('GET /auth/github-projects 503s when GitHub App env is not configured', async () => {
     delete process.env.GITHUB_APP_ID;
     const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
@@ -926,7 +936,8 @@ describe('GitHub Projects auth routes', () => {
   });
 
   test('POST link (re-bind, new) mints the installation token for the chosen board and writes the LIN-711 binding (LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const stores = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const session = makeSession({
@@ -942,14 +953,18 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(ws.id, 'github:42');
     const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
     // Persisted credential is an INSTALLATION token for the board's resolved installation (77).
-    assert.deepEqual(ws.bindings, [{ provider: 'github-projects', scope: 'octocat/5', credentials: { installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry } }]);
+    assert.equal(ws.bindings.length, 1);
+    await assertConnectionBackedLin711(stores.connectionStore, session, ws.bindings[0], {
+      urlKey: 'octocat', scope: 'octocat/5', installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry,
+    });
     assert.ok(!JSON.stringify(session.workspaces).includes('gho_user'), 'discovery user token is never persisted');
     assert.equal(session.githubProjectsPending, undefined, 'pending cleared');
     assert.equal(res.redirectedTo, '/workspace/octocat/');
   });
 
   test('POST link (re-bind, add-source) mints + binds onto the viewed workspace without clobbering its primary (LIN-735)', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const stores = freshAccountStores();
+    const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -962,7 +977,9 @@ describe('GitHub Projects auth routes', () => {
     await handler({ body: { board: 'octocat/5' }, session }, res);
 
     const binding = linearWs.bindings.find(b => b.provider === 'github-projects');
-    assert.deepEqual(binding.credentials, { installationId: '77', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z') });
+    await assertConnectionBackedLin711(stores.connectionStore, session, binding, {
+      urlKey: 'acme', scope: 'octocat/5', installationId: '77', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z'),
+    });
     assert.equal(linearWs.provider, 'linear', 'non-active re-add must not clobber the active scalar mirror');
     assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github-projects');
   });
