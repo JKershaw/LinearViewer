@@ -99,7 +99,10 @@ first, then act on the `reason` it printed:
 - `stall` → handle each entry (§5).
 - `abort` → another consumer is polling (§3).
 - `cap` → nothing happened: just re-arm.
-- `credential` → the credential expired or was revoked: tell the person (§7).
+- `error` → Harbour answered the poll with an error (a 429, a 5xx during a deploy): just re-arm.
+- `credential` → the poll could not be made. Read its `message`. Only a message saying the
+  credential was **rejected (expired or revoked)** means it is dead: tell the person (§7) and end
+  (§8). Anything else (a network failure, waking from sleep with no Wi-Fi) is transient: re-arm.
 
 On every turn, also check `runner status`: a stale `heartbeat` with no `wait` running means the
 poll loop died. Re-arm it. If your environment can't run background commands, use `/loop 2m`
