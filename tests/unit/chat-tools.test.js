@@ -1029,6 +1029,7 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
     return {
       ...stores.dispatchQueueStore,
       calls,
+      getGrantDeclaration: async () => ({ state: 'none' }),
       async addItem(urlKey, item) {
         calls.push({ urlKey, item });
         return { _id: 'queued-item-1', urlKey, ...item };
@@ -1237,6 +1238,7 @@ describe('LIN-1486: send_follow_up targets the lineage tail, not the session roo
     return {
       ...stores.dispatchQueueStore,
       calls,
+      getGrantDeclaration: async () => ({ state: 'none' }),
       async addItem(urlKey, item) {
         calls.push({ urlKey, item });
         return { _id: 'queued-item-1', urlKey, ...item };
@@ -1479,6 +1481,7 @@ describe('LIN-2432 §A.4: send_follow_up followUpMode (execute/propose)', () => 
     return {
       ...stores.dispatchQueueStore,
       calls,
+      getGrantDeclaration: async () => ({ state: 'none' }),
       async addItem(urlKey, item) {
         calls.push({ urlKey, item });
         return { _id: 'queued-item-1', urlKey, ...item };

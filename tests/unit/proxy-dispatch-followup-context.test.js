@@ -53,6 +53,7 @@ function buildApp(captured, { createToken, getItemStatus } = {}) {
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
+      getGrantDeclaration: async () => ({ state: 'none' }),
       addItem: async (urlKey, item) => {
         captured.item = item;
         return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item };

@@ -33,7 +33,7 @@ import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE } from '../lib/workspace.js';
-import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
+import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
@@ -368,20 +368,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
       const wantProxyContext = attachProxy === true && !isAbort;
 
-      // Follow-up credential provisioning (LIN-1431 S3 #1). The human reply box
-      // (public/session.js) posts only { prompt, followUpTo, target, force } — it
-      // never sets `attachProxy`, so `wantProxyContext` is false and, pre-LIN-1431,
-      // NO finalizePrompt was passed at all: the follow-up was enqueued with
-      // `bootstrapToken: null` and resumed a session whose local broker had died
-      // with its window (LIN-1362/1375), leaving it unable to write back.
-      //
-      // The fix is a SERVER-SIDE default, deliberately not a new client flag: the
-      // reply-box client stays dumb by design (LIN-1252/1298/1309). It only arms
-      // the callback; whether a credential is actually minted is decided INSIDE it,
-      // on the RESOLVED harness (see below) — so this can never upgrade a blank
-      // harness, and `applyDefaultHarness:false` below is untouched (7926ee8).
-      const wantFollowUpProvisioning = !wantProxyContext && !isAbort && !!followUpTo && !!prompt;
-
       // Reject local target from non-localhost requests
       if (target === 'local') {
         const host = (req.get('host') || '').split(':')[0];
@@ -484,7 +470,66 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         composedRunMarker,
         getWorkspaceAccessToken,
         fetchIssueContext,
-        ...(wantProxyContext
+        // Follow-up credential provisioning (LIN-1431 S3 #1, LIN-3134 T2-ii). The
+        // human reply box (public/session.js) posts only { prompt, followUpTo,
+        // target, force } and never sets `attachProxy`; pre-LIN-1431 such a
+        // follow-up was enqueued with `bootstrapToken: null` and resumed a session
+        // whose local broker had died with its window (LIN-1362/1375). The fix is a
+        // SERVER-SIDE default, deliberately not a new client flag (LIN-1252/1298/
+        // 1309): EVERY follow-up arms the one resume helper, which takes its
+        // credential from the persisted parent record — declared or plain, the
+        // RECORDED owner and workspace, never the poster.
+        //
+        // `followUpTo` is tested first, so this gate covers both modes:
+        //   - attach mode when the client asked (`wantProxyContext`, LIN-1162) —
+        //     attach always mints, exactly as the launch attach below;
+        //   - otherwise pbt mode, `mint` = shouldUseMcpTokenField(RESOLVED harness).
+        //     The guard is load-bearing: a prose-harness token has no channel to
+        //     reach the worker (the prompt is untouched), and keying on the
+        //     resolved harness preserves LIN-1111 — a blank harness resolves null
+        //     here (applyDefaultHarness:false), so it never mints.
+        // A record never turns a non-minting follow-up into a mint. A follow-up is
+        // never an abort and always has a prompt (both are 400s above).
+        //
+        // Fail-closed is inherited (LIN-1162/LIN-525): a failed mint throws before
+        // addItem and the catch below maps it. The server attaches or throws.
+        ...(followUpTo
+          ? {
+              finalizePrompt: async (resolvedHarness) => {
+                const resumed = await provisionResumeCredential({
+                  proxyTokenStore,
+                  dispatchStore: dispatchQueueStore,
+                  urlKey: workspace.urlKey,
+                  baseUrl,
+                  label: 'dispatch-bootstrap',
+                  harness: resolvedHarness,
+                  followUpTo,
+                  // LIN-1376: stamp the launching account (ignored on a declared
+                  // resume, where the recorded owner is the authority).
+                  createdBy: req.session?.accountId || null,
+                  prompt,
+                  mint: shouldUseMcpTokenField(resolvedHarness),
+                  attach: wantProxyContext
+                    ? {
+                        issueIdentifier: issueIdentifier || null,
+                        prompt,
+                        providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
+                        providerUi: getProvider(workspace.provider)?.ui ?? null
+                      }
+                    : null
+                });
+                // LIN-1162's "surface, don't silently drop" check (see the launch
+                // attach below) applies to the attach-mode result: same condition,
+                // same error.
+                if (wantProxyContext && resumed.prompt === prompt) {
+                  const err = new Error('proxy context requested but could not be attached');
+                  err.proxyAttachFailed = true;
+                  throw err;
+                }
+                return resumed;
+              }
+            }
+          : wantProxyContext
           ? {
               finalizePrompt: async (resolvedHarness) => {
                 const attached = await attachProxyContext({
@@ -521,44 +566,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
                 return attached;
               }
             }
-          : wantFollowUpProvisioning
-            ? {
-                // LIN-1431 S3 #1: provision WITHOUT appending prose — S1's shape at
-                // routes/proxy.js's dispatch seam. The `shouldUseMcpTokenField` guard
-                // is load-bearing, not decorative: provisionBootstrapToken returns the
-                // minted token for prose harnesses too, and a prose-path token has no
-                // channel to reach the worker (the prompt is untouched here), so
-                // minting one would put an unreferenceable credential on the item.
-                //
-                // Keying on the RESOLVED harness is what preserves LIN-1111: a blank
-                // harness resolves to null here (applyDefaultHarness:false, and
-                // beat 1's anchor inheritance yields null for a blank anchor), and
-                // shouldUseMcpTokenField(null) is false — so a blank-harness reply
-                // takes the null branch below, exactly as before this change.
-                //
-                // Fail-closed comes for free and matches LIN-1162/LIN-525: in MCP mode
-                // provisionBootstrapToken THROWS with err.proxyAttachFailed on any
-                // inability to mint, createDispatchItem propagates it before addItem,
-                // and this route's catch already maps that flag to a transient 503.
-                // The server attaches or throws — it never silently drops.
-                finalizePrompt: async (resolvedHarness) => {
-                  if (shouldUseMcpTokenField(resolvedHarness)) {
-                    const bootstrapToken = await provisionBootstrapToken({
-                      proxyTokenStore,
-                      urlKey: workspace.urlKey,
-                      baseUrl,
-                      label: 'dispatch-bootstrap',
-                      harness: resolvedHarness,
-                      // LIN-1376: stamp the launching account, same as the
-                      // attachProxyContext branch above.
-                      createdBy: req.session?.accountId || null
-                    });
-                    return { prompt, bootstrapToken };
-                  }
-                  return { prompt, bootstrapToken: null };
-                }
-              }
-            : { prompt }),
+          : { prompt }),
         fields: {
           promptName: promptName || 'Prompt',
           issueId: issueId || null,
@@ -689,6 +697,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // NEVER as a success: no item was enqueued (the throw fired before addItem).
       if (err && err.proxyAttachFailed) {
         return serviceUnavailable.json(res, 'Proxy context was requested but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+      }
+      // A declared resume whose grant cannot be re-issued (LIN-3134): relay the
+      // coded refusal's own status and code rather than the generic 500 below.
+      if (isStructuralGrantRefusal(err)) {
+        return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
       }
       // Terminal-anchor refusal (LIN-2775 Area 8): same tagged-throw relay
       // convention as the duplicate/budget guards above — the body was

@@ -45,6 +45,7 @@ function buildApp(captured, opts = {}) {
   app.use(express.json());
   app.use(createDispatchRoutes({
     dispatchQueueStore: {
+      getGrantDeclaration: async () => ({ state: 'none' }),
       addItem: async (urlKey, item) => {
         captured.item = item;
         return { _id: 'disp-1', dispatchedAt: '2026-07-09T00:00:00.000Z', ...item };
