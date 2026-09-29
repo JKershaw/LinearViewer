@@ -60,7 +60,7 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess } from './lib/connection-credential.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader } from './lib/connection-credential.js'
 import { isConnectionBacked, activeBindingIsConnectionBacked, readWorkspaceCredential } from './lib/connection-binding.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
@@ -777,7 +777,10 @@ scheduler.register({
     accountStore,
     ownerCredentialStore,
     lifecycleEventStore: credentialLifecycleEventStore,
-    sessionsCollection
+    sessionsCollection,
+    // LIN-3124 PR3 (D3): connection rows + connection-keyed records, built in
+    // the seam so the sweep imports no store.
+    loadConnectionData: createSweepConnectionDataLoader({ connectionStore, ownerCredentialStore }),
   })
 // Same discipline as observer-sweep's own registration above: not awaited
 // (a failed seed write must not abort server boot), with a purpose-written
