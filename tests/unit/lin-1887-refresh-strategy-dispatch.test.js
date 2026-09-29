@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
-import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
+import { removeWorkspace, normalizeProvider, getWorkspaceTokenExpiry } from '../../lib/workspace.js';
 import { serviceUnavailable } from '../../lib/errors.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, refreshStrategyFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
@@ -114,6 +114,9 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     // refreshOwnerCredential above, never on lifecycle-event recording.
     credentialLifecycleEventStore: { recordEvent: async () => {} },
     getActiveWorkspace: () => workspace,
+    // LIN-3124 PR1 (S0): the real ensureValidToken source now reads the raw
+    // expiry mirror through this free identifier; bind the genuine accessor.
+    getWorkspaceTokenExpiry,
     TOKEN_REFRESH_BUFFER_MS: 5 * 60 * 1000,
     // LIN-2110: ensureValidToken's real source now guards its OAUTH_REFRESH
     // arm with these two free identifiers. REAL implementations (same
