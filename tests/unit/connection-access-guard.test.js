@@ -309,7 +309,8 @@ function decoyLaneOffenders(sources) {
   const serverSrc = sources.get('server.js') || '';
   const offenders = [];
   for (const { lane, accessor } of DECOY_LANES) {
-    const present = workspaceSrc.includes(`function ${accessor}`) || serverSrc.includes(`function ${accessor}`);
+    const re = new RegExp(`\\bfunction\\s+${accessor}\\s*\\(`);
+    const present = re.test(workspaceSrc) || re.test(serverSrc);
     if (!present) offenders.push(`${lane}: accessor ${accessor} is missing`);
   }
   return offenders;
@@ -323,6 +324,12 @@ describe('LIN-3124 PR1 T4 — decoy lane registry (static)', () => {
   test('planted: dropping a lane accessor fails the registry', () => {
     const dropped = new Map(REAL);
     dropped.set('lib/workspace.js', REAL.get('lib/workspace.js').replace('export function getWorkspaceCallScope(', 'function removedCallScope('));
+    assert.ok(decoyLaneOffenders(dropped).length > 0);
+  });
+
+  test('planted: dropping getWorkspaceToken fails even though getWorkspaceTokenExpiry exists', () => {
+    const dropped = new Map(REAL);
+    dropped.set('lib/workspace.js', REAL.get('lib/workspace.js').replace('export function getWorkspaceToken(', 'function removedWsTok('));
     assert.ok(decoyLaneOffenders(dropped).length > 0);
   });
 });
