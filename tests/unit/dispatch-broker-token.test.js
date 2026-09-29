@@ -242,3 +242,42 @@ describe('LIN-1448 — DISPATCH_OWNERLESS_BROKER_COMPAT gates the ownerless lane
     assert.match(hit, /legacy/, 'names the offending token label so the operator knows WHICH token to re-issue');
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIN-3135 (R2) — the no-itemId request stays byte-identical.
+//
+// R2 adds an optional JSON `itemId` body to this route. Old Simple Dispatcher
+// sends no body at all, and nothing above ever sent one, so a regression in the
+// absent-id path would be silent here. These pin the exact mint options and the
+// exact response for that request (the declared branch is covered in
+// lin-3135-broker-refire-declared.test.js).
+// ---------------------------------------------------------------------------
+
+describe('LIN-3135 — no itemId: byte-identical grant-less mint', () => {
+  function recordingStore(captured) {
+    return {
+      createToken: async (urlKey, options) => {
+        captured.push({ urlKey, options });
+        return { token: 'minted-bootstrap', expiresAt: '2026-07-20T00:00:00.000Z' };
+      }
+    };
+  }
+
+  for (const [token, createdBy] of [['good-token', 'account-A'], ['no-owner-token', null]]) {
+    test(`${token}, no body -> exact createToken options and exactly {token, expiresAt}`, async () => {
+      const captured = [];
+      const res = await call(buildApp({ proxyTokenStore: recordingStore(captured) }), PATH, token);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.deepEqual(res.body, { token: 'minted-bootstrap', expiresAt: '2026-07-20T00:00:00.000Z' });
+      assert.equal(captured.length, 1);
+      assert.equal(captured[0].urlKey, 'acme');
+      assert.deepEqual(captured[0].options, {
+        kind: 'bootstrap',
+        scope: 'readWrite',
+        label: 'refire-broker',
+        ttl: 172800,
+        createdBy
+      });
+    });
+  }
+});

@@ -404,6 +404,7 @@ const MINT_SITE_TABLE = [
   { key: 'routes/flight-companion.js | POST /workspace/:urlKey/api/flight-companion/approve-follow-up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'approve-follow-up: a follow-up by construction' },
   { key: 'lib/chat-tools.js | tool send_follow_up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'send_follow_up: a follow-up by construction' },
   { key: 'lib/wake-credential.js | function buildWakeCredentialProvisioner | - | provisionResumeCredential', count: 1, cls: 'wake-helper', reason: 'the wake (Class F eleventh member)' },
+  { key: 'routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential', count: 1, cls: 'refire-helper', reason: 'declared refire re-mint, R2 (LIN-3135)' },
   { key: `${KICKOFF} [kind: 'autopilot'] | launch | attachProxyContext`, count: 1, cls: 'launch-M1', reason: 'kickoff launch: T3/T2c, out of T2' },
   { key: `${SESSION} | launch | attachProxyContext`, count: 1, cls: 'launch-M2', reason: 'session route launch attach, after the gate' },
   { key: `${PD_DISPATCH} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'POST /dispatch launch attach, after the gate' },
@@ -544,10 +545,11 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
     assert.deepEqual(censusClassification(PRODUCTION), []);
   });
 
-  test('C3 class set: followup-helper 6 calls / 10 branches, wake 1, M1 1, M2 1, M3 3, M4 1, leaf 3, internal 5', () => {
+  test('C3 class set: followup-helper 6 calls / 10 branches, wake 1, refire 1, M1 1, M2 1, M3 3, M4 1, leaf 3, internal 5', () => {
     assert.deepEqual(classSet(), {
       'followup-helper': { calls: 6, branches: 10 },
       'wake-helper': { calls: 1, branches: 1 },
+      'refire-helper': { calls: 1, branches: 1 },
       'launch-M1': { calls: 1, branches: 1 },
       'launch-M2': { calls: 1, branches: 1 },
       'launch-M3': { calls: 3, branches: 3 },
@@ -578,6 +580,112 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
   test('mutation 5: a new unlisted mint site fails', () => {
     const mutated = [...PRODUCTION, { file: 'routes/new-mint.js', src: "router.post('/api/new-mint', async () => { await provisionBootstrapToken({ proxyTokenStore }); });" }];
     assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site: routes/new-mint.js')));
+  });
+});
+
+// ── LIN-3135 (R2): the broker route's inline mint stays grant-less ───────────
+// `MINT_FNS` sees the route's `provisionResumeCredential(` (the refire-helper
+// row above) but not its inline `proxyTokenStore.createToken(` — today's
+// grant-less mint for no itemId / none / row-missing. This witness pins that
+// mint's shape, that the route never calls `mintGrantBootstrap(` directly, and
+// that the helper call reads the record itself (ruling
+// lin3135-f3c4-census-conflict = helper-lookup: no route holds the record).
+
+const BROKER_ROUTE = "router.post('/api/dispatch/broker-token'";
+const BROKER_CREATE_TOKEN_KEYS = ['kind', 'scope', 'label', 'ttl', 'createdBy'];
+
+/** Depth-1 property names of the object literal spanning [objOpen, objClose]. */
+function topLevelKeys(masked, objOpen, objClose) {
+  const keys = [];
+  let depth = 0;
+  let expectKey = false;
+  for (let k = objOpen; k <= objClose; k++) {
+    const c = masked[k];
+    if ('({['.includes(c)) { depth++; if (depth === 1) expectKey = true; continue; }
+    if (')}]'.includes(c)) { depth--; continue; }
+    if (depth !== 1) continue;
+    if (c === ',') { expectKey = true; continue; }
+    if (expectKey && /[A-Za-z_$]/.test(c)) {
+      const m = /^[A-Za-z_$][\w$]*/.exec(masked.slice(k));
+      keys.push(m[0]);
+      k += m[0].length - 1;
+      expectKey = false;
+    }
+  }
+  return keys;
+}
+
+/** Violations of the broker-route mint shape in routes/dispatch.js; empty when clean. */
+function brokerRouteWitness(files) {
+  const v = [];
+  const file = files.find(f => f.file === 'routes/dispatch.js');
+  if (!file) return ['routes/dispatch.js not found'];
+  const { src } = file;
+  const masked = maskSource(src);
+  if (masked.includes('mintGrantBootstrap(')) v.push('routes/dispatch.js calls mintGrantBootstrap( directly');
+  const start = src.indexOf(BROKER_ROUTE);
+  if (start < 0) return [...v, 'broker-token route not found'];
+  const end = matchClose(masked, start + 'router.post'.length);
+
+  const creates = indicesOf(masked, 'proxyTokenStore.createToken(', start, end);
+  if (creates.length !== 1) v.push(`broker route: expected 1 inline createToken, found ${creates.length}`);
+  for (const idx of creates) {
+    const objOpen = masked.indexOf('{', idx);
+    const keys = topLevelKeys(masked, objOpen, matchClose(masked, objOpen));
+    if (JSON.stringify(keys) !== JSON.stringify(BROKER_CREATE_TOKEN_KEYS)) {
+      v.push(`broker route: inline createToken keys ${JSON.stringify(keys)}, expected ${JSON.stringify(BROKER_CREATE_TOKEN_KEYS)}`);
+    }
+  }
+
+  const helpers = indicesOf(masked, 'provisionResumeCredential(', start, end);
+  if (helpers.length !== 1) v.push(`broker route: expected 1 provisionResumeCredential call, found ${helpers.length}`);
+  for (const idx of helpers) {
+    const objOpen = masked.indexOf('{', idx);
+    const objClose = matchClose(masked, objOpen);
+    const keys = topLevelKeys(masked, objOpen, objClose);
+    for (const forbidden of ['grantDeclaration', 'declaredGrants', 'grantOwnerAccountId', 'attach']) {
+      if (keys.includes(forbidden)) v.push(`broker route: helper call passes ${forbidden}`);
+    }
+    for (const [name, text] of [['dispatchStore', 'dispatchStore: dispatchQueueStore'], ['followUpTo', 'followUpTo: itemId'], ['urlKey', 'urlKey: req.dispatchUrlKey'], ['label', "label: 'refire-broker'"]]) {
+      const prop = topLevelProp(masked, src, objOpen, objClose, name);
+      if (!prop || prop.text !== text) v.push(`broker route: helper call ${name} is ${prop ? prop.text : 'absent'}, expected ${text}`);
+    }
+  }
+  return v;
+}
+
+const BROKER_CREATED_BY = '        createdBy: req.dispatchTokenOwner\n      });';
+const BROKER_HELPER_CALL = '          resumed = await provisionResumeCredential({';
+
+describe('LIN-3135 (R2) — the broker route: helper re-mint listed, inline mint grant-less', () => {
+  test('one grant-less inline createToken {kind, scope, label, ttl, createdBy}, one helper call reading the record itself, no direct mintGrantBootstrap', () => {
+    assert.deepEqual(brokerRouteWitness(PRODUCTION), []);
+  });
+
+  test('mutation: grants planted on the inline createToken fails the witness', () => {
+    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_CREATED_BY, "        createdBy: req.dispatchTokenOwner,\n        grants: ['dispatch']\n      });"));
+    assert.ok(brokerRouteWitness(mutated).some(m => m.includes('inline createToken keys')));
+  });
+
+  test('mutation: the record passed into the helper (grantDeclaration) fails the witness', () => {
+    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, `${BROKER_HELPER_CALL}\n            grantDeclaration: lookup.record,`));
+    assert.ok(brokerRouteWitness(mutated).includes('broker route: helper call passes grantDeclaration'));
+  });
+
+  test('mutation: a second helper call in the route fails the census (count drift) and the witness', () => {
+    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, `          await provisionResumeCredential({ proxyTokenStore, dispatchStore: dispatchQueueStore, urlKey: req.dispatchUrlKey, followUpTo: itemId });\n${BROKER_HELPER_CALL}`));
+    assert.ok(censusClassification(mutated).includes('count drift: routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential expected x1, found x2'));
+    assert.ok(brokerRouteWitness(mutated).some(m => m.includes('expected 1 provisionResumeCredential call, found 2')));
+  });
+
+  test('mutation: the helper call removed fails the census (stale refire-helper row)', () => {
+    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, '          resumed = await Promise.resolve({'));
+    assert.ok(censusClassification(mutated).includes('stale table entry: routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential'));
+  });
+
+  test('mutation: a direct mintGrantBootstrap( in routes/dispatch.js fails the witness', () => {
+    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, `          await proxyTokenStore.mintGrantBootstrap({});\n${BROKER_HELPER_CALL}`));
+    assert.ok(brokerRouteWitness(mutated).includes('routes/dispatch.js calls mintGrantBootstrap( directly'));
   });
 });
 

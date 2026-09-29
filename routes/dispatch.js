@@ -42,6 +42,7 @@ import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
+import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -1465,6 +1466,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * now reports `hasOwner` so "are any ownerless tokens still live?" is answerable),
    * then (2) set DISPATCH_OWNERLESS_BROKER_COMPAT=off to restore strict minting.
    * Default stays compat-ON precisely so part 2 cannot take effect before part 1.
+   *
+   * LIN-3135 (R2) — DECLARED REFIRE. An optional JSON body `{ itemId }` names the
+   * refired row. With a declaration record on that row, and only when the caller
+   * is the recorded owner's own token (B1) AND the taker of the live, non-terminal
+   * row (B2), the bootstrap is re-minted through provisionResumeCredential from
+   * the RECORDED owner/workspace/grants, and the response is `{ token }` (no
+   * `expiresAt`). A bound failure is a coded 403 REFIRE_CALLER_NOT_PERMITTED; a
+   * lookup fault is a 503; structural grant refusals are relayed — never a plain
+   * mint. No `itemId`, or a row with no record, keeps the grant-less mint below.
+   * The ownerless lanes above still run first.
    */
   router.post('/api/dispatch/broker-token', authenticateDispatchToken, async (req, res) => {
     if (req.dispatchTokenOwner === null) {
@@ -1494,6 +1505,107 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
     if (!proxyTokenStore) {
       return serviceUnavailable.json(res, 'Broker token minting is not configured');
+    }
+
+    // LIN-3135 (R2): an optional JSON `itemId` names the refired row. Absent →
+    // today's inline mint below, untouched, with no store read. Present → look
+    // the declaration up first, then branch: a record re-mints declared from the
+    // RECORDED authority behind the caller bound, never falling back to plain;
+    // `none` / `row-missing` fall through to today's grant-less mint.
+    const itemId = req.body?.itemId;
+    if (itemId !== undefined) {
+      // Present but malformed fails closed rather than falling back.
+      if (typeof itemId !== 'string' || !UUID_REGEX.test(itemId)) {
+        return badRequest.json(res, 'Invalid item ID format');
+      }
+
+      let lookup;
+      try {
+        // urlKey from the dispatch token, never the body.
+        lookup = await dispatchQueueStore.getGrantDeclaration(req.dispatchUrlKey, itemId);
+      } catch {
+        // The store already logged the fault (ids only). Never a fallback mint.
+        return serviceUnavailable.json(res, 'Could not read the item\'s grant declaration; retry');
+      }
+
+      if (lookup?.state === 'record') {
+        // One generic body for every reason, so the response never says which
+        // condition failed; the reason goes to the server log only.
+        const refuse = (reason) => {
+          console.warn('[dispatch] broker-declared-remint-refused', { urlKey: req.dispatchUrlKey, itemId, reason });
+          return jsonError(res, 403, 'Caller may not re-mint the declared credential for this item', {
+            code: 'REFIRE_CALLER_NOT_PERMITTED',
+            retryable: false
+          });
+        };
+
+        // B1 (authority): the caller's dispatch token was created by the
+        // RECORDED owner's own session. It gates only — the mint owner stays the
+        // recorded one. An ownerless record has no owner to compare, so B1 is
+        // skipped and the helper refuses it GRANT_OWNERLESS below (B2 still
+        // applies first).
+        const recordedOwner = lookup.record?.ownerAccountId;
+        if (typeof recordedOwner === 'string' && recordedOwner.trim() !== ''
+          && req.dispatchTokenOwner !== recordedOwner) {
+          return refuse('owner-mismatch');
+        }
+
+        // B2 (session binding): this caller took the row and it is still live on
+        // its own feedback — the addFeedback ownership precedent, as a read.
+        // getItemStatus swallows read faults into null, so a fault refuses here.
+        let row = null;
+        try {
+          row = await dispatchQueueStore.getItemStatus(req.dispatchUrlKey, itemId);
+        } catch {
+          row = null;
+        }
+        if (!row) return refuse('status-unreadable');
+        if (row.status === 'expired' || row.status === 'cancelled') return refuse('terminal');
+        if (row.status !== 'taken' || !req.dispatchTokenLabel || row.takenByTokenLabel !== req.dispatchTokenLabel) {
+          return refuse('not-taker');
+        }
+        if (deriveTerminalStatus(row.feedback) !== null) return refuse('terminal');
+
+        // Both hold: re-mint through the T2 helper, which re-reads the record
+        // itself (the sibling follow-up arms' form, so no route ever holds the
+        // record) and mints from the RECORDED owner/workspace/grants. `createdBy`
+        // is ignored on that declared branch; it is passed only for the window
+        // where the row vanished between the two reads, where the helper's plain
+        // path then mints exactly today's grant-less bootstrap for this caller —
+        // never an ownerless one, and never claiming to be declared.
+        const baseUrl = `${req.protocol}://${req.get('host')}`;
+        let resumed;
+        try {
+          resumed = await provisionResumeCredential({
+            proxyTokenStore,
+            dispatchStore: dispatchQueueStore,
+            urlKey: req.dispatchUrlKey,
+            baseUrl,
+            label: 'refire-broker',
+            harness: 'claude-code',
+            followUpTo: itemId,
+            createdBy: req.dispatchTokenOwner,
+            prompt: null
+          });
+        } catch (err) {
+          if (isStructuralGrantRefusal(err)) {
+            return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
+          }
+          console.error('Broker-token declared re-mint failed:', err?.code || err?.message);
+          if (err?.code === 'OWNER_CHECK_UNAVAILABLE' || err?.proxyAttachFailed) {
+            return serviceUnavailable.json(res, 'Could not re-mint the declared broker token; retry');
+          }
+          return serviceUnavailable.json(res, 'Could not mint a broker bootstrap token');
+        }
+
+        if (!resumed?.bootstrapToken) {
+          return serviceUnavailable.json(res, 'Could not mint a broker bootstrap token');
+        }
+
+        // `expiresAt` is omitted on this branch: the helper does not return it
+        // and a derived value would be a second source of truth.
+        return res.status(201).json({ token: resumed.bootstrapToken });
+      }
     }
 
     let minted;
