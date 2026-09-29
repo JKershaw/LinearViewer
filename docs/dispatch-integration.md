@@ -286,6 +286,71 @@ your tokens still need re-issuing — an ownerless one is also flagged on the Di
 Callers should treat any non-2xx response from this endpoint as "mint failed" and fall back to
 their own degraded-but-safe behavior.
 
+#### Declared refire: the optional `itemId` body (LIN-3135)
+
+A session launched as a declared orchestrator carries a server-written grant declaration on its
+dispatch row, and its bootstrap carries the `dispatch` grant. A refire that mints a plain
+bootstrap would come back grant-less. To re-mint the declared credential, send the id of the
+session's **current live row**:
+
+```
+POST /api/dispatch/broker-token
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "itemId": "550e8400-e29b-41d4-a716-446655440000" }
+```
+
+`itemId` is the only input the server reads from the body. Anything else in it (`grants`,
+`declaredGrants`, an owner, a `urlKey`, a verb) is ignored. The workspace always comes from the
+dispatch token, and the grants, owner and workspace always come from the stored declaration.
+
+| Request | Outcome |
+| --- | --- |
+| No body, or no `itemId` (today's callers) | `201 { token, expiresAt }`: the grant-less mint above, byte-for-byte unchanged, and no store read |
+| `itemId` for a row with no declaration, or a row not found in this workspace | `201 { token, expiresAt }`: the same grant-less mint, for any caller |
+| `itemId` for a declared row, caller bound satisfied | `201 { token }`: a bootstrap minted from the **recorded** owner, workspace and grants (`worker` lifetime profile). `expiresAt` is omitted on this branch |
+| `itemId` present but not a UUID string (`null`, `""`, a number, an object…) | `400 Invalid item ID format`, before any lookup |
+
+**Caller bound.** The declared re-mint happens only when both of these hold:
+
+- **B1:** the calling dispatch token was created by the declaration's recorded owner.
+- **B2:** the caller took that row (`status: taken`, `takenByTokenLabel` equals the calling
+  token's label), and the row has no terminal marker (`[done]`/`[failed]`/`[aborted]`/…) on its
+  own feedback.
+
+A queued, expired or cancelled row, a row another token took, a member's token, and an ownerless
+token all fail the bound. So does an older or terminal row in a follow-up lineage: always send the
+current live row. A bound failure is refused. It never degrades to a grant-less mint that looks
+declared.
+
+**Refusals on the declared branch.** Every one is non-2xx and mints nothing:
+
+| Status | `code` | Cause |
+| --- | --- | --- |
+| `403` | `REFIRE_CALLER_NOT_PERMITTED` | the caller bound failed. One generic body for every reason; the reason (`owner-mismatch`, `not-taker`, `terminal`, `status-unreadable`) is only in the server log `[dispatch] broker-declared-remint-refused` |
+| `403` | `GRANT_OWNER_ONLY` | the recorded owner no longer owns the workspace (ownership changed since launch) |
+| `409` | `WORKSPACE_OWNER_UNSET` | the workspace has no owner |
+| `503` | `GRANT_OWNERLESS` | the stored declaration names no owner (a corrupt record) |
+| `400` | `INVALID_GRANTS` | the stored declaration is otherwise corrupt |
+| `503` | none | the declaration lookup or the owner check failed transiently; retry |
+
+**Precondition: an owner-stamped runner token.** Because of B1, a runner authenticating with an
+**ownerless** dispatch token (see above) can never get a declared refire. Its refire of a declared
+orchestrator stays grant-less until the token is re-issued as owned, the same step as LIN-1448
+part 1.
+
+**Residual window.** The server reads the declaration twice: once to apply the bound, and once
+inside the shared re-mint helper, which mints from what it reads. If the row disappears between
+the two reads, the result is the plain grant-less mint for this caller, never a declared one.
+
+**Interim: refire of an orchestrator needs a fresh launch.** Simple Dispatcher's broker caller
+does not send `itemId` yet (LIN-3135's hand-back to the Simple Dispatcher owner). Until it does,
+every refire through this endpoint is grant-less. A stall-failsafe refire of a declared
+orchestrator therefore comes back without `dispatch` and cannot enqueue children. Launch a fresh
+session instead. Old callers keep working unchanged, and a new caller against an older server
+gets the grant-less mint (the body is ignored), so either side can ship first.
+
 ### Signaling Completion (terminal markers)
 
 A taken item's lifecycle `status` stays `'taken'` while the consumer runs — there is no
