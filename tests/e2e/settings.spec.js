@@ -43,6 +43,15 @@ test.describe('Settings Page', () => {
     await expect(logoutLink).toContainText('logout')
   })
 
+  test('offers the email add affordance in the Account section (LIN-1892 S3-3)', async ({ page }) => {
+    // The Playwright server runs the capture transport, so email sign-in is
+    // available and a local (email-less) account is offered the link-mode add.
+    const add = page.getByTestId('settings-account-add-email')
+    await expect(add).toBeVisible()
+    await expect(add).toContainText('Add email')
+    await expect(add).toHaveAttribute('href', /\/auth\/email\/register\?next=/)
+  })
+
   test('shows workspace dropdown in nav', async ({ page }) => {
     const workspaceToggle = page.locator('#workspace-toggle')
     await expect(workspaceToggle).toBeVisible()

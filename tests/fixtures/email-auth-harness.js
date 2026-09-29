@@ -51,8 +51,9 @@ export const sha256 = value => createHash('sha256').update(value).digest('hex');
  * @param {{ms: number}} [options.storeClock] - drives MagicLinkStore expiry
  * @param {{ms: number}} [options.nonceClock] - drives the routes' nonce ages
  * @param {string|null} [options.linkOrigin] - the configured origin for emailed links
+ * @param {'on'|'off'|'opt-in'} [options.promptStep] - the S3 provider-user prompt gate
  */
-export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null } = {}) {
+export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null, promptStep = 'off' } = {}) {
   const dbDir = mkdtempSync(join(tmpdir(), 'email-auth-harness-'));
   const client = new MangoClient(dbDir);
   await client.connect();
@@ -80,13 +81,18 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
   })));
 
   app.post('/__test/sign-in', async (req, res) => {
-    const { provider, scope, workspaceId, urlKey, staleAuth } = req.body;
+    const { provider, scope, workspaceId, urlKey, staleAuth, isPAT } = req.body;
     const established = await establishAccount(req.session, stores.accountStore, stores.accountWorkspaceStore, provider, scope, {}, workspaceId || null);
     if (workspaceId) {
-      req.session.workspaces = [...(req.session.workspaces || []), { id: workspaceId, urlKey: urlKey || workspaceId, provider }];
+      req.session.workspaces = [...(req.session.workspaces || []), { id: workspaceId, urlKey: urlKey || workspaceId, provider, ...(isPAT ? { isPAT: true } : {}) }];
     }
     if (staleAuth) req.session.identityAuthenticatedAt = 0;
     res.json(established);
+  });
+  // Mirrors routes/test.js's /test/email-prompt-opt-in for the unit harness.
+  app.post('/__test/prompt-opt-in', (req, res) => {
+    req.session.emailPromptOptIn = true;
+    req.session.save(() => res.json({ ok: true }));
   });
   app.get('/__test/session', (req, res) => {
     const { cookie, ...rest } = req.session;
@@ -126,8 +132,14 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
     transport,
     sendLimiter,
     linkOrigin,
+    promptStep,
     ...(nonceClock ? { now: () => nonceClock.ms } : {}),
   }));
+
+  // A sentinel workspace-root route, mounted AFTER the email router so the S3
+  // prompt middleware (inside createEmailAuthRoutes) gets first look. Lets a
+  // test distinguish "the step redirected" from "the request passed through".
+  app.get('/workspace/:urlKey/', (req, res) => res.send('<div data-testid="workspace-root"></div>'));
 
   const server = await new Promise(resolve => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -163,7 +175,9 @@ export class Browser {
 
   request(method, path, { form, headers = {}, cookies = true, timeoutMs = 15000 } = {}) {
     const body = form ? new URLSearchParams(form).toString() : null;
-    const allHeaders = { ...headers };
+    // A real browser sends an HTML Accept; routes that are HTML-only (the S3
+    // prompt middleware) rely on it. Overridable per request.
+    const allHeaders = { Accept: 'text/html', ...headers };
     if (body !== null) {
       allHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
       allHeaders['Content-Length'] = Buffer.byteLength(body);

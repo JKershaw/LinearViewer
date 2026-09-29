@@ -113,6 +113,7 @@ function sha256Hex(value) {
  * @param {import('../lib/email-auth.js').MagicLinkStore} options.magicLinkStore
  * @param {Object|null} options.transport - from createEmailTransport; null = email sign-in off
  * @param {string|null} [options.linkOrigin] - canonical origin for links in emails (required for a Resend transport); null = the request's own (console/capture only)
+ * @param {'on'|'off'|'opt-in'} [options.promptStep='off'] - the S3 provider-user prompt gate (lib/email-availability.js resolvePromptStepMode); the middleware is installed only when transport exists and this isn't 'off'
  * @param {Function} [options.sendLimiter] - defaults to the module-scope per-IP limiter
  * @param {() => number} [options.now] - clock for nonce ages (tests)
  * @returns {Router}
@@ -124,6 +125,7 @@ export function createEmailAuthRoutes({
   magicLinkStore,
   transport,
   linkOrigin = null,
+  promptStep = 'off',
   sendLimiter = emailSendLimiter,
   now = Date.now,
 }) {
@@ -281,6 +283,42 @@ export function createEmailAuthRoutes({
     return `${origin}/auth/email/confirm?t=${token}`;
   }
 
+  // G3 (LIN-1892 S3): the one-time, skippable provider-user email prompt.
+  // Installed ONLY when a transport exists AND the resolver chose a prompting
+  // mode — so a server with no explicit email choice (including Resend keys
+  // without the configured link origin) never installs it and never burns the
+  // one-shot flag. Fires once per session on the workspace root HTML page, and
+  // never blocks the provider flow: any failure falls through to `next()`.
+  if (transport && promptStep !== 'off') {
+    router.use(async (req, res, next) => {
+      try {
+        if (req.method !== 'GET') return next();
+        if (!/^\/workspace\/[^/]+\/?$/.test(req.path)) return next();
+        if (!(req.get('accept') || '').includes('text/html')) return next();
+        if (!req.session?.accountId) return next();
+        if (req.session.emailPrompt !== undefined) return next();
+        // Test mode requires this session's explicit opt-in.
+        if (promptStep === 'opt-in' && req.session.emailPromptOptIn !== true) return next();
+        // A pure PAT session is a single-operator dev mode; skip it.
+        const workspaces = req.session.workspaces || [];
+        if (workspaces.length > 0 && workspaces.every(w => w.isPAT)) return next();
+
+        const account = await accountStore.getAccount(await canonical(req.session.accountId));
+        const hasEmail = (account?.identities || []).some(i => i.provider === 'email');
+        req.session.emailPrompt = hasEmail ? 'done' : 'shown';
+        await saveSession(req.session);
+        if (hasEmail) return next();
+
+        const nextUrl = safeNext(req.originalUrl) || safeNext(req.path) || '/';
+        return res.redirect(`/auth/email/register?next=${encodeURIComponent(nextUrl)}&step=1`);
+      } catch (err) {
+        // Never block the provider flow on the prompt.
+        console.error('[email-auth] provider email prompt failed:', err?.name || 'Error');
+        return next();
+      }
+    });
+  }
+
   router.get('/account', async (req, res) => {
     if (!req.session.accountId) return res.redirect('/');
     // Only the zero-workspace state lives here; `/` takes a session with
@@ -309,10 +347,11 @@ export function createEmailAuthRoutes({
     if (!transport) return unavailable(res);
     if (!req.session.accountId) return res.redirect('/');
     const next = safeNext(req.query?.next);
+    const step = req.query?.step === '1';
     const nonce = mintSendNonce(req.session, now());
     const prefill = await emailPrefill(req.session.accountId);
     await saveSession(req.session);
-    res.send(renderEmailRegisterPage({ nonce, prefill, next }));
+    res.send(renderEmailRegisterPage({ nonce, prefill, next, step }));
   });
 
   // S3-4: the email-only re-proof page. A stale email-only account must be able

@@ -371,6 +371,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     res.json({ to: message.to, subject: message.subject, text: message.text, html: message.html });
   });
 
+  // LIN-1892 S3 (G3): opt THIS session into the provider-user email prompt. The
+  // Playwright server runs the capture transport (promptStep 'opt-in'), so a
+  // spec that wants the step calls this AFTER signing in — provider callbacks'
+  // regenerate() drops non-carried fields.
+  router.all('/test/email-prompt-opt-in', (req, res) => {
+    req.session.emailPromptOptIn = true;
+    req.session.save(() => res.json({ ok: true, emailPromptOptIn: true }));
+  });
+
   // LIN-1892: which account this browser's session is signed in as (or null),
   // so an e2e spec can assert "the same account" rather than assume it.
   router.get('/test/session-account', (req, res) => {
