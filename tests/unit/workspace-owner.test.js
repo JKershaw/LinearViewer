@@ -297,7 +297,7 @@ function createMockCollection() {
       docs = docs.filter(d => !matches(d, query));
       return { deletedCount: before - docs.length };
     },
-    find(query) { return { toArray: async () => docs.filter(d => matches(d || {})) }; },
+    find(query = {}) { return { toArray: async () => docs.filter(d => matches(d, query)) }; },
     _docs: () => docs
   };
 }
