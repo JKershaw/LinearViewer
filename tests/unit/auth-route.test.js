@@ -550,6 +550,57 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(session.oauthIntent, undefined);
   });
 
+  // === LIN-1892 S3-4: the re-auth an email-only live account is offered ===
+  // The arriving provider's own URL re-proves the INCOMING identity (on another
+  // account), not P — so an email-only P gets the email re-proof route. A
+  // provider P keeps the arm's existing URL (characterized below).
+
+  test('S3-4: an email-only stale P on the Linear mode:new conflict arm is offered the working email re-proof', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const emailOnly = await accountStore.createAccount();
+    await accountStore.linkIdentity(emailOnly._id, 'email', 'p@x.io');
+    const other = await accountStore.createAccount();
+    await accountStore.linkIdentity(other._id, 'linear', 'viewer-1', {}); // the arriving identity is elsewhere
+
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({
+      oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' },
+      accountId: emailOnly._id, identityAuthenticatedAt: Date.now() - 60 * 60 * 1000, workspaces: [],
+    });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 409);
+    assert.match(res.body, /data-testid="merge-reauth-required-page"/);
+    assert.match(res.body, /href="\/auth\/email\/reproof"/, 'the working email re-proof, never the arriving provider');
+    assert.doesNotMatch(res.body, /href="\/auth\/email"/);
+    assert.strictEqual(session.pendingMerge, undefined, 'LIN-2233 A1: no offer while P is stale');
+  });
+
+  test('S3-4 characterization: a provider P on the Linear conflict arm keeps the arriving provider re-auth URL', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const providerP = await accountStore.createAccount();
+    await accountStore.linkIdentity(providerP._id, 'linear', 'viewer-self', {});
+    const other = await accountStore.createAccount();
+    await accountStore.linkIdentity(other._id, 'linear', 'viewer-1', {});
+
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({
+      oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' },
+      accountId: providerP._id, identityAuthenticatedAt: Date.now() - 60 * 60 * 1000, workspaces: [],
+    });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 409);
+    assert.match(res.body, /href="\/auth\/linear"/, 'a provider P keeps the arm\'s existing re-auth URL');
+    assert.doesNotMatch(res.body, /href="\/auth\/email\/reproof"/);
+  });
+
   test('add-source success consumes oauthState/oauthIntent (LIN-2499 characterization of the LIN-1351 clear)', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const myAccount = await accountStore.createAccount();

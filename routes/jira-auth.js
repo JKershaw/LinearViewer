@@ -59,7 +59,7 @@ import {
   upsertWorkspace,
 } from '../lib/workspace.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
-import { respondToAccountConflict } from '../lib/account-conflict.js'
+import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-conflict.js'
 import { writeConnection } from '../lib/connection-store.js'
 import { isConnectionBacked } from '../lib/connection-binding.js'
 import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from '../lib/connection-credential.js'
@@ -880,7 +880,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
                 req.session.workspaces = workspacesBeforeLogin
                 return await respondToAccountConflict({
                   req, res, established, workspace, refreshToken, mode: 'new', returnUrlKey: workspace.urlKey,
-                  identityLabel: 'Jira', reauthUrl: '/auth/jira/oauth?mode=new', provider: 'jira'
+                  identityLabel: 'Jira', reauthUrl: await reproofUrlForAccount(accountStore, req.session.accountId, '/auth/jira/oauth?mode=new'), provider: 'jira'
                 })
               }
 

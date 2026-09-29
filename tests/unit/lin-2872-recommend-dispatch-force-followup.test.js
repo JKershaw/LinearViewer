@@ -33,6 +33,7 @@ const FOLLOW_UP_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 // is only installed when a test asks for the duplicate-guard wiring.
 function buildApp(captured, { withDuplicatePrior = false } = {}) {
   const store = {
+    getGrantDeclaration: async () => ({ state: 'none' }),
     addItem: async (urlKey, item) => {
       captured.item = item;
       return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item };

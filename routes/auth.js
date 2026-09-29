@@ -17,7 +17,7 @@ import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
-import { respondToAccountConflict } from '../lib/account-conflict.js'
+import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-conflict.js'
 
 /**
  * Create auth routes with required dependencies.
@@ -277,7 +277,7 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             intent.workspaceUrlKey ||
             (getActiveWorkspace(req.session) || {}).urlKey ||
             workspace.urlKey
-          return respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'add-source', returnUrlKey, identityLabel: 'Linear', reauthUrl: '/auth/linear', provider: 'linear' })
+          return respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'add-source', returnUrlKey, identityLabel: 'Linear', reauthUrl: await reproofUrlForAccount(accountStore, req.session.accountId, '/auth/linear'), provider: 'linear' })
         }
 
         // LIN-3124 PR3 (D2a phase B): a new Linear binding becomes
@@ -408,7 +408,7 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
               // as the add-source branch above. respondToAccountConflict re-adds
               // it only if/when the merge is actually confirmed.
               req.session.workspaces = workspacesBeforeLogin
-              return await respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'new', returnUrlKey: workspace.urlKey, identityLabel: 'Linear', reauthUrl: '/auth/linear', provider: 'linear' })
+              return await respondToAccountConflict({ req, res, established, workspace, refreshToken: data.refresh_token, mode: 'new', returnUrlKey: workspace.urlKey, identityLabel: 'Linear', reauthUrl: await reproofUrlForAccount(accountStore, req.session.accountId, '/auth/linear'), provider: 'linear' })
             }
 
             // LIN-3124 PR3 (D2a phase B): see the add-source arm above.

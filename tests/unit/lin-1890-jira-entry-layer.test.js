@@ -109,11 +109,24 @@ function makeAccountStores() {
     accountStore: {
       async findAccountByIdentity(provider, scope) { return identities.get(`${provider}:${scope}`) ?? null; },
       async createAccount() { return { _id: 'acct-new' }; },
-      async linkIdentity(accountId, provider, scope) { identities.set(`${provider}:${scope}`, { _id: accountId }); return { ok: true }; },
+      async linkIdentity(accountId, provider, scope) { identities.set(`${provider}:${scope}`, { _id: accountId, provider, scope }); return { ok: true }; },
+      async getAccount(accountId) {
+        const ids = [...identities.values()]
+          .filter(v => v._id === accountId)
+          .map(v => ({ provider: v.provider, scope: v.scope, credentials: {} }));
+        return ids.length ? { _id: accountId, identities: ids } : null;
+      },
       async deleteAccount() { return true; },
       // This fake models no merging, so canonicalization is always a no-op —
       // mirrors AccountStore.resolveCanonicalAccountId's no-mergedInto case.
       async resolveCanonicalAccountId(accountId) { return accountId ?? null; },
+      // D2 (LIN-1892 S3 review): the chain-aware email read; with no merging
+      // modelled, the chain is just the account's own email identities.
+      async listEmailIdentities(accountId) {
+        return [...identities.values()]
+          .filter(v => v._id === accountId && v.provider === 'email')
+          .map(v => v.scope);
+      },
     },
     accountWorkspaceStore: { async bindAccountToWorkspace(accountId, workspaceId) { bound.push([accountId, workspaceId]); return true; } },
   };
@@ -584,6 +597,44 @@ describe('LIN-2304 — Jira mode:new regenerate branch reaches the shared merge 
     assert.equal(callback.status, 409)
     assert.match(callback.text, /Sign in again to confirm/)
     assert.strictEqual(session.pendingMerge, undefined, 'no pending merge is offered when the canonical side is not fresh')
+  })
+
+  // === LIN-1892 S3-4: the re-auth an email-only live account is offered ===
+
+  test('S3-4: an email-only stale canonical account on the Jira conflict arm is offered the working email re-proof', async () => {
+    const stores = makeAccountStores()
+    await stores.accountStore.linkIdentity('acct-other', 'jira', MYSELF.accountId)
+    await stores.accountStore.linkIdentity('acct-canonical', 'email', 'p@x.io')
+    const session = makeSession({
+      accountId: 'acct-canonical',
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      workspaces: [],
+    })
+
+    const { callback } = await signInWithJira({ session, stores })
+
+    assert.equal(callback.status, 409)
+    assert.match(callback.text, /data-testid="merge-reauth-required-page"/)
+    assert.match(callback.text, /href="\/auth\/email\/reproof"/, 'the working email re-proof, never the arriving provider')
+    assert.doesNotMatch(callback.text, /href="\/auth\/email"/)
+    assert.strictEqual(session.pendingMerge, undefined, 'LIN-2233 A1: no offer while P is stale')
+  })
+
+  test('S3-4 characterization: a provider canonical account on the Jira conflict arm keeps the arriving provider re-auth URL', async () => {
+    const stores = makeAccountStores()
+    await stores.accountStore.linkIdentity('acct-other', 'jira', MYSELF.accountId)
+    await stores.accountStore.linkIdentity('acct-canonical', 'jira', '557058:canonical-self')
+    const session = makeSession({
+      accountId: 'acct-canonical',
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      workspaces: [],
+    })
+
+    const { callback } = await signInWithJira({ session, stores })
+
+    assert.equal(callback.status, 409)
+    assert.match(callback.text, /href="\/auth\/jira\/oauth\?mode=new"/, 'a provider P keeps the arm\'s existing re-auth URL')
+    assert.doesNotMatch(callback.text, /href="\/auth\/email\/reproof"/)
   })
 
   // Credential-write witness (paired with github-auth.test.js's "writes NO

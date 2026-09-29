@@ -43,6 +43,15 @@ test.describe('Settings Page', () => {
     await expect(logoutLink).toContainText('logout')
   })
 
+  test('offers the email add affordance in the Account section (LIN-1892 S3-3)', async ({ page }) => {
+    // The Playwright server runs the capture transport, so email sign-in is
+    // available and a local (email-less) account is offered the link-mode add.
+    const add = page.getByTestId('settings-account-add-email')
+    await expect(add).toBeVisible()
+    await expect(add).toContainText('Add email')
+    await expect(add).toHaveAttribute('href', /\/auth\/email\/register\?next=/)
+  })
+
   test('shows workspace dropdown in nav', async ({ page }) => {
     const workspaceToggle = page.locator('#workspace-toggle')
     await expect(workspaceToggle).toBeVisible()
@@ -116,6 +125,40 @@ test.describe('Settings Page', () => {
     await setOverrideAndSave('')
     await expect(page.locator('[data-testid="ai-override-row-flight-companion"] select')).toHaveValue('')
   })
+})
+
+// LIN-1892 S3-3 / G3 (round-3): the Settings email surface is threaded from the
+// REAL route (`server.js` `accountEmails`) to the rendered page — not passed in
+// by hand at store+renderer level. The Playwright server runs the capture
+// transport, so a real email sign-in gives the account an email identity; the
+// /test local harness then attaches a workspace to that SAME live account
+// (`establishAccount` links the local identity onto the existing accountId).
+// This is the test the `accountEmails: []` mutant must fail.
+test.describe('Settings account email threading (LIN-1892 S3-3, G3)', () => {
+  test('an account holding an email shows it in Settings and offers no add link', async ({ page, request, seedLocal }) => {
+    const email = `settings-g3-${Date.now()}@example.test`;
+
+    // Sign in by email on the capture transport → an email-only account P.
+    await page.goto('/auth/email');
+    await page.getByTestId('email-signin-address').fill(email);
+    await page.getByTestId('email-signin-submit').click();
+    await expect(page.getByTestId('email-check-inbox')).toBeVisible();
+    const outbox = await request.get(`/test/email-outbox?to=${encodeURIComponent(email)}`);
+    expect(outbox.status()).toBe(200);
+    const message = await outbox.json();
+    const link = message.text.match(/https?:\/\/[^\s]+\/auth\/email\/confirm\?t=[A-Za-z0-9_-]+/)[0];
+    await page.goto(link);
+    await page.getByTestId('email-confirm-submit').click();
+    await expect(page).toHaveURL(/\/account$/);
+
+    // Give the SAME account a workspace: the local harness links its local
+    // identity onto the live accountId rather than replacing the account.
+    const { urlKey } = await seedLocal();
+
+    await page.goto(`/workspace/${urlKey}/settings`);
+    await expect(page.getByTestId('settings-account-emails')).toContainText(email);
+    await expect(page.getByTestId('settings-account-add-email')).toHaveCount(0);
+  });
 })
 
 test.describe('Token Management', () => {

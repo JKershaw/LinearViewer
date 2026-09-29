@@ -102,7 +102,7 @@ import { createEnsurePATSession } from './lib/pat-session.js'
 import { createEmailAuthRoutes, accountHomeRedirect } from './routes/email-auth.js'
 import { createEmailTransport } from './lib/email-transport.js'
 import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
-import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning, isEmailSignInAvailable } from './lib/email-availability.js'
+import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning, isEmailSignInAvailable, resolvePromptStepMode } from './lib/email-availability.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
@@ -1268,7 +1268,7 @@ for (const provider of getAllProviders()) {
 // mounts first).
 app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
 // LIN-1892 S2: the email magic-link door. Every route 503s when emailTransport is null.
-app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin }))
+app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin, promptStep: resolvePromptStepMode(process.env) }))
 app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
@@ -3391,6 +3391,10 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
   // during automated test runs.
   const dispatchModelCatalog = await getModelCatalog({ mock: shouldMockAi(workspace) });
 
+  // S3-3 (LIN-1892): the account's own email identity for the Settings "email"
+  // surface. Read fresh from the store (canonicalised) — never from req.session.
+  const accountEmails = req.session.accountId ? await accountStore.listEmailIdentities(req.session.accountId) : [];
+
   const html = renderSettingsPage(workspace.name || 'Workspace', {
     openRouterConnected: !!(openRouterSource === 'oauth' || openRouterSource === 'env'),
     openRouterSource,
@@ -3413,6 +3417,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     aiModelOverrides,
     aiOverridesError,
     dispatchPresets,
+    accountEmails,
     // Gate the GitHub add affordance on the SAME shared predicate the /auth/github
     // route guard and landing hero use (LIN-761), so the settings page never offers
     // an add that would 503/hang on a server where GitHub isn't fully configured.

@@ -34,10 +34,13 @@ import { ensureIndexes } from '../../lib/db-indexes.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { UserPreferencesStore } from '../../lib/user-preferences.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { ConnectionStore } from '../../lib/connection-store.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { MagicLinkStore, MAGIC_LINK_COLLECTION } from '../../lib/email-auth.js';
 import { createCaptureTransport } from '../../lib/email-transport.js';
 import { createEmailAuthRoutes } from '../../routes/email-auth.js';
+import { createAccountMergeRoutes } from '../../routes/account-merge.js';
 
 export const sha256 = value => createHash('sha256').update(value).digest('hex');
 
@@ -48,8 +51,12 @@ export const sha256 = value => createHash('sha256').update(value).digest('hex');
  * @param {{ms: number}} [options.storeClock] - drives MagicLinkStore expiry
  * @param {{ms: number}} [options.nonceClock] - drives the routes' nonce ages
  * @param {string|null} [options.linkOrigin] - the configured origin for emailed links
+ * @param {'on'|'off'|'opt-in'} [options.promptStep] - the S3 provider-user prompt gate
+ * @param {Function} [options.mount] - optional `(app, stores) => void`, invoked after the
+ *   email router so a test can compose another REAL router (e.g. the Linear OAuth
+ *   callback for the S3-4 end-to-end re-proof witness) over the same real session.
  */
-export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null } = {}) {
+export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null, promptStep = 'off', mount } = {}) {
   const dbDir = mkdtempSync(join(tmpdir(), 'email-auth-harness-'));
   const client = new MangoClient(dbDir);
   await client.connect();
@@ -60,6 +67,8 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
     accountStore: new AccountStore({ collection: db.collection('accounts') }),
     accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
     userPreferencesStore: new UserPreferencesStore({ collection: db.collection('user-preferences') }),
+    ownerCredentialStore: new OwnerCredentialStore({ collection: db.collection('owner-credentials') }),
+    connectionStore: new ConnectionStore({ collection: db.collection('connections') }),
     magicLinkStore: new MagicLinkStore({
       collection: db.collection(MAGIC_LINK_COLLECTION),
       ...(storeClock ? { now: () => new Date(storeClock.ms) } : {}),
@@ -75,26 +84,73 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
   })));
 
   app.post('/__test/sign-in', async (req, res) => {
-    const { provider, scope, workspaceId, urlKey, staleAuth } = req.body;
+    const { provider, scope, workspaceId, urlKey, staleAuth, isPAT, noAuthStamp } = req.body;
     const established = await establishAccount(req.session, stores.accountStore, stores.accountWorkspaceStore, provider, scope, {}, workspaceId || null);
     if (workspaceId) {
-      req.session.workspaces = [...(req.session.workspaces || []), { id: workspaceId, urlKey: urlKey || workspaceId, provider }];
+      req.session.workspaces = [...(req.session.workspaces || []), { id: workspaceId, urlKey: urlKey || workspaceId, provider, ...(isPAT ? { isPAT: true } : {}) }];
     }
     if (staleAuth) req.session.identityAuthenticatedAt = 0;
+    // G4 (LIN-1892 S3): simulate a legacy pre-LIN-2233 session that carries an
+    // accountId with NO freshness stamp, so the D1 stamp-absent restore branch
+    // is reachable in tests.
+    if (noAuthStamp) delete req.session.identityAuthenticatedAt;
     res.json(established);
+  });
+  // Mirrors routes/test.js's /test/email-prompt-opt-in for the unit harness.
+  app.post('/__test/prompt-opt-in', (req, res) => {
+    req.session.emailPromptOptIn = true;
+    req.session.save(() => res.json({ ok: true }));
   });
   app.get('/__test/session', (req, res) => {
     const { cookie, ...rest } = req.session;
     res.json(rest);
   });
 
+  // S3 merge tests: plant a pending merge in this browser's session, exactly
+  // as `respondToAccountConflict` would after a fresh real conflict. `workspace`
+  // is a JSON string or absent/null for the null-workspace (email link) case.
+  app.post('/__test/pending-merge', async (req, res) => {
+    const { canonicalAccountId, mergedAccountId, workspace, provider, mode, returnUrlKey, refreshToken, staleAuth } = req.body;
+    req.session.pendingMerge = {
+      canonicalAccountId,
+      mergedAccountId,
+      workspace: workspace ? JSON.parse(workspace) : null,
+      provider: provider || null,
+      mode: mode || 'new',
+      returnUrlKey: returnUrlKey || null,
+      refreshToken: refreshToken || null,
+      createdAt: Date.now(),
+    };
+    if (staleAuth) req.session.identityAuthenticatedAt = 0;
+    await new Promise(resolve => req.session.save(resolve));
+    res.json({ ok: true });
+  });
+
+  app.use(createAccountMergeRoutes({
+    accountStore: stores.accountStore,
+    accountWorkspaceStore: stores.accountWorkspaceStore,
+    ownerCredentialStore: stores.ownerCredentialStore,
+    userPreferencesStore: stores.userPreferencesStore,
+    connectionStore: stores.connectionStore,
+  }));
+
   app.use(createEmailAuthRoutes({
     ...stores,
     transport,
     sendLimiter,
     linkOrigin,
+    promptStep,
     ...(nonceClock ? { now: () => nonceClock.ms } : {}),
   }));
+
+  // Optional composed router (real session, same stores) — e.g. the Linear
+  // OAuth callback for the S3-4 end-to-end re-proof witness.
+  if (mount) mount(app, stores);
+
+  // A sentinel workspace-root route, mounted AFTER the email router so the S3
+  // prompt middleware (inside createEmailAuthRoutes) gets first look. Lets a
+  // test distinguish "the step redirected" from "the request passed through".
+  app.get('/workspace/:urlKey/', (req, res) => res.send('<div data-testid="workspace-root"></div>'));
 
   const server = await new Promise(resolve => {
     const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -128,9 +184,11 @@ export class Browser {
     return this.cookies.get('connect.sid') || null;
   }
 
-  request(method, path, { form, headers = {}, cookies = true } = {}) {
+  request(method, path, { form, headers = {}, cookies = true, timeoutMs = 15000 } = {}) {
     const body = form ? new URLSearchParams(form).toString() : null;
-    const allHeaders = { ...headers };
+    // A real browser sends an HTML Accept; routes that are HTML-only (the S3
+    // prompt middleware) rely on it. Overridable per request.
+    const allHeaders = { Accept: 'text/html', ...headers };
     if (body !== null) {
       allHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
       allHeaders['Content-Length'] = Buffer.byteLength(body);
@@ -160,6 +218,9 @@ export class Browser {
           });
         });
       });
+      // A route that hangs (e.g. an unhandled rejection inside the handler)
+      // fails the test fast instead of wedging the whole suite.
+      if (timeoutMs) req.setTimeout(timeoutMs, () => req.destroy(new Error(`request timed out after ${timeoutMs}ms: ${method} ${path}`)));
       req.on('error', reject);
       if (body !== null) req.write(body);
       req.end();

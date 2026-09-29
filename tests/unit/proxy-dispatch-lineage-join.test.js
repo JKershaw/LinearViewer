@@ -87,7 +87,7 @@ function buildApp({ queued = [], history = [] } = {}) {
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
-    dispatchQueueStore: { listItems, listHistory },
+    dispatchQueueStore: { getGrantDeclaration: async () => ({ state: 'none' }), listItems, listHistory },
     workspaceFromUrl: (req, res, next) => next(),
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
