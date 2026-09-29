@@ -55,6 +55,8 @@ import {
   abortAction,
   recoverAction,
   watchdogAction,
+  watchdogSweep,
+  canPost,
   sumTranscriptUsage,
   usageMessage,
   subagentModelFor,
@@ -306,6 +308,54 @@ describe('haltAction and haltSweep (Simple Dispatcher\'s halt meaning)', () => {
   });
 });
 
+describe('F2: rows taken under an earlier runner token are never posted to', () => {
+  const OLD = 'sha256:0000000000000000';
+  const CUR = 'sha256:1111111111111111';
+
+  test('canPost: the current token, or a row with no recorded token', () => {
+    assert.equal(canPost({ tokenId: CUR }, CUR), true);
+    assert.equal(canPost({ tokenId: null }, CUR), true);
+    assert.equal(canPost({ tokenId: OLD }, CUR), false);
+    assert.equal(canPost({ tokenId: CUR }, null), false, 'no live token: nothing can be posted');
+  });
+
+  test('haltSweep: an old-token row is stopped and kept, but listed as unposted, not posted', () => {
+    const ledger = ledgerWith([
+      { itemId: K, agentId: 'agent-old', rootItemId: K, state: 'running', tokenId: OLD },
+      { itemId: W1, agentId: 'agent-cur', rootItemId: W1, state: 'running', tokenId: CUR }
+    ]);
+    const sweep = haltSweep({ mode: 'stop' }, ledger, { currentTokenId: CUR });
+    assert.deepEqual(sweep.posts.map((p) => p.itemId), [W1]);
+    assert.deepEqual(sweep.unposted.map((p) => p.itemId), [K]);
+    assert.deepEqual(sweep.stopAgents.sort(), ['agent-cur', 'agent-old']);
+    assert.equal(sweep.ledger.items[K].state, 'stopped');
+  });
+
+  test('abortAction: an old-token target is stopped and acked, but its child post is listed, not made', () => {
+    const ledger = ledgerWith([{ itemId: K, agentId: 'agent-old', rootItemId: K, state: 'running', tokenId: OLD }]);
+    const r = abortAction(item({ id: X, abort: true, abortTo: K, prompt: null }), ledger, { currentTokenId: CUR });
+    assert.equal(r.ack, `[aborted] Cancelled running session ${K.slice(0, 8)} (running).`);
+    assert.equal(r.childPost, null);
+    assert.equal(r.unpostedChild.itemId, K);
+    assert.equal(r.stopAgent, 'agent-old');
+    assert.equal(r.ledger.items[K].state, 'stopped');
+  });
+
+  test('watchdogSweep: an old-token stall is recorded locally with post:false', () => {
+    const now = NOW;
+    const ledger = ledgerWith([
+      { itemId: K, agentId: 'agent-old', rootItemId: K, state: 'running', tokenId: OLD, takenAt: new Date(now - 30 * 60_000).toISOString() },
+      { itemId: W1, agentId: 'agent-cur', rootItemId: W1, state: 'running', tokenId: CUR, takenAt: new Date(now - 30 * 60_000).toISOString() }
+    ]);
+    const r = watchdogSweep(ledger, now, { currentTokenId: CUR, transcriptMtimeFor: () => null });
+    const by = Object.fromEntries(r.actions.map((a) => [a.itemId, a]));
+    assert.equal(by[K].action, 'block');
+    assert.equal(by[K].post, false);
+    assert.equal(by[W1].post, true);
+    assert.ok(r.ledger.items[K].blockedAt, 'the local ledger change is kept');
+  });
+});
+
 describe('resolveFollowUp', () => {
   const ledger = ledgerWith([
     { itemId: K, agentId: 'agent-k', rootItemId: K, state: 'done' },
@@ -451,6 +501,41 @@ describe('watchdogAction', () => {
     assert.equal(r.stop, true);
     assert.match(r.message, /^\[failed\] stalled: subagent agent-k silent for \d+ min$/);
     assert.equal(findTerminalFeedback(fb(r.message)).status, 'failed');
+  });
+  test('F3: a taken row never handed to a subagent is measured from the take and blocked', () => {
+    const r = watchdogAction({ itemId: K, agentId: null, takenAt: new Date(NOW - (WATCHDOG_STALL_MIN + 1) * 60_000).toISOString() }, NOW, opts(WATCHDOG_STALL_MIN + 1));
+    assert.equal(r.action, 'block');
+    assert.equal(r.message, `[blocked] stalled: no subagent took item ${K} (silent for ${WATCHDOG_STALL_MIN + 1} min)`);
+    assert.equal(findWakeEvent(fb(r.message)).marker, 'blocked');
+  });
+  test('F3: … and failed past the fail threshold', () => {
+    const r = watchdogAction({ itemId: K, agentId: null, takenAt: new Date(NOW - 90 * 60_000).toISOString() }, NOW, { transcriptMtime: null });
+    assert.equal(r.action, 'fail');
+    assert.equal(findTerminalFeedback(fb(r.message)).status, 'failed');
+  });
+  test('F3: activity after a [blocked] clears it', () => {
+    const blockedAt = new Date(NOW - 10 * 60_000).toISOString();
+    const r = watchdogAction({ ...inflight, blockedAt }, NOW, opts(1));
+    assert.equal(r.action, 'clear');
+    assert.equal(r.message, null);
+  });
+  test('F3: a second stall after recovering gets a second [blocked]', () => {
+    const blockedAt = new Date(NOW - 60 * 60_000).toISOString();
+    // Active 55 min ago (after the block), silent since.
+    const r = watchdogAction({ ...inflight, blockedAt }, NOW, opts(WATCHDOG_STALL_MIN + 5));
+    assert.equal(r.action, 'block');
+  });
+  test('F3: watchdogSweep covers rows with no agentId and clears blockedAt on activity', () => {
+    const ledger = ledgerWith([
+      { itemId: K, agentId: null, rootItemId: K, state: 'running', tokenId: 't', takenAt: new Date(NOW - 30 * 60_000).toISOString() },
+      { itemId: W1, agentId: 'agent-w', rootItemId: W1, state: 'running', tokenId: 't', takenAt: new Date(NOW - 90 * 60_000).toISOString(), blockedAt: new Date(NOW - 30 * 60_000).toISOString() }
+    ]);
+    const r = watchdogSweep(ledger, NOW, { currentTokenId: 't', transcriptMtimeFor: (row) => (row.agentId === 'agent-w' ? NOW - 60_000 : null) });
+    const by = Object.fromEntries(r.actions.map((a) => [a.itemId, a]));
+    assert.equal(by[K].action, 'block');
+    assert.equal(by[W1].action, 'clear');
+    assert.equal(r.ledger.items[W1].blockedAt, undefined);
+    assert.ok(r.ledger.items[K].blockedAt);
   });
   test('no transcript: silence is measured from the take', () => {
     const r = watchdogAction(inflight, NOW, { stallMin: WATCHDOG_STALL_MIN, failMin: WATCHDOG_FAIL_MIN, transcriptMtime: null });
@@ -1029,6 +1114,63 @@ describe('commands (against a fake Harbour)', () => {
     assert.ok(fresh.fail.includes(it.id));
     const post = harbour.state.feedback.filter((p) => p.itemId === it.id).at(-1);
     assert.deepEqual(post.body, { message: '[failed] runner restarted: subagent lost', kind: 'status', rootItemId: it.id });
+  });
+
+  // F2: after a re-login inside a live session, rows the OLD runner token took
+  // are still running. Harbour refuses the new token's posts on them (the fake
+  // 404s: these ids are not in its history), so a post would throw. Each path
+  // must finish, keep its local ledger change and stop the subagent.
+  const plantOldTokenRow = (over = {}) => {
+    const file = join(home, 'acme', 'ledger.json');
+    const ledger = JSON.parse(readFileSync(file, 'utf8'));
+    const id = randomUUID();
+    ledger.items[id] = {
+      itemId: id, agentId: `agent-old-${id.slice(0, 4)}`, rootItemId: id, state: 'running',
+      tokenId: 'sha256:0000000000000000', session: null, takenAt: new Date().toISOString(), socket: null, ...over
+    };
+    writeFileSync(file, JSON.stringify(ledger));
+    return ledger.items[id];
+  };
+  const ledgerNow = () => JSON.parse(readFileSync(join(home, 'acme', 'ledger.json'), 'utf8'));
+
+  test('F2: a stop halt with an old-token row finishes: stopped locally, listed unposted, not thrown', TIMEOUT, async () => {
+    const row = plantOldTokenRow();
+    const before = harbour.state.feedback.length;
+    harbour.state.halt = { mode: 'stop', setAt: new Date().toISOString(), setBy: OWNER };
+    try {
+      const r = await run(['poll']);
+      assert.ok(r.stopAgents.includes(row.agentId));
+      assert.ok(r.unposted.some((u) => u.itemId === row.itemId));
+      assert.equal(ledgerNow().items[row.itemId].state, 'stopped');
+      assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
+    } finally {
+      harbour.state.halt = null;
+      await run(['poll']);
+    }
+  });
+
+  test('F2: the watchdog in wait records an old-token stall without posting or throwing', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const row = plantOldTokenRow({ takenAt: new Date(Date.now() - (WATCHDOG_STALL_MIN + 2) * 60_000).toISOString() });
+    const before = harbour.state.feedback.length;
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10 });
+    assert.equal(r.reason, 'stall');
+    const mine = r.stalls.find((x) => x.itemId === row.itemId);
+    assert.equal(mine.action, 'block');
+    assert.equal(mine.posted, false);
+    assert.ok(ledgerNow().items[row.itemId].blockedAt);
+    assert.ok(!harbour.state.feedback.slice(before).some((f) => f.itemId === row.itemId));
+  });
+
+  test('F2: an abort of an old-token target acks, stops it, and skips the child post', TIMEOUT, async () => {
+    const row = plantOldTokenRow();
+    const abortRow = harbour.enqueue({ abort: true, abortTo: row.itemId, prompt: null, bootstrapToken: null });
+    await run(['poll']);
+    const r = await run(['take', abortRow.id]);
+    assert.equal(r.abort.stopAgent, row.agentId);
+    assert.equal(r.abort.unpostedChild.itemId, row.itemId);
+    assert.equal(harbour.state.feedback.at(-1).itemId, abortRow.id);
+    assert.equal(ledgerNow().items[row.itemId].state, 'stopped');
   });
 
   test('ledger prints ids and states only', TIMEOUT, async () => {
