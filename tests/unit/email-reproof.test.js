@@ -149,4 +149,30 @@ describe('GET /auth/email/reproof (S3-4)', () => {
     assert.deepStrictEqual(identities, [`email:${email}`], 'no new identity');
     assert.ok((await harness.db.collection('email-magic-links').findOne({ _id: sha256(t) })).consumedAt, 'the re-proof link was consumed');
   });
+
+  // G2 (S3 round-3): pin `primaryEmailForAccount`'s chain read. Reverting it to
+  // a canonical-only lookup makes this page 302 to /account instead. This is the
+  // exact page the S3-1 link-mode conflict sends a stale local P to.
+  test('G2: a local P whose email lives only on merged E still gets the working re-proof page for that address', async () => {
+    const browser = harness.browser();
+    const email = `g2-merged-${Date.now()}@x.io`;
+
+    // P is local-only: no email of its own.
+    const pRes = await browser.post('/__test/sign-in', { provider: 'local', scope: `g2-p-${Date.now()}` });
+    const P = JSON.parse(pRes.text).accountId;
+    assert.ok(P, 'P is established');
+
+    // E owns the address; merge E INTO P. `mergeAccounts` never moves
+    // identities[], so the address is visible only from the chain, not from the
+    // canonical account alone.
+    const E = await harness.stores.accountStore.createAccount();
+    await harness.stores.accountStore.linkIdentity(E._id, 'email', email);
+    assert.strictEqual((await harness.stores.accountStore.mergeAccounts(P, E._id, {})).ok, true, 'E merged into P');
+
+    const page = await browser.get('/auth/email/reproof');
+    assert.strictEqual(page.status, 200, 'the re-proof page renders, not a 302 to /account');
+    assert.match(page.text, /data-testid="email-reproof-page"/);
+    const escaped = email.replace(/[.+*?^${}()|[\]\\]/g, '\\$&');
+    assert.match(page.text, new RegExp(escaped), 'the merged-in address is the re-proof target');
+  });
 });

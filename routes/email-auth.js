@@ -214,20 +214,34 @@ export function createEmailAuthRoutes({
   // S3-1/S3-4: the re-auth target for a stale conflict against the live account
   // P. It must re-prove P, never `/auth/email` — navigating a signed-in session
   // to `/auth/email` only shows "You're signed in" and cannot re-stamp freshness.
-  // Use P's own provider sign-in when it has one (any provider identity,
-  // github-projects included via the `github` identity provider); an email-only
-  // (or local-only) P gets the working email re-proof page, which emails a
-  // sign-in link to an address already on P. Never returns `/auth/email`.
+  // Use P's own provider sign-in when it has one — read across P's WHOLE
+  // mergedInto chain (`mergeAccounts` never moves `identities[]`, so a provider
+  // identity on an account merged into P is invisible to a canonical-only read;
+  // G1 is D2's canonical-versus-chain class applied to the provider read), any
+  // provider identity (github-projects included via the `github` identity
+  // provider). When there is no usable provider sign-in, offer the email
+  // re-proof page ONLY when a chain-aware email identity actually exists
+  // (S3-4), which emails a sign-in link to an address already on P. A genuinely
+  // local-only P has neither, so it gets NO url and no dead-end link. Never
+  // returns `/auth/email`.
   async function linkModeReproof(accountId) {
     try {
-      const account = await accountStore.getAccount(await canonical(accountId));
-      const identity = (account?.identities || []).find(i => i.provider !== 'email' && i.provider !== 'local');
+      const canonicalId = await canonical(accountId);
+      const account = await accountStore.getAccount(canonicalId);
+      const merged = await accountStore.listMergedAccounts(canonicalId);
+      const identity = [account, ...merged]
+        .filter(Boolean)
+        .flatMap(a => a.identities || [])
+        .find(i => i.provider !== 'email' && i.provider !== 'local');
       const href = identity ? getProvider(identity.provider)?.entryCta?.href : null;
       if (href) return { reauthUrl: href, emailOnly: false };
+      // Only a real email identity makes the email re-proof a working offer.
+      const hasEmail = (await accountStore.listEmailIdentities(accountId)).length > 0;
+      if (hasEmail) return { reauthUrl: EMAIL_REPROOF_URL, emailOnly: true };
     } catch (err) {
       console.error('[email-auth] re-proof lookup failed:', err?.name || 'Error');
     }
-    return { reauthUrl: EMAIL_REPROOF_URL, emailOnly: true };
+    return { reauthUrl: null, emailOnly: false };
   }
 
   // S3 link-mode completion: NO regenerate (it is not a new sign-in). The
@@ -259,9 +273,14 @@ export function createEmailAuthRoutes({
       // the user to re-prove P and then request a NEW link (S3-1) — not to
       // `/auth/email`, which cannot re-prove a signed-in session.
       const { reauthUrl, emailOnly } = await linkModeReproof(req.session.accountId);
-      const reauthNote = emailOnly
-        ? 'The email link you opened has been used. Re-prove your account with a sign-in link to your own address, then request a new link to add the address.'
-        : 'The email link you opened has been used. After signing in again, request a new link to add the address.';
+      // A consumed-link note for each reachable state: the email re-proof is the
+      // target, a provider sign-in is the target, or (local-only P) there is no
+      // working re-proof at all — the renderer says so honestly, with no link.
+      const reauthNote = !reauthUrl
+        ? null
+        : emailOnly
+          ? 'The email link you opened has been used. Re-prove your account with a sign-in link to your own address, then request a new link to add the address.'
+          : 'The email link you opened has been used. After signing in again, request a new link to add the address.';
       // A conflict (the address already belongs to another account) shows the
       // merge offer when P is fresh, or this re-proof page when stale. A
       // stale/unresolvable session takes the responder's non-mergeable arm.

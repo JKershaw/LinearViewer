@@ -84,12 +84,16 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
   })));
 
   app.post('/__test/sign-in', async (req, res) => {
-    const { provider, scope, workspaceId, urlKey, staleAuth, isPAT } = req.body;
+    const { provider, scope, workspaceId, urlKey, staleAuth, isPAT, noAuthStamp } = req.body;
     const established = await establishAccount(req.session, stores.accountStore, stores.accountWorkspaceStore, provider, scope, {}, workspaceId || null);
     if (workspaceId) {
       req.session.workspaces = [...(req.session.workspaces || []), { id: workspaceId, urlKey: urlKey || workspaceId, provider, ...(isPAT ? { isPAT: true } : {}) }];
     }
     if (staleAuth) req.session.identityAuthenticatedAt = 0;
+    // G4 (LIN-1892 S3): simulate a legacy pre-LIN-2233 session that carries an
+    // accountId with NO freshness stamp, so the D1 stamp-absent restore branch
+    // is reachable in tests.
+    if (noAuthStamp) delete req.session.identityAuthenticatedAt;
     res.json(established);
   });
   // Mirrors routes/test.js's /test/email-prompt-opt-in for the unit harness.

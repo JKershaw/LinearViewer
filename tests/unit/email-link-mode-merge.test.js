@@ -34,13 +34,14 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
 
   const identities = async accountId => (await harness.stores.accountStore.getAccount(accountId)).identities.map(i => `${i.provider}:${i.scope}`);
 
-  async function signIn(browser, { provider = 'linear', scope, workspaceId, urlKey, staleAuth = false } = {}) {
+  async function signIn(browser, { provider = 'linear', scope, workspaceId, urlKey, staleAuth = false, noAuthStamp = false } = {}) {
     const n = counter++;
     const res = await browser.post('/__test/sign-in', {
       provider,
       scope: scope || `p-${n}`,
       ...(workspaceId ? { workspaceId, urlKey: urlKey || workspaceId } : {}),
       ...(staleAuth ? { staleAuth: '1' } : {}),
+      ...(noAuthStamp ? { noAuthStamp: '1' } : {}),
     });
     return JSON.parse(res.text).accountId;
   }
@@ -193,6 +194,63 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
   });
 
   // ---------------------------------------------------------------------------
+  // G1 (S3 round-3): the re-proof selection is chain-aware for providers and
+  // must not offer a dead-end email re-proof to a truly local-only P.
+  // ---------------------------------------------------------------------------
+  test('G1(b): a stale local P with a provider identity on merged E re-proves via that provider (chain-aware), no merge', async () => {
+    const browser = harness.browser();
+    const scope = `g1b-p-${counter++}`;
+    const P = await signIn(browser, { provider: 'local', scope, workspaceId: 'ws-g1b', urlKey: 'ws-g1b' });
+    // E holds the Linear identity; it is merged INTO P. `mergeAccounts` never
+    // moves identities[], so a canonical-only provider read cannot see it.
+    const E = await harness.stores.accountStore.createAccount();
+    await harness.stores.accountStore.linkIdentity(E._id, 'linear', `g1b-viewer-${counter}`, {});
+    assert.strictEqual((await harness.stores.accountStore.mergeAccounts(P, E._id, {})).ok, true);
+    // A stale P takes the re-auth arm, not the merge offer.
+    await browser.post('/__test/sign-in', { provider: 'local', scope, workspaceId: 'ws-g1b', urlKey: 'ws-g1b', staleAuth: '1' });
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, 0);
+
+    const y = `g1b-owned-${counter}@x.io`;
+    const F = await accountOwningEmail(y);
+    const t = await requestLinkMode(browser, y);
+    const { nonce } = await browser.openConfirm(t);
+    const res = await browser.confirm(t, nonce);
+
+    assert.strictEqual(res.status, 409);
+    assert.match(res.text, /data-testid="merge-reauth-required-page"/);
+    assert.match(res.text, /href="\/auth\/linear"/, 'the provider identity on merged E is found and offered');
+    assert.doesNotMatch(res.text, /href="\/auth\/email\/reproof"/, 'not a dead-end email re-proof');
+    const session = await browser.session();
+    assert.strictEqual(session.pendingMerge, undefined, 'no merge offered while P is stale');
+    assert.strictEqual(session.accountId, P);
+    assert.strictEqual((await harness.stores.accountStore.getAccount(F)).mergedInto, undefined, 'F untouched');
+  });
+
+  test('G1(a): a pure local-only stale P gets honest no-re-proof guidance, never a dead-end email re-proof link', async () => {
+    const browser = harness.browser();
+    const scope = `g1a-p-${counter++}`;
+    const P = await signIn(browser, { provider: 'local', scope, workspaceId: 'ws-g1a', urlKey: 'ws-g1a' });
+    await browser.post('/__test/sign-in', { provider: 'local', scope, workspaceId: 'ws-g1a', urlKey: 'ws-g1a', staleAuth: '1' });
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, 0);
+
+    const y = `g1a-owned-${counter}@x.io`;
+    const F = await accountOwningEmail(y);
+    const t = await requestLinkMode(browser, y);
+    const { nonce } = await browser.openConfirm(t);
+    const res = await browser.confirm(t, nonce);
+
+    assert.strictEqual(res.status, 409);
+    assert.match(res.text, /data-testid="merge-reauth-required-page"/);
+    assert.doesNotMatch(res.text, /href="\/auth\/email\/reproof"/, 'no dead-end re-proof link');
+    assert.doesNotMatch(res.text, /href="\/auth\/email"/, 'never /auth/email');
+    assert.match(res.text, /can't be re-proved here/i, 'honest guidance is rendered');
+    const session = await browser.session();
+    assert.strictEqual(session.pendingMerge, undefined, 'no merge offered');
+    assert.strictEqual(session.accountId, P);
+    assert.strictEqual((await harness.stores.accountStore.getAccount(F)).mergedInto, undefined, 'F untouched');
+  });
+
+  // ---------------------------------------------------------------------------
   // within-window: fresh conflict offers the null-workspace merge, end to end
   // ---------------------------------------------------------------------------
   test('within-window: a fresh link-mode conflict offers the null-workspace merge, and confirm completes it with no workspace writes', async () => {
@@ -299,6 +357,26 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
 
     assert.strictEqual((await browser.session()).identityAuthenticatedAt, before, 'the prior fresh stamp survived the link unchanged');
     assert.deepStrictEqual((await identities(P)).filter(s => s.startsWith('email:')), [`email:${X}`]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // G4 (S3 round-3): D1's stamp-absent branch — a session with no
+  // identityAuthenticatedAt must still have none after a link-mode confirm.
+  // ---------------------------------------------------------------------------
+  test('G4: link mode leaves an ABSENT freshness stamp absent (D1b mutant must fail this)', async () => {
+    const browser = harness.browser();
+    const X = `g4-new-${counter++}@x.io`;
+    const scope = `g4-p-${counter}`;
+    const P = await signIn(browser, { provider: 'linear', scope, workspaceId: 'ws-g4', urlKey: 'ws-g4', noAuthStamp: true });
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, undefined, 'P started with no stamp');
+
+    const t = await requestLinkMode(browser, X);
+    const { nonce } = await browser.openConfirm(t);
+    const res = await browser.confirm(t, nonce);
+
+    assert.strictEqual(res.status, 302, 'the new address links onto the live account');
+    assert.deepStrictEqual((await identities(P)).filter(s => s.startsWith('email:')), [`email:${X}`], 'X is attached to P');
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, undefined, 'link mode did not create a stamp');
   });
 
   // ---------------------------------------------------------------------------
