@@ -165,6 +165,7 @@ function dispatchWatchChanged(baseline, item) {
  * @param {number} deps.RECOMMEND_DESCENT_BUDGET_MS - Shared cross-hop budget for the recommend recursion (module-scope)
  * @param {Function} deps.refuseIfBudgetExhausted - 409s a budget-exhausted dispatch error (closure-local)
  * @param {Function} deps.refuseIfDuplicateDispatch - 409s a duplicate dispatch error (closure-local)
+ * @param {Function} deps.requireGrant - The dispatch grant gate middleware factory (module-scope in routes/proxy.js; declared here, not yet applied)
  * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups F/H)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
@@ -192,6 +193,7 @@ export function createDispatchRoutes({
   RECOMMEND_DESCENT_BUDGET_MS,
   refuseIfBudgetExhausted,
   refuseIfDuplicateDispatch,
+  requireGrant,
   requireWriteScope,
   resolvePromptIssueContext,
   resolveProviderAccess,

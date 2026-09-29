@@ -196,11 +196,15 @@ describe('Half A: mount-completeness census against the real repo', () => {
   // dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore
   // — plus two DEFAULTED, uncounted params (sessionsFeedCache = null,
   // haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS): 137 + 8 = 145.
-  test('the corpus is exactly 12 proxy sub-router files totalling 145 declared deps', () => {
+  //
+  // LIN-3133 (T1): routes/proxy-kickoff.js and routes/proxy-dispatch.js each
+  // declare one more required dep, requireGrant (threaded from the composer's
+  // own closure at their two mounts): 145 + 2 = 147.
+  test('the corpus is exactly 12 proxy sub-router files totalling 147 declared deps', () => {
     const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
     assert.equal(rows.length, 12, `expected 12 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
     const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
-    assert.equal(totalDeps, 145, `expected 145 total required deps across the 12 factories, found ${totalDeps}`);
+    assert.equal(totalDeps, 147, `expected 147 total required deps across the 12 factories, found ${totalDeps}`);
   });
 });
 
