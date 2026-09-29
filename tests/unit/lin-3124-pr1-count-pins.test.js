@@ -121,7 +121,7 @@ const PINS = [
     // owner-scoped provider selection (ownerHeadlessProvider) reads the owner's
     // session row, exactly as D12 specifies. Deliberate growth, not a
     // hand-rolled session scan.
-    expected: 6,
+    expected: 7,
     sources: REAL,
     count: countOffSessionReaders,
     plus: (s) => countOffSessionReaders(withLine(s, 'lib/workspace.js', 'const r = selectOwnerSessionRow(s, u, o);')),

@@ -61,7 +61,7 @@ import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
 import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess } from './lib/connection-credential.js'
-import { isConnectionBacked } from './lib/connection-binding.js'
+import { isConnectionBacked, activeBindingIsConnectionBacked, readWorkspaceCredential } from './lib/connection-binding.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
@@ -2546,7 +2546,22 @@ async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccou
 
 // Thin wrapper preserving the token-only contract for existing callers
 // (routes/test.js). Unchanged behaviour.
-async function getWorkspaceAccessToken(urlKey) {
+async function getWorkspaceAccessToken(urlKey, session = null) {
+  // LIN-3124 PR3 (D16): a caller that HOLDS a session reads that session's own
+  // hydrated connection credential (the same credential the browser lane
+  // serves it), when live — never the owner-blind scan. `UNSCOPED` never
+  // serves a Connection credential, so a caller without a session (or a legacy
+  // workspace) takes the unchanged path below (LIN-1448).
+  if (session) {
+    const workspace = getWorkspaceByUrlKey(session, urlKey);
+    if (workspace && activeBindingIsConnectionBacked(workspace)) {
+      const credentials = readWorkspaceCredential(workspace);
+      if (credentials?.token && typeof credentials.tokenExpiresAt === 'number' && credentials.tokenExpiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+        return credentials.token;
+      }
+      return null;
+    }
+  }
   return (await resolveWorkspaceAccess(urlKey)).token;
 }
 
@@ -2597,7 +2612,9 @@ function clearWorkspaceIssuesMemo() {
 // here; behaviour is byte-identical to the former inline functions.
 const _workspaceTitleResolver = createWorkspaceTitleResolver({
   sessionsCollection,
-  fetchWorkspaceIssues
+  fetchWorkspaceIssues,
+  // LIN-3124 PR3 (D7): the connection-first title arm (owner-scoped, live only).
+  resolveConnectionBackedWorkspace: (args) => connectionAccess.resolveConnectionBackedWorkspace(args),
 });
 
 // Hoisted wrapper so the materializer wiring earlier in source order can reference

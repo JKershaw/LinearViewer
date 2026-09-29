@@ -835,7 +835,7 @@ export function createDashboardRoutes({
    *   extension. Reading live sidesteps that second seam entirely (V1).
    * @returns {Promise<Array<Object>>}
    */
-  async function mergeSessions(workspaces, { live = false } = {}) {
+  async function mergeSessions(workspaces, { live = false, session = null } = {}) {
     // Per-workspace source of the session objects (LIN-623): the durable
     // `observation-sessions` read-model when present, else the live 30-day
     // reconstruction. The read swap changes ONLY where the session objects come
@@ -882,7 +882,7 @@ export function createDashboardRoutes({
     // done-state (LIN-1258/LIN-1259, Axis B) — the only way the collapsed/feed card
     // can reflect a `done-with-warning` without a per-poll Linear read. Mutates the
     // eligible entries' `.payload` in place.
-    await hydrateTouchedTaskDone(built);
+    await hydrateTouchedTaskDone(built, session);
 
     // Descendant recency rollup (LIN-1314): fold each session's transitive
     // child-autopilot sessions' activity into its own `lastActivity` hub field so
@@ -938,7 +938,7 @@ export function createDashboardRoutes({
    * @param {Array<{session: Object, ws: {urlKey: string, name?: string}, payload: Object}>} built
    * @returns {Promise<void>}
    */
-  async function hydrateTouchedTaskDone(built) {
+  async function hydrateTouchedTaskDone(built, session = null) {
     // Eligible = errored-terminal sessions with ≥1 touched task. `payload.status
     // === 'error'` is exactly `terminal && hasError` (deriveSessionStatus: `stale`
     // only holds for non-terminal sessions, and taskDone is false at this point).
@@ -990,7 +990,7 @@ export function createDashboardRoutes({
         budget--;
         try {
           const taskDone = await taskDoneCache.get(key, async () => {
-            const token = await getWorkspaceAccessToken(b.ws.urlKey);
+            const token = await getWorkspaceAccessToken(b.ws.urlKey, session);
             if (!token) return false;
             const context = await fetchIssueContext(token, ident);
             const issue = context?.issue || context || {};
@@ -1429,7 +1429,7 @@ export function createDashboardRoutes({
       // (LIN-1194) rather than colliding on the Autopilot entry.
       const merged = await sessionsFeedCache.get(
         sessionsFeedCache.keyFor(workspaces, isSessionsView ? 'sessions' : undefined),
-        () => mergeSessions(workspaces, { live: isSessionsView })
+        () => mergeSessions(workspaces, { live: isSessionsView, session: req.session })
       );
 
       let active;
@@ -2555,7 +2555,7 @@ export function createDashboardRoutes({
     if (!connected) return res.status(403).json({ error: 'Not connected to that workspace' });
 
     try {
-      const token = await getWorkspaceAccessToken(wsUrlKey);
+      const token = await getWorkspaceAccessToken(wsUrlKey, req.session);
       if (!token) return res.json({ hydrated: false, reason: 'no_token' });
 
       const context = await fetchIssueContext(token, identifier);
