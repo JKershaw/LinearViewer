@@ -54,7 +54,7 @@ describe('connection-store', () => {
   // CS1
   test('null on a missing point read, never throws', async () => {
     const store = freshStore();
-    const result = await store.get('acct-1', 'github', 'install-1');
+    const result = await store.readConnectionByParts('acct-1', 'github', 'install-1');
     assert.strictEqual(result, null);
   });
 
@@ -67,7 +67,7 @@ describe('connection-store', () => {
     const ok = await store.put(accountId, 'github', 'install-1', credentials);
     assert.strictEqual(ok, true);
 
-    const fetched = await store.get(accountId, 'github', 'install-1');
+    const fetched = await store.readConnectionByParts(accountId, 'github', 'install-1');
     assert.ok(fetched, 'record should be retrievable after put');
     assert.strictEqual(fetched._id, `${accountId}::github::install-1`);
     assert.strictEqual(fetched.accountId, accountId);
@@ -89,7 +89,7 @@ describe('connection-store', () => {
     await new Promise(resolve => setTimeout(resolve, 5));
     await store.put(accountId, 'github', 'install-1', { installationId: 'install-1', token: 'tok-2' });
 
-    const fetched = await store.get(accountId, 'github', 'install-1');
+    const fetched = await store.readConnectionByParts(accountId, 'github', 'install-1');
     assert.strictEqual(fetched.credentials.token, 'tok-2', 'the most recent write must win');
 
     const all = await store.collection.find({ accountId, provider: 'github', unitId: 'install-1' }).toArray();
@@ -107,11 +107,11 @@ describe('connection-store', () => {
     await store.put(accountA, 'github', 'install-2', { installationId: 'install-2', token: 'c' });
     await store.put(accountA, 'linear', 'install-1', { token: 'd' });
 
-    assert.strictEqual((await store.get(accountA, 'github', 'install-1')).credentials.token, 'a');
-    assert.strictEqual((await store.get(accountB, 'github', 'install-1')).credentials.token, 'b');
-    assert.strictEqual((await store.get(accountA, 'github', 'install-2')).credentials.token, 'c');
-    assert.strictEqual((await store.get(accountA, 'linear', 'install-1')).credentials.token, 'd');
-    assert.strictEqual(await store.get(accountB, 'github', 'install-2'), null);
+    assert.strictEqual((await store.readConnectionByParts(accountA, 'github', 'install-1')).credentials.token, 'a');
+    assert.strictEqual((await store.readConnectionByParts(accountB, 'github', 'install-1')).credentials.token, 'b');
+    assert.strictEqual((await store.readConnectionByParts(accountA, 'github', 'install-2')).credentials.token, 'c');
+    assert.strictEqual((await store.readConnectionByParts(accountA, 'linear', 'install-1')).credentials.token, 'd');
+    assert.strictEqual(await store.readConnectionByParts(accountB, 'github', 'install-2'), null);
   });
 
   // CS5 — provider normalization (LIN-1887 convention, via normalizeProviderName)
@@ -125,7 +125,7 @@ describe('connection-store', () => {
     // A real provider string (including github-projects) round-trips verbatim.
     const accountId = randomUUID();
     await store.put(accountId, 'github-projects', 'install-1', { installationId: 'install-1', token: 'x' });
-    const fetched = await store.get(accountId, 'github-projects', 'install-1');
+    const fetched = await store.readConnectionByParts(accountId, 'github-projects', 'install-1');
     assert.strictEqual(fetched._id, `${accountId}::github-projects::install-1`);
     assert.strictEqual(fetched.provider, 'github-projects');
   });
@@ -147,7 +147,7 @@ describe('connection-store', () => {
       secret: 'SHOULD-NEVER-LAND'
     });
 
-    const fetched = await store.get(accountId, 'jira', 'https://acme.atlassian.net');
+    const fetched = await store.readConnectionByParts(accountId, 'jira', 'https://acme.atlassian.net');
     assert.deepStrictEqual(fetched.credentials, {
       token: 'tok',
       tokenExpiresAt: 42,
@@ -182,7 +182,7 @@ describe('connection-store', () => {
     const store = new ConnectionStore({ collection: exploding });
 
     assert.strictEqual(await store.put('acct-1', 'github', 'install-1', { token: 'x' }), false);
-    assert.strictEqual(await store.get('acct-1', 'github', 'install-1'), null);
+    assert.strictEqual(await store.readConnectionByParts('acct-1', 'github', 'install-1'), null);
   });
 
   // CS9 — no delete path this ticket (B1 resolution: deletion deferred whole)
