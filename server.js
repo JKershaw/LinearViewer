@@ -139,6 +139,7 @@ import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createShipJourneyRoutes } from './routes/ship-journey.js'
 import { createFlightCompanionRoutes } from './routes/flight-companion.js'
 import { createPassagePlannerRoutes } from './routes/passage-planner.js'
+import { createRunnerSetupRoutes } from './routes/runner-setup.js'
 import { createShipBiscuitRoutes } from './routes/ship-biscuit.js'
 import { yapClientFromEnv } from './lib/yap-client.js'
 import { getLoopsForWorkspace } from './lib/pipeline-loops.js'
@@ -2779,6 +2780,12 @@ app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, get
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
+
+// LIN-3098 S4: the runner setup page, /workspace/:urlKey/runner — the UI mint of
+// the runner credential plus the served runner prompt, phone-usable. Its owner
+// state uses checkWorkspaceOwner (the runner mint's own seam), so the page and
+// the mint can't disagree.
+app.use(createRunnerSetupRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, accountWorkspaceStore, accountStore }))
 
 // Mount live-console routes (experimental ambient "watch the swarm" feed — LIN-1436).
 app.use(createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, dispatchQueueStore, proxyEventStore, getOpenRouterSource, getDeployInfo }))

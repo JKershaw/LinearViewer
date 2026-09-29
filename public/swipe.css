@@ -1303,3 +1303,24 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   color: var(--fg-dim);
   opacity: 0.7;
 }
+
+/* LIN-3098 S4: "run on my machine ›" beside the ladder (not a rung), and the
+   same link inside the dispatch/proxy set-up notices. */
+.opened-task-runner-link,
+.opened-task-setup-runner-link {
+  font-family: var(--font-content);
+  color: var(--blue);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.opened-task-runner-link {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.opened-task-runner-link:hover,
+.opened-task-setup-runner-link:hover {
+  text-decoration: underline;
+}

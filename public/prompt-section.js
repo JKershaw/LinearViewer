@@ -188,6 +188,24 @@
    * not-yet-enabled rung says what it needs (recording that press is LIN-2942,
    * deliberately out of P0).
    */
+  // LIN-3098 S4: the runner setup page, where an owner makes their own Claude
+  // Code session this workspace's runner.
+  function runnerSetupHref(opts) {
+    return `/workspace/${encodeURIComponent(opts.urlKey || '')}/runner`;
+  }
+
+  // LIN-3098 N3: has THIS browser set up a runner for this workspace?
+  // public/runner-setup.js writes the marker after a successful mint. Storage
+  // can throw (private mode, blocked site data), which reads as "no".
+  function runnerMarkerSet(urlKey) {
+    try {
+      const ls = window.localStorage || (typeof localStorage !== 'undefined' ? localStorage : null);
+      return !!ls && ls.getItem(`harbour-runner:${urlKey}`) === '1';
+    } catch {
+      return false;
+    }
+  }
+
   function renderLadder(opts, state) {
     // A rung can only act on a prompt once one exists. `hasResult` distinguishes
     // the fresh state from idle/generating.
@@ -216,7 +234,11 @@
       // Enabled run-step: dispatches the current prompt through the SAME path the
       // dispatch disclosure uses (window.dispatchPrompt, default target cli). The
       // press is not recorded (LIN-2942).
-      rungs.push('<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli">run this step</button>');
+      // LIN-3098 N3: where a runner was set up in this browser (and proxy is on),
+      // THIS rung alone forces workspace API access onto its dispatch, so the
+      // runner's subagent can reach Harbour. Every other caller is unchanged.
+      const force = opts.proxyEnabled && runnerMarkerSet(opts.urlKey) ? ' data-proxy-force="runner"' : '';
+      rungs.push(`<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli"${force}>run this step</button>`);
     } else if (opts.dispatchEnabled) {
       rungs.push(needsPrompt('run-step', 'run this step'));
     } else {
@@ -227,7 +249,12 @@
     } else {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-task" data-action="setup" data-setup-needs="proxy">run the whole task <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
-    return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>`;
+    // LIN-3098 S4: "run on my machine ›" sits BESIDE the ladder, never as a
+    // rung (no data-rung), whenever the proxy flag is on, whatever dispatch says.
+    const runnerLink = opts.proxyEnabled
+      ? `<a class="opened-task-runner-link" href="${esc(runnerSetupHref(opts))}" data-testid="opened-task-runner-link">run on my machine \u203A</a>`
+      : '';
+    return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>${runnerLink}`;
   }
 
   /**
@@ -284,8 +311,14 @@
     return html;
   }
 
-  function setupNoticeHtml(notice) {
-    return notice ? `<div class="opened-task-setup-notice">${esc(notice)}</div>` : '';
+  // LIN-3098 S4: the dispatch and proxy notices also link to the runner setup
+  // page; the text itself is unchanged, and "generate a prompt first" gets no link.
+  function setupNoticeHtml(notice, linkHref) {
+    if (!notice) return '';
+    const link = linkHref
+      ? ` <a class="opened-task-setup-runner-link" href="${esc(linkHref)}" data-testid="opened-task-setup-runner-link">run on my machine \u203A</a>`
+      : '';
+    return `<div class="opened-task-setup-notice">${esc(notice)}${link}</div>`;
   }
 
   /**
@@ -296,7 +329,7 @@
    * into it (N4), so it can never rebuild the prompt body or streamed text.
    */
   function renderSetupNotice(state) {
-    return `<div class="opened-task-notice-slot" data-setup-notice-slot aria-live="polite">${setupNoticeHtml(state.setupNotice)}</div>`;
+    return `<div class="opened-task-notice-slot" data-setup-notice-slot aria-live="polite">${setupNoticeHtml(state.setupNotice, state.setupNoticeLink)}</div>`;
   }
 
   /**
@@ -475,6 +508,7 @@
     function enterPhase(phase) {
       state.phase = phase;
       state.setupNotice = null;
+      state.setupNoticeLink = null;
     }
 
     function render() {
@@ -738,8 +772,9 @@
           : needs === 'prompt'
             ? 'generate a prompt first'
             : 'running the whole task needs the proxy set up';
+        state.setupNoticeLink = needs === 'dispatch' || needs === 'proxy' ? runnerSetupHref(opts) : null;
         const slot = container.querySelector('[data-setup-notice-slot]');
-        if (slot) slot.innerHTML = setupNoticeHtml(state.setupNotice);
+        if (slot) slot.innerHTML = setupNoticeHtml(state.setupNotice, state.setupNoticeLink);
         return;
       }
 
@@ -857,7 +892,9 @@
           model,
           harness,
           // LIN-3079: server-side attach forced for the autopilot result only.
-          proxyForce: !!(state.result && state.result.proxyForce)
+          // LIN-3098 N3: or by the run-step rung, when a runner was set up in
+          // this browser (only that rung carries data-proxy-force="runner").
+          proxyForce: !!(state.result && state.result.proxyForce) || btn.dataset.proxyForce === 'runner'
         });
         btn.textContent = '\u2713';
       } catch {
