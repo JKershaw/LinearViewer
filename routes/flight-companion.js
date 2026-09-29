@@ -91,7 +91,7 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
 import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
+import { shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
 import { dispatchQueueLimiter } from './dispatch.js';
 import { badRequest, unauthorized, notFound, jsonError, serverError } from '../lib/errors.js';
 // LIN-2631 item 2: one shared writer, so LIN-2620's proxy turn does not become
@@ -947,24 +947,25 @@ export function createFlightCompanionRoutes({
         applyDefaultHarness: false,
         prompt,
         // Byte-for-byte mirror of send_follow_up's own finalizePrompt
-        // (lib/chat-tools.js): the shouldUseMcpTokenField guard is
-        // load-bearing (LIN-1431 S3 #2) — minting for a prose harness that
-        // never rewrites the prompt would strand an unreferenceable
-        // credential on the item.
-        finalizePrompt: async (resolvedHarness) => {
-          if (shouldUseMcpTokenField(resolvedHarness)) {
-            const bootstrapToken = await provisionBootstrapToken({
-              proxyTokenStore,
-              urlKey: workspace.urlKey,
-              baseUrl,
-              label: 'dispatch-bootstrap',
-              harness: resolvedHarness,
-              createdBy: dispatchedBy
-            });
-            return { prompt, bootstrapToken };
-          }
-          return { prompt, bootstrapToken: null };
-        },
+        // (lib/chat-tools.js). Always a follow-up (`followUpTo` is derived
+        // server-side), so the whole finalize is the one resume helper
+        // (LIN-3134 T2-ii): the credential comes from the persisted parent
+        // record, declared or plain. `mint` keeps the load-bearing
+        // shouldUseMcpTokenField guard (LIN-1431 S3 #2) — minting for a prose
+        // harness that never rewrites the prompt would strand an
+        // unreferenceable credential on the item.
+        finalizePrompt: (resolvedHarness) => provisionResumeCredential({
+          proxyTokenStore,
+          dispatchStore: dispatchQueueStore,
+          urlKey: workspace.urlKey,
+          baseUrl,
+          label: 'dispatch-bootstrap',
+          harness: resolvedHarness,
+          followUpTo,
+          createdBy: dispatchedBy,
+          prompt,
+          mint: shouldUseMcpTokenField(resolvedHarness)
+        }),
         fields: {
           followUpTo,
           target,
@@ -982,6 +983,17 @@ export function createFlightCompanionRoutes({
       });
     } catch (error) {
       console.error('Flight Companion approve-follow-up error:', error);
+      // LIN-3134 (NB2): only the CODED transient refusal is a retryable 503 —
+      // any other error, including an uncoded mint failure that carries
+      // `proxyAttachFailed`, keeps the 500 below.
+      if (error && error.code === 'OWNER_CHECK_UNAVAILABLE') {
+        return jsonError(res, 503, error.message, { code: error.code, retryable: true });
+      }
+      // A structural refusal is 422, never 403: public/flight-companion.js
+      // treats 403 as flag-off and stops the cadence (LIN-2771).
+      if (isStructuralGrantRefusal(error)) {
+        return jsonError(res, 422, error.message, { code: error.code, retryable: false });
+      }
       serverError.json(res, 'Failed to approve follow-up');
     }
   });

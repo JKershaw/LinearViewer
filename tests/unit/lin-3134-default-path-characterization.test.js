@@ -438,6 +438,7 @@ describe('S0 — POST /api/proxy/dispatch createToken arguments', () => {
       recapCacheStore: { get: async () => null, set: async () => {} },
       briefCacheStore: { get: async () => null, set: async () => {} },
       dispatchQueueStore: {
+        getGrantDeclaration: async () => ({ state: 'none' }),
         addItem: async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }),
         getItemStatus: async () => null,
         listItems: async () => [],
@@ -606,6 +607,7 @@ function proxyApp() {
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
+      getGrantDeclaration: async () => ({ state: 'none' }),
       addItem: async (urlKey, item) => { captured.items.push(item); return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }; },
       getItemStatus: async () => null,
       listItems: async () => [],
@@ -746,6 +748,7 @@ function sessionApp({ anchor = null, proxyTokenStore } = {}) {
   app.use(express.json());
   app.use(createDispatchRoutes({
     dispatchQueueStore: {
+      getGrantDeclaration: async () => ({ state: 'none' }),
       addItem: async (urlKey, item) => { captured.items.push(item); return { _id: 'disp-1', dispatchedAt: '2026-07-09T00:00:00.000Z', ...item }; },
       getItemStatus: async () => anchor
     },
@@ -846,6 +849,7 @@ function fcApp({ anchorStatus = null } = {}) {
     getOpenRouterSource: () => null, getDeployInfo: () => ({}), observerStateStore: null, freeTierStore: null,
     workspacePreferencesStore: null, recapCacheStore: null, briefCacheStore: null,
     dispatchQueueStore: {
+      getGrantDeclaration: async () => ({ state: 'none' }),
       listItems: async () => [],
       listHistory: async () => ({ items: history, total: history.length }),
       getItemStatus: async () => anchorStatus,
@@ -902,6 +906,7 @@ function chatCatalog({ anchorHarness, proxyTokenStore } = {}) {
     },
     scope: 'workspace-token-abc', urlKey: 'ws-key',
     dispatchQueueStore: {
+      getGrantDeclaration: async () => ({ state: 'none' }),
       listItems: async () => [],
       listHistory: async () => { const items = withFreshDigests(history); return { items, total: items.length }; },
       getItemStatus: async () => (anchorHarness !== undefined ? { harness: anchorHarness } : null),
