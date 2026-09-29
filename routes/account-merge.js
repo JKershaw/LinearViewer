@@ -9,6 +9,7 @@ import { Router } from 'express'
 import { renderErrorPage } from '../lib/render-pages.js'
 import { upsertWorkspace, saveSession, persistOwnerCredential } from '../lib/workspace.js'
 import { writeConnection } from '../lib/connection-store.js'
+import { onAccountMerged } from '../lib/connection-lifecycle.js'
 import { isFreshlyAuthenticated, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 
@@ -116,6 +117,11 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     }
 
     const canonicalAccountId = pending.canonicalAccountId
+    // LIN-3124 PR2 (D4/D10): drop the merged account's unreferenced
+    // connection-backed rows and their owner records. A row with referents
+    // stays and keeps resolving; a LIN-3127-born row (no origin) is never
+    // deleted. Inert until PR3 writes connection-backed bindings.
+    await onAccountMerged({ connectionStore, ownerCredentialStore, mergedAccountId: pending.mergedAccountId })
     try {
       upsertWorkspace(req.session, pending.workspace)
     } catch (limitError) {

@@ -101,6 +101,10 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     evictAllWorkspaceTokens: () => { calls.evictAll++; },
     evictWorkspaceToken: () => {},
     evictWorkspaceTokenPair: (_e, urlKey) => { calls.evictions.push(urlKey); },
+    // LIN-3124 PR2: the sliced ensureValidToken/handleUnauthorizedError
+    // reference these free identifiers.
+    connectionStore: {},
+    releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
     ownerCredentialStore: {
       get: async (_a, _u, provider) => { calls.durableGets.push(provider); return durableRecord; },
       delete: async (accountId, urlKey, provider) => { calls.durableDeletes.push([accountId, urlKey, provider]); },
