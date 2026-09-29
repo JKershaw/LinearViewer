@@ -34,10 +34,13 @@ import { ensureIndexes } from '../../lib/db-indexes.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { UserPreferencesStore } from '../../lib/user-preferences.js';
+import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { ConnectionStore } from '../../lib/connection-store.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { MagicLinkStore, MAGIC_LINK_COLLECTION } from '../../lib/email-auth.js';
 import { createCaptureTransport } from '../../lib/email-transport.js';
 import { createEmailAuthRoutes } from '../../routes/email-auth.js';
+import { createAccountMergeRoutes } from '../../routes/account-merge.js';
 
 export const sha256 = value => createHash('sha256').update(value).digest('hex');
 
@@ -60,6 +63,8 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
     accountStore: new AccountStore({ collection: db.collection('accounts') }),
     accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
     userPreferencesStore: new UserPreferencesStore({ collection: db.collection('user-preferences') }),
+    ownerCredentialStore: new OwnerCredentialStore({ collection: db.collection('owner-credentials') }),
+    connectionStore: new ConnectionStore({ collection: db.collection('connections') }),
     magicLinkStore: new MagicLinkStore({
       collection: db.collection(MAGIC_LINK_COLLECTION),
       ...(storeClock ? { now: () => new Date(storeClock.ms) } : {}),
@@ -87,6 +92,34 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
     const { cookie, ...rest } = req.session;
     res.json(rest);
   });
+
+  // S3 merge tests: plant a pending merge in this browser's session, exactly
+  // as `respondToAccountConflict` would after a fresh real conflict. `workspace`
+  // is a JSON string or absent/null for the null-workspace (email link) case.
+  app.post('/__test/pending-merge', async (req, res) => {
+    const { canonicalAccountId, mergedAccountId, workspace, provider, mode, returnUrlKey, refreshToken, staleAuth } = req.body;
+    req.session.pendingMerge = {
+      canonicalAccountId,
+      mergedAccountId,
+      workspace: workspace ? JSON.parse(workspace) : null,
+      provider: provider || null,
+      mode: mode || 'new',
+      returnUrlKey: returnUrlKey || null,
+      refreshToken: refreshToken || null,
+      createdAt: Date.now(),
+    };
+    if (staleAuth) req.session.identityAuthenticatedAt = 0;
+    await new Promise(resolve => req.session.save(resolve));
+    res.json({ ok: true });
+  });
+
+  app.use(createAccountMergeRoutes({
+    accountStore: stores.accountStore,
+    accountWorkspaceStore: stores.accountWorkspaceStore,
+    ownerCredentialStore: stores.ownerCredentialStore,
+    userPreferencesStore: stores.userPreferencesStore,
+    connectionStore: stores.connectionStore,
+  }));
 
   app.use(createEmailAuthRoutes({
     ...stores,
@@ -128,7 +161,7 @@ export class Browser {
     return this.cookies.get('connect.sid') || null;
   }
 
-  request(method, path, { form, headers = {}, cookies = true } = {}) {
+  request(method, path, { form, headers = {}, cookies = true, timeoutMs = 15000 } = {}) {
     const body = form ? new URLSearchParams(form).toString() : null;
     const allHeaders = { ...headers };
     if (body !== null) {
@@ -160,6 +193,9 @@ export class Browser {
           });
         });
       });
+      // A route that hangs (e.g. an unhandled rejection inside the handler)
+      // fails the test fast instead of wedging the whole suite.
+      if (timeoutMs) req.setTimeout(timeoutMs, () => req.destroy(new Error(`request timed out after ${timeoutMs}ms: ${method} ${path}`)));
       req.on('error', reject);
       if (body !== null) req.write(body);
       req.end();

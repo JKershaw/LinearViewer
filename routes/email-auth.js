@@ -55,6 +55,7 @@ import {
   renderEmailUnavailablePage,
 } from '../lib/render-email-auth.js';
 import { renderAccountHomePage } from '../lib/render-account-home.js';
+import { getProvider } from '../lib/providers/index.js';
 
 const WELL_FORMED_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -187,6 +188,25 @@ export function createEmailAuthRoutes({
     }
   }
 
+  // S3-1: the re-auth target for a stale conflict against the live account P.
+  // It must re-prove P, never `/auth/email` — navigating a signed-in session to
+  // `/auth/email` only shows "You're signed in" and cannot re-stamp freshness.
+  // Use P's own provider sign-in when it has one (any provider identity,
+  // github-projects included via the `github` identity provider); an email-only
+  // (or local-only) P is told to sign out and sign in by email again, which the
+  // N2 positive control re-stamps. Never returns `/auth/email`.
+  async function linkModeReproof(accountId) {
+    try {
+      const account = await accountStore.getAccount(await canonical(accountId));
+      const identity = (account?.identities || []).find(i => i.provider !== 'email' && i.provider !== 'local');
+      const href = identity ? getProvider(identity.provider)?.entryCta?.href : null;
+      if (href) return { reauthUrl: href, emailOnly: false };
+    } catch (err) {
+      console.error('[email-auth] re-proof lookup failed:', err?.name || 'Error');
+    }
+    return { reauthUrl: '/logout', emailOnly: true };
+  }
+
   // S3 link-mode completion: NO regenerate (it is not a new sign-in). The
   // email identity is linked onto the live account; a conflict (the address
   // already belongs to another account) is the one email path that may offer
@@ -199,11 +219,17 @@ export function createEmailAuthRoutes({
     const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'email', emailNorm, {}, null);
     delete req.session.emailLinkNext;
     if (!established.ok) {
-      // A conflict (the address already belongs to another account) is the one
-      // email path that may offer a merge, via the shared responder with
-      // `workspace:null`. A stale/unresolvable session takes its non-mergeable
-      // arm. Either way nothing sign-in mode would do.
-      await respondToAccountConflict({ req, res, established, workspace: null, mode: 'new', returnUrlKey: null, identityLabel: 'email', reauthUrl: '/auth/email', provider: 'email' });
+      // The link was consumed before we got here, so a stale conflict must send
+      // the user to re-prove P and then request a NEW link (S3-1) — not to
+      // `/auth/email`, which cannot re-prove a signed-in session.
+      const { reauthUrl, emailOnly } = await linkModeReproof(req.session.accountId);
+      const reauthNote = emailOnly
+        ? 'The email link you opened has been used. To add the address, sign out and sign in by email again, then request a new link.'
+        : 'The email link you opened has been used. After signing in again, request a new link to add the address.';
+      // A conflict (the address already belongs to another account) shows the
+      // merge offer when P is fresh, or this re-proof page when stale. A
+      // stale/unresolvable session takes the responder's non-mergeable arm.
+      await respondToAccountConflict({ req, res, established, workspace: null, mode: 'new', returnUrlKey: null, identityLabel: 'email', reauthUrl, provider: 'email', reauthNote });
       return;
     }
     await saveSession(req.session);

@@ -116,50 +116,59 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     }
 
     const canonicalAccountId = pending.canonicalAccountId
-    try {
-      upsertWorkspace(req.session, pending.workspace)
-    } catch (limitError) {
-      delete req.session.pendingMerge
-      const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
-        action: 'Go to dashboard',
-        actionUrl: '/'
-      })
-      return res.status(400).send(html)
-    }
-    await accountWorkspaceStore.bindAccountToWorkspace(canonicalAccountId, pending.workspace.id)
-
-    // LIN-3127: additive, write-only Connection dual-write (best-effort) for
-    // EVERY provider — deliberately NOT gated on pending.refreshToken (that
-    // gate is for the owner-credential write only), so a GitHub/GitHub-Projects
-    // merge (which offers no refreshToken) still writes. Runs after both
-    // refusal returns above. `pendingMerge` carries no `scope`, so derive it
-    // from the container's SINGLE binding for `pending.provider` (all four
-    // respondToAccountConflict callers pass a freshly-built container with
-    // exactly one binding); if it is not exactly one, skip and log — never
-    // guess (N2).
-    if (connectionStore) {
-      const matches = (pending.workspace.bindings || []).filter(b => b.provider === pending.provider)
-      if (matches.length === 1) {
-        await writeConnection(connectionStore, canonicalAccountId, pending.workspace, pending.provider, matches[0].scope)
-      } else {
-        console.warn(`LIN-3127 merge-confirm: expected exactly one binding for provider "${pending.provider}", found ${matches.length}; skipping Connection write`)
+    // S3-2 (LIN-1892): a null-workspace merge (an email link-mode conflict is
+    // its only producer) still performs the account merge and the session
+    // canonicalisation, but skips EVERY workspace-keyed write — the session
+    // upsert, the account↔workspace edge, the LIN-3127 Connection record, the
+    // owner credential, and `activeWorkspaceId`. The provider merge flows all
+    // pass a real workspace and are byte-identical below.
+    const hasWorkspace = pending.workspace != null
+    if (hasWorkspace) {
+      try {
+        upsertWorkspace(req.session, pending.workspace)
+      } catch (limitError) {
+        delete req.session.pendingMerge
+        const html = renderErrorPage('Workspace Limit Reached', 'You have reached the maximum number of connected workspaces. Please remove one before adding another.', {
+          action: 'Go to dashboard',
+          actionUrl: '/'
+        })
+        return res.status(400).send(html)
       }
-    }
-    // LIN-2304: conditional on pending.refreshToken — persistOwnerCredential
-    // itself has no internal skip-on-missing-refreshToken guard, so gating
-    // the CALL is what keeps GitHub/GitHub Projects (which pass no
-    // refreshToken into the offer) from gaining an owner-credential write
-    // they never had on their normal sign-in path.
-    if (pending.refreshToken) {
-      await persistOwnerCredential(canonicalAccountId, pending.workspace, ownerCredentialStore, pending.refreshToken)
-    }
+      await accountWorkspaceStore.bindAccountToWorkspace(canonicalAccountId, pending.workspace.id)
 
-    // LIN-2304: uniform confirm-completion, run identically for every
-    // provider (no per-provider branch) — mirrors the activeWorkspaceId +
-    // preferences steps already present on every provider's non-conflict
-    // success path. This is a deliberate extension of Linear's own confirm
-    // behavior, which previously set neither.
-    req.session.activeWorkspaceId = pending.workspace.id
+      // LIN-3127: additive, write-only Connection dual-write (best-effort) for
+      // EVERY provider — deliberately NOT gated on pending.refreshToken (that
+      // gate is for the owner-credential write only), so a GitHub/GitHub-Projects
+      // merge (which offers no refreshToken) still writes. Runs after both
+      // refusal returns above. `pendingMerge` carries no `scope`, so derive it
+      // from the container's SINGLE binding for `pending.provider` (all four
+      // respondToAccountConflict callers pass a freshly-built container with
+      // exactly one binding); if it is not exactly one, skip and log — never
+      // guess (N2).
+      if (connectionStore) {
+        const matches = (pending.workspace.bindings || []).filter(b => b.provider === pending.provider)
+        if (matches.length === 1) {
+          await writeConnection(connectionStore, canonicalAccountId, pending.workspace, pending.provider, matches[0].scope)
+        } else {
+          console.warn(`LIN-3127 merge-confirm: expected exactly one binding for provider "${pending.provider}", found ${matches.length}; skipping Connection write`)
+        }
+      }
+      // LIN-2304: conditional on pending.refreshToken — persistOwnerCredential
+      // itself has no internal skip-on-missing-refreshToken guard, so gating
+      // the CALL is what keeps GitHub/GitHub Projects (which pass no
+      // refreshToken into the offer) from gaining an owner-credential write
+      // they never had on their normal sign-in path.
+      if (pending.refreshToken) {
+        await persistOwnerCredential(canonicalAccountId, pending.workspace, ownerCredentialStore, pending.refreshToken)
+      }
+
+      // LIN-2304: uniform confirm-completion, run identically for every
+      // provider (no per-provider branch) — mirrors the activeWorkspaceId +
+      // preferences steps already present on every provider's non-conflict
+      // success path. This is a deliberate extension of Linear's own confirm
+      // behavior, which previously set neither.
+      req.session.activeWorkspaceId = pending.workspace.id
+    }
     if (userPreferencesStore) {
       const savedPrefs = await userPreferencesStore.getUserPreferences(canonicalAccountId)
       applyUserPreferencesToSession(req.session, savedPrefs)
@@ -178,10 +187,16 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
     delete req.session.pendingMerge
     await saveSession(req.session)
 
-    if (pending.mode === 'add-source') {
+    if (hasWorkspace && pending.mode === 'add-source') {
       return res.redirect(`/workspace/${encodeURIComponent(pending.returnUrlKey)}/settings?provider_ok=${encodeURIComponent(pending.provider)}`)
     }
-    return res.redirect(`/workspace/${encodeURIComponent(pending.workspace.urlKey)}/`)
+    if (hasWorkspace) {
+      return res.redirect(`/workspace/${encodeURIComponent(pending.workspace.urlKey)}/`)
+    }
+    // Null-workspace merge: land on the session's first workspace, or the
+    // account home when there is none (the email-only link-mode case).
+    const firstWorkspace = req.session.workspaces?.[0]
+    return res.redirect(firstWorkspace ? `/workspace/${encodeURIComponent(firstWorkspace.urlKey)}/` : '/account')
   })
 
   return router
