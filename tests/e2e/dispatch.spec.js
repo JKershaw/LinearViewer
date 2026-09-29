@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // Per-worker workspace URL key (LIN-628): bound from the worker-scoped fixture
 // so session, nav, the dispatch token, and the teardown query params all address
@@ -1204,6 +1205,9 @@ test.describe('Token Management API', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    // LIN-3137 J5: the mint is now owner-only, so seed the owner edge
+    // explicitly instead of relying on first-binder order.
+    await seedWorkspaceOwnership(page, URL_KEY);
   });
 
   test('can create dispatch token', async ({ request }) => {

@@ -15,6 +15,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { dispatchHalt } from '../helpers.js';
 
 let WS, DISPATCH_URL, API_PREFIX;
@@ -38,6 +39,8 @@ test.describe('Workspace Halt (LIN-2994 Surface 4 / LIN-3026)', () => {
     API_PREFIX = `/workspace/${WS}`;
 
     await seedLocalWorkspace(page, null, { features: { dispatch: true }, urlKey: WS });
+    // LIN-3137 J5: the mint is owner-only — seed the owner edge explicitly.
+    await seedWorkspaceOwnership(page, WS);
 
     // Isolation, asserted rather than assumed (plan-review d745e3ec carry-
     // forward #2, close-out L2). Deliberately dirty the worker's halt FIRST,
