@@ -86,6 +86,9 @@ function makeContext({ workspace, durableRecord, calls, refreshOnResolveGate }) 
     evictAllWorkspaceTokens: () => {},
     evictWorkspaceToken: () => {},
     evictWorkspaceTokenPair: () => {},
+    // LIN-3124 PR2: the sliced `ensureValidToken` references these free identifiers.
+    connectionStore: {},
+    releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
     ownerCredentialStore: {
       get: async (_a, _u, provider) => { calls.durableGets.push(provider); return durableRecord ?? null; },
       delete: async () => {},

@@ -27,6 +27,7 @@ import {
   providerIndexImportOffenders,
   wiringOffenders,
   siblingCallOffenders,
+  namedCallOffenders,
   byConnectionWriteOffenders,
   registryOffenders,
 } from '../fixtures/connection-access-guards.js';
@@ -41,11 +42,16 @@ const STORE_ALLOWED_IMPORTERS = [
   'routes/account-merge.js',
   'lib/github-install-flow.js',
   'routes/jira-auth.js',
+  // LIN-3124 PR2 (S6): the lifecycle module imports `CONNECTION_ORIGIN`; the
+  // store INSTANCE is otherwise injected.
+  'lib/connection-lifecycle.js',
 ];
-// Declared for the PR2 modules; enforced as allow-lists now (the modules do
-// not exist in PR1, so their importer set is empty and no file may add one).
-const CREDENTIAL_ALLOWED_IMPORTERS = ['server.js'];
-const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'lib/connection-credential.js'];
+// LIN-3124 PR2 (S2/S8): the seam, imported by the server (hydration wiring) and
+// by the session store (the persist sanitizer). Exact at this tree.
+const CREDENTIAL_ALLOWED_IMPORTERS = ['server.js', 'lib/session-store.js'];
+// LIN-3124 PR2 (S6): the release functions, called at the 7 unwired-by-others
+// census sites plus the account merge. Exact at this tree.
+const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'routes/workspace.js', 'routes/account-merge.js'];
 const READ_ALLOWED_MODULES = ['lib/connection-store.js', 'lib/connection-credential.js', 'lib/connection-lifecycle.js'];
 
 const PROTECTED_MODULES = [
@@ -97,17 +103,17 @@ const SOURCE_ARMS = [
   },
   {
     id: 'a2',
-    name: 'connection-credential.js importers stay within the allow-list',
-    check: (s) => importerOffenders(s, 'lib/connection-credential.js', CREDENTIAL_ALLOWED_IMPORTERS),
+    name: 'connection-credential.js importers are EXACTLY the allow-list',
+    check: (s) => importerOffenders(s, 'lib/connection-credential.js', CREDENTIAL_ALLOWED_IMPORTERS, { exact: true }),
     planted: withFile(REAL, 'lib/evil-importer.js', CRED_IMPORT),
-    plantedNote: 'an importer outside the allow-list',
+    plantedNote: 'an extra importer (also fails for a dropped allow-listed importer)',
   },
   {
     id: 'a3',
-    name: 'connection-lifecycle.js importers stay within the allow-list',
-    check: (s) => importerOffenders(s, 'lib/connection-lifecycle.js', LIFECYCLE_ALLOWED_IMPORTERS),
+    name: 'connection-lifecycle.js importers are EXACTLY the allow-list',
+    check: (s) => importerOffenders(s, 'lib/connection-lifecycle.js', LIFECYCLE_ALLOWED_IMPORTERS, { exact: true }),
     planted: withFile(REAL, 'lib/evil-importer.js', LIFECYCLE_IMPORT),
-    plantedNote: 'an importer outside the allow-list',
+    plantedNote: 'an extra importer (also fails for a dropped allow-listed importer)',
   },
   {
     id: 'b1',
@@ -186,7 +192,42 @@ const SOURCE_ARMS = [
     planted: withFile(REAL, 'server.js', `${REAL.get('server.js')}\nownerCredentialStore.getByConnection('c');\n`),
     plantedNote: 'a getByConnection read outside the seam',
   },
+  {
+    id: 'f6',
+    name: 'releaseOrphanOwnerRecord is called only from connection-credential.js',
+    check: (s) => namedCallOffenders(s, ['releaseOrphanOwnerRecord'], BY_CONNECTION_SEAM),
+    planted: withFile(REAL, 'server.js', `${REAL.get('server.js')}\nawait releaseOrphanOwnerRecord({ connectionId: 'c' });\n`),
+    plantedNote: 'a releaseOrphanOwnerRecord call outside the seam',
+  },
 ];
+
+describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
+  // The lifecycle release is called at exactly the 7 durable-delete census
+  // sites (D4): definitive-revocation ×3 in server.js, unlink ×1 in server.js,
+  // whole-workspace removal ×1 in server.js + ×2 in routes/workspace.js. Note
+  // `releaseOrphanOwnerRecord` is NOT part of this count — it is the converter's
+  // failure-path release (arm f6), not one of the 7 sites.
+  const KNOWN_CONNECTION_RELEASE_COUNT = 7;
+  const RELEASE_CALL = /releaseConnectionCredential\s*\(/g;
+
+  function releaseCallCount(sources) {
+    const files = ['server.js', 'routes/workspace.js'];
+    return files.reduce((n, rel) => n + ((sources.get(rel) || '').match(RELEASE_CALL) || []).length, 0);
+  }
+
+  test('releaseConnectionCredential is called at exactly the 7 census sites', () => {
+    assert.strictEqual(releaseCallCount(REAL), KNOWN_CONNECTION_RELEASE_COUNT);
+  });
+
+  test('planted: a dropped site fails the census', () => {
+    const dropped = new Map(REAL);
+    dropped.set('server.js', REAL.get('server.js').replace(
+      "await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })",
+      'await noop()'
+    ));
+    assert.ok(releaseCallCount(dropped) < KNOWN_CONNECTION_RELEASE_COUNT);
+  });
+});
 
 describe('LIN-3124 PR1 T4 — D6 source arms', () => {
   for (const arm of SOURCE_ARMS) {
@@ -217,6 +258,7 @@ const METHOD_CLASSES = {
   // LIN-3124 PR2 (S1): the connection-first read/delete lifecycle.
   link: 'WRITE',
   readConnectionById: 'READ',
+  readConnectionsByIds: 'READ',
   readConnectionsByReferent: 'READ',
   readReferencedConnections: 'READ',
   readConnectionsByAccountPrefix: 'READ',

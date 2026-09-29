@@ -174,6 +174,9 @@ async function runGitHubFamilyBranch({
     },
     evictWorkspaceTokenPair: (_evict, urlKey, accountId) => { calls.evictions.push([urlKey, accountId]); },
     evictWorkspaceToken: () => {},
+    // LIN-3124 PR2: the sliced source references these free identifiers.
+    connectionStore: {},
+    releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
     // LIN-1892: handleWorkspaceRemoval's landing render reads the email predicate.

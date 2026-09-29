@@ -191,6 +191,23 @@ export function siblingCallOffenders(sources, methods, allowedCallers) {
 }
 
 /**
+ * A function-name caller pin for EXPORTED functions called bare (not as a
+ * method). Matches `\bNAME(` but not the `function NAME(` definition. Every
+ * caller must be in `allowedCallers`.
+ */
+export function namedCallOffenders(sources, names, allowedCallers) {
+  const offenders = [];
+  for (const [rel, src] of sources) {
+    if (allowedCallers.includes(rel)) continue;
+    for (const name of names) {
+      const re = new RegExp(`(?<!function\\s)\\b${escapeRe(name)}\\s*\\(`, 'g');
+      if (re.test(src)) offenders.push(`${rel}: ${name}( outside [${allowedCallers.join(', ')}]`);
+    }
+  }
+  return offenders;
+}
+
+/**
  * Arm (f3) wildcard: every `X.<name>ByConnection(` write must live only in
  * `allowedCallers` (D6(f)). Exemptions:
  *   - `this.<name>ByConnection(` — a class calling its own method (the defining
