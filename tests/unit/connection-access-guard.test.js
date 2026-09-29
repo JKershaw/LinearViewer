@@ -30,6 +30,7 @@ import {
   namedCallOffenders,
   byConnectionWriteOffenders,
   registryOffenders,
+  refresherInstanceOffenders,
 } from '../fixtures/connection-access-guards.js';
 
 // ---------------------------------------------------------------------------
@@ -244,6 +245,30 @@ describe('LIN-3124 PR1 T4 — D6 source arms', () => {
       assert.ok(arm.planted, `arm ${arm.id} is missing a planted case`);
       assert.ok(arm.check(arm.planted).length > 0, `arm ${arm.id}'s planted case does not fail it`);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// G3b (PR2 verdict b39d8121): exactly one production createConnectionRefresher
+// ---------------------------------------------------------------------------
+
+describe('LIN-3124 PR2 G3b — single connection refresher instance', () => {
+  test('exactly one createConnectionRefresher( instance, in server.js', () => {
+    assert.deepEqual(refresherInstanceOffenders(REAL), []);
+  });
+
+  test('planted: a dropped instance fails the pin', () => {
+    const dropped = new Map(REAL);
+    dropped.set('server.js', REAL.get('server.js').replace(
+      '= createConnectionRefresher({',
+      '= buildRefresher({'
+    ));
+    assert.ok(refresherInstanceOffenders(dropped).length > 0);
+  });
+
+  test('planted: a second instance outside server.js fails the pin', () => {
+    const planted = withFile(REAL, 'lib/workspace.js', `${REAL.get('lib/workspace.js')}\nconst second = createConnectionRefresher({});\n`);
+    assert.ok(refresherInstanceOffenders(planted).length > 0);
   });
 });
 

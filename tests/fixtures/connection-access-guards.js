@@ -251,6 +251,28 @@ export function registryOffenders(methodNames, classification) {
   return offenders;
 }
 
+/**
+ * G3b (PR2 verdict `b39d8121`): exactly ONE production `createConnectionRefresher(`
+ * instance. Counts call sites (excluding the `function createConnectionRefresher(`
+ * definition) across the corpus; the single instance must live in `server.js` so
+ * the `conn:${connectionId}` single-flight has exactly one registration layer.
+ */
+export function refresherInstanceOffenders(sources) {
+  const DEF = /function\s+createConnectionRefresher\s*\(/g;
+  const CALL = /\bcreateConnectionRefresher\s*\(/g;
+  const offenders = [];
+  let total = 0;
+  for (const [rel, src] of sources) {
+    const calls = (src.match(CALL) || []).length - (src.match(DEF) || []).length;
+    if (calls > 0) {
+      total += calls;
+      if (rel !== 'server.js') offenders.push(`${rel}: createConnectionRefresher( outside server.js`);
+    }
+  }
+  if (total !== 1) offenders.push(`createConnectionRefresher( count ${total} !== 1`);
+  return offenders;
+}
+
 /** Extract a top-level `function NAME(...) {...}` body (brace-matched). */
 export function extractFunction(source, name) {
   const re = new RegExp(`(?:export\\s+)?function\\s+${escapeRe(name)}\\s*\\(`);

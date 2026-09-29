@@ -60,7 +60,7 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware } from './lib/connection-credential.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher } from './lib/connection-credential.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
@@ -92,7 +92,7 @@ import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable 
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
+import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getBindingCredentials, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
@@ -1296,7 +1296,11 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     const binding = bindings[i];
     const isPrimary = i === 0;
     const provider = getProvider(binding.provider);
-    const bindingToken = binding.credentials?.token;
+    // LIN-3124 PR3 (D15): read through the binding accessor so a
+    // connection-backed binding's credential (the per-request side-table) is
+    // served too. Legacy returns the same `binding.credentials` object, so this
+    // is byte-identical for every legacy binding.
+    const bindingToken = getBindingCredentials(binding)?.token;
     // The per-call read scope: the bare token for Linear/local (byte-identical),
     // or a { token, repo } credential for a GitHub App binding so the provider
     // builds a request-time client from the installation token (LIN-713) — the
@@ -2181,6 +2185,24 @@ console.log('[rejected-credentials] registry init', JSON.stringify({ processId: 
 function evictWorkspaceToken(key) {
   workspaceTokenCache.evict(key);
 }
+
+// LIN-3124 PR3 (S2/G3b): the ONE production connection refresher instance.
+// Exactly one is created per process, so the single-flight Map keyed
+// `conn:${connectionId}` (inside `createConnectionRefresher`) is the only
+// registration on the connection path — outer entrants receive `refreshConnection`
+// by injection and never coalesce themselves, so the LIN-1546 double-registration
+// deadlock cannot recur. Dark at this checkpoint: no read arm calls it until the
+// read cutover wires it into resolveWorkspaceAccess and the entrants. The
+// `evict` closure fans cache eviction out over the connection's referents using
+// the existing per-workspace cache-key helper.
+const refreshConnectionCredential = createConnectionRefresher({
+  connectionStore,
+  ownerCredentialStore,
+  resolveProvider: getProviderForWorkspace,
+  resolveExchange: refreshExchangeFor,
+  refreshAccessToken,
+  evict: (urlKey, ownerAccountId) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, ownerAccountId),
+});
 
 // LIN-1373: TTL-preserving persist-back for refresh-on-resolve. Deliberately
 // NOT sessionStore.set() (lib/session-store.js's MongoSessionStore.set), which
@@ -3179,8 +3201,8 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     provider: b.provider,
     scope: b.scope,
     displayName: getProvider(b.provider)?.ui?.displayName || b.provider,
-    token: b.credentials?.token,
-    active: b.provider === workspace.provider && b.credentials?.token === workspace.accessToken,
+    token: getBindingCredentials(b)?.token,
+    active: b.provider === workspace.provider && getBindingCredentials(b)?.token === workspace.accessToken,
   }));
   // One-shot session flash (LIN-2803): read and delete unconditionally, even
   // when this load carries no matching `provider_ok` (or none at all) — a
