@@ -163,7 +163,12 @@ describe('attributeItem (Q4)', () => {
     ['a wake whose root is foreign is left', item({ kind: 'wake', dispatchedBy: null, followUpTo: K }), { id: K, dispatchedBy: STRANGER }, false],
     ['a wake whose root has null dispatchedBy is left', item({ kind: 'wake', dispatchedBy: null, followUpTo: K }), { id: K, dispatchedBy: null }, false],
     ['a wake whose root could not be read is left', item({ kind: 'wake', dispatchedBy: null, followUpTo: K }), null, false],
-    ['a wake-kind row carrying an enqueuer\'s id is judged on that id', item({ kind: 'wake', dispatchedBy: STRANGER, followUpTo: K }), { id: K, dispatchedBy: OWNER }, false]
+    ['a wake-kind row carrying an enqueuer\'s id is judged on that id', item({ kind: 'wake', dispatchedBy: STRANGER, followUpTo: K }), { id: K, dispatchedBy: OWNER }, false],
+    // F1: only a server-minted WAKE may borrow its root's attribution. An
+    // ownerless/legacy proxy token enqueues with dispatchedBy:null, so a
+    // non-wake follow-up at the owner's kickoff must not pass as owner-wake
+    // (it would continue the owner's subagent with that row's prompt).
+    ['F1: a NON-wake with null dispatchedBy following up the owner\'s kickoff is left', item({ kind: 'implementation', dispatchedBy: null, followUpTo: K }), { id: K, dispatchedBy: OWNER }, false]
   ];
   for (const [name, it, root, pass] of rows) {
     test(name, () => {
@@ -212,6 +217,9 @@ describe('pollDecision (order: other consumer, harness, attribution, halt, token
       item({ dispatchedBy: STRANGER, sessionId: K }), ctx(), 'leave'],
     ['a wake whose root is foreign is left', item({ kind: 'wake', dispatchedBy: null, followUpTo: K }), ctx({ wakeRoot: { id: K, dispatchedBy: STRANGER } }), 'leave'],
     ['a non-wake with null dispatchedBy is left', item({ dispatchedBy: null }), ctx(), 'leave'],
+    ['F1: a NON-wake with null dispatchedBy following up the owner\'s kickoff is left',
+      item({ kind: 'implementation', dispatchedBy: null, followUpTo: K }),
+      ctx({ wakeRoot: { id: K, dispatchedBy: OWNER }, promptRead: { id: X, prompt: 'do the step', followUpTo: K } }), 'leave'],
     ['N2: harness opencode is left', item({ harness: 'opencode' }), ctx(), 'leave'],
     ['N2: harness claude-code passes', item({ harness: 'claude-code' }), ctx(), 'take'],
     ['a prompt mismatch is left', item(), ctx({ promptRead: { id: X, prompt: 'changed', followUpTo: null } }), 'leave'],
