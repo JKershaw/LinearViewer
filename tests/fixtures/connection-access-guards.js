@@ -106,7 +106,7 @@ export function countMatches(source, re) {
 // module BASENAME, not the corpus-relative path.
 const importRe = (target) => new RegExp(`from\\s+['"][^'"]*${escapeRe(target.split('/').pop())}['"]`);
 export const ANY_CONNECTION_MODULE_IMPORT =
-  /from\s+['"][^'"]*connection-(?:store|credential|lifecycle)\.js['"]/;
+  /from\s+['"][^'"]*connection-(?:store|credential|lifecycle|access)\.js['"]/;
 
 /** Files importing `target`. */
 export function importers(sources, target) {

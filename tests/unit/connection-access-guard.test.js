@@ -53,6 +53,10 @@ const CREDENTIAL_ALLOWED_IMPORTERS = ['server.js', 'lib/session-store.js'];
 // LIN-3124 PR2 (S6): the release functions, called at the 7 unwired-by-others
 // census sites plus the account merge. Exact at this tree.
 const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'routes/workspace.js', 'routes/account-merge.js'];
+// LIN-3124 PR3 (C): `lib/connection-access.js` is the arm's pure selection
+// helpers. It imports none of the three connection modules and is imported only
+// by the single credential seam. Exact at this tree.
+const ACCESS_ALLOWED_IMPORTERS = ['lib/connection-credential.js'];
 const READ_ALLOWED_MODULES = ['lib/connection-store.js', 'lib/connection-credential.js', 'lib/connection-lifecycle.js'];
 
 const PROTECTED_MODULES = [
@@ -89,6 +93,7 @@ function withFile(sources, rel, src) {
 const STORE_IMPORT = "import { writeConnection } from '../lib/connection-store.js';\n";
 const CRED_IMPORT = "import { x } from '../lib/connection-credential.js';\n";
 const LIFECYCLE_IMPORT = "import { x } from '../lib/connection-lifecycle.js';\n";
+const ACCESS_IMPORT = "import { x } from '../lib/connection-access.js';\n";
 
 // ---------------------------------------------------------------------------
 // Source arms (pure `check(sources) -> offenders` + planted offender)
@@ -114,6 +119,13 @@ const SOURCE_ARMS = [
     name: 'connection-lifecycle.js importers are EXACTLY the allow-list',
     check: (s) => importerOffenders(s, 'lib/connection-lifecycle.js', LIFECYCLE_ALLOWED_IMPORTERS, { exact: true }),
     planted: withFile(REAL, 'lib/evil-importer.js', LIFECYCLE_IMPORT),
+    plantedNote: 'an extra importer (also fails for a dropped allow-listed importer)',
+  },
+  {
+    id: 'a4',
+    name: 'connection-access.js importers are EXACTLY the allow-list',
+    check: (s) => importerOffenders(s, 'lib/connection-access.js', ACCESS_ALLOWED_IMPORTERS, { exact: true }),
+    planted: withFile(REAL, 'lib/evil-importer.js', ACCESS_IMPORT),
     plantedNote: 'an extra importer (also fails for a dropped allow-listed importer)',
   },
   {
@@ -203,12 +215,13 @@ const SOURCE_ARMS = [
 ];
 
 describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
-  // The lifecycle release is called at exactly the 7 durable-delete census
-  // sites (D4): definitive-revocation ×3 in server.js, unlink ×1 in server.js,
+  // The lifecycle release is called at exactly the 8 durable-delete census
+  // sites (D4): definitive-revocation ×4 in server.js (PR3 C3 added the
+  // handleUnauthorizedError connection arm's revoke), unlink ×1 in server.js,
   // whole-workspace removal ×1 in server.js + ×2 in routes/workspace.js. Note
   // `releaseOrphanOwnerRecord` is NOT part of this count — it is the converter's
-  // failure-path release (arm f6), not one of the 7 sites.
-  const KNOWN_CONNECTION_RELEASE_COUNT = 7;
+  // failure-path release (arm f6), not one of these sites.
+  const KNOWN_CONNECTION_RELEASE_COUNT = 8;
   const RELEASE_CALL = /releaseConnectionCredential\s*\(/g;
 
   function releaseCallCount(sources) {
@@ -216,7 +229,7 @@ describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
     return files.reduce((n, rel) => n + ((sources.get(rel) || '').match(RELEASE_CALL) || []).length, 0);
   }
 
-  test('releaseConnectionCredential is called at exactly the 7 census sites', () => {
+  test('releaseConnectionCredential is called at exactly the 8 census sites', () => {
     assert.strictEqual(releaseCallCount(REAL), KNOWN_CONNECTION_RELEASE_COUNT);
   });
 

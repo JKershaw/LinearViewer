@@ -215,6 +215,9 @@ async function runGitHubFamilyBranch({
     // harness.
     '  const declaration = refreshDeclarationFor(workspace);',
     '  const provider = normalizeProvider(workspace);',
+    // LIN-3124 PR3 checkpoint C3: handleUnauthorizedError now computes the
+    // active connection id before the branch. Legacy fixtures return null.
+    '  const connectionId = activeConnectionIdForWorkspace(workspace);',
     sliceGitHubFamilyBranch(),
     "  return '__FELL_THROUGH_TO_LINEAR__';",
     '}',

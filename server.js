@@ -1686,6 +1686,11 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
   // function's fallthrough, on its first 401.
   const declaration = refreshDeclarationFor(workspace);
   const provider = normalizeProvider(workspace);
+  // LIN-3124 PR3 (D2/D7): the connection-backed arm. When set, the refresh
+  // routes through the Connection and PRECEDES the legacy-key durable read, so a
+  // connection-backed 401 never reads a null legacy record and falls through to
+  // workspace removal.
+  const connectionId = activeConnectionIdForWorkspace(workspace);
 
   // LIN-1503: GitHub-family credentials are RE-MINTED from installationId + the
   // App JWT, never refreshed from a stored refresh token — so they must never
@@ -1707,7 +1712,15 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       // produces for the same failure, so the two paths stay consistent; the
       // session is unusable either way. Covered by
       // tests/unit/lin-1503-github-family-401-remint-behaviour.test.js.
-      await remintActiveCredential(workspace, getProviderForWorkspace(workspace));
+      // LIN-3124 PR3 (D7): a connection-backed remint kind re-mints through
+      // the Connection; remintActiveCredential refuses connection-backed
+      // bindings by design.
+      if (connectionId) {
+        const refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, session.accountId, workspace.urlKey);
+        if (!refreshed) throw new Error(`No connection credential to re-mint for workspace ${workspace.id}`);
+      } else {
+        await remintActiveCredential(workspace, getProviderForWorkspace(workspace));
+      }
       await saveSession(session);
     } catch (remintError) {
       // GitHub-family errors are plain Error, never TokenRefreshError, so
@@ -1775,6 +1788,35 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       console.error(`No refresh exchange wired for provider ${provider} — treating as non-refreshable`);
     }
     return sendRelinkNotice(workspace, res);
+  }
+
+  // LIN-3124 PR3 (D7/D4): a connection-backed workspace refreshes through
+  // the Connection. This arm PRECEDES the legacy-key durable read below, so a
+  // connection-backed Linear 401 never reads a null legacy record and falls
+  // through to workspace removal. A definitive revocation deletes the
+  // Connection at this site (D4) before the destructive/non-destructive split.
+  if (connectionId) {
+    let refreshed;
+    try {
+      refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, session.accountId, workspace.urlKey);
+      if (!refreshed) throw new Error(`No connection credential to refresh workspace ${workspace.id}`);
+    } catch (refreshError) {
+      console.error('Connection refresh failed after 401:', refreshError);
+      if (isDefinitiveRevocation(refreshError)) {
+        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' });
+      }
+      if (!declaration.destructiveOnFailure) return sendRelinkNotice(workspace, res);
+      if (isDefinitiveRevocation(refreshError)) {
+        return handleWorkspaceRemoval(session, workspace.id, res, true);
+      }
+      return serviceUnavailable.html(res);
+    }
+    try {
+      return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
+    } catch (renderError) {
+      console.error('Post-connection-refresh dashboard render failed (workspace preserved):', renderError);
+      return serviceUnavailable.html(res);
+    }
   }
 
   // LIN-1887 Step 2: provider-scoped read. A Jira 401 must never read, and never
@@ -2664,7 +2706,7 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore }))
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args) }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
