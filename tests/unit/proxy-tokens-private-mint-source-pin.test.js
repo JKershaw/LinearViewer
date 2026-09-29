@@ -81,18 +81,17 @@ describe('LIN-3129/LIN-3131 — the grant API caller allow-lists', () => {
     join(REPO, 'server.js')
   ].filter(f => f !== STORE);
 
-  // NARROWED (LIN-3134 T2-i / LIN-3138 S2): the declared-mint mechanism lands
-  // the ONE `mintGrantBootstrap` caller, in lib/proxy-preamble.js's declared
-  // branch. It is INERT — no production caller passes a non-empty
-  // `declaredGrants` — and the LIN-3134 F3 census is the replacement pin that
-  // enforces exactly that. This is the same shape of narrowing the requireGrant
-  // pin below already took at LIN-3130 S2a: a named, still-tight allow-list, not
-  // a loosening — any second caller still fails. (LIN-3131 S2b.2 adds the live
-  // runner mint caller in routes/proxy-tokens-admin.js.)
-  test('mintGrantBootstrap has exactly one non-store caller: the inert mechanism module lib/proxy-preamble.js', () => {
-    const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('mintGrantBootstrap'));
-    assert.deepEqual(offenders, [join(REPO, 'lib/proxy-preamble.js')],
-      'the declared-mint mechanism (inert) is the only caller outside lib/proxy-tokens.js');
+  // NARROWED (LIN-3134 T2-i / LIN-3138 S2, then LIN-3131 S2b.2): the
+  // declared-mint mechanism in lib/proxy-preamble.js was the first caller;
+  // S2b.2 adds the live owner-checked runner mint in routes/proxy-tokens-admin.js
+  // (the ONE route that turns the feature on). Still an exact allow-list, not a
+  // loosening: any OTHER caller fails.
+  test('mintGrantBootstrap callers are exactly the inert mechanism module and the S2b.2 runner mint route', () => {
+    const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('mintGrantBootstrap')).sort();
+    assert.deepEqual(offenders, [
+      join(REPO, 'lib/proxy-preamble.js'),
+      join(REPO, 'routes/proxy-tokens-admin.js')
+    ].sort(), 'only the inert declared-mint mechanism and the S2b.2 runner mint route may call mintGrantBootstrap');
   });
 
   // UPDATED (LIN-3131 S2b.1): the owner seam is now wired in production, so the
