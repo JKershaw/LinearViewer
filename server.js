@@ -26,7 +26,7 @@ import { createSessionOptions, SESSION_TTL_SECONDS } from './lib/session-options
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
-import { UNSCOPED, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
+import { UNSCOPED, selectOwnerWorkspaceToken, selectOwnerSessionRow, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { attemptSuspectCredentialRefresh as attemptSuspectCredentialRefreshImpl } from './lib/suspect-credential-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
@@ -60,7 +60,8 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher } from './lib/connection-credential.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess } from './lib/connection-credential.js'
+import { isConnectionBacked } from './lib/connection-binding.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
@@ -92,7 +93,7 @@ import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable 
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getBindingCredentials, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, isActiveBinding, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
+import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getBindingCredentials, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, isActiveBinding, normalizeProvider, normalizeProviderName, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
@@ -982,6 +983,10 @@ async function ensureValidToken(req, res, next) {
   const declaration = refreshDeclarationFor(workspace)
   const provider = normalizeProvider(workspace)
   const exchange = refreshExchangeFor(provider)
+  // LIN-3124 PR3 (D2/D5): a connection-backed active workspace refreshes
+  // through the Connection, not the legacy session/durable path, and its
+  // LIN-2097 gate is keyed on the connection.
+  const connectionId = activeConnectionIdForWorkspace(workspace)
 
   // `none` is the fail-safe: no refresh, and — the part that makes it a genuine
   // fail-safe rather than a delay — no removal, no eviction, no session
@@ -1015,22 +1020,29 @@ async function ensureValidToken(req, res, next) {
   // so the same credential identity can never be throttled by one site and
   // not the other.
   if (declaration.strategy !== REFRESH_STRATEGY.REMINT) {
-    const staleRecord = await ownerCredentialStore.get(req.session.accountId, workspace.urlKey, provider)
-    const staleFingerprint = staleRecord?.token ? fingerprintCredential(staleRecord.token) : null
-    if (!refreshOnResolveGate.shouldAttempt(`${req.session.accountId}:${workspace.urlKey}`, staleFingerprint)) {
-      // Suppressed: no refresh, no teardown, keep the current (possibly
-      // frozen-expiry) token in place and let the existing 401 retry/liveness
-      // ladder (handleUnauthorizedError) handle an actual failure — the same
-      // fail-safe shape as the `NONE` strategy above, just reached from a
-      // cooldown instead of a declared non-refreshable provider. Recorded via
-      // the same REFRESH_SKIP lifecycle event LIN-2236 already emits from the
-      // sibling gate, so both suppression sites are visible through one kind.
-      credentialLifecycleEventStore.recordEvent({
-        accountId: req.session.accountId, urlKey: workspace.urlKey, provider,
-        kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS.REFRESH_SKIP,
-        detail: { branch: 'ensure-valid-token-cooldown-gate' }
-      }).catch(err => console.error('Failed to record credential-lifecycle event:', err));
-      return next()
+    if (connectionId) {
+      // Connection-keyed gate (D5): one budget per connection.
+      if (!(await connectionAccess.connectionRefreshGateAllows(connectionId, provider, req.session.accountId, workspace.urlKey))) {
+        return next()
+      }
+    } else {
+      const staleRecord = await ownerCredentialStore.get(req.session.accountId, workspace.urlKey, provider)
+      const staleFingerprint = staleRecord?.token ? fingerprintCredential(staleRecord.token) : null
+      if (!refreshOnResolveGate.shouldAttempt(`${req.session.accountId}:${workspace.urlKey}`, staleFingerprint)) {
+        // Suppressed: no refresh, no teardown, keep the current (possibly
+        // frozen-expiry) token in place and let the existing 401 retry/liveness
+        // ladder (handleUnauthorizedError) handle an actual failure — the same
+        // fail-safe shape as the `NONE` strategy above, just reached from a
+        // cooldown instead of a declared non-refreshable provider. Recorded via
+        // the same REFRESH_SKIP lifecycle event LIN-2236 already emits from the
+        // sibling gate, so both suppression sites are visible through one kind.
+        credentialLifecycleEventStore.recordEvent({
+          accountId: req.session.accountId, urlKey: workspace.urlKey, provider,
+          kind: CREDENTIAL_LIFECYCLE_EVENT_KINDS.REFRESH_SKIP,
+          detail: { branch: 'ensure-valid-token-cooldown-gate' }
+        }).catch(err => console.error('Failed to record credential-lifecycle event:', err));
+        return next()
+      }
     }
   }
 
@@ -1050,8 +1062,20 @@ async function ensureValidToken(req, res, next) {
     // needsTokenRefresh stays false.) Switching GitHub-family providers to a
     // real ~1h expiry means those bindings flow through this middleware for
     // the first time — that is intended, not a regression.
-    if (declaration.strategy === REFRESH_STRATEGY.REMINT) {
+    if (declaration.strategy === REFRESH_STRATEGY.REMINT && !connectionId) {
       await remintActiveCredential(workspace, getProviderForWorkspace(workspace))
+    } else if (declaration.strategy === REFRESH_STRATEGY.REMINT) {
+      // LIN-3124 PR3 (D7): a connection-backed remint kind re-mints through
+      // the Connection. remintActiveCredential refuses connection-backed
+      // bindings by design, so this arm takes it instead.
+      const refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, req.session.accountId, workspace.urlKey)
+      if (!refreshed) throw new Error(`No connection credential to re-mint for workspace ${workspace.id}`)
+    } else if (connectionId) {
+      // LIN-3124 PR3 (D7/D9): refresh-token kinds rotate through the
+      // connection-keyed durable record + Connection mirror. No session mirror
+      // is written (the Connection is the credential home).
+      const refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, req.session.accountId, workspace.urlKey)
+      if (!refreshed) throw new Error(`No connection credential to refresh workspace ${workspace.id}`)
     } else {
       // LIN-1524: Linear's rotating credential lives ONLY in the durable
       // store now — `workspace.refreshToken` is never written anymore, so it
@@ -2220,6 +2244,36 @@ function persistSessionRow(sid, session) {
   return sessionsCollection.updateOne({ _id: sid }, { $set: { session: sanitizeSessionForPersist(session) } });
 }
 
+/**
+ * LIN-3124 PR3 (D2/D7): the connectionId of a session workspace's ACTIVE
+ * binding when it is connection-backed, else null. Used to route the refresh
+ * entrants and the D5 gate onto the Connection.
+ */
+function activeConnectionIdForWorkspace(workspace) {
+  const marker = workspace?.activeBinding;
+  if (!marker || !Array.isArray(workspace.bindings)) return null;
+  const match = workspace.bindings.find(b => b && b.provider === marker.provider && b.scope === marker.scope);
+  return isConnectionBacked(match) ? match.connectionId : null;
+}
+
+// LIN-3124 PR3 (D7/D12/D5): the owner-scoped connection-first read arm and its
+// re-keyed gate, built as one seam (lib/connection-credential.js) so every
+// `readConnectionsByReferent` / `getByConnection` call lives there (D6(b′)) and
+// the protected modules import none of it. Injected into resolveWorkspaceAccess
+// and ensureValidToken below.
+const connectionAccess = createConnectionAccess({
+  connectionStore,
+  ownerCredentialStore,
+  refreshConnection: refreshConnectionCredential,
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  selectOwnerSessionRow,
+  normalizeProvider,
+  fingerprintCredential,
+  gate: refreshOnResolveGate,
+  lifecycleEventStore: credentialLifecycleEventStore,
+  bufferMs: TOKEN_REFRESH_BUFFER_MS,
+});
+
 // CLOSED GAP (LIN-1885 research → fixed by LIN-1891). This resolver used to
 // return a BARE token string regardless of provider, so the headless proxy/
 // dispatch lane could not authenticate any provider whose credential is not a
@@ -2302,8 +2356,23 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
 
   // Look up the access token from the sessions collection, scoped to
   // ownerAccountId (or owner-blind for UNSCOPED) via the pure selector.
+  let connectionSummary = null;
   try {
     const sessions = await sessionsCollection.find({}).toArray();
+
+    // LIN-3124 PR3 (D7/D12): connection-first arm. Owner-scoped only — an
+    // UNSCOPED caller skips it entirely and runs the unchanged legacy scan
+    // (D16/LIN-1448), and an arm result is never cached under the owner-blind
+    // key. Falls through to the scan when no authorized Connection matches.
+    if (ownerAccountId !== UNSCOPED) {
+      const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions });
+      if (arm?.result) {
+        workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
+        return arm.result;
+      }
+      connectionSummary = arm?.connectionSummary || null;
+    }
+
     const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
 
     if (selected.token) {
@@ -2344,7 +2413,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // is no single owner to refresh on behalf of. Any failure (nothing to
     // refresh, or the refresh itself failing) falls straight through to the
     // untouched classification below — never a 500, never cached.
-    if (!selected.token && ownerAccountId !== UNSCOPED) {
+    if (!selected.token && ownerAccountId !== UNSCOPED && (!connectionSummary || connectionSummary.ownerCount === 0)) {
       // LIN-2097: the durable record's own `token` is what identifies the
       // credential this branch is about to (re-)spend — NOT its `scope`
       // (for Linear, the durable record's `scope` is the Linear ORG id, an
@@ -2400,7 +2469,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // Neither is proof the owner lost the workspace, and ordering is
     // load-bearing (owner_mismatch wins any overlap) — see
     // classifyWorkspaceFailure's docstring in lib/workspace-token-resolver.js.
-    const reason = classifyWorkspaceFailure({ sessions, urlKey, ownerAccountId, selectedReason: selected.reason });
+    const reason = classifyWorkspaceFailure({ sessions, urlKey, ownerAccountId, selectedReason: selected.reason, connectionSummary });
 
     // Diagnostic log on EVERY non-ok resolution (not just owner_mismatch, which
     // was the only case that logged before). A bare `not_connected` is genuinely
@@ -2412,6 +2481,10 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // account's id or any token bytes (see describeWorkspaceResolution's privacy
     // contract; same boundary lib/errors.js enforces on the wire).
     const diag = describeWorkspaceResolution(sessions, urlKey, ownerAccountId);
+    if (connectionSummary) {
+      // D17: counts-only — never another account's id or any token bytes.
+      diag.connection = { ownerCount: connectionSummary.ownerCount, otherLive: connectionSummary.otherLive };
+    }
     console.warn(`[workspace-access] resolution failed`, {
       selectedReason: selected.reason,
       finalReason: reason,

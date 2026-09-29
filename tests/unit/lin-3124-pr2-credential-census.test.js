@@ -41,6 +41,7 @@ const D15_EXCLUDED_FILES = new Set([
   'lib/connection-credential.js',// the connection seam
   'lib/connection-binding.js',   // the connection seam
   'lib/connection-lifecycle.js', // the connection seam
+  'lib/connection-access.js',    // the connection seam (PR3 read arm)
   'routes/test.js',              // test fixture
   'lib/providers/github/index.js',          // refreshCredential reads
   'lib/providers/github-projects/index.js', // refreshCredential reads

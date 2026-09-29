@@ -477,9 +477,10 @@ describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source
       assert.match(line, /scope:/, `success return missing scope: ${line.trim()}`);
     }
 
-    // All workspaceTokenCache.set(...) calls.
+    // All workspaceTokenCache.set(...) calls. LIN-3124 PR3 checkpoint C added a
+    // fifth: the connection-first arm's own cache write (carries arm.result.scope).
     const cacheWriteLines = lines.filter(l => l.includes('workspaceTokenCache.set('));
-    assert.equal(cacheWriteLines.length, 4, `expected exactly 4 cache writes, found ${cacheWriteLines.length}`);
+    assert.equal(cacheWriteLines.length, 5, `expected exactly 5 cache writes, found ${cacheWriteLines.length}`);
     for (const line of cacheWriteLines) {
       assert.match(line, /scope:/, `cache write missing scope: ${line.trim()}`);
     }

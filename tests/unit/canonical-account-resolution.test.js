@@ -235,6 +235,10 @@ async function runResolveWorkspaceAccess({ urlKey, ownerAccountId, sessions, acc
     refreshOnResolveGate: { shouldAttempt: () => false },
     credentialLifecycleEventStore: { recordEvent: async () => {} },
     attemptSuspectCredentialRefresh: async () => null,
+    // LIN-3124 PR3 checkpoint C: the connection-first arm's free identifier.
+    // Returning null (no connections) makes the slice take the unchanged
+    // legacy scan, which is what this harness characterizes.
+    connectionAccess: { resolveConnectionBackedAccess: async () => null },
     console: { log() {}, warn() {}, error() {} },
     process: { env: {} },
   });
