@@ -954,6 +954,19 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   font-size: 11px;
 }
 
+/* A rung that needs a prompt while the ✦ stream is generating one (N4):
+   shown, but inert until the prompt lands. */
+.opened-task-rung--pending {
+  border-style: dashed;
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+
+.opened-task-rung--pending .opened-task-setup {
+  color: var(--muted);
+}
+
 /* Templates grouped under "other prompts" — human label, sans. */
 .opened-task-other-prompts {
   margin-top: var(--space-2);

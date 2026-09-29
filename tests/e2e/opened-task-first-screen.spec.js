@@ -383,5 +383,57 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await expect(component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]')).toHaveAttribute('data-action', 'run-step');
       await expect(notice).toHaveCount(0);
     });
+
+    // N4/T1 (verdict a1f95b25): a ladder rung pressed while the ✦ stream is in
+    // flight must not wipe the streamed reasoning, and must never say "generate
+    // a prompt first" under a prompt that is generating. A notice raised
+    // mid-stream (the proxy set-up rung) is cleared once the stream settles.
+    test('a ladder rung pressed mid-stream keeps the streamed reasoning; settle clears the notice (N4/T1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      const STREAMED_REASONING = 'Reasoning about the task in several words.';
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+      await page.waitForLoadState('networkidle');
+      await openPrompts(page);
+
+      // Gate the shared SSE reader: emit the reasoning, then hold until released.
+      await page.evaluate((reasoning) => {
+        let release;
+        const gate = new Promise((r) => { release = r; });
+        window.__releaseStream = () => release();
+        window.readSSEStream = async (response, onEvent) => {
+          if (response.body) response.body.cancel().catch(() => {});
+          onEvent('message', { phase: 'reasoning' });
+          onEvent('message', { section: 'reasoning', content: `${reasoning}\n` });
+          await gate;
+          onEvent('message', { phase: 'prompt' });
+          onEvent('message', { section: 'prompt', content: '## Next step\n\nDo the thing.' });
+        };
+      }, STREAMED_REASONING);
+
+      const component = page.locator('.prompt-section').first();
+      const ladder = component.locator('[data-testid="opened-task-ladder"]');
+      const body = component.locator('[data-prompt-body]');
+      const notice = component.locator('.opened-task-setup-notice');
+
+      await component.locator('[data-testid="opened-task-go"]').click();
+      await expect(component).toHaveClass(/streaming/);
+      await expect(body).toContainText(STREAMED_REASONING);
+
+      // run this step needs a prompt; one is generating, so the press is inert.
+      await ladder.locator('[data-rung="run-step"]').click({ force: true });
+      await expect(body).toContainText(STREAMED_REASONING);
+      await expect(component.getByText(/generate a prompt first/i)).toHaveCount(0);
+
+      // run the whole task needs the proxy: its notice shows, the body is kept.
+      await ladder.locator('[data-rung="run-task"]').click();
+      await expect(notice).toContainText(/proxy set up/i);
+      await expect(body).toContainText(STREAMED_REASONING);
+
+      await page.evaluate(() => window.__releaseStream());
+      await expect(component).not.toHaveClass(/streaming/);
+      await expect(body).toContainText('Do the thing');
+      await expect(notice).toHaveCount(0);
+      await expect(ladder.locator('[data-rung="run-step"]')).toHaveAttribute('data-action', 'run-step');
+    });
   });
 });

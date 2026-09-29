@@ -192,6 +192,17 @@
     // A rung can only act on a prompt once one exists. `hasResult` distinguishes
     // the fresh state from idle/generating.
     const hasResult = !!(state.result && state.result.raw);
+    // Streaming policy (LIN-2944 N4): while the ✦ stream is in flight, a rung
+    // that needs a prompt is rendered INERT with an honest "generating…"
+    // reason rather than hiding the ladder until settle. The ladder's contract
+    // is that rungs are shown, never hidden; keeping it mounted also means the
+    // settle swaps rung states in place instead of the ladder jumping in under
+    // the streamed text. "generate a prompt first" would be false mid-stream,
+    // so the set-up form is kept for when no prompt exists or is coming.
+    const streaming = !!(state.result && state.result.streaming);
+    const needsPrompt = (rung, text) => (streaming
+      ? `<button class="opened-task-rung opened-task-rung--pending" data-rung="${rung}" disabled title="a prompt is generating">${text} <span class="opened-task-setup">generating\u2026</span></button>`
+      : `<button class="opened-task-rung opened-task-rung--setup" data-rung="${rung}" data-action="setup" data-setup-needs="prompt" title="generate a prompt first">${text} <span class="opened-task-setup">\u25CB set up \u203A</span></button>`);
     const rungs = [];
     // copy: with no prompt there is nothing to copy, and generating on a press
     // labelled "copy" would spend AI behind a non-AI label. So the idle rung is
@@ -199,7 +210,7 @@
     // the fresh state the action cluster already carries the prominent copy, so
     // the rung is not re-rendered — no duplicate copy affordance (F1/F3).
     if (!hasResult) {
-      rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="copy" data-action="setup" data-setup-needs="prompt" title="generate a prompt first">copy <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
+      rungs.push(needsPrompt('copy', 'copy'));
     }
     if (opts.dispatchEnabled && hasResult) {
       // Enabled run-step: dispatches the current prompt through the SAME path the
@@ -207,7 +218,7 @@
       // press is not recorded (LIN-2942).
       rungs.push('<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli">run this step</button>');
     } else if (opts.dispatchEnabled) {
-      rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="prompt" title="generate a prompt first">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
+      rungs.push(needsPrompt('run-step', 'run this step'));
     } else {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="dispatch">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
@@ -273,14 +284,19 @@
     return html;
   }
 
+  function setupNoticeHtml(notice) {
+    return notice ? `<div class="opened-task-setup-notice">${esc(notice)}</div>` : '';
+  }
+
   /**
-   * The notice a not-yet-enabled rung shows when pressed ("what it needs").
-   * Shared by BOTH states — idle AND fresh — so a `○ set up ›` rung is never a
-   * dead control, including for a remembered prompt restored into fresh (N1).
+   * The slot for the notice a not-yet-enabled rung shows when pressed ("what
+   * it needs"). Shared by BOTH states — idle AND fresh — so a `○ set up ›` rung
+   * is never a dead control, including for a remembered prompt restored into
+   * fresh (N1). The slot is always rendered, even empty: a press writes ONLY
+   * into it (N4), so it can never rebuild the prompt body or streamed text.
    */
   function renderSetupNotice(state) {
-    if (!state.setupNotice) return '';
-    return `<div class="opened-task-setup-notice">${esc(state.setupNotice)}</div>`;
+    return `<div class="opened-task-notice-slot" data-setup-notice-slot aria-live="polite">${setupNoticeHtml(state.setupNotice)}</div>`;
   }
 
   /**
@@ -452,10 +468,10 @@
     }
 
     // Every phase transition clears the press-raised setup notice (LIN-2944 N3):
-// the notice's truth is tied to the state it was raised in, so it must not
-// outlive a transition (idle -> generating -> fresh -> error, and a new
-// request). `render()` alone does NOT clear it, so a press's own re-render
-// keeps the notice visible until the next transition (N1).
+    // the notice's truth is tied to the state it was raised in, so it must not
+    // outlive a transition (idle -> generating -> fresh -> error, a new request,
+    // and the stream settle). `render()` alone does NOT clear it, so a re-render
+    // without a transition keeps the notice visible (N1).
     function enterPhase(phase) {
       state.phase = phase;
       state.setupNotice = null;
@@ -587,9 +603,11 @@
       let prevChildCount = 0;
       let truncated = false;
 
-      // First render: swap to fresh with empty body so the stream animates inline
+      // First render: swap to fresh with empty body so the stream animates inline.
+      // `streaming` lives on this placeholder result, so it ends with it: the
+      // settle, an error, `↻ change` or a new request all replace the result.
       enterPhase('fresh');
-      state.result = { label, name: 'AI thinking\u2026', raw: '', html: '', reasoning: '' };
+      state.result = { label, name: 'AI thinking\u2026', raw: '', html: '', reasoning: '', streaming: true };
       render();
       container.classList.add('streaming');
       let body = container.querySelector('[data-prompt-body]');
@@ -711,13 +729,17 @@
       if (action === 'setup') {
         // A not-yet-enabled rung says what it needs. It does NOT spend and does
         // NOT record the press — recording is LIN-2942, out of P0.
+        // N4: the press writes ONLY the notice slot, never a full render(), so
+        // it cannot rebuild the prompt body — above all the streamed text while
+        // the ✦ stream is in flight (the stream paints the body directly).
         const needs = btn.dataset.setupNeeds;
         state.setupNotice = needs === 'dispatch'
           ? 'running this step needs the dispatch runner set up'
           : needs === 'prompt'
             ? 'generate a prompt first'
             : 'running the whole task needs the proxy set up';
-        render();
+        const slot = container.querySelector('[data-setup-notice-slot]');
+        if (slot) slot.innerHTML = setupNoticeHtml(state.setupNotice);
         return;
       }
 

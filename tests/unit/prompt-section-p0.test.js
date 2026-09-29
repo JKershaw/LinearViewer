@@ -40,9 +40,44 @@ function makeLocalStorage() {
   };
 }
 
+// Locate the element whose opening tag matches `selector` (`[data-attr]` or
+// `.class`) in an HTML string, balancing nested same-name tags. Returns the
+// span of its inner HTML, or null. Enough DOM for the slot/body writes the
+// module makes through `container.querySelector` (N4).
+function findElement(html, selector) {
+  const attr = selector.match(/^\[([\w-]+)\]$/);
+  const cls = selector.match(/^\.([\w-]+)$/);
+  if (!attr && !cls) return null;
+  const matches = attr
+    ? (tag) => new RegExp(`\\s${attr[1]}(?=[\\s=>])`).test(tag)
+    : (tag) => new RegExp(`class="(?:[^"]*\\s)?${cls[1]}(?:\\s[^"]*)?"`).test(tag);
+  const tagRe = /<([a-z][a-z0-9]*)\b[^>]*>/gi;
+  let m;
+  while ((m = tagRe.exec(html))) {
+    if (!matches(m[0])) continue;
+    const openEnd = m.index + m[0].length;
+    const re = new RegExp(`<(/?)${m[1]}\\b[^>]*>`, 'gi');
+    re.lastIndex = openEnd;
+    let depth = 1;
+    let t;
+    while ((t = re.exec(html))) {
+      depth += t[1] ? -1 : 1;
+      if (depth === 0) return { openEnd, closeStart: t.index };
+    }
+    return null;
+  }
+  return null;
+}
+
 function makeContainer() {
   const container = {
-    innerHTML: '',
+    // Every full render is an `innerHTML` assignment on the container itself;
+    // `fullRenders` counts them. Element writes through querySelector splice
+    // `_html` directly, so they do NOT count as a full render.
+    _html: '',
+    fullRenders: 0,
+    get innerHTML() { return this._html; },
+    set innerHTML(v) { this._html = String(v); this.fullRenders++; },
     dataset: {},
     classList: {
       _c: new Set(),
@@ -54,7 +89,25 @@ function makeContainer() {
     _attrs: {},
     setAttribute(k, v) { this._attrs[k] = v; },
     getAttribute(k) { return this._attrs[k] ?? null; },
-    querySelector() { return null; },
+    querySelector(selector) {
+      if (!findElement(container._html, selector)) return null;
+      const splice = (value) => {
+        const at = findElement(container._html, selector);
+        if (!at) return;
+        container._html = container._html.slice(0, at.openEnd) + String(value) + container._html.slice(at.closeStart);
+      };
+      return {
+        get innerHTML() {
+          const at = findElement(container._html, selector);
+          return at ? container._html.slice(at.openEnd, at.closeStart) : '';
+        },
+        set innerHTML(v) { splice(v); },
+        set textContent(v) { splice(v); },
+        children: [],
+        scrollTop: 0,
+        scrollHeight: 0,
+      };
+    },
     contains() { return true; },
     _clickHandler: null,
     addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
@@ -170,6 +223,28 @@ function emptyStreamResponse() {
       },
     },
   };
+}
+
+// A gated ✦ stream (N4/T1): emits the reasoning, then holds until `release()`
+// before emitting the prompt, so a test can act while the stream is in flight.
+function gatedStream() {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  return {
+    release: () => release(),
+    readSSEStream: async (response, onEvent) => {
+      onEvent('message', { phase: 'reasoning' });
+      onEvent('message', { section: 'reasoning', content: 'STREAMED REASONING' });
+      await gate;
+      onEvent('message', { phase: 'prompt' });
+      onEvent('message', { section: 'prompt', content: 'STREAMED PROMPT' });
+    },
+  };
+}
+
+function promptBody(container) {
+  const body = container.querySelector('[data-prompt-body]');
+  return body ? body.innerHTML : '';
 }
 
 // ---------------------------------------------------------------------------
@@ -641,6 +716,44 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
       await flush();
       assert.equal(noticeCount(container.innerHTML), 0, 'the next request cleared the notice');
     });
+
+    // N4/T1 (verdict a1f95b25): the streaming sub-state of fresh. No rung that
+    // needs a prompt is a set-up rung while one is generating; any set-up rung
+    // that remains (dispatch/proxy) raises its notice without touching the
+    // streamed body; and the stream-settle transition clears that notice (the
+    // S-settle mutant leaves it standing beside the now-landed prompt).
+    test(`[${label}] streaming: no prompt-needing set-up rung, a press keeps the streamed body, settle clears the notice`, async () => {
+      const stream = gatedStream();
+      const { PromptSection } = loadPromptSection({
+        readSSEStream: stream.readSSEStream,
+        fetchImpl: async () => emptyStreamResponse(),
+      });
+      const container = makeContainer();
+      PromptSection.init(container, optsFor(combo));
+      await container.click({ prompt: '__ai__' });
+      await flush();
+
+      assert.equal(container.getAttribute('data-phase'), 'fresh');
+      assert.ok(container.classList.contains('streaming'), 'the stream is in flight');
+      assert.match(promptBody(container), /STREAMED REASONING/);
+      assert.equal(container.innerHTML.includes('generate a prompt first'), false, 'never "generate a prompt first" while generating');
+      const rungs = setupRungs(container.innerHTML);
+      assert.equal(rungs.some((r) => r.needs === 'prompt'), false, 'no prompt-needing set-up rung while streaming');
+
+      for (const rung of rungs) {
+        await container.click({ action: 'setup', setupNeeds: rung.needs });
+        assert.equal(noticeCount(container.innerHTML), 1, `pressing ${rung.rung} mid-stream shows its notice`);
+        assert.match(promptBody(container), /STREAMED REASONING/, `pressing ${rung.rung} keeps the streamed body`);
+      }
+
+      stream.release();
+      await flush();
+
+      assert.equal(container.classList.contains('streaming'), false, 'the stream settled');
+      assert.match(promptBody(container), /STREAMED PROMPT/);
+      assert.equal(noticeCount(container.innerHTML), 0, 'the settle transition clears a mid-stream notice (T1)');
+      assert.equal(hasEnabledRunStep(container.innerHTML), combo.dispatch, 'run-step is ready once the prompt lands');
+    });
   }
 
   test('a notice raised in idle does not survive the AI-stream transition to fresh', async () => {
@@ -687,5 +800,84 @@ describe('P0 re-review N3: the setup notice is tied to phase transitions (class 
 
     assert.equal(container.getAttribute('data-phase'), 'fresh');
     assert.equal(noticeCount(container.innerHTML), 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P0 re-review round 4 (verdict a1f95b25) N4: a set-up press updates ONLY the
+// notice slot. It never re-renders the component, so it cannot clobber the
+// prompt body — above all the streamed body while the ✦ stream is in flight.
+// ---------------------------------------------------------------------------
+
+describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
+  test('in idle, a set-up press shows its notice without a full render', async () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-70', identifier: 'LIN-70' }, { dispatchEnabled: true }));
+    const renders = container.fullRenders;
+
+    await container.click({ action: 'setup', setupNeeds: 'prompt' });
+
+    assert.match(container.innerHTML, /<div class="opened-task-setup-notice">generate a prompt first<\/div>/);
+    assert.equal(container.fullRenders, renders, 'no full render on a set-up press');
+  });
+
+  test('in fresh, a set-up press keeps the prompt body and does not re-render', async () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-71', identifier: 'LIN-71' }));
+    await container.click({ prompt: 'implementation' });
+    await flush();
+    const renders = container.fullRenders;
+
+    await container.click({ action: 'setup', setupNeeds: 'dispatch' });
+
+    assert.match(container.innerHTML, /dispatch runner set up/);
+    assert.equal(promptBody(container), 'TEMPLATE PROMPT');
+    assert.equal(container.fullRenders, renders, 'no full render on a set-up press');
+  });
+
+  test('mid-stream, a set-up press keeps the streamed reasoning and does not re-render', async () => {
+    const stream = gatedStream();
+    const { PromptSection } = loadPromptSection({
+      readSSEStream: stream.readSSEStream,
+      fetchImpl: async () => emptyStreamResponse(),
+    });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-72', identifier: 'LIN-72' }, { dispatchEnabled: false }));
+    await container.click({ prompt: '__ai__' });
+    await flush();
+    assert.ok(container.classList.contains('streaming'), 'the stream is in flight');
+    const renders = container.fullRenders;
+
+    await container.click({ action: 'setup', setupNeeds: 'dispatch' });
+
+    assert.match(container.innerHTML, /dispatch runner set up/);
+    assert.match(promptBody(container), /STREAMED REASONING/, 'the streamed body survives the press');
+    assert.equal(container.fullRenders, renders, 'no full render on a set-up press');
+    stream.release();
+    await flush();
+  });
+
+  test('mid-stream, the prompt-needing rungs are inert and say a prompt is generating', async () => {
+    const stream = gatedStream();
+    const { PromptSection } = loadPromptSection({
+      readSSEStream: stream.readSSEStream,
+      fetchImpl: async () => emptyStreamResponse(),
+    });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-73', identifier: 'LIN-73' }, { dispatchEnabled: true }));
+    await container.click({ prompt: '__ai__' });
+    await flush();
+
+    for (const rung of ['copy', 'run-step']) {
+      const html = container.innerHTML.match(new RegExp(`<button[^>]*data-rung="${rung}"[^>]*>[\\s\\S]*?</button>`));
+      assert.ok(html, `the ${rung} rung stays shown while streaming`);
+      assert.match(html[0], / disabled/);
+      assert.match(html[0], /generating/);
+      assert.equal(/data-action=/.test(html[0]), false, `the ${rung} rung has no action while streaming`);
+    }
+    stream.release();
+    await flush();
   });
 });
