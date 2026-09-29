@@ -67,6 +67,26 @@ function shortTmp() {
   return mkdtempSync(join(existsSync('/tmp') ? '/tmp' : tmpdir(), 'rk-'));
 }
 
+// F5: every socket test carries an explicit timeout, and every server and
+// child the file opens is registered here and torn down in a file-level
+// after(). A failed assertion that skips a test's own close() then fails the
+// test instead of leaving a listener that keeps the file (and CI) alive.
+const TIMEOUT = { timeout: 15_000 };
+const live = { servers: new Set(), children: new Set() };
+function track(server) {
+  live.servers.add(server);
+  return server;
+}
+after(() => {
+  for (const server of live.servers) {
+    if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    server.close();
+  }
+  for (const child of live.children) {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  }
+});
+
 // Tokens are minted at runtime so no token-shaped literal sits in the repo for
 // the secret scan to (rightly) flag.
 function freshToken() {
@@ -79,7 +99,7 @@ async function fakeHarbour() {
   const working = freshToken();
   const seen = [];
   let exchanges = 0;
-  const server = http.createServer(async (req, res) => {
+  const server = track(http.createServer(async (req, res) => {
     const chunks = [];
     for await (const c of req) chunks.push(c);
     const body = Buffer.concat(chunks).toString('utf8');
@@ -97,7 +117,7 @@ async function fakeHarbour() {
     seen.push({ method: req.method, url: req.url, headers: req.headers, body });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, method: req.method, url: req.url }));
-  });
+  }));
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
@@ -150,6 +170,7 @@ function spawnBroker({ home, base, bootstrap, itemId = ITEM_ID, urlKey = URL_KEY
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { PATH: process.env.PATH, HOME: home }
   });
+  live.children.add(child);
   let stdout = '';
   let stderr = '';
   child.stdout.on('data', (c) => { stdout += c; });
@@ -218,12 +239,12 @@ describe('credentialStore: the one place the broker keeps its working token', ()
 });
 
 describe('brokerTransport: mode-600 socket inside a mode-700 directory', () => {
-  test('dir is 700 and socket is 600, pinned with fs.stat', async () => {
+  test('dir is 700 and socket is 600, pinned with fs.stat', TIMEOUT, async () => {
     const tmp = shortTmp();
     try {
       const socketDir = join(tmp, 's');
       const socketPath = join(socketDir, 'abcd1234.sock');
-      const server = http.createServer((req, res) => res.end('x'));
+      const server = track(http.createServer((req, res) => res.end('x')));
       const t = await brokerTransport({ server, socketDir, socketPath });
       const d = statSync(socketDir);
       const s = statSync(socketPath);
@@ -239,22 +260,25 @@ describe('brokerTransport: mode-600 socket inside a mode-700 directory', () => {
     }
   });
 
-  test('a pre-existing loose directory is tightened to 700 before the socket is bound', async () => {
+  test('a pre-existing loose directory is tightened to 700 before the socket is bound', TIMEOUT, async () => {
     const tmp = shortTmp();
     try {
       const socketDir = join(tmp, 's');
       mkdirSync(socketDir, { mode: 0o755 });
       chmodSync(socketDir, 0o755);
-      const server = http.createServer((req, res) => res.end('x'));
+      const server = track(http.createServer((req, res) => res.end('x')));
       const t = await brokerTransport({ server, socketDir, socketPath: join(socketDir, 'abcd1234.sock') });
-      assert.equal(statSync(socketDir).mode & 0o777, 0o700);
-      await t.close();
+      try {
+        assert.equal(statSync(socketDir).mode & 0o777, 0o700);
+      } finally {
+        await t.close();
+      }
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
 
-  test('a path over the 104-byte sun_path limit fails closed and creates nothing', async () => {
+  test('a path over the 104-byte sun_path limit fails closed and creates nothing', TIMEOUT, async () => {
     const tmp = shortTmp();
     try {
       const socketDir = join(tmp, 'x'.repeat(120));
@@ -268,24 +292,25 @@ describe('brokerTransport: mode-600 socket inside a mode-700 directory', () => {
     }
   });
 
-  test('a live socket already at the path is refused (fail closed); a dead one is replaced', async () => {
+  test('a live socket already at the path is refused (fail closed); a dead one is replaced', TIMEOUT, async () => {
     const tmp = shortTmp();
     try {
       const socketDir = join(tmp, 's');
       const socketPath = join(socketDir, 'abcd1234.sock');
-      const first = await brokerTransport({ server: http.createServer((q, r) => r.end('1')), socketDir, socketPath });
+      const first = await brokerTransport({ server: track(http.createServer((q, r) => r.end('1'))), socketDir, socketPath });
       await assert.rejects(
-        brokerTransport({ server: http.createServer((q, r) => r.end('2')), socketDir, socketPath }),
+        brokerTransport({ server: track(http.createServer((q, r) => r.end('2'))), socketDir, socketPath }),
         /already listening|in use/i
       );
       await first.close();
       // A crashed broker (SIGKILL) leaves its socket file behind with nothing listening.
       const crashed = spawn(process.execPath, ['-e', `require('net').createServer().listen(${JSON.stringify(socketPath)}, () => console.log('up'))`], { stdio: ['ignore', 'pipe', 'ignore'] });
+      live.children.add(crashed);
       await new Promise((resolve) => crashed.stdout.once('data', resolve));
       crashed.kill('SIGKILL');
       await new Promise((resolve) => crashed.on('exit', resolve));
       assert.ok(existsSync(socketPath), 'the dead socket file is left behind');
-      const second = await brokerTransport({ server: http.createServer((q, r) => r.end('2')), socketDir, socketPath });
+      const second = await brokerTransport({ server: track(http.createServer((q, r) => r.end('2'))), socketDir, socketPath });
       const r = await brokerRequest(socketPath, { path: '/' });
       assert.equal(r.body, '2');
       await second.close();
@@ -334,7 +359,7 @@ describe('the broker over its socket (in-process)', () => {
       log: (line) => logLines.push(line),
       autoTick: false
     });
-  });
+  }, TIMEOUT);
 
   after(async () => {
     await broker?.stop('test-done');
@@ -346,7 +371,7 @@ describe('the broker over its socket (in-process)', () => {
     assert.equal(harbour.exchanges, 1);
   });
 
-  test('a GET is forwarded with a bearer the client never sent', async () => {
+  test('a GET is forwarded with a bearer the client never sent', TIMEOUT, async () => {
     const before = harbour.seen.length;
     const r = await brokerRequest(broker.socketPath, { path: '/api/proxy/dispatch/abc?full=1' });
     assert.equal(r.status, 200);
@@ -356,14 +381,14 @@ describe('the broker over its socket (in-process)', () => {
     assert.ok(!r.body.includes(harbour.working));
   });
 
-  test('a client-supplied Authorization is replaced, never forwarded', async () => {
+  test('a client-supplied Authorization is replaced, never forwarded', TIMEOUT, async () => {
     const before = harbour.seen.length;
     const r = await brokerRequest(broker.socketPath, { path: '/api/proxy/x', headers: { Authorization: 'Bearer attacker' } });
     assert.equal(r.status, 200);
     assert.equal(harbour.seen[before].headers.authorization, `Bearer ${harbour.working}`);
   });
 
-  test('a wrong Host gets 403 and reaches nothing upstream', async () => {
+  test('a wrong Host gets 403 and reaches nothing upstream', TIMEOUT, async () => {
     const before = harbour.seen.length;
     for (const host of ['localhost', '127.0.0.1', 'harbour-runner.invalid.evil', 'evil.example']) {
       const r = await brokerRequest(broker.socketPath, { path: '/api/proxy/x', host });
@@ -372,7 +397,7 @@ describe('the broker over its socket (in-process)', () => {
     assert.equal(harbour.seen.length, before);
   });
 
-  test('a non-/api/proxy path gets 404; so does the mint endpoint', async () => {
+  test('a non-/api/proxy path gets 404; so does the mint endpoint', TIMEOUT, async () => {
     const before = harbour.seen.length;
     for (const path of ['/', '/api/dispatch/x', '/workspace/acme', '/api/proxy/../admin']) {
       const r = await brokerRequest(broker.socketPath, { path });
@@ -384,7 +409,7 @@ describe('the broker over its socket (in-process)', () => {
     assert.equal(harbour.exchanges, 1);
   });
 
-  test('a write without X-Harbour-Intent: write gets 403 and reaches nothing upstream', async () => {
+  test('a write without X-Harbour-Intent: write gets 403 and reaches nothing upstream', TIMEOUT, async () => {
     const before = harbour.seen.length;
     for (const method of ['POST', 'PATCH', 'PUT', 'DELETE']) {
       const r = await brokerRequest(broker.socketPath, { method, path: '/api/proxy/dispatch/x/feedback', body: '{}', headers: { 'Content-Type': 'application/json' } });
@@ -394,7 +419,7 @@ describe('the broker over its socket (in-process)', () => {
     assert.equal(harbour.seen.length, before);
   });
 
-  test('a write with the intent header is forwarded with its body and content type', async () => {
+  test('a write with the intent header is forwarded with its body and content type', TIMEOUT, async () => {
     const before = harbour.seen.length;
     const payload = JSON.stringify({ kind: 'status', message: '[done]' });
     const r = await brokerRequest(broker.socketPath, {
@@ -537,7 +562,7 @@ describe('lifetime against a real broker (in-process, fake clock)', () => {
     }
   }
 
-  test('a stale heartbeat closes the socket and removes the pid file', async () => {
+  test('a stale heartbeat closes the socket and removes the pid file', TIMEOUT, async () => {
     await withBroker(async ({ broker, touch, advance, now }) => {
       touch(now());
       assert.equal(await socketRefuses(broker.socketPath), false);
@@ -553,7 +578,7 @@ describe('lifetime against a real broker (in-process, fake clock)', () => {
     });
   });
 
-  test('a simulated sleep gap does not close it', async () => {
+  test('a simulated sleep gap does not close it', TIMEOUT, async () => {
     await withBroker(async ({ broker, touch, advance, now }) => {
       touch(now());
       advance(BROKER_CHECK_MS); await broker.tick();
@@ -566,14 +591,14 @@ describe('lifetime against a real broker (in-process, fake clock)', () => {
     });
   });
 
-  test('a heartbeat the runner keeps refreshing never closes it', async () => {
+  test('a heartbeat the runner keeps refreshing never closes it', TIMEOUT, async () => {
     await withBroker(async ({ broker, touch, advance, now }) => {
       for (let i = 0; i < 30; i++) { advance(BROKER_CHECK_MS); touch(now()); await broker.tick(); }
       assert.equal(broker.stopped, false);
     });
   });
 
-  test('the maximum lifetime closes it', async () => {
+  test('the maximum lifetime closes it', TIMEOUT, async () => {
     await withBroker(async ({ broker, touch, advance, now }) => {
       advance(BROKER_MAX_LIFETIME_MS);
       touch(now());
@@ -583,7 +608,7 @@ describe('lifetime against a real broker (in-process, fake clock)', () => {
     });
   });
 
-  test('stop is idempotent and closes the socket', async () => {
+  test('stop is idempotent and closes the socket', TIMEOUT, async () => {
     await withBroker(async ({ broker }) => {
       await broker.stop('manual');
       await broker.stop('again');
@@ -595,7 +620,7 @@ describe('lifetime against a real broker (in-process, fake clock)', () => {
 });
 
 describe('startBroker fails closed', () => {
-  test('a failed exchange creates no socket and no pid file', async () => {
+  test('a failed exchange creates no socket and no pid file', TIMEOUT, async () => {
     const tmp = shortTmp();
     const harbour = await fakeHarbour();
     try {
@@ -612,11 +637,11 @@ describe('startBroker fails closed', () => {
     }
   });
 
-  test('a transport failure never spends the single-use bootstrap', async () => {
+  test('a transport failure never spends the single-use bootstrap', TIMEOUT, async () => {
     const tmp = shortTmp();
     const harbour = await fakeHarbour();
     const p = kitPaths({ home: tmp, urlKey: URL_KEY, itemId: ITEM_ID });
-    const squatter = http.createServer((q, r) => r.end('squatter'));
+    const squatter = track(http.createServer((q, r) => r.end('squatter')));
     const held = await brokerTransport({ server: squatter, socketDir: p.socketDir, socketPath: p.socket });
     try {
       await assert.rejects(
@@ -631,7 +656,7 @@ describe('startBroker fails closed', () => {
     }
   });
 
-  test('an empty bootstrap is refused before any network call', async () => {
+  test('an empty bootstrap is refused before any network call', TIMEOUT, async () => {
     const tmp = shortTmp();
     const harbour = await fakeHarbour();
     try {
@@ -646,7 +671,7 @@ describe('startBroker fails closed', () => {
     }
   });
 
-  test('a cleartext base that is not loopback is refused, so the bearer never crosses the network unencrypted', async () => {
+  test('a cleartext base that is not loopback is refused, so the bearer never crosses the network unencrypted', TIMEOUT, async () => {
     const tmp = shortTmp();
     try {
       await assert.rejects(
@@ -660,7 +685,7 @@ describe('startBroker fails closed', () => {
 });
 
 describe('the broker CLI (spawned, bootstrap on stdin)', () => {
-  test('the token is never in argv, env, any file under the kit dir, or output', async () => {
+  test('the token is never in argv, env, any file under the kit dir, or output', TIMEOUT, async () => {
     const home = shortTmp();
     const harbour = await fakeHarbour();
     const b = spawnBroker({ home, base: harbour.base, bootstrap: harbour.bootstrap });
@@ -711,7 +736,7 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
     assert.doesNotMatch(src, /Object\.assign\(\s*process\.env/);
   });
 
-  test('SIGTERM closes it: socket and pid file are removed, exit 0', async () => {
+  test('SIGTERM closes it: socket and pid file are removed, exit 0', TIMEOUT, async () => {
     const home = shortTmp();
     const harbour = await fakeHarbour();
     const b = spawnBroker({ home, base: harbour.base, bootstrap: harbour.bootstrap });
@@ -728,7 +753,7 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
     }
   });
 
-  test('stopBroker uses the pid file: closes it, removes the pid file and the socket', async () => {
+  test('stopBroker uses the pid file: closes it, removes the pid file and the socket', TIMEOUT, async () => {
     const home = shortTmp();
     const harbour = await fakeHarbour();
     const b = spawnBroker({ home, base: harbour.base, bootstrap: harbour.bootstrap });
@@ -749,7 +774,7 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
     }
   });
 
-  test('stopBroker does not signal a pid that no longer owns the socket, but still cleans up', async () => {
+  test('stopBroker does not signal a pid that no longer owns the socket, but still cleans up', TIMEOUT, async () => {
     const home = shortTmp();
     try {
       const p = kitPaths({ home, urlKey: URL_KEY, itemId: ITEM_ID });
@@ -765,7 +790,7 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
     }
   });
 
-  test('stopBroker with no pid file reports not found', async () => {
+  test('stopBroker with no pid file reports not found', TIMEOUT, async () => {
     const home = shortTmp();
     try {
       const result = await stopBroker({ home, urlKey: URL_KEY, itemId: ITEM_ID });
@@ -776,7 +801,7 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
     }
   });
 
-  test('a stdin bootstrap that fails to exchange exits non-zero with no token in its output', async () => {
+  test('a stdin bootstrap that fails to exchange exits non-zero with no token in its output', TIMEOUT, async () => {
     const home = shortTmp();
     const harbour = await fakeHarbour();
     const wrong = freshToken();
