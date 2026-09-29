@@ -44,6 +44,7 @@ import {
   BROKER_CHECK_MS,
   BROKER_SLEEP_GAP_MS,
   BROKER_MAX_LIFETIME_MS,
+  BROKER_MAX_BODY_BYTES,
   SUN_PATH_MAX_BYTES,
   kitPaths,
   credentialStore,
@@ -493,6 +494,48 @@ describe('the broker over its socket (in-process)', () => {
   test('the working token is not in this process\'s env or argv', () => {
     assert.ok(!JSON.stringify(process.env).includes(harbour.working));
     assert.ok(!process.argv.join(' ').includes(harbour.working));
+  });
+});
+
+describe('request body cap (F4)', () => {
+  test('the default cap sits above Harbour\'s largest proxy body (14mb attachment upload)', () => {
+    assert.ok(BROKER_MAX_BODY_BYTES >= 14 * 1024 * 1024);
+    assert.ok(BROKER_MAX_BODY_BYTES <= 32 * 1024 * 1024);
+  });
+
+  test('a body over the cap gets 413 and reaches nothing upstream; one at the cap is forwarded', TIMEOUT, async () => {
+    const tmp = shortTmp();
+    const harbour = await fakeHarbour();
+    let broker;
+    try {
+      broker = await startBroker({
+        base: harbour.base, urlKey: URL_KEY, itemId: ITEM_ID, home: tmp,
+        bootstrap: harbour.bootstrap, log: () => {}, autoTick: false, maxBodyBytes: 1024
+      });
+      const write = { 'Content-Type': 'text/plain', 'X-Harbour-Intent': 'write' };
+      const over = await brokerRequest(broker.socketPath, { method: 'POST', path: '/api/proxy/x', body: 'a'.repeat(1025), headers: write });
+      assert.equal(over.status, 413);
+      assert.equal(harbour.seen.length, 0);
+      // Streamed with no Content-Length: still capped.
+      const chunked = await new Promise((resolve, reject) => {
+        const req = http.request({ socketPath: broker.socketPath, method: 'POST', path: '/api/proxy/x', headers: { Host: BROKER_HOST, ...write } }, (res) => {
+          res.resume();
+          res.on('end', () => resolve(res.statusCode));
+        });
+        req.on('error', reject);
+        for (let i = 0; i < 4; i++) req.write('b'.repeat(512));
+        req.end();
+      });
+      assert.equal(chunked, 413);
+      assert.equal(harbour.seen.length, 0);
+      const at = await brokerRequest(broker.socketPath, { method: 'POST', path: '/api/proxy/x', body: 'c'.repeat(1024), headers: write });
+      assert.equal(at.status, 200);
+      assert.equal(harbour.seen[0].body.length, 1024);
+    } finally {
+      await broker?.stop('test-done');
+      await harbour.close();
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 
