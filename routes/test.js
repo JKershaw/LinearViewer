@@ -32,6 +32,7 @@ import { createFakeJiraClient } from '../lib/providers/jira/fake-client.js';
 import { defaultJiraSeed, JIRA_WORKSPACE_URL_KEY, JIRA_SITE } from '../tests/fixtures/jira-harness.js';
 import { establishAccount } from '../lib/account-session.js';
 import { respondToAccountConflict } from '../lib/account-conflict.js';
+import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection-credential.js';
 
 /**
  * Create test routes with required dependencies.
@@ -52,8 +53,45 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
  * @param {Object|null} [options.emailTransport] - The capture email transport (LIN-1892), or null when email sign-in isn't in capture mode
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null }) {
   const router = Router();
+
+  // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
+  // The four fixture writers below (local `extraBindings`, github,
+  // github-projects, jira) default to the LEGACY session-carried shape, byte-
+  // identical to before the cutover. `connectionBacked: true` (body or query)
+  // runs the REAL phase-B converter on the session-resident workspace after
+  // establishAccount, exactly as a live seam does, so an e2e spec can drive a
+  // connection-backed binding through the stubbed providers: the binding
+  // becomes {provider, scope, connectionId}, the credential lives on the
+  // Connection row, and every read is served by hydration. Explicitly opted in
+  // (`writesEnabled: true`), so the fixture ignores CONNECTION_BACKED_WRITES.
+  const wantsConnectionBacked = (req) =>
+    (req.body && req.body.connectionBacked === true) || req.query.connectionBacked === 'true';
+  const convertFixtureBinding = (req, workspaceId, binding, refreshToken) => convertToConnectionBacked({
+    connectionStore, ownerCredentialStore, session: req.session, accountId: req.session.accountId,
+    workspaceId, provider: binding.provider, scope: binding.scope, credentials: binding.credentials,
+    refreshToken, prior: 'none', writesEnabled: true,
+  });
+
+  // T27: the binding SHAPES of this session (never a credential value), so a
+  // spec can assert connection-backed vs legacy without reading the session.
+  router.get('/test/session-bindings', (req, res) => {
+    res.json({
+      accountId: req.session.accountId || null,
+      workspaces: (req.session.workspaces || []).map(w => ({
+        urlKey: w.urlKey,
+        activeBinding: w.activeBinding || null,
+        hasScalarMirror: w.accessToken !== undefined || w.credentials !== undefined,
+        bindings: (w.bindings || []).map(b => ({
+          provider: b.provider,
+          scope: b.scope,
+          connectionId: isConnectionBacked(b) ? b.connectionId : null,
+          hasCredentials: b.credentials !== undefined,
+        })),
+      })),
+    });
+  });
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
   // A tiny in-memory stand-in for the Yap chat server so the Collective live
@@ -1271,10 +1309,19 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // materialize an explicit bindings[] with the local binding ACTIVE first,
       // so the providers settings switch can be exercised end-to-end. The local
       // binding stays the scalar-mirrored active one; extras are non-active.
+      // LIN-3124 PR3 (T27): an extra binding may carry `connectionBacked: true`;
+      // the marker is stripped here and the binding converted after
+      // establishAccount below. Without it the extras are stored verbatim.
+      const connectionBackedExtras = [];
       if (Array.isArray(body.extraBindings) && body.extraBindings.length) {
         localWorkspace.bindings = [
           { provider: 'local', scope: urlKey, credentials: { token: urlKey, tokenExpiresAt: Number.MAX_SAFE_INTEGER } },
-          ...body.extraBindings,
+          ...body.extraBindings.map(b => {
+            if (!b || b.connectionBacked !== true) return b;
+            const { connectionBacked, refreshToken, ...binding } = b;
+            connectionBackedExtras.push({ binding, refreshToken });
+            return binding;
+          }),
         ];
       }
       // Optional session flash seam (LIN-2803): Local has no live add-source
@@ -1301,6 +1348,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // itself (Q6 — freshly-unique per real create, never a false-conflict
       // risk), mirroring routes/workspace.js's POST /workspace/new.
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, wsId);
+      for (const { binding, refreshToken } of connectionBackedExtras) {
+        const conversion = await convertFixtureBinding(req, wsId, binding, refreshToken);
+        if (!conversion.connectionBacked) throw new Error(`connection-backed extra binding ${binding.provider} did not convert`);
+      }
 
       // Optionally provision a mock OpenRouter key, mirroring /test/set-session
       // (L93-97). Honored from query (GET) or body (POST). Superset/no-op by
@@ -1438,8 +1489,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // GitHub user id (Q1), shared with GitHub Projects (Q3) — this fixture's
       // simulated human is distinct from the Projects fixture's.
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', 'test-github-user-id', {}, GITHUB_WS_UUID);
+      const connectionBacked = wantsConnectionBacked(req);
+      if (connectionBacked) {
+        const conversion = await convertFixtureBinding(req, GITHUB_WS_UUID, req.session.workspaces[0].bindings[0]);
+        if (!conversion.connectionBacked) throw new Error('connection-backed github fixture did not convert');
+      }
 
-      req.session.save(() => res.json({ ok: true, urlKey: GITHUB_WORKSPACE_URL_KEY, repo: GITHUB_REPO }));
+      req.session.save(() => res.json({ ok: true, urlKey: GITHUB_WORKSPACE_URL_KEY, repo: GITHUB_REPO, ...(connectionBacked ? { connectionBacked } : {}) }));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -1529,8 +1585,13 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // GitHub user id (Q1) — SAME identity provider as GitHub Issues (Q3), but
       // this fixture's simulated human is a distinct one from the Issues fixture.
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'github', 'test-github-projects-user-id', {}, GITHUB_PROJECTS_WS_UUID);
+      const connectionBacked = wantsConnectionBacked(req);
+      if (connectionBacked) {
+        const conversion = await convertFixtureBinding(req, GITHUB_PROJECTS_WS_UUID, req.session.workspaces[0].bindings[0]);
+        if (!conversion.connectionBacked) throw new Error('connection-backed github-projects fixture did not convert');
+      }
 
-      req.session.save(() => res.json({ ok: true, urlKey: GITHUB_PROJECTS_WORKSPACE_URL_KEY, board: GITHUB_PROJECTS_BOARD }));
+      req.session.save(() => res.json({ ok: true, urlKey: GITHUB_PROJECTS_WORKSPACE_URL_KEY, board: GITHUB_PROJECTS_BOARD, ...(connectionBacked ? { connectionBacked } : {}) }));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -1560,6 +1621,8 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // pair: deliberately not 'test-token', so no mock short-circuit fires.
   const JIRA_OAUTH_ACCESS_TOKEN = 'fake_jira_oauth_access_token';
   const JIRA_CLOUD_ID = '11111111-2222-3333-4444-555555555555';
+  // The connection-keyed owner record's stand-in rotating token (T27 variant only).
+  const JIRA_OAUTH_REFRESH_TOKEN = 'fake_jira_oauth_refresh_token';
 
   // POST → seeds a custom `{ seed }` body (the clean {projects,issues} shape,
   //        falls back to defaultJiraSeed). GET → seeds the default.
@@ -1662,8 +1725,16 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // LIN-1329 fixture re-point: `jira` identity scope is the human's Jira
       // accountId (mirrors routes/jira-auth.js's real establishAccount call).
       await establishAccount(req.session, accountStore, accountWorkspaceStore, 'jira', 'test-jira-account-id', {}, JIRA_WS_UUID);
+      // Jira Basic is never connection-backed (ruling 04461f8f): the variant
+      // requires the OAuth arm, and refuses rather than silently staying legacy.
+      const connectionBacked = wantsConnectionBacked(req);
+      if (connectionBacked) {
+        if (authType !== 'oauth') throw new Error('a connection-backed jira fixture needs authType=oauth (Basic never converts)');
+        const conversion = await convertFixtureBinding(req, JIRA_WS_UUID, req.session.workspaces[0].bindings[0], JIRA_OAUTH_REFRESH_TOKEN);
+        if (!conversion.connectionBacked) throw new Error('connection-backed jira fixture did not convert');
+      }
 
-      req.session.save(() => res.json({ ok: true, urlKey: JIRA_WORKSPACE_URL_KEY, site: JIRA_SITE }));
+      req.session.save(() => res.json({ ok: true, urlKey: JIRA_WORKSPACE_URL_KEY, site: JIRA_SITE, ...(connectionBacked ? { connectionBacked } : {}) }));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

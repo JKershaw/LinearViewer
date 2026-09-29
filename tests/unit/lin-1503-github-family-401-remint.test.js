@@ -85,11 +85,13 @@ describe('LIN-1503: handleUnauthorizedError GitHub-family branch (source-text pi
     assert.notEqual(renderCatchIdx, -1, 'expected a catch (renderError) clause in the GitHub-family branch');
 
     // Bound the slice to catch (renderError)'s own body: from the catch clause
-    // to the GitHub-family branch's closing brace, i.e. up to the Linear
-    // durableRecord check that follows the whole branch.
+    // to the GitHub-family branch's closing brace. LIN-3124 PR3 (C3) inserts the
+    // connection arm (`if (connectionId) {`) between this branch and the Linear
+    // durableRecord check, so bound there when present.
+    const connectionArmIdx = body.indexOf('if (connectionId) {', renderCatchIdx);
     const linearCheckIdx = body.indexOf('const durableRecord = await ownerCredentialStore.get(', renderCatchIdx);
     assert.notEqual(linearCheckIdx, -1, 'expected the Linear durableRecord check to follow the GitHub-family branch');
-    const renderCatchBody = body.slice(renderCatchIdx, linearCheckIdx);
+    const renderCatchBody = body.slice(renderCatchIdx, connectionArmIdx !== -1 ? connectionArmIdx : linearCheckIdx);
 
     assert.ok(renderCatchBody.includes('serviceUnavailable'), 'expected catch (renderError) to return a retryable serviceUnavailable response');
     assert.ok(!renderCatchBody.includes('handleWorkspaceRemoval('), 'catch (renderError) must NEVER call handleWorkspaceRemoval — a post-remint render failure must preserve the workspace, this is the direct F1 regression guard');

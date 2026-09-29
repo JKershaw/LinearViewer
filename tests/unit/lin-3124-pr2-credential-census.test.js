@@ -19,26 +19,27 @@
  *   (lib/providers/github/index.js, github-projects), plus the test fixture
  *   (routes/test.js).
  *
- *   Re-stated 24 -> 25 when LIN-1892 S3 merged: `routes/email-auth.js`'s
+ *   Re-stated +1 when LIN-1892 S3 merged: `routes/email-auth.js`'s
  *   `emailPrefill` reads an ACCOUNT-IDENTITY credential
  *   (`jira.credentials.email`, the Jira pre-fill, N7) — the account-identities
  *   sub-class, which this file's own exclusion note scopes to
  *   lib/account-store.js but which the S3 route reads in place. Counted, not
- *   excluded, so the guard still sees it.
+ *   excluded, so the guard still sees it (main: 24 -> 25; this tree: 12 -> 13).
  *
  *   WRITER census — `workspace.credentials` writes and its delete in
  *   lib/workspace.js (the second workspace-level mirror, D15).
  *
- * These are counts, not hashes: PR3's read cutover will change the READ census
- * (several raw reads convert to accessors), and the failure here is the signal
- * to re-state the query and its new value.
+ * These are counts, not hashes: PR3's read cutover changed the READ census
+ * (the D15 accessor conversions in lib/workspace.js route the binding /
+ * workspace reads through `getBindingCredentials`, so the raw count fell from
+ * 24 to 12). The count is re-stated here for the PR3 tree.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
 
-const D15_READ_CENSUS = 25;
-const D15_WORKSPACE_MIRROR_WRITER_CENSUS = 4;
+const D15_READ_CENSUS = 13;
+const D15_WORKSPACE_MIRROR_WRITER_CENSUS = 5;
 
 // Files whose `.credentials` occurrences belong to a different D15 sub-class.
 const D15_EXCLUDED_FILES = new Set([
@@ -47,6 +48,7 @@ const D15_EXCLUDED_FILES = new Set([
   'lib/connection-credential.js',// the connection seam
   'lib/connection-binding.js',   // the connection seam
   'lib/connection-lifecycle.js', // the connection seam
+  'lib/connection-access.js',    // the connection seam (PR3 read arm)
   'routes/test.js',              // test fixture
   'lib/providers/github/index.js',          // refreshCredential reads
   'lib/providers/github-projects/index.js', // refreshCredential reads
@@ -87,7 +89,7 @@ describe('LIN-3124 PR2 — D15 raw-credential census (explicit query)', () => {
     assert.strictEqual(rawCredentialReadLines(plus), D15_READ_CENSUS + 1);
 
     const minus = new Map(REAL);
-    minus.set('lib/workspace.js', REAL.get('lib/workspace.js').replace('return match?.credentials?.token;', 'return match;'));
+    minus.set('lib/workspace.js', REAL.get('lib/workspace.js').replace('return binding.credentials;', 'return undefined;'));
     assert.strictEqual(rawCredentialReadLines(minus), D15_READ_CENSUS - 1);
   });
 
@@ -98,14 +100,18 @@ describe('LIN-3124 PR2 — D15 raw-credential census (explicit query)', () => {
     assert.strictEqual(workspaceMirrorWriterLines(planted), D15_WORKSPACE_MIRROR_WRITER_CENSUS + 1);
   });
 
-  test('the two review-named readers are present and unedited', () => {
+  test('the two review-named readers are present: resolver legacy-only + workspace D1-served', () => {
     const resolver = REAL.get('lib/workspace-token-resolver.js');
     assert.match(resolver, /\.credentials\?\.installationId/, 'findActiveInstallationId (resolver:62)');
     const workspace = REAL.get('lib/workspace.js');
-    // getWorkspaceCallScope's Jira projection (the D1 accessor body)
-    assert.match(workspace, /binding\.credentials\?\.authType === 'oauth'/);
-    assert.match(workspace, /binding\.credentials\?\.cloudId/);
-    assert.match(workspace, /binding\.credentials\?\.email/);
+    // LIN-3124 PR3: getWorkspaceCallScope's Jira projection is a D1 accessor
+    // body, now served from the binding/workspace accessor (side-table eligible)
+    // instead of a raw `binding.credentials` read.
+    assert.match(workspace, /const activeCreds = getBindingCredentials\(active\)/);
+    assert.match(workspace, /activeCreds\?\.authType === 'oauth'/);
+    assert.match(workspace, /activeCreds\?\.cloudId/);
+    assert.match(workspace, /activeCreds\?\.email/);
+    assert.match(workspace, /export function getBindingCredentials\(binding\)/);
   });
 
   // B4/R21 — the account-merge lifecycle wiring is pinned.

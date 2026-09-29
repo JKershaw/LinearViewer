@@ -177,6 +177,13 @@ async function runGitHubFamilyBranch({
     // LIN-3124 PR2: the sliced source references these free identifiers.
     connectionStore: {},
     releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
+    evictReferentFor: () => () => {},
+    // LIN-3124 PR3 checkpoint C: legacy fixtures have no connection-backed binding.
+    activeConnectionIdForWorkspace: () => null,
+    connectionAccess: {
+      connectionRefreshGateAllows: async () => true,
+      refreshConnectionForWorkspace: async () => null,
+    },
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
     // LIN-1892: handleWorkspaceRemoval's landing render reads the email predicate.
@@ -209,6 +216,9 @@ async function runGitHubFamilyBranch({
     // harness.
     '  const declaration = refreshDeclarationFor(workspace);',
     '  const provider = normalizeProvider(workspace);',
+    // LIN-3124 PR3 checkpoint C3: handleUnauthorizedError now computes the
+    // active connection id before the branch. Legacy fixtures return null.
+    '  const connectionId = activeConnectionIdForWorkspace(workspace);',
     sliceGitHubFamilyBranch(),
     "  return '__FELL_THROUGH_TO_LINEAR__';",
     '}',

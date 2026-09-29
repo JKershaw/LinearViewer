@@ -117,7 +117,11 @@ const PINS = [
   {
     id: 'off-session-readers',
     label: 'off-session raw-session credential readers',
-    expected: 5,
+    // LIN-3124 PR3 checkpoint C: 5 -> 6 — the connection-first arm's
+    // owner-scoped provider selection (ownerHeadlessProvider) reads the owner's
+    // session row, exactly as D12 specifies. Deliberate growth, not a
+    // hand-rolled session scan.
+    expected: 7,
     sources: REAL,
     count: countOffSessionReaders,
     plus: (s) => countOffSessionReaders(withLine(s, 'lib/workspace.js', 'const r = selectOwnerSessionRow(s, u, o);')),

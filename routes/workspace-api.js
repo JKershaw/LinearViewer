@@ -61,6 +61,7 @@ import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, getWorkspaceMirrorToken, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
 import { adoptDurableCredentialIfDifferent } from '../lib/suspect-credential-refresh.js';
+import { isConnectionBacked, setBindingCredential, setWorkspaceCredential } from '../lib/connection-binding.js';
 import { fingerprintCredential } from '../lib/credential-diagnostics.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
@@ -308,6 +309,17 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
 }
 
 /**
+ * LIN-3124 PR3 (D2): the workspace's active connectionId when its active binding
+ * is connection-backed, else null. Store-free (connection-binding.js).
+ */
+function connectionBackedId(workspace) {
+  const marker = workspace?.activeBinding;
+  if (!marker || !Array.isArray(workspace.bindings)) return null;
+  const binding = workspace.bindings.find(b => b && b.provider === marker.provider && b.scope === marker.scope);
+  return isConnectionBacked(binding) ? binding.connectionId : null;
+}
+
+/**
  * Create workspace API routes with required dependencies.
  * @param {Object} options
  * @param {Function} options.workspaceFromUrl - Middleware to extract workspace from URL
@@ -316,9 +328,10 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
  * @param {Object} [options.taskDecisionsStore] - Task-keyed scan-decision store (LIN-2197)
  * @param {Object} [options.sessionsFeedCache] - Shared SWR cache for the rulings/sessions feed (LIN-2755); null → uncached deployment, invalidation is a no-op
  * @param {Object} [options.ownerCredentialStore] - Durable owner-credential store (LIN-2933); null → the comment route's one-shot auth-recovery is disabled, not a hard dependency
+ * @param {Function} [options.adoptConnectionCredential] - LIN-3124 PR3 (D7): connection-keyed adopt read (injected; protected module imports no connection seam)
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -1716,13 +1729,33 @@ ${goal}`
         && provider.name === 'linear'
 
       if (recoveryEligible) {
-        const adopted = await adoptDurableCredentialIfDifferent({
-          fingerprint: fingerprintCredential(token),
-          urlKey: workspace.urlKey,
-          ownerAccountId: req.session.accountId,
-          provider: provider.name,
-          store: ownerCredentialStore,
-        })
+        // LIN-3124 PR3 (D7 adopt entrant): a connection-backed active workspace
+        // adopts from its Connection (connection-keyed) and hydrates the
+        // per-request side-table — `applyAccessTokenToWorkspace` no-ops for such
+        // a workspace, so without this the retry would read the stale credential.
+        // The legacy path is byte-identical.
+        const activeConnectionId = connectionBackedId(workspace)
+        let adopted = null
+        if (activeConnectionId && typeof adoptConnectionCredential === 'function') {
+          const adoptedConnection = await adoptConnectionCredential({
+            workspace,
+            ownerAccountId: req.session.accountId,
+            fingerprint: fingerprintCredential(token),
+          })
+          if (adoptedConnection) {
+            setBindingCredential(adoptedConnection.binding, adoptedConnection.credentialBag)
+            setWorkspaceCredential(workspace, adoptedConnection.credentialBag)
+            adopted = { token: adoptedConnection.token, expiresAt: adoptedConnection.expiresAt }
+          }
+        } else {
+          adopted = await adoptDurableCredentialIfDifferent({
+            fingerprint: fingerprintCredential(token),
+            urlKey: workspace.urlKey,
+            ownerAccountId: req.session.accountId,
+            provider: provider.name,
+            store: ownerCredentialStore,
+          })
+        }
 
         if (adopted) {
           // Inner error boundary (plan-review R1): the route's outer `catch`

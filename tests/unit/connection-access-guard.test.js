@@ -30,6 +30,8 @@ import {
   namedCallOffenders,
   byConnectionWriteOffenders,
   registryOffenders,
+  refresherInstanceOffenders,
+  DECOY_LANES,
 } from '../fixtures/connection-access-guards.js';
 
 // ---------------------------------------------------------------------------
@@ -47,11 +49,28 @@ const STORE_ALLOWED_IMPORTERS = [
   'lib/connection-lifecycle.js',
 ];
 // LIN-3124 PR2 (S2/S8): the seam, imported by the server (hydration wiring) and
-// by the session store (the persist sanitizer). Exact at this tree.
-const CREDENTIAL_ALLOWED_IMPORTERS = ['server.js', 'lib/session-store.js'];
-// LIN-3124 PR2 (S6): the release functions, called at the 7 unwired-by-others
-// census sites plus the account merge. Exact at this tree.
-const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'routes/workspace.js', 'routes/account-merge.js'];
+// by the session store (the persist sanitizer). LIN-3124 PR3 checkpoint E (F1):
+// extended by EXACTLY the four modules holding the 10 `writeConnection`
+// conversion seams (auth ×2, GitHub install flow ×3, Jira ×4, merge ×1).
+const CREDENTIAL_ALLOWED_IMPORTERS = [
+  'server.js',
+  'lib/session-store.js',
+  'routes/auth.js',
+  'lib/github-install-flow.js',
+  'routes/jira-auth.js',
+  'routes/account-merge.js',
+  // LIN-3124 PR3 checkpoint F (T27): the test-only fixture writers' opt-in
+  // connection-backed variants (routes/test.js is mounted only under NODE_ENV=test).
+  'routes/test.js',
+];
+// LIN-3124 PR2 (S6): the release functions, called at the census sites plus the
+// account merge. LIN-3124 PR3 checkpoint E: + the converter's D18 step-1/2
+// orphan release (`releaseOrphanOwnerRecord`, arm f6). Exact at this tree.
+const LIFECYCLE_ALLOWED_IMPORTERS = ['server.js', 'routes/workspace.js', 'routes/account-merge.js', 'lib/connection-credential.js'];
+// LIN-3124 PR3 (C): `lib/connection-access.js` is the arm's pure selection
+// helpers. It imports none of the three connection modules and is imported only
+// by the single credential seam. Exact at this tree.
+const ACCESS_ALLOWED_IMPORTERS = ['lib/connection-credential.js'];
 const READ_ALLOWED_MODULES = ['lib/connection-store.js', 'lib/connection-credential.js', 'lib/connection-lifecycle.js'];
 
 const PROTECTED_MODULES = [
@@ -88,6 +107,7 @@ function withFile(sources, rel, src) {
 const STORE_IMPORT = "import { writeConnection } from '../lib/connection-store.js';\n";
 const CRED_IMPORT = "import { x } from '../lib/connection-credential.js';\n";
 const LIFECYCLE_IMPORT = "import { x } from '../lib/connection-lifecycle.js';\n";
+const ACCESS_IMPORT = "import { x } from '../lib/connection-access.js';\n";
 
 // ---------------------------------------------------------------------------
 // Source arms (pure `check(sources) -> offenders` + planted offender)
@@ -113,6 +133,13 @@ const SOURCE_ARMS = [
     name: 'connection-lifecycle.js importers are EXACTLY the allow-list',
     check: (s) => importerOffenders(s, 'lib/connection-lifecycle.js', LIFECYCLE_ALLOWED_IMPORTERS, { exact: true }),
     planted: withFile(REAL, 'lib/evil-importer.js', LIFECYCLE_IMPORT),
+    plantedNote: 'an extra importer (also fails for a dropped allow-listed importer)',
+  },
+  {
+    id: 'a4',
+    name: 'connection-access.js importers are EXACTLY the allow-list',
+    check: (s) => importerOffenders(s, 'lib/connection-access.js', ACCESS_ALLOWED_IMPORTERS, { exact: true }),
+    planted: withFile(REAL, 'lib/evil-importer.js', ACCESS_IMPORT),
     plantedNote: 'an extra importer (also fails for a dropped allow-listed importer)',
   },
   {
@@ -203,10 +230,15 @@ const SOURCE_ARMS = [
 
 describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
   // The lifecycle release is called at exactly the 7 durable-delete census
-  // sites (D4): definitive-revocation ×3 in server.js, unlink ×1 in server.js,
-  // whole-workspace removal ×1 in server.js + ×2 in routes/workspace.js. Note
+  // sites (D4): definitive-revocation ×3 in server.js (ensureValidToken's two
+  // catches and the handleUnauthorizedError connection arm PR3 C3 added — each
+  // scoped to the ACTIVE connection-backed binding, review blocker 3), unlink ×1
+  // in server.js, whole-workspace removal ×1 in server.js + ×2 in
+  // routes/workspace.js. PR3 review blocker 3 removed the legacy 401 arm's
+  // release (8 -> 7): that arm is reached only when the active binding is legacy,
+  // and an unscoped revoke there deleted connection-backed siblings. Note
   // `releaseOrphanOwnerRecord` is NOT part of this count — it is the converter's
-  // failure-path release (arm f6), not one of the 7 sites.
+  // failure-path release (arm f6), not one of these sites.
   const KNOWN_CONNECTION_RELEASE_COUNT = 7;
   const RELEASE_CALL = /releaseConnectionCredential\s*\(/g;
 
@@ -222,7 +254,7 @@ describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
   test('planted: a dropped site fails the census', () => {
     const dropped = new Map(REAL);
     dropped.set('server.js', REAL.get('server.js').replace(
-      "await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })",
+      "if (connectionId) await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope: workspace.activeBinding.scope, mode: 'revoke', evict: evictReferentFor(accountId) })",
       'await noop()'
     ));
     assert.ok(releaseCallCount(dropped) < KNOWN_CONNECTION_RELEASE_COUNT);
@@ -244,6 +276,30 @@ describe('LIN-3124 PR1 T4 — D6 source arms', () => {
       assert.ok(arm.planted, `arm ${arm.id} is missing a planted case`);
       assert.ok(arm.check(arm.planted).length > 0, `arm ${arm.id}'s planted case does not fail it`);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// G3b (PR2 verdict b39d8121): exactly one production createConnectionRefresher
+// ---------------------------------------------------------------------------
+
+describe('LIN-3124 PR2 G3b — single connection refresher instance', () => {
+  test('exactly one createConnectionRefresher( instance, in server.js', () => {
+    assert.deepEqual(refresherInstanceOffenders(REAL), []);
+  });
+
+  test('planted: a dropped instance fails the pin', () => {
+    const dropped = new Map(REAL);
+    dropped.set('server.js', REAL.get('server.js').replace(
+      '= createConnectionRefresher({',
+      '= buildRefresher({'
+    ));
+    assert.ok(refresherInstanceOffenders(dropped).length > 0);
+  });
+
+  test('planted: a second instance outside server.js fails the pin', () => {
+    const planted = withFile(REAL, 'lib/workspace.js', `${REAL.get('lib/workspace.js')}\nconst second = createConnectionRefresher({});\n`);
+    assert.ok(refresherInstanceOffenders(planted).length > 0);
   });
 });
 
@@ -284,6 +340,8 @@ const METHOD_CLASSES = {
   // LIN-3124 PR2 (S1): the connection-first read/delete lifecycle.
   link: 'WRITE',
   readConnectionById: 'READ',
+  // LIN-3124 PR3 checkpoint E: the D18 ambiguous-acknowledgement re-read.
+  readConnectionOutcome: 'READ',
   readConnectionsByIds: 'READ',
   readConnectionsByReferent: 'READ',
   readReferencedConnections: 'READ',
@@ -382,14 +440,9 @@ describe('LIN-3124 PR1 T4 — retired no-read-switch assertions are subsumed', (
 // no connection-backed read yet, so the behavioural half lands with the read
 // cutover (PR3, T18). This registry pins the LANE SET now, so a lane cannot be
 // silently dropped before the behavioural test is written.
-const DECOY_LANES = [
-  { lane: 'browser (active binding)', accessor: 'getWorkspaceCallScope' },
-  { lane: 'per-binding: dashboard fan-out', accessor: 'getBindingCallScope' },
-  { lane: 'per-binding: resolveIssueBinding', accessor: 'resolveIssueBinding' },
-  { lane: 'per-binding: settings probe (3-arg getWorkspaceToken)', accessor: 'getWorkspaceToken' },
-  { lane: 'owner-scoped headless', accessor: 'resolveWorkspaceAccess' },
-  { lane: 'owner-blind', accessor: 'getWorkspaceAccessToken' },
-];
+// LIN-3124 PR3 checkpoint F: the registry now lives in the shared fixture so the
+// behavioural half (tests/unit/lin-3124-pr3-t18-decoy.test.js) iterates the SAME
+// lane set and its coverage meta-check fails if a lane has no probe.
 
 function decoyLaneOffenders(sources) {
   const workspaceSrc = sources.get('lib/workspace.js') || '';

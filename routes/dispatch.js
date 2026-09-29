@@ -468,7 +468,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         // chokepoint), not duplicated at this route layer the way model/
         // harness/terminal are via validateDispatchPayload above.
         composedRunMarker,
-        getWorkspaceAccessToken,
+        // LIN-3124 PR3 (D16): pass the session so a connection-backed
+        // workspace's done-guard reads the session's own hydrated credential.
+        getWorkspaceAccessToken: (k) => getWorkspaceAccessToken(k, req.session),
         fetchIssueContext,
         // Follow-up credential provisioning (LIN-1431 S3 #1, LIN-3134 T2-ii). The
         // human reply box (public/session.js) posts only { prompt, followUpTo,

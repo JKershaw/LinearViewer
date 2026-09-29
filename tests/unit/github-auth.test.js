@@ -433,6 +433,30 @@ describe('GitHub auth routes', () => {
     };
   }
 
+  // LIN-3124 PR3 checkpoint E: a NEW GitHub binding is connection-backed — the
+  // LIN-711 shape (installationId + real ms expiry) lives on the Connection row,
+  // one per installation, with the workspace as a referent; the binding itself
+  // carries only `{provider, scope, connectionId}`.
+  async function assertConnectionBackedLin711(connectionStore, session, binding, { urlKey, provider = 'github', scope, installationId, token, tokenExpiresAt }) {
+    const connectionId = `${session.accountId}::${provider}::${installationId}`;
+    assert.deepEqual(binding, { provider, scope, connectionId });
+    const row = await connectionStore.readConnectionById(connectionId);
+    assert.deepEqual(row.credentials, { installationId, token, tokenExpiresAt });
+    assert.deepEqual(row.referents, [{ urlKey, provider, scope }]);
+    assert.equal(row.origin, 'connection');
+  }
+
+  // D11: CONNECTION_BACKED_WRITES=off governs creation — the pre-cutover legacy
+  // shape, byte-identical.
+  async function withWritesOff(fn) {
+    const prev = process.env.CONNECTION_BACKED_WRITES;
+    process.env.CONNECTION_BACKED_WRITES = 'off';
+    try { return await fn(); } finally {
+      if (prev === undefined) delete process.env.CONNECTION_BACKED_WRITES;
+      else process.env.CONNECTION_BACKED_WRITES = prev;
+    }
+  }
+
   test('GET /auth/github 503s when GitHub App env is not configured', async () => {
     delete process.env.GITHUB_APP_ID;
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
@@ -733,7 +757,8 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (re-bind, new) mints the installation token for the chosen repo and writes the LIN-711 binding (LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const stores = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -750,14 +775,18 @@ describe('GitHub auth routes', () => {
     const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
     // The persisted credential is an INSTALLATION token in the LIN-711 shape — for the
     // repo's resolved installation (77), never the discovery user token.
-    assert.deepEqual(ws.bindings, [{ provider: 'github', scope: 'octocat/hello-world', credentials: { installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry } }]);
+    assert.equal(ws.bindings.length, 1);
+    await assertConnectionBackedLin711(stores.connectionStore, session, ws.bindings[0], {
+      urlKey: 'octocat', scope: 'octocat/hello-world', installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry,
+    });
     assert.ok(!JSON.stringify(session.workspaces).includes('gho_user'), 'discovery user token is never persisted');
     assert.equal(session.githubPending, undefined, 'pending cleared');
     assert.equal(res.redirectedTo, '/workspace/octocat/');
   });
 
   test('POST link (re-bind, add-source) mints + binds onto the active workspace without clobbering its primary (LIN-717 + LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const stores = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -770,7 +799,10 @@ describe('GitHub auth routes', () => {
     await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
     const binding = linearWs.bindings.find(b => b.provider === 'github');
-    assert.deepEqual(binding.credentials, { installationId: '77', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z') });
+    await assertConnectionBackedLin711(stores.connectionStore, session, binding, {
+      urlKey: 'acme', scope: 'octocat/hello-world', installationId: '77', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z'),
+    });
+    assert.equal(linearWs.activeBinding, undefined, 'a non-active add-source sets no D2 marker');
     // A non-active re-add must NOT clobber the active scalar mirror (LIN-717).
     assert.equal(linearWs.provider, 'linear');
     assert.equal(linearWs.accessToken, 'lin_tok');
@@ -794,7 +826,8 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (new) find-or-creates the GitHub account container and writes the binding', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const stores = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -812,12 +845,41 @@ describe('GitHub auth routes', () => {
     // GitHub App binding shape (LIN-711): installationId persisted (re-mint key) and
     // a REAL ms expiry from expires_at, not the old never-expires MAX.
     const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
-    assert.deepEqual(ws.bindings, [{ provider: 'github', scope: 'octocat/hello-world', credentials: { installationId: '99', token: 'gho_token', tokenExpiresAt: expectedExpiry } }]);
-    assert.equal(ws.tokenExpiresAt, expectedExpiry, 'workspace stamp is the real expiry, not MAX');
-    assert.notEqual(ws.tokenExpiresAt, Number.MAX_SAFE_INTEGER);
+    assert.equal(ws.bindings.length, 1);
+    await assertConnectionBackedLin711(stores.connectionStore, session, ws.bindings[0], {
+      urlKey: 'octocat', scope: 'octocat/hello-world', installationId: '99', token: 'gho_token', tokenExpiresAt: expectedExpiry,
+    });
+    // The active binding is connection-backed: the D2 marker names it and the
+    // scalar mirror (and its expiry stamp) is stripped, never a MAX stamp.
+    assert.deepEqual(ws.activeBinding, { provider: 'github', scope: 'octocat/hello-world' });
+    assert.equal(ws.tokenExpiresAt, undefined);
+    assert.equal(ws.accessToken, undefined);
     assert.equal(session.activeWorkspaceId, 'github:42');
     assert.equal(session.githubPending, undefined, 'pending cleared');
     assert.equal(res.redirectedTo, '/workspace/octocat/');
+  });
+
+  test('POST link (new) with CONNECTION_BACKED_WRITES=off writes the legacy LIN-711 binding, byte-identical (D11)', async () => {
+    await withWritesOff(async () => {
+      const stores = freshAccountStores();
+      const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+      const handler = getHandler(router, 'post', '/auth/github/link');
+      const res = makeRes();
+      const session = makeSession({
+        githubHumanId: 'human-42',
+        githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+        workspaces: [],
+      });
+      await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+      const ws = session.workspaces[0];
+      const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
+      assert.deepEqual(ws.bindings, [{ provider: 'github', scope: 'octocat/hello-world', credentials: { installationId: '99', token: 'gho_token', tokenExpiresAt: expectedExpiry } }]);
+      assert.equal(ws.tokenExpiresAt, expectedExpiry, 'workspace stamp is the real expiry, not MAX');
+      assert.equal(ws.activeBinding, undefined);
+      const [row] = await stores.connectionStore.collection.find({}).toArray();
+      assert.equal(row.referents, undefined, 'the LIN-3127 dual-write row, never connection-managed');
+      assert.equal(res.redirectedTo, '/workspace/octocat/');
+    });
   });
 
   // LIN-1349: at MAX_WORKSPACES, the upsertWorkspace limit check must run BEFORE
@@ -1406,7 +1468,8 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) writes the LIN-711 binding shape: installationId + real ms expiry', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const stores = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -1419,10 +1482,8 @@ describe('GitHub auth routes', () => {
     await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
     const binding = linearWs.bindings.find(b => b.provider === 'github');
-    assert.deepEqual(binding.credentials, {
-      installationId: '99',
-      token: 'ghs_inst',
-      tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z'),
+    await assertConnectionBackedLin711(stores.connectionStore, session, binding, {
+      urlKey: 'acme', scope: 'octocat/hello-world', installationId: '99', token: 'ghs_inst', tokenExpiresAt: Date.parse('2026-06-25T20:00:00Z'),
     });
     // A non-active binding must NOT clobber the Linear primary's scalar mirror.
     assert.equal(linearWs.provider, 'linear');

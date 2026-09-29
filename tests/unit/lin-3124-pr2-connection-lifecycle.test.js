@@ -58,7 +58,12 @@ describe('LIN-3124 PR2 T12 — connection lifecycle', () => {
     await connectionStore.link(accountId, 'linear', 'org-1', { token: 'tok' }, { urlKey: 'ws-b', provider: 'linear', scope: 'org-1' });
     const workspace = { urlKey: 'ws-a', bindings: [{ provider: 'linear', scope: 'org-1', connectionId: a.connectionId }] };
 
-    const result = await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider: 'linear', mode: 'revoke' });
+    // LIN-3124 PR3 review blocker 3: a revoke names ONE binding by scope; an
+    // unscoped revoke releases nothing (it would reach sibling bindings).
+    assert.deepStrictEqual(await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider: 'linear', mode: 'revoke' }), { released: 0, referents: [] });
+    assert.ok(await connectionStore.readConnectionById(a.connectionId), 'nothing released without a scope');
+
+    const result = await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider: 'linear', scope: 'org-1', mode: 'revoke' });
 
     assert.strictEqual(result.released, 1);
     assert.strictEqual(result.referents.length, 2, 'both referents are returned for cache eviction');

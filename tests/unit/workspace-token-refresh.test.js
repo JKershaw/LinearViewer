@@ -1443,7 +1443,7 @@ describe('LIN-2097 (Block J) — the non-live liveness check lives on doRefresh 
 
 describe('resolveWorkspaceAccess refresh-on-resolve gate (LIN-2097, Block I — source-text pin)', () => {
   test("I1: the refresh-on-resolve block fingerprints the stale durable record's TOKEN, not its scope (the Linear org id) — and gates the exchange through refreshOnResolveGate", () => {
-    const startIdx = SERVER_SRC.indexOf('if (!selected.token && ownerAccountId !== UNSCOPED) {');
+    const startIdx = SERVER_SRC.indexOf('if (!selected.token && ownerAccountId !== UNSCOPED');
     assert.notEqual(startIdx, -1, 'expected to find the refresh-on-resolve block in server.js');
     const endIdx = SERVER_SRC.indexOf('\n    }', startIdx);
     const blockSlice = SERVER_SRC.slice(startIdx, endIdx);
@@ -1455,7 +1455,7 @@ describe('resolveWorkspaceAccess refresh-on-resolve gate (LIN-2097, Block I — 
   });
 
   test('I2: the gate is unconditional — NOT additionally gated on rejectedCredentialRegistry.isSuspect (that mark\'s TTL is shorter than how long this branch must keep applying)', () => {
-    const startIdx = SERVER_SRC.indexOf('if (!selected.token && ownerAccountId !== UNSCOPED) {');
+    const startIdx = SERVER_SRC.indexOf('if (!selected.token && ownerAccountId !== UNSCOPED');
     const endIdx = SERVER_SRC.indexOf('\n    }', startIdx);
     const blockSlice = SERVER_SRC.slice(startIdx, endIdx);
     assert.doesNotMatch(blockSlice, /rejectedCredentialRegistry\.isSuspect/, 'this branch must not require isSuspect to still be true');

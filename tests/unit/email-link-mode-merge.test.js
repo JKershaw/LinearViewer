@@ -64,6 +64,10 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
   // Characterization FIRST: the workspace-bearing path is unchanged by S3-2.
   // ---------------------------------------------------------------------------
   test('characterization: a workspace-bearing merge still writes the session workspace, edge, Connection and owner credential', async () => {
+    // LIN-3124 PR3 checkpoint E: the arriving binding is NEW, so it is written
+    // connection-backed — its owner credential is the connection-keyed record,
+    // and the Connection row carries the workspace as a referent. The pre-flip
+    // legacy shape is pinned by the CONNECTION_BACKED_WRITES=off twin below.
     const browser = harness.browser();
     const P = await signIn(browser, { scope: `char-p-${counter++}`, workspaceId: 'ws-home-char', urlKey: 'ws-home-char' });
     const E = await accountOwningEmail(`char-${counter}@x.io`);
@@ -90,9 +94,51 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
     assert.strictEqual(session.activeWorkspaceId, 'ws-new-char', 'activeWorkspaceId was set to the arriving workspace');
     assert.strictEqual(session.pendingMerge, undefined);
     assert.strictEqual(await harness.db.collection('account-workspaces').countDocuments({ accountId: P, workspaceId: 'ws-new-char' }), 1, 'the edge was bound');
-    assert.strictEqual(await harness.db.collection('connections').countDocuments({ _id: `${P}::linear::org-char` }), 1, 'the Connection dual-write happened');
-    assert.ok(await harness.stores.ownerCredentialStore.get(P, 'ws-new-char', 'linear'), 'the owner credential was persisted');
+    const connectionId = `${P}::linear::org-char`;
+    const row = await harness.db.collection('connections').findOne({ _id: connectionId });
+    assert.ok(row, 'the Connection was written');
+    assert.deepStrictEqual(row.referents, [{ urlKey: 'ws-new-char', provider: 'linear', scope: 'org-char' }]);
+    assert.deepStrictEqual(session.workspaces.find(w => w.id === 'ws-new-char').bindings, [{ provider: 'linear', scope: 'org-char', connectionId }]);
+    assert.strictEqual((await harness.stores.ownerCredentialStore.getByConnection(connectionId)).refreshToken, 'rt-char', 'the owner credential was persisted (connection-keyed)');
+    assert.strictEqual(await harness.stores.ownerCredentialStore.get(P, 'ws-new-char', 'linear'), null, 'no legacy-keyed record for a connection-backed binding');
     assert.strictEqual((await harness.stores.accountStore.getAccount(E)).mergedInto, P, 'the merge happened');
+  });
+
+  test('characterization (CONNECTION_BACKED_WRITES=off, LIN-3124 D11): a workspace-bearing merge writes the legacy session workspace, edge, Connection and owner credential', async () => {
+    process.env.CONNECTION_BACKED_WRITES = 'off';
+    try {
+      const browser = harness.browser();
+      const P = await signIn(browser, { scope: `off-p-${counter++}`, workspaceId: 'ws-home-off', urlKey: 'ws-home-off' });
+      const E = await accountOwningEmail(`off-${counter}@x.io`);
+      const workspace = {
+        id: 'ws-new-off',
+        urlKey: 'ws-new-off',
+        provider: 'linear',
+        bindings: [{ provider: 'linear', scope: 'org-off', credentials: { token: 'tok-off' } }],
+      };
+      await browser.post('/__test/pending-merge', {
+        canonicalAccountId: P,
+        mergedAccountId: E,
+        workspace: JSON.stringify(workspace),
+        provider: 'linear',
+        refreshToken: 'rt-off',
+      });
+
+      const res = await browser.post('/auth/merge/confirm', {});
+      assert.strictEqual(res.status, 302);
+      assert.strictEqual(res.location, '/workspace/ws-new-off/');
+
+      const session = await browser.session();
+      assert.ok(session.workspaces.some(w => w.id === 'ws-new-off'), 'the arriving workspace was upserted into the session');
+      assert.strictEqual(session.activeWorkspaceId, 'ws-new-off', 'activeWorkspaceId was set to the arriving workspace');
+      assert.strictEqual(session.pendingMerge, undefined);
+      assert.strictEqual(await harness.db.collection('account-workspaces').countDocuments({ accountId: P, workspaceId: 'ws-new-off' }), 1, 'the edge was bound');
+      assert.strictEqual(await harness.db.collection('connections').countDocuments({ _id: `${P}::linear::org-off` }), 1, 'the Connection dual-write happened');
+      assert.ok(await harness.stores.ownerCredentialStore.get(P, 'ws-new-off', 'linear'), 'the owner credential was persisted');
+      assert.strictEqual((await harness.stores.accountStore.getAccount(E)).mergedInto, P, 'the merge happened');
+    } finally {
+      delete process.env.CONNECTION_BACKED_WRITES;
+    }
   });
 
   // ---------------------------------------------------------------------------

@@ -106,7 +106,7 @@ export function countMatches(source, re) {
 // module BASENAME, not the corpus-relative path.
 const importRe = (target) => new RegExp(`from\\s+['"][^'"]*${escapeRe(target.split('/').pop())}['"]`);
 export const ANY_CONNECTION_MODULE_IMPORT =
-  /from\s+['"][^'"]*connection-(?:store|credential|lifecycle)\.js['"]/;
+  /from\s+['"][^'"]*connection-(?:store|credential|lifecycle|access)\.js['"]/;
 
 /** Files importing `target`. */
 export function importers(sources, target) {
@@ -251,6 +251,28 @@ export function registryOffenders(methodNames, classification) {
   return offenders;
 }
 
+/**
+ * G3b (PR2 verdict `b39d8121`): exactly ONE production `createConnectionRefresher(`
+ * instance. Counts call sites (excluding the `function createConnectionRefresher(`
+ * definition) across the corpus; the single instance must live in `server.js` so
+ * the `conn:${connectionId}` single-flight has exactly one registration layer.
+ */
+export function refresherInstanceOffenders(sources) {
+  const DEF = /function\s+createConnectionRefresher\s*\(/g;
+  const CALL = /\bcreateConnectionRefresher\s*\(/g;
+  const offenders = [];
+  let total = 0;
+  for (const [rel, src] of sources) {
+    const calls = (src.match(CALL) || []).length - (src.match(DEF) || []).length;
+    if (calls > 0) {
+      total += calls;
+      if (rel !== 'server.js') offenders.push(`${rel}: createConnectionRefresher( outside server.js`);
+    }
+  }
+  if (total !== 1) offenders.push(`createConnectionRefresher( count ${total} !== 1`);
+  return offenders;
+}
+
 /** Extract a top-level `function NAME(...) {...}` body (brace-matched). */
 export function extractFunction(source, name) {
   const re = new RegExp(`(?:export\\s+)?function\\s+${escapeRe(name)}\\s*\\(`);
@@ -273,3 +295,22 @@ export function extractFunction(source, name) {
 export function sha256(s) {
   return createHash('sha256').update(s).digest('hex');
 }
+
+/**
+ * LIN-3124 D6 — the decoy-token lane set (the session-credential rule's
+ * behavioural half). Every lane that can serve a credential for a workspace:
+ * T4 pins that each accessor exists; T18 (lin-3124-pr3-t18-decoy) runs a
+ * decoy probe per lane and meta-checks it has one for EXACTLY this set.
+ */
+export const DECOY_LANES = Object.freeze([
+  { lane: 'browser (active binding)', accessor: 'getWorkspaceCallScope' },
+  { lane: 'per-binding: dashboard fan-out', accessor: 'getBindingCallScope' },
+  { lane: 'per-binding: resolveIssueBinding', accessor: 'resolveIssueBinding' },
+  { lane: 'per-binding: settings probe (3-arg getWorkspaceToken)', accessor: 'getWorkspaceToken' },
+  { lane: 'owner-scoped headless', accessor: 'resolveWorkspaceAccess' },
+  { lane: 'owner-blind', accessor: 'getWorkspaceAccessToken' },
+  // LIN-3124 PR3 review blocker 1: the raw-mirror readers (the audit egress and
+  // the Linear image relay) and the proactive-refresh expiry read.
+  { lane: 'raw mirror (audit egress / image relay)', accessor: 'getWorkspaceMirrorToken' },
+  { lane: 'expiry (ensureValidToken proactive refresh)', accessor: 'getWorkspaceTokenExpiry' },
+]);
