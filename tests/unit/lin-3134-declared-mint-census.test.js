@@ -625,3 +625,43 @@ describe('C2 (i) — the queue writer set is closed', () => {
     assert.deepEqual(censusClassification(mutated), []);
   });
 });
+
+// C2 (i) closure (LIN-3134 parent review): `.addItem(` is the ONLY way
+// production reaches the queue writer. Any other code-position `addItem`
+// reference (an alias, `.bind`/`.call`, a destructure, a computed
+// `['addItem']` access) would be a writer the scan above cannot key.
+const ADD_ITEM_NON_CALL_REFS = {
+  'lib/dispatch-factory.js': 1,   // the `typeof store.addItem !== 'function'` guard
+  'lib/dispatch-store.js': 1      // the method definition
+};
+
+function scanAddItemNonCallRefs(files) {
+  const out = {};
+  for (const { file, src } of files) {
+    const masked = maskSource(src);
+    let n = 0;
+    for (const m of masked.matchAll(/\baddItem\b/g)) if (!masked.startsWith('.addItem(', m.index - 1)) n++;
+    // Computed access: strings are masked, so read the RAW text of `[ '…' ]`.
+    for (const m of masked.matchAll(/\[\s*(['"`])/g)) {
+      const q = m.index + m[0].length - 1;
+      const close = masked.indexOf(m[1], q + 1);
+      if (close > q && src.slice(q + 1, close) === 'addItem') n++;
+    }
+    if (n) out[file] = n;
+  }
+  return out;
+}
+
+describe('C2 (i) closure — no aliased or computed addItem reference', () => {
+  test('the only non-call addItem references are the guard and the definition', () => {
+    assert.deepEqual(scanAddItemNonCallRefs(PRODUCTION), ADD_ITEM_NON_CALL_REFS);
+  });
+  test('mutation: an aliased writer (addItem.bind) fails', () => {
+    const mutated = [...PRODUCTION, { file: 'lib/new-alias.js', src: 'export function w(s, u, p) {\n  const enqueue = s.addItem.bind(s);\n  return enqueue(u, { prompt: p });\n}' }];
+    assert.notDeepEqual(scanAddItemNonCallRefs(mutated), ADD_ITEM_NON_CALL_REFS);
+  });
+  test('mutation: a computed-access writer (store[\'addItem\']) fails', () => {
+    const mutated = [...PRODUCTION, { file: 'routes/new-bracket.js', src: "export function w(s, u, p) {\n  return s['addItem'](u, { prompt: p });\n}" }];
+    assert.notDeepEqual(scanAddItemNonCallRefs(mutated), ADD_ITEM_NON_CALL_REFS);
+  });
+});
