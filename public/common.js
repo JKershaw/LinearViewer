@@ -1596,6 +1596,72 @@ window.ProxyToggle = (function () {
   }
 
   /**
+   * The runner-copy error-copy map (LIN-3131 S2b.3, plan P3(d)). Keyed by the
+   * server's refusal `code`, plus two client-only cases (`NETWORK` for a
+   * transport failure with no HTTP status, `UNKNOWN` for anything else). One
+   * wording per code; every value is user-facing and never names an account.
+   */
+  const RUNNER_BOOTSTRAP_ERROR_COPY = {
+    GRANT_OWNERLESS: "This session isn't linked to an account. Sign in again, then copy.",
+    WORKSPACE_OWNER_UNSET: "This workspace has no recorded owner yet, so a runner prompt can't be created. Workspaces made before ownership tracking need an operator to assign an owner; a workspace created now gets its owner automatically.",
+    GRANT_OWNER_ONLY: "Only this workspace's owner can copy a runner prompt. Ask the owner, or sign in as the owner.",
+    OWNER_CHECK_UNAVAILABLE: "Couldn't verify ownership right now. Try again in a minute.",
+    GRANTS_NOT_CLIENT_SETTABLE: "The runner prompt request was malformed. Reload the page and try again.",
+    NETWORK: "Couldn't reach Harbour to create a runner prompt. Check your connection and try again.",
+    UNKNOWN: "Couldn't create a runner prompt. Try again in a minute."
+  };
+
+  /**
+   * Mint the owner-checked runner bootstrap for a workspace (LIN-3131 S2b.3,
+   * plan P7). Unlike `getOrCreateToken` — which swallows failures to
+   * `{token: null}` — this NEVER swallows: it resolves either the mint result
+   * `{ token, expiresAt, grants }` or a structured `{ error: { code, message } }`
+   * so the caller (the runner prompt, LIN-3098) can render the exact copy from
+   * `RUNNER_BOOTSTRAP_ERROR_COPY`. The prompt body itself is LIN-3098's; this is
+   * only the credential mint.
+   *
+   * @param {string} urlKey
+   * @returns {Promise<{token: string, expiresAt: string, grants: string[]}
+   *   | {error: {code: string, message: string}}>}
+   */
+  async function getRunnerBootstrap(urlKey) {
+    if (!urlKey) {
+      return { error: { code: 'GRANT_OWNERLESS', message: RUNNER_BOOTSTRAP_ERROR_COPY.GRANT_OWNERLESS } };
+    }
+    let data;
+    try {
+      data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // The server resolves the grants and the owner; the client sends only
+        // the intent (`runner: true`) and never a grant.
+        body: JSON.stringify({ runner: true }),
+        on401: false
+      });
+    } catch (err) {
+      const serverCode = (err && err.body && err.body.code) || null;
+      if (serverCode && RUNNER_BOOTSTRAP_ERROR_COPY[serverCode]) {
+        return { error: { code: serverCode, message: RUNNER_BOOTSTRAP_ERROR_COPY[serverCode] } };
+      }
+      // No known server code: a 5xx is the retryable "unavailable" case; anything
+      // else (a dropped connection, an unmapped 4xx) is a transport/failure case.
+      // Either way `code` stays a stable key into the copy map. Never swallowed.
+      const fallback = (err && typeof err.status === 'number' && err.status >= 500)
+        ? 'OWNER_CHECK_UNAVAILABLE'
+        : 'NETWORK';
+      return { error: { code: fallback, message: RUNNER_BOOTSTRAP_ERROR_COPY[fallback] } };
+    }
+    if (!data || !data.token) {
+      return { error: { code: 'UNKNOWN', message: RUNNER_BOOTSTRAP_ERROR_COPY.UNKNOWN } };
+    }
+    return {
+      token: data.token,
+      expiresAt: data.expiresAt || null,
+      grants: Array.isArray(data.grants) ? data.grants.slice() : []
+    };
+  }
+
+  /**
    * Compose the `## Workspace API access` block the +proxy toggle appends.
    *
    * LIN-2370: `providerDisplayName` follows LIN-2354's contract exactly — name the
@@ -1678,7 +1744,7 @@ window.ProxyToggle = (function () {
     });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, buildBlock, maybeAppend, shouldAppend, init, setActive };
+  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

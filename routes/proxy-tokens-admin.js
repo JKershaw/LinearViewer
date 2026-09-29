@@ -18,7 +18,7 @@ import { getProvider } from '../lib/providers/registry.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
-import { SCOPES } from '../lib/proxy-scopes.js';
+import { SCOPES, RUNNER_GRANTS } from '../lib/proxy-scopes.js';
 
 // LIN-525 #5: the +proxy toggle auto-mints a 'prompt-proxy' readWrite token on
 // every page-load session that dispatches. To stop these standing credentials
@@ -27,6 +27,30 @@ import { SCOPES } from '../lib/proxy-scopes.js';
 // plus the agent run that consumes the token, while bounding the exposure window.
 const PROMPT_PROXY_LABEL = 'prompt-proxy';
 const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
+
+// LIN-3131 S2b.2 — the P5 refusal map for the owner-checked runner copy mint.
+// `mintGrantBootstrap` throws a tagged error (`code`/`status`/`retryable`); the
+// route surfaces exactly the P5 code/status, with a short human `error`. There
+// is deliberately NO compatibility lane: every one fails closed. An unknown
+// code is rethrown (→ the route's generic 500) rather than silently allowed.
+const RUNNER_MINT_REFUSALS = Object.freeze({
+  GRANT_OWNERLESS: Object.freeze({
+    status: 503, category: 'auth', retryable: false,
+    error: 'This session has no account owner'
+  }),
+  WORKSPACE_OWNER_UNSET: Object.freeze({
+    status: 409, category: 'config', retryable: false,
+    error: 'This workspace has no recorded owner'
+  }),
+  GRANT_OWNER_ONLY: Object.freeze({
+    status: 403, category: 'auth', retryable: false,
+    error: "Only this workspace's owner can mint a runner credential"
+  }),
+  OWNER_CHECK_UNAVAILABLE: Object.freeze({
+    status: 503, category: 'upstream', retryable: true,
+    error: 'Owner verification is temporarily unavailable'
+  })
+});
 
 /**
  * @param {Object} deps
@@ -54,7 +78,69 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
     }
 
     try {
-      const { label, scope, singleUse, bootstrap } = req.body || {};
+      const { label, scope, singleUse, bootstrap, runner, grants } = req.body || {};
+
+      // F4 (LIN-3129/LIN-3059): the server resolves grants, never the client.
+      // Any body carrying the field is refused outright, on every path — before
+      // the runner branch and before the default path, so neither grows a
+      // client-settable grant lane.
+      if (grants !== undefined) {
+        return jsonError(res, 400, 'Grants cannot be set by the client', {
+          code: 'GRANTS_NOT_CLIENT_SETTABLE', category: 'auth', retryable: false
+        });
+      }
+
+      const wantRunner = runner === true || runner === 'true';
+
+      // LIN-3131 S2b.2 — the owner-checked runner copy mint (LIN-3059 P4).
+      // `runner: true` asks for the runner credential; the SERVER resolves the
+      // grant list (J2: RUNNER_GRANTS) and the owner (J4), never the client.
+      // Branched BEFORE the label/scope validation on purpose: client `scope`
+      // and `label` are IGNORED on this path. The lifetime profile is the named
+      // `runner` profile (LIN-3132). No compatibility lane — every refusal fails
+      // closed and maps through RUNNER_MINT_REFUSALS (P5).
+      if (wantRunner) {
+        if (!req.session?.accountId) {
+          console.warn(
+            `Runner copy refused: session has no account owner (urlKey=${workspace.urlKey}) — ` +
+            `GRANT_OWNERLESS (LIN-3131)`
+          );
+          return jsonError(res, 503, RUNNER_MINT_REFUSALS.GRANT_OWNERLESS.error, {
+            code: 'GRANT_OWNERLESS', category: 'auth', retryable: false
+          });
+        }
+
+        let minted;
+        try {
+          minted = await proxyTokenStore.mintGrantBootstrap({
+            urlKey: workspace.urlKey,
+            workspaceId: workspace.id,
+            ownerAccountId: req.session.accountId,
+            grants: RUNNER_GRANTS,
+            profile: 'runner'
+          });
+        } catch (err) {
+          const refusal = RUNNER_MINT_REFUSALS[err?.code];
+          if (!refusal) throw err;
+          return jsonError(res, refusal.status, refusal.error, {
+            code: err.code, category: refusal.category, retryable: refusal.retryable
+          });
+        }
+
+        return res.status(201).json({
+          success: true,
+          tokenId: minted.tokenId,
+          token: minted.token,
+          label: minted.label,
+          scope: minted.scope,
+          kind: minted.kind,
+          singleUse: minted.singleUse,
+          grants: minted.grants,
+          expiresAt: minted.expiresAt,
+          lifetimeProfile: minted.lifetimeProfile,
+          message: 'Runner bootstrap created. Save this token now - it cannot be retrieved later.'
+        });
+      }
 
       if (label && label.length > MAX_NAME_LENGTH) {
         return badRequest.json(res, `label exceeds maximum length of ${MAX_NAME_LENGTH}`);

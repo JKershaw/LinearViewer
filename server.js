@@ -57,6 +57,7 @@ import { AccountMergeLogStore } from './lib/account-merge-log.js'
 import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from './lib/credential-lifecycle-events.js'
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
+import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
 import { sanitizeSessionForPersist, createHydrationMiddleware } from './lib/connection-credential.js'
@@ -573,6 +574,14 @@ const workspacesCollection = db.collection('workspaces')
 const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
+
+// LIN-3131 S2b.1: late-bind the owner-check seam now that both stores it
+// composes exist. `proxyTokenStore` is built above (before these), so the seam
+// is injected here rather than at construction; while it stays unwired the
+// grant mint fails closed with OWNER_CHECK_UNAVAILABLE. Keys on `workspaceId`
+// (the account↔workspace edge, LIN-1892 S1), reusing #1601's
+// `getWorkspaceOwnerAccountId` — no parallel owner model.
+proxyTokenStore.setOwnerCheck(createWorkspaceOwnerCheck({ accountWorkspaceStore, accountStore }))
 
 // Email magic-link sign-in (LIN-1892 S2). The transport exists exactly when
 // email sign-in is available (lib/email-availability.js — the one predicate;

@@ -3,7 +3,7 @@
 // buildInstructions is the pure Markdown template construction extracted
 // verbatim out of routes/proxy.js's GET /api/proxy/instructions handler. It
 // captures none of createProxyRoutes's injected dependencies and does no
-// IO — a pure function of its five inputs. These exercise the builder
+// IO — a pure function of its inputs. These exercise the builder
 // DIRECTLY (proxy-preamble.test.js style): no express, no server.
 //
 // The `read` branch's exclusion of the write-only sections had no unit
@@ -92,7 +92,50 @@ describe('buildInstructions — per-path token lifetime table (LIN-1938 S1)', ()
     assert.match(text, new RegExp(`${BOOTSTRAP_TOKEN_TTL_SECONDS / 3600}h  - the single-use bootstrap itself`));
     assert.match(text, /prompt-proxy` \(`PROMPT_PROXY_TOKEN_TTL_SECONDS`/);
     assert.match(text, /90d {2}- an operator standard mint under any other label/);
-    assert.match(text, /never - dispatch\/runner tokens/);
+    assert.match(text, /never - dispatch tokens/); // LIN-3131 S2b.4: runner moved off this line
+    // LIN-3131 S2b.4: the runner copy's own rows (1h bootstrap / 24h working).
+    assert.match(text, /1h {2}- the runner copy's single-use bootstrap/);
+    assert.match(text, /24h - the runner copy's working token after exchange/);
+  });
+});
+
+describe('buildInstructions — grants table + take-gated runner section (LIN-3131 S2b.4)', () => {
+  test('the grants table is shown to every bearer, and names dispatch as not yet enforced', () => {
+    for (const scope of ['read', 'readWrite']) {
+      const text = buildInstructions({ baseUrl: BASE_URL, scope });
+      assert.match(text, /## Grants/);
+      assert.match(text, /`take`/);
+      assert.match(text, /`dispatch`/);
+      assert.match(text, /RECORDED BUT NOT YET\n\s*ENFORCED/);
+      assert.match(text, /Your token's grants: \(none\)\./);
+    }
+  });
+
+  test('a take-grant bearer sees the runner endpoints and the refusal codes', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants: ['take', 'dispatch'] });
+    assert.match(text, /## Runner Endpoints/);
+    assert.match(text, new RegExp(`GET ${BASE_URL}/api/proxy/runner/poll`));
+    assert.match(text, new RegExp(`POST ${BASE_URL}/api/proxy/runner/take/:id`));
+    assert.match(text, new RegExp(`POST ${BASE_URL}/api/proxy/runner/feedback/:id`));
+    assert.match(text, /Your token's grants: take, dispatch\./);
+    for (const refusal of [
+      '400 GRANTS_NOT_CLIENT_SETTABLE',
+      '403 GRANT_OWNER_ONLY',
+      '409 WORKSPACE_OWNER_UNSET',
+      '503 GRANT_OWNERLESS',
+      '503 OWNER_CHECK_UNAVAILABLE'
+    ]) {
+      assert.ok(text.includes(refusal), `instructions must state the refusal: ${refusal}`);
+    }
+    // Only the owner may mint a runner copy.
+    assert.match(text, /minted by the workspace OWNER only/);
+  });
+
+  test('a non-take token never sees the runner endpoint section', () => {
+    for (const grants of [[], ['dispatch'], undefined]) {
+      const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite', grants });
+      assert.doesNotMatch(text, /## Runner Endpoints/, `runner section must be omitted for grants=${JSON.stringify(grants)}`);
+    }
   });
 });
 
