@@ -83,9 +83,14 @@ describe('the honesty copy', () => {
     assert.match(prompt, /longer than about 24h/i);
   });
 
-  test('before T3, only items the owner enqueued run (Q4)', () => {
+  test('only items the owner enqueued run, unconditionally (Q4; lin3098-owner-check-after-t3 = keep)', () => {
     assert.match(prompt, /only items the workspace owner enqueued/i);
-    assert.match(prompt, /T3/);
+    // N3: the rule is not scoped to "before T3"; the pre-T3 exposure is the why.
+    for (const line of prompt.split('\n').filter((l) => /owner/i.test(l))) {
+      assert.doesNotMatch(line, /before T3/i, `the owner rule must not read as lifting at T3: ${line}`);
+    }
+    assert.match(prompt, /after T3 \(LIN-3136\) too/);
+    assert.match(prompt, /until T3 \(LIN-3136\)[^.]*enqueue/i);
   });
 
   test('the same-user boundary, stated plainly', () => {

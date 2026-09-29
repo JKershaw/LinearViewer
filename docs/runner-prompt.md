@@ -122,8 +122,9 @@ or a token. Decisions are made **before** any take, in this order:
    the same items. Stop this runner: take nothing more, let running subagents finish and report,
    tell the person, then end (§8).
 2. **Harness.** Claude Code only.
-3. **Owner.** Before T3 (LIN-3136), this runner runs only items the workspace owner enqueued, and
-   wakes of the owner's own dispatches. Anything else is left queued.
+3. **Owner.** This runner runs only items the workspace owner enqueued, and wakes of the
+   owner's own dispatches. Anything else is left queued. This holds after T3 (LIN-3136) too; see
+   §7 for why.
 4. **Halt** (§6).
 5. **Credential life.** With less than {{FRESH_TAKE_MIN_TOKEN_LIFE_HOURS}}h left on the runner
    credential, fresh items are left queued; follow-ups, wakes and aborts still flow.
@@ -231,8 +232,9 @@ this runner, so don't follow it.
   a same-user socket. Any process running as the same OS user, subagents included, could read that
   file or use a live broker. The kernel keeps other users out; nothing keeps your own user's
   processes out. Run only work you'd run yourself.
-- **Before T3 (LIN-3136)**, anyone with a read-write token for this workspace can enqueue work, so
-  this runner runs only the owner's items (§3).
+- **Owner-only, always.** Until T3 (LIN-3136) enforces the dispatch grant, anyone with a
+  read-write token for this workspace can enqueue work, and this runner executes on your machine.
+  That is why it runs only the owner's items (§3), and it keeps that rule after T3 as well.
 
 ## 8. End summary
 
