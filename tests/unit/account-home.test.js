@@ -82,6 +82,62 @@ describe('GET /account', () => {
   });
 });
 
+describe('GET /account F15: email identities across the mergedInto chain', () => {
+  let harness;
+  before(async () => { harness = await startEmailAuthHarness(); });
+  after(async () => { await harness?.close(); });
+
+  // F15 decision (LIN-1892): the account home lists email identities across the
+  // whole mergedInto chain. A merge is an alias — identities stay on the merged
+  // account — so a stale session on an account since merged away must still see
+  // the address it signed in with; a live canonical session sees the same set.
+
+  test('a live canonical session lists its own and every merged-in account\'s email', async () => {
+    const suffix = Date.now();
+    const pEmail = `f15-p-${suffix}@x.io`;
+    const xEmail = `f15-x-${suffix}@x.io`;
+    const P = (await harness.stores.accountStore.createAccount())._id;
+    await harness.stores.accountStore.linkIdentity(P, 'email', pEmail);
+    const X = (await harness.stores.accountStore.createAccount())._id;
+    await harness.stores.accountStore.linkIdentity(X, 'email', xEmail);
+    const merged = await harness.stores.accountStore.mergeAccounts(P, X, { accountWorkspaceStore: harness.stores.accountWorkspaceStore });
+    assert.ok(merged.ok);
+
+    const browser = harness.browser();
+    await browser.post('/__test/sign-in', { provider: 'email', scope: pEmail });
+    const res = await browser.get('/account');
+
+    assert.strictEqual(res.status, 200);
+    assert.match(res.text, new RegExp(`Signed in as [^<]*${pEmail}`));
+    assert.match(res.text, new RegExp(xEmail), 'the merged-in account\'s email is listed too');
+  });
+
+  test('a stale session on an account merged into the canonical still lists the address it signs in with', async () => {
+    const suffix = Date.now();
+    const pEmail = `f15b-p-${suffix}@x.io`;
+    const xEmail = `f15b-x-${suffix}@x.io`;
+
+    // X signs in first, holding the session that will go stale.
+    const X = (await harness.stores.accountStore.createAccount())._id;
+    await harness.stores.accountStore.linkIdentity(X, 'email', xEmail);
+    const browser = harness.browser();
+    await browser.post('/__test/sign-in', { provider: 'email', scope: xEmail });
+    assert.strictEqual((await browser.session()).accountId, X);
+
+    // P absorbs X; the phone session still holds X.
+    const P = (await harness.stores.accountStore.createAccount())._id;
+    await harness.stores.accountStore.linkIdentity(P, 'email', pEmail);
+    const merged = await harness.stores.accountStore.mergeAccounts(P, X, { accountWorkspaceStore: harness.stores.accountWorkspaceStore });
+    assert.ok(merged.ok);
+    assert.strictEqual((await browser.session()).accountId, X, 'the session is stale on X');
+
+    const res = await browser.get('/account');
+    assert.strictEqual(res.status, 200);
+    assert.match(res.text, new RegExp(xEmail), 'the stale session still sees the address it signed in with');
+    assert.match(res.text, new RegExp(pEmail), 'and the canonical account\'s address');
+  });
+});
+
 describe('the C6 line claims no cross-device restore', () => {
   test('it says workspaces do NOT follow to a new device yet, and promises no sync or restore', () => {
     assert.strictEqual(ACCOUNT_HOME_C6_LINE, "Workspaces don't follow you to a new device yet: reconnect a source here.");

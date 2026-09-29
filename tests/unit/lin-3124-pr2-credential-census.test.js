@@ -19,6 +19,13 @@
  *   (lib/providers/github/index.js, github-projects), plus the test fixture
  *   (routes/test.js).
  *
+ *   Re-stated 24 -> 25 when LIN-1892 S3 merged: `routes/email-auth.js`'s
+ *   `emailPrefill` reads an ACCOUNT-IDENTITY credential
+ *   (`jira.credentials.email`, the Jira pre-fill, N7) — the account-identities
+ *   sub-class, which this file's own exclusion note scopes to
+ *   lib/account-store.js but which the S3 route reads in place. Counted, not
+ *   excluded, so the guard still sees it.
+ *
  *   WRITER census — `workspace.credentials` writes and its delete in
  *   lib/workspace.js (the second workspace-level mirror, D15).
  *
@@ -30,7 +37,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
 
-const D15_READ_CENSUS = 24;
+const D15_READ_CENSUS = 25;
 const D15_WORKSPACE_MIRROR_WRITER_CENSUS = 4;
 
 // Files whose `.credentials` occurrences belong to a different D15 sub-class.

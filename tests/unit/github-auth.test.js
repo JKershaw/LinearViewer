@@ -1113,6 +1113,57 @@ describe('GitHub auth routes', () => {
     assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, undefined);
   });
 
+  // === LIN-1892 S3-4: the re-auth an email-only live account is offered ===
+
+  test('S3-4: an email-only stale canonical account on the GitHub conflict arm is offered the working email re-proof', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(canonicalAccount._id, 'email', 'p@x.io');
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      githubHumanId: 'human-other',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /href="\/auth\/email\/reproof"/, 'the working email re-proof, never the arriving provider');
+    assert.doesNotMatch(res.body, /href="\/auth\/email"/);
+    assert.strictEqual(session.pendingMerge, undefined, 'LIN-2233 A1: no offer while P is stale');
+  });
+
+  test('S3-4 characterization: a provider canonical account on the GitHub conflict arm keeps the arriving provider re-auth URL', async () => {
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const canonicalAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(canonicalAccount._id, 'github', 'human-self', {});
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
+
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      accountId: canonicalAccount._id,
+      identityAuthenticatedAt: Date.now() - 60 * 60 * 1000,
+      githubHumanId: 'human-other',
+      githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [],
+    });
+    const res = makeRes();
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /href="\/auth\/github"/, 'a provider P keeps the arm\'s existing re-auth URL');
+    assert.doesNotMatch(res.body, /href="\/auth\/email\/reproof"/);
+  });
+
   test('GitHub confirm-to-completion: merges, binds the workspace, applies the uniform completion step, and writes NO owner credential (LIN-2304 finding 1)', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
     const canonicalAccount = await accountStore.createAccount();
