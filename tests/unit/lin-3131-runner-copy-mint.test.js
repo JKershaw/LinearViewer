@@ -194,15 +194,25 @@ describe('LIN-3131 L2 — runner mint authority is session/workspace, never requ
   const realisticOwnerCheck = async ({ workspaceId, accountId }) =>
     (workspaceId === 'ws-1' && accountId === OWNER) ? { status: 'owner' } : { status: 'not-owner' };
 
-  test('L2 success: the seam is asked about the session account + route workspace, and they are persisted', async () => {
+  test('L2/L4 success: every runner-mint authority is session/route-derived, never body-derived', async () => {
     let seamArgs;
     const { collection, proxyTokenStore } = harness({
       ownerCheck: async (args) => { seamArgs = args; return realisticOwnerCheck(args); }
     });
     const app = buildApp({ proxyTokenStore, session: session({ accountId: OWNER }) });
 
-    // The body names a DIFFERENT owner and workspace. The route must ignore both.
-    const res = await call(app, { runner: true, ownerAccountId: 'attacker', workspaceId: 'other-ws' });
+    // The body names a DIFFERENT owner, workspace, urlKey and lifetime profile.
+    // Every one must be ignored: urlKey is the token's DATA authority, so a
+    // body-supplied value would let workspace-A's owner mint a runner token
+    // scoped to workspace B.
+    const res = await call(app, {
+      runner: true,
+      ownerAccountId: 'attacker',
+      workspaceId: 'other-ws',
+      urlKey: 'other-key',
+      profile: 'worker',
+      lifetimeProfile: 'worker'
+    });
 
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.deepEqual(
@@ -213,6 +223,8 @@ describe('LIN-3131 L2 — runner mint authority is session/workspace, never requ
     const doc = collection._docs()[0];
     assert.equal(doc.createdBy, OWNER, 'createdBy is the session account, never body ownerAccountId');
     assert.equal(doc.workspaceId, 'ws-1', 'workspaceId is the route workspace, never body workspaceId');
+    assert.equal(doc.urlKey, 'acme', 'urlKey is the route workspace, never body urlKey');
+    assert.equal(doc.lifetimeProfile, 'runner', 'the profile is the route constant, never body profile');
   });
 
   test('L2 disagreement: a non-owner session naming the real owner in the body is still refused GRANT_OWNER_ONLY', async () => {
