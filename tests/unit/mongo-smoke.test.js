@@ -39,6 +39,7 @@ import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { MagicLinkStore } from '../../lib/email-auth.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
+import { computeOwnershipReport } from '../../scripts/dry-run-workspace-ownership.mjs';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -89,14 +90,14 @@ describe(
       );
     });
 
-    test('the four LIN-1328 indexes from db-indexes.js build on real MongoDB', async () => {
+    test('the LIN-1328 + LIN-1892 account-workspaces/workspaces indexes from db-indexes.js build on real MongoDB', async () => {
       const lin1328Specs = INDEX_SPECS.filter(
         (s) => s.collection === 'workspaces' || s.collection === 'account-workspaces'
       );
       assert.strictEqual(
         lin1328Specs.length,
-        4,
-        'expected exactly 4 LIN-1328 index specs in db-indexes.js (asserted here, not redesigned)'
+        5,
+        'expected exactly 5 index specs in db-indexes.js: the 4 LIN-1328 specs plus LIN-1892\'s account_workspaces_one_owner (asserted here, not redesigned)'
       );
 
       const { failed } = await ensureIndexes(db);
@@ -106,7 +107,7 @@ describe(
       assert.deepStrictEqual(
         lin1328Failures,
         [],
-        'none of the 4 LIN-1328 index builds should fail against a clean real-Mongo db'
+        'none of the 5 index builds should fail against a clean real-Mongo db'
       );
 
       for (const spec of lin1328Specs) {
@@ -118,19 +119,105 @@ describe(
           !!spec.options.unique,
           `${spec.collection} index ${JSON.stringify(spec.keySpec)} unique flag mismatch`
         );
+        if (spec.options.name) {
+          assert.strictEqual(match.name, spec.options.name, `${spec.collection} index ${JSON.stringify(spec.keySpec)} name mismatch`);
+        }
+        if (spec.options.partialFilterExpression) {
+          assert.deepStrictEqual(
+            match.partialFilterExpression,
+            spec.options.partialFilterExpression,
+            `${spec.collection} index ${JSON.stringify(spec.keySpec)} partialFilterExpression mismatch`
+          );
+        }
       }
     });
 
-    test('clean unique {accountId, workspaceId} creation succeeds against a real unique index', async () => {
+    // Builds every account-workspaces spec from INDEX_SPECS on a fresh
+    // collection, the owner index included, as production has them.
+    async function indexedAccountWorkspaces() {
       const collection = freshCollection('account-workspaces');
-      await collection.createIndex({ accountId: 1, workspaceId: 1 }, { unique: true });
-      const store = new AccountWorkspaceStore({ collection });
+      for (const spec of INDEX_SPECS.filter((s) => s.collection === 'account-workspaces')) {
+        await collection.createIndex(spec.keySpec, spec.options);
+      }
+      return collection;
+    }
 
-      const edge = await store.bindAccountToWorkspace(randomUUID(), randomUUID());
+    test('clean unique {accountId, workspaceId} creation succeeds against a real unique index', async () => {
+      // Stated setup changes (LIN-1892 N5), not a softened assertion: under S1
+      // a workspace's first bind becomes its owner edge, which also carries
+      // `role`, so a prior binder takes that slot and the pinned edge is a
+      // plain member. The collection carries every account-workspaces index
+      // (the {accountId, workspaceId} unique one included), because a
+      // same-millisecond tie could otherwise mark the pinned edge owner too.
+      const collection = await indexedAccountWorkspaces();
+      const store = new AccountWorkspaceStore({ collection });
+      const workspaceId = randomUUID();
+      await store.bindAccountToWorkspace(randomUUID(), workspaceId);
+
+      const edge = await store.bindAccountToWorkspace(randomUUID(), workspaceId);
       assert.deepStrictEqual(
         new Set(Object.keys(edge)),
         new Set(['_id', 'accountId', 'workspaceId', 'createdAt'])
       );
+    });
+
+    test('the owner edge carries no credentials: its key set is exactly {_id, accountId, workspaceId, createdAt, role} (LIN-1892)', async () => {
+      const collection = await indexedAccountWorkspaces();
+      const store = new AccountWorkspaceStore({ collection });
+      const accountId = randomUUID();
+      const workspaceId = randomUUID();
+
+      const edge = await store.bindAccountToWorkspace(accountId, workspaceId);
+      const stored = await collection.findOne({ accountId, workspaceId });
+
+      const ownerKeys = new Set(['_id', 'accountId', 'workspaceId', 'createdAt', 'role']);
+      assert.deepStrictEqual(new Set(Object.keys(edge)), ownerKeys, 'returned owner edge');
+      assert.deepStrictEqual(new Set(Object.keys(stored)), ownerKeys, 're-read owner edge');
+      assert.strictEqual(edge.role, 'owner');
+      assert.strictEqual(stored.role, 'owner');
+    });
+
+    test('the owner index enforces one owner per workspace on real MongoDB, alongside the plain {workspaceId:1} index (LIN-1892)', async () => {
+      const collection = await indexedAccountWorkspaces();
+      const indexes = await collection.listIndexes().toArray();
+      assert.ok(
+        indexes.some((ix) => JSON.stringify(ix.key) === JSON.stringify({ workspaceId: 1 })),
+        'the plain {workspaceId:1} index is present'
+      );
+      assert.ok(indexes.some((ix) => ix.name === 'account_workspaces_one_owner'), 'the owner index is present');
+
+      const workspaceId = randomUUID();
+      const a = { _id: randomUUID(), accountId: randomUUID(), workspaceId, createdAt: new Date() };
+      const b = { _id: randomUUID(), accountId: randomUUID(), workspaceId, createdAt: new Date() };
+      await collection.insertMany([a, b]);
+
+      await collection.updateOne({ _id: a._id }, { $set: { role: 'owner' } });
+      await assert.rejects(
+        () => collection.updateOne({ _id: b._id }, { $set: { role: 'owner' } }),
+        /E11000|duplicate key/i
+      );
+    });
+
+    test('bindAccountToWorkspace: concurrent first binds by distinct accounts produce exactly one owner edge, no unhandled throw (LIN-1892 N4)', async () => {
+      const collection = await indexedAccountWorkspaces();
+      const store = new AccountWorkspaceStore({ collection });
+      const workspaceId = randomUUID();
+      const BINDERS = 10;
+
+      const results = await Promise.allSettled(
+        Array.from({ length: BINDERS }, () => store.bindAccountToWorkspace(randomUUID(), workspaceId))
+      );
+
+      const rejected = results.filter((r) => r.status === 'rejected');
+      assert.deepStrictEqual(
+        rejected,
+        [],
+        `bindAccountToWorkspace must never throw under a first-binder race, got ${rejected.length} rejection(s): ${rejected[0]?.reason}`
+      );
+      assert.strictEqual(await collection.countDocuments({ workspaceId }), BINDERS, 'one edge per binder');
+      assert.strictEqual(await collection.countDocuments({ workspaceId, role: 'owner' }), 1, 'exactly one owner edge');
+      const owners = results.filter((r) => r.value.role === 'owner');
+      assert.strictEqual(owners.length, 1, 'exactly one bind reports itself as the owner');
     });
 
     test('createWorkspace: parallel duplicate creates produce exactly one record, no unhandled throw', async () => {
@@ -180,6 +267,42 @@ describe(
 
       const edges = await collection.find({ accountId, workspaceId }).toArray();
       assert.strictEqual(edges.length, 1, 'exactly one edge should exist for this pair');
+    });
+
+    test('the ownership dry-run counts every workspace of a multi-workspace session and returns no identity on real MongoDB (LIN-1892 S1-1, S1-2)', async () => {
+      // Its own db: the dry-run reads the bare `sessions`/`accounts`/
+      // `account-workspaces` collections, not this suite's suffixed ones.
+      const dryRunDb = client.db(`${db.databaseName}_dryrun`);
+      try {
+        await dryRunDb.collection('accounts').insertMany([
+          { _id: 'acct-local', identities: [{ provider: 'local', scope: 'l', credentials: { token: 'SECRET-CRED-1' } }] },
+          { _id: 'acct-mixed', identities: [{ provider: 'local', scope: 'm' }, { provider: 'linear', scope: 'm', credentials: { token: 'SECRET-CRED-2' } }] }
+        ]);
+        await dryRunDb.collection('account-workspaces').insertOne({ _id: 'e1', accountId: 'acct-mixed', workspaceId: 'org-a', createdAt: new Date() });
+        await dryRunDb.collection('sessions').insertOne({
+          _id: 'sid-SECRET',
+          expires: new Date(Date.now() + 60_000),
+          session: {
+            workspaces: [
+              { id: 'org-a', urlKey: 'a', accessToken: 'SECRET-AT-1' },
+              { id: 'org-b', urlKey: 'b', accessToken: 'SECRET-AT-2' },
+              { id: 'org-c', urlKey: 'c', refreshToken: 'SECRET-RT-3' }
+            ]
+          }
+        });
+
+        const report = await computeOwnershipReport({ db: dryRunDb });
+
+        assert.strictEqual(report.totals.sessionWorkspaceEntries, 3, 'all three workspaces of the session are counted');
+        assert.deepStrictEqual(report.c_sessionOnlyNoEdge.rows.map((r) => r.workspaceId), ['org-b', 'org-c']);
+        assert.strictEqual(report.d_localOnlyAccounts.count, 1, 'only acct-local; acct-mixed also has linear');
+        const json = JSON.stringify(report);
+        for (const value of ['sid-SECRET', 'SECRET-AT-1', 'SECRET-AT-2', 'SECRET-RT-3', 'SECRET-CRED-1', 'SECRET-CRED-2']) {
+          assert.ok(!json.includes(value), `the report must not contain ${value}`);
+        }
+      } finally {
+        await dryRunDb.dropDatabase();
+      }
     });
 
     // --- LIN-1338: linkIdentity cross-document race + unique backstop ---
