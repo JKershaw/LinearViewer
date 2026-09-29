@@ -237,4 +237,62 @@ describe('LIN-3124 PR2 T9/T10/T11/T13 — connection-credential seam', () => {
     const sessionStoreSrc = readFileSync(new URL('../../lib/session-store.js', import.meta.url), 'utf8');
     assert.match(sessionStoreSrc, /sanitizeSessionForPersist\(session\)/);
   });
+
+  // B4/R17 — spend-intent is marked BEFORE the exchange, and a past-grace
+  // marker rejects with EXPIRED without spending the token.
+  test('B4/R17: spend-intent precedes the exchange; past-grace marker rejects EXPIRED with no exchange', async () => {
+    const { connectionStore, ownerCredentialStore } = stores();
+    const { accountId, connectionId } = await seedLinearConnection(connectionStore, ownerCredentialStore);
+
+    const order = [];
+    const exchange = async () => { order.push('exchange'); return { access_token: 't', refresh_token: 'R1', expires_in: 3600 }; };
+    const spy = new Proxy(ownerCredentialStore, {
+      get(target, prop) {
+        if (prop === 'markSpendIntentByConnection') {
+          return (...a) => { order.push('mark'); return target.markSpendIntentByConnection(...a); };
+        }
+        return typeof target[prop] === 'function' ? target[prop].bind(target) : target[prop];
+      }
+    });
+    const refresh = createConnectionRefresher({ connectionStore, ownerCredentialStore: spy, resolveExchange: () => exchange, refreshAccessToken: exchange });
+    await refresh(connectionId, accountId);
+    assert.deepStrictEqual(order.slice(0, 2), ['mark', 'exchange'], 'markSpendIntent must precede the exchange');
+
+    // Past-grace marker: no exchange, EXPIRED.
+    const { connectionStore: cs2, ownerCredentialStore: ocs2 } = stores();
+    const seeded = await seedLinearConnection(cs2, ocs2, { refreshToken: 'R-old' });
+    await ocs2.markSpendIntentByConnection(seeded.connectionId, 'R-old');
+    await ocs2.collection.updateOne(
+      { _id: seeded.connectionId },
+      { $set: { 'pendingSpend.attemptedAt': new Date(Date.now() - 31 * 60 * 1000) } }
+    );
+    let exchanged = 0;
+    const refresh2 = createConnectionRefresher({
+      connectionStore: cs2, ownerCredentialStore: ocs2,
+      resolveExchange: () => async () => { exchanged++; return {}; },
+      refreshAccessToken: async () => { exchanged++; return {}; }
+    });
+    await assert.rejects(() => refresh2(seeded.connectionId, seeded.accountId), (err) => err.code === 'EXPIRED');
+    assert.strictEqual(exchanged, 0, 'a past-grace spend-intent must not re-spend');
+  });
+
+  // B4/R15 — a CAS loser converges on the stored winner and never throws.
+  test('B4/R15: a CAS loser converges on the winner', async () => {
+    const { connectionStore, ownerCredentialStore } = stores();
+    const { accountId, connectionId } = await seedLinearConnection(connectionStore, ownerCredentialStore);
+
+    // The exchange lands a concurrent winner's record before we try to CAS on R0,
+    // so `putIfRefreshTokenByConnection` misses.
+    const exchange = async () => {
+      await ownerCredentialStore.putByConnection(connectionId, {
+        accountId, provider: 'linear', token: 'tokW', refreshToken: 'winner', tokenExpiresAt: Date.now() + 3600_000
+      });
+      return { access_token: 'tokL', refresh_token: 'loser', expires_in: 3600 };
+    };
+    const refresh = createConnectionRefresher({ connectionStore, ownerCredentialStore, resolveExchange: () => exchange, refreshAccessToken: exchange });
+
+    const result = await refresh(connectionId, accountId);
+    assert.strictEqual(result.token, 'tokW');
+    assert.strictEqual(result.refreshToken, 'winner');
+  });
 });

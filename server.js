@@ -3786,7 +3786,10 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
     await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider);
     // LIN-3124 PR2 (D4, last-referent unlink): release the connection-backed
     // credential only when this binding was the last referent. Inert for legacy.
-    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope, mode: 'unlink' })
+    // B1: `unlinkProvider` above has ALREADY reassigned `workspace.bindings`
+    // without the removed binding, so the release must see the PRE-unlink array
+    // (`bindingsBefore`) or it filters to nothing and never fires.
+    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: { urlKey: workspace.urlKey, bindings: bindingsBefore }, provider, scope, mode: 'unlink' })
   }
 
   try {

@@ -248,6 +248,32 @@ describe('LIN-3124 PR1 T4 — D6 source arms', () => {
 });
 
 // ---------------------------------------------------------------------------
+// B3: the f3 wildcard must catch every *ByConnection call shape
+// ---------------------------------------------------------------------------
+
+describe('LIN-3124 PR2 B3 — f3 wildcard call shapes', () => {
+  const SHAPES = [
+    ['optional-chaining receiver', "ownerCredentialStore?.putByConnection('c', {});"],
+    ['call-chain receiver', "getStore().putByConnection('c', {});"],
+    ['indexed receiver', "stores[0].rotateByConnection('c', {});"],
+    ['this receiver outside the defining module', "this.putByConnection('c', {});"],
+  ];
+
+  for (const [name, call] of SHAPES) {
+    test(`planted: ${name} is flagged`, () => {
+      const planted = withFile(REAL, 'routes/proxy.js', `${REAL.get('routes/proxy.js')}\n${call}\n`);
+      assert.ok(byConnectionWriteOffenders(planted, BY_CONNECTION_SEAM).length > 0, `${name} must be flagged`);
+    });
+  }
+
+  test('the real tree stays clean — the defining module self-call is exempt', () => {
+    assert.deepEqual(byConnectionWriteOffenders(REAL, BY_CONNECTION_SEAM), []);
+    assert.ok(REAL.get('lib/owner-credential-store.js').includes('this.putByConnection('),
+      'the only allowed self-call in the tree');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Prototype-reflection registry (every ConnectionStore method classified)
 // ---------------------------------------------------------------------------
 

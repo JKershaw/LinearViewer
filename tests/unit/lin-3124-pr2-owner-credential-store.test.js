@@ -245,4 +245,35 @@ describe('LIN-3124 PR2 T8 — OwnerCredentialStore connection-keyed records', ()
     assert.strictEqual(await store.copyToConnection('a', 'u', 'jira', 'c'), false);
     assert.strictEqual(await store.finalizePromotion('a', 'u', 'jira', { connectionId: 'c', copiedRefreshToken: 'r' }), false);
   });
+
+  // B2 (LIN-3124 PR2 review): a connection-keyed record must carry no `urlKey`,
+  // so the legacy `deleteAll(accountId, urlKey)` filter can never reach it.
+  test('B2: deleteAll(accountId, urlKey) cannot reach a connection-keyed record', async () => {
+    const store = freshStore();
+    const acct = randomUUID();
+    const urlKey = `acme-${randomUUID().slice(0, 8)}`;
+    const connectionId = connectionIdFor(acct, 'jira', urlKey);
+
+    await store.put(acct, urlKey, sampleCredential({ provider: 'jira', refreshToken: 'r' }));
+    assert.strictEqual(await store.copyToConnection(acct, urlKey, 'jira', connectionId), true);
+
+    // The record must not carry `urlKey`.
+    const copied = await store.getByConnection(connectionId);
+    assert.strictEqual(copied.urlKey, undefined, 'connection-keyed records carry no urlKey');
+
+    // Removing the workspace that staged it must NOT delete the shared record.
+    await store.deleteAll(acct, urlKey);
+
+    const survivor = await store.getByConnection(connectionId);
+    assert.ok(survivor, 'the connection-keyed record must survive deleteAll');
+    assert.strictEqual(survivor.refreshToken, 'r');
+    assert.strictEqual(await store.get(acct, urlKey, 'jira'), null, 'the staged legacy record is gone');
+  });
+
+  test('B2: putByConnection never persists a urlKey, even when one is supplied', async () => {
+    const store = freshStore();
+    const connectionId = `${randomUUID()}::jira::site`;
+    assert.strictEqual(await store.putByConnection(connectionId, sampleCredential({ urlKey: 'leak', provider: 'jira' })), true);
+    assert.strictEqual((await store.getByConnection(connectionId)).urlKey, undefined);
+  });
 });

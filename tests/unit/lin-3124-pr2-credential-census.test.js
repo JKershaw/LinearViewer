@@ -100,4 +100,22 @@ describe('LIN-3124 PR2 — D15 raw-credential census (explicit query)', () => {
     assert.match(workspace, /binding\.credentials\?\.cloudId/);
     assert.match(workspace, /binding\.credentials\?\.email/);
   });
+
+  // B4/R21 — the account-merge lifecycle wiring is pinned.
+  test('B4/R21: exactly one onAccountMerged( call in routes/account-merge.js, after mergeAccounts(', () => {
+    const mergeWiringCount = (sources) => {
+      const src = sources.get('routes/account-merge.js') || '';
+      return (src.match(/onAccountMerged\s*\(/g) || []).length;
+    };
+    assert.strictEqual(mergeWiringCount(REAL), 1, 'the merge must call onAccountMerged exactly once');
+    const src = REAL.get('routes/account-merge.js');
+    assert.ok(
+      src.indexOf('onAccountMerged(') > src.indexOf('mergeAccounts('),
+      'onAccountMerged must run AFTER mergeAccounts'
+    );
+
+    const dropped = new Map(REAL);
+    dropped.set('routes/account-merge.js', src.replace(/await onAccountMerged\(/, 'await noop('));
+    assert.strictEqual(mergeWiringCount(dropped), 0, 'the planted drop must be caught');
+  });
 });

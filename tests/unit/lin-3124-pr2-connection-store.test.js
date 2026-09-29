@@ -272,4 +272,41 @@ describe('LIN-3124 PR2 T7 — ConnectionStore referent/delete lifecycle', () => 
     // A missing row is a miss, not a create.
     assert.strictEqual(await store.updateCredentials(`${acct}::github::missing`, { token: 'x', tokenExpiresAt: 9 }), false);
   });
+
+  // B4/R6 — the referent lookup must match BOTH fields on the SAME element.
+  test('B4/R6: readConnectionsByReferent matches both fields on the same element', async () => {
+    const store = freshStore();
+    const acct = randomUUID();
+    await store.link(acct, 'linear', 'org-1', { token: 'x' }, { urlKey: 'a', provider: 'jira', scope: 's' });
+    await store.link(acct, 'linear', 'org-1', { token: 'x' }, { urlKey: 'b', provider: 'linear', scope: 's' });
+
+    assert.deepStrictEqual(
+      await store.readConnectionsByReferent('a', 'linear'), [],
+      'urlKey a belongs to the jira referent, not the linear one'
+    );
+    assert.strictEqual((await store.readConnectionsByReferent('a', 'jira')).length, 1);
+    assert.strictEqual((await store.readConnectionsByReferent('b', 'linear')).length, 1);
+  });
+
+  // B4/R10 — the account-prefix scan and the empty-delete must be anchored.
+  test('B4/R10: account-prefix scan and empty-delete are anchored', async () => {
+    const store = freshStore();
+    const first = store._id('acc1', 'linear', 'x'); // acc1::linear::x
+    const second = 'xacc1::linear::y';
+    for (const id of [first, second]) {
+      await store.collection.updateOne(
+        { _id: id },
+        { $set: { accountId: id.split('::')[0], provider: 'linear', unitId: id.split('::')[2], origin: 'connection', referents: [], credentials: {}, createdAt: new Date(), updatedAt: new Date() } },
+        { upsert: true }
+      );
+    }
+
+    const rows = await store.readConnectionsByAccountPrefix('acc1');
+    assert.deepStrictEqual(rows.map(r => r._id), [first], 'xacc1 must not match the acc1 prefix');
+
+    const deleted = await store.deleteEmptyByAccountPrefix('acc1');
+    assert.strictEqual(deleted, 1);
+    assert.strictEqual(await store.readConnectionById(first), null);
+    assert.ok(await store.readConnectionById(second), 'xacc1::linear::y must survive');
+  });
 });

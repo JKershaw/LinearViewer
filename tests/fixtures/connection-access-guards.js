@@ -208,24 +208,25 @@ export function namedCallOffenders(sources, names, allowedCallers) {
 }
 
 /**
- * Arm (f3) wildcard: every `X.<name>ByConnection(` write must live only in
- * `allowedCallers` (D6(f)). Exemptions:
- *   - `this.<name>ByConnection(` — a class calling its own method (the defining
- *     module, lib/owner-credential-store.js);
+ * Arm (f3) wildcard: every `<receiver>.<name>ByConnection(` write must live only
+ * in `allowedCallers` (D6(f)). The receiver is intentionally NOT captured — the
+ * method is flagged wherever a `.` **or `?.`** precedes it, whatever the call
+ * shape (`getStore().putByConnection(`, `stores[0].rotateByConnection(`,
+ * `ownerCredentialStore?.putByConnection(`). Exemptions:
+ *   - `this.<name>ByConnection(` — a self-call, exempt ONLY in the defining
+ *     module `lib/owner-credential-store.js`;
  *   - `getByConnection(` — the READ, pinned separately by the caller pin;
  *   - `deleteByConnection(` — lifecycle-only, pinned by arm f2.
- * Matching the receiver (not just the method) is what lets the wildcard exclude
- * the defining module's self-calls while still catching a new write name.
  */
 export function byConnectionWriteOffenders(sources, allowedCallers) {
-  const re = /(\w+)\s*\.\s*(\w+ByConnection)\s*\(/g;
+  const re = /(\bthis\s*)?\??\.\s*(\w+ByConnection)\s*\(/g;
   const offenders = [];
   for (const [rel, src] of sources) {
     if (allowedCallers.includes(rel)) continue;
     for (const m of src.matchAll(re)) {
-      const receiver = m[1];
+      const selfCall = m[1];
       const method = m[2];
-      if (receiver === 'this') continue;
+      if (selfCall && rel === 'lib/owner-credential-store.js') continue;
       if (method === 'getByConnection') continue;
       if (method === 'deleteByConnection') continue;
       offenders.push(`${rel}: .${method}( outside [${allowedCallers.join(', ')}]`);
