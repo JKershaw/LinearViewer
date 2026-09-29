@@ -43,9 +43,12 @@ import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-prefe
 import {
   renderEmailSignInPage,
   renderEmailSignedInPage,
+  renderEmailRegisterPage,
   renderEmailCheckInboxPage,
   renderEmailLinkExpiredPage,
   renderEmailConfirmPage,
+  renderEmailLinkConfirmPage,
+  renderEmailLinkWrongBrowserPage,
   renderEmailConfirmSignedInRefusedPage,
   renderEmailConfirmRefusedPage,
   renderEmailSendRefusedPage,
@@ -145,6 +148,68 @@ export function createEmailAuthRoutes({
     return (await canonical(owner._id)) === (await canonical(sessionAccountId));
   }
 
+  // S3 link mode: the confirming session's canonical account must be the
+  // account the token was minted for. Reuses `canonical()` (the same helper
+  // `emailIsOnLiveAccount` uses), so a resolver failure degrades to the raw
+  // ids — a mismatch is refused, never failed open (F16).
+  async function sameCanonicalAccount(a, b) {
+    if (!a || !b) return false;
+    return (await canonical(a)) === (await canonical(b));
+  }
+
+  // A post-link destination must be a same-origin absolute path — never an
+  // off-site URL and never a protocol-relative `//host` (open-redirect guard).
+  function safeNext(next) {
+    return typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : null;
+  }
+
+  // Where to land after a link-mode confirm: the requested `next` when safe,
+  // else the session's first workspace, else the account home. No regenerate
+  // happens in link mode, so `session.workspaces` is intact.
+  function linkCompletionRedirect(req, next) {
+    const ws = (req.session.workspaces || [])[0];
+    return safeNext(next) || (ws ? `/workspace/${encodeURIComponent(ws.urlKey)}/` : '/account');
+  }
+
+  // S3 pre-fill (N7): the address already at rest on the account, never a new
+  // provider call and never treated as verified. Jira stores
+  // `credentials.email` via linkIdentity; Linear's viewer.email is only ever
+  // used if it is already on the session (nothing writes it today).
+  async function emailPrefill(accountId) {
+    try {
+      const account = await accountStore.getAccount(await canonical(accountId));
+      const jira = (account?.identities || []).find(i => i.provider === 'jira');
+      const fromJira = jira?.credentials?.email;
+      return normalizeEmail(fromJira) || null;
+    } catch (err) {
+      console.error('[email-auth] email pre-fill lookup failed:', err?.name || 'Error');
+      return null;
+    }
+  }
+
+  // S3 link-mode completion: NO regenerate (it is not a new sign-in). The
+  // email identity is linked onto the live account; a conflict (the address
+  // already belongs to another account) is the one email path that may offer
+  // a merge, via the shared responder with `workspace:null` — never sign-in
+  // mode's refusal. The null-workspace confirm branch completes it.
+  async function completeLinkMode(req, res, { emailNorm, next }) {
+    // Resolve the destination first: the hidden `next` from the confirm form,
+    // else the value carried from the register page (cleared below).
+    const destination = safeNext(next) || safeNext(req.session.emailLinkNext);
+    const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'email', emailNorm, {}, null);
+    delete req.session.emailLinkNext;
+    if (!established.ok) {
+      // A conflict (the address already belongs to another account) is the one
+      // email path that may offer a merge, via the shared responder with
+      // `workspace:null`. A stale/unresolvable session takes its non-mergeable
+      // arm. Either way nothing sign-in mode would do.
+      await respondToAccountConflict({ req, res, established, workspace: null, mode: 'new', returnUrlKey: null, identityLabel: 'email', reauthUrl: '/auth/email', provider: 'email' });
+      return;
+    }
+    await saveSession(req.session);
+    res.redirect(linkCompletionRedirect(req, destination));
+  }
+
   function linkUrl(req, token) {
     // Resend links reach real inboxes: never from the (forgeable) Host header.
     // lib/email-availability.js already keeps Resend off without an origin;
@@ -178,6 +243,19 @@ export function createEmailAuthRoutes({
     res.send(renderEmailSignInPage({ nonce }));
   });
 
+  // S3 link mode: the "add an email to this account" form. Sign-in is
+  // required, so the token is bound to a live canonical account by the send
+  // below. This is the step page and the target of Settings' "Add email".
+  router.get('/auth/email/register', async (req, res) => {
+    if (!transport) return unavailable(res);
+    if (!req.session.accountId) return res.redirect('/');
+    const next = safeNext(req.query?.next);
+    const nonce = mintSendNonce(req.session, now());
+    const prefill = await emailPrefill(req.session.accountId);
+    await saveSession(req.session);
+    res.send(renderEmailRegisterPage({ nonce, prefill, next }));
+  });
+
   router.post('/auth/email/send', sendLimiter, async (req, res) => {
     if (!transport) return unavailable(res);
     const body = req.body || {};
@@ -189,14 +267,27 @@ export function createEmailAuthRoutes({
     if (!verifySendNonce(req.session, body.nonce, now())) {
       return res.status(403).send(renderEmailSendRefusedPage());
     }
-    if (req.session.accountId) return res.send(renderEmailSignedInPage());
+
+    const mode = body.mode === 'link' ? 'link' : 'signin';
+    // S3 link mode: a token that attaches an email to an account may only be
+    // minted by a session already holding that account. A signed-out (or
+    // cross-site) send can never mint one — it is not a link, it is not bound.
+    if (mode === 'link' && !req.session.accountId) {
+      return res.status(403).send(renderEmailSendRefusedPage());
+    }
+    // S2 sign-in mode: a live session gets no sign-in token (N2).
+    if (mode === 'signin' && req.session.accountId) return res.send(renderEmailSignedInPage());
 
     const emailNorm = normalizeEmail(body.email);
     if (!emailNorm) {
       // About the typed text only, never about whether the address is known.
       const nonce = mintSendNonce(req.session, now());
       await saveSession(req.session);
-      return res.status(400).send(renderEmailSignInPage({ nonce, error: 'Enter an email address like you@example.com.' }));
+      const error = 'Enter an email address like you@example.com.';
+      if (mode === 'link') {
+        return res.status(400).send(renderEmailRegisterPage({ nonce, prefill: await emailPrefill(req.session.accountId), next: safeNext(body.next), error }));
+      }
+      return res.status(400).send(renderEmailSignInPage({ nonce, error }));
     }
 
     // One per browser; its hash rides on the token. It only drives the
@@ -205,24 +296,33 @@ export function createEmailAuthRoutes({
       req.session.emailRequestNonce = randomBytes(32).toString('base64url');
     }
 
+    // S3: bind a link-mode token to the live session's canonical account. The
+    // confirm re-derives canonical on both sides before spending it.
+    const linkToAccountId = mode === 'link' ? await canonical(req.session.accountId) : null;
+    const next = mode === 'link' ? safeNext(body.next) : null;
+    if (mode === 'link') req.session.emailLinkNext = next;
+
     try {
       if (await magicLinkStore.recentCountForEmail(emailNorm) < EMAIL_SEND_THROTTLE_MAX) {
         const { token } = await magicLinkStore.issue({
           emailNorm,
-          mode: 'signin',
+          mode,
+          linkToAccountId,
           requestNonceHash: sha256Hex(req.session.emailRequestNonce),
         });
         const url = linkUrl(req, token);
+        const lead = mode === 'link' ? 'Confirm this email for your Harbour account' : 'Sign in to Harbour';
+        const text = `${lead}:\n\n${url}\n\nThis link works once, for 15 minutes. If you didn't ask for it, ignore this email.`;
         await transport.send({
           to: emailNorm,
-          subject: 'Your Harbour sign-in link',
-          text: `Sign in to Harbour:\n\n${url}\n\nThis link works once, for 15 minutes. If you didn't ask for it, ignore this email.`,
-          html: `<p><a href="${url}">Sign in to Harbour</a></p><p>This link works once, for 15 minutes. If you didn't ask for it, ignore this email.</p>`,
+          subject: mode === 'link' ? 'Confirm your email for Harbour' : 'Your Harbour sign-in link',
+          text,
+          html: `<p><a href="${url}">${lead}</a></p><p>This link works once, for 15 minutes. If you didn't ask for it, ignore this email.</p>`,
         });
       }
     } catch (err) {
       // Logged without the address or token; the page below is unchanged.
-      console.error('[email-auth] sign-in link issue failed:', err?.name || 'Error');
+      console.error('[email-auth] email link issue failed:', err?.name || 'Error');
     }
 
     await saveSession(req.session);
@@ -235,13 +335,24 @@ export function createEmailAuthRoutes({
     setConfirmPageHeaders(res);
     const t = req.query?.t;
     const link = await magicLinkStore.peek(t);
-    // S2 issues sign-in tokens only; a link-mode token belongs to S3's flow.
-    if (!link || link.mode !== 'signin') return res.status(410).send(renderEmailLinkExpiredPage());
+    // Only a well-formed live token has a page; unknown/expired is a 410.
+    if (!link) return res.status(410).send(renderEmailLinkExpiredPage());
 
-    // Minted even on the N2 refusal page below, so the POST-side guard
-    // stands on its own rather than relying on the missing button.
+    // Minted even on the refusal pages below, so the POST-side guards stand on
+    // their own rather than relying on a missing button.
     const nonce = mintConfirmNonce(req.session, t, now());
     await saveSession(req.session);
+
+    if (link.mode === 'link') {
+      // S3: a link-mode token is bound to the account that requested it; the
+      // confirming session must be that same canonical account. A different
+      // browser, or a session that switched account, is refused without
+      // touching the token.
+      if (!(await sameCanonicalAccount(req.session.accountId, link.linkToAccountId))) {
+        return res.status(409).send(renderEmailLinkWrongBrowserPage({ token: t, nonce }));
+      }
+      return res.send(renderEmailLinkConfirmPage({ email: link.emailNorm, token: t, nonce, next: safeNext(req.session.emailLinkNext) }));
+    }
 
     if (req.session.accountId) {
       if (!(await emailIsOnLiveAccount(req.session.accountId, link.emailNorm))) {
@@ -272,22 +383,40 @@ export function createEmailAuthRoutes({
       return res.status(403).send(renderEmailConfirmRefusedPage({ retryUrl }));
     }
 
-    const liveAccountId = req.session.accountId || null;
-    // (b′) N2, before consume: a live account may only re-confirm an address
-    //      it already holds. Nothing consumed, attached or offered.
+    // (b′) The token's mode decides which guard runs, BEFORE consume — a
+    //      refusal consumes nothing.
     const link = await magicLinkStore.peek(t);
-    if (!link || link.mode !== 'signin') return res.status(410).send(renderEmailLinkExpiredPage());
-    if (liveAccountId && !(await emailIsOnLiveAccount(liveAccountId, link.emailNorm))) {
-      return res.status(409).send(renderEmailConfirmSignedInRefusedPage({ email: link.emailNorm }));
+    if (!link) return res.status(410).send(renderEmailLinkExpiredPage());
+
+    if (link.mode === 'link') {
+      // S3: the confirming session must be the canonical account the token was
+      // minted for. A throwing canonical resolver degrades to the raw ids →
+      // mismatch → refused (F16), never failed open.
+      if (!(await sameCanonicalAccount(req.session.accountId, link.linkToAccountId))) {
+        return res.status(409).send(renderEmailLinkWrongBrowserPage({ token: t, nonce }));
+      }
+    } else {
+      // N2: a live account may only re-confirm an address it already holds.
+      const liveAccountId = req.session.accountId || null;
+      if (liveAccountId && !(await emailIsOnLiveAccount(liveAccountId, link.emailNorm))) {
+        return res.status(409).send(renderEmailConfirmSignedInRefusedPage({ email: link.emailNorm }));
+      }
     }
 
     // (c) Spend the link: exactly one concurrent confirm wins.
     const consumed = await magicLinkStore.consume(t);
-    if (!consumed || consumed.mode !== 'signin') return res.status(410).send(renderEmailLinkExpiredPage());
+    if (!consumed) return res.status(410).send(renderEmailLinkExpiredPage());
     const emailNorm = consumed.emailNorm;
 
-    // (c′) N2 again, closing the gap between (b′) and (c). The token is
-    //      spent if this refuses, which is harmless: nothing was attached.
+    // (c′) Re-check after consume, closing the gap between (b′) and (c). The
+    //      token is spent if this refuses, which is harmless: nothing attached.
+    if (consumed.mode === 'link') {
+      if (!(await sameCanonicalAccount(req.session.accountId, consumed.linkToAccountId))) {
+        return res.status(409).send(renderEmailLinkWrongBrowserPage({ token: t, nonce }));
+      }
+      return await completeLinkMode(req, res, { emailNorm, next: req.body?.next });
+    }
+    const liveAccountId = req.session.accountId || null;
     if (liveAccountId && !(await emailIsOnLiveAccount(liveAccountId, emailNorm))) {
       return res.status(409).send(renderEmailConfirmSignedInRefusedPage({ email: emailNorm }));
     }
