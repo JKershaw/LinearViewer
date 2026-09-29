@@ -10,12 +10,17 @@
  *      no new connection-backed binding is created;
  *   2. list the affected workspaces: `connections` rows whose `referents` is
  *      non-empty (this script's report, `affected`);
- *   3. run this script: for every connection-backed binding in every stored
+ *   3. drain traffic (so no live session re-saves over the revert), then run
+ *      this script: for every connection-backed binding in every stored
  *      session it writes the Connection's credential back into the binding (and
  *      the scalar mirror when it is the D2-marked active binding) and, for the
  *      refresh-token kinds (linear, jira), copies the connection-keyed owner
  *      record to the legacy key `${accountId}::${urlKey}::${provider}` FIRST, so
- *      a reverted binding always has a durable refresh token;
+ *      a reverted binding always has a durable refresh token. LAST it removes the
+ *      reverted binding's referent from the Connection, and deletes the
+ *      Connection and its connection-keyed record once no referent is left, so
+ *      the connection-first read arm can no longer find the reverted workspace:
+ *      exactly one live copy of each rotating refresh token (the legacy one);
  *   4. anything skipped is re-linked by the user (the report says why).
  *
  * Properties (pinned by tests/unit/revert-connection-backed.test.js, T28):
@@ -23,10 +28,13 @@
  *   - IDEMPOTENT: a second run finds no connection-backed binding and writes
  *     nothing; a legacy record already holding the same refresh token is not
  *     rewritten;
- *   - NEVER DELETES: Connection rows and connection-keyed owner records are
- *     left in place (pre-cutover code ignores them), and a legacy key already
- *     holding a DIFFERENT refresh token (a co-resident legacy site's grant) is
- *     never overwritten — that binding is skipped instead;
+ *   - ONE LIVE COPY (review blocker 6): a reverted binding's referent is
+ *     removed and its Connection + connection-keyed record are deleted only
+ *     when unreferenced (a Connection still referenced by another, unreverted
+ *     binding keeps both); nothing is deleted before the legacy record and the
+ *     session have been written; a legacy key already holding a DIFFERENT
+ *     refresh token (a co-resident legacy site's grant) is never overwritten —
+ *     that binding is skipped instead, and keeps its Connection;
  *   - SECRET-SAFE REPORT: urlKeys, provider names and reasons only — never a
  *     token, a session id or an account id.
  *
@@ -42,6 +50,7 @@
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { OwnerCredentialStore } from '../lib/owner-credential-store.js'
+import { ConnectionStore } from '../lib/connection-store.js'
 
 const REFRESH_TOKEN_KINDS = new Set(['linear', 'jira'])
 
@@ -60,6 +69,7 @@ export async function runRevert({ db, execute = false, log = console.log }) {
   const sessions = db.collection('sessions')
   const connections = db.collection('connections')
   const ownerCredentialStore = new OwnerCredentialStore({ collection: db.collection('owner-credentials') })
+  const connectionStore = new ConnectionStore({ collection: connections })
 
   const affectedRows = await connections.find({ referents: { $exists: true, $ne: [] } }).toArray()
   const report = {
@@ -73,6 +83,7 @@ export async function runRevert({ db, execute = false, log = console.log }) {
     reverted: [],
     skipped: [],
     legacyRecordsWritten: 0,
+    connectionsReleased: 0,
   }
 
   for (const row of await sessions.find({}).toArray()) {
@@ -81,6 +92,7 @@ export async function runRevert({ db, execute = false, log = console.log }) {
     report.sessionsScanned += 1
     const next = structuredClone(session)
     const legacyWrites = []
+    const releases = []
     let changed = false
 
     for (const workspace of next.workspaces) {
@@ -124,6 +136,7 @@ export async function runRevert({ db, execute = false, log = console.log }) {
           delete workspace.activeBinding
         }
         report.reverted.push(where)
+        releases.push({ connectionId: binding.connectionId, referent: { urlKey: workspace.urlKey, provider: binding.provider, scope: binding.scope } })
         changed = true
       }
     }
@@ -136,14 +149,23 @@ export async function runRevert({ db, execute = false, log = console.log }) {
       if (await ownerCredentialStore.put(accountId, urlKey, record)) report.legacyRecordsWritten += 1
     }
     await sessions.updateOne({ _id: row._id }, { $set: { session: next } })
+    // Last: the connection-first arm must no longer find a reverted binding.
+    for (const { connectionId, referent } of releases) {
+      await connectionStore.removeReferent(connectionId, referent)
+      if (await connectionStore.deleteIfUnreferenced(connectionId)) {
+        await ownerCredentialStore.deleteByConnection(connectionId)
+        report.connectionsReleased += 1
+      }
+    }
   }
 
-  log(`[revert-connection-backed] ${execute ? 'EXECUTE' : 'dry run'}: ${report.reverted.length} binding(s) reverted in ${report.sessionsChanged} session(s), ${report.skipped.length} skipped (re-link), ${report.legacyRecordsWritten} legacy record(s) written`)
+  log(`[revert-connection-backed] ${execute ? 'EXECUTE' : 'dry run'}: ${report.reverted.length} binding(s) reverted in ${report.sessionsChanged} session(s), ${report.skipped.length} skipped (re-link), ${report.legacyRecordsWritten} legacy record(s) written, ${report.connectionsReleased} Connection(s) released`)
   return report
 }
 
 async function main() {
   const execute = process.argv.includes('--execute')
+  console.log(`[revert-connection-backed] Order: (1) CONNECTION_BACKED_WRITES=off, (2) drain traffic, (3) run this script${execute ? ' — EXECUTING now' : ' (dry run; --execute to write)'}.`)
   const dbClient = process.env.MONGODB_URI
     ? new MongoClient(process.env.MONGODB_URI)
     : new MangoClient(process.env.HARBOUR_DATA_DIR || './data')

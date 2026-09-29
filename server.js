@@ -60,8 +60,8 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader } from './lib/connection-credential.js'
-import { isConnectionBacked, activeBindingIsConnectionBacked, readWorkspaceCredential } from './lib/connection-binding.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh } from './lib/connection-credential.js'
+import { isConnectionBacked, activeBindingIsConnectionBacked, activeConnectionBackedBinding, readWorkspaceCredential } from './lib/connection-binding.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
@@ -1073,12 +1073,18 @@ async function ensureValidToken(req, res, next) {
       // bindings by design, so this arm takes it instead.
       const refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, req.session.accountId, workspace.urlKey)
       if (!refreshed) throw new Error(`No connection credential to re-mint for workspace ${workspace.id}`)
+      // Review blocker 2: the rest of this request uses the re-minted token.
+      rehydrateAfterRefresh(workspace, refreshed)
     } else if (connectionId) {
       // LIN-3124 PR3 (D7/D9): refresh-token kinds rotate through the
       // connection-keyed durable record + Connection mirror. No session mirror
       // is written (the Connection is the credential home).
-      const refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, req.session.accountId, workspace.urlKey)
+      // Review blocker 4: the connection-keyed gate was already consulted
+      // above, so this is the UNGATED refresh (one gate per attempt), and a
+      // definitive revocation propagates to the catch below.
+      const refreshed = await connectionAccess.refreshConnectionUngated(connectionId, req.session.accountId)
       if (!refreshed) throw new Error(`No connection credential to refresh workspace ${workspace.id}`)
+      rehydrateAfterRefresh(workspace, refreshed)
     } else {
       // LIN-1524: Linear's rotating credential lives ONLY in the durable
       // store now — `workspace.refreshToken` is never written anymore, so it
@@ -1171,7 +1177,9 @@ async function ensureValidToken(req, res, next) {
         await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider)
         // LIN-3124 PR2 (D4, definitive revocation): revoke the connection-backed
         // credential too. Inert for a legacy workspace (no connection-backed binding).
-        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(req.session.accountId) })
+        // Review blocker 3: revoke ONLY the active connection-backed binding — a
+        // legacy binding's revocation must never reach a connection-backed sibling.
+        if (connectionId) await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope: workspace.activeBinding.scope, mode: 'revoke', evict: evictReferentFor(req.session.accountId) })
       }
       return sendRelinkNotice(workspace, res)
     }
@@ -1203,7 +1211,8 @@ async function ensureValidToken(req, res, next) {
     if (isDefinitiveRevocation(error)) {
       await ownerCredentialStore.delete(accountId, workspace.urlKey, provider)
       // LIN-3124 PR2 (D4, definitive revocation).
-      await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(accountId) })
+      // Review blocker 3 (see above).
+      if (connectionId) await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope: workspace.activeBinding.scope, mode: 'revoke', evict: evictReferentFor(accountId) })
     }
 
     // LIN-1518: hoisted above the branch for exactly the reason the durable
@@ -1721,6 +1730,8 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       if (connectionId) {
         const refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, session.accountId, workspace.urlKey);
         if (!refreshed) throw new Error(`No connection credential to re-mint for workspace ${workspace.id}`);
+        // Review blocker 2: the retry render below uses the re-minted token.
+        rehydrateAfterRefresh(workspace, refreshed);
       } else {
         await remintActiveCredential(workspace, getProviderForWorkspace(workspace));
       }
@@ -1803,10 +1814,12 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
     try {
       refreshed = await connectionAccess.refreshConnectionForWorkspace({ _id: connectionId, provider }, session.accountId, workspace.urlKey);
       if (!refreshed) throw new Error(`No connection credential to refresh workspace ${workspace.id}`);
+      // Review blocker 2: the retry render below uses the refreshed token.
+      rehydrateAfterRefresh(workspace, refreshed);
     } catch (refreshError) {
       console.error('Connection refresh failed after 401:', refreshError);
       if (isDefinitiveRevocation(refreshError)) {
-        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(session.accountId) });
+        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope: workspace.activeBinding.scope, mode: 'revoke', evict: evictReferentFor(session.accountId) });
       }
       if (!declaration.destructiveOnFailure) return sendRelinkNotice(workspace, res);
       if (isDefinitiveRevocation(refreshError)) {
@@ -1845,8 +1858,9 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       if (!declaration.destructiveOnFailure) {
         if (isDefinitiveRevocation(refreshError)) {
           await ownerCredentialStore.delete(session.accountId, workspace.urlKey, provider);
-          // LIN-3124 PR2 (D4, definitive revocation).
-          await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(session.accountId) })
+          // LIN-3124 PR3 review blocker 3: no Connection release here — the
+          // connection arm above returned for a connection-backed active
+          // binding, so this legacy arm's revocation must not reach one.
         }
         return sendRelinkNotice(workspace, res);
       }
@@ -2300,10 +2314,7 @@ function persistSessionRow(sid, session) {
  * entrants and the D5 gate onto the Connection.
  */
 function activeConnectionIdForWorkspace(workspace) {
-  const marker = workspace?.activeBinding;
-  if (!marker || !Array.isArray(workspace.bindings)) return null;
-  const match = workspace.bindings.find(b => b && b.provider === marker.provider && b.scope === marker.scope);
-  return isConnectionBacked(match) ? match.connectionId : null;
+  return activeConnectionBackedBinding(workspace)?.connectionId ?? null;
 }
 
 // LIN-3124 PR3 (D7/D12/D5): the owner-scoped connection-first read arm and its

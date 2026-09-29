@@ -34,7 +34,7 @@ import {
 import { activeBindingIsConnectionBacked, readWorkspaceCredential } from '../../lib/connection-binding.js';
 import {
   linkProvider, getWorkspaceCallScope, getBindingCallScope, resolveIssueBinding, getWorkspaceToken,
-  getWorkspaceByUrlKey, normalizeProvider,
+  getWorkspaceByUrlKey, normalizeProvider, getWorkspaceMirrorToken, getWorkspaceTokenExpiry,
 } from '../../lib/workspace.js';
 import {
   UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, selectOwnerSessionRow,
@@ -106,9 +106,9 @@ describe('LIN-3124 T18 — decoy-token across every lane', () => {
     const pw = poisoned.workspaces[0];
     pw.accessToken = DECOY;
     pw.credentials = { token: DECOY };
-    pw.tokenExpiresAt = live;
+    pw.tokenExpiresAt = live + 999_000; // a decoy expiry, distinct from the Connection's
     for (const b of pw.bindings) b.credentials = { token: DECOY, installationId: '9', tokenExpiresAt: live };
-    return { db, connectionStore, ownerCredentialStore, session: poisoned };
+    return { db, connectionStore, ownerCredentialStore, session: poisoned, realExpiry: live };
   }
 
   const hydrate = (w) => hydrateSession(w.session, { connectionStore: w.connectionStore });
@@ -119,6 +119,14 @@ describe('LIN-3124 T18 — decoy-token across every lane', () => {
     'per-binding: dashboard fan-out': async (w) => tokenOf(getBindingCallScope(w.session.workspaces[0].bindings.find(b => b.provider === 'github'))),
     'per-binding: resolveIssueBinding': async (w) => tokenOf(resolveIssueBinding(w.session.workspaces[0], 'github').callScope),
     'per-binding: settings probe (3-arg getWorkspaceToken)': async (w) => getWorkspaceToken(w.session.workspaces[0], 'linear', 'org-1'),
+    'raw mirror (audit egress / image relay)': async (w) => getWorkspaceMirrorToken(w.session.workspaces[0]),
+    // The expiry lane serves an expiry, not a token: map it onto the same
+    // REAL / DECOY vocabulary so one assertion covers every lane.
+    'expiry (ensureValidToken proactive refresh)': async (w) => {
+      const expiry = getWorkspaceTokenExpiry(w.session.workspaces[0]);
+      if (expiry === w.realExpiry) return REAL_LINEAR;
+      return expiry === w.session.workspaces[0].tokenExpiresAt ? DECOY : expiry;
+    },
     'owner-scoped headless': async (w) => {
       // The REAL resolveWorkspaceAccess body, whose connection-first arm is the
       // REAL createConnectionAccess over the real stores; the session rows it
@@ -172,7 +180,7 @@ describe('LIN-3124 T18 — decoy-token across every lane', () => {
 
   test('UNHYDRATED: every session-side lane fails closed — no decoy, no fallback', async () => {
     const w = await world();
-    for (const lane of ['browser (active binding)', 'per-binding: dashboard fan-out', 'per-binding: resolveIssueBinding', 'per-binding: settings probe (3-arg getWorkspaceToken)', 'owner-blind']) {
+    for (const lane of ['browser (active binding)', 'per-binding: dashboard fan-out', 'per-binding: resolveIssueBinding', 'per-binding: settings probe (3-arg getWorkspaceToken)', 'owner-blind', 'raw mirror (audit egress / image relay)', 'expiry (ensureValidToken proactive refresh)']) {
       const served = await PROBES[lane](w);
       assert.notEqual(served, DECOY, `${lane} fell back to the decoy`);
       assert.ok(served === undefined || served === null, `${lane} must fail closed, served ${served}`);

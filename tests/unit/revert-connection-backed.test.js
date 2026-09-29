@@ -82,7 +82,6 @@ describe('LIN-3124 T28 — scripts/revert-connection-backed.js', () => {
 
   test('--execute: bindings, mirror and legacy durable records restored; the legacy code path reads them', async () => {
     const { db, ownerCredentialStore } = await seed();
-    const connectionsBefore = (await dump(db)).connections;
     const report = await runRevert({ db, execute: true, log: () => {} });
     assert.equal(report.legacyRecordsWritten, 2, 'linear + jira; github has none');
     const [{ session }] = await db.collection('sessions').find({}).toArray();
@@ -101,9 +100,13 @@ describe('LIN-3124 T28 — scripts/revert-connection-backed.js', () => {
     assert.equal((await ownerCredentialStore.get(ACCT, 'acme', 'jira')).refreshToken, 'R-jira');
     const out = await refreshOwnerCredential({ ownerAccountId: ACCT, urlKey: 'acme', provider: 'linear', refreshAccessToken: async () => ({ access_token: 'n', refresh_token: 'R-lin2', expires_in: 3600 }), store: ownerCredentialStore });
     assert.equal(out.refreshToken, 'R-lin2');
-    // Never deletes.
-    assert.deepEqual((await dump(db)).connections, connectionsBefore);
-    assert.ok(await ownerCredentialStore.getByConnection(`${ACCT}::linear::org-1`), 'connection-keyed record left in place');
+    // Review blocker 6: every reverted binding's referent is gone, so the
+    // (now unreferenced) Connections and their connection-keyed records are
+    // released — the connection-first arm can no longer find them.
+    assert.equal(report.connectionsReleased, 3);
+    assert.equal(await db.collection('connections').countDocuments({}), 0);
+    assert.equal(await ownerCredentialStore.getByConnection(`${ACCT}::linear::org-1`), null);
+    assert.equal(await ownerCredentialStore.getByConnection(`${ACCT}::jira::https://j.atlassian.net`), null);
     // The legacy workspace is byte-identical.
     assert.deepEqual(session.workspaces[1], { id: 'ws-legacy', urlKey: 'old', provider: 'linear', accessToken: 'legacy-tok', credentials: { token: 'legacy-tok' }, tokenExpiresAt: 5, bindings: [{ provider: 'linear', scope: 'org-old', credentials: { token: 'legacy-tok', tokenExpiresAt: 5 } }] });
   });
@@ -126,6 +129,8 @@ describe('LIN-3124 T28 — scripts/revert-connection-backed.js', () => {
     assert.equal((await ownerCredentialStore.get(ACCT, 'acme', 'jira')).refreshToken, 'R-other', 'a co-resident grant is never clobbered');
     const [{ session }] = await db.collection('sessions').find({}).toArray();
     assert.equal(typeof session.workspaces[0].bindings[1].connectionId, 'string', 'the skipped binding is left for the user to re-link');
+    assert.ok(await db.collection('connections').findOne({ _id: `${ACCT}::jira::https://j.atlassian.net` }), 'a skipped binding keeps its Connection');
+    assert.ok(await ownerCredentialStore.getByConnection(`${ACCT}::jira::https://j.atlassian.net`), 'and its connection-keyed record');
   });
 
   test('the report is secret-safe: no token, refresh token, session id or account id', async () => {
@@ -139,6 +144,12 @@ describe('LIN-3124 T28 — scripts/revert-connection-backed.js', () => {
     assert.match(src, /const execute = process\.argv\.includes\('--execute'\)/);
     assert.match(src, /export async function runRevert\(\{ db, execute = false,/);
     assert.match(src, /if \(import\.meta\.url === `file:\/\/\$\{process\.argv\[1\]\}`\)/);
-    assert.doesNotMatch(src, /\.delete(One|Many|ByConnection|Connection)?\(/, 'the rollback never deletes');
+    // Deletion only via the last-referent lifecycle, and only AFTER the legacy
+    // record and the session are written (review blocker 6).
+    assert.doesNotMatch(src, /\.delete(One|Many|Connection)\(/, 'no unconditional delete');
+    const sessionWrite = src.indexOf('await sessions.updateOne(');
+    assert.ok(sessionWrite > src.indexOf('await ownerCredentialStore.put('));
+    assert.ok(src.indexOf('await connectionStore.removeReferent(') > sessionWrite);
+    assert.match(src, /if \(await connectionStore\.deleteIfUnreferenced\(connectionId\)\) \{\n\s*await ownerCredentialStore\.deleteByConnection\(connectionId\)/);
   });
 });

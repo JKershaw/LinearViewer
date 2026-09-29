@@ -194,7 +194,7 @@ describe('LIN-3124 PR3 N1 + D4', () => {
       const ids = await seed(connectionStore, ownerCredentialStore);
       const workspace = { urlKey: 'ws-a', bindings: [{ provider: 'linear', scope: 'org-1', connectionId: ids.connectionId }] };
       const evicted = [];
-      const out = await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider: 'linear', mode: 'revoke', evict: (u) => evicted.push(u) });
+      const out = await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider: 'linear', scope: 'org-1', mode: 'revoke', evict: (u) => evicted.push(u) });
       assert.equal(out.released, 1);
       assert.deepEqual(evicted.sort(), ['ws-a', 'ws-b'], 'the sibling referent ws-b is evicted too');
       assert.equal(await connectionStore.readConnectionById(ids.connectionId), null);
@@ -219,7 +219,7 @@ describe('LIN-3124 PR3 N1 + D4', () => {
       const { connectionStore, ownerCredentialStore } = stores();
       const evicted = [];
       const out = await releaseConnectionCredential({
-        connectionStore, ownerCredentialStore, mode: 'revoke', provider: 'linear',
+        connectionStore, ownerCredentialStore, mode: 'revoke', provider: 'linear', scope: 'org-1',
         workspace: { urlKey: 'ws-l', bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 't' } }] },
         evict: (u) => evicted.push(u),
       });
@@ -227,14 +227,14 @@ describe('LIN-3124 PR3 N1 + D4', () => {
       assert.deepEqual(evicted, []);
     });
 
-    test('every census call site passes the per-referent evict (server.js ×6, routes/workspace.js ×2)', () => {
+    test('every census call site passes the per-referent evict (server.js ×5, routes/workspace.js ×2; census 7 after review blocker 3)', () => {
       const re = /releaseConnectionCredential\(\{[^\n]*\}\)/g;
       const sites = [];
       for (const rel of ['server.js', 'routes/workspace.js']) {
         const src = readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
         for (const m of src.match(re) || []) sites.push([rel, m]);
       }
-      assert.equal(sites.length, 8);
+      assert.equal(sites.length, 7);
       for (const [rel, call] of sites) assert.match(call, /evict: /, `${rel}: ${call}`);
     });
   });

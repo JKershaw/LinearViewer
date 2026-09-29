@@ -89,13 +89,10 @@ describe('LIN-3124 PR3 checkpoint C3 — source-text pins', () => {
     assert.ok(armIdx < legacyReadIdx, 'the connection arm must precede the legacy-key durable read (the :1717-class hazard)');
   });
 
-  test('the connection arm deletes the Connection on a definitive revocation (D4)', () => {
-    const start = SERVER_SRC.indexOf('async function handleUnauthorizedError(');
-    const body = SERVER_SRC.slice(start, SERVER_SRC.indexOf('\n}\n', start));
-    const armIdx = body.indexOf('if (connectionId) {');
-    const armSlice = body.slice(armIdx, body.indexOf('const durableRecord = await ownerCredentialStore.get(session.accountId'));
-    assert.match(armSlice, /releaseConnectionCredential\(\{ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor\(session\.accountId\) \}\)/);
-  });
+  // PR3 review blocker 4: the source-regex pin that stood here is replaced by the
+  // behavioural test in lin-3124-pr3-review-fixes.test.js (a refresher throwing
+  // invalid_grant deletes the Connection and its record and takes the removal /
+  // re-link path).
 
   test('workspace-api adopt entrant uses the injected connection read + hydrates the side-table', () => {
     assert.match(WORKSPACE_API_SRC, /connectionBackedId\(workspace\)/);

@@ -647,7 +647,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     assert.equal(await w.real.ownerStore.collection.countDocuments({}), 1);
   });
 
-  test('pins: finalizePromotion / copyToConnection have one caller (the seam); the durable-delete census stays 8', () => {
+  test('pins: finalizePromotion / copyToConnection have one caller (the seam); the durable-delete census is 7 (review blocker 3)', () => {
     const src = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
     const seam = src('lib/connection-credential.js');
     assert.equal((seam.match(/\.finalizePromotion\(/g) || []).length, 1);
@@ -656,7 +656,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
       assert.doesNotMatch(src(rel), /\.(finalizePromotion|copyToConnection)\(/, rel);
     }
     const census = src('tests/unit/connection-access-guard.test.js');
-    assert.match(census, /const KNOWN_CONNECTION_RELEASE_COUNT = 8;/);
+    assert.match(census, /const KNOWN_CONNECTION_RELEASE_COUNT = 7;/);
     // The Jira route awaits the finalize thunk only AFTER the session save.
     const jira = src('routes/jira-auth.js');
     const save = jira.indexOf('await saveSession(req.session)\n    await conversion.finalize()');

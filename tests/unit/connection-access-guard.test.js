@@ -229,13 +229,17 @@ const SOURCE_ARMS = [
 ];
 
 describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
-  // The lifecycle release is called at exactly the 8 durable-delete census
-  // sites (D4): definitive-revocation ×4 in server.js (PR3 C3 added the
-  // handleUnauthorizedError connection arm's revoke), unlink ×1 in server.js,
-  // whole-workspace removal ×1 in server.js + ×2 in routes/workspace.js. Note
+  // The lifecycle release is called at exactly the 7 durable-delete census
+  // sites (D4): definitive-revocation ×3 in server.js (ensureValidToken's two
+  // catches and the handleUnauthorizedError connection arm PR3 C3 added — each
+  // scoped to the ACTIVE connection-backed binding, review blocker 3), unlink ×1
+  // in server.js, whole-workspace removal ×1 in server.js + ×2 in
+  // routes/workspace.js. PR3 review blocker 3 removed the legacy 401 arm's
+  // release (8 -> 7): that arm is reached only when the active binding is legacy,
+  // and an unscoped revoke there deleted connection-backed siblings. Note
   // `releaseOrphanOwnerRecord` is NOT part of this count — it is the converter's
   // failure-path release (arm f6), not one of these sites.
-  const KNOWN_CONNECTION_RELEASE_COUNT = 8;
+  const KNOWN_CONNECTION_RELEASE_COUNT = 7;
   const RELEASE_CALL = /releaseConnectionCredential\s*\(/g;
 
   function releaseCallCount(sources) {
@@ -243,14 +247,14 @@ describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
     return files.reduce((n, rel) => n + ((sources.get(rel) || '').match(RELEASE_CALL) || []).length, 0);
   }
 
-  test('releaseConnectionCredential is called at exactly the 8 census sites', () => {
+  test('releaseConnectionCredential is called at exactly the 7 census sites', () => {
     assert.strictEqual(releaseCallCount(REAL), KNOWN_CONNECTION_RELEASE_COUNT);
   });
 
   test('planted: a dropped site fails the census', () => {
     const dropped = new Map(REAL);
     dropped.set('server.js', REAL.get('server.js').replace(
-      "await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(accountId) })",
+      "if (connectionId) await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, scope: workspace.activeBinding.scope, mode: 'revoke', evict: evictReferentFor(accountId) })",
       'await noop()'
     ));
     assert.ok(releaseCallCount(dropped) < KNOWN_CONNECTION_RELEASE_COUNT);

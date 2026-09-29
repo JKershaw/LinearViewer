@@ -142,17 +142,19 @@ describe('LIN-3124 PR3 checkpoint A — connection-backed fail-closed + hydrated
   test('a hydrated connection-backed binding/workspace serves the side-table', () => {
     const b = connectionBackedBinding();
     const ws = { ...legacyWorkspace({ credentials: undefined, accessToken: undefined, tokenExpiresAt: undefined }), bindings: [b], activeBinding: { provider: 'linear', scope: 'org-1' } };
-    setBindingCredential(b, { token: 'conn-tok' });
-    setWorkspaceCredential(ws, { token: 'conn-tok' });
+    setBindingCredential(b, { token: 'conn-tok', tokenExpiresAt: 4242 });
+    setWorkspaceCredential(ws, { token: 'conn-tok', tokenExpiresAt: 4242 });
     try {
-      assert.deepEqual(getBindingCredentials(b), { token: 'conn-tok' });
+      assert.deepEqual(getBindingCredentials(b), { token: 'conn-tok', tokenExpiresAt: 4242 });
       assert.strictEqual(getBindingCallScope(b), 'conn-tok');
       assert.strictEqual(getWorkspaceToken(ws), 'conn-tok');
       assert.strictEqual(getWorkspaceToken(ws, 'linear', 'org-1'), 'conn-tok');
       assert.strictEqual(getWorkspaceCallScope(ws), 'conn-tok');
-      // The raw mirror is still E2 and connection-backed workspaces carry none.
-      assert.strictEqual(getWorkspaceMirrorToken(ws), undefined);
-      assert.strictEqual(getWorkspaceTokenExpiry(ws), undefined);
+      // PR3 review blocker 1: a connection-backed workspace carries no raw
+      // mirror, so the mirror/expiry accessors serve the Connection credential
+      // (legacy workspaces stay raw E2 — PR1's T1–T3 are unchanged).
+      assert.strictEqual(getWorkspaceMirrorToken(ws), 'conn-tok');
+      assert.strictEqual(getWorkspaceTokenExpiry(ws), 4242);
       // The bind itself still carries no credentials (nothing to persist).
       assert.strictEqual(b.credentials, undefined);
     } finally {
