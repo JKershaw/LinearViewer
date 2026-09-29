@@ -48,6 +48,7 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createFlightCompanionRoutes } from '../../routes/flight-companion.js';
 import { createChatToolCatalog } from '../../lib/chat-tools.js';
+import { provisionResumeCredential } from '../../lib/proxy-preamble.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const URL_KEY = 'acme';
@@ -131,14 +132,23 @@ async function makeWorld({ proxyTokenStore: tokenStoreOverride } = {}) {
   };
 
   // Lookup seam: the REAL store read, with its collections made to throw while
-  // `lookupFault` is set (so the store's own log-and-rethrow runs).
+  // `lookupFault` is set (so the store's own log-and-rethrow runs). `'reread'`
+  // faults only a history RE-read (the first history read misses normally).
   const realLookup = dispatchStore.getGrantDeclaration.bind(dispatchStore);
   dispatchStore.getGrantDeclaration = async (urlKey, itemId) => {
     world.lookupCalls.push({ urlKey, itemId });
     if (!world.lookupFault) return realLookup(urlKey, itemId);
     const cols = [dispatchStore.collection, dispatchStore.historyCollection];
     const saved = cols.map(c => c.findOne);
-    for (const c of cols) c.findOne = async () => { throw new Error('mongo read timeout'); };
+    if (world.lookupFault === 'reread') {
+      let historyReads = 0;
+      dispatchStore.historyCollection.findOne = async (...args) => {
+        if (++historyReads >= 2) throw new Error('mongo re-read timeout');
+        return saved[1].apply(dispatchStore.historyCollection, args);
+      };
+    } else {
+      for (const c of cols) c.findOne = async () => { throw new Error('mongo read timeout'); };
+    }
     try {
       return await realLookup(urlKey, itemId);
     } finally {
@@ -438,15 +448,17 @@ const TRANSIENT = {
   }
 };
 
-function structural(code, status) {
+// `message` is the refusal's own message, relayed as-is: a mint refusal's by
+// default, or a local pre-mint refusal's (`declared resume record is unusable`).
+function structural(code, status, message = `Grant bootstrap mint refused: ${code}`) {
   return {
     proxy: (out) => {
       assert.equal(out.status, status);
-      assert.deepEqual(out.body, { error: `Grant bootstrap mint refused: ${code}`, code, retryable: false });
+      assert.deepEqual(out.body, { error: message, code, retryable: false });
     },
     session: (out) => {
       assert.equal(out.status, status);
-      assert.deepEqual(out.body, { error: `Grant bootstrap mint refused: ${code}`, code, retryable: false });
+      assert.deepEqual(out.body, { error: message, code, retryable: false });
     },
     fc: (out) => {
       assert.equal(out.status, 422, 'approve-follow-up maps a structural refusal to 422');
@@ -605,5 +617,117 @@ describe('NB2 — approve-follow-up maps only the coded refusal to 503', () => {
     const out = await viaFc(world, parentId);
     structural('WORKSPACE_OWNER_UNSET', 409).fc(out);
     assertNothingEnqueued(world, out);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N3 — a thrown RE-read gives the tabled 503 at each of the 10 branches
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('N3 — a thrown history re-read (parent row not yet visible) is transient at every branch', () => {
+  for (const branch of BRANCHES) {
+    test(`${branch.id}: tabled 503, nothing enqueued, spy 0`, async () => {
+      const world = await makeWorld();
+      const missingParent = crypto.randomUUID();
+      // Session discovery still names the (not yet visible) parent.
+      await seedParent(world, { record: null });
+      world.dispatchStore.historyCollection._docs.length = 0;
+      world.sessionRows[0].id = missingParent;
+      world.lookupFault = 'reread';
+      const out = await branch.run(world, missingParent);
+      TRANSIENT[branch.family](out);
+      assertNothingEnqueued(world, out);
+      assert.ok(world.lookupCalls.some(c => c.itemId === missingParent), 'the lookup ran');
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N2 — a corrupt record gives the tabled structural status at every branch
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CORRUPT_RECORDS = [
+  { code: 'INVALID_GRANTS', status: 400, record: { ...RECORD, grants: [] } },
+  { code: 'GRANT_OWNERLESS', status: 503, record: { ...RECORD, ownerAccountId: null } }
+];
+
+describe('N2 — a corrupt record at every branch shape: tabled status and code, spy 0', () => {
+  for (const branch of BRANCHES) {
+    for (const c of CORRUPT_RECORDS) {
+      test(`${branch.id} ${c.code}`, async () => {
+        const world = await makeWorld();
+        const parentId = await seedParent(world, { record: c.record });
+        const out = await branch.run(world, parentId);
+        structural(c.code, c.status, `declared resume record is unusable (${c.code})`)[branch.family](out);
+        assertNothingEnqueued(world, out);
+        assert.equal(world.spy.grant.length, 0, 'refused before any mint');
+      });
+    }
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N4 — carry-forward truth table: each false guard term mints nothing while
+// the row still carries the record (a record never upgrades a non-minting
+// follow-up into a mint)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function assertCarriedNoMint(world, out) {
+  assert.equal(out.ok, true, `expected success, got ${JSON.stringify(out)}`);
+  assert.equal(world.spy.grant.length + world.spy.plain.length, 0, 'mint spy 0');
+  const row = rowById(world, out.itemId);
+  assert.ok(row, 'the follow-up row is enqueued');
+  assert.deepEqual(row.grantDeclaration, RECORD, 'the row still carries the record');
+  assert.strictEqual(row.bootstrapToken, null);
+  return row;
+}
+
+const byId = (id) => BRANCHES.find(b => b.id === id);
+
+describe('N4 — carry-forward truth table (declared parent)', () => {
+  for (const id of ['B1', 'B2', 'B3']) {
+    test(`${id}: explicitOptOut (appendProxyContext:false) -> spy 0, record carried`, async () => {
+      const world = await makeWorld();
+      const parentId = await seedParent(world, { record: RECORD });
+      const out = await byId(id).run(world, parentId, { appendProxyContext: false });
+      const row = assertCarriedNoMint(world, out);
+      assert.ok(!row.prompt.includes(PROXY_MARKER), 'nothing appended');
+    });
+  }
+
+  test('B1 !prompt: the route 400s first; at the helper, mint:false returns the record, spy 0', async () => {
+    const world = await makeWorld();
+    const parentId = await seedParent(world, { record: RECORD });
+    const out = await byId('B1').run(world, parentId, { prompt: undefined });
+    assert.equal(out.status, 400, JSON.stringify(out.body));
+    const result = await provisionResumeCredential({
+      proxyTokenStore: world.tokenStore, dispatchStore: world.dispatchStore, urlKey: URL_KEY, baseUrl: 'https://h',
+      harness: 'claude-code', followUpTo: parentId, createdBy: POSTER, prompt: undefined, mint: false
+    });
+    assert.deepEqual(result.grantDeclaration, RECORD);
+    assert.strictEqual(result.bootstrapToken, null);
+    assert.equal(world.spy.grant.length + world.spy.plain.length, 0);
+  });
+
+  for (const id of ['B4', 'B5', 'B6']) {
+    for (const [label, harness] of [['blank harness (LIN-1111)', null], ['prose harness', 'opencode']]) {
+      test(`${id}: ${label} -> spy 0, record carried`, async () => {
+        const world = await makeWorld();
+        const parentId = await seedParent(world, { record: RECORD, harness });
+        assertCarriedNoMint(world, await byId(id).run(world, parentId));
+      });
+    }
+  }
+
+  test('A1 attach mode off and pbt guard off (appendProxyContext:false) -> spy 0, record carried', async () => {
+    const world = await makeWorld();
+    const parentId = await seedParent(world, { record: RECORD });
+    assertCarriedNoMint(world, await byId('B1').run(world, parentId, { appendProxyContext: false, harness: 'claude-code' }));
+  });
+
+  test('A4 attach selector false (attachProxy:false) and pbt guard false (prose) -> spy 0, record carried', async () => {
+    const world = await makeWorld();
+    const parentId = await seedParent(world, { record: RECORD });
+    assertCarriedNoMint(world, await byId('B4').run(world, parentId, { attachProxy: false, harness: 'opencode' }));
   });
 });

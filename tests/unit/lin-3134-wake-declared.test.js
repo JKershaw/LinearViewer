@@ -586,3 +586,22 @@ describe('provider order — prose gate first', () => {
     assert.equal(dispatchWake.formatGrantRefusalNotice('GRANT_OWNER_ONLY'), NOTICE('GRANT_OWNER_ONLY'));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// F2 (3), wake half: launched under A, transferred to B
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('F2 (3) — owner transferred A -> B: the wake degrades, and the mint names A, never B', () => {
+  test('the refused mint attempt carries the recorded owner, not the live owner or the poster', async () => {
+    const world = makeWorld();
+    const parentId = await seedParent(world, { record: RECORD });
+    const childId = await takenChild(world, parentId);
+    world.owners[RECORDED_WORKSPACE] = 'account-B';
+    await captureLogs(() => report(world, childId, '[done] shipped', provisioner(world, { createdBy: 'account-B' })));
+    const [row] = wakeRows(world);
+    assert.equal(row.grantRefusal, 'GRANT_OWNER_ONLY', 'the wake degrades');
+    assert.equal(world.spy.grant.length, 1);
+    assert.equal(world.spy.grant[0].ownerAccountId, RECORDED_OWNER, 'exactly A');
+    assert.notEqual(world.spy.grant[0].ownerAccountId, 'account-B', 'never B');
+  });
+});
