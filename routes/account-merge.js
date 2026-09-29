@@ -8,6 +8,7 @@
 import { Router } from 'express'
 import { renderErrorPage } from '../lib/render-pages.js'
 import { upsertWorkspace, saveSession, persistOwnerCredential } from '../lib/workspace.js'
+import { writeConnection } from '../lib/connection-store.js'
 import { isFreshlyAuthenticated, MERGE_CONFIRM_FRESH_AUTH_WINDOW_MS } from '../lib/account-session.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 
@@ -41,7 +42,7 @@ const MERGE_FAILURE_COPY = {
  * @param {Object} [options.userPreferencesStore] - LIN-2304: the confirm-completion step is now uniform across every provider (including Linear), so it needs the same preferences rehydration every non-conflict success path already performs.
  * @returns {Router}
  */
-export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore }) {
+export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }) {
   const router = Router()
 
   /**
@@ -126,6 +127,24 @@ export function createAccountMergeRoutes({ accountStore, accountWorkspaceStore, 
       return res.status(400).send(html)
     }
     await accountWorkspaceStore.bindAccountToWorkspace(canonicalAccountId, pending.workspace.id)
+
+    // LIN-3127: additive, write-only Connection dual-write (best-effort) for
+    // EVERY provider — deliberately NOT gated on pending.refreshToken (that
+    // gate is for the owner-credential write only), so a GitHub/GitHub-Projects
+    // merge (which offers no refreshToken) still writes. Runs after both
+    // refusal returns above. `pendingMerge` carries no `scope`, so derive it
+    // from the container's SINGLE binding for `pending.provider` (all four
+    // respondToAccountConflict callers pass a freshly-built container with
+    // exactly one binding); if it is not exactly one, skip and log — never
+    // guess (N2).
+    if (connectionStore) {
+      const matches = (pending.workspace.bindings || []).filter(b => b.provider === pending.provider)
+      if (matches.length === 1) {
+        await writeConnection(connectionStore, canonicalAccountId, pending.workspace, pending.provider, matches[0].scope)
+      } else {
+        console.warn(`LIN-3127 merge-confirm: expected exactly one binding for provider "${pending.provider}", found ${matches.length}; skipping Connection write`)
+      }
+    }
     // LIN-2304: conditional on pending.refreshToken — persistOwnerCredential
     // itself has no internal skip-on-missing-refreshToken guard, so gating
     // the CALL is what keeps GitHub/GitHub Projects (which pass no

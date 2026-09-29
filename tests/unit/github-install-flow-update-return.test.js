@@ -508,7 +508,11 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
     const s = SURFACES[0];
     const provider = spyProvider(s.providerName);
     const router = s.createRoutes({ provider, ...freshAccountStores() });
-    const session = makeSession({ accountId: 'acct-1' });
+    // LIN-1892 S2-1 (stated setup change, assertions unchanged): a signed-in
+    // "new" flow that mints a fresh container is the switcher click, from a
+    // session that holds a workspace; accountId with zero workspaces (email-
+    // only) now reuses github:<userId> (tests/unit/lin-1892-github-from-account.test.js).
+    const session = makeSession({ accountId: 'acct-1', workspaces: [{ id: 'ws-existing', name: 'Existing', urlKey: 'existing', provider: 'linear', bindings: [] }] });
     const begin = await get(router, s.basePath, {}, session);
     assert.equal(session.oauthIntent.fresh, true, 'begin mints fresh for a signed-in new flow');
     const { res: picker } = await follow(router, s.basePath, session, begin);

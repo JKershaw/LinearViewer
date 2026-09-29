@@ -11,6 +11,7 @@ import { getProvider } from '../lib/providers/registry.js'
 import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
 import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey, persistOwnerCredential } from '../lib/workspace.js'
+import { writeConnection } from '../lib/connection-store.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import { applyUserPreferencesToSession, setThemeCookie } from '../lib/user-preferences.js'
 import { establishAccount } from '../lib/account-session.js'
@@ -31,7 +32,7 @@ import { respondToAccountConflict } from '../lib/account-conflict.js'
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore] - LIN-1523: durable owner-credential store. Linear-only; other providers' auth routers receive this option too (shared mount loop) but ignore it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -286,6 +287,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         // longer carries one (linkProvider above was deliberately not given it).
         await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
 
+        // LIN-3127: additive, write-only Connection dual-write (best-effort),
+        // after the limit-check + establishAccount conflict return above and
+        // after linkProvider. Linear's unit id is its binding scope (org.id).
+        if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'linear', org.id)
+
         // Success: clear the OAuth state/intent, save the session, and return to
         // the initiating workspace's settings. Do NOT set activeWorkspaceId — the
         // user stays on their current workspace (plan UX (b), mirroring GitHub
@@ -394,6 +400,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
             // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
             // longer carries one (linkProvider above was deliberately not given it).
             await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
+
+            // LIN-3127: additive, write-only Connection dual-write (best-effort),
+            // after the limit-check + establishAccount conflict return above and
+            // after linkProvider. Linear's unit id is its binding scope (org.id).
+            if (connectionStore) await writeConnection(connectionStore, established.accountId, workspace, 'linear', org.id)
 
             // Load saved user preferences and apply to session.
             // regenerate() wiped the session, so rehydrate every durable field

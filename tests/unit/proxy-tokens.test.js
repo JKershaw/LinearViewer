@@ -642,9 +642,13 @@ describe('ProxyTokenStore', () => {
       await store.createToken('acme', { label: 'owned', scope: 'readWrite', createdBy: 'account-A' });
       const [token] = await store.listTokens('acme');
 
+      // LIN-3129 S1.2 stated setup change: listTokens now also returns `grants`
+      // and `parentTokenId` (Additive fields: `[]` and `null` for an ordinary
+      // mint). The expected key list gains exactly those two names; every
+      // pre-existing assertion below is unchanged.
       assert.deepStrictEqual(Object.keys(token).sort(), [
-        'consumed', 'createdAt', 'expiresAt', 'hasOwner', 'kind',
-        'label', 'lastUsedAt', 'scope', 'singleUse', 'tokenId'
+        'consumed', 'createdAt', 'expiresAt', 'grants', 'hasOwner', 'kind',
+        'label', 'lastUsedAt', 'parentTokenId', 'scope', 'singleUse', 'tokenId'
       ]);
       assert.strictEqual(token.label, 'owned');
       assert.strictEqual(token.scope, 'readWrite');

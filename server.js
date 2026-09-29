@@ -22,6 +22,7 @@ import { MangoClient } from '@jkershaw/mangodb'
 import { ensureIndexes } from './lib/db-indexes.js'
 import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
+import { createSessionOptions, SESSION_TTL_SECONDS } from './lib/session-options.js'
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
@@ -57,6 +58,7 @@ import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from 
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
+import { ConnectionStore } from './lib/connection-store.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { createObserverPassRun } from './lib/observer-pass.js'
@@ -93,6 +95,10 @@ import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/j
 import { createWorkspaceRoutes } from './routes/workspace.js'
 import { createAccountMergeRoutes } from './routes/account-merge.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
+import { createEmailAuthRoutes, accountHomeRedirect } from './routes/email-auth.js'
+import { createEmailTransport } from './lib/email-transport.js'
+import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
+import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning, isEmailSignInAvailable } from './lib/email-availability.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
@@ -190,8 +196,8 @@ if (process.env.LINEAR_ACCESS_TOKEN) {
 // =============================================================================
 // Constants
 // =============================================================================
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
-const SESSION_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// SESSION_TTL_SECONDS and the cookie maxAge live in lib/session-options.js
+// (LIN-1892 S2-2), shared with the tests that run real express-session.
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes before expiry
 
 // =============================================================================
@@ -566,6 +572,19 @@ const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
 
+// Email magic-link sign-in (LIN-1892 S2). The transport exists exactly when
+// email sign-in is available (lib/email-availability.js — the one predicate;
+// this file reads none of the email variables itself, S2-4). Off by default
+// on every server, whatever NODE_ENV is.
+const emailTransport = createEmailTransport({ env: process.env })
+const magicLinkStore = new MagicLinkStore({ collection: db.collection(MAGIC_LINK_COLLECTION) })
+const emailLinkOrigin = resolveEmailLinkOrigin(process.env)
+console.log(`Email sign-in: ${resolveEmailTransportKind(process.env) || 'off'}`)
+const emailTransportRefusal = resolveEmailTransportRefusal(process.env)
+if (emailTransportRefusal) console.warn(`Warning: ${emailTransportRefusal}`)
+const emailLinkOriginWarning = resolveEmailLinkOriginWarning(process.env)
+if (emailLinkOriginWarning) console.warn(`Warning: ${emailLinkOriginWarning}`)
+
 // Durable owner-scoped Linear credential (LIN-1523, Session 1 of LIN-1501).
 // Additive-only in this session: dual-written alongside the session-only
 // credential (never instead of it) via persistOwnerCredential (OAuth
@@ -579,6 +598,16 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 // collection.
 const ownerCredentialsCollection = db.collection('owner-credentials')
 const ownerCredentialStore = new OwnerCredentialStore({ collection: ownerCredentialsCollection })
+
+// Durable, write-only Connection record (LIN-3127, Session 1 of LIN-2149).
+// Dual-written alongside every existing binding/owner-credential write through
+// the shared writeConnection helper; no read path wired yet (LIN-3124 owns the
+// read cutover). No delete path this ticket — deletion is deferred whole to
+// LIN-3124 (see the module doc + the recorded obligation on that ticket).
+// Threaded into the flow-layer seams in a following change; instantiated here
+// first, next to ownerCredentialStore.
+const connectionsCollection = db.collection('connections')
+const connectionStore = new ConnectionStore({ collection: connectionsCollection })
 
 // Credential-lifecycle event log (LIN-2236, L5.1 of the LIN-2231 design):
 // durable, append-only record of refresh_skip/refresh_fail/refresh_success/
@@ -819,22 +848,11 @@ app.use(express.static('public'))
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json({ limit: '250kb' }))
 
-// Session middleware configuration:
-// - resave: false - don't save session if unmodified
-// - saveUninitialized: false - don't create session until something is stored
-// - secure cookies only in production (requires HTTPS)
-// - sameSite: 'lax' - CSRF protection (prevents cookies on cross-origin POST)
-app.use(session({
-  store: sessionStore,
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    maxAge: SESSION_COOKIE_MAX_AGE_MS,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
-  }
-}))
+// Session middleware configuration: no resave, no session until something is
+// stored, secure cookies in production, sameSite 'lax'. The options object
+// comes from lib/session-options.js so the email login-CSRF tests run real
+// express-session with exactly these options (LIN-1892 S2-2).
+app.use(session(createSessionOptions({ store: sessionStore, secret: process.env.SESSION_SECRET })))
 
 // =============================================================================
 // Test Mode Setup
@@ -844,7 +862,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null }))
 }
 
 // =============================================================================
@@ -1184,7 +1202,7 @@ app.use((req, res, next) => {
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
@@ -1196,7 +1214,9 @@ for (const provider of getAllProviders()) {
 // per-provider (every provider router mounts at root too, so a per-provider
 // registration of these same paths would be shadowed by whichever router
 // mounts first).
-app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore }))
+app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
+// LIN-1892 S2: the email magic-link door. Every route 503s when emailTransport is null.
+app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin }))
 app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
@@ -1459,7 +1479,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   return new Promise((resolve) => {
     session.destroy((err) => {
       if (err) console.error('Session destroy error:', err);
-      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
+      const html = renderLandingPage({ deployInfo, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY });
       res.send(html);
       resolve();
     });
@@ -1771,6 +1791,9 @@ app.get('/', (req, res) => {
   if (workspace) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/`)
   }
+  // LIN-1892 (N1): a signed-in account with no workspaces (email-only) goes to
+  // its account home, not the sign-in landing.
+  if (accountHomeRedirect(req, res)) return
 
   // Show setup notice on localhost when nothing is configured
   const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h))
@@ -1778,7 +1801,7 @@ app.get('/', (req, res) => {
   const setupNotice = (isLocalhost && hasNoAuth) ? 'setup' : null
 
   // Unauthenticated users see the bespoke Harbour showcase landing (LIN-980).
-  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
+  const html = renderLandingPage({ deployInfo, setupNotice, githubEnabled: getProvider('github').entryCta.isConfigured(), jiraEnabled: getProvider('jira').entryCta.isConfigured(), emailEnabled: isEmailSignInAvailable(), freeTierEnabled: !!process.env.OPENROUTER_FREE_TIER_KEY })
   res.send(html)
 })
 
@@ -1788,7 +1811,8 @@ app.get('/', (req, res) => {
  * Renders the swipe view with static landing page data so visitors can
  * explore the UI before signing in.
  *
- * For authenticated users: Redirects to their workspace swipe page.
+ * For authenticated users: Redirects to their workspace swipe page; a
+ * signed-in account with no workspaces goes to /account (LIN-1892 N1).
  */
 app.get('/swipe/:identifier?', (req, res) => {
   const workspace = req.session.workspaces?.[0]
@@ -1799,6 +1823,7 @@ app.get('/swipe/:identifier?', (req, res) => {
       : `/workspace/${encodeURIComponent(workspace.urlKey)}/swipe`
     return res.redirect(dest)
   }
+  if (accountHomeRedirect(req, res)) return
 
   const html = renderSwipePage(
     { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
@@ -1813,7 +1838,8 @@ app.get('/swipe/:identifier?', (req, res) => {
  * Renders the swim view with static landing page data so visitors can
  * explore the UI before signing in.
  *
- * For authenticated users: Redirects to their workspace swim page.
+ * For authenticated users: Redirects to their workspace swim page; a
+ * signed-in account with no workspaces goes to /account (LIN-1892 N1).
  */
 app.get('/swim', (req, res) => {
   const workspace = req.session.workspaces?.[0]
@@ -1821,6 +1847,7 @@ app.get('/swim', (req, res) => {
   if (workspace) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/swim`)
   }
+  if (accountHomeRedirect(req, res)) return
 
   const html = renderSwimPage(
     { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },
@@ -1831,7 +1858,8 @@ app.get('/swim', (req, res) => {
 
 /**
  * Landing ship page — unauthenticated preview of the radial Ship view.
- * For authenticated users: redirects to their workspace ship page.
+ * For authenticated users: redirects to their workspace ship page; a
+ * signed-in account with no workspaces goes to /account (LIN-1892 N1).
  * Prototype: not linked from navigation.
  */
 app.get('/ship', (req, res) => {
@@ -1840,6 +1868,7 @@ app.get('/ship', (req, res) => {
   if (workspace) {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/ship`)
   }
+  if (accountHomeRedirect(req, res)) return
 
   const html = renderShipPage(
     { projectTrees: landingTrees, inProgressTrees: [], recentActivityTrees: [] },

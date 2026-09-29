@@ -194,6 +194,84 @@ describe('routes/jira-auth.js', () => {
       assert.deepEqual(workspaces, ['ws-1'])
     })
 
+    // -----------------------------------------------------------------------
+    // LIN-3127 — Jira Basic add-source Connection dual-write + the omission
+    // (lin3127-jira-basic-retention: the Basic API token is NEVER persisted).
+    // -----------------------------------------------------------------------
+
+    function recordingConnectionStore() {
+      const calls = []
+      return {
+        calls,
+        put: async (accountId, provider, unitId, credentials) => {
+          calls.push({ accountId, provider, unitId, credentials })
+          return true
+        },
+      }
+    }
+
+    test('LIN-3127: Basic add-source dual-writes a record with NO token (non-secret fields only)', async () => {
+      const { accountStore, accountWorkspaceStore } = freshAccountStores()
+      const connectionStore = recordingConnectionStore()
+      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
+
+      await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'basic-secret-tok', site: SITE }, session }, res)
+
+      assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=jira')
+      assert.equal(connectionStore.calls.length, 1, 'exactly one Connection write')
+      const call = connectionStore.calls[0]
+      assert.equal(call.accountId, session.accountId)
+      assert.equal(call.provider, 'jira')
+      assert.equal(call.unitId, SITE)
+      assert.equal(call.credentials.token, undefined, 'the Basic API token must never be persisted')
+      assert.equal(call.credentials.email, 'ada@acme.com', 'non-secret fields are still written')
+      assert.equal(call.credentials.tokenExpiresAt, Number.MAX_SAFE_INTEGER)
+    })
+
+    test('LIN-3127: Basic add-source over an existing OAuth binding on the same site does NOT leak the Basic token (bypass case)', async () => {
+      const { accountStore, accountWorkspaceStore } = freshAccountStores()
+      const connectionStore = recordingConnectionStore()
+      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      // The viewed workspace already holds an OAuth binding on this exact site.
+      // linkProvider MERGES, so the Basic credential inherits `authType:'oauth'`
+      // from it — the authType check alone would let the Basic token through.
+      const session = makeSession({
+        workspaces: [{
+          id: 'ws-1', name: 'Acme', urlKey: 'acme',
+          bindings: [{ provider: 'jira', scope: SITE, credentials: { token: 'old-oauth', authType: 'oauth', cloudId: 'cid-1' } }],
+        }],
+      })
+
+      await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'basic-secret-tok', site: SITE }, session }, res)
+
+      assert.equal(connectionStore.calls.length, 1)
+      const credentials = connectionStore.calls[0].credentials
+      assert.equal(credentials.token, undefined, 'the merged-looking OAuth authType must not let the Basic token through')
+      assert.equal(credentials.email, 'ada@acme.com')
+    })
+
+    test('LIN-3127 refusal: Basic 409 (identity owned by another account) writes NO Connection record', async () => {
+      const { accountStore, accountWorkspaceStore } = freshAccountStores()
+      const otherAccount = await accountStore.createAccount()
+      await accountStore.linkIdentity(otherAccount._id, 'jira', 'jira-acct-1', {})
+      const myAccount = await accountStore.createAccount()
+      const connectionStore = recordingConnectionStore()
+      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      const session = makeSession({ accountId: myAccount._id, workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
+
+      await handler({ body: { workspace: 'acme', email: 'ada@acme.com', apiToken: 'tok-123', site: SITE }, session }, res)
+
+      assert.equal(res.statusCode, 409)
+      assert.equal(connectionStore.calls.length, 0, 'no Connection residue on a refused Basic link')
+    })
+
     test('a returning Jira identity (fresh session, previously-seen accountId) lands on their EXISTING account', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
       const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })

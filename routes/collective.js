@@ -333,6 +333,7 @@ export function createCollectiveRoutes({
           store: dispatchQueueStore,
           urlKey: ws.urlKey,
           workspacePreferencesStore,
+          proxyTokenStore,
           applyDefaultHarness: false,
           kind: 'custom',
           finalizePrompt: async (resolvedHarness) => {

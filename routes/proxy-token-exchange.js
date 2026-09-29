@@ -67,6 +67,11 @@ export function createTokenExchangeRoutes({ proxyTokenStore, proxyEventStore, pr
       res.json({
         token: working.token,
         scope: working.scope,
+        // LIN-3129: grants ride the response only when non-empty, so a grant-less
+        // exchange body stays byte-identical to before.
+        ...(Array.isArray(working.grants) && working.grants.length > 0
+          ? { grants: working.grants }
+          : {}),
         expiresAt: working.expiresAt,
         notes: 'The bootstrap token you sent has been consumed by this exchange. Use the token above (the "token" field of this response) for all subsequent requests — the bootstrap is now spent and will never authenticate again.'
       });

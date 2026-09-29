@@ -25,6 +25,10 @@ import { createGitHubProjectsAuthRoutes } from '../../routes/github-projects-aut
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { UserPreferencesStore } from '../../lib/user-preferences.js';
+import { createEmailAuthRoutes } from '../../routes/email-auth.js';
+import { MagicLinkStore, MAGIC_LINK_COLLECTION } from '../../lib/email-auth.js';
+import { createCaptureTransport } from '../../lib/email-transport.js';
+import { establishAccount } from '../../lib/account-session.js';
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
@@ -249,5 +253,88 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
 
     assert.strictEqual(session.workspaces.length, 2);
     assert.ok(session.workspaces.some(w => w.id === 'prior-3'));
+  });
+});
+
+// LIN-1892 S2 (N10): the email confirm is the fourth session.regenerate() path.
+// Drives the real createEmailAuthRoutes GET-then-POST confirm handlers with the
+// real UserPreferencesStore and the account seam.
+describe('email confirm (sign-in mode) survives session.regenerate() (LIN-1892 N10)', () => {
+  let dbClient, dbDir, counter = 0;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'regen-survival-email-'));
+    dbClient = new MangoClient(dbDir);
+    await dbClient.connect();
+  });
+
+  after(async () => {
+    if (dbClient?.close) await dbClient.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  function freshEmailDeps() {
+    const db = dbClient.db(`regen_email_${counter++}`);
+    return {
+      accountStore: new AccountStore({ collection: db.collection('accounts') }),
+      accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+      userPreferencesStore: new UserPreferencesStore({ collection: db.collection('user-preferences') }),
+      magicLinkStore: new MagicLinkStore({ collection: db.collection(MAGIC_LINK_COLLECTION) }),
+    };
+  }
+
+  function emailRes() {
+    return { ...makeRes(), headers: {}, cookies: {}, set(h) { Object.assign(this.headers, h); return this; }, cookie(name, value) { this.cookies[name] = value; return this; } };
+  }
+
+  // GET confirm (mints the nonce into `session`), then POST confirm with it.
+  async function confirmThroughHandlers(deps, session, emailNorm) {
+    const router = createEmailAuthRoutes({ ...deps, transport: createCaptureTransport() });
+    const { token } = await deps.magicLinkStore.issue({ emailNorm });
+    const getRes = emailRes();
+    await getHandler(router, 'get', '/auth/email/confirm')({ query: { t: token }, session, get: () => undefined }, getRes);
+    assert.strictEqual(getRes.statusCode, 200);
+    const nonce = getRes.body.match(/name="nonce" value="([^"]+)"/)[1];
+    const postRes = emailRes();
+    await getHandler(router, 'post', '/auth/email/confirm')({ body: { t: token, nonce }, session, get: () => undefined }, postRes);
+    return postRes;
+  }
+
+  test('Email confirm (sign-in mode): durable preferences (OpenRouter key, features, theme) rehydrate onto the fresh session', async () => {
+    const deps = freshEmailDeps();
+    const established = await establishAccount({}, deps.accountStore, deps.accountWorkspaceStore, 'email', 'a@x.io', {}, null);
+    await deps.userPreferencesStore.saveUserPreferences(established.accountId, {
+      openRouterApiKey: 'sk-or-v1-email-survive',
+      features: { collective: true },
+      theme: 'dark',
+    });
+
+    const session = makeSession({});
+    const res = await confirmThroughHandlers(deps, session, 'a@x.io');
+
+    assert.strictEqual(res.redirectedTo, '/account');
+    assert.strictEqual(session.accountId, established.accountId);
+    assert.strictEqual(session.openRouterApiKey, 'sk-or-v1-email-survive');
+    assert.deepStrictEqual(session.features, { collective: true });
+    assert.strictEqual(session.theme, 'dark');
+    assert.strictEqual(res.cookies.theme, 'dark', 'the pre-paint theme cookie is seeded');
+    assert.strictEqual(session.emailConfirm, undefined, 'the spent nonce does not survive');
+  });
+
+  test('Email confirm: carried workspaces survive regenerate', async () => {
+    const deps = freshEmailDeps();
+    const session = makeSession({});
+    await establishAccount(session, deps.accountStore, deps.accountWorkspaceStore, 'linear', 'viewer-1', {}, 'prior-4');
+    await establishAccount(session, deps.accountStore, deps.accountWorkspaceStore, 'email', 'p@x.io', {}, null);
+    const priorWs = { id: 'prior-4', name: 'Prior', urlKey: 'prior', accessToken: 'tok' };
+    session.workspaces = [priorWs];
+    const accountId = session.accountId;
+
+    const res = await confirmThroughHandlers(deps, session, 'p@x.io');
+
+    assert.strictEqual(res.redirectedTo, '/workspace/prior/');
+    assert.strictEqual(session.accountId, accountId);
+    assert.deepStrictEqual(session.workspaces, [priorWs]);
+    assert.strictEqual(session.activeWorkspaceId, 'prior-4');
   });
 });

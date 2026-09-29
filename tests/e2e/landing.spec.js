@@ -164,6 +164,16 @@ test.describe('Landing Page (bespoke showcase)', () => {
     await expect(footerLink.first()).toHaveAttribute('href', 'https://github.com/JKershaw/LinearViewer');
   });
 
+  test('the email-enabled server renders "Continue with email" in the hero (LIN-1892)', async ({ page }) => {
+    // The Playwright server runs EMAIL_TRANSPORT=capture under NODE_ENV=test, so
+    // isEmailSignInAvailable() is true here; absence (the default everywhere
+    // else) is pinned at unit level (tests/unit/landing-hero.test.js).
+    const emailCta = page.locator('[data-testid="landing-cta-email"]');
+    await expect(emailCta).toBeVisible();
+    await expect(emailCta).toHaveAttribute('href', '/auth/email');
+    await expect(emailCta).toHaveText('Continue with email');
+  });
+
   test('hero sign-in CTA is a directly reachable link', async ({ page }) => {
     await page.goto('/');
     const linearCta = page.locator('[data-testid="landing-cta-linear"]');

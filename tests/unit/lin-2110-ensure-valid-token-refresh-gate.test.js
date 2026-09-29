@@ -101,6 +101,8 @@ function makeContext({ workspace, durableRecord, calls, refreshOnResolveGate }) 
     CREDENTIAL_LIFECYCLE_EVENT_KINDS,
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
+    // LIN-1892: handleWorkspaceRemoval's landing render reads the email predicate.
+    isEmailSignInAvailable: () => false,
     getProvider: () => ({ entryCta: { isConfigured: () => true } }),
     Date,
     process: { env: {} },

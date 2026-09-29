@@ -1683,7 +1683,9 @@ window.ProxyToggle = (function () {
 
 // Back-compat global consumed by app.js / dispatch.js call sites
 // (and their `typeof maybeAppendProxyBlock === 'function'` guards).
-window.maybeAppendProxyBlock = (text, urlKey) => window.ProxyToggle.maybeAppend(text, urlKey);
+// LIN-3079: the optional `opts` is forwarded so forced surfaces can pass
+// `{ force: true }`; existing callers that omit it are unchanged.
+window.maybeAppendProxyBlock = (text, urlKey, opts) => window.ProxyToggle.maybeAppend(text, urlKey, opts);
 
 // =============================================================================
 // Disclosure (collapsible options panels)

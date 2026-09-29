@@ -27,15 +27,18 @@ import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, DISPATCH_KINDS, DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals } from '../lib/periodicals.js';
-import { FEEDBACK_ENTRY_KINDS } from '../lib/dispatch-store.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE } from '../lib/workspace.js';
-import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField, applyDefaultDispatchHarness } from '../lib/proxy-preamble.js';
+import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { READ_WRITE } from '../lib/proxy-scopes.js';
+import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
+import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
+import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
@@ -44,48 +47,6 @@ import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 // shared between the Node server and the Harbour OS terminal that reads the
 // staged prompt back out via `cat` inside the spawned `sh -c` command.
 const HARBOUR_STAGING_DIR = path.join(os.tmpdir(), 'harbour-dispatch');
-
-// LIN-3024 (LIN-2994 Surface 2): default bound for the poll handler's halt
-// read, independent of `maxTimeMS` (nothing sets that yet, LIN-2997) and well
-// below Simple Dispatcher's own 15s client timeout. Overridable per
-// `createDispatchRoutes` call (`haltReadTimeoutMs`) so tests can inject a
-// short bound instead of waiting out the production value.
-const POLL_HALT_READ_TIMEOUT_MS = 1500;
-
-// Bounds `promise` with a local timeout, mirroring the withTimeout idiom in
-// lib/dispatch-repo-guard.js: reject on the timer, but always clear it so an
-// already-won race doesn't keep the event loop (or a test process) alive.
-// This does NOT cancel `promise` itself — the underlying store read keeps
-// running to completion in the background (accepted residual, LIN-2997).
-function raceWithLocalTimeout(promise, timeoutMs) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('workspace halt read timed out')), timeoutMs);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
-// Projects a raw workspace-halt document (which carries a Mongo `_id`) to
-// the poll response's contract shape. `doc` is `null` when unset.
-function projectHaltForPoll(doc) {
-  if (!doc) return null;
-  const { mode, setAt, setBy } = doc;
-  return { mode, setAt, setBy };
-}
-
-// LIN-3024's bounded halt read for the poll handler. Never throws: a missing
-// store, a timeout, or a store-read failure all degrade to the shared
-// store's synchronous last-known cache (null on a cold cache), so a halt
-// read can never turn the poll into a non-2xx response.
-async function readHaltForPoll(workspaceHaltStore, urlKey, timeoutMs) {
-  if (!workspaceHaltStore) return null;
-  try {
-    const doc = await raceWithLocalTimeout(workspaceHaltStore.getWorkspaceHalt(urlKey), timeoutMs);
-    return projectHaltForPoll(doc);
-  } catch {
-    return workspaceHaltStore.getLastKnownHalt(urlKey);
-  }
-}
 
 /**
  * Writes the prompt to a staging file under HARBOUR_STAGING_DIR (mode 0600
@@ -147,11 +108,11 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 // Input length limits to prevent MongoDB errors (16MB document limit). The
 // prompt/identifier caps for the POST /dispatch payload now live in
-// lib/dispatch-validation.js (shared with the proxy twin, LIN-1139); these
-// remain for the other endpoints in this router (token label, feedback message).
+// lib/dispatch-validation.js (shared with the proxy twin, LIN-1139); the
+// feedback message/url caps live in lib/dispatch-feedback-validation.js
+// (shared with the runner feedback route, LIN-3130). This remains for the
+// other endpoints in this router (token label, model/harness/effort).
 const MAX_NAME_LENGTH = 1000;          // Names/labels/titles
-const MAX_URL_LENGTH = 8000;           // URLs (covers long query strings)
-const MAX_FEEDBACK_MESSAGE_LENGTH = 2000; // Feedback message
 
 // Pattern to detect null bytes and dangerous control characters (except common whitespace)
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
@@ -514,6 +475,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         terminal,
         effort,
         dispatchTokenStore,
+        proxyTokenStore,
         // LIN-2775 Area 8: threaded straight through, unvalidated here — the
         // marker's own validation and the terminal-anchor guard it gates
         // both live inside createDispatchItem (the one reusable, testable
@@ -1006,8 +968,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * GET /workspace/:urlKey/api/dispatch/halt
-   * Reuses the poll handler's own `projectHaltForPoll` (this file, above) so
-   * there is exactly one `{mode,setAt,setBy}` projection, not a third copy.
+   * Reuses `projectHaltForPoll` from lib/poll-halt.js (shared with the poll
+   * handler) so there is exactly one `{mode,setAt,setBy}` projection, not a
+   * second copy.
    */
   router.get('/workspace/:urlKey/api/dispatch/halt', workspaceFromUrl, async (req, res) => {
     if (!workspaceHaltStore) {
@@ -1522,7 +1485,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     try {
       minted = await proxyTokenStore.createToken(req.dispatchUrlKey, {
         kind: 'bootstrap',
-        scope: 'readWrite',
+        scope: READ_WRITE,
         label: 'refire-broker',
         ttl: BOOTSTRAP_TOKEN_TTL_SECONDS,
         createdBy: req.dispatchTokenOwner
@@ -1586,162 +1549,33 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       return badRequest.json(res, 'Invalid item ID format');
     }
 
-    // Wake-path credential provisioning (LIN-1430 / S2). A wake follow-up is
-    // built and enqueued INSIDE addFeedback (lib/dispatch-store.js), bypassing
-    // createDispatchItem entirely — so, pre-fix, `bootstrapToken` was
-    // structurally always null on this path and a resumed claude-code session
-    // had no credential to write back with (LIN-1428). This closure is the
-    // provisioning policy; the store only decides WHETHER a wake fires and
-    // resolves the donor (parent) harness to hand it.
-    //
-    // Mirrors the S1/S3 shape (routes/proxy.js's dispatch seam, this route's
-    // own follow-up-provisioning branch above): decide on the RESOLVED harness
-    // via shouldUseMcpTokenField, never throw (a feedback write must not be
-    // lost to a provisioning failure — LIN-1343), and stamp `createdBy` from
-    // the posting token's own owner so the exchanged working token resolves
-    // under LIN-1366's owner-scoped selection (never fabricated).
+    // Wake-path credential provisioning policy (LIN-1430 / S2), extracted to
+    // lib/wake-credential.js for LIN-3130 S2a so the runner feedback route
+    // reuses it rather than forking. The store calls the returned callback
+    // between building the wake descriptor and the LIN-1357 CAS/witness update.
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const createdBy = req.dispatchTokenOwner ?? null;
-    const provisionWakeCredential = async (parentHarness) => {
-      // Null-harness rule here is DELIBERATELY the opposite of the reply-box /
-      // send_follow_up rule in LIN-1431 (S3). Do not "harmonize" them.
-      //
-      //   Here (wake):  null harness -> claude-code -> MINT.
-      //     A wake is machine-generated and resumes a parent on Simple Dispatcher,
-      //     whose own default harness is claude-code. Null means "unspecified", and
-      //     an unprovisioned claude-code resume is exactly the LIN-1428 stall.
-      //
-      //   There (S3):   blank harness -> stays prose -> NO MINT.
-      //     That path is user-facing and `applyDefaultHarness:false` keeps the
-      //     LIN-1159 interpose off on purpose — LIN-1111's blank-harness escape
-      //     hatch, test-locked at dispatch-route-proxy-context.test.js:125.
-      //
-      // Both are correct for their own path. Changing either to match the other
-      // regresses LIN-1111 or LIN-1430. See LIN-1431.
-      const resolved = applyDefaultDispatchHarness(parentHarness);
-      // Prose harness (explicit 'opencode' etc.): no out-of-band token is WANTED.
-      // Not a failure — the wake enqueues normally with bootstrapToken null.
-      if (!shouldUseMcpTokenField(resolved)) return { token: null, reason: null, degraded: null };
-      // ── STRUCTURAL misses: enqueue the wake anyway, token-less (LIN-1447) ──
-      // Neither of these can be fixed by retrying, so suppressing the wake would
-      // just strand the parent forever — the exact LIN-1428 stall. LIN-1447 landed
-      // a tolerate-ownerless policy on POST /api/dispatch/broker-token
-      // (routes/dispatch.js above), because the host runner authenticates with
-      // exactly such a token.
-      //
-      // LIN-1448 note: that lane is now switchable, and when it is switched off
-      // it adopts THIS branch's policy (refuse rather than hand back a token that
-      // cannot work) rather than the reverse. The degrade below is unaffected
-      // either way — this branch has never minted for an ownerless caller.
-      if (!proxyTokenStore) return { token: null, reason: null, degraded: 'no-proxy-token-store' };
-      // We deliberately do NOT mint for an ownerless caller. An ownerless bootstrap
-      // mints fine and EXCHANGES fine (exchangeBootstrapToken has no owner check) —
-      // it dies one hop later, at every data endpoint, because LIN-1366's
-      // owner-scoped selection fails closed on a null owner
-      // (lib/workspace-token-resolver.js `selectOwnerWorkspaceToken`, the explicit
-      // `scoped && !ownerAccountId` guard → reason 'not_connected'). So a minted
-      // ownerless token is dead on arrival; handing one to the wake would only
-      // disguise the miss. Enqueue token-less instead.
-      //
-      // NOTE — there is NO downstream backstop on this lane. LIN-1446's fallback
-      // mint is on SD's FRESH-LAUNCH path only (dispatcher.js:741); the follow-up/
-      // wake resume branch returns at dispatcher.js:658, well before it, and reads
-      // item.bootstrapToken directly with no mint of its own. So a degraded wake
-      // really does resume with an empty HARBOUR_LOCAL_BASE — LIN-1428's symptom,
-      // surviving in this narrow lane. We degrade anyway because a woken-but-
-      // uncredentialed parent strictly beats a parent that never wakes, and
-      // post-fix only these two structural lanes are token-less where pre-fix
-      // EVERY wake was. Do not widen the degrade on the assumption something
-      // downstream catches it — nothing does. SD-side follow-up: LIN-1449.
-      // This is also the degrade path for the harbour-feedback auth branch
-      // (authenticateFeedbackToken above), which never sets req.dispatchTokenOwner.
-      if (!createdBy) return { token: null, reason: null, degraded: 'no-token-owner' };
-      // ── TRANSIENT failures: withdraw the wake so the terminal stays retryable ──
-      try {
-        const token = await provisionBootstrapToken({
-          proxyTokenStore,
-          urlKey: req.dispatchUrlKey,
-          baseUrl,
-          label: 'wake-bootstrap',
-          harness: resolved,
-          createdBy
-        });
-        return token
-          ? { token, reason: null, degraded: null }
-          : { token: null, reason: 'wake-provision-failed:mint-returned-null', degraded: null };
-      } catch (err) {
-        console.error('Wake bootstrap provisioning failed:', err.message);
-        return { token: null, reason: `wake-provision-failed:${err.message}`, degraded: null };
-      }
-    };
+    const provisionWakeCredential = buildWakeCredentialProvisioner({
+      proxyTokenStore,
+      urlKey: req.dispatchUrlKey,
+      baseUrl,
+      createdBy
+    });
 
-    const { message, url, urlLabel, kind, rootItemId } = req.body;
-
-    // Additive, tolerant validation (LIN-1297): an invalid kind/rootItemId is
-    // silently dropped, never rejected — mirrors the existing tolerate-unknown-
-    // keys behavior for this route. `kind` here is the feedback-ENTRY vocabulary
-    // (FEEDBACK_ENTRY_KINDS), distinct from the dispatch-item DISPATCH_KINDS above.
-    const sanitizedKind = typeof kind === 'string' && FEEDBACK_ENTRY_KINDS.includes(kind) ? kind : undefined;
-    const sanitizedRootItemId = typeof rootItemId === 'string' && UUID_REGEX.test(rootItemId) ? rootItemId : undefined;
-
-    // Validate required fields
-    if (!message || typeof message !== 'string') {
-      return badRequest.json(res, 'message is required and must be a string');
+    // Shared, extracted validator (lib/dispatch-feedback-validation.js) — the
+    // runner feedback route reuses these exact rules rather than forking them
+    // (LIN-3035/LIN-3130). Validation order and error contracts are unchanged.
+    const validation = validateFeedbackBody(req.body);
+    if (validation.error) {
+      return badRequest.json(res, validation.error);
     }
-
-    // Validate lengths
-    if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
-      return badRequest.json(res, `message exceeds maximum length of ${MAX_FEEDBACK_MESSAGE_LENGTH}`);
-    }
-    if (url && url.length > MAX_URL_LENGTH) {
-      return badRequest.json(res, `url exceeds maximum length of ${MAX_URL_LENGTH}`);
-    }
-    if (urlLabel && urlLabel.length > MAX_NAME_LENGTH) {
-      return badRequest.json(res, `urlLabel exceeds maximum length of ${MAX_NAME_LENGTH}`);
-    }
-
-    // Reject dangerous characters
-    if (DANGEROUS_CHARS_REGEX.test(message)) {
-      return badRequest.json(res, 'message contains invalid characters');
-    }
-    if (urlLabel && DANGEROUS_CHARS_REGEX.test(urlLabel)) {
-      return badRequest.json(res, 'urlLabel contains invalid characters');
-    }
-
-    // Block javascript: and other dangerous URL schemes
-    if (url) {
-      try {
-        const parsed = new URL(url);
-        if (!['http:', 'https:'].includes(parsed.protocol)) {
-          return badRequest.json(res, 'url must use http or https protocol');
-        }
-      } catch {
-        return badRequest.json(res, 'url must be a valid URL');
-      }
-    }
-
-    // LIN-2891/LIN-3035: kind:'decision-withdrawn' carries its own required
-    // shape — `message` must be JSON `{decision_id, reason}`, both non-empty
-    // (trimmed) strings — validated HERE, immediately before the sole
-    // production addFeedback call below, so a malformed payload returns 400
-    // instead of silently landing kind-less (the merge-order hazard the
-    // `:100` sanitize test guards for every OTHER unrecognized/rejected kind).
-    if (sanitizedKind === 'decision-withdrawn') {
-      let parsedWithdrawal;
-      try {
-        parsedWithdrawal = JSON.parse(message);
-      } catch {
-        return badRequest.json(res, 'message must be valid JSON for kind:"decision-withdrawn"');
-      }
-      const decisionId = parsedWithdrawal?.decision_id;
-      const reason = parsedWithdrawal?.reason;
-      if (
-        typeof decisionId !== 'string' || decisionId.trim().length === 0 ||
-        typeof reason !== 'string' || reason.trim().length === 0
-      ) {
-        return badRequest.json(res, 'kind:"decision-withdrawn" requires a non-empty decision_id and reason');
-      }
-    }
+    const {
+      message,
+      url,
+      urlLabel,
+      kind: sanitizedKind,
+      rootItemId: sanitizedRootItemId
+    } = validation.value;
 
     try {
       const result = await dispatchQueueStore.addFeedback(

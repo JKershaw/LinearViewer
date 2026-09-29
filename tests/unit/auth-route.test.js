@@ -566,4 +566,140 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(session.oauthState, undefined);
     assert.strictEqual(session.oauthIntent, undefined);
   });
+
+  // -------------------------------------------------------------------------
+  // LIN-3127 — write-only Connection dual-write from the two Linear seams.
+  // A recording double stands in for the store: the route under test is the
+  // seam, and writeConnection only calls `put`.
+  // -------------------------------------------------------------------------
+
+  function recordingConnectionStore() {
+    const calls = [];
+    return {
+      calls,
+      put: async (accountId, provider, unitId, credentials) => {
+        calls.push({ accountId, provider, unitId, credentials });
+        return true;
+      },
+    };
+  }
+
+  test('LIN-3127: new-login callback dual-writes one Connection record keyed (account, linear, org.id)', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const connectionStore = recordingConnectionStore();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real' });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(connectionStore.calls.length, 1, 'exactly one Connection write');
+    const call = connectionStore.calls[0];
+    assert.strictEqual(call.accountId, session.accountId);
+    assert.strictEqual(call.provider, 'linear');
+    assert.strictEqual(call.unitId, 'org-1');
+    assert.strictEqual(call.credentials.token, 'lin_tok');
+  });
+
+  test('LIN-3127: add-source callback dual-writes one Connection record for the second org', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+    const connectionStore = recordingConnectionStore();
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = addSourceSession(myAccount._id);
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, makeRes());
+
+    assert.strictEqual(connectionStore.calls.length, 1, 'exactly one Connection write');
+    assert.strictEqual(connectionStore.calls[0].accountId, myAccount._id);
+    assert.strictEqual(connectionStore.calls[0].provider, 'linear');
+    assert.strictEqual(connectionStore.calls[0].unitId, 'org-2');
+    assert.strictEqual(connectionStore.calls[0].credentials.token, 'lin_tok');
+  });
+
+  // === LIN-3127 refusal paths: no Connection residue =========================
+
+  test('LIN-3127 refusal: Linear add-source at the workspace limit writes NO Connection record', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+    const connectionStore = recordingConnectionStore();
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `W${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
+    const session = addSourceSession(myAccount._id, { workspaces: existingWorkspaces });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 400);
+    assert.match(res.body, /Workspace Limit Reached/);
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue on a refused add-source');
+  });
+
+  test('LIN-3127 refusal: Linear add-source strict 409 writes NO Connection record', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const otherAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(otherAccount._id, 'linear', 'viewer-2', {});
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+    const connectionStore = recordingConnectionStore();
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = addSourceSession(myAccount._id);
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 409);
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue on a refused conflict');
+  });
+
+  test('LIN-3127 refusal: Linear new-login at the workspace limit writes NO Connection record', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const connectionStore = recordingConnectionStore();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `W${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
+    const session = makeSession({ oauthState: 'real', workspaces: existingWorkspaces });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 400);
+    assert.strictEqual(connectionStore.calls.length, 0, 'no Connection residue on a refused new-login');
+  });
+
+  // === LIN-3127 best-effort + missing dependency =============================
+
+  test('LIN-3127 best-effort: a throwing Connection store put does not fail the Linear login (redirect + owner credential still land)', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const connectionStore = { put: async () => { throw new Error('connection store down'); } };
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+    const session = makeSession({ oauthState: 'real' });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/', 'auth completes despite the Connection write failing');
+    assert.ok(await ownerCredentialStore.get(session.accountId, 'acme'), 'the owner-credential write still lands');
+  });
+
+  test('LIN-3127 missing dependency: a Linear router without a connectionStore still completes', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const res = makeRes();
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+
+    assert.strictEqual(res.redirectedTo, '/workspace/acme/');
+  });
 });

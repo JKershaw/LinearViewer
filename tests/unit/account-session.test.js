@@ -184,3 +184,106 @@ describe('establishAccount', () => {
     assert.deepStrictEqual(workspaces.sort(), ['ws-a', 'ws-b']);
   });
 });
+
+// LIN-1892 S2 item 5: a null workspace is an identity-only sign-in (email).
+// It must write NO account↔workspace edge; a real id behaves exactly as before.
+describe('establishAccount with a null workspace (LIN-1892 identity-only sign-in)', () => {
+  let client;
+  let dbDir;
+  let counter = 0;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'account-session-null-ws-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+  });
+
+  after(async () => {
+    if (client?.close) await client.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  async function freshStores() {
+    const db = client.db(`acct_null_${counter++}`);
+    await ensureIndexes(db);
+    return {
+      accountStore: new AccountStore({ collection: db.collection('accounts') }),
+      accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+      edges: db.collection('account-workspaces'),
+    };
+  }
+
+  test('null workspace: mints the account, links the email identity, sets accountId and freshness, writes no edge', async () => {
+    const { accountStore, accountWorkspaceStore, edges } = await freshStores();
+    const session = {};
+    const before = Date.now();
+
+    const result = await establishAccount(session, accountStore, accountWorkspaceStore, 'email', 'a@x.io', {}, null);
+
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(session.accountId, result.accountId);
+    assert.ok(Number.isFinite(session.identityAuthenticatedAt) && session.identityAuthenticatedAt >= before, 'freshness stamped');
+    const account = await accountStore.getAccount(result.accountId);
+    assert.deepStrictEqual(account.identities, [{ provider: 'email', scope: 'a@x.io', credentials: {} }]);
+    assert.strictEqual(await edges.countDocuments({}), 0, 'no account↔workspace edge');
+  });
+
+  test('undefined workspace is treated the same as null (no edge)', async () => {
+    const { accountStore, accountWorkspaceStore, edges } = await freshStores();
+    const result = await establishAccount({}, accountStore, accountWorkspaceStore, 'email', 'a@x.io', {}, undefined);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(await edges.countDocuments({}), 0);
+  });
+
+  test('returning email sign-in in a new session lands on the same account, still with no edge', async () => {
+    const { accountStore, accountWorkspaceStore, edges } = await freshStores();
+    const first = await establishAccount({}, accountStore, accountWorkspaceStore, 'email', 'a@x.io', {}, null);
+    const secondSession = {};
+    const second = await establishAccount(secondSession, accountStore, accountWorkspaceStore, 'email', 'a@x.io', {}, null);
+
+    assert.strictEqual(second.accountId, first.accountId);
+    assert.strictEqual(secondSession.accountId, first.accountId);
+    assert.strictEqual(await accountStore.collection.countDocuments({}), 1, 'no second account');
+    assert.strictEqual(await edges.countDocuments({}), 0);
+  });
+
+  test('live account already holding the email: re-stamps freshness, links nothing new, leaves existing edges alone', async () => {
+    const { accountStore, accountWorkspaceStore } = await freshStores();
+    const session = {};
+    const linear = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-1', {}, 'ws-1');
+    await establishAccount(session, accountStore, accountWorkspaceStore, 'email', 'p@x.io', {}, null);
+    session.identityAuthenticatedAt = 0;
+
+    const again = await establishAccount(session, accountStore, accountWorkspaceStore, 'email', 'p@x.io', {}, null);
+
+    assert.deepStrictEqual(again, { ok: true, accountId: linear.accountId });
+    assert.ok(session.identityAuthenticatedAt > 0, 'freshness re-stamped');
+    const account = await accountStore.getAccount(linear.accountId);
+    assert.deepStrictEqual(account.identities.map(i => `${i.provider}:${i.scope}`), ['linear:viewer-1', 'email:p@x.io']);
+    assert.deepStrictEqual(await accountWorkspaceStore.listAllEdges(), [{ accountId: linear.accountId, workspaceId: 'ws-1' }]);
+  });
+
+  test('a conflict with a null workspace is still returned unchanged, and writes no edge', async () => {
+    const { accountStore, accountWorkspaceStore, edges } = await freshStores();
+    const owner = await establishAccount({}, accountStore, accountWorkspaceStore, 'email', 'e@x.io', {}, null);
+    const session = {};
+    await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-p', {}, 'ws-p');
+
+    const result = await establishAccount(session, accountStore, accountWorkspaceStore, 'email', 'e@x.io', {}, null);
+
+    assert.deepStrictEqual(result, { ok: false, conflict: { accountId: owner.accountId } });
+    assert.deepStrictEqual((await edges.find({}).toArray()).map(e => e.workspaceId), ['ws-p']);
+  });
+
+  test('a real workspace id behaves exactly as before: one edge, keyed to the canonical account', async () => {
+    const { accountStore, accountWorkspaceStore, edges } = await freshStores();
+    const session = {};
+    const result = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-1', { name: 'Ada' }, 'ws-1');
+
+    assert.strictEqual(result.ok, true);
+    // Compared through listAllEdges' {accountId, workspaceId} projection, not
+    // the raw key set: S1 (PR #1601) adds an owner `role` to first edges.
+    assert.deepStrictEqual(await accountWorkspaceStore.listAllEdges(), [{ accountId: result.accountId, workspaceId: 'ws-1' }]);
+    assert.strictEqual(await edges.countDocuments({}), 1);
+  });
+});

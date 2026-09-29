@@ -48,9 +48,10 @@ import { respondToAccountConflict } from '../lib/account-conflict.js';
  * @param {Object} options.dispatchHistoryCollection - Raw dispatch-history collection (LIN-3002: /kpis aggregation-failure fault injection)
  * @param {Object} options.proxyEventsCollection - Raw proxy-events collection (LIN-3002: /kpis aggregation-failure fault injection)
  * @param {Function} options.resetKpiCache - Resets server.js's kpiCache to cold (LIN-3002)
+ * @param {Object|null} [options.emailTransport] - The capture email transport (LIN-1892), or null when email sign-in isn't in capture mode
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null }) {
   const router = Router();
 
   // ── Mock Yap server (LIN-450) ─────────────────────────────────────────────
@@ -358,6 +359,22 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       reauthUrl: '/auth/linear',
       provider: 'linear',
     });
+  });
+
+  // LIN-1892 (email magic-link sign-in): the newest captured sign-in email for
+  // `?to=` (case-insensitive), from the capture transport the Playwright server
+  // runs (see playwright.config.js). Nothing is ever sent; 404 when there is no
+  // capture transport or no message for that address.
+  router.get('/test/email-outbox', (req, res) => {
+    const message = emailTransport?.lastMessageTo?.(String(req.query.to || ''));
+    if (!message) return res.status(404).json({ error: 'no captured email for that address' });
+    res.json({ to: message.to, subject: message.subject, text: message.text, html: message.html });
+  });
+
+  // LIN-1892: which account this browser's session is signed in as (or null),
+  // so an e2e spec can assert "the same account" rather than assume it.
+  router.get('/test/session-account', (req, res) => {
+    res.json({ accountId: req.session.accountId || null });
   });
 
   // Endpoint to clear session (for testing logout and unauthenticated states)

@@ -2415,18 +2415,20 @@ body.is-landing {
   background: color-mix(in srgb, var(--teal) 85%, black);
 }
 
-/* GitHub and Jira: co-equal CTAs, visually quieter as a teal outline — the
-   same treatment for both, so a third auth option reads as part of the set
-   rather than introducing its own visual weight. */
+/* GitHub, Jira and email (LIN-1892): co-equal CTAs, visually quieter as a teal
+   outline — the same treatment for each, so another auth option reads as part
+   of the set rather than introducing its own visual weight. */
 .landing-cta-github,
-.landing-cta-jira {
+.landing-cta-jira,
+.landing-cta-email {
   background: transparent;
   color: var(--teal);
   border-color: var(--teal);
 }
 
 .landing-cta-github:hover,
-.landing-cta-jira:hover {
+.landing-cta-jira:hover,
+.landing-cta-email:hover {
   background: var(--teal-soft);
 }
 

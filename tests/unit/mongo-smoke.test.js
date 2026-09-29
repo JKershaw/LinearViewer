@@ -37,6 +37,7 @@ import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
+import { MagicLinkStore } from '../../lib/email-auth.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
 import { computeOwnershipReport } from '../../scripts/dry-run-workspace-ownership.mjs';
 
@@ -1199,6 +1200,38 @@ describe(
       // Exactly one record exists throughout — no CAS ever forked a duplicate.
       const all = await store.collection.find({ accountId, urlKey }).toArray();
       assert.strictEqual(all.length, 1);
+    });
+
+    // -----------------------------------------------------------------------
+    // LIN-1892 (N4): MagicLinkStore.consume is single use under GENUINE
+    // concurrency. MangoDB's per-collection mutex serialises the consumes in
+    // tests/unit/email-auth.test.js, so only this engine proves the atomic
+    // findOneAndUpdate claim. Also pins the TTL cleanup index building on
+    // the engine that actually runs it.
+    // -----------------------------------------------------------------------
+    test('MagicLinkStore.consume: concurrent consumes of one token yield exactly one winner, consumedAt set once (real MongoDB)', async () => {
+      const collection = freshCollection('email-magic-links');
+      const store = new MagicLinkStore({ collection });
+      const { token } = await store.issue({ emailNorm: 'race@x.io' });
+
+      const results = await Promise.all(Array.from({ length: CONCURRENCY }, () => store.consume(token)));
+
+      const winners = results.filter(Boolean);
+      assert.strictEqual(winners.length, 1, 'exactly one consume wins');
+      const docs = await collection.find({}).toArray();
+      assert.strictEqual(docs.length, 1);
+      assert.ok(docs[0].consumedAt instanceof Date, 'consumedAt is set');
+      assert.deepStrictEqual(docs[0].consumedAt, winners[0].consumedAt, 'set once, by the winner');
+      assert.strictEqual(await store.consume(token), null, 'a later replay is refused');
+    });
+
+    test('the email-magic-links TTL index builds on real MongoDB with expireAfterSeconds (LIN-1892)', async () => {
+      const spec = INDEX_SPECS.find(s => s.collection === 'email-magic-links' && s.options.expireAfterSeconds !== undefined);
+      const collection = freshCollection('email-magic-links');
+      await collection.createIndex(spec.keySpec, spec.options);
+      const built = (await collection.indexes()).find(idx => JSON.stringify(idx.key) === JSON.stringify(spec.keySpec));
+      assert.ok(built, 'the TTL index exists');
+      assert.strictEqual(built.expireAfterSeconds, 86400);
     });
 
     // -----------------------------------------------------------------------

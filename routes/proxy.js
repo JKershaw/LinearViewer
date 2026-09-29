@@ -28,8 +28,11 @@ import { createComputeRoutes } from './proxy-compute.js';
 import { createKickoffRoutes } from './proxy-kickoff.js';
 import { createDispatchRoutes } from './proxy-dispatch.js';
 import { createProxyFlightCompanionRoutes } from './proxy-flight-companion.js';
+import { createProxyRunnerRoutes } from './proxy-runner.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
+import { READ_WRITE } from '../lib/proxy-scopes.js';
+import { requireGrant } from '../lib/require-grant.js';
 import { graphqlErrorExtra, graphqlErrorDetail, declaredProviderDisplayName } from '../lib/proxy-graphql-errors.js';
 import { deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
@@ -575,6 +578,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       req.proxyTokenLabel = result.label;
       req.proxyTokenScope = result.scope;
       req.proxyCreatedBy = result.createdBy;
+      // LIN-3129: the token's grant set, additively. Nothing reads it until a
+      // mount uses requireGrant (LIN-2884) — S1 adds no mount.
+      req.proxyTokenGrants = result.grants || [];
       next();
     } catch (err) {
       console.error('Proxy token validation error:', err.message);
@@ -586,7 +592,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * Middleware to require write scope.
    */
   function requireWriteScope(req, res, next) {
-    if (req.proxyTokenScope !== 'readWrite') {
+    if (req.proxyTokenScope !== READ_WRITE) {
       return jsonError(res, 403, 'This endpoint requires a read-write token');
     }
     next();
@@ -1568,11 +1574,21 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
+  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+
+  // LIN-3130 S2a: the runner proxy surface (routes/proxy-runner.js) over the
+  // runner credential. Mounted PATH-LESS like the halt/kickoff/dispatch
+  // sub-routers; the factory's own first statement is the PATH-SCOPED
+  // `take` grant gate at /api/proxy/runner, so a runner path whose grant is
+  // missing is refused by that gate while every other proxy path falls
+  // through untouched. `haltReadTimeoutMs` is deliberately NOT passed — it is
+  // not bound in this composer, and the factory's own default applies. The
+  // routes land dormant: no production path mints a `take` grant until S2b.
+  router.use(createProxyRunnerRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore, sessionsFeedCache }));
 
   // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router
   // (routes/proxy-flight-companion.js) built on the extracted turn core

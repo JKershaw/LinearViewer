@@ -105,3 +105,4 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 - A PAT-mode session still supports OAuth if OAuth vars are configured; see `docs/architecture/auth.md`.
 - Workspace owner = its `role:'owner'` edge (first binder, LIN-1892); read via `getWorkspaceOwnerAccountId`. Not the credential-scope `ownerAccountId`; see `docs/architecture/auth.md`.
 - The scheduler's registered-job roster and the prompt-template count are hand-written in `docs/architecture/source-map.md`, but checked against source at test time, never trusted as written.
+- Email is an **identity type, never a provider** (no `lib/providers/email`): `lib/email-auth.js` + `routes/email-auth.js`. `lib/email-availability.js` is the one availability predicate (never enabled by `NODE_ENV` alone); see `docs/architecture/auth.md`.

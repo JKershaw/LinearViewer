@@ -18,6 +18,7 @@ import { getProvider } from '../lib/providers/registry.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
+import { SCOPES } from '../lib/proxy-scopes.js';
 
 // LIN-525 #5: the +proxy toggle auto-mints a 'prompt-proxy' readWrite token on
 // every page-load session that dispatches. To stop these standing credentials
@@ -59,7 +60,7 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
         return badRequest.json(res, `label exceeds maximum length of ${MAX_NAME_LENGTH}`);
       }
 
-      if (scope && !['read', 'readWrite'].includes(scope)) {
+      if (scope && !SCOPES.includes(scope)) {
         return badRequest.json(res, 'scope must be "read" or "readWrite"');
       }
 

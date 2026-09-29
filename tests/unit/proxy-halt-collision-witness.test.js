@@ -10,16 +10,16 @@
  * BASE_DEPS/buildApp/call over the real createProxyRoutes), never a bespoke
  * ad-hoc harness.
  *
- * A dispatchQueueStore spy is required, not optional: BASE_DEPS() carries no
- * dispatchQueueStore, so a STILL-captured GET would 503 "Dispatch is not
- * available" (dispatchQueueStore missing) instead of ever calling
- * getItemStatus — a naive "getItemStatus was never called" assertion would
- * then pass for the WRONG reason (research §5: reproduced — without the
- * spy, a captured request's 503 makes that assertion vacuously true).
- * Injecting the spy means a still-captured request would instead 404
- * "Dispatch item not found" with getItemStatus actually called once, so
- * "getItemStatus called 0 times" here is real evidence, not an artifact of
- * a missing dependency.
+ * A dispatchQueueStore spy is STILL required, even though BASE_DEPS() now
+ * carries a dispatchQueueStore (LIN-3130 S2a added it for the runner routes):
+ * the default `getItemStatus → null` would make a still-captured GET 404
+ * "Dispatch item not found" WITHOUT recording the call, so a naive
+ * "getItemStatus was never called" assertion would pass for the WRONG reason.
+ * Injecting the spy means a still-captured request would 404 with
+ * getItemStatus actually called once, so "getItemStatus called 0 times" here
+ * is real evidence, not an artifact of a missing/uninstrumented dependency.
+ * (The spy stays required; only the RATIONALE changed — the default is now an
+ * uninstrumented 404 rather than a missing-dep 503.)
  */
 process.env.NODE_ENV = 'test';
 

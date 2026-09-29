@@ -25,6 +25,10 @@ test.describe('Landing Swim Page (/swim)', () => {
     // this (Jira-CONFIGURED) server actually has.
     await expect(page.locator('[data-testid="nav-login-jira"]')).toBeVisible();
     await expect(page.locator('[data-testid="nav-login-jira"]')).toHaveAttribute('href', '/auth/jira/oauth?mode=new');
+    // LIN-1892 (G2): the email CTA, gated on isEmailSignInAvailable(), which the
+    // Playwright server's EMAIL_TRANSPORT=capture turns on.
+    await expect(page.locator('[data-testid="nav-login-email"]')).toBeVisible();
+    await expect(page.locator('[data-testid="nav-login-email"]')).toHaveAttribute('href', '/auth/email');
     await expect(page.locator('nav a[href="/"]')).toBeVisible();
   });
 

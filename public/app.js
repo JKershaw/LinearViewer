@@ -14,7 +14,8 @@ const QUEUE_POLL_INTERVAL_MS = 1000
 // Proxy-toggle logic (state, token mint/cache, block append) now lives in a
 // single shared module: window.ProxyToggle in common.js (LIN-525 #7). The
 // copy/download/dispatch call sites below use the back-compat global
-// maybeAppendProxyBlock(text, urlKey) that common.js exposes.
+// maybeAppendProxyBlock(text, urlKey, opts) that common.js exposes; `opts.force`
+// forces the append (LIN-3079).
 
 /**
  * Strip markdown code block fences from prompt text.
@@ -1075,7 +1076,10 @@ function initPrompts() {
     try {
       // Append the proxy block (if +proxy is on) inside the try so a failed
       // token mint surfaces as "failed" instead of silently copying a bare prompt.
-      textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey)
+      // LIN-3079: a container marked data-proxy-force (home/Autopilot, periodical
+      // Mint+Autopilot) forces the append regardless of the +proxy toggle.
+      const forceProxy = promptContainer.dataset.proxyForce === 'true'
+      textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey, { force: forceProxy })
       await navigator.clipboard.writeText(textToCopy)
       const originalText = copyBtn.textContent
       copyBtn.textContent = 'copied!'
@@ -1117,7 +1121,10 @@ function initPrompts() {
     try {
       // Append the proxy block (if +proxy is on) inside the try so a failed
       // token mint surfaces as "failed" instead of silently saving a bare prompt.
-      textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey)
+      // LIN-3079: honour data-proxy-force (home/Autopilot, periodical
+      // Mint+Autopilot) so the downloaded .md always carries the forced block.
+      const forceProxy = promptContainer.dataset.proxyForce === 'true'
+      textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey, { force: forceProxy })
       downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
       const originalText = downloadBtn.textContent
       downloadBtn.textContent = 'saved!'

@@ -83,6 +83,71 @@ POST /auth/github/link      → Write the binding: linkProvider(workspace, 'gith
   **hardcoded consts** in `app-auth.js` (the App migration centralized them as literals), not
   `process.env` reads — do not document them as environment variables.
 
+### Email magic link (LIN-1892)
+
+Email is an **identity type** on the durable account (`accounts.identities[]`,
+`provider: 'email'`, `scope: <normalised address>`), **not** a workspace provider —
+there is no `lib/providers/email`. Logic lives in `lib/email-auth.js`; the thin HTTP
+layer is `routes/email-auth.js`; pages are `lib/render-email-auth.js` and
+`lib/render-account-home.js`.
+
+```
+GET  /auth/email          → Form (mints a send nonce), or "You're signed in" for a live account
+POST /auth/email/send     → One "check your inbox" page for every address
+GET  /auth/email/confirm  → Confirm page (mints a confirm nonce); NEVER consumes the link
+POST /auth/email/confirm  → CSRF checks → N2 guard → consume → sign in → /account or first workspace
+GET  /account             → Account home for a signed-in account with zero workspaces
+```
+
+**Availability** — `lib/email-availability.js` (zero imports) is the one predicate
+behind the transport, the 503s, the landing-hero CTA (threaded as `emailEnabled`) and the
+landing navbar CTA (which calls it directly). `resolveEmailTransportKind(env)`:
+`'resend'` needs `RESEND_API_KEY` + `EMAIL_FROM` + a valid `EMAIL_LINK_ORIGIN`;
+`'console'` needs `EMAIL_TRANSPORT=console` and not production; `'capture'` needs
+`EMAIL_TRANSPORT=capture` under `NODE_ENV=test`; anything else is `null` (off).
+`NODE_ENV` only refuses or scopes — it never turns email on. Only this module and
+`lib/email-transport.js` read the email variables; `server.js` takes its startup line and
+refusal warning from it (pinned by `tests/unit/email-import-boundary.test.js`).
+
+**Link origin** — emailed links are built from `EMAIL_LINK_ORIGIN`, never from the
+request's `Host`: a forged `Host:` on `/auth/email/send` would otherwise mail a victim a
+genuine token pointing at another host. Resend without it resolves to off; console/capture
+fall back to the request origin (their links reach only the server log / test outbox).
+
+**Links** — 32 random bytes (base64url), stored only as SHA-256 (`email-magic-links`,
+`_id` = hash), 15-minute expiry enforced by every query, `peek` never consumes, `consume`
+is an atomic `findOneAndUpdate` (single use). Sends are throttled per address (3 / 15 min)
+and per IP (10 / 15 min), and every send answers with the same page (no enumeration).
+A TTL index removes dead rows a day after expiry.
+
+**Login-CSRF (G1)** — `POST /auth/email/confirm` is refused (403, nothing consumed) unless,
+in this order and before any token is touched: (a) `Sec-Fetch-Site` is absent or
+`same-origin`; (b) the session holds this browser's confirm nonce, minted by its own GET of
+the confirm page, bound to the token, at most 15 minutes old, and single use. The session
+cookie is `sameSite:'lax'` (`lib/session-options.js`, shared with the tests), so a
+cross-site POST carries no cookie and so no nonce. The confirm page is served with
+`frame-ancestors 'none'`, `X-Frame-Options: DENY`, `no-store` and `no-referrer`. The send
+form carries a send nonce, so a cross-site send can't plant a session in a victim's browser.
+Opening a link in another browser is supported: that browser's GET mints its own nonce and
+shows an "asked for from another device" notice.
+
+**N2 — a sign-in link never attaches an email to a live account.** If the session already
+holds account P, the confirm proceeds only when the address is already on P (checked
+before and again after consume); otherwise 409 with no confirm button and nothing
+consumed, attached or offered. Attaching an email to a live account is a separate,
+account-bound link mode (LIN-1892 S3). A sign-in-mode confirm never produces a merge offer.
+
+**Session** — the confirm carries `workspaces`/`accountId`/`identityAuthenticatedAt`
+across `regenerate()`, then calls `establishAccount(…, 'email', emailNorm, {}, null)`: a
+`null` workspace writes no account↔workspace edge. Preferences and the theme cookie are
+rehydrated like the provider callbacks.
+
+**Zero-workspace accounts (N1)** — a session with `accountId` and no workspaces is signed
+in, not signed out: `/`, `/swipe`, `/swim` and `/ship` redirect it to `/account`, and PAT
+auto-login (`lib/pat-session.js`) skips it. Connecting GitHub from `/account` reuses the
+`github:<userId>` container (the LIN-2802 fresh-container gate requires an existing
+workspace). Workspaces don't follow a person to a new device yet (follow-up behind LIN-2149).
+
 ### Free Tier (Rate-Limited)
 
 When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection get limited free prompts:
