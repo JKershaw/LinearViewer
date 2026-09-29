@@ -57,6 +57,7 @@ import {
   watchdogAction,
   watchdogSweep,
   canPost,
+  wakeRootFrom,
   sumTranscriptUsage,
   usageMessage,
   subagentModelFor,
@@ -177,6 +178,17 @@ describe('attributeItem (Q4)', () => {
       assert.equal(attributeItem(it, { ownerAccountId: OWNER, wakeRoot: root }).pass, pass);
     });
   }
+
+  test('F4: wakeRootFrom never invents the root id, so the id check in the wake rule means something', () => {
+    assert.deepEqual(wakeRootFrom({ status: 200, json: { id: K, dispatchedBy: OWNER } }), { id: K, dispatchedBy: OWNER });
+    assert.deepEqual(wakeRootFrom({ status: 200, json: { dispatchedBy: OWNER } }), { id: null, dispatchedBy: OWNER });
+    assert.equal(wakeRootFrom({ status: 404, json: { id: K } }), null);
+    assert.equal(wakeRootFrom(null), null);
+    const wake = item({ kind: 'wake', dispatchedBy: null, followUpTo: K });
+    assert.equal(attributeItem(wake, { ownerAccountId: OWNER, wakeRoot: wakeRootFrom({ status: 200, json: { dispatchedBy: OWNER } }) }).pass, false);
+    assert.equal(attributeItem(wake, { ownerAccountId: OWNER, wakeRoot: wakeRootFrom({ status: 200, json: { id: W1, dispatchedBy: OWNER } }) }).pass, false);
+    assert.equal(attributeItem(wake, { ownerAccountId: OWNER, wakeRoot: wakeRootFrom({ status: 200, json: { id: K, dispatchedBy: OWNER } }) }).pass, true);
+  });
 
   test('no owner id at all fails closed', () => {
     assert.equal(attributeItem(item(), { ownerAccountId: null }).pass, false);
