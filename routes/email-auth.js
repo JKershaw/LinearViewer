@@ -252,7 +252,20 @@ export function createEmailAuthRoutes({
     // Resolve the destination first: the hidden `next` from the confirm form,
     // else the value carried from the register page (cleared below).
     const destination = safeNext(next) || safeNext(req.session.emailLinkNext);
+    // D1 (LIN-1892 S3 review): link mode ATTACHES an identity to the live
+    // account P; it is not a sign-in for P. `establishAccount` is the one seam
+    // every real sign-in converges on and stamps `identityAuthenticatedAt` on
+    // every success, so save P's prior freshness and restore it exactly after a
+    // successful link — leaving it absent when it was absent. Otherwise adding
+    // an address would mark a stale P freshly authenticated, relaxing the
+    // LIN-2233 A1 merge-confirm proof. `lib/account-session.js` is deliberately
+    // untouched: every provider path depends on that stamp.
+    const priorAuthenticatedAt = req.session.identityAuthenticatedAt;
     const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'email', emailNorm, {}, null);
+    if (established.ok) {
+      if (priorAuthenticatedAt === undefined) delete req.session.identityAuthenticatedAt;
+      else req.session.identityAuthenticatedAt = priorAuthenticatedAt;
+    }
     delete req.session.emailLinkNext;
     if (!established.ok) {
       // The link was consumed before we got here, so a stale conflict must send

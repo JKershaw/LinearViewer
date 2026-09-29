@@ -232,4 +232,103 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
     assert.strictEqual(await harness.db.collection('owner-credentials').countDocuments({}), ownerCredentialsBefore, 'no owner credential');
     assert.deepStrictEqual(await identities(E), [`email:${email}`], 'the email stays recorded on the merged account (identity is not moved)');
   });
+
+  // ---------------------------------------------------------------------------
+  // D1: link mode must NOT refresh P's freshness (LIN-2233 A1 stays intact).
+  // ---------------------------------------------------------------------------
+  test('D1: a stale P link-confirms a new X, X is attached and P stays stale', async () => {
+    const browser = harness.browser();
+    const X = `d1-new-${counter++}@x.io`;
+    const scope = `d1-stale-p-${counter}`;
+    const P = await signIn(browser, { scope, workspaceId: 'ws-d1', urlKey: 'ws-d1' });
+    // P is stale: the merge-proof window has lapsed.
+    await browser.post('/__test/sign-in', { provider: 'linear', scope, workspaceId: 'ws-d1', urlKey: 'ws-d1', staleAuth: '1' });
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, 0);
+
+    const t = await requestLinkMode(browser, X);
+    const { nonce } = await browser.openConfirm(t);
+    const res = await browser.confirm(t, nonce);
+
+    assert.strictEqual(res.status, 302, 'the new address links onto the live account');
+    assert.deepStrictEqual((await identities(P)).filter(s => s.startsWith('email:')), [`email:${X}`], 'X is attached to P');
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, 0, 'link mode did not refresh P freshness');
+  });
+
+  test('D1: after a stale P link-confirms X, linking Y owned by E still forces re-proof (no merge, E untouched)', async () => {
+    const browser = harness.browser();
+    const X = `d1-second-${counter++}@x.io`;
+    const Y = `d1-owned-${counter++}@x.io`;
+    const scope = `d1-second-p-${counter}`;
+    const P = await signIn(browser, { scope, workspaceId: 'ws-d1b', urlKey: 'ws-d1b' });
+    await browser.post('/__test/sign-in', { provider: 'linear', scope, workspaceId: 'ws-d1b', urlKey: 'ws-d1b', staleAuth: '1' });
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, 0);
+
+    // Link-confirm a brand-new address: this must not make P fresh.
+    const tx = await requestLinkMode(browser, X);
+    const { nonce: nx } = await browser.openConfirm(tx);
+    assert.strictEqual((await browser.confirm(tx, nx)).status, 302);
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, 0, 'X did not re-stamp P');
+
+    // E owns Y; P is still stale, so the conflict must re-prove P, never merge.
+    const E = await accountOwningEmail(Y);
+    const ty = await requestLinkMode(browser, Y);
+    const { nonce: ny } = await browser.openConfirm(ty);
+    const res = await browser.confirm(ty, ny);
+
+    assert.strictEqual(res.status, 409);
+    assert.match(res.text, /data-testid="merge-reauth-required-page"/);
+    assert.doesNotMatch(res.text, /data-testid="merge-confirm-page"/);
+    const session = await browser.session();
+    assert.strictEqual(session.pendingMerge, undefined, 'no merge offered to a stale P');
+    assert.strictEqual(session.accountId, P);
+    assert.strictEqual((await harness.stores.accountStore.getAccount(E)).mergedInto, undefined, 'E was not merged into P');
+    assert.deepStrictEqual(await identities(E), [`email:${Y}`], 'E keeps its own email identity');
+  });
+
+  test('D1: a fresh P\'s existing stamp is preserved exactly, not refreshed, by link mode', async () => {
+    const browser = harness.browser();
+    const X = `d1-fresh-${counter++}@x.io`;
+    const scope = `d1-fresh-p-${counter}`;
+    const P = await signIn(browser, { scope, workspaceId: 'ws-d1c', urlKey: 'ws-d1c' });
+    const before = (await browser.session()).identityAuthenticatedAt;
+    assert.ok(before > 0, 'P is freshly authenticated');
+
+    const t = await requestLinkMode(browser, X);
+    const { nonce } = await browser.openConfirm(t);
+    assert.strictEqual((await browser.confirm(t, nonce)).status, 302);
+
+    assert.strictEqual((await browser.session()).identityAuthenticatedAt, before, 'the prior fresh stamp survived the link unchanged');
+    assert.deepStrictEqual((await identities(P)).filter(s => s.startsWith('email:')), [`email:${X}`]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // N1: the post-consume link-mode account check is pinned (M5d).
+  // ---------------------------------------------------------------------------
+  test('N1: a link-mode token whose linkToAccountId changes between peek and consume is refused after consume', async () => {
+    const browser = harness.browser();
+    const email = `n1-${counter++}@x.io`;
+    const P = await signIn(browser, { scope: `n1-p-${counter}`, workspaceId: 'ws-n1', urlKey: 'ws-n1' });
+    const t = await requestLinkMode(browser, email);
+    const { nonce } = await browser.openConfirm(t);
+
+    // The peek (pre-consume check) sees the real owner and passes; the consume
+    // then hands back the same record bound to a different account, exactly the
+    // gap the post-consume re-check closes.
+    const store = harness.stores.magicLinkStore;
+    const originalConsume = store.consume.bind(store);
+    store.consume = async token => {
+      const record = await originalConsume(token);
+      return record ? { ...record, linkToAccountId: 'a-different-account' } : record;
+    };
+    let res;
+    try {
+      res = await browser.confirm(t, nonce);
+    } finally {
+      store.consume = originalConsume;
+    }
+
+    assert.strictEqual(res.status, 409, 'refused rather than attaching to P');
+    assert.match(res.text, /data-testid="email-link-wrong-browser"/);
+    assert.deepStrictEqual((await identities(P)).filter(s => s.startsWith('email:')), [], 'no email identity was attached');
+  });
 });
