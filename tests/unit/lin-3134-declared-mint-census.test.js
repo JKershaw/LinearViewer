@@ -580,3 +580,48 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
     assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site: routes/new-mint.js')));
   });
 });
+
+// ── C2 (i) completeness: the queue's writer set (Class F: "the queue has no
+// other follow-up writer"). C2 (i) enumerates createDispatchItem calls and
+// C2 (v) the three mint helpers; a direct `.addItem(` writer outside the
+// factory would bypass both. Keyed by {file, enclosing function/method}.
+const ADD_ITEM_WRITERS = {
+  'lib/dispatch-factory.js | createDispatchItem': 1,   // the factory chokepoint (LIN-1139)
+  'lib/dispatch-store.js | expandCascadeAborts': 1,    // abort items: no followUpTo, no credential
+  'lib/dispatch-store.js | _mintWake': 1,              // the wake (Class F eleventh member)
+  'lib/dispatch-store.js | addFeedback': 1             // a [pending] wake's direct enqueue (no witness CAS)
+};
+
+function scanAddItemWriters(files) {
+  const counts = {};
+  for (const { file, src } of files) {
+    const masked = maskSource(src);
+    for (const idx of indicesOf(masked, '.addItem(', 0, masked.length)) {
+      const pre = masked.slice(0, idx);
+      // Nearest enclosing function declaration or class method (masked text,
+      // so prose and strings never match).
+      let best = null;
+      const consider = (i, name) => { if (!best || i > best.i) best = { i, name }; };
+      for (const m of pre.matchAll(/(?:^|\n)[ \t]*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(/g)) consider(m.index, m[1]);
+      for (const m of pre.matchAll(/\n[ \t]+(?:async\s+)?(\w+)\s*\([^)\n]*\)\s*\{/g)) {
+        if (!['if', 'for', 'while', 'switch', 'catch'].includes(m[1])) consider(m.index, m[1]);
+      }
+      const key = `${file} | ${best ? best.name : '(top level)'}`;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+describe('C2 (i) — the queue writer set is closed', () => {
+  test('exactly the four known .addItem( writers', () => {
+    assert.deepEqual(scanAddItemWriters(PRODUCTION), ADD_ITEM_WRITERS);
+  });
+  test('mutation: a fifth, direct .addItem( follow-up writer fails', () => {
+    const mutated = [...PRODUCTION, { file: 'routes/new-resume.js', src: "export function mount(router) {\n  router.post('/api/new-resume', async (req, res) => {\n    const t = await proxyTokenStore.createToken(urlKey, {});\n    await dispatchQueueStore.addItem(urlKey, { prompt, followUpTo: req.body.followUpTo, bootstrapToken: t.token });\n  });\n}" }];
+    assert.notDeepEqual(scanAddItemWriters(mutated), ADD_ITEM_WRITERS);
+    // …and the existing C2 (i) and (v) do NOT see it (the gap this closes):
+    assert.deepEqual(censusC2(mutated), []);
+    assert.deepEqual(censusClassification(mutated), []);
+  });
+});
