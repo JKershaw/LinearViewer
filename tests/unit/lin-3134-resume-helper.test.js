@@ -374,6 +374,38 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
     assert.equal(calls[0].opts.label, 'wake-bootstrap');
   });
 
+  test('attach mode ignores mint:false — no record still attaches with today\'s exact createToken args', async () => {
+    const calls = [];
+    const result = await provisionResumeCredential({
+      proxyTokenStore: mkStore(calls), dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) },
+      urlKey: 'acme', baseUrl: 'https://h', prompt: 'helper-prompt', attach: ATTACH, label: LABEL,
+      harness: 'claude-code', createdBy: 'u1', followUpTo: 'row-1', mint: false
+    });
+    assert.equal(result.bootstrapToken, 'plain-tok');
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].opts, PLAIN_OPTS);
+  });
+
+  test('attach mode ignores mint:false — a record still validates and mints declared', async () => {
+    const store = mintSpy();
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h',
+      prompt: 'helper-prompt', attach: ATTACH, label: LABEL, harness: 'claude-code', createdBy: 'poster-B', followUpTo: 'row-1', mint: false
+    });
+    assert.equal(result.bootstrapToken, TOKEN);
+    assert.equal(result.grantDeclaration, RECORD);
+    assert.equal(store.calls.length, 1);
+    const spy = mintSpy();
+    await assert.rejects(
+      () => provisionResumeCredential({
+        proxyTokenStore: spy, dispatchStore: recordStore({ ...RECORD, grants: [] }), urlKey: 'acme', baseUrl: 'https://h',
+        prompt: 'p', attach: ATTACH, harness: 'claude-code', followUpTo: 'row-1', mint: false
+      }),
+      (err) => err.code === 'INVALID_GRANTS' && err.status === 400
+    );
+    assert.equal(spy.calls.length, 0);
+  });
+
   test('declared pbt with a non-default label (wake-bootstrap) threads it to mintGrantBootstrap', async () => {
     const store = mintSpy();
     const result = await provisionResumeCredential({

@@ -71,6 +71,13 @@ describe('S1 — sparse persistence on addItem / _archiveItem', () => {
     assert.equal(store.collection._docs[0].grantRefusal, 'INVALID_GRANTS');
   });
 
+  test('explicit null fields are not written (sparse: never a null key)', async () => {
+    const store = makeStore();
+    await store.addItem('acme', { prompt: 'run me', grantDeclaration: null, grantRefusal: null });
+    assert.equal('grantDeclaration' in store.collection._docs[0], false);
+    assert.equal('grantRefusal' in store.collection._docs[0], false);
+  });
+
   test('an undeclared item writes NEITHER key (byte-identity)', async () => {
     const store = makeStore();
     const doc = await store.addItem('acme', { prompt: 'run me' });
@@ -100,6 +107,13 @@ describe('S1 — F2(7) store half: secrecy at the addItem return', () => {
     for (const marker of RECORD_MARKERS) {
       assert.ok(!serialized.includes(marker), `return must not contain ${marker}`);
     }
+  });
+
+  test('a refusal-only doc is also stripped from the return (either key triggers the strip)', async () => {
+    const store = makeStore();
+    const returned = await store.addItem('acme', { prompt: 'run me', grantRefusal: 'INVALID_GRANTS' });
+    assert.equal('grantRefusal' in returned, false);
+    assert.equal(store.collection._docs[0].grantRefusal, 'INVALID_GRANTS');
   });
 
   test('the persisted document keeps the full record', async () => {
