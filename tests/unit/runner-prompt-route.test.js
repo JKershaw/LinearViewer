@@ -158,6 +158,25 @@ describe('GET /runner-kit/:file (public, allow-listed)', () => {
     });
   }
 
+  test('N4: each file is read once and served from memory (a later disk change is not served mid-process)', async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'rk-kitcache-'));
+    try {
+      writeFileSync(join(dir, 'broker.mjs'), '// first broker\n');
+      writeFileSync(join(dir, 'runner.mjs'), '// first runner\n');
+      const app = express();
+      app.use(createRunnerKitRoutes({ kitDir: dir }));
+      const first = await call(app, 'GET', '/runner-kit/runner.mjs', { headers: { Authorization: '' } });
+      assert.equal(first.body, '// first runner\n');
+      writeFileSync(join(dir, 'runner.mjs'), '// changed on disk\n');
+      const second = await call(app, 'GET', '/runner-kit/runner.mjs', { headers: { Authorization: '' } });
+      assert.equal(second.body, '// first runner\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('the served set is exactly the kit', () => {
     assert.deepEqual([...RUNNER_KIT_FILES].sort(), ['broker.mjs', 'runner.mjs']);
   });

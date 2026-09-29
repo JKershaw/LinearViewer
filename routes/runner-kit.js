@@ -11,6 +11,8 @@
  *
  * Only the allow-listed file names are served, read from lib/runner-kit at
  * HEAD, so the bytes always match what lib/prompts/runner-kickoff.js pins.
+ * Each file is read once and served from memory after that, the same way the
+ * builder computes its pins once per process.
  */
 import { Router } from 'express';
 import { readFileSync } from 'fs';
@@ -19,17 +21,21 @@ import { RUNNER_KIT_DIR, RUNNER_KIT_FILES } from '../lib/prompts/runner-kickoff.
 
 export function createRunnerKitRoutes({ kitDir = RUNNER_KIT_DIR } = {}) {
   const router = Router();
+  const cache = new Map();
 
   router.get('/runner-kit/:file', (req, res) => {
     const { file } = req.params;
     if (!RUNNER_KIT_FILES.includes(file)) {
       return res.status(404).json({ error: 'Not a runner kit file' });
     }
-    let body;
-    try {
-      body = readFileSync(join(kitDir, file));
-    } catch {
-      return res.status(404).json({ error: 'Not a runner kit file' });
+    let body = cache.get(file);
+    if (!body) {
+      try {
+        body = readFileSync(join(kitDir, file));
+      } catch {
+        return res.status(404).json({ error: 'Not a runner kit file' });
+      }
+      cache.set(file, body);
     }
     res.set('Cache-Control', 'no-store');
     res.type('text/javascript; charset=utf-8').send(body);
