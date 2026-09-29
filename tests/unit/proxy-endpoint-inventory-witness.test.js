@@ -9,8 +9,8 @@
  * asserts that all 55 registrations still resolve"). This file is that
  * replacement, landed as PR-0 (no handler moves) before any group is moved.
  *
- * 74 covered (method, URL) forms (3 `routes/proxy-rulings.js` forms
- * known-uncovered; see the Group K comment below) — 64 route registrations,
+ * 75 covered (method, URL) forms (3 `routes/proxy-rulings.js` forms
+ * known-uncovered; see the Group K comment below) — 65 route registrations,
  * 10 of them array-path aliases (2 URL forms each) — are driven through
  * `createProxyRoutes` over REAL HTTP (an express app + `fetch`, the pattern
  * already established by tests/unit/proxy-route-aliases.test.js), each
@@ -99,7 +99,7 @@ function runnerApp(overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// 74 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
+// 75 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
 // own group letter. `run` builds the app + issues the one deterministic
 // offline request and returns { status }.
 // ---------------------------------------------------------------------------
@@ -489,8 +489,8 @@ const ROWS = [
   // POST .../suggest-dismissal, POST .../suggest-answer) — a bounded,
   // documented gap from LIN-2444, which updated the DI census
   // (tests/unit/proxy-di-witness.test.js) but not this file. Fixing that
-  // gap is out of scope here; this comment exists so 74 below is read as
-  // "74 covered forms, 3 known-uncovered", never as "the whole surface".
+  // gap is out of scope here; this comment exists so 75 below is read as
+  // "75 covered forms, 3 known-uncovered", never as "the whole surface".
   {
     group: 'K', method: 'GET', url: '/api/proxy/dispatch/halt', expect: 200,
     note: 'no halt set yet — BASE_DEPS() default workspaceHaltStore.getWorkspaceHalt resolves null',
@@ -508,7 +508,13 @@ const ROWS = [
     run: () => call(buildApp(), 'DELETE', '/api/proxy/dispatch/halt'),
   },
 
-  // --- Group L: runner routes (LIN-3130 S2a, routes/proxy-runner.js) ---
+  // --- Group L: runner routes (LIN-3130 S2a, routes/proxy-runner.js; and
+  // LIN-3098 S3, routes/proxy-runner-prompt.js, mounted BEFORE it) ---
+  {
+    group: 'L', method: 'GET', url: '/api/proxy/runner/prompt', expect: 200,
+    note: 'take-granted token reaches the served runner prompt (LIN-3098 S3); its own take gate, mounted before createProxyRunnerRoutes',
+    run: () => call(runnerApp(), 'GET', '/api/proxy/runner/prompt'),
+  },
   // Each row uses a `take`-granted token and pins the handler's OWN exact
   // JSON body, so it reaches PAST the path-scoped gate into the handler — a
   // gate-only 401/403 answer is not used as a row (see the file header's
@@ -574,14 +580,18 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // landing directly in the new routes/proxy-runner.js via router.use() —
   // routes/proxy.js's OWN registration count is STILL unchanged at 1;
   // total 71 -> 74.
-  test('routes/proxy.js has exactly 1 router.* registration (74 URL forms across the whole proxy surface)', () => {
+  // LIN-3098 (S3): group L adds 1 registration (GET /api/proxy/runner/prompt),
+  // landing directly in the new routes/proxy-runner-prompt.js via
+  // router.use(), mounted BEFORE createProxyRunnerRoutes — routes/proxy.js's
+  // OWN registration count is still 1; total 74 -> 75.
+  test('routes/proxy.js has exactly 1 router.* registration (75 URL forms across the whole proxy surface)', () => {
     const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
     const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
     assert.equal(matches.length, 1,
       `expected 1 route registration in routes/proxy.js, found ${matches.length} — ` +
-      `this file's 74-row ROWS table must be re-derived from source before trusting it`);
-    assert.equal(ROWS.length, 74,
-      `this file's ROWS table must cover exactly 74 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 14 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 2 in routes/proxy-flight-companion.js + 3 in routes/proxy-halt.js + 3 in routes/proxy-runner.js + 10 array-path aliases) — still deliberately excluding the 3 pre-existing routes/proxy-rulings.js forms (LIN-2444's documented, bounded gap; see the Group K comment above), found ${ROWS.length}`);
+      `this file's 75-row ROWS table must be re-derived from source before trusting it`);
+    assert.equal(ROWS.length, 75,
+      `this file's ROWS table must cover exactly 75 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 14 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 2 in routes/proxy-flight-companion.js + 3 in routes/proxy-halt.js + 1 in routes/proxy-runner-prompt.js + 3 in routes/proxy-runner.js + 10 array-path aliases) — still deliberately excluding the 3 pre-existing routes/proxy-rulings.js forms (LIN-2444's documented, bounded gap; see the Group K comment above), found ${ROWS.length}`);
   });
 });
 
@@ -589,7 +599,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (74 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (75 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();
