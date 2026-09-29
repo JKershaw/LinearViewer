@@ -214,6 +214,21 @@ body itself is the runner-prompt ticket's (LIN-3098); this is only the credentia
 | owner check unwired, erroring, or a corrupt merge chain | 503 (retryable) | `OWNER_CHECK_UNAVAILABLE` |
 | body carries `grants` | 400 | `GRANTS_NOT_CLIENT_SETTABLE` |
 
+### The runner prompt (LIN-3098)
+
+- **`GET /api/proxy/runner/prompt`** (requires `take`; any other token gets `403
+  TAKE_GRANT_REQUIRED`) returns the runner prompt as `text/plain`: the pasteable instructions that
+  make a Claude Code session this workspace's runner. It is `docs/runner-prompt.md` at HEAD, with
+  the runner lifetimes, halt modes, feedback kinds, the kit's thresholds and this request's base
+  URL filled in (`lib/prompts/runner-kickoff.js`). It is mounted before the other runner routes
+  and runs its own limiter → auth → grant chain.
+- **`GET /runner-kit/{broker.mjs|runner.mjs}`** (public, no token) serves the runner kit
+  (`lib/runner-kit/`) byte-for-byte. The prompt pins each file's sha256, and the session verifies
+  the kit before it runs anything; a mismatch means the prompt predates a deploy and must be
+  copied again.
+- The session never hands a subagent a token: each taken item gets its own local broker on a
+  same-user Unix socket (`broker.mjs`), and subagents call it with `curl --unix-socket`.
+
 
 ### Using the Token
 

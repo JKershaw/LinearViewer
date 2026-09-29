@@ -29,6 +29,7 @@ import { createKickoffRoutes } from './proxy-kickoff.js';
 import { createDispatchRoutes } from './proxy-dispatch.js';
 import { createProxyFlightCompanionRoutes } from './proxy-flight-companion.js';
 import { createProxyRunnerRoutes } from './proxy-runner.js';
+import { createProxyRunnerPromptRoutes } from './proxy-runner-prompt.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
@@ -1588,6 +1589,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // through untouched. `haltReadTimeoutMs` is deliberately NOT passed — it is
   // not bound in this composer, and the factory's own default applies. The
   // routes land dormant: no production path mints a `take` grant until S2b.
+  // LIN-3098 S3: the served runner prompt (routes/proxy-runner-prompt.js),
+  // GET /api/proxy/runner/prompt. Mounted BEFORE createProxyRunnerRoutes: it
+  // runs its own limiter → auth → take-grant chain and answers, so the runner
+  // sub-router's path-scoped gate never runs a second pass over it (R8).
+  router.use(createProxyRunnerPromptRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent }));
+
   router.use(createProxyRunnerRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore, sessionsFeedCache }));
 
   // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router

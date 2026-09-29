@@ -113,7 +113,14 @@ describe('LIN-3129/LIN-3131 — the grant API caller allow-lists', () => {
   // gated on its own merge order (S2b + #1601 deployed + the LIN-1892 backfill),
   // and must not exist yet. This is narrower than the old empty-set assertion,
   // not looser: a second take mount, or any dispatch mount, still fails.
-  test('S2a mounts requireGrant(\'take\') in routes/proxy-runner.js only; LIN-2884 owns dispatch', () => {
+  //
+  // RE-DERIVED (LIN-3098 S3, per its approved plan and R8): the served runner
+  // prompt, GET /api/proxy/runner/prompt, is its own take-gated route in
+  // routes/proxy-runner-prompt.js, mounted BEFORE the runner sub-router so the
+  // runner gate never runs a second pass over it. The set stays EXACT — that
+  // one planned file is added by name; any other take mount, or any dispatch
+  // mount, still fails.
+  test('take is mounted in routes/proxy-runner.js and routes/proxy-runner-prompt.js only; LIN-2884 owns dispatch', () => {
     // Match an actual mount call, requireGrant('<name>') — not a passing mention.
     const mounts = [];
     for (const file of walk(join(REPO, 'routes'))) {
@@ -126,8 +133,8 @@ describe('LIN-3129/LIN-3131 — the grant API caller allow-lists', () => {
     const files = [...new Set(mounts.map((m) => m.file))].sort();
     assert.deepEqual(
       files,
-      ['routes/proxy-runner.js'],
-      'S2a mounts requireGrant only in routes/proxy-runner.js; any additional/other mount fails this pin'
+      ['routes/proxy-runner-prompt.js', 'routes/proxy-runner.js'],
+      'requireGrant is mounted only in routes/proxy-runner.js (S2a) and routes/proxy-runner-prompt.js (LIN-3098 S3); any additional/other mount fails this pin'
     );
 
     const grants = [...new Set(mounts.map((m) => m.grant))].sort();
