@@ -417,11 +417,13 @@ const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
 // every other cell would still pass — the three re-reads would collapse into
 // microseconds and the take-hop window would be unclosed (review finding M5c).
 
-describe('S1 — R1 retry spacing is the asserted interval', () => {
-  test('no history re-read before GRANT_LOOKUP_RETRY_MS; exactly one after', async () => {
+describe('S1 — R1 retry spacing is the asserted interval for EVERY re-read', () => {
+  test('each of the three intervals: tick 49 -> count unchanged, tick 1 -> exactly one more', async () => {
     mock.timers.enable({ apis: ['setTimeout'] });
     try {
-      const { store, counts } = takeHopCollections({ releaseAtHistoryRead: 2 });
+      // Release at history read 4, so the record resolves only after the THIRD
+      // re-read: all three intervals are exercised (finding 1).
+      const { store, counts } = takeHopCollections({ releaseAtHistoryRead: 4 });
       let settled = false;
       const p = store.getGrantDeclaration('acme', 'hop-1').then((v) => { settled = true; return v; });
 
@@ -429,14 +431,17 @@ describe('S1 — R1 retry spacing is the asserted interval', () => {
       assert.equal(counts().historyReads, 1, 'the initial history read has run');
       assert.equal(settled, false);
 
-      mock.timers.tick(GRANT_LOOKUP_RETRY_MS - 1);
-      await flushMicrotasks();
-      assert.equal(counts().historyReads, 1, 'no re-read before the full interval');
-      assert.equal(settled, false, 'the promise is still pending before the interval');
+      for (let i = 0; i < GRANT_LOOKUP_HISTORY_RETRIES; i++) {
+        const before = counts().historyReads;
+        mock.timers.tick(GRANT_LOOKUP_RETRY_MS - 1);
+        await flushMicrotasks();
+        assert.equal(counts().historyReads, before, `interval ${i + 1}: no re-read before the full interval`);
+        assert.equal(settled, false, `interval ${i + 1}: still pending before the interval`);
 
-      mock.timers.tick(1);
-      await flushMicrotasks();
-      assert.equal(counts().historyReads, 2, 'exactly one re-read once the interval elapses');
+        mock.timers.tick(1);
+        await flushMicrotasks();
+        assert.equal(counts().historyReads, before + 1, `interval ${i + 1}: exactly one re-read once the interval elapses`);
+      }
 
       assert.deepEqual(await p, { state: 'record', record: RECORD });
     } finally {
@@ -444,6 +449,32 @@ describe('S1 — R1 retry spacing is the asserted interval', () => {
     }
   });
 });
+
+// ── Finding 2: `_id` scoping on BOTH the active and history reads ────────────
+// A lookup that drops `_id` and queries `{ urlKey }` alone returns SOME row in
+// the workspace — another item's grants/site. This needs two rows with
+// different records (row A active, row B taken -> history).
+
+describe('S1 — `_id` scoping on active and history reads', () => {
+  const RECORD_A = { grants: ['dispatch'], ownerAccountId: 'owner-A', workspaceId: 'ws-1', profile: 'worker', site: 'site-A', declaredAt: 'A' };
+  const RECORD_B = { grants: ['take'], ownerAccountId: 'owner-B', workspaceId: 'ws-1', profile: 'worker', site: 'site-B', declaredAt: 'B' };
+
+  test('each id resolves its OWN record (A active, B taken); an unknown id is row-missing', async () => {
+    const store = makeStore();
+    const rowA = await store.addItem('acme', { prompt: 'a', grantDeclaration: RECORD_A });
+    const rowB = await store.addItem('acme', { prompt: 'b', grantDeclaration: RECORD_B });
+    await store.takeItem(rowB._id, 'acme');
+    assert.equal(store.collection._docs.length, 1, 'A is active, B is in history');
+
+    // Active read must return A's record, not B's.
+    assert.deepEqual(await store.getGrantDeclaration('acme', rowA._id), { state: 'record', record: RECORD_A });
+    // History read must return B's record, not the active row's.
+    assert.deepEqual(await store.getGrantDeclaration('acme', rowB._id), { state: 'record', record: RECORD_B });
+    // An unknown id with other rows present must be row-missing, not some row.
+    assert.deepEqual(await store.getGrantDeclaration('acme', 'unknown-id-xyz'), { state: 'row-missing' });
+  });
+});
+
 
 // ── M7c: history-side urlKey scoping (review finding M7c) ────────────────────
 // A follow-up's parent is normally already taken, so the HISTORY read is the

@@ -282,6 +282,13 @@ describe('S2 — non-array declaredGrants is refused, never degrades to grant-le
     assert.equal(store.calls.length, 0);
   });
 
+  test('guard ordering: with NO store and prose, a non-array declaredGrants still refuses (never a plain null)', async () => {
+    await assert.rejects(
+      () => provisionBootstrapToken({ proxyTokenStore: null, baseUrl: null, urlKey: 'acme', harness: 'opencode', declaredGrants: 'dispatch' }),
+      (err) => err.code === 'INVALID_GRANTS' && err.status === 400
+    );
+  });
+
   test('undefined and [] still take the plain path', async () => {
     const calls = [];
     const store = {

@@ -20,7 +20,7 @@ import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'crypto';
 import express from 'express';
-import { provisionResumeCredential, provisionBootstrapToken } from '../../lib/proxy-preamble.js';
+import { provisionResumeCredential, provisionBootstrapToken, attachProxyContext } from '../../lib/proxy-preamble.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { RUNNER_GRANTS } from '../../lib/proxy-scopes.js';
 import { DispatchQueueStore, GRANT_LOOKUP_HISTORY_RETRIES, GRANT_LOOKUP_RETRY_MS } from '../../lib/dispatch-store.js';
@@ -246,50 +246,96 @@ describe('S3 — N3 lookup read fault mapping', () => {
 
 // ── attach mode (no record and record; MCP + prose) ──────────────────────────
 
-describe('S3 — attach mode', () => {
-  const attach = { issueIdentifier: 'LIN-1', prompt: 'base', providerDisplayName: null, providerUi: null };
+describe('S3 — attach mode (full argument parity, finding 3)', () => {
+  const ATTACH = { issueIdentifier: 'LIN-888', prompt: 'attach-base', providerDisplayName: 'ProviderX', providerUi: { example: true } };
+  const LABEL = 'custom-attach-label';
+  const mkStore = (calls) => ({ createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain-tok' }; } });
 
-  test('no record, MCP: block appended, token as field, grantDeclaration null', async () => {
+  test('no record, MCP: equals a direct attachProxyContext call; label + issueIdentifier threaded', async () => {
     const calls = [];
-    const store = { createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain-tok' }; } };
-    const result = await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) }, urlKey: 'acme', baseUrl: 'https://h', prompt: 'base', attach, harness: 'claude-code', createdBy: 'u1', followUpTo: 'row-1' });
-    assert.deepEqual(Object.keys(result).sort(), ['bootstrapToken', 'grantDeclaration', 'prompt']);
-    assert.equal(result.bootstrapToken, 'plain-tok');
-    assert.ok(result.prompt.startsWith('base'));
-    assert.ok(!result.prompt.includes('plain-tok'));
+    const store = mkStore(calls);
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) },
+      urlKey: 'acme', baseUrl: 'https://h', prompt: 'helper-prompt', attach: ATTACH,
+      label: LABEL, harness: 'claude-code', createdBy: 'u1', followUpTo: 'row-1'
+    });
+    const direct = await attachProxyContext({
+      proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h',
+      issueIdentifier: ATTACH.issueIdentifier, prompt: ATTACH.prompt, label: LABEL,
+      harness: 'claude-code', createdBy: 'u1',
+      providerDisplayName: ATTACH.providerDisplayName, providerUi: ATTACH.providerUi
+    });
+    assert.equal(result.prompt, direct.prompt, 'exact prompt parity (attach.prompt, issueIdentifier, providerDisplayName, providerUi)');
+    assert.equal(result.bootstrapToken, direct.bootstrapToken);
     assert.strictEqual(result.grantDeclaration, null);
-    // H9: the plain attach branch must pass today's EXACT createToken arguments.
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0].opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1' });
+    assert.ok(!result.prompt.includes('plain-tok'), 'MCP strips the token from prose');
+    assert.equal(calls[0].opts.label, LABEL, 'the passed label is threaded to createToken');
   });
 
-  test('no record, prose: token embedded, bootstrapToken null', async () => {
+  test('no record, prose: equals a direct call; token embedded; label threaded', async () => {
     const calls = [];
-    const store = { createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain-tok' }; } };
-    const result = await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) }, urlKey: 'acme', baseUrl: 'https://h', prompt: 'base', attach, harness: 'opencode', createdBy: 'u1', followUpTo: 'row-1' });
+    const store = mkStore(calls);
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) },
+      urlKey: 'acme', baseUrl: 'https://h', prompt: 'helper-prompt', attach: ATTACH,
+      label: LABEL, harness: 'opencode', createdBy: 'u1', followUpTo: 'row-1'
+    });
+    const direct = await attachProxyContext({
+      proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h',
+      issueIdentifier: ATTACH.issueIdentifier, prompt: ATTACH.prompt, label: LABEL,
+      harness: 'opencode', createdBy: 'u1',
+      providerDisplayName: ATTACH.providerDisplayName, providerUi: ATTACH.providerUi
+    });
+    assert.equal(result.prompt, direct.prompt);
     assert.strictEqual(result.bootstrapToken, null);
-    assert.ok(result.prompt.includes('plain-tok'));
-    assert.strictEqual(result.grantDeclaration, null);
-    assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0].opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1' });
+    assert.ok(result.prompt.includes('plain-tok'), 'prose embeds the token');
+    assert.equal(calls[0].opts.label, LABEL);
   });
 
-  test('record, MCP: declared attach, recorded owner, token field, record returned', async () => {
+  test('record, MCP: declared attach carries issueIdentifier + provider; owner/workspace recorded', async () => {
     const store = mintSpy();
-    const result = await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h', prompt: 'base', attach, harness: 'claude-code', createdBy: 'poster-B', followUpTo: 'row-1' });
-    assert.equal(store.calls[0].ownerAccountId, 'account-A');
-    assert.equal(result.bootstrapToken, TOKEN);
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h',
+      prompt: 'helper-prompt', attach: ATTACH, label: LABEL, harness: 'claude-code', createdBy: 'poster-B', followUpTo: 'row-1'
+    });
+    const direct = await attachProxyContext({
+      proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h',
+      issueIdentifier: ATTACH.issueIdentifier, prompt: ATTACH.prompt, label: LABEL,
+      harness: 'claude-code', createdBy: 'poster-B',
+      providerDisplayName: ATTACH.providerDisplayName, providerUi: ATTACH.providerUi,
+      declaredGrants: RECORD.grants, grantOwnerAccountId: RECORD.ownerAccountId,
+      workspaceId: RECORD.workspaceId, declaredSite: RECORD.site
+    });
+    assert.equal(result.prompt, direct.prompt, 'issueIdentifier + providerDisplayName reached the declared block');
+    assert.equal(result.bootstrapToken, direct.bootstrapToken);
     assert.equal(result.grantDeclaration, RECORD);
+    assert.equal(store.calls.find(c => c.ownerAccountId)?.ownerAccountId, 'account-A', 'recorded owner, not the poster');
   });
 
-  test('record, prose: declared attach, token embedded, record returned', async () => {
+  test('record, prose: declared attach carries the record; token embedded', async () => {
     const store = mintSpy();
-    const result = await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h', prompt: 'base', attach, harness: 'opencode', createdBy: 'poster-B', followUpTo: 'row-1' });
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h',
+      prompt: 'helper-prompt', attach: ATTACH, label: LABEL, harness: 'opencode', createdBy: 'poster-B', followUpTo: 'row-1'
+    });
     assert.strictEqual(result.bootstrapToken, null);
     assert.ok(result.prompt.includes(TOKEN));
     assert.equal(result.grantDeclaration, RECORD);
   });
+
+  test('pbt with a non-default label (wake-bootstrap) threads it to createToken', async () => {
+    const calls = [];
+    const store = mkStore(calls);
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) },
+      urlKey: 'acme', baseUrl: 'https://h', prompt: 'wake prompt',
+      label: 'wake-bootstrap', harness: 'claude-code', createdBy: 'u1', followUpTo: 'row-1'
+    });
+    assert.equal(result.bootstrapToken, 'plain-tok');
+    assert.equal(calls[0].opts.label, 'wake-bootstrap');
+  });
 });
+
 
 // ── F2 (7) helper half: real store, history fallback ─────────────────────────
 
@@ -560,11 +606,11 @@ describe('S3 — R1 take-hop through the helper (mock timers, counted reads)', (
 
 const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
 
-describe('S3 — R1 retry spacing through the helper is the asserted interval', () => {
-  test('no history re-read before GRANT_LOOKUP_RETRY_MS; exactly one after', async () => {
+describe('S3 — R1 retry spacing through the helper is the asserted interval for EVERY re-read', () => {
+  test('each of the three intervals: tick 49 -> count unchanged, tick 1 -> exactly one more', async () => {
     mock.timers.enable({ apis: ['setTimeout'] });
     try {
-      const { dispatchStore, counts } = takeHopStore({ releaseAtHistoryRead: 2 });
+      const { dispatchStore, counts } = takeHopStore({ releaseAtHistoryRead: 4 });
       const mint = mintSpy();
       let settled = false;
       const p = provisionResumeCredential({
@@ -576,21 +622,25 @@ describe('S3 — R1 retry spacing through the helper is the asserted interval', 
       assert.equal(counts().historyReads, 1, 'the initial history read has run');
       assert.equal(settled, false);
 
-      mock.timers.tick(GRANT_LOOKUP_RETRY_MS - 1);
-      await flushMicrotasks();
-      assert.equal(counts().historyReads, 1, 'no re-read before the full interval');
-      assert.equal(settled, false);
+      for (let i = 0; i < GRANT_LOOKUP_HISTORY_RETRIES; i++) {
+        const before = counts().historyReads;
+        mock.timers.tick(GRANT_LOOKUP_RETRY_MS - 1);
+        await flushMicrotasks();
+        assert.equal(counts().historyReads, before, `interval ${i + 1}: no re-read before the full interval`);
+        assert.equal(settled, false, `interval ${i + 1}: still pending before the interval`);
 
-      mock.timers.tick(1);
-      await flushMicrotasks();
-      assert.equal(counts().historyReads, 2, 'exactly one re-read once the interval elapses');
+        mock.timers.tick(1);
+        await flushMicrotasks();
+        assert.equal(counts().historyReads, before + 1, `interval ${i + 1}: exactly one re-read once the interval elapses`);
+      }
 
       const result = await p;
-      assert.equal(result.bootstrapToken, TOKEN, 'the resume resolves declared after the first re-read');
+      assert.equal(result.bootstrapToken, TOKEN, 'the resume resolves declared after the third re-read');
     } finally {
       mock.timers.reset();
     }
   });
 });
+
 
 

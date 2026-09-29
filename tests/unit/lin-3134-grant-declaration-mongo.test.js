@@ -81,6 +81,24 @@ describe(
       assert.deepEqual(await s.getGrantDeclaration('other-workspace', created._id), { state: 'row-missing' });
     });
 
+    test('two rows in one workspace: each id resolves its OWN record; an unknown id is row-missing', async () => {
+      await queue.deleteMany({});
+      await history.deleteMany({});
+
+      const A = { grants: ['dispatch'], ownerAccountId: 'owner-A', workspaceId: 'ws-A', profile: 'worker', site: 'site-A', declaredAt: 'A' };
+      const B = { grants: ['take'], ownerAccountId: 'owner-B', workspaceId: 'ws-A', profile: 'worker', site: 'site-B', declaredAt: 'B' };
+      const s = store();
+      const rowA = await s.addItem(URL_KEY, { prompt: 'a', grantDeclaration: A });
+      const rowB = await s.addItem(URL_KEY, { prompt: 'b', grantDeclaration: B });
+      await s.takeItem(rowB._id, URL_KEY);
+      assert.equal(await queue.findOne({ _id: rowA._id }) !== null, true, 'A stays active');
+      assert.equal(await history.findOne({ _id: rowB._id }) !== null, true, 'B is archived');
+
+      assert.deepEqual(await s.getGrantDeclaration(URL_KEY, rowA._id), { state: 'record', record: A });
+      assert.deepEqual(await s.getGrantDeclaration(URL_KEY, rowB._id), { state: 'record', record: B });
+      assert.deepEqual(await s.getGrantDeclaration(URL_KEY, 'unknown-id-xyz'), { state: 'row-missing' });
+    });
+
     test('an undeclared row writes neither key (real-Mongo byte-identity)', async () => {
       await queue.deleteMany({});
       await history.deleteMany({});
