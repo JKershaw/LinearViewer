@@ -171,7 +171,7 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
     assert.ok((await harness.db.collection('email-magic-links').findOne({ _id: sha256(t) })).consumedAt, 'the old link was consumed');
   });
 
-  test('S3-1: an email-only P gets log-out guidance (still not /auth/email as the target)', async () => {
+  test('S3-1/S3-4: an email-only P is offered the working email re-proof (still not /auth/email)', async () => {
     const browser = harness.browser();
     const ownEmail = `emailonly-${counter++}@x.io`;
     // P is an email-only account holding one address.
@@ -184,7 +184,7 @@ describe('S3 merge paths (S3-1 stale re-proof, S3-2 null-workspace merge)', () =
     const res = await browser.confirm(t, nonce);
     assert.strictEqual(res.status, 409);
     assert.match(res.text, /data-testid="merge-reauth-required-page"/);
-    assert.match(res.text, /href="\/logout"/, 'email-only P is told to sign in again (log out first)');
+    assert.match(res.text, /href="\/auth\/email\/reproof"/, 'email-only P is offered the working re-proof route');
     assert.doesNotMatch(res.text, /href="\/auth\/email"/);
     const session = await browser.session();
     assert.strictEqual(session.pendingMerge, undefined);
