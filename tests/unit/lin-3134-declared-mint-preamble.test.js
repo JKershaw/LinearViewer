@@ -258,3 +258,42 @@ describe('S2 — attachProxyContext declared return shape', () => {
     assert.equal(result.grantDeclaration.site, 'proxy-kickoff');
   });
 });
+
+// ── non-array declaredGrants fail closed (review finding 4) ───────────────────
+
+describe('S2 — non-array declaredGrants is refused, never degrades to grant-less', () => {
+  for (const [label, value] of [['string', 'dispatch'], ['null', null], ['object', { 0: 'dispatch' }]]) {
+    test(`provisionBootstrapToken(${label}) -> INVALID_GRANTS 400 with no mint and no createToken`, async () => {
+      const store = mintSpy();
+      await assert.rejects(
+        () => provisionBootstrapToken({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h', harness: 'claude-code', declaredGrants: value }),
+        (err) => err.code === 'INVALID_GRANTS' && err.status === 400 && err.retryable === false
+      );
+      assert.equal(store.calls.length, 0, 'neither mintGrantBootstrap nor createToken may be reached');
+    });
+  }
+
+  test('attachProxyContext inherits the refusal (no mint)', async () => {
+    const store = mintSpy();
+    await assert.rejects(
+      () => attachProxyContext({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h', issueIdentifier: 'LIN-1', prompt: 'do', declaredGrants: 'dispatch' }),
+      (err) => err.code === 'INVALID_GRANTS' && err.status === 400
+    );
+    assert.equal(store.calls.length, 0);
+  });
+
+  test('undefined and [] still take the plain path', async () => {
+    const calls = [];
+    const store = {
+      async createToken(urlKey, opts) { calls.push({ createToken: true, urlKey, opts }); return { token: 'plain-tok' }; },
+      async mintGrantBootstrap(args) { calls.push({ mint: true, args }); return { token: TOKEN, workspaceId: args.workspaceId }; }
+    };
+    const a = await provisionBootstrapToken({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h', createdBy: 'u1', declaredGrants: undefined });
+    const b = await provisionBootstrapToken({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h', createdBy: 'u1', declaredGrants: [] });
+    assert.equal(a, 'plain-tok');
+    assert.equal(b, 'plain-tok');
+    assert.equal(calls.length, 2);
+    assert.ok(calls.every(c => c.createToken), 'only createToken on the plain path, never a grant mint');
+  });
+});
+

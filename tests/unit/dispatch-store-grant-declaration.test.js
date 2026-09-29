@@ -409,3 +409,79 @@ describe('S1 — R1 take-hop witness (delete-then-insert)', () => {
     }
   });
 });
+
+const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
+
+// ── M5c: the retry waiting is the ASSERTED interval, not zero ────────────────
+// Without this, `await sleep(GRANT_LOOKUP_RETRY_MS)` could be `sleep(0)` and
+// every other cell would still pass — the three re-reads would collapse into
+// microseconds and the take-hop window would be unclosed (review finding M5c).
+
+describe('S1 — R1 retry spacing is the asserted interval', () => {
+  test('no history re-read before GRANT_LOOKUP_RETRY_MS; exactly one after', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const { store, counts } = takeHopCollections({ releaseAtHistoryRead: 2 });
+      let settled = false;
+      const p = store.getGrantDeclaration('acme', 'hop-1').then((v) => { settled = true; return v; });
+
+      await flushMicrotasks();
+      assert.equal(counts().historyReads, 1, 'the initial history read has run');
+      assert.equal(settled, false);
+
+      mock.timers.tick(GRANT_LOOKUP_RETRY_MS - 1);
+      await flushMicrotasks();
+      assert.equal(counts().historyReads, 1, 'no re-read before the full interval');
+      assert.equal(settled, false, 'the promise is still pending before the interval');
+
+      mock.timers.tick(1);
+      await flushMicrotasks();
+      assert.equal(counts().historyReads, 2, 'exactly one re-read once the interval elapses');
+
+      assert.deepEqual(await p, { state: 'record', record: RECORD });
+    } finally {
+      mock.timers.reset();
+    }
+  });
+});
+
+// ── M7c: history-side urlKey scoping (review finding M7c) ────────────────────
+// A follow-up's parent is normally already taken, so the HISTORY read is the
+// realistic path. `findOne({ _id, urlKey })` must never resolve another
+// workspace's record under the caller's urlKey.
+
+describe('S1 — history-side urlKey scoping', () => {
+  test('a taken (archived) declared row does not resolve under another workspace', async () => {
+    const store = makeStore();
+    const created = await store.addItem('acme', declaredItem());
+    await store.takeItem(created._id, 'acme');
+    assert.equal(store.collection._docs.length, 0, 'the row is only in history now');
+    assert.deepEqual(await store.getGrantDeclaration('other-workspace', created._id), { state: 'row-missing' });
+  });
+
+  test('re-read variant: a row surfacing after read 1 under another urlKey does not resolve', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const row = { _id: 'other-1', urlKey: 'other-workspace', grantDeclaration: RECORD };
+      let historyReads = 0;
+      const collection = { findOne: async () => null };
+      const historyCollection = {
+        findOne: async (q) => {
+          historyReads += 1;
+          // The row belongs to `other-workspace`. A correctly-scoped query
+          // (carrying the caller's urlKey) must never match it; an UNSCOPED
+          // query would return it on the re-read.
+          if (!('urlKey' in q)) return historyReads >= 2 ? row : null;
+          return null;
+        }
+      };
+      const store = new DispatchQueueStore({ collection, historyCollection });
+      const result = await settleWithMockTimers(store.getGrantDeclaration('acme', 'other-1'));
+      assert.deepEqual(result, { state: 'row-missing' });
+      assert.ok(historyReads >= 2, 'the re-read was attempted');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+});
+

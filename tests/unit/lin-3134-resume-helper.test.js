@@ -250,21 +250,28 @@ describe('S3 — attach mode', () => {
   const attach = { issueIdentifier: 'LIN-1', prompt: 'base', providerDisplayName: null, providerUi: null };
 
   test('no record, MCP: block appended, token as field, grantDeclaration null', async () => {
-    const store = { createToken: async () => ({ token: 'plain-tok' }) };
+    const calls = [];
+    const store = { createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain-tok' }; } };
     const result = await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) }, urlKey: 'acme', baseUrl: 'https://h', prompt: 'base', attach, harness: 'claude-code', createdBy: 'u1', followUpTo: 'row-1' });
     assert.deepEqual(Object.keys(result).sort(), ['bootstrapToken', 'grantDeclaration', 'prompt']);
     assert.equal(result.bootstrapToken, 'plain-tok');
     assert.ok(result.prompt.startsWith('base'));
     assert.ok(!result.prompt.includes('plain-tok'));
     assert.strictEqual(result.grantDeclaration, null);
+    // H9: the plain attach branch must pass today's EXACT createToken arguments.
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1' });
   });
 
   test('no record, prose: token embedded, bootstrapToken null', async () => {
-    const store = { createToken: async () => ({ token: 'plain-tok' }) };
+    const calls = [];
+    const store = { createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain-tok' }; } };
     const result = await provisionResumeCredential({ proxyTokenStore: store, dispatchStore: { getGrantDeclaration: async () => ({ state: 'none' }) }, urlKey: 'acme', baseUrl: 'https://h', prompt: 'base', attach, harness: 'opencode', createdBy: 'u1', followUpTo: 'row-1' });
     assert.strictEqual(result.bootstrapToken, null);
     assert.ok(result.prompt.includes('plain-tok'));
     assert.strictEqual(result.grantDeclaration, null);
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].opts, { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: 48 * 60 * 60, createdBy: 'u1' });
   });
 
   test('record, MCP: declared attach, recorded owner, token field, record returned', async () => {
@@ -548,4 +555,42 @@ describe('S3 — R1 take-hop through the helper (mock timers, counted reads)', (
     }
   });
 });
+
+// ── M5c: through the helper, the retry wait is the asserted interval ─────────
+
+const flushMicrotasks = () => new Promise((resolve) => setImmediate(resolve));
+
+describe('S3 — R1 retry spacing through the helper is the asserted interval', () => {
+  test('no history re-read before GRANT_LOOKUP_RETRY_MS; exactly one after', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const { dispatchStore, counts } = takeHopStore({ releaseAtHistoryRead: 2 });
+      const mint = mintSpy();
+      let settled = false;
+      const p = provisionResumeCredential({
+        proxyTokenStore: mint, dispatchStore, urlKey: 'acme', baseUrl: 'https://h',
+        prompt: 'p', label: 'dispatch-bootstrap', harness: 'claude-code', createdBy: 'u1', followUpTo: 'hop-1'
+      }).then((v) => { settled = true; return v; });
+
+      await flushMicrotasks();
+      assert.equal(counts().historyReads, 1, 'the initial history read has run');
+      assert.equal(settled, false);
+
+      mock.timers.tick(GRANT_LOOKUP_RETRY_MS - 1);
+      await flushMicrotasks();
+      assert.equal(counts().historyReads, 1, 'no re-read before the full interval');
+      assert.equal(settled, false);
+
+      mock.timers.tick(1);
+      await flushMicrotasks();
+      assert.equal(counts().historyReads, 2, 'exactly one re-read once the interval elapses');
+
+      const result = await p;
+      assert.equal(result.bootstrapToken, TOKEN, 'the resume resolves declared after the first re-read');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+});
+
 
