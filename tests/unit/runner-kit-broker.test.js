@@ -824,6 +824,30 @@ describe('the broker CLI (spawned, bootstrap on stdin)', () => {
     }
   });
 
+  test('stopBroker never unlinks a live socket it did not stop (8-char prefix collision, F3)', TIMEOUT, async () => {
+    const home = shortTmp();
+    const harbour = await fakeHarbour();
+    // Item B shares A's first 8 characters, so both map to the same socket path.
+    const itemB = `${ITEM_ID.slice(0, 8)}-ffff-4fff-8fff-ffffffffffff`;
+    let brokerA;
+    try {
+      brokerA = await startBroker({ base: harbour.base, urlKey: URL_KEY, itemId: ITEM_ID, home, bootstrap: harbour.bootstrap, log: () => {}, autoTick: false });
+      const pB = kitPaths({ home, urlKey: URL_KEY, itemId: itemB });
+      assert.equal(pB.socket, brokerA.socketPath);
+      // B's broker is long gone: its pid file names a pid that isn't a broker.
+      writeFileSync(pB.pidFile, JSON.stringify({ pid: process.pid, socket: pB.socket, itemId: itemB, startedAt: new Date().toISOString() }));
+      const result = await stopBroker({ home, urlKey: URL_KEY, itemId: itemB });
+      assert.equal(result.signalled, false);
+      assert.equal(existsSync(pB.pidFile), false, "B's stale pid file is removed");
+      assert.ok(existsSync(brokerA.socketPath), "A's live socket is left alone");
+      assert.equal((await brokerRequest(brokerA.socketPath, { path: '/api/proxy/still-a' })).status, 200);
+    } finally {
+      await brokerA?.stop('test-done');
+      await harbour.close();
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   test('stopBroker with no pid file reports not found', TIMEOUT, async () => {
     const home = shortTmp();
     try {
