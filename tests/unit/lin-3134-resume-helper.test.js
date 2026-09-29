@@ -16,14 +16,14 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'crypto';
 import express from 'express';
 import { provisionResumeCredential, provisionBootstrapToken } from '../../lib/proxy-preamble.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { RUNNER_GRANTS } from '../../lib/proxy-scopes.js';
-import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+import { DispatchQueueStore, GRANT_LOOKUP_HISTORY_RETRIES, GRANT_LOOKUP_RETRY_MS } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 
@@ -451,3 +451,101 @@ describe('S3 — F1 declared worker lifetimes through the preamble', () => {
     assert.ok(hoursFromNow(working.expiresAt, beforeWorking) > 23.9 && hoursFromNow(working.expiresAt, beforeWorking) <= 24.01, 'runner working ~24h');
   });
 });
+
+// ── R1 take-hop through the HELPER (a+b), mock timers ────────────────────────
+
+/**
+ * Active/history fakes modelling delete-then-insert faithfully: the row is
+ * removed from active first (active `findOne` never returns it) and reaches
+ * history only when the test releases the insert. History `findOne` calls are
+ * counted (read 1 = initial, reads 2-4 = the at-most-3 re-reads).
+ */
+function takeHopStore({ releaseAtHistoryRead = null } = {}) {
+  const row = { _id: 'hop-1', urlKey: 'acme', grantDeclaration: RECORD };
+  let activeReads = 0;
+  let historyReads = 0;
+  let inserted = false;
+  const collection = { async findOne() { activeReads += 1; return null; } };
+  const historyCollection = {
+    async findOne() {
+      historyReads += 1;
+      if (releaseAtHistoryRead !== null && historyReads >= releaseAtHistoryRead) inserted = true;
+      return inserted ? row : null;
+    }
+  };
+  return {
+    dispatchStore: new DispatchQueueStore({ collection, historyCollection }),
+    counts: () => ({ activeReads, historyReads })
+  };
+}
+
+async function settleWithMockTimers(promise) {
+  let settled = false;
+  let value;
+  let failure;
+  promise.then((v) => { value = v; settled = true; }, (e) => { failure = e; settled = true; });
+  for (let i = 0; i < GRANT_LOOKUP_HISTORY_RETRIES + 1 && !settled; i++) {
+    await new Promise((resolve) => setImmediate(resolve));
+    mock.timers.tick(GRANT_LOOKUP_RETRY_MS);
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  if (failure) throw failure;
+  return value;
+}
+
+describe('S3 — R1 take-hop through the helper (mock timers, counted reads)', () => {
+  for (const releaseAtHistoryRead of [2, 3, 4]) {
+    test(`(a) insert released at history read ${releaseAtHistoryRead}: record resolves AND the resume is declared`, async () => {
+      mock.timers.enable({ apis: ['setTimeout'] });
+      try {
+        const { dispatchStore, counts } = takeHopStore({ releaseAtHistoryRead });
+        const mint = mintSpy();
+        const result = await settleWithMockTimers(provisionResumeCredential({
+          proxyTokenStore: mint, dispatchStore, urlKey: 'acme', baseUrl: 'https://h',
+          prompt: 'p', label: 'dispatch-bootstrap', harness: 'claude-code', createdBy: 'poster-B', followUpTo: 'hop-1'
+        }));
+        assert.equal(result.bootstrapToken, TOKEN, 'the resume is declared, not plain');
+        assert.deepEqual(result.grantDeclaration, RECORD);
+        assert.equal(mint.calls.length, 1);
+        assert.equal(mint.calls[0].ownerAccountId, 'account-A', 'mint spy sees the recorded owner');
+        assert.equal(mint.calls[0].workspaceId, 'ws-1', 'mint spy sees the recorded workspaceId');
+        const { activeReads, historyReads } = counts();
+        assert.equal(activeReads, 1, 'exactly one active read — no third active read');
+        assert.equal(historyReads, releaseAtHistoryRead);
+        assert.ok(historyReads <= 1 + GRANT_LOOKUP_HISTORY_RETRIES, 'at most 3 re-reads');
+      } finally {
+        mock.timers.reset();
+      }
+    });
+  }
+
+  test('(b) insert released only after 4 history reads: row-missing, miss log, plain resume', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const { dispatchStore, counts } = takeHopStore({ releaseAtHistoryRead: null });
+      const mint = mintSpy();
+      const logs = [];
+      const origWarn = console.warn;
+      console.warn = (...args) => logs.push(args);
+      let result;
+      try {
+        result = await settleWithMockTimers(provisionResumeCredential({
+          proxyTokenStore: mint, dispatchStore, urlKey: 'acme', baseUrl: 'https://h',
+          prompt: 'p', label: 'dispatch-bootstrap', harness: 'claude-code', createdBy: 'u1', followUpTo: 'hop-1'
+        }));
+      } finally {
+        console.warn = origWarn;
+      }
+      assert.deepEqual(result, { prompt: 'p', bootstrapToken: 'plain-tok', grantDeclaration: null }, 'plain resume');
+      assert.equal(mint.calls.filter(c => c.opts).length, 1, 'the plain path still createTokens');
+      const { activeReads, historyReads } = counts();
+      assert.equal(activeReads, 1, 'exactly one active read');
+      assert.equal(historyReads, 1 + GRANT_LOOKUP_HISTORY_RETRIES, 'initial history read + all 3 re-reads');
+      assert.equal(logs.length, 1);
+      assert.equal(logs[0][0], '[dispatch] resume-declaration-lookup-miss');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+});
+
