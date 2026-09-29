@@ -1,0 +1,228 @@
+import { test, expect } from '../fixtures/test-base.js';
+import { seedLocalWorkspace } from '../fixtures/local-harness.js';
+import { execFile, spawn } from 'node:child_process';
+import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * LIN-3098 S2 — the runner kit's local loop, end to end: the real
+ * `lib/runner-kit/runner.mjs` CLI (and the brokers it starts) driven against
+ * the running Playwright server, the way a person's Claude Code session drives
+ * it through Bash.
+ *
+ * The workspace comes from `append: true`, so the session's account is its
+ * OWNER (LIN-1892) and can mint the runner copy (LIN-3131). Owner items are
+ * enqueued through an owner-created proxy token (`dispatchedBy` = the owner).
+ * The B1 non-owner item goes through the SAME real enqueue route, with a token
+ * minted under a second session (the canonical Linear test account) in its own
+ * request context, so no test-only queue writer is needed and the owner's
+ * session is never touched.
+ *
+ * Everything stays on loopback; broker sockets live in a short /tmp dir.
+ */
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const RUNNER = join(ROOT, 'lib', 'runner-kit', 'runner.mjs');
+const BASE = 'http://localhost:3001';
+
+let urlKey;
+let home;
+let ownerAccountId;
+let ownerToken;
+
+function runner(args, { stdin } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [RUNNER, ...args, '--home', home], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    child.stdout.on('data', (c) => { out += c; });
+    child.stderr.on('data', (c) => { err += c; });
+    child.on('exit', (code) => {
+      if (code !== 0) return reject(new Error(`runner ${args[0]} exited ${code}: ${err}`));
+      try { resolve(JSON.parse(out)); } catch (e) { reject(new Error(`runner ${args[0]} printed non-JSON: ${out}`)); }
+    });
+    child.stdin.end(stdin || '');
+  });
+}
+
+async function cookieHeader(page) {
+  const cookies = await page.context().cookies();
+  return cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+}
+
+async function enqueue(request, data) {
+  const res = await request.post('/api/proxy/dispatch', {
+    headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+    data: { harness: 'claude-code', ...data }
+  });
+  expect(res.status()).toBe(201);
+  return res.json();
+}
+
+async function watch(request, id) {
+  const res = await request.get(`/api/proxy/dispatch/${id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  expect(res.status()).toBe(200);
+  return res.json();
+}
+
+test.beforeEach(async ({ page, request }) => {
+  const seeded = await seedLocalWorkspace(page, null, { urlKey: 'runner-kit-loop', append: true, features: { proxy: true } });
+  urlKey = seeded.urlKey;
+  await page.goto(`/test/clear-proxy-tokens?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-dispatch-tokens?urlKey=${urlKey}`);
+  const header = await cookieHeader(page);
+  ownerAccountId = (await (await request.get('/test/session-account', { headers: { Cookie: header } })).json()).accountId;
+  expect(ownerAccountId).toBeTruthy();
+  ownerToken = (await (await request.get(`/test/create-proxy-token?urlKey=${urlKey}&scope=readWrite&label=owner-enqueue`, { headers: { Cookie: header } })).json()).token;
+
+  // 1. Mint the runner credential (owner-only), then recover (a no-op) and login.
+  home = mkdtempSync(join(existsSync('/tmp') ? '/tmp' : tmpdir(), 'rk-e2e-'));
+  const mint = await request.post(`/workspace/${urlKey}/api/proxy/tokens`, {
+    headers: { Cookie: header, 'Content-Type': 'application/json' },
+    data: { runner: true }
+  });
+  expect(mint.status()).toBe(201);
+  const bootstrap = (await mint.json()).token;
+  const recovered = await runner(['recover', '--url-key', urlKey]);
+  expect(recovered.fail).toEqual([]);
+  const block = `## Your runner credential\n- baseUrl: ${BASE}\n- urlKey: ${urlKey}\n- ownerAccountId: ${ownerAccountId}\n- bootstrap: ${bootstrap}\n`;
+  const login = await runner(['login'], { stdin: block });
+  expect(login.grants).toEqual(['take', 'dispatch']);
+  expect(JSON.stringify(login)).not.toContain(bootstrap);
+});
+
+test.afterEach(async () => {
+  if (!home) return;
+  try {
+    const ledger = JSON.parse(readFileSync(join(home, urlKey, 'ledger.json'), 'utf8'));
+    for (const id of Object.keys(ledger.items || {})) await runner(['stop-broker', id]).catch(() => {});
+  } catch { /* nothing taken */ }
+  rmSync(home, { recursive: true, force: true });
+  home = null;
+});
+
+test.describe('runner kit local loop (LIN-3098 S2)', () => {
+  test('poll → take (confirmed) → handoff → [done]; a subscribed child\'s [done] wake passes', async ({ request }) => {
+    const parent = await enqueue(request, { prompt: 'parent step' });
+    const child = await enqueue(request, { prompt: 'child step', sessionId: parent.id, subscription: 'terminal-only' });
+
+    const polled = await runner(['poll']);
+    const by = Object.fromEntries(polled.decisions.map((d) => [d.id, d]));
+    expect(by[parent.id].decision).toBe('take');
+    expect(by[child.id].decision).toBe('take');
+    expect(JSON.stringify(polled)).not.toContain('parent step');
+
+    // Take the parent (the orchestrator) and the child, each with its own broker.
+    const tp = await runner(['take', parent.id]);
+    expect(tp.prompt).toContain('parent step');
+    expect(tp.broker?.socket).toBeTruthy();
+    await runner(['handoff', parent.id, 'agent-parent']);
+    const tc = await runner(['take', child.id]);
+    await runner(['handoff', child.id, 'agent-child']);
+
+    // The child's broker reaches Harbour with the item's own credential.
+    const viaBroker = await new Promise((resolve, reject) => {
+      execFile('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', '--unix-socket', tc.broker.socket, `http://harbour-runner.invalid/api/proxy/dispatch/${child.id}`], (e, out) => (e ? reject(e) : resolve(out)));
+    });
+    expect(viaBroker).toBe('200');
+
+    // [done] on the child: terminal, and it wakes the subscribed parent.
+    await runner(['feedback', child.id, 'status', '[done]']);
+    const childWatch = await watch(request, child.id);
+    expect(childWatch.feedback.map((f) => f.message)).toEqual(expect.arrayContaining([
+      `[handoff] item ${child.id} → subagent agent-child (new)`,
+      '[done]'
+    ]));
+
+    const afterDone = await runner(['poll']);
+    const wake = afterDone.decisions.find((d) => d.kind === 'wake' && d.followUpTo === parent.id);
+    expect(wake, 'a wake row was minted for the parent').toBeTruthy();
+    expect(wake.decision).toBe('take');
+    const tw = await runner(['take', wake.id]);
+    expect(tw.handoff).toMatchObject({ mode: 'continue', agentId: 'agent-parent', rootItemId: parent.id });
+    await runner(['handoff', wake.id, 'agent-parent']);
+    await runner(['feedback', wake.id, 'status', '[done]']);
+    const wakeWatch = await watch(request, wake.id);
+    // NB1: the wake's feedback joins the parent's lineage.
+    expect(wakeWatch.feedback.every((f) => f.rootItemId === parent.id)).toBe(true);
+  });
+
+  test('B1: a non-owner item with the owner\'s kickoff as sessionId is left queued, never taken, and mints no wake', async ({ request, playwright }) => {
+    const kickoff = await enqueue(request, { prompt: 'owner kickoff' });
+    await runner(['poll']);
+    await runner(['take', kickoff.id]);
+    await runner(['handoff', kickoff.id, 'agent-kickoff']);
+
+    // A second account, in its own cookie jar.
+    const other = await playwright.request.newContext({ baseURL: BASE });
+    let foreign;
+    try {
+      expect((await other.get('/test/set-session?urlKey=runner-kit-stranger')).ok()).toBe(true);
+      const strangerId = (await (await other.get('/test/session-account')).json()).accountId;
+      expect(strangerId).toBeTruthy();
+      expect(strangerId).not.toBe(ownerAccountId);
+      const strangerToken = (await (await other.get(`/test/create-proxy-token?urlKey=${urlKey}&scope=readWrite&label=stranger`)).json()).token;
+      const res = await other.post('/api/proxy/dispatch', {
+        headers: { Authorization: `Bearer ${strangerToken}`, 'Content-Type': 'application/json' },
+        data: { prompt: 'stranger work', harness: 'claude-code', sessionId: kickoff.id, subscription: 'terminal-only' }
+      });
+      expect(res.status()).toBe(201);
+      foreign = await res.json();
+      expect((await watch(request, foreign.id)).dispatchedBy).toBe(strangerId);
+    } finally {
+      await other.dispose();
+    }
+
+    const polled = await runner(['poll']);
+    const d = polled.decisions.find((x) => x.id === foreign.id);
+    expect(d.decision).toBe('leave');
+    expect(d.reason).toBe('not-owner');
+    await expect(runner(['take', foreign.id])).rejects.toThrow(/poll/);
+
+    const stillQueued = await runner(['poll']);
+    expect(stillQueued.decisions.some((x) => x.id === foreign.id)).toBe(true);
+    expect(stillQueued.decisions.some((x) => x.kind === 'wake' && x.followUpTo === kickoff.id)).toBe(false);
+    const foreignWatch = await watch(request, foreign.id);
+    expect(foreignWatch.feedback).toEqual([]);
+  });
+
+  test('an abort row closes a live item: [aborted] on the abort row and on the target', async ({ request }) => {
+    const target = await enqueue(request, { prompt: 'long step' });
+    await runner(['poll']);
+    await runner(['take', target.id]);
+    await runner(['handoff', target.id, 'agent-long']);
+
+    const abortRes = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' },
+      data: { abort: true, abortTo: target.id }
+    });
+    expect(abortRes.status()).toBe(201);
+    const abortRow = await abortRes.json();
+
+    await runner(['poll']);
+    const r = await runner(['take', abortRow.id]);
+    expect(r.abort.stopAgent).toBe('agent-long');
+    const line = `[aborted] Cancelled running session ${target.id.slice(0, 8)} (running).`;
+    expect((await watch(request, abortRow.id)).feedback.map((f) => f.message)).toContain(line);
+    expect((await watch(request, target.id)).feedback.map((f) => f.message)).toContain(line);
+  });
+
+  test('a stop halt leaves fresh items queued', async ({ request }) => {
+    const auth = { Authorization: `Bearer ${ownerToken}`, 'Content-Type': 'application/json' };
+    const set = await request.post('/api/proxy/dispatch/halt', { headers: auth, data: { mode: 'stop' } });
+    expect(set.status()).toBe(200);
+    try {
+      const fresh = await enqueue(request, { prompt: 'fresh under stop' });
+      const polled = await runner(['poll']);
+      const d = polled.decisions.find((x) => x.id === fresh.id);
+      expect(d.decision).toBe('leave');
+      expect(d.reason).toBe('halt:stop');
+      await expect(runner(['take', fresh.id])).rejects.toThrow(/poll/);
+      expect((await watch(request, fresh.id)).status).toBe('queued');
+    } finally {
+      await request.delete('/api/proxy/dispatch/halt', { headers: auth });
+    }
+  });
+});
