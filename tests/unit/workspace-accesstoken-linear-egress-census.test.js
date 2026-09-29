@@ -181,18 +181,24 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
   });
 
   test('routes/ templates the raw mirror into a Bearer header exactly once (LIN-1899, guarded)', () => {
+    // LIN-3124 PR1 (S0) routed the image-proxy site through the raw-mirror
+    // accessor `getWorkspaceMirrorToken(workspace)`, so this class now matches
+    // EITHER the legacy inline raw read or the S0 accessor. The SET is
+    // unchanged: exactly one Bearer template, still the image proxy.
+    const BEARER_MIRROR = /Bearer \$\{(?:workspace\.accessToken|getWorkspaceMirrorToken\(workspace\))\}/g;
     const counts = {
-      'routes/workspace-api.js': count(read('routes/workspace-api.js'), /Bearer \$\{workspace\.accessToken\}/g),
-      'routes/proxy.js': count(read('routes/proxy.js'), /Bearer \$\{workspace\.accessToken\}/g),
-      'routes/dashboard.js': count(read('routes/dashboard.js'), /Bearer \$\{workspace\.accessToken\}/g),
+      'routes/workspace-api.js': count(read('routes/workspace-api.js'), BEARER_MIRROR),
+      'routes/proxy.js': count(read('routes/proxy.js'), BEARER_MIRROR),
+      'routes/dashboard.js': count(read('routes/dashboard.js'), BEARER_MIRROR),
     };
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
     assert.equal(
       total,
       1,
-      `Found ${total} raw \`Bearer \${workspace.accessToken}\` template(s) (${JSON.stringify(counts)}), expected ` +
-      'exactly 1: the image proxy, whose header object is now conditional on isActiveProviderLinear(workspace). ' +
+      `Found ${total} raw-mirror \`Bearer\` template(s) (${JSON.stringify(counts)}), expected ` +
+      'exactly 1: the image proxy, whose header object is now conditional on isActiveProviderLinear(workspace) ' +
+      '(and, from LIN-3124 PR1 S0, reads through getWorkspaceMirrorToken(workspace)). ' +
       'A new one sends whatever credential the active binding holds — Jira, GitHub, or a local urlKey — to ' +
       'whatever host it is pointed at (LIN-1899).'
     );

@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
-import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
+import { removeWorkspace, normalizeProvider, getWorkspaceTokenExpiry } from '../../lib/workspace.js';
 import { serviceUnavailable } from '../../lib/errors.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
@@ -95,6 +95,9 @@ function makeContext({ workspace, durableRecord, calls, refreshOnResolveGate }) 
       recordEvent: async (evt) => { calls.lifecycleEvents.push(evt); },
     },
     getActiveWorkspace: () => workspace,
+    // LIN-3124 PR1 (S0): the real ensureValidToken source now reads the raw
+    // expiry mirror through this free identifier; bind the genuine accessor.
+    getWorkspaceTokenExpiry,
     TOKEN_REFRESH_BUFFER_MS: 5 * 60 * 1000,
     fingerprintCredential,
     refreshOnResolveGate,
@@ -204,6 +207,37 @@ describe('LIN-2110 — the proactive OAuth-exchange arm is gated against a byte-
     // with no fingerprint to bound); its own null-token echo is a separate,
     // pre-existing failure path unrelated to this ticket's gate.
     assert.equal(first.calls.refreshCalls.length, 1);
+  });
+
+  test('LIN-3124 PR1 T2 — ensureValidToken reads the raw tokenExpiresAt mirror, not the E1 credential (diverged state)', async () => {
+    // The headless mirror (lib/workspace-token-refresh.js:201-202) refreshes
+    // accessToken/tokenExpiresAt leaves credentials.token stale. ensureValidToken
+    // must key its proactive-refresh decision on the RAW mirror expiry (the
+    // expression S0 converts to getWorkspaceTokenExpiry), not on the E1
+    // credential. A conversion that read the credential/binding instead would
+    // either skip a needed refresh or attempt a spurious one.
+    const diverged = (over) => ({
+      id: 'w-x', urlKey: 'acme', provider: undefined,
+      accessToken: 'NEW-mirror', credentials: { token: 'OLD-credential' },
+      tokenExpiresAt: Date.now() + 3_600_000, ...over,
+    });
+
+    const future = await runOnce({
+      workspace: diverged(),
+      durableRecord: { token: 'durable-token' },
+      refreshOnResolveGate: createRefreshOnResolveGate(),
+    });
+    assert.equal(future.calls.nextCalled, true);
+    assert.equal(future.calls.refreshCalls.length, 0,
+      'a future raw tokenExpiresAt skips the proactive refresh regardless of the stale E1 credential');
+
+    const past = await runOnce({
+      workspace: diverged({ tokenExpiresAt: Date.now() - 10_000 }),
+      durableRecord: { token: 'durable-token' },
+      refreshOnResolveGate: createRefreshOnResolveGate(),
+    });
+    assert.equal(past.calls.refreshCalls.length, 1,
+      'a past raw tokenExpiresAt attempts the proactive refresh');
   });
 
   test('REMINT (GitHub-family) never consults the gate — repeated re-mints are unaffected', async () => {
