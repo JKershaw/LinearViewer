@@ -89,7 +89,7 @@ import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable 
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
+import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
@@ -950,7 +950,7 @@ async function ensureValidToken(req, res, next) {
   if (workspace.isPAT) return next()
 
   // Check if token needs refresh (5-minute buffer)
-  const needsTokenRefresh = workspace.tokenExpiresAt - Date.now() < TOKEN_REFRESH_BUFFER_MS
+  const needsTokenRefresh = getWorkspaceTokenExpiry(workspace) - Date.now() < TOKEN_REFRESH_BUFFER_MS
   if (!needsTokenRefresh) return next()
 
   // LIN-1887 Step 1: ONE provider-declared strategy, read by BOTH refresh

@@ -59,7 +59,7 @@ import { settleWithConcurrency } from './dashboard.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceCallScope, getWorkspaceMirrorToken, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
 import { adoptDurableCredentialIfDifferent } from '../lib/suspect-credential-refresh.js';
 import { fingerprintCredential } from '../lib/credential-diagnostics.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
@@ -398,7 +398,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         });
       }
 
-      const report = await runAudit(workspace.accessToken);
+      const report = await runAudit(getWorkspaceMirrorToken(workspace));
       res.json(report);
     } catch (error) {
       console.error('Audit error:', error);
@@ -3397,7 +3397,7 @@ ${goal}`
       // Placed at the fetch, AFTER the https-only / exact-host-allowlist /
       // path-traversal checks above — none of which are reordered or relaxed.
       const fetchHeaders = isActiveProviderLinear(workspace)
-        ? { Authorization: `Bearer ${workspace.accessToken}` }
+        ? { Authorization: `Bearer ${getWorkspaceMirrorToken(workspace)}` }
         : {}
       const response = await fetch(imageUrl, {
         headers: fetchHeaders,
