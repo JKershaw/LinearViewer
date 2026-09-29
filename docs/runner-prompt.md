@@ -105,8 +105,12 @@ first, then act on the `reason` it printed:
   (§8). Anything else (a network failure, waking from sleep with no Wi-Fi) is transient: re-arm.
 
 On every turn, also check `runner status`: a stale `heartbeat` with no `wait` running means the
-poll loop died. Re-arm it. If your environment can't run background commands, use `/loop 2m`
-with `runner poll` instead.
+poll loop died. Re-arm it.
+
+If your environment can't run background commands, use `/loop 2m` and on each tick run
+`runner wait` in the foreground (it returns within {{WAIT_CAP_MIN}} minutes), then act on its reason as above.
+Never loop on `runner poll` alone: only `wait` refreshes the heartbeat each item's broker needs to
+stay up, and only `wait` runs the watchdog (§5).
 
 ## 3. Decide at poll time; leave refused items queued
 

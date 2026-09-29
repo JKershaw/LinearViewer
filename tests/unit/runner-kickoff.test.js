@@ -128,6 +128,30 @@ describe('N1: the wait reasons match what runner.mjs returns', () => {
   });
 });
 
+// N2 (S3 review 49b9f290): only `wait` refreshes the heartbeat the brokers
+// need and runs the watchdog, so the no-background fallback must run `wait`
+// (in the foreground, on each /loop tick), never `poll` alone.
+describe('N2: the /loop fallback keeps brokers alive', () => {
+  const section = prompt.slice(prompt.indexOf('## 2.'), prompt.indexOf('## 3.'));
+  const fallback = section.slice(section.indexOf('`/loop'));
+  test('each /loop tick runs `runner wait` in the foreground', () => {
+    assert.match(fallback, /`\/loop 2m`[^.]*`runner wait` in the foreground/);
+  });
+  test('it says why: only wait keeps the heartbeat and the watchdog', () => {
+    assert.match(fallback, /heartbeat/);
+    assert.match(fallback, /watchdog/);
+  });
+  test('the fallback never tells you to loop on `runner poll` alone', () => {
+    assert.doesNotMatch(fallback, /\/loop 2m`?\s+with `runner poll`/);
+  });
+  test('the kit agrees: only waitLoop touches the heartbeat', () => {
+    const src = readFileSync(join(KIT_DIR, 'runner.mjs'), 'utf8');
+    const touches = [...src.matchAll(/touch\(p\.heartbeat\)/g)].length;
+    assert.equal(touches, 1);
+    assert.ok(src.slice(src.indexOf('async function waitLoop(')).includes('touch(p.heartbeat)'));
+  });
+});
+
 describe('the review steps', () => {
   test('NB2: stop if another consumer is polling', () => {
     assert.match(prompt, /another consumer/i);
