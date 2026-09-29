@@ -40,9 +40,10 @@ exchanges it for the runner credential, which lives {{WORKING_TTL_HOURS}}h. Neve
 
 ## 1. Set up (once per session)
 
-Fetch the kit from Harbour, verify it, recover, then log in. Stop at the first failure.
+Fetch the kit from Harbour, verify it, recover, then log in. Run each block as written, in order,
+and stop at the first failure.
 
-```sh
+```sh setup
 mkdir -p ~/.harbour-runner/kit && cd ~/.harbour-runner/kit
 curl -fsS {{BASE_URL}}/runner-kit/broker.mjs -o broker.mjs
 curl -fsS {{BASE_URL}}/runner-kit/runner.mjs -o runner.mjs
@@ -59,15 +60,31 @@ Anything but `kit ok` means Harbour changed since this prompt was copied: stop a
 person to copy a fresh prompt. Never edit the kit to make it pass.
 
 Below, `runner` means `node ~/.harbour-runner/kit/runner.mjs`. Every command prints one JSON
-object.
+object. After login each command finds this workspace on its own; if this machine also runs a
+runner for another workspace, add `--url-key <urlKey>` to every command.
 
-1. **Recover first:** `node ~/.harbour-runner/kit/runner.mjs recover`. It prints a `session` id:
-   keep it for the whole session. It also closes out what an earlier runner left behind: rows
-   this credential took get `[failed] runner restarted: subagent lost`, and rows another
-   credential took are listed as orphans with what that means (see §7). Tell the person.
-2. **Log in:** pipe the credential block in, never echo it:
-   `node ~/.harbour-runner/kit/runner.mjs login <<'CRED'` … the block … `CRED`.
-   It prints the workspace, `expiresAt` and the grants (`take`, `dispatch`), never the token.
+**Recover first**, naming the workspace (the `urlKey` line of your credential block), since
+nothing on this machine knows it yet:
+
+```sh recover
+node ~/.harbour-runner/kit/runner.mjs recover --url-key <urlKey from the credential block>
+```
+
+It prints a `session` id: keep it for the whole session. It also closes out what an earlier
+runner left behind: rows this credential took get `[failed] runner restarted: subagent lost`,
+and rows another credential took are listed as orphans with what that means (see §7). Tell the
+person.
+
+**Then log in:** pipe the credential block in, never echo it. The closing `CRED` must stay alone
+at the start of its line:
+
+```sh login
+node ~/.harbour-runner/kit/runner.mjs login <<'CRED'
+<paste the credential block here, unchanged>
+CRED
+```
+
+It prints the workspace, `expiresAt` and the grants (`take`, `dispatch`), never the token.
 
 ## 2. Keep polling while idle: the `wait` loop
 

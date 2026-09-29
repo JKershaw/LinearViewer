@@ -18,13 +18,16 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import express from 'express';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, copyFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildRunnerKickoff, createRunnerKickoffBuilder, RUNNER_KIT_FILES } from '../../lib/prompts/runner-kickoff.js';
+import { createRunnerKitRoutes } from '../../routes/runner-kit.js';
 import { RUNNER_BOOTSTRAP_TTL_SECONDS, RUNNER_WORKING_TTL_SECONDS } from '../../lib/proxy-scopes.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
 import { FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
@@ -251,5 +254,85 @@ describe('the builder', () => {
 
   test('baseUrl is required', () => {
     assert.throws(() => buildRunnerKickoff({}), /baseUrl/);
+  });
+});
+
+// F1 (S3 review 49b9f290): the setup must complete on a FRESH machine. Every
+// setup block is taken from the SERVED prompt and run verbatim, in order, with
+// HOME pointed at an empty directory and the prompt built against a local
+// Harbour (the real /runner-kit route plus a fake token exchange). Async exec,
+// so this process's server can answer the curl and the kit's own requests.
+describe('F1: the served setup runs verbatim on a fresh machine', () => {
+  const sh = promisify(execFile);
+  const block = (served, info) => {
+    const m = served.match(new RegExp('```sh ' + info + '\\n([\\s\\S]*?)```'));
+    assert.ok(m, `the prompt carries a \`\`\`sh ${info} block`);
+    return m[1].trim();
+  };
+
+  async function localHarbour() {
+    const bootstrap = randomBytes(24).toString('base64url');
+    const app = express();
+    app.use(createRunnerKitRoutes());
+    app.post('/api/proxy/token', (req, res) => {
+      if (req.headers.authorization !== `Bearer ${bootstrap}`) return res.status(401).json({ error: 'spent' });
+      res.json({ token: randomBytes(32).toString('base64url'), scope: 'readWrite', grants: ['take', 'dispatch'], expiresAt: new Date(Date.now() + 24 * 3600_000).toISOString() });
+    });
+    const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    return { bootstrap, base: `http://127.0.0.1:${server.address().port}`, close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }) };
+  }
+
+  test('fetch → verify → recover → login → status, with nothing on disk beforehand', { timeout: 30_000 }, async () => {
+    const harbour = await localHarbour();
+    const home = mkdtempSync(join(tmpdir(), 'rk-fresh-'));
+    const env = { PATH: process.env.PATH, HOME: home };
+    try {
+      const served = buildRunnerKickoff({ baseUrl: harbour.base });
+      await sh('sh', ['-c', block(served, 'setup')], { env });
+      const kitDir = join(home, '.harbour-runner', 'kit');
+      const verified = await sh('sh', ['-c', block(served, 'verify')], { env, cwd: kitDir });
+      assert.match(verified.stdout, /kit ok/);
+
+      const recoverCmd = block(served, 'recover');
+      assert.match(recoverCmd, /--url-key <urlKey from the credential block>/);
+      const recovered = JSON.parse((await sh('sh', ['-c', recoverCmd.replace('<urlKey from the credential block>', 'acme')], { env })).stdout);
+      assert.match(recovered.session, /^[0-9a-f]{16}$/);
+      assert.deepEqual([recovered.fail, recovered.orphans, recovered.lost, recovered.live], [[], [], [], []]);
+
+      const credential = `## Your runner credential\n- baseUrl: ${harbour.base}\n- urlKey: acme\n- ownerAccountId: acct-owner\n- bootstrap: ${harbour.bootstrap}\n`;
+      const loginCmd = block(served, 'login');
+      assert.ok(loginCmd.includes('<paste the credential block here, unchanged>'));
+      // The heredoc terminator must sit at column 0, or sh never matches it.
+      assert.equal(loginCmd.split('\n').at(-1), 'CRED');
+      for (const info of ['setup', 'verify', 'recover', 'login']) {
+        assert.ok(served.includes('\n```sh ' + info + '\n'), `${info} block is not indented`);
+      }
+      const loggedIn = JSON.parse((await sh('sh', ['-c', loginCmd.replace('<paste the credential block here, unchanged>', credential.trim())], { env })).stdout);
+      assert.equal(loggedIn.ok, true);
+      assert.deepEqual(loggedIn.grants, ['take', 'dispatch']);
+
+      const status = JSON.parse((await sh('sh', ['-c', 'node ~/.harbour-runner/kit/runner.mjs status'], { env })).stdout);
+      assert.equal(status.loggedIn, true);
+      assert.equal(status.urlKey, 'acme');
+    } finally {
+      await harbour.close();
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  test('the prompt says when later commands need --url-key too', () => {
+    assert.match(prompt, /another workspace, add `--url-key <urlKey>` to every command/);
+  });
+
+  test('control: recover without --url-key fails on a fresh home (why the served step carries it)', { timeout: 30_000 }, async () => {
+    const home = mkdtempSync(join(tmpdir(), 'rk-fresh-'));
+    try {
+      await assert.rejects(
+        sh(process.execPath, [join(KIT_DIR, 'runner.mjs'), 'recover', '--home', home], { env: { PATH: process.env.PATH, HOME: home } }),
+        /no workspace set up yet/
+      );
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });
