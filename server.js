@@ -2586,6 +2586,10 @@ async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccou
     persistSession: persistSessionRow,
     resolveProvider: getProviderForWorkspace,
     resolveExchange: refreshExchangeFor,
+    // LIN-3124 PR3 (D7): connection-backed suspect arms (authorize-first inside
+    // the seam).
+    adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredentialForUrlKey(args),
+    refreshConnection: (args) => connectionAccess.refreshConnectionForSuspect(args),
   });
 }
 

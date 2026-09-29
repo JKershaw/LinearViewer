@@ -109,4 +109,14 @@ describe('LIN-3124 PR3 checkpoint C3 — source-text pins', () => {
     assert.match(WORKSPACE_API_SRC, /from '\.\.\/lib\/connection-binding\.js'/);
     assert.doesNotMatch(WORKSPACE_API_SRC, /from '\.\.\/lib\/connection-(?:credential|store|lifecycle|access)\.js'/);
   });
+
+  test('N1: the Linear reuse-grace constant is defined once (shared via token-refresh.js)', () => {
+    const files = ['lib/token-refresh.js', 'lib/workspace-token-refresh.js', 'lib/connection-credential.js'];
+    let defs = 0;
+    for (const rel of files) defs += (readFileSync(join(__dirname, '../..', rel), 'utf8').match(/LINEAR_REFRESH_TOKEN_REUSE_GRACE_MS\s*=/g) || []).length;
+    assert.equal(defs, 1, 'exactly one definition');
+    assert.match(readFileSync(join(__dirname, '../../lib/token-refresh.js'), 'utf8'), /export const LINEAR_REFRESH_TOKEN_REUSE_GRACE_MS = 30 \* 60 \* 1000/);
+    assert.match(readFileSync(join(__dirname, '../../lib/workspace-token-refresh.js'), 'utf8'), /LINEAR_REFRESH_TOKEN_REUSE_GRACE_MS \} from '\.\/token-refresh\.js'/);
+    assert.match(CREDENTIAL_SRC, /LINEAR_REFRESH_TOKEN_REUSE_GRACE_MS \} from '\.\/token-refresh\.js'/);
+  });
 });
