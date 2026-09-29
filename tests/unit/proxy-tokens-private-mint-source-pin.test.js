@@ -78,12 +78,24 @@ describe('LIN-3129 — the grant API is inert in S1 (no production caller)', () 
     join(REPO, 'server.js')
   ].filter(f => f !== STORE);
 
-  for (const name of ['mintGrantBootstrap', 'setOwnerCheck']) {
-    test(`nothing outside lib/proxy-tokens.js references ${name}`, () => {
-      const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes(name));
-      assert.deepEqual(offenders, [], `${name} must have no production caller in S1`);
-    });
-  }
+  // NARROWED (LIN-3134 T2-i / LIN-3138 S2): the declared-mint mechanism lands
+  // the ONE `mintGrantBootstrap` caller, in lib/proxy-preamble.js's declared
+  // branch. It is INERT — no production caller passes a non-empty
+  // `declaredGrants` — and the LIN-3134 F3 census is the replacement pin that
+  // enforces exactly that. This is the same shape of narrowing the requireGrant
+  // pin below already took at LIN-3130 S2a: a named, still-tight allow-list, not
+  // a loosening — any second caller still fails.
+  test('mintGrantBootstrap has exactly one non-store caller: the inert mechanism module lib/proxy-preamble.js', () => {
+    const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('mintGrantBootstrap'));
+    assert.deepEqual(offenders, [join(REPO, 'lib/proxy-preamble.js')],
+      'the declared-mint mechanism (inert) is the only caller outside lib/proxy-tokens.js');
+  });
+
+  // Unchanged: setOwnerCheck stays unwired in production (fail-closed 503).
+  test('nothing outside lib/proxy-tokens.js references setOwnerCheck', () => {
+    const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('setOwnerCheck'));
+    assert.deepEqual(offenders, [], 'setOwnerCheck must have no production caller');
+  });
 
   // NARROWED (LIN-3130 S2a, autopilot ruling; the approved LIN-3059 plan
   // supersedes the S1-era "no mount yet" pin): S2a mounts requireGrant('take')
