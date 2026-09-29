@@ -151,7 +151,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
         if (ownerCredentialStore) await ownerCredentialStore.deleteAll(accountId, workspace.urlKey)
         // LIN-3124 PR2 (D4, whole-workspace removal): last-referent per
         // connection-backed binding. Inert for a legacy workspace.
-        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove' })
+        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove', evict: (urlKey) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, accountId) })
       }
       return req.session.destroy(() => res.redirect('/'))
     }
@@ -169,7 +169,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     // LIN-1887 N2: whole-workspace teardown → every provider partition.
     if (ownerCredentialStore) await ownerCredentialStore.deleteAll(req.session.accountId, workspace.urlKey)
     // LIN-3124 PR2 (D4, whole-workspace removal).
-    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove' })
+    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove', evict: (urlKey) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, req.session.accountId) })
 
     removeWorkspace(req.session, workspace.id)
     await saveSession(req.session)

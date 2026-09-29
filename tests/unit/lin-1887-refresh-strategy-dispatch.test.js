@@ -105,6 +105,7 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     // reference these free identifiers.
     connectionStore: {},
     releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
+    evictReferentFor: () => () => {},
     // LIN-3124 PR3 checkpoint C: legacy fixtures have no connection-backed binding.
     activeConnectionIdForWorkspace: () => null,
     connectionAccess: {

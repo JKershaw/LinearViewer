@@ -1171,7 +1171,7 @@ async function ensureValidToken(req, res, next) {
         await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider)
         // LIN-3124 PR2 (D4, definitive revocation): revoke the connection-backed
         // credential too. Inert for a legacy workspace (no connection-backed binding).
-        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })
+        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(req.session.accountId) })
       }
       return sendRelinkNotice(workspace, res)
     }
@@ -1203,7 +1203,7 @@ async function ensureValidToken(req, res, next) {
     if (isDefinitiveRevocation(error)) {
       await ownerCredentialStore.delete(accountId, workspace.urlKey, provider)
       // LIN-3124 PR2 (D4, definitive revocation).
-      await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })
+      await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(accountId) })
     }
 
     // LIN-1518: hoisted above the branch for exactly the reason the durable
@@ -1513,7 +1513,7 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
     await ownerCredentialStore.deleteAll(session.accountId, removedWorkspace.urlKey);
     // LIN-3124 PR2 (D4, whole-workspace removal): last-referent per
     // connection-backed binding. Inert for a legacy workspace.
-    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: removedWorkspace, mode: 'remove' })
+    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: removedWorkspace, mode: 'remove', evict: evictReferentFor(session.accountId) })
   }
 
   // accountId is still live here — only `workspaces`/`activeWorkspaceId` were
@@ -1806,7 +1806,7 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
     } catch (refreshError) {
       console.error('Connection refresh failed after 401:', refreshError);
       if (isDefinitiveRevocation(refreshError)) {
-        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' });
+        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(session.accountId) });
       }
       if (!declaration.destructiveOnFailure) return sendRelinkNotice(workspace, res);
       if (isDefinitiveRevocation(refreshError)) {
@@ -1846,7 +1846,7 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
         if (isDefinitiveRevocation(refreshError)) {
           await ownerCredentialStore.delete(session.accountId, workspace.urlKey, provider);
           // LIN-3124 PR2 (D4, definitive revocation).
-          await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })
+          await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(session.accountId) })
         }
         return sendRelinkNotice(workspace, res);
       }
@@ -2264,6 +2264,10 @@ function evictWorkspaceToken(key) {
 // read cutover wires it into resolveWorkspaceAccess and the entrants. The
 // `evict` closure fans cache eviction out over the connection's referents using
 // the existing per-workspace cache-key helper.
+// LIN-3124 PR3 (D4/S7): the per-referent eviction a Connection release fans
+// out over its removed referents (`releaseConnectionCredential`'s `evict`).
+const evictReferentFor = (accountId) => (urlKey) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, accountId)
+
 const refreshConnectionCredential = createConnectionRefresher({
   connectionStore,
   ownerCredentialStore,
@@ -2271,6 +2275,7 @@ const refreshConnectionCredential = createConnectionRefresher({
   resolveExchange: refreshExchangeFor,
   refreshAccessToken,
   evict: (urlKey, ownerAccountId) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, ownerAccountId),
+  lifecycleEventStore: credentialLifecycleEventStore,
 });
 
 // LIN-1373: TTL-preserving persist-back for refresh-on-resolve. Deliberately
@@ -3959,7 +3964,7 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
     // B1: `unlinkProvider` above has ALREADY reassigned `workspace.bindings`
     // without the removed binding, so the release must see the PRE-unlink array
     // (`bindingsBefore`) or it filters to nothing and never fires.
-    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: { urlKey: workspace.urlKey, bindings: bindingsBefore }, provider, scope, mode: 'unlink' })
+    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: { urlKey: workspace.urlKey, bindings: bindingsBefore }, provider, scope, mode: 'unlink', evict: evictReferentFor(req.session.accountId) })
   }
 
   try {

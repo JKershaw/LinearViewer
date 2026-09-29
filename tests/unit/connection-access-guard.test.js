@@ -236,7 +236,7 @@ describe('LIN-3124 PR2 — connection-release census (D6 sibling pin)', () => {
   test('planted: a dropped site fails the census', () => {
     const dropped = new Map(REAL);
     dropped.set('server.js', REAL.get('server.js').replace(
-      "await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })",
+      "await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor(accountId) })",
       'await noop()'
     ));
     assert.ok(releaseCallCount(dropped) < KNOWN_CONNECTION_RELEASE_COUNT);

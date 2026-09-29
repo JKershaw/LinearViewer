@@ -94,7 +94,7 @@ describe('LIN-3124 PR3 checkpoint C3 — source-text pins', () => {
     const body = SERVER_SRC.slice(start, SERVER_SRC.indexOf('\n}\n', start));
     const armIdx = body.indexOf('if (connectionId) {');
     const armSlice = body.slice(armIdx, body.indexOf('const durableRecord = await ownerCredentialStore.get(session.accountId'));
-    assert.match(armSlice, /releaseConnectionCredential\(\{ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' \}\)/);
+    assert.match(armSlice, /releaseConnectionCredential\(\{ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke', evict: evictReferentFor\(session\.accountId\) \}\)/);
   });
 
   test('workspace-api adopt entrant uses the injected connection read + hydrates the side-table', () => {
