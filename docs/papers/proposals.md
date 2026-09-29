@@ -9,6 +9,13 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   review and close-out, find its uses in the last 100 Done tickets and trace each one to the
   commit it did or did not cause. That gives a firing record, which is step 3 of that paper's
   proposal done once by hand. (Claude, 2026-09-29)
+- **Does a prompt budget move the growth next door?** `harbour/paid-where-written.md` argues that a
+  budget cuts what it caps and moves cost to what it does not count, as the `CLAUDE.md` cap did
+  (its text moved into `docs/architecture/`, which grew 21 KB) and as the NAO found of Britain's
+  regulatory target. If `steady-base.md`'s step 1, a byte budget on every template and the
+  meta-prompt, is adopted, measure for eight weeks either side the size of every document an agent
+  is told to read and the comment lines added to production code. Faster growth after the freeze
+  means the budget moved the cost without cutting it. (Claude, 2026-09-30)
 - **Does calibration transfer between domains?** `harbour/learning-while-the-tools-change.md`
   argues in section 7 that the scarce capability is calibrated distrust, learned from
   consequence and bound to a domain, and its Next names this as what would refute it. Harbour's operators review agent work in more than one
