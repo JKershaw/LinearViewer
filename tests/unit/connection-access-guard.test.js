@@ -27,6 +27,7 @@ import {
   providerIndexImportOffenders,
   wiringOffenders,
   siblingCallOffenders,
+  byConnectionWriteOffenders,
   registryOffenders,
 } from '../fixtures/connection-access-guards.js';
 
@@ -58,12 +59,12 @@ const PROTECTED_MODULES = [
   'lib/refresh-on-resolve-gate.js',
 ];
 
-const SIBLING_WRITES = [
-  'putByConnection',
-  'putIfRefreshTokenByConnection',
-  'markSpendIntentByConnection',
-  'clearSpendIntentByConnection',
-];
+// D6(f): the connection-keyed OwnerCredentialStore writes are reachable only
+// from the single credential seam (lib/connection-credential.js, PR2's S2).
+// Arm f3 enforces this with the `\.\w+ByConnection\s*\(` wildcard, excluding
+// the read `getByConnection` (arm f5) and lifecycle-only `deleteByConnection`
+// (arm f2); the deleted `promoteToConnection` name is pinned absent (arm f4).
+const BY_CONNECTION_SEAM = ['lib/connection-credential.js'];
 
 const REAL = loadStrippedSources();
 const RAW = loadRawSources();
@@ -166,10 +167,10 @@ const SOURCE_ARMS = [
   },
   {
     id: 'f3',
-    name: '*ByConnection writes only from connection-credential.js',
-    check: (s) => siblingCallOffenders(s, SIBLING_WRITES, ['lib/connection-credential.js']),
-    planted: withFile(REAL, 'routes/proxy.js', `${REAL.get('routes/proxy.js')}\nownerCredentialStore.putByConnection('c', {});\n`),
-    plantedNote: 'a *ByConnection write outside the seam',
+    name: '*ByConnection writes live only in connection-credential.js (wildcard)',
+    check: (s) => byConnectionWriteOffenders(s, BY_CONNECTION_SEAM),
+    planted: withFile(REAL, 'routes/proxy.js', `${REAL.get('routes/proxy.js')}\nownerCredentialStore.rotateByConnection('c', {});\n`),
+    plantedNote: 'a new-named *ByConnection write outside the seam',
   },
   {
     id: 'f4',
@@ -177,6 +178,13 @@ const SOURCE_ARMS = [
     check: (s) => siblingCallOffenders(s, ['promoteToConnection'], []),
     planted: withFile(REAL, 'lib/connection-credential.js', '\nstore.promoteToConnection();\n'),
     plantedNote: 'the deleted method name reappearing',
+  },
+  {
+    id: 'f5',
+    name: 'getByConnection reads live only in connection-credential.js',
+    check: (s) => siblingCallOffenders(s, ['getByConnection'], BY_CONNECTION_SEAM),
+    planted: withFile(REAL, 'server.js', `${REAL.get('server.js')}\nownerCredentialStore.getByConnection('c');\n`),
+    plantedNote: 'a getByConnection read outside the seam',
   },
 ];
 
@@ -206,6 +214,17 @@ const METHOD_CLASSES = {
   _id: 'INTERNAL',
   put: 'WRITE',
   readConnectionByParts: 'READ',
+  // LIN-3124 PR2 (S1): the connection-first read/delete lifecycle.
+  link: 'WRITE',
+  readConnectionById: 'READ',
+  readConnectionsByReferent: 'READ',
+  readReferencedConnections: 'READ',
+  readConnectionsByAccountPrefix: 'READ',
+  updateCredentials: 'WRITE',
+  removeReferent: 'WRITE',
+  deleteIfUnreferenced: 'WRITE',
+  deleteConnection: 'WRITE',
+  deleteEmptyByAccountPrefix: 'WRITE',
 };
 
 describe('LIN-3124 PR1 T4 — ConnectionStore method registry', () => {
