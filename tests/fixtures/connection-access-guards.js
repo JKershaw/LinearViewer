@@ -295,3 +295,18 @@ export function extractFunction(source, name) {
 export function sha256(s) {
   return createHash('sha256').update(s).digest('hex');
 }
+
+/**
+ * LIN-3124 D6 — the decoy-token lane set (the session-credential rule's
+ * behavioural half). Every lane that can serve a credential for a workspace:
+ * T4 pins that each accessor exists; T18 (lin-3124-pr3-t18-decoy) runs a
+ * decoy probe per lane and meta-checks it has one for EXACTLY this set.
+ */
+export const DECOY_LANES = Object.freeze([
+  { lane: 'browser (active binding)', accessor: 'getWorkspaceCallScope' },
+  { lane: 'per-binding: dashboard fan-out', accessor: 'getBindingCallScope' },
+  { lane: 'per-binding: resolveIssueBinding', accessor: 'resolveIssueBinding' },
+  { lane: 'per-binding: settings probe (3-arg getWorkspaceToken)', accessor: 'getWorkspaceToken' },
+  { lane: 'owner-scoped headless', accessor: 'resolveWorkspaceAccess' },
+  { lane: 'owner-blind', accessor: 'getWorkspaceAccessToken' },
+]);

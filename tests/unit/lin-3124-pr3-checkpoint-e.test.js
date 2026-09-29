@@ -646,14 +646,19 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
       }
     });
 
-    test('F1: connection-credential.js importers are exactly the server, the session store and the four seam modules', () => {
+    test('F1: connection-credential.js importers are exactly the server, the session store, the four seam modules and (F) the test fixtures', () => {
       const guard = read('tests/unit/connection-access-guard.test.js');
       for (const rel of ['routes/auth.js', 'lib/github-install-flow.js', 'routes/jira-auth.js', 'routes/account-merge.js']) {
         assert.ok(guard.includes(`'${rel}'`), rel);
         assert.match(read(rel), /from '\.\.?\/(lib\/)?connection-credential\.js'/, rel);
       }
-      // The 4 routes/test.js fixture writers stay legacy until checkpoint F.
-      assert.doesNotMatch(read('routes/test.js'), /convertToConnectionBacked/);
+      // Checkpoint F (T27): the 4 routes/test.js fixture writers default to the
+      // legacy shape; they convert ONLY behind the explicit opt-in.
+      const fixtures = read('routes/test.js');
+      assert.ok(guard.includes("'routes/test.js'"));
+      for (const call of fixtures.match(/await convertFixtureBinding\(/g) || []) assert.ok(call);
+      assert.equal((fixtures.match(/if \(connectionBacked\) \{/g) || []).length, 3, 'github, github-projects, jira: opt-in only');
+      assert.match(fixtures, /if \(!b \|\| b\.connectionBacked !== true\) return b;/, 'local extras: opt-in per binding');
     });
   });
 });

@@ -31,6 +31,7 @@ import {
   byConnectionWriteOffenders,
   registryOffenders,
   refresherInstanceOffenders,
+  DECOY_LANES,
 } from '../fixtures/connection-access-guards.js';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,9 @@ const CREDENTIAL_ALLOWED_IMPORTERS = [
   'lib/github-install-flow.js',
   'routes/jira-auth.js',
   'routes/account-merge.js',
+  // LIN-3124 PR3 checkpoint F (T27): the test-only fixture writers' opt-in
+  // connection-backed variants (routes/test.js is mounted only under NODE_ENV=test).
+  'routes/test.js',
 ];
 // LIN-3124 PR2 (S6): the release functions, called at the census sites plus the
 // account merge. LIN-3124 PR3 checkpoint E: + the converter's D18 step-1/2
@@ -432,14 +436,9 @@ describe('LIN-3124 PR1 T4 — retired no-read-switch assertions are subsumed', (
 // no connection-backed read yet, so the behavioural half lands with the read
 // cutover (PR3, T18). This registry pins the LANE SET now, so a lane cannot be
 // silently dropped before the behavioural test is written.
-const DECOY_LANES = [
-  { lane: 'browser (active binding)', accessor: 'getWorkspaceCallScope' },
-  { lane: 'per-binding: dashboard fan-out', accessor: 'getBindingCallScope' },
-  { lane: 'per-binding: resolveIssueBinding', accessor: 'resolveIssueBinding' },
-  { lane: 'per-binding: settings probe (3-arg getWorkspaceToken)', accessor: 'getWorkspaceToken' },
-  { lane: 'owner-scoped headless', accessor: 'resolveWorkspaceAccess' },
-  { lane: 'owner-blind', accessor: 'getWorkspaceAccessToken' },
-];
+// LIN-3124 PR3 checkpoint F: the registry now lives in the shared fixture so the
+// behavioural half (tests/unit/lin-3124-pr3-t18-decoy.test.js) iterates the SAME
+// lane set and its coverage meta-check fails if a lane has no probe.
 
 function decoyLaneOffenders(sources) {
   const workspaceSrc = sources.get('lib/workspace.js') || '';
