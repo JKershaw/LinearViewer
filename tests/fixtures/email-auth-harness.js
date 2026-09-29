@@ -52,8 +52,11 @@ export const sha256 = value => createHash('sha256').update(value).digest('hex');
  * @param {{ms: number}} [options.nonceClock] - drives the routes' nonce ages
  * @param {string|null} [options.linkOrigin] - the configured origin for emailed links
  * @param {'on'|'off'|'opt-in'} [options.promptStep] - the S3 provider-user prompt gate
+ * @param {Function} [options.mount] - optional `(app, stores) => void`, invoked after the
+ *   email router so a test can compose another REAL router (e.g. the Linear OAuth
+ *   callback for the S3-4 end-to-end re-proof witness) over the same real session.
  */
-export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null, promptStep = 'off' } = {}) {
+export async function startEmailAuthHarness({ transport = createCaptureTransport(), sendLimiter = (req, res, next) => next(), storeClock, nonceClock, linkOrigin = null, promptStep = 'off', mount } = {}) {
   const dbDir = mkdtempSync(join(tmpdir(), 'email-auth-harness-'));
   const client = new MangoClient(dbDir);
   await client.connect();
@@ -135,6 +138,10 @@ export async function startEmailAuthHarness({ transport = createCaptureTransport
     promptStep,
     ...(nonceClock ? { now: () => nonceClock.ms } : {}),
   }));
+
+  // Optional composed router (real session, same stores) — e.g. the Linear
+  // OAuth callback for the S3-4 end-to-end re-proof witness.
+  if (mount) mount(app, stores);
 
   // A sentinel workspace-root route, mounted AFTER the email router so the S3
   // prompt middleware (inside createEmailAuthRoutes) gets first look. Lets a
