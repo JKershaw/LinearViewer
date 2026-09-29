@@ -200,8 +200,19 @@ it); `503 GRANT_OWNERLESS` is a session with no account. Any signed-in member ma
 runner credentials from the Proxy page, and revoking one revokes its whole lineage. `dispatch` is
 stamped on the runner copy but is **not yet enforced** (LIN-2884).
 
+The same owner edge also gates the **legacy dispatch-token mint** (LIN-3137 / LIN-2884 J5). A
+legacy dispatch token is a never-expiring take path, so only the workspace owner may mint one:
+`POST /workspace/:urlKey/api/dispatch/tokens` reuses the same owner seam and refusal vocabulary —
+`403 GRANT_OWNER_ONLY` (a different account owns it), `409 WORKSPACE_OWNER_UNSET` (no owner edge),
+`503 GRANT_OWNERLESS` (the session has no account), `503 OWNER_CHECK_UNAVAILABLE` (seam unwired,
+throwing, or a corrupt `mergedInto` chain) — and writes nothing on any refusal. This is a **mint
+gate only**: existing tokens keep authenticating (the verify path has no owner branch), and
+`GET`/`DELETE` on the same path are unchanged.
+
 Workspaces that already have an edge when this lands get **no** owner automatically;
-assigning them is an operator decision (LIN-1892 Open decision 2). A workspace with **no**
+assigning them is an operator decision (LIN-1892 Open decision 2). Until an owner is assigned,
+the owner-gated mints (the runner copy and the legacy dispatch token) refuse with
+`409 WORKSPACE_OWNER_UNSET`. A workspace with **no**
 edge at all (seen only in sessions: the dry-run's bucket (c)) can't be told apart from a new
 one, so the first sign-in after deploy that binds it makes that account its owner, and it
 leaves bucket (c). Run the dry-run **before** deploying to see that population.
