@@ -247,9 +247,30 @@ describe('S3 — N3 lookup read fault mapping', () => {
 // ── attach mode (no record and record; MCP + prose) ──────────────────────────
 
 describe('S3 — attach mode (full argument parity, finding 3)', () => {
-  const ATTACH = { issueIdentifier: 'LIN-888', prompt: 'attach-base', providerDisplayName: 'ProviderX', providerUi: { example: true } };
+  // A capability-BEARING providerUi (review 3 finding 3): buildProxyContextPreamble
+  // only reacts to `issueDetail/relations/search === false`, so this fixture renders
+  // differently from `null` and the direct-call prompt parity can distinguish it.
+  const ATTACH = { issueIdentifier: 'LIN-888', prompt: 'attach-base', providerDisplayName: 'ProviderX', providerUi: { issueDetail: false, relations: false, search: false } };
   const LABEL = 'custom-attach-label';
   const mkStore = (calls) => ({ createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: 'plain-tok' }; } });
+  // Today's exact plain createToken args for these cells (H9, review 1 finding 3).
+  const PLAIN_OPTS = { kind: 'bootstrap', scope: 'readWrite', label: LABEL, ttl: 48 * 60 * 60, createdBy: 'u1' };
+
+  test('the providerUi fixture is capability-bearing (renders differently from null)', async () => {
+    const withUi = await attachProxyContext({
+      proxyTokenStore: mkStore([]), urlKey: 'acme', baseUrl: 'https://h',
+      issueIdentifier: ATTACH.issueIdentifier, prompt: ATTACH.prompt, label: LABEL,
+      harness: 'claude-code', createdBy: 'u1',
+      providerDisplayName: ATTACH.providerDisplayName, providerUi: ATTACH.providerUi
+    });
+    const withoutUi = await attachProxyContext({
+      proxyTokenStore: mkStore([]), urlKey: 'acme', baseUrl: 'https://h',
+      issueIdentifier: ATTACH.issueIdentifier, prompt: ATTACH.prompt, label: LABEL,
+      harness: 'claude-code', createdBy: 'u1',
+      providerDisplayName: ATTACH.providerDisplayName, providerUi: null
+    });
+    assert.notEqual(withUi.prompt, withoutUi.prompt, 'a providerUi: null mutant must be visible to prompt parity');
+  });
 
   test('no record, MCP: equals a direct attachProxyContext call; label + issueIdentifier threaded', async () => {
     const calls = [];
@@ -270,6 +291,11 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
     assert.strictEqual(result.grantDeclaration, null);
     assert.ok(!result.prompt.includes('plain-tok'), 'MCP strips the token from prose');
     assert.equal(calls[0].opts.label, LABEL, 'the passed label is threaded to createToken');
+    // H9 restored: today's exact createToken args, createdBy + urlKey included.
+    assert.equal(calls.length, 2, 'one createToken for the helper, one for the direct call');
+    assert.equal(calls[0].urlKey, 'acme', 'the helper mints under the caller urlKey');
+    assert.deepEqual(calls[0].opts, PLAIN_OPTS, 'the helper passes today\'s exact createToken opts (createdBy: u1)');
+    assert.deepEqual(calls[0], calls[1], 'the helper\'s createToken call equals the direct attachProxyContext call');
   });
 
   test('no record, prose: equals a direct call; token embedded; label threaded', async () => {
@@ -290,6 +316,11 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
     assert.strictEqual(result.bootstrapToken, null);
     assert.ok(result.prompt.includes('plain-tok'), 'prose embeds the token');
     assert.equal(calls[0].opts.label, LABEL);
+    // H9 restored: today's exact createToken args, createdBy + urlKey included.
+    assert.equal(calls.length, 2, 'one createToken for the helper, one for the direct call');
+    assert.equal(calls[0].urlKey, 'acme', 'the helper mints under the caller urlKey');
+    assert.deepEqual(calls[0].opts, PLAIN_OPTS, 'the helper passes today\'s exact createToken opts (createdBy: u1)');
+    assert.deepEqual(calls[0], calls[1], 'the helper\'s createToken call equals the direct attachProxyContext call');
   });
 
   test('record, MCP: declared attach carries issueIdentifier + provider; owner/workspace recorded', async () => {
@@ -310,6 +341,14 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
     assert.equal(result.bootstrapToken, direct.bootstrapToken);
     assert.equal(result.grantDeclaration, RECORD);
     assert.equal(store.calls.find(c => c.ownerAccountId)?.ownerAccountId, 'account-A', 'recorded owner, not the poster');
+    // Review 3 finding 4: the declared attach mint carries the passed label.
+    assert.equal(store.calls.length, 2, 'one grant mint for the helper, one for the direct call');
+    assert.equal(store.calls[0].label, LABEL, 'the declared attach mint carries the passed label');
+    assert.deepEqual(store.calls[0], {
+      urlKey: 'acme', workspaceId: 'ws-1', ownerAccountId: 'account-A',
+      grants: ['dispatch'], label: LABEL, profile: 'worker'
+    });
+    assert.deepEqual(store.calls[0], store.calls[1], 'the helper\'s grant mint equals the direct attachProxyContext call');
   });
 
   test('record, prose: declared attach carries the record; token embedded', async () => {
@@ -333,6 +372,22 @@ describe('S3 — attach mode (full argument parity, finding 3)', () => {
     });
     assert.equal(result.bootstrapToken, 'plain-tok');
     assert.equal(calls[0].opts.label, 'wake-bootstrap');
+  });
+
+  test('declared pbt with a non-default label (wake-bootstrap) threads it to mintGrantBootstrap', async () => {
+    const store = mintSpy();
+    const result = await provisionResumeCredential({
+      proxyTokenStore: store, dispatchStore: recordStore(), urlKey: 'acme', baseUrl: 'https://h',
+      prompt: 'wake prompt', label: 'wake-bootstrap', harness: 'claude-code', createdBy: 'poster-B', followUpTo: 'row-1'
+    });
+    assert.equal(result.bootstrapToken, TOKEN);
+    assert.equal(result.grantDeclaration, RECORD);
+    assert.equal(store.calls.length, 1);
+    assert.equal(store.calls[0].label, 'wake-bootstrap', 'the declared pbt mint carries the passed label');
+    assert.deepEqual(store.calls[0], {
+      urlKey: 'acme', workspaceId: 'ws-1', ownerAccountId: 'account-A',
+      grants: ['dispatch'], label: 'wake-bootstrap', profile: 'worker'
+    });
   });
 });
 

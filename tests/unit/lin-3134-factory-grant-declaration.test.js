@@ -75,6 +75,31 @@ describe('S4 — F2(7) factory half (real factory + real store)', () => {
   });
 });
 
+describe('S4 — D11 the finalized record is pinned after every spread', () => {
+  test('an injected fields record loses to the finalize record, which is the LAST key of the addItem argument', async () => {
+    const store = makeStore();
+    const addItem = store.addItem.bind(store);
+    const args = [];
+    store.addItem = async (urlKey, item) => { args.push(item); return addItem(urlKey, item); };
+    await createDispatchItem({
+      store,
+      urlKey: 'acme',
+      prompt: 'base',
+      finalizePrompt: async () => ({ prompt: 'final', bootstrapToken: null, grantDeclaration: MARKER }),
+      fields: {
+        promptName: 'Prompt',
+        issueIdentifier: 'LIN-1',
+        grantDeclaration: { ownerAccountId: 'HACK', grants: ['dispatch'], workspaceId: 'hack', site: 'hack', profile: 'worker', declaredAt: 't' }
+      }
+    });
+    assert.equal(args.length, 1);
+    assert.deepEqual(args[0].grantDeclaration, MARKER, 'the factory\'s own finalize record wins');
+    assert.equal(Object.keys(args[0]).at(-1), 'grantDeclaration', 'the record is re-added after every spread (Decision 11)');
+    assert.deepEqual(store.collection._docs[0].grantDeclaration, MARKER);
+    assert.ok(!JSON.stringify(store.collection._docs[0]).includes('HACK'));
+  });
+});
+
 describe('S4 — N6 injection persists neither key', () => {
   test('a caller\'s fields carrying both keys persists neither', async () => {
     const store = makeStore();

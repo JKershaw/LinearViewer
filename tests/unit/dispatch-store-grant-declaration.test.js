@@ -218,6 +218,16 @@ describe('S1 — N3 getGrantDeclaration states', () => {
     assert.deepEqual(result, { state: 'none' });
   });
 
+  test('none: a row persisted with an explicit grantDeclaration null reads as none, active and history', async () => {
+    // `addItem` never writes a null (sparse), but a hand-written or legacy doc
+    // may carry one: "a missing key and null read alike" — never { record: null }.
+    const store = makeStore();
+    await store.collection.insertOne({ _id: 'null-active', urlKey: 'acme', prompt: 'x', grantDeclaration: null });
+    await store.historyCollection.insertOne({ _id: 'null-hist', urlKey: 'acme', prompt: 'x', grantDeclaration: null });
+    assert.deepEqual(await store.getGrantDeclaration('acme', 'null-active'), { state: 'none' });
+    assert.deepEqual(await store.getGrantDeclaration('acme', 'null-hist'), { state: 'none' });
+  });
+
   test('row-missing: unknown id, miss log asserted only here', async () => {
     const store = makeStore();
     const logs = [];

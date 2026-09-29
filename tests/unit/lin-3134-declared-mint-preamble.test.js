@@ -123,6 +123,13 @@ describe('S2 — declared mint', () => {
     assert.equal(typeof result.grantDeclaration.declaredAt, 'string');
   });
 
+  test('the record\'s workspaceId is the one the mint returned, not the live param', async () => {
+    const store = mintSpy({ result: { token: TOKEN, tokenId: 't1', workspaceId: 'ws-resolved-by-mint' } });
+    const result = await provisionBootstrapToken({ proxyTokenStore: store, urlKey: 'acme', baseUrl: 'https://h', harness: 'claude-code', ...DECLARED });
+    assert.equal(store.calls[0].workspaceId, 'ws-1', 'the mint was asked for the passed workspace');
+    assert.equal(result.grantDeclaration.workspaceId, 'ws-resolved-by-mint', 'the record carries the mint\'s workspaceId');
+  });
+
   test('missing workspaceId -> INVALID_GRANTS 400 pre-mint (spy 0)', async () => {
     const store = mintSpy();
     await assert.rejects(
@@ -288,6 +295,18 @@ describe('S2 — non-array declaredGrants is refused, never degrades to grant-le
       (err) => err.code === 'INVALID_GRANTS' && err.status === 400
     );
   });
+
+  // Review 3 finding 2: a non-empty string has `.length`, so only `null` and an
+  // object distinguish a guard that is skipped when the store is absent (`null`
+  // would throw a raw TypeError, the object would degrade to a plain prose `null`).
+  for (const [label, value] of [['string', 'dispatch'], ['null', null], ['object', { 0: 'dispatch' }]]) {
+    test(`guard ordering: NO store, prose, declaredGrants ${label} -> INVALID_GRANTS 400 (never a plain null)`, async () => {
+      await assert.rejects(
+        () => provisionBootstrapToken({ proxyTokenStore: null, baseUrl: null, urlKey: 'acme', harness: 'opencode', declaredGrants: value }),
+        (err) => err.code === 'INVALID_GRANTS' && err.status === 400 && err.retryable === false
+      );
+    });
+  }
 
   test('undefined and [] still take the plain path', async () => {
     const calls = [];
