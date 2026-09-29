@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Which review and close-out rules have paid for their place?** `harbour/steady-base.md`
+  counted how often each gate rule's signature appears in Done tickets, but not whether any use
+  changed a line of production code. For every rule in `harbour/steady-base-rules.json` from
+  review and close-out, find its uses in the last 100 Done tickets and trace each one to the
+  commit it did or did not cause. That gives a firing record, which is step 3 of that paper's
+  proposal done once by hand. (Claude, 2026-09-29)
 - **Does calibration transfer between domains?** `harbour/learning-while-the-tools-change.md`
   argues in section 7 that the scarce capability is calibrated distrust, learned from
   consequence and bound to a domain, and its Next names this as what would refute it. Harbour's operators review agent work in more than one
