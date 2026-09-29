@@ -185,8 +185,9 @@ describe('connection-store', () => {
     assert.strictEqual(await store.readConnectionByParts('acct-1', 'github', 'install-1'), null);
   });
 
-  // CS9 — no delete path this ticket (B1 resolution: deletion deferred whole)
-  test('the store exposes no delete method (deletion deferred to LIN-3124)', () => {
+  // CS9 — the bare OwnerCredentialStore-style verbs are still absent; LIN-3124
+  // PR2's deletion authority is the narrow referent-gated lifecycle (T7).
+  test('the store exposes no bare delete/deleteAll (narrow lifecycle instead)', () => {
     const store = new ConnectionStore({ collection: {} });
     assert.strictEqual(typeof store.delete, 'undefined');
     assert.strictEqual(typeof store.deleteAll, 'undefined');

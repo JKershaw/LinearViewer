@@ -8,6 +8,7 @@ import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getW
 import { badRequest, notFound, serverError } from '../lib/errors.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
+import { releaseConnectionCredential } from '../lib/connection-lifecycle.js'
 
 /**
  * Slugify a workspace name into the urlKey body (alphanumeric + hyphens).
@@ -54,7 +55,7 @@ function starterSeed(urlKey) {
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [deps.ownerCredentialStore] - LIN-1523: durable owner-credential store. Deleted alongside the LIN-1507 cache eviction on disconnect — a cache is not a grant, but a disconnected workspace's durable credential must not outlive the disconnect either.
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore } = {}) {
   const router = Router()
 
   /**
@@ -148,6 +149,9 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
         // LIN-1887 N2: whole-workspace teardown, so EVERY provider partition
         // goes — a single-partition delete would orphan the others.
         if (ownerCredentialStore) await ownerCredentialStore.deleteAll(accountId, workspace.urlKey)
+        // LIN-3124 PR2 (D4, whole-workspace removal): last-referent per
+        // connection-backed binding. Inert for a legacy workspace.
+        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove' })
       }
       return req.session.destroy(() => res.redirect('/'))
     }
@@ -164,6 +168,8 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     // LIN-1523: durable delete alongside the cache eviction — see the note above.
     // LIN-1887 N2: whole-workspace teardown → every provider partition.
     if (ownerCredentialStore) await ownerCredentialStore.deleteAll(req.session.accountId, workspace.urlKey)
+    // LIN-3124 PR2 (D4, whole-workspace removal).
+    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove' })
 
     removeWorkspace(req.session, workspace.id)
     await saveSession(req.session)

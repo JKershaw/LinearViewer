@@ -26,13 +26,11 @@ const EXCLUDED_COLLECTIONS = [
   'run-summary-cache',
   'session-summary-cache',
   'brief-cache',
-  // connections (LIN-3127): a pure composite-`_id` point lookup/upsert
-  // (`${accountId}::${provider}::${unitId}`), served by the automatic `_id_`
-  // index — deliberately NOT indexed via INDEX_SPECS. This entry is the
-  // enforcement for that decision: it relies on THIS test staying red until
-  // the exclusion lands, not on manual review, to catch a future contributor
-  // adding an INDEX_SPECS entry here.
-  'connections',
+  // connections (LIN-3127) was excluded while the store was write-only. LIN-3124
+  // PR2 (D10) adds the referent index `{ 'referents.urlKey': 1,
+  // 'referents.provider': 1 }` for the connection-first read arms and removes
+  // it from this list; the composite-`_id` point lookups stay on the auto
+  // `_id_` index.
   // scheduler-locks (LIN-2128): the plan relies on THIS test staying red until
   // the exclusion lands, not on manual review, to catch a future contributor
   // adding an INDEX_SPECS entry here (plan-review F2; PR #1149 review F-B).
@@ -104,6 +102,17 @@ describe('db-indexes', () => {
         `expected index ${JSON.stringify(spec.keySpec)} on "${spec.collection}"`
       );
     }
+  });
+
+  test('declares the connection referent index (LIN-3124 PR2, D10)', () => {
+    // Backs the connection-first read arms' referent lookup
+    // (ConnectionStore.readConnectionsByReferent) so resolving a connection by
+    // `{urlKey, provider}` is an indexed read, not a collection scan.
+    const hasIt = INDEX_SPECS.some(s =>
+      s.collection === 'connections' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ 'referents.urlKey': 1, 'referents.provider': 1 })
+    );
+    assert.ok(hasIt, 'connections must have a {referents.urlKey:1, referents.provider:1} index');
   });
 
   test('declares the bounded newest-first dispatch-history index (LIN-1030)', () => {

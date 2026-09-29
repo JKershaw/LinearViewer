@@ -6,6 +6,7 @@
  */
 import { Router } from 'express';
 import crypto from 'crypto';
+import { getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { isValidFeatureKey, isValidWorkspaceFeatureKey } from '../lib/feature-defaults.js';
 import { setWorkspaceFeature } from '../lib/workspace-preferences.js';
 import { getProvider } from '../lib/providers/registry.js';
@@ -386,6 +387,59 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     res.json({ accountId: req.session.accountId || null });
   });
 
+  // Drive the owner-checked runner mint's refusal states over HTTP (LIN-3131
+  // S2b.5). Test-only. Sets the session workspace's owner edge to:
+  //   owner (default) — the session account owns it
+  //   ownerless       — no owner edge (membership may remain)  -> 409
+  //   foreign         — a synthetic account (not the session's) owns it -> 403
+  //   corrupt         — the session (owner) account's mergedInto chain is a
+  //                     cycle, so canonical resolution throws -> 503
+  router.get('/test/set-workspace-ownership', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey;
+      const state = req.query.state || 'owner';
+      const ws = getWorkspaceByUrlKey(req.session, urlKey);
+      if (!ws) return res.status(400).json({ error: 'workspace not in session' });
+      const workspaceId = ws.id;
+      const edges = accountWorkspaceStore.collection;
+      // `role: null` is outside the `{role:'owner'}` partial index and the owner
+      // query, so this clears any existing owner without needing $unset.
+      await edges.updateMany({ workspaceId }, { $set: { role: null } });
+      if (state === 'ownerless') return res.json({ ok: true, state });
+
+      let ownerAccountId;
+      if (state === 'foreign') {
+        ownerAccountId = `foreign-owner-${workspaceId}`;
+      } else if (state === 'corrupt') {
+        // A SYNTHETIC owner account (never the session's), so corrupting its
+        // merge chain cannot poison the shared local account identity.
+        ownerAccountId = `corrupt-owner-${workspaceId}`;
+      } else {
+        ownerAccountId = req.session.accountId;
+        if (!ownerAccountId) return res.status(400).json({ error: 'session has no accountId' });
+      }
+      const existing = await edges.findOne({ accountId: ownerAccountId, workspaceId });
+      if (existing) {
+        await edges.updateOne({ _id: existing._id }, { $set: { role: 'owner' } });
+      } else {
+        await edges.insertOne({ _id: crypto.randomUUID(), accountId: ownerAccountId, workspaceId, createdAt: new Date(), role: 'owner' });
+      }
+      if (state === 'corrupt') {
+        const peer = `corrupt-peer-${workspaceId}`;
+        const now = new Date();
+        for (const id of [ownerAccountId, peer]) {
+          const other = id === ownerAccountId ? peer : ownerAccountId;
+          const acct = await accountStore.getAccount(id);
+          if (acct) await accountStore.collection.updateOne({ _id: id }, { $set: { mergedInto: other } });
+          else await accountStore.collection.insertOne({ _id: id, identities: [], createdAt: now, updatedAt: now, mergedInto: other });
+        }
+      }
+      res.json({ ok: true, state, ownerAccountId });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Endpoint to clear session (for testing logout and unauthenticated states)
   router.get('/test/clear-session', (req, res) => {
     req.session.destroy((err) => {
@@ -691,7 +745,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         // what owner-scoped workspace resolution needs.
         createdBy: req.query.ownerless === 'true' ? null : await resolveTestPrefsAccountId(req)
       })
-      res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope, kind: result.kind })
+      res.json({ tokenId: result.tokenId, token: result.token, scope: result.scope, kind: result.kind, expiresAt: result.expiresAt })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }
@@ -702,6 +756,23 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     try {
       await proxyTokenStore.clear(req.query.urlKey || 'test-workspace')
       res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Age a proxy token's expiresAt into the past (LIN-3131 S2b.5), so the
+  // LIN-2394 expiry witness can drive a real 401 `proxyTokenState:"expired"`
+  // with `proxyTokenExpiredAt == expiresAt`. A direct collection update, NOT a
+  // mint: `#mint`'s opportunistic cleanup would race an already-expired insert.
+  router.get('/test/expire-proxy-token', async (req, res) => {
+    try {
+      const urlKey = req.query.urlKey || 'test-workspace'
+      const tokenId = req.query.tokenId
+      if (!tokenId) return res.status(400).json({ error: 'tokenId is required' })
+      const expiredAt = new Date(Date.now() - 60 * 1000)
+      await proxyTokenStore.collection.updateOne({ _id: tokenId, urlKey }, { $set: { expiresAt: expiredAt } })
+      res.json({ ok: true, expiresAt: expiredAt.toISOString() })
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

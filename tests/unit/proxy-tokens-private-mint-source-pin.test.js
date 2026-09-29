@@ -3,8 +3,11 @@
  *
  * The invariant is "no bypassable grant-mint path": `#mint` is a true ES
  * private method, only the same-class internal callers may reference it, tests
- * cannot reach it, and nothing outside lib/proxy-tokens.js calls the new grant
- * API (`mintGrantBootstrap` / `setOwnerCheck`) in S1 — it is inert until S2b.
+ * cannot reach it, and the new grant API's callers stay on a named allow-list.
+ * At S1 (`mintGrantBootstrap` / `setOwnerCheck`) the grant API was inert; from
+ * LIN-3131 S2b.1 the owner seam is wired in production, so its allow-list is
+ * exactly `server.js` rather than the empty set — still a tight list, not a
+ * loosening.
  *
  * Note the `this.#mint(` set is now exactly {createToken, mintGrantBootstrap,
  * exchangeBootstrapToken}: `createToken` is the grant-less wrapper (it passes
@@ -70,7 +73,7 @@ describe('LIN-3129 — #mint is a true private method with an allow-listed calle
   });
 });
 
-describe('LIN-3129 — the grant API is inert in S1 (no production caller)', () => {
+describe('LIN-3129/LIN-3131 — the grant API caller allow-lists', () => {
   const SOURCE_FILES = [
     ...walk(join(REPO, 'routes')),
     ...walk(join(REPO, 'lib')),
@@ -78,23 +81,28 @@ describe('LIN-3129 — the grant API is inert in S1 (no production caller)', () 
     join(REPO, 'server.js')
   ].filter(f => f !== STORE);
 
-  // NARROWED (LIN-3134 T2-i / LIN-3138 S2): the declared-mint mechanism lands
-  // the ONE `mintGrantBootstrap` caller, in lib/proxy-preamble.js's declared
-  // branch. It is INERT — no production caller passes a non-empty
-  // `declaredGrants` — and the LIN-3134 F3 census is the replacement pin that
-  // enforces exactly that. This is the same shape of narrowing the requireGrant
-  // pin below already took at LIN-3130 S2a: a named, still-tight allow-list, not
-  // a loosening — any second caller still fails.
-  test('mintGrantBootstrap has exactly one non-store caller: the inert mechanism module lib/proxy-preamble.js', () => {
-    const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('mintGrantBootstrap'));
-    assert.deepEqual(offenders, [join(REPO, 'lib/proxy-preamble.js')],
-      'the declared-mint mechanism (inert) is the only caller outside lib/proxy-tokens.js');
+  // NARROWED (LIN-3134 T2-i / LIN-3138 S2, then LIN-3131 S2b.2): the
+  // declared-mint mechanism in lib/proxy-preamble.js was the first caller;
+  // S2b.2 adds the live owner-checked runner mint in routes/proxy-tokens-admin.js
+  // (the ONE route that turns the feature on). Still an exact allow-list, not a
+  // loosening: any OTHER caller fails.
+  test('mintGrantBootstrap callers are exactly the inert mechanism module and the S2b.2 runner mint route', () => {
+    const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('mintGrantBootstrap')).sort();
+    assert.deepEqual(offenders, [
+      join(REPO, 'lib/proxy-preamble.js'),
+      join(REPO, 'routes/proxy-tokens-admin.js')
+    ].sort(), 'only the inert declared-mint mechanism and the S2b.2 runner mint route may call mintGrantBootstrap');
   });
 
-  // Unchanged: setOwnerCheck stays unwired in production (fail-closed 503).
-  test('nothing outside lib/proxy-tokens.js references setOwnerCheck', () => {
+  // UPDATED (LIN-3131 S2b.1): the owner seam is now wired in production, so the
+  // S1 "inert" empty-set pin is replaced by an exact allow-list — the ONE
+  // `setOwnerCheck` caller is server.js's late binding, after
+  // `accountWorkspaceStore` exists and the seam is composed in
+  // lib/workspace-owner.js. Any second caller still fails.
+  test('setOwnerCheck is wired in exactly one production site: server.js', () => {
     const offenders = SOURCE_FILES.filter(f => readFileSync(f, 'utf8').includes('setOwnerCheck'));
-    assert.deepEqual(offenders, [], 'setOwnerCheck must have no production caller');
+    assert.deepEqual(offenders, [join(REPO, 'server.js')],
+      'S2b.1 late-binds the owner seam only in server.js; any other caller fails');
   });
 
   // NARROWED (LIN-3130 S2a, autopilot ruling; the approved LIN-3059 plan

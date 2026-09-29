@@ -16,6 +16,7 @@
   const generateFeedback = document.getElementById('proxy-generate-feedback');
   const createTokenForm = document.getElementById('proxy-create-token-form');
   const tokenList = document.querySelector('.proxy-token-list');
+  const runnerList = document.getElementById('proxy-runner-credentials');
   const tokensCollapsible = document.getElementById('proxy-tokens-collapsible');
   const tokensCount = document.getElementById('proxy-tokens-count');
   const eventsList = document.querySelector('.proxy-events-list');
@@ -191,7 +192,10 @@ This will return all available endpoints with examples. Your token scope is: ${s
       tokensCount.textContent = '';
       return;
     }
-    tokensCount.textContent = tokens.length ? `(${tokens.length})` : '(0)';
+    // LIN-3131 S2b.3: runner credentials (grant-bearing) live in their own
+    // "Runner credentials" group, so this count covers the ordinary tokens only.
+    const generic = tokens.filter(t => !isRunnerToken(t));
+    tokensCount.textContent = generic.length ? `(${generic.length})` : '(0)';
   }
 
   async function loadTokens() {
@@ -202,10 +206,11 @@ This will return all available endpoints with examples. Your token scope is: ${s
       tokenList.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>';
       return;
     }
+    const generic = tokens.filter(t => !isRunnerToken(t));
     if (tokensCount) {
-      tokensCount.textContent = tokens.length ? `(${tokens.length})` : '(0)';
+      tokensCount.textContent = generic.length ? `(${generic.length})` : '(0)';
     }
-    renderTokenList(tokens);
+    renderTokenList(generic);
   }
 
   function renderTokenList(tokens) {
@@ -304,6 +309,106 @@ This will return all available endpoints with examples. Your token scope is: ${s
     return `<span class="status-pill status-pill--dot status-pill--${state}">` +
       '<span class="status-pill__dot" aria-hidden="true"></span>' +
       `<span class="status-pill__label">${escapeHtml(String(label))}</span></span>`;
+  }
+
+  // =========================================================================
+  // Runner credentials (LIN-3131 S2b.3)
+  //
+  // The owner-checked runner copy mints a grant-bearing bootstrap that exchanges
+  // into a working token. These render as ONE derived row per credential lineage
+  // (plan P3(c)): a *waiting* row is an unconsumed bootstrap, an *active* row is
+  // the exchanged working token, and a spent bootstrap is HIDDEN — its working
+  // token is the live row. Revoke always sends the LIVE row's own `tokenId`
+  // (never a derived display key); the store revokes the whole lineage
+  // structurally (lib/proxy-tokens.js `revokeToken`), so no new route is needed.
+  // =========================================================================
+
+  function isRunnerToken(t) {
+    return Array.isArray(t.grants) && t.grants.length > 0;
+  }
+
+  async function loadRunnerCredentials() {
+    if (!runnerList) return;
+    const tokens = await fetchTokens();
+    if (tokens === null) {
+      runnerList.innerHTML = '<div class="token-list-empty">Failed to load runner credentials</div>';
+      return;
+    }
+    renderRunnerCredentials(tokens);
+  }
+
+  function runnerCredentialRows(tokens) {
+    const rows = [];
+    for (const t of tokens) {
+      if (!isRunnerToken(t)) continue;
+      if (t.kind === 'bootstrap') {
+        // Spent bootstrap → hidden: the exchanged working token is the live row.
+        if (t.consumed) continue;
+        rows.push({ state: 'waiting', token: t });
+      } else {
+        rows.push({ state: 'active', token: t });
+      }
+    }
+    return rows;
+  }
+
+  function renderRunnerCredentials(tokens) {
+    const rows = runnerCredentialRows(tokens);
+    if (!rows.length) {
+      runnerList.innerHTML = '<div class="token-list-empty">No runner credentials yet</div>';
+      return;
+    }
+    runnerList.innerHTML = rows.map(renderRunnerCredentialItem).join('');
+
+    runnerList.querySelectorAll('.runner-credential-revoke').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const tokenId = btn.dataset.tokenId;
+        // Destructive-action copy ratified for runner credentials (plan P3(c)).
+        if (!confirm('Revoke this runner credential? The session using it stops taking work immediately and loses its tracker access too.')) return;
+        try {
+          // on401:false — failure is reported by the catch's toast, not a redirect.
+          await window.api(`${apiBase}/tokens/${tokenId}`, { method: 'DELETE', on401: false });
+          loadRunnerCredentials();
+          refreshTokenCount();
+          if (tokensExpanded) loadTokens();
+        } catch (err) {
+          toast('Failed to revoke runner credential: ' + err.message, { type: 'error' });
+        }
+      });
+    });
+  }
+
+  function renderRunnerCredentialItem(row) {
+    const t = row.token;
+    const stateLabel = row.state === 'waiting' ? 'waiting for exchange' : 'active';
+    const stateBadge = `<span class="runner-credential-state runner-credential-state--${row.state}">${stateLabel}</span>`;
+    const grants = escapeHtml(t.grants.join(', '));
+    const meta = [
+      escapeHtml(t.label || 'default'),
+      `grants: ${grants}`,
+      escapeHtml(formatRunnerExpiry(t.expiresAt))
+    ].join(' \u00B7 ');
+    return `<div class="surface runner-credential-item" data-token-id="${escapeHtml(t.tokenId)}">
+      <div class="runner-credential-info">
+        <div class="runner-credential-label">runner ${stateBadge}</div>
+        <div class="runner-credential-meta">${meta}</div>
+      </div>
+      <button class="action-btn runner-credential-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
+    </div>`;
+  }
+
+  // Hour/minute expiry (the ordinary badge above is day-granular). A runner
+  // bootstrap lives an hour and its working token a day, so days would read
+  // "expires <1d" for both — useless for the copy-again decision.
+  function formatRunnerExpiry(expiresAt) {
+    if (!expiresAt) return 'no expiry';
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    if (Number.isNaN(ms)) return '';
+    if (ms <= 0) return 'expired';
+    const totalMinutes = Math.max(1, Math.round(ms / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours >= 1 ? `expires in ${hours}h ${minutes}m` : `expires in ${minutes}m`;
   }
 
   function showTokenModal(token, label, scope) {
@@ -534,4 +639,5 @@ This will return all available endpoints with examples. Your token scope is: ${s
   refreshTokenCount();
   refreshEventsCount();
   loadCredentialHealth();
+  loadRunnerCredentials();
 })();
