@@ -186,6 +186,20 @@ before the write lands). Read it with `getWorkspaceOwnerAccountId(workspaceId,
 accountStore)`, which resolves a merged owner to its survivor and returns `null` when there's
 no owner edge. This is unrelated to the credential-scope `ownerAccountId`.
 
+The owner edge is what gates the **runner copy** (LIN-3131 / LIN-3059 S2b): a session may mint
+one only when `getWorkspaceOwnerAccountId` says it owns the workspace. The mint route
+(`routes/proxy-tokens-admin.js`, `POST .../api/proxy/tokens` with `{ "runner": true }`) calls
+`ProxyTokenStore.mintGrantBootstrap` with **server-resolved** grants `['take','dispatch']` — a
+client can never name a grant (`400 GRANTS_NOT_CLIENT_SETTABLE`) — and a fixed `runner` lifetime
+profile (1h bootstrap / 24h working, `lib/proxy-scopes.js`). The owner seam is
+`lib/workspace-owner.js`'s `checkWorkspaceOwner`, late-bound in `server.js` via
+`proxyTokenStore.setOwnerCheck(...)` after `accountWorkspaceStore` exists; unwired, erroring, or a
+corrupt `mergedInto` chain fails closed as `503 OWNER_CHECK_UNAVAILABLE`. Ownership refusals are
+`409 WORKSPACE_OWNER_UNSET` (no owner edge) and `403 GRANT_OWNER_ONLY` (a different account owns
+it); `503 GRANT_OWNERLESS` is a session with no account. Any signed-in member may list and revoke
+runner credentials from the Proxy page, and revoking one revokes its whole lineage. `dispatch` is
+stamped on the runner copy but is **not yet enforced** (LIN-2884).
+
 Workspaces that already have an edge when this lands get **no** owner automatically;
 assigning them is an operator decision (LIN-1892 Open decision 2). A workspace with **no**
 edge at all (seen only in sessions: the dry-run's bucket (c)) can't be told apart from a new

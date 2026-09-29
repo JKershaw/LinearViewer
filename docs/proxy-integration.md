@@ -39,6 +39,12 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
   https://your-instance.com/api/proxy/issues/ISSUE_UUID/comments
 ```
 
+> **The token in steps 2–4 is a *working* token. If you were handed a prompt,** that
+> credential is a single-use **bootstrap** — exchange it first (see
+> [Bootstrap Tokens](#bootstrap-tokens-single-use-exchange-only)). A **runner** copy
+> (`{ "runner": true }`) is an owner-only bootstrap too; see
+> [Runner credentials](#runner-credentials-lin-3131).
+
 ## Authentication
 
 ### Getting a Token
@@ -80,6 +86,21 @@ Response:
 |-------|--------|
 | `read` | Query all read endpoints (issues, teams, projects, cycles, labels, etc.) |
 | `readWrite` | All read access plus create/update/delete issues, comments, relations, labels |
+
+### Scopes vs grants (LIN-3059)
+
+`scope` is the base tier above. A token may ALSO carry `grants`: a closed, **server-assigned**
+set of privileged authorities. `scope` and `grants` are independent axes, and a client can
+never name a grant — the runner mint (below) takes only the intent and resolves the set
+server-side.
+
+| Grant | Authorises | Status |
+| --- | --- | --- |
+| `take` | `GET /api/proxy/runner/poll`, `POST /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}` | Enforced (LIN-3059 S2a) |
+| `dispatch` | `POST /api/proxy/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff` | **Not yet enforced** (LIN-2884): `readWrite` still passes these today |
+
+A plain `read`/`readWrite` token carries no grants, so it gets `403 TAKE_GRANT_REQUIRED` on the
+runner routes. Only the owner-minted **runner copy** carries `take` + `dispatch`.
 
 ### Single-Use Tokens
 
@@ -150,15 +171,48 @@ uses which one so a value change there is not also a doc-drift bug here.
 | Operator bootstrap mint (`"bootstrap": true`) | `BOOTSTRAP_TOKEN_TTL_SECONDS` | 48h |
 | Operator standard mint, label `prompt-proxy` | `PROMPT_PROXY_TOKEN_TTL_SECONDS` | 48h |
 | Operator standard mint, any other label | `ProxyTokenStore.defaultTtl` (store default) | 90 days |
-| Dispatch/runner tokens (`DispatchTokenStore`) | — (schema has no `expiresAt`) | never expires |
+| Runner copy bootstrap (`{ "runner": true }`) | `RUNNER_BOOTSTRAP_TTL_SECONDS` (`lib/proxy-scopes.js`) | 1h |
+| Runner copy working token (its exchange) | `RUNNER_WORKING_TTL_SECONDS` (`lib/proxy-scopes.js`) | 24h |
+| Dispatch tokens (`DispatchTokenStore`) | — (schema has no `expiresAt`) | never expires |
 
-Every path an agent reaches programmatically is 48h. There is no mint-time duration control on
-this consumer surface — an operator choosing a longer lifetime at mint time is tracked
-separately as **LIN-2602**; a human-approved extension of an existing token, with no new token
-bytes ever minted, is tracked as **LIN-2603**. Today, a session expected to outlive 48h needs a
-fresh operator mint before the old token expires, not a self-service renewal or refresh call —
-none exists, and none is planned at this endpoint (`POST /api/proxy/token` remains
+Every ordinary path an agent reaches programmatically is 48h; a **runner copy** is the 1h/24h
+exception above (re-copy the prompt when its working token expires). There is no mint-time
+duration control on this consumer surface — an operator choosing a longer lifetime at mint time
+is tracked separately as **LIN-2602**; a human-approved extension of an existing token, with no
+new token bytes ever minted, is tracked as **LIN-2603**. Today, a session expected to outlive 48h
+needs a fresh operator mint before the old token expires, not a self-service renewal or refresh
+call — none exists, and none is planned at this endpoint (`POST /api/proxy/token` remains
 bootstrap-exchange-only, never a re-exchange of a live working token).
+
+### Runner credentials (LIN-3131)
+
+A **runner copy** is the owner-checked single-use bootstrap a human copies into a Claude Code
+session to turn it into this workspace's runner. It is minted from the Proxy page (or
+`POST /workspace/:urlKey/api/proxy/tokens` with `{ "runner": true }`), and the exchange yields a
+working token carrying the `take` + `dispatch` grants with the runner lifetimes above. The prompt
+body itself is the runner-prompt ticket's (LIN-3098); this is only the credential.
+
+- **Only the workspace owner can mint one.** The server resolves the grants and the owner; the
+  client sends only `{ "runner": true }` and `scope`/`label` are ignored. Any body carrying a
+  `grants` field is refused `400 GRANTS_NOT_CLIENT_SETTABLE`.
+- **Any signed-in member can list and revoke one.** The Proxy page's "Runner credentials" group
+  shows the waiting bootstrap and the active working token (spent bootstraps hidden) with an
+  hour/minute expiry; revoking either revokes the whole credential lineage (`DELETE
+  /workspace/:urlKey/api/proxy/tokens/{tokenId}`).
+- **Runner routes** (require `take`): `GET /api/proxy/runner/poll`, `POST
+  /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}`. The poll response adds
+  `otherConsumerLastSeenAt` — a separate consumer (Simple Dispatcher) seen polling the same
+  workspace; a recent value means warn and stop rather than race it for work.
+- **Mint refusals** (fail closed; no compatibility lane):
+
+| Case | Status | Code |
+| --- | --- | --- |
+| session has no `accountId` | 503 | `GRANT_OWNERLESS` |
+| workspace has no owner edge | 409 | `WORKSPACE_OWNER_UNSET` |
+| another account owns the workspace | 403 | `GRANT_OWNER_ONLY` |
+| owner check unwired, erroring, or a corrupt merge chain | 503 (retryable) | `OWNER_CHECK_UNAVAILABLE` |
+| body carries `grants` | 400 | `GRANTS_NOT_CLIENT_SETTABLE` |
+
 
 ### Using the Token
 
