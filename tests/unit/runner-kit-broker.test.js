@@ -407,6 +407,28 @@ describe('the broker over its socket (in-process)', () => {
     assert.equal(harbour.seen.length, before);
   });
 
+  test('a request with no Host at all gets 403 and reaches nothing upstream (F2)', TIMEOUT, async () => {
+    const before = harbour.seen.length;
+    // Node's http.request always adds a Host, so write the request by hand.
+    const raw = await new Promise((resolve, reject) => {
+      const s = net.connect({ path: broker.socketPath });
+      let out = '';
+      s.on('connect', () => s.write('GET /api/proxy/x HTTP/1.0\r\n\r\n'));
+      s.on('data', (c) => { out += c; });
+      s.on('end', () => resolve(out));
+      s.on('error', reject);
+    });
+    assert.match(raw, /^HTTP\/1\.[01] 403 /);
+    assert.equal(harbour.seen.length, before);
+  });
+
+  test('Host must match exactly: harbour-runner.invalid:80 is refused too (F2)', TIMEOUT, async () => {
+    const before = harbour.seen.length;
+    const r = await brokerRequest(broker.socketPath, { path: '/api/proxy/x', host: 'harbour-runner.invalid:80' });
+    assert.equal(r.status, 403);
+    assert.equal(harbour.seen.length, before);
+  });
+
   test('a non-/api/proxy path gets 404; so does the mint endpoint', TIMEOUT, async () => {
     const before = harbour.seen.length;
     for (const path of ['/', '/api/dispatch/x', '/workspace/acme', '/api/proxy/../admin']) {
