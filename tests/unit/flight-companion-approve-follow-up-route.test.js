@@ -115,6 +115,7 @@ function makeStores({ history = [], anchorStatus = null, mintedToken = 'boot-abc
   const addItemCalls = [];
   const mintCalls = [];
   const dispatchQueueStore = {
+    getGrantDeclaration: async () => ({ state: 'none' }),
     async listItems() { return []; },
     async listHistory() { return { items: history, total: history.length }; },
     async getItemStatus() { return anchorStatus; },
