@@ -192,6 +192,9 @@ async function runHandleUnauthorizedError({
     },
     getDeployInfo: () => ({}),
     renderLandingPage: () => '<landing/>',
+    // LIN-3124 PR2: the sliced source references these free identifiers.
+    connectionStore: {},
+    releaseConnectionCredential: async () => ({ released: 0, referents: [] }),
     // LIN-1892: handleWorkspaceRemoval's landing render reads the email predicate.
     isEmailSignInAvailable: () => false,
     // LIN-2010: this harness evals REAL server.js source, so every free

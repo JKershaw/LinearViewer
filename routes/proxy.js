@@ -1321,7 +1321,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
     logEvent(req, '/api/proxy/instructions', 200);
 
-    const text = buildInstructions({ baseUrl, scope, declaredDisplayName, isDeclaredLinear, requiresTeam });
+    const text = buildInstructions({ baseUrl, scope, declaredDisplayName, isDeclaredLinear, requiresTeam, grants: req.proxyTokenGrants || [] });
 
     res.type('text/plain').send(text);
   });

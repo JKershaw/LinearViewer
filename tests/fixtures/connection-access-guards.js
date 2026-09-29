@@ -132,8 +132,14 @@ export function importerOffenders(sources, target, allowed, { exact = false } = 
  * Arm (b′): any `readConnection*` identifier (calls, imports, destructuring —
  * identifier-level, so aliases are caught) or a legacy `connectionStore.get(`
  * call must live only in the allowed modules.
+ *
+ * D6's naming law is "every ConnectionStore read is `readConnection*`". LIN-3124
+ * PR2 adds one D10-named read, `readReferencedConnections`, that does not share
+ * the literal prefix; it is included explicitly here so the identifier-level
+ * scan stays sound (a call to it from a protected module is still caught).
  */
-export const CONNECTION_READ_TOKEN = /\breadConnection[A-Za-z0-9_]*\b/;
+export const CONNECTION_READ_TOKEN = /\breadConnection[A-Za-z0-9_]*\b|\breadReferencedConnections\b/;
+export const CONNECTION_READ_NAME = /^(?:readConnection[A-Za-z0-9_]*|readReferencedConnections)$/;
 export const LEGACY_CONNECTION_GET = /\bconnectionStore\s*\??\.\s*get\s*\(/;
 
 export function readUsageOffenders(sources, allowedModules) {
@@ -185,6 +191,51 @@ export function siblingCallOffenders(sources, methods, allowedCallers) {
 }
 
 /**
+ * A function-name caller pin for EXPORTED functions called bare (not as a
+ * method). Matches `\bNAME(` but not the `function NAME(` definition. Every
+ * caller must be in `allowedCallers`.
+ */
+export function namedCallOffenders(sources, names, allowedCallers) {
+  const offenders = [];
+  for (const [rel, src] of sources) {
+    if (allowedCallers.includes(rel)) continue;
+    for (const name of names) {
+      const re = new RegExp(`(?<!function\\s)\\b${escapeRe(name)}\\s*\\(`, 'g');
+      if (re.test(src)) offenders.push(`${rel}: ${name}( outside [${allowedCallers.join(', ')}]`);
+    }
+  }
+  return offenders;
+}
+
+/**
+ * Arm (f3) wildcard: every `<receiver>.<name>ByConnection(` write must live only
+ * in `allowedCallers` (D6(f)). The receiver is intentionally NOT captured — the
+ * method is flagged wherever a `.` **or `?.`** precedes it, whatever the call
+ * shape (`getStore().putByConnection(`, `stores[0].rotateByConnection(`,
+ * `ownerCredentialStore?.putByConnection(`). Exemptions:
+ *   - `this.<name>ByConnection(` — a self-call, exempt ONLY in the defining
+ *     module `lib/owner-credential-store.js`;
+ *   - `getByConnection(` — the READ, pinned separately by the caller pin;
+ *   - `deleteByConnection(` — lifecycle-only, pinned by arm f2.
+ */
+export function byConnectionWriteOffenders(sources, allowedCallers) {
+  const re = /(\bthis\s*)?\??\.\s*(\w+ByConnection)\s*\(/g;
+  const offenders = [];
+  for (const [rel, src] of sources) {
+    if (allowedCallers.includes(rel)) continue;
+    for (const m of src.matchAll(re)) {
+      const selfCall = m[1];
+      const method = m[2];
+      if (selfCall && rel === 'lib/owner-credential-store.js') continue;
+      if (method === 'getByConnection') continue;
+      if (method === 'deleteByConnection') continue;
+      offenders.push(`${rel}: .${method}( outside [${allowedCallers.join(', ')}]`);
+    }
+  }
+  return offenders;
+}
+
+/**
  * Prototype-reflection registry: every own method name must be classified, and
  * the naming law must hold (READ names start with `readConnection`, WRITE names
  * do not start with `read`). Returns unclassified/misnamed methods.
@@ -194,7 +245,7 @@ export function registryOffenders(methodNames, classification) {
   for (const name of methodNames) {
     const cls = classification[name];
     if (!cls) { offenders.push(`${name}: unclassified`); continue; }
-    if (cls === 'READ' && !/^readConnection/.test(name)) offenders.push(`${name}: READ but not readConnection*`);
+    if (cls === 'READ' && !CONNECTION_READ_NAME.test(name)) offenders.push(`${name}: READ but not readConnection*`);
     if (cls === 'WRITE' && /^read/.test(name)) offenders.push(`${name}: WRITE but read*`);
   }
   return offenders;

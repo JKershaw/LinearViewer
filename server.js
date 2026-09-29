@@ -57,8 +57,11 @@ import { AccountMergeLogStore } from './lib/account-merge-log.js'
 import { CredentialLifecycleEventStore, CREDENTIAL_LIFECYCLE_EVENT_KINDS } from './lib/credential-lifecycle-events.js'
 import { WorkspaceStore } from './lib/workspace-store.js'
 import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
+import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware } from './lib/connection-credential.js'
+import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { createObserverPassRun } from './lib/observer-pass.js'
@@ -572,6 +575,14 @@ const workspaceStore = new WorkspaceStore({ collection: workspacesCollection })
 const accountWorkspacesCollection = db.collection('account-workspaces')
 const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWorkspacesCollection })
 
+// LIN-3131 S2b.1: late-bind the owner-check seam now that both stores it
+// composes exist. `proxyTokenStore` is built above (before these), so the seam
+// is injected here rather than at construction; while it stays unwired the
+// grant mint fails closed with OWNER_CHECK_UNAVAILABLE. Keys on `workspaceId`
+// (the account↔workspace edge, LIN-1892 S1), reusing #1601's
+// `getWorkspaceOwnerAccountId` — no parallel owner model.
+proxyTokenStore.setOwnerCheck(createWorkspaceOwnerCheck({ accountWorkspaceStore, accountStore }))
+
 // Email magic-link sign-in (LIN-1892 S2). The transport exists exactly when
 // email sign-in is available (lib/email-availability.js — the one predicate;
 // this file reads none of the email variables itself, S2-4). Off by default
@@ -854,6 +865,15 @@ app.use(express.json({ limit: '250kb' }))
 // express-session with exactly these options (LIN-1892 S2-2).
 app.use(session(createSessionOptions({ store: sessionStore, secret: process.env.SESSION_SECRET })))
 
+// LIN-3124 PR2 (D1): one batched hydration read of the session's
+// connection-backed Connections, AFTER the session middleware. Legacy-only
+// sessions do zero reads. The side-table is written here and read by nothing
+// until PR3's read cutover, so this is inert today.
+app.use(createHydrationMiddleware({
+  connectionStore,
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id)
+}))
+
 // =============================================================================
 // Test Mode Setup
 // =============================================================================
@@ -1122,6 +1142,9 @@ async function ensureValidToken(req, res, next) {
     if (!declaration.destructiveOnFailure) {
       if (isDefinitiveRevocation(error)) {
         await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider)
+        // LIN-3124 PR2 (D4, definitive revocation): revoke the connection-backed
+        // credential too. Inert for a legacy workspace (no connection-backed binding).
+        await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })
       }
       return sendRelinkNotice(workspace, res)
     }
@@ -1152,6 +1175,8 @@ async function ensureValidToken(req, res, next) {
     // and leave the dead one in place.
     if (isDefinitiveRevocation(error)) {
       await ownerCredentialStore.delete(accountId, workspace.urlKey, provider)
+      // LIN-3124 PR2 (D4, definitive revocation).
+      await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })
     }
 
     // LIN-1518: hoisted above the branch for exactly the reason the durable
@@ -1217,7 +1242,7 @@ for (const provider of getAllProviders()) {
 app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
 // LIN-1892 S2: the email magic-link door. Every route 503s when emailTransport is null.
 app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin }))
-app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
@@ -1455,6 +1480,9 @@ async function handleWorkspaceRemoval(session, workspaceId, res, deleteDurable =
   // verb would have been a silent regression rather than a visible one.
   if (removedWorkspace && deleteDurable) {
     await ownerCredentialStore.deleteAll(session.accountId, removedWorkspace.urlKey);
+    // LIN-3124 PR2 (D4, whole-workspace removal): last-referent per
+    // connection-backed binding. Inert for a legacy workspace.
+    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: removedWorkspace, mode: 'remove' })
   }
 
   // accountId is still live here — only `workspaces`/`activeWorkspaceId` were
@@ -1744,6 +1772,8 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       if (!declaration.destructiveOnFailure) {
         if (isDefinitiveRevocation(refreshError)) {
           await ownerCredentialStore.delete(session.accountId, workspace.urlKey, provider);
+          // LIN-3124 PR2 (D4, definitive revocation).
+          await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, provider, mode: 'revoke' })
         }
         return sendRelinkNotice(workspace, res);
       }
@@ -2163,7 +2193,9 @@ function evictWorkspaceToken(key) {
 // 30-day-from-last-human-activity lifetime — untouched. This is the line that
 // keeps LIN-1373 inside LIN-1367's settled `(b)` envelope.
 function persistSessionRow(sid, session) {
-  return sessionsCollection.updateOne({ _id: sid }, { $set: { session } });
+  // LIN-3124 PR2 (D1 backstop): a connection-backed workspace never persists a
+  // credential. A legacy shape is untouched, so this is a no-op today.
+  return sessionsCollection.updateOne({ _id: sid }, { $set: { session: sanitizeSessionForPersist(session) } });
 }
 
 // CLOSED GAP (LIN-1885 research → fixed by LIN-1891). This resolver used to
@@ -3761,6 +3793,12 @@ app.post('/workspace/:urlKey/settings/providers/remove', workspaceFromUrl, async
   // achieved by not running.
   if (bindingRemoved) {
     await ownerCredentialStore.delete(req.session.accountId, workspace.urlKey, provider);
+    // LIN-3124 PR2 (D4, last-referent unlink): release the connection-backed
+    // credential only when this binding was the last referent. Inert for legacy.
+    // B1: `unlinkProvider` above has ALREADY reassigned `workspace.bindings`
+    // without the removed binding, so the release must see the PRE-unlink array
+    // (`bindingsBefore`) or it filters to nothing and never fires.
+    await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace: { urlKey: workspace.urlKey, bindings: bindingsBefore }, provider, scope, mode: 'unlink' })
   }
 
   try {
