@@ -161,6 +161,29 @@ test.describe('Runner loop - owner copy → exchange → poll → take → feedb
     const polled2 = await poll2.json();
     expect(polled2.items.some(i => i.kind === 'wake')).toBe(true);
   });
+
+  // L3 (review c50dfdd4): the `take`-gated runner section must be threaded end
+  // to end from the token's grants through `routes/proxy.js` into
+  // `buildInstructions` — a plain token's instructions must omit it.
+  test('L3: /api/proxy/instructions shows the runner section to a runner token only', async ({ page, request }) => {
+    const header = await cookieHeader(page);
+    const { working } = await exchangeRunner(request, header);
+
+    const runnerInstructions = await (await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${working.token}` }
+    })).text();
+    expect(runnerInstructions).toContain('## Runner Endpoints');
+    expect(runnerInstructions).toContain("Your token's grants: take, dispatch.");
+    expect(runnerInstructions).toMatch(/GET https?:\/\/[^ ]+\/api\/proxy\/runner\/poll/);
+
+    // A plain readWrite token gets the grants table but NOT the runner section.
+    const plain = await (await request.get(`/test/create-proxy-token?urlKey=${urlKey}&label=plain-rw&scope=readWrite`)).json();
+    const plainInstructions = await (await request.get('/api/proxy/instructions', {
+      headers: { Authorization: `Bearer ${plain.token}` }
+    })).text();
+    expect(plainInstructions).toContain('## Grants');
+    expect(plainInstructions).not.toContain('## Runner Endpoints');
+  });
 });
 
 test.describe('Runner mint refusal probes - over HTTP on the running server (LIN-3131 S2b.5)', () => {

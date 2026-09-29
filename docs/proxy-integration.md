@@ -187,8 +187,9 @@ bootstrap-exchange-only, never a re-exchange of a live working token).
 ### Runner credentials (LIN-3131)
 
 A **runner copy** is the owner-checked single-use bootstrap a human copies into a Claude Code
-session to turn it into this workspace's runner. It is minted from the Proxy page (or
-`POST /workspace/:urlKey/api/proxy/tokens` with `{ "runner": true }`), and the exchange yields a
+session to turn it into this workspace's runner. It is minted via `POST
+/workspace/:urlKey/api/proxy/tokens` with `{ "runner": true }` (the runner-prompt copy, LIN-3098,
+calls this), and the exchange yields a
 working token carrying the `take` + `dispatch` grants with the runner lifetimes above. The prompt
 body itself is the runner-prompt ticket's (LIN-3098); this is only the credential.
 

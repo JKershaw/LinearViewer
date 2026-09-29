@@ -178,6 +178,60 @@ describe('LIN-3131 S2b.2 — runner: true mints the owner-checked runner bootstr
 });
 
 // ---------------------------------------------------------------------------
+// L2 — the owner and workspace come from the session/route, never the body
+//
+// Review counselling (c50dfdd4 L2): mutation M8 (take `ownerAccountId` from
+// `req.body` before the session) survived, because no test posted a body that
+// DISAGREED with the session. These pin the authority source: the seam must be
+// asked about the session account and the route-resolved workspace id, and a
+// non-owner session cannot mint by naming the real owner in the body.
+// ---------------------------------------------------------------------------
+
+describe('LIN-3131 L2 — runner mint authority is session/workspace, never request body', () => {
+  const OWNER = 'account-owner';
+  // A realistic owner check: owner iff asked about the real owner account on the
+  // route's workspace id. Body-supplied values are NOT the owner.
+  const realisticOwnerCheck = async ({ workspaceId, accountId }) =>
+    (workspaceId === 'ws-1' && accountId === OWNER) ? { status: 'owner' } : { status: 'not-owner' };
+
+  test('L2 success: the seam is asked about the session account + route workspace, and they are persisted', async () => {
+    let seamArgs;
+    const { collection, proxyTokenStore } = harness({
+      ownerCheck: async (args) => { seamArgs = args; return realisticOwnerCheck(args); }
+    });
+    const app = buildApp({ proxyTokenStore, session: session({ accountId: OWNER }) });
+
+    // The body names a DIFFERENT owner and workspace. The route must ignore both.
+    const res = await call(app, { runner: true, ownerAccountId: 'attacker', workspaceId: 'other-ws' });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(
+      [seamArgs.workspaceId, seamArgs.accountId],
+      ['ws-1', OWNER],
+      'the owner check is asked about the route workspace + the session account, not the body'
+    );
+    const doc = collection._docs()[0];
+    assert.equal(doc.createdBy, OWNER, 'createdBy is the session account, never body ownerAccountId');
+    assert.equal(doc.workspaceId, 'ws-1', 'workspaceId is the route workspace, never body workspaceId');
+  });
+
+  test('L2 disagreement: a non-owner session naming the real owner in the body is still refused GRANT_OWNER_ONLY', async () => {
+    const { collection, proxyTokenStore } = harness({ ownerCheck: realisticOwnerCheck });
+    // Session account 'account-A' is NOT the owner; the body claims it is.
+    const app = buildApp({ proxyTokenStore, session: session() });
+
+    const res = await call(app, { runner: true, ownerAccountId: OWNER, workspaceId: 'ws-1' });
+
+    assert.equal(res.status, 403, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'GRANT_OWNER_ONLY');
+    assert.equal(collection._docs().length, 0, 'nothing is written on the refusal');
+    const body = JSON.stringify(res.body);
+    assert.ok(!body.includes(OWNER), 'the refusal never echoes the body owner');
+    assert.ok(!body.includes('ws-1') && !body.includes('other-ws'), 'nor a workspace id');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Refusals (P5) — one test per code
 // ---------------------------------------------------------------------------
 
