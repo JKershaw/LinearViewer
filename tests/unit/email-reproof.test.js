@@ -12,8 +12,13 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { MangoClient } from '@jkershaw/mangodb';
 import { startEmailAuthHarness, tokenFromOutbox, hiddenField, sha256 } from '../fixtures/email-auth-harness.js';
 import { reproofUrlForAccount, EMAIL_REPROOF_URL } from '../../lib/account-conflict.js';
+import { AccountStore } from '../../lib/account-store.js';
 
 describe('reproofUrlForAccount (S3-4)', () => {
   const store = {
@@ -22,6 +27,10 @@ describe('reproofUrlForAccount (S3-4)', () => {
       if (id === 'provider') return { _id: id, identities: [{ provider: 'linear', scope: 'v', credentials: {} }] };
       if (id === 'local-only') return { _id: id, identities: [{ provider: 'local', scope: 'w', credentials: {} }] };
       return null;
+    },
+    listEmailIdentities: async (id) => {
+      const account = await store.getAccount(id);
+      return (account?.identities || []).filter(i => i.provider === 'email').map(i => i.scope);
     },
   };
 
@@ -40,8 +49,34 @@ describe('reproofUrlForAccount (S3-4)', () => {
   });
 
   test('a store that throws degrades to the default (fails closed to the arm URL)', async () => {
-    const throwing = { getAccount: async () => { throw new Error('store down'); } };
+    const throwing = {
+      getAccount: async () => { throw new Error('store down'); },
+      listEmailIdentities: async () => { throw new Error('store down'); },
+    };
     assert.strictEqual(await reproofUrlForAccount(throwing, 'email-only', '/auth/linear'), '/auth/linear');
+  });
+});
+
+describe('reproofUrlForAccount uses the chain-aware email read (D2)', () => {
+  let dbDir;
+  let client;
+  let s;
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'email-reproof-d2-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+    s = new AccountStore({ collection: client.db('d2').collection('accounts') });
+  });
+  after(async () => { if (client?.close) await client.close(); if (dbDir) rmSync(dbDir, { recursive: true, force: true }); });
+
+  test('an address that lives only on a merged-away account still selects the email re-proof route', async () => {
+    const P = await s.createAccount();
+    await s.linkIdentity(P._id, 'local', 'p-local');
+    const E = await s.createAccount();
+    await s.linkIdentity(E._id, 'email', 'y@x.io');
+    await s.mergeAccounts(P._id, E._id, {});
+
+    assert.strictEqual(await reproofUrlForAccount(s, P._id, '/auth/linear'), EMAIL_REPROOF_URL);
   });
 });
 

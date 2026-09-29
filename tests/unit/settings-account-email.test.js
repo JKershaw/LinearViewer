@@ -33,7 +33,7 @@ describe('AccountStore.listEmailIdentities (S3-3)', () => {
     return new AccountStore({ collection: client.db(`se_${counter++}`).collection('accounts') });
   }
 
-  test('returns the account\'s email scopes, canonicalising a merged session', async () => {
+  test('returns the account\'s email scopes across the mergedInto chain (D2)', async () => {
     const s = store();
     const P = await s.createAccount();
     await s.linkIdentity(P._id, 'email', 'p@x.io');
@@ -41,8 +41,24 @@ describe('AccountStore.listEmailIdentities (S3-3)', () => {
     await s.linkIdentity(X._id, 'email', 'x@x.io');
     await s.mergeAccounts(P._id, X._id, {});
 
-    assert.deepStrictEqual(await s.listEmailIdentities(P._id), ['p@x.io']);
-    assert.deepStrictEqual(await s.listEmailIdentities(X._id), ['p@x.io'], 'a merged id resolves to canonical');
+    assert.deepStrictEqual(await s.listEmailIdentities(P._id), ['p@x.io', 'x@x.io'], 'the canonical account sees its merged-in email too');
+    assert.deepStrictEqual(await s.listEmailIdentities(X._id), ['p@x.io', 'x@x.io'], 'a merged id resolves to the same canonical chain view');
+  });
+
+  test('D2: after a fresh join-by-merge Settings shows the merged email and no add link', async () => {
+    const s = store();
+    const P = await s.createAccount();
+    await s.linkIdentity(P._id, 'linear', 'viewer', {});
+    const E = await s.createAccount();
+    await s.linkIdentity(E._id, 'email', 'y@x.io');
+    await s.mergeAccounts(P._id, E._id, {});
+
+    const emails = await s.listEmailIdentities(P._id);
+    assert.deepStrictEqual(emails, ['y@x.io'], 'the merged-away email is visible from canonical P');
+
+    const html = renderSettingsPage('Acme', { urlKey: 'acme', accountEmails: emails });
+    assert.match(html, /data-testid="settings-account-emails">y@x\.io</);
+    assert.doesNotMatch(html, /settings-account-add-email/);
   });
 
   test('returns [] for no id, no account, and a non-email-only account; never throws', async () => {

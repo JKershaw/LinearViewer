@@ -192,17 +192,12 @@ export function createEmailAuthRoutes({
   }
 
   // S3-4: the address the email re-proof sends its sign-in link to — any email
-  // identity already on P (canonical). Never affects who is allowed to sign in:
-  // confirming it goes through the N2 guard like any sign-in link.
+  // identity already on P (F15 chain-aware, LIN-1892 D2: an address that lives
+  // on an account merged into P still re-proves P). Never affects who is allowed
+  // to sign in: confirming it goes through the N2 guard like any sign-in link.
   async function primaryEmailForAccount(accountId) {
-    try {
-      const account = await accountStore.getAccount(await canonical(accountId));
-      const identity = (account?.identities || []).find(i => i.provider === 'email');
-      return identity?.scope || null;
-    } catch (err) {
-      console.error('[email-auth] re-proof address lookup failed:', err?.name || 'Error');
-      return null;
-    }
+    const emails = await accountStore.listEmailIdentities(accountId);
+    return emails[0] || null;
   }
 
   // F15 (LIN-1892) decision: the account home lists email identities across the
@@ -212,17 +207,9 @@ export function createEmailAuthRoutes({
   // (a stale phone session on X, merged into P) would otherwise stop seeing the
   // address it signs in with. Reading the alias chain keeps that address
   // visible, and makes a live canonical session and a stale merged session
-  // agree on the same set.
-  async function emailIdentitiesAcrossMerged(canonicalId) {
-    const account = await accountStore.getAccount(canonicalId);
-    const merged = await accountStore.listMergedAccounts(canonicalId);
-    const scopes = [account, ...merged]
-      .filter(Boolean)
-      .flatMap(a => a.identities || [])
-      .filter(i => i.provider === 'email')
-      .map(i => i.scope);
-    return [...new Set(scopes)];
-  }
+  // agree on the same set. That walk now lives in ONE place,
+  // `AccountStore.listEmailIdentities` (D2), which Settings, the prompt and
+  // `GET /account` all share.
 
   // S3-1/S3-4: the re-auth target for a stale conflict against the live account
   // P. It must re-prove P, never `/auth/email` — navigating a signed-in session
@@ -316,8 +303,8 @@ export function createEmailAuthRoutes({
         const workspaces = req.session.workspaces || [];
         if (workspaces.length > 0 && workspaces.every(w => w.isPAT)) return next();
 
-        const account = await accountStore.getAccount(await canonical(req.session.accountId));
-        const hasEmail = (account?.identities || []).some(i => i.provider === 'email');
+        const emails = await accountStore.listEmailIdentities(req.session.accountId);
+        const hasEmail = emails.length > 0;
         req.session.emailPrompt = hasEmail ? 'done' : 'shown';
         await saveSession(req.session);
         if (hasEmail) return next();
@@ -338,7 +325,7 @@ export function createEmailAuthRoutes({
     // workspaces to its first one (and sends this state back here — no loop,
     // the two conditions are exclusive).
     if (req.session.workspaces?.length > 0) return res.redirect('/');
-    const emails = await emailIdentitiesAcrossMerged(await canonical(req.session.accountId));
+    const emails = await accountStore.listEmailIdentities(req.session.accountId);
     res.set('Cache-Control', 'no-store');
     res.send(renderAccountHomePage({ emails }));
   });
@@ -549,7 +536,7 @@ export function createEmailAuthRoutes({
     //      token is spent if this refuses, which is harmless: nothing attached.
     if (consumed.mode === 'link') {
       if (!(await sameCanonicalAccount(req.session.accountId, consumed.linkToAccountId))) {
-        return res.status(409).send(renderEmailLinkWrongBrowserPage({ token: t, nonce }));
+        return res.status(409).send(renderEmailLinkWrongBrowserPage({ consumed: true }));
       }
       return await completeLinkMode(req, res, { emailNorm, next: req.body?.next });
     }

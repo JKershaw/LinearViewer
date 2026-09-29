@@ -103,12 +103,34 @@ describe('the prompt fires once under an enabling mode', () => {
     assert.strictEqual((await browser.session()).emailPrompt, 'done');
   });
 
+  test('D2: an address on a merged-away account still marks a new P session done, with no redirect', async () => {
+    // P is a provider/local account with no own email; Y lives on E, merged into P.
+    const scope = `prompt-merged-${Date.now()}`;
+    const seen = harness.browser();
+    await seen.post('/__test/sign-in', { provider: 'local', scope, workspaceId: 'ws-1', urlKey: 'ws-1' });
+    const P = (await seen.session()).accountId;
+    const E = await harness.stores.accountStore.createAccount();
+    await harness.stores.accountStore.linkIdentity(E._id, 'email', `merged-${Date.now()}@x.io`);
+    await harness.stores.accountStore.mergeAccounts(P, E._id, { accountWorkspaceStore: harness.stores.accountWorkspaceStore });
+
+    const fresh = harness.browser();
+    await fresh.post('/__test/sign-in', { provider: 'local', scope, workspaceId: 'ws-1', urlKey: 'ws-1' });
+    const res = await fresh.get(WORKSPACE);
+    assert.strictEqual(res.status, 200, 'no redirect to the register step');
+    assert.strictEqual((await fresh.session()).emailPrompt, 'done');
+  });
+
   test('non-HTML, non-workspace-root and non-GET requests are untouched', async () => {
     const browser = await signIn(harness, { scope: `prompt-shapes-${Date.now()}` });
     const json = await browser.get(WORKSPACE, { headers: { Accept: 'application/json' } });
     assert.strictEqual(json.status, 200, 'non-HTML passes through');
     const other = await browser.get('/auth/email');
     assert.strictEqual(other.status, 200, 'a non-workspace-root path is untouched');
+
+    // N2 (LIN-1892 S3 review): a non-GET request with an HTML Accept must not
+    // be redirected into the prompt — the gate is method-first.
+    const posted = await browser.post(WORKSPACE, {});
+    assert.notStrictEqual(posted.status, 302, 'a non-GET request is not redirected to the prompt');
     assert.strictEqual((await browser.session()).emailPrompt, undefined);
   });
 

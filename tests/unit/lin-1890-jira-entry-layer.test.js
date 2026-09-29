@@ -120,6 +120,13 @@ function makeAccountStores() {
       // This fake models no merging, so canonicalization is always a no-op —
       // mirrors AccountStore.resolveCanonicalAccountId's no-mergedInto case.
       async resolveCanonicalAccountId(accountId) { return accountId ?? null; },
+      // D2 (LIN-1892 S3 review): the chain-aware email read; with no merging
+      // modelled, the chain is just the account's own email identities.
+      async listEmailIdentities(accountId) {
+        return [...identities.values()]
+          .filter(v => v._id === accountId && v.provider === 'email')
+          .map(v => v.scope);
+      },
     },
     accountWorkspaceStore: { async bindAccountToWorkspace(accountId, workspaceId) { bound.push([accountId, workspaceId]); return true; } },
   };
