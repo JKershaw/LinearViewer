@@ -326,6 +326,16 @@ describe('isProxiablePath', () => {
     ['/api/proxy/issues/LIN-1?x=1', true],
     ['/api/proxy/token', false],
     ['/api/proxy/token?x=1', false],
+    // F1: Express 4 routes case-insensitively and non-strictly, so each of
+    // these reaches POST /api/proxy/token on the real server.
+    ['/api/proxy/token/', false],
+    ['/api/proxy/token//', false],
+    ['/api/proxy/Token', false],
+    ['/api/proxy/TOKEN?x=1', false],
+    ['/api/proxy/tOkEn/?x=1', false],
+    ['/api/proxy//token', false],
+    ['/api/proxy/tokens', true],
+    ['/api/proxy/token/extra', true],
     ['/api/proxy/../admin', false],
     ['/api/proxy/%2e%2e/admin', false],
     ['/api/proxyx/foo', false],
@@ -403,8 +413,10 @@ describe('the broker over its socket (in-process)', () => {
       const r = await brokerRequest(broker.socketPath, { path });
       assert.equal(r.status, 404, path);
     }
-    const mint = await brokerRequest(broker.socketPath, { method: 'POST', path: '/api/proxy/token', headers: { 'X-Harbour-Intent': 'write' } });
-    assert.equal(mint.status, 404, 'the mint endpoint is never reachable through the broker');
+    for (const path of ['/api/proxy/token', '/api/proxy/token/', '/api/proxy/Token', '/api/proxy/TOKEN?x=1']) {
+      const mint = await brokerRequest(broker.socketPath, { method: 'POST', path, headers: { 'X-Harbour-Intent': 'write' } });
+      assert.equal(mint.status, 404, `${path}: the mint endpoint is never reachable through the broker`);
+    }
     assert.equal(harbour.seen.length, before);
     assert.equal(harbour.exchanges, 1);
   });
