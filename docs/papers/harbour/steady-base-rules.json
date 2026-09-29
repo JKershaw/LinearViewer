@@ -1,0 +1,6072 @@
+{
+ "coverage": "Repo HEAD 8f5fe4aa (2026-09-29). FULL CENSUS (sampled=false): every rule in the 'review' (58 rules), 'close-out' (44), 'plan-review' (16) and 'implementation' (18) templates of lib/prompt-template-defs.js, counting only each template's own text; shared formatter sections they inline (formatReadOnlyWorkflow, formatAttachmentPerceptionCheck, formatPlanFidelityCheck, formatCiGateCheck, formatIfBlocked) are counted under 'formatters', not here. Also every rule in lib/prompts/autopilot-kickoff.js (77 rules), counting each rendering variant once (stepper, readonly/write, budgeted, scoped/general variants are included and tagged in the summary); standalone-only alternates of the same rules and the inlined handbook (docs/autopilot-operating-manual.md) are excluded. SYSTEMATIC SAMPLE (sampled=true): every rule in each source was enumerated in file order, and rules #1, #4, #7, ... were kept. Full enumerations are in parts/<source>.enum.txt. Populations and kept counts: plan 31 -> 11; research 26 -> 9; formatters 20 -> 7; passage-runner (body after the first '---' in docs/passage-runner-prompt.md) 35 -> 12; meta-prompt (the metaPrompt literal in lib/prompts/meta-prompt-template.js, conditional and flag-gated blocks included, quality-rule bullets split per numbered/lettered clause) 204 -> 68. The formatters population is appendGroundingSections' four sections, formatAttachmentsSection, formatCiGateCheck, formatPlanFidelityCheck, formatAttachmentPerceptionCheck, formatScaleToTask and formatIfBlocked; feature-flag-gated toggles are excluded. Population byte totals for the sampled sources, summed over all enumerated rules: plan 10915, research 8656, formatters 7361, passage-runner 11844, meta-prompt 96083. bytes = UTF-8 length of the rule's source text with JS quote wrappers, escapes, indentation and // comments stripped (scratchpad/build.py; tokens ~ bytes/4). Enforcement: runtime-code needs a runtime refusal, flag or deterministic performance. Metric and eval scripts (follow-on-ratio.js, plan-review-round-trips.js, scripts/eval-*) do not count. A tests/unit assertion that the text is present counts as prose-pinned-by-test, including weak anchor-word pins.",
+ "rules": [
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 101,
+   "summary": "[stepper] Beat 1 fresh as ROOT; later beats followUpTo ROOT, force:true, same cli/web target, own sessionId",
+   "bytes": 608,
+   "tickets": [
+    "LIN-791",
+    "LIN-1324"
+   ],
+   "incident": "Omitting the wake edge starved beat 4 of its wake (LIN-1324)",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:811",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "beat 1/",
+   "class": "convert-to-code",
+   "class_reason": "Dispatch fields (followUpTo=ROOT, force, same target) are mechanically checkable; only the cli/web target is refused at runtime (lib/dispatch-validation.js:236)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 106,
+   "summary": "[stepper] Set BOTH subscription:'everything' (wake) and waitForFollowUps:true (hold) on every beat",
+   "bytes": 895,
+   "tickets": [
+    "LIN-845",
+    "LIN-901"
+   ],
+   "incident": "Without the hold the worker finalized after beat 1; cold --resume lost memory",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:813",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "waitForFollowUps: true",
+   "class": "convert-to-code",
+   "class_reason": "A stepper beat missing either flag could be defaulted or refused at the dispatch seam; routes only type-check the booleans (routes/proxy-dispatch.js:293)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 136,
+   "summary": "[stepper] After dispatching a beat, stop and stand by for the push; never build a long-poll watch",
+   "bytes": 1326,
+   "tickets": [
+    "LIN-843",
+    "LIN-831"
+   ],
+   "incident": "Hand-rolled long-poll caused beat-boundary deadlock and the LIN-831 wedge",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:825",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "standing by for the wake",
+   "class": "keep-prose",
+   "class_reason": "Agent-side waiting behaviour; no seam can observe that an orchestrator is polling rather than idle. Restated in hard rules below."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 149,
+   "summary": "[stepper] A beat woken as blocked is not a wedge: surface it to the human; exemption ends when unblocked",
+   "bytes": 637,
+   "tickets": [
+    "LIN-2332"
+   ],
+   "incident": "Old clause's premise (blocked beats stay silent) was false",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:907",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "blocked — surfacing to the human",
+   "class": "keep-prose",
+   "class_reason": "Judgement about silence vs wedge; LIN-2332 replaced an earlier false clause, so this is a patch on the wedge rule."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 156,
+   "summary": "[stepper] After ~30 min silence send one followUpTo ROOT liveness nudge, then re-dispatch; don't poll",
+   "bytes": 213,
+   "tickets": [
+    "LIN-843"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:987",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "still working? report where things stand",
+   "class": "convert-to-code",
+   "class_reason": "A fixed 30-minute silence ceiling is a timer the runner/dispatch store could fire itself instead of the orchestrator watching the clock."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 163,
+   "summary": "[stepper] Judge and challenge each beat's recap; send a labelled corrective followUpTo before advancing",
+   "bytes": 362,
+   "tickets": [
+    "LIN-791",
+    "LIN-1324"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:817",
+   "duplicated_in": [],
+   "signature": "corrective",
+   "class": "keep-prose",
+   "class_reason": "Judging whether tests are real and the plan was followed is model judgement no check makes."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 186,
+   "summary": "[stepper] Do not one-shot the worker prompt or run the standard loop; run the beat loop instead",
+   "bytes": 487,
+   "tickets": [
+    "LIN-788",
+    "LIN-791"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Selects which loop governs the run; framing a disposition, not checkable at a seam."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 193,
+   "summary": "[stepper] Confirm a single task first; for a batch dispatch one stepper child autopilot per task, concurrently",
+   "bytes": 537,
+   "tickets": [
+    "LIN-888",
+    "LIN-874"
+   ],
+   "incident": "Stepper stepped into the first task of a batch",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:853",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "child autopilot per task",
+   "class": "convert-to-code",
+   "class_reason": "Whether the goal names more than one task is detectable at kickoff build time; the server could refuse or route a multi-task stepper run."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 198,
+   "summary": "[stepper] Hold a waits-on child until its blocker is judged clean; never close a DONE child; stalled child never blocks siblings",
+   "bytes": 595,
+   "tickets": [
+    "LIN-874",
+    "LIN-1206"
+   ],
+   "incident": "Serial child coordination stalled batches",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:863",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "held back until",
+   "class": "keep-prose",
+   "class_reason": "Judging a blocker \"clean\" is judgement; the DONE-close half is already runner code (../simple-dispatcher/reapers.js:3410)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 208,
+   "summary": "[stepper] Read the worker prompt via GET /recommend/{id}, not the fused dispatch verb",
+   "bytes": 200,
+   "tickets": [
+    "LIN-791"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Procedural instruction on which read verb exposes the body; low cost, no violation mode worth code."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 210,
+   "summary": "[stepper] Decompose into 3–6 ordered beats of ONE kind; never chain into review",
+   "bytes": 231,
+   "tickets": [
+    "LIN-791"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:809",
+   "duplicated_in": [],
+   "signature": "beat 1/",
+   "class": "convert-to-code",
+   "class_reason": "Beat count bound (3–6) and single-kind constraint are countable from beat labels/kinds at the dispatch seam."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 216,
+   "summary": "[stepper] Treat a mid-chain PENDING wake as a clean advance, not a fault",
+   "bytes": 308,
+   "tickets": [
+    "LIN-843"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:816",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Interpretive guidance on a signal; nothing to enforce."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 219,
+   "summary": "[stepper] Before concluding, post a run-summary comment: beats run, evidence, what holds, what's left",
+   "bytes": 186,
+   "tickets": [
+    "LIN-791"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:818",
+   "duplicated_in": [],
+   "signature": "run summary",
+   "class": "convert-to-code",
+   "class_reason": "Presence of a run-summary comment at run end is mechanically checkable (a completion check on the orchestrator row)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 223,
+   "summary": "[stepper] Warm single session is default; fresh-per-beat only as emergency fallback",
+   "bytes": 222,
+   "tickets": [
+    "LIN-791"
+   ],
+   "incident": "Fresh-per-beat lost memory and paid re-orientation every beat",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Whether later beats carry followUpTo=ROOT is visible on dispatch rows; largely restates beat 3 (self-duplicate)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 226,
+   "summary": "[stepper] Label every send 'beat N/M: <label>', including corrective follow-ups",
+   "bytes": 171,
+   "tickets": [
+    "LIN-791"
+   ],
+   "incident": "Run 2 left default \"Prompt\" labels, breaking progress tracking",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:815",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "beat N/M:",
+   "class": "convert-to-code",
+   "class_reason": "Label format is a regex; the dispatch seam could reject or auto-label stepper beats."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 228,
+   "summary": "[stepper] Reference files by repo-relative paths in beat prompts; worker checks its own pwd",
+   "bytes": 432,
+   "tickets": [
+    "LIN-1124"
+   ],
+   "incident": "Absolute path from orchestrator's clone sent worker down wrong tree, wedging beat",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Absolute paths in a beat prompt are lint-detectable at dispatch (a regex on the prompt body)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 178,
+   "summary": "[stepper] Hard rule: followUpTo always ROOT; force, subscription, waitForFollowUps on every beat",
+   "bytes": 290,
+   "tickets": [
+    "LIN-845",
+    "LIN-901"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "followUpTo: ROOT",
+   "class": "retire",
+   "class_reason": "Verbatim restatement of beat step 3 within the same prompt."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 181,
+   "summary": "[stepper] Hard rule: stand by for the push; never long-poll or idle on PENDING",
+   "bytes": 192,
+   "tickets": [
+    "LIN-843"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates beat step 4 within the same prompt."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 331,
+   "summary": "Orchestrator does not write code or hold its details; the worker does",
+   "bytes": 119,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Role/altitude disposition; not observable at a seam."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 334,
+   "summary": "Read the handbook first; run the machinery through its lens",
+   "bytes": 347,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "The handbook is composed inline directly above; \"read it first\" adds nothing a model would not do."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 402,
+   "summary": "Human owns 'worth it' and 'done'; never redefine goals or ticket intent; flag value/direction decisions",
+   "bytes": 241,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Which decisions are value/direction is judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 405,
+   "summary": "Treat 'done' as a claim until you fetch proof: commit, PR, green CI, state change, evidence URLs",
+   "bytes": 246,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:31",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "verified:",
+   "class": "keep-prose",
+   "class_reason": "Core disposition; the fetch itself is agent behaviour (Harbour does post [evidence] URLs, but nothing checks the orchestrator read them)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 408,
+   "summary": "Narrate freely; never touch the north star or a definition of done",
+   "bytes": 140,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Orchestrator writes to north-star/definition-of-done fields could be refused by token scope at the proxy."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 410,
+   "summary": "Hold the task header, not the task; pull full prompt or feedback only when a decision needs it",
+   "bytes": 143,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:32",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Context-economy judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 413,
+   "summary": "Dispatch is mandate for reversible work; never hold a call waiting for a live reply outside the four lines",
+   "bytes": 323,
+   "tickets": [
+    "LIN-1365",
+    "LIN-1127"
+   ],
+   "incident": "Orchestrators stalled waiting for a human go-ahead that never came",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:47",
+   "duplicated_in": [
+    "lib/proxy-preamble.js",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Anti-stall disposition; restated in proxy preamble for every dispatch."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 416,
+   "summary": "Merge and Done need a recorded independent review Approve plus discharged/empty ledger, verified on the issue",
+   "bytes": 227,
+   "tickets": [
+    "LIN-1365"
+   ],
+   "incident": "Token/dispatch conflated with authorization to merge",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:54",
+   "duplicated_in": [
+    "lib/proxy-preamble.js",
+    "lib/proxy-instructions.js",
+    "close-out"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "No code gates merge on a recorded Approve (no merge verb exists in routes/); a merge-gate check on the verdict+ledger comments is mechanically possible."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 418,
+   "summary": "Unprovable ledger items discharge via review's named monitor/rollback; risky undischarged items need a human naming the precondition",
+   "bytes": 464,
+   "tickets": [
+    "LIN-1579"
+   ],
+   "incident": "Blanket \"human sign-off for risky merges\" clause contradicted other surfaces",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:62",
+   "duplicated_in": [
+    "review",
+    "close-out",
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the review/close-out proportional lane (LIN-1579 amends LIN-1365); close-out applies it, the orchestrator never does."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 424,
+   "summary": "The proxy token authenticates the channel; it is not permission to merge",
+   "bytes": 67,
+   "tickets": [
+    "LIN-1365"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:55",
+   "duplicated_in": [
+    "lib/proxy-preamble.js",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the preceding \"not authorization for the irreversible finish\" sentence."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 424,
+   "summary": "Human watches asynchronously; don't hold for confirmation — check against the four lines and flag in one line",
+   "bytes": 736,
+   "tickets": [
+    "LIN-1127"
+   ],
+   "incident": "Holds for confirmation hung until the run was reaped",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Disposition against over-halting; judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 438,
+   "summary": "Use the supplied readWrite proxy token for every proxy call, including dispatched worker prompts",
+   "bytes": 88,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Every proxy call already fails 401 without a valid token (authenticateProxyToken), so the rule is self-enforcing."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 444,
+   "summary": "Drill into a task's full detail via GET /brief only after picking it",
+   "bytes": 81,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restated in the general first-act block (\"Pull a task's full detail ... only once you've picked it\")."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 449,
+   "summary": "Plain POST /dispatch only for human-supplied prompts; resume sessions via followUpTo on recommend-and-dispatch",
+   "bytes": 180,
+   "tickets": [
+    "LIN-321"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Whether a plain /dispatch carries a human-authored prompt vs orchestrator-authored is detectable by caller token kind; could be refused."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 343,
+   "summary": "Pass your session id as sessionId on every worker dispatch, recommend-and-dispatch, and followUpTo nudge",
+   "bytes": 461,
+   "tickets": [
+    "LIN-599",
+    "LIN-1117"
+   ],
+   "incident": "Spawned work did not group into one session",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md",
+    "docs/passage-runner-prompt.md"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "The server knows the caller is an autopilot dispatch (appendAutopilotSessionRef); it could stamp sessionId itself instead of asking."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 455,
+   "summary": "Pick next by policy: explicit human goal, else top of stack; say what you picked in a line",
+   "bytes": 261,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:543",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "oriented: top of stack is",
+   "class": "retire",
+   "class_reason": "Two-level order is explicitly superseded by the general first-act three-level order (LIN-1829) and moot in scoped runs; it never governs a run."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 457,
+   "summary": "Re-read the handbook via GET /autopilot/manual at the top of each loop",
+   "bytes": 212,
+   "tickets": [
+    "LIN-467"
+   ],
+   "incident": "Orchestrator lost altitude on long runs",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Self-refresh habit; unobservable except as a GET count."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 461,
+   "summary": "Trigger steps via POST /recommend-and-dispatch with sessionId; never read or hold the prompt body",
+   "bytes": 614,
+   "tickets": [
+    "LIN-321"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "The fused verb already hides the body server-side, so compliance is structural; wording is guidance on which verb to use."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 466,
+   "summary": "Read kind sequence as health: research→plan→impl→review→close-out converging; same kind repeating is looping",
+   "bytes": 307,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "looping",
+   "class": "convert-to-code",
+   "class_reason": "Kind sequence per task is in dispatch history; a loop detector could flag repeats instead of the orchestrator eyeballing it."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 469,
+   "summary": "One plan→plan-review→plan round trip is converging; a second is looping — escalate, never run a third",
+   "bytes": 323,
+   "tickets": [
+    "LIN-1603"
+   ],
+   "incident": "Plan-review loops burned 4+ sessions with zero commits",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md",
+    "meta-prompt",
+    "plan"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Round-trip count is computed by lib/plan-review-round-trips.js (measurement only; 33/94 tickets exceeded one cycle); a dispatch refusal could enforce it."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 472,
+   "summary": "If recommend-and-dispatch times out or errors, halt; never hand-write your own prompt",
+   "bytes": 148,
+   "tickets": [
+    "LIN-321"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Halt disposition; overlaps the halt paragraph below."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 474,
+   "summary": "On a clearly wrong verb, pin it via kind on recommend-and-dispatch and note why; never hand-write the prompt",
+   "bytes": 486,
+   "tickets": [
+    "LIN-573"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "kind override",
+   "class": "keep-prose",
+   "class_reason": "Recognising a wrong verb is judgement; the kind override itself is recorded by code."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 374,
+   "summary": "After dispatching, stop and stand by for the push wake; never poll or build a watch loop",
+   "bytes": 1015,
+   "tickets": [
+    "LIN-826"
+   ],
+   "incident": "Old long-poll watch loop kept orchestrator busy so wakes could not land",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:103",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Agent waiting behaviour not observable at a seam; the old long-poll rule was removed (1403655c/5fc2bdd7)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 386,
+   "summary": "A step woken as blocked is not a wedge; surface it to the human; exemption lasts only while blocked",
+   "bytes": 745,
+   "tickets": [
+    "LIN-2332"
+   ],
+   "incident": "Earlier clause wrongly claimed blocked steps stay silent",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:137",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement on silence; LIN-2332 replaced a false premise (patch on the wedge rule)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 393,
+   "summary": "After ~30 min silence send a one-line liveness followUpTo nudge; if it can't resume, re-dispatch or hand back",
+   "bytes": 387,
+   "tickets": [],
+   "incident": "Silent workers wedged runs indefinitely",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:118",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "still working? report where things stand",
+   "class": "convert-to-code",
+   "class_reason": "A 30-minute zero-activity timer is mechanical; the runner or dispatch store could emit the nudge or a wedged wake."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 482,
+   "summary": "Read worker's last lines; a done that is still waiting is not-yet — confirm CI/substitute before advancing",
+   "bytes": 993,
+   "tickets": [
+    "LIN-1455"
+   ],
+   "incident": "Workers exited done while CI still running",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:161",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "confirm CI went green and report the run URL",
+   "class": "keep-prose",
+   "class_reason": "Reading whether closing words mean waiting is judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 492,
+   "summary": "On done, fetch evidence URLs; confirm the kind's real deliverable changed, else flag 'claimed, not verified'",
+   "bytes": 543,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:156",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "claimed, not verified",
+   "class": "convert-to-code",
+   "class_reason": "Per-kind deliverable existence (commit/PR/plan in description/state change) is largely checkable; completion-signal code could verify rather than the orchestrator."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 499,
+   "summary": "Hand heavy cross-check reading (CI traces, diffs, logs) to a sub-agent; ask for verdict plus evidence",
+   "bytes": 779,
+   "tickets": [
+    "LIN-467"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md",
+    "docs/worker-lane-prompt.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Context-management judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 508,
+   "summary": "After each step, give the human a short line and decide continue/complete/pause; continue is common",
+   "bytes": 231,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "continue",
+   "class": "keep-prose",
+   "class_reason": "Decision judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 511,
+   "summary": "On complete: scoped run stops; never close DONE sessions or abort child autopilots — the runner reaps them",
+   "bytes": 768,
+   "tickets": [
+    "LIN-1206",
+    "LIN-1071"
+   ],
+   "incident": "Autopilot closed windows itself; replaced by runner close-on-DONE",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:196",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Runner already closes DONE windows (../simple-dispatcher/reapers.js:3410); rule only forbids a now-obsolete act. LIN-1206 reverses LIN-1071."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 519,
+   "summary": "Pause for the human on direction questions, risky changes, uncleared blockers, sprawl, contradicting evidence; use handbook hand-back",
+   "bytes": 461,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:288",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Pointer to handbook; which moments are the human's is judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 527,
+   "summary": "Merge/close are not the orchestrator's; close-out owns merge, Done, summary, archive/prune, follow-ups",
+   "bytes": 855,
+   "tickets": [
+    "LIN-804",
+    "LIN-1770"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "review",
+    "close-out",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "scope-to-risk-tier",
+   "class_reason": "Nothing in code stops the orchestrator merging (no merge seam in routes/); restates close-out prune rules on every run, trivial or not."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 537,
+   "summary": "On Approve, dispatch close-out via recommend-and-dispatch, then verify PR merged, CI green on landed commit, task Done",
+   "bytes": 619,
+   "tickets": [
+    "LIN-804",
+    "LIN-1455"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:90",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md",
+    "self"
+   ],
+   "signature": "dispatched close-out",
+   "class": "keep-prose",
+   "class_reason": "Routing to close-out is done by the engine; verification of the finish is orchestrator judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 543,
+   "summary": "On conditional Approve let close-out discharge the ledger; don't judge it informally; close-out authors only trivial named edits",
+   "bytes": 370,
+   "tickets": [
+    "LIN-804",
+    "LIN-3033"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "close-out",
+    "review"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates close-out's own authoring bound (LIN-3033 amends LIN-804 wording); the orchestrator never performs it."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 548,
+   "summary": "Finish lines are only task verified complete or a human-review point; extra settle pass is normal",
+   "bytes": 440,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:95",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Stopping judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 553,
+   "summary": "[budgeted] Run covers up to N distinct tasks; on 409 BUDGET_EXHAUSTED wind down and report",
+   "bytes": 420,
+   "tickets": [
+    "LIN-1751"
+   ],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:433",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "BUDGET_EXHAUSTED",
+   "class": "retire",
+   "class_reason": "Server refuses the NEW-task dispatch; restated three times (snapshot, finish line, instruments)."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 565,
+   "summary": "[budgeted] Any one task may take at most N worker sessions, enforced server-side",
+   "bytes": 318,
+   "tickets": [
+    "LIN-2934"
+   ],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:450",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "sessionsPerTask",
+   "class": "retire",
+   "class_reason": "Server-enforced; restated three times in the same prompt."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 570,
+   "summary": "At run end close nothing: no cascade or reaper; just stop and report",
+   "bytes": 992,
+   "tickets": [
+    "LIN-1206"
+   ],
+   "incident": "End-of-run close --cascade removed when runner took over DONE close",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:175",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Runner owns DONE close (../simple-dispatcher/reapers.js:3410); rule survives only to countermand the removed cascade instruction."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 586,
+   "summary": "Treat terminal done as 'go look', never proof; a done waiting on CI/deploy ended mid-flight",
+   "bytes": 478,
+   "tickets": [],
+   "incident": "Workers backgrounded commands and posted done before work landed",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:40",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates cross-check step 4 almost verbatim in the same prompt."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 591,
+   "summary": "A [stalled?] with last tool Bash is usually a long command; check before re-dispatching",
+   "bytes": 169,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Known-quirk fact; cheap and useful."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 593,
+   "summary": "wait=50 is a one-off liveness check, never a standing watch loop; 30-min ceiling applies",
+   "bytes": 801,
+   "tickets": [
+    "LIN-1324"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates step 3 stand-by and 30-minute rules."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 601,
+   "summary": "In shell loops never name the variable status (zsh read-only)",
+   "bytes": 178,
+   "tickets": [
+    "LIN-326"
+   ],
+   "incident": "zsh reserved $status aborted poll-loop assignment",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Only mattered for the removed poll loop; the prompt now forbids poll loops."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 603,
+   "summary": "Don't set a short client timeout on /recommend; it can run past 25s",
+   "bytes": 134,
+   "tickets": [
+    "LIN-467"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Instrument fact; cheap."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 605,
+   "summary": "On 409 DUPLICATE_DISPATCH adopt the returned id and stand by; never retry, reword, count a strike, or halt",
+   "bytes": 770,
+   "tickets": [
+    "LIN-1656"
+   ],
+   "incident": "Two sessions doing the same work",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:319",
+   "duplicated_in": [
+    "docs/passage-runner-prompt.md",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "adopting the existing dispatch",
+   "class": "keep-prose",
+   "class_reason": "Server refuses the duplicate; the prose only prevents the orchestrator misreading the 409 as a failure."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 614,
+   "summary": "[budgeted] On 409 task budget: wind down, comment naming bound and ledger, post summary, stop",
+   "bytes": 790,
+   "tickets": [
+    "LIN-1751",
+    "LIN-2934"
+   ],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:433",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "bound that was hit",
+   "class": "keep-prose",
+   "class_reason": "Refusal is runtime; the wind-down comment is agent behaviour."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 624,
+   "summary": "[budgeted] On 409 per-task session budget: comment naming bound and ledger, post summary, stop",
+   "bytes": 678,
+   "tickets": [
+    "LIN-2934"
+   ],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:450",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "bound that was hit",
+   "class": "keep-prose",
+   "class_reason": "Refusal is runtime; the report is agent behaviour."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 632,
+   "summary": "Space requests under 60/min rate limit",
+   "bytes": 55,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "routes/proxy.js:256",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "express-rate-limit enforces 60/min; the prompt now forbids polling anyway."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 634,
+   "summary": "On network error, timeout, 5xx, or unparseable response: halt, say what failed, wait; never improvise",
+   "bytes": 548,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "halt",
+   "class": "keep-prose",
+   "class_reason": "Distinguishing breakage from known quirks is judgement."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 643,
+   "summary": "Every turn restate to yourself role, next allowed action, task header, strike counters",
+   "bytes": 143,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Internal self-talk; unobservable."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 645,
+   "summary": "Narrate to the human one line per loop boundary",
+   "bytes": 80,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "dispatched ",
+   "class": "keep-prose",
+   "class_reason": "Narration habit; format could be linted but lines are free text."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 654,
+   "summary": "[readonly] Don't use recommend-and-dispatch; hand-author investigation prompts via POST /dispatch forbidding code/PR/state changes",
+   "bytes": 722,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:735",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "no code changes, no PRs, no tracker state changes",
+   "class": "convert-to-code",
+   "class_reason": "Read-only is an admitted convention, not enforced; the proxy could refuse writes and the fused verb for a readonly-run token."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 662,
+   "summary": "[write] Drive through close via close-out, never merge inline; pause before large or risky changes land",
+   "bytes": 406,
+   "tickets": [
+    "LIN-804"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:81",
+   "duplicated_in": [
+    "self",
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the finish-line section in the same prompt."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 672,
+   "summary": "[budgeted] State task budget up front; wind down and post summary as you approach it",
+   "bytes": 289,
+   "tickets": [
+    "LIN-1751"
+   ],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:433",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Server enforces; third restatement of the task budget in the same prompt."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 676,
+   "summary": "[budgeted] Per-task session budget stated up front; plan pace per task",
+   "bytes": 352,
+   "tickets": [
+    "LIN-2934"
+   ],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:450",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Server enforces; restated in finish line and instruments."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 693,
+   "summary": "[scoped] Loop only on the pinned task until complete or a human point; never pull other tasks off the stack",
+   "bytes": 428,
+   "tickets": [
+    "LIN-2818"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:396",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "A scoped run could be refused dispatches for other issueIdentifiers (maxTasks=1-style guard) instead of asking."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 703,
+   "summary": "[scoped] First read the brief (and raw issue), then trigger recommend-and-dispatch and go; dispatch is the go-ahead",
+   "bytes": 650,
+   "tickets": [
+    "LIN-2804"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:386",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Opening procedure; low-risk guidance."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 707,
+   "summary": "[general] Check periodicals first, per repo lane; precedence is goal > due periodical > top of stack",
+   "bytes": 819,
+   "tickets": [
+    "LIN-1829",
+    "LIN-1932"
+   ],
+   "incident": "Aggregated periodical state hid which repo was overdue",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:349",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "A fixed precedence policy (\"not a judgment call\") over computed state; the stack endpoint could rank due periodicals itself. Amends the Orient rule."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 716,
+   "summary": "[general] Stamp periodicalId only on the chain-opening recommend-and-dispatch; never on followUpTo beats",
+   "bytes": 583,
+   "tickets": [
+    "LIN-2385"
+   ],
+   "incident": "Cadence ledger could not see periodical runs",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "periodicalId",
+   "class": "convert-to-code",
+   "class_reason": "Later stamps are already ignored in code (lib/periodical-runs.js:134); the server could stamp the opening call from the chosen periodical."
+  },
+  {
+   "source": "autopilot-kickoff",
+   "sampled": false,
+   "line": 723,
+   "summary": "[general] Fetch stack digest, orient under policy, announce choice; pull full detail only once picked",
+   "bytes": 437,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/autopilot-kickoff.test.js:318",
+   "duplicated_in": [
+    "docs/autopilot-kickoff.md"
+   ],
+   "signature": "oriented:",
+   "class": "keep-prose",
+   "class_reason": "Opening procedure."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1141,
+   "summary": "Read the review verdict and the gaps it flagged as not covered by CI.",
+   "bytes": 112,
+   "tickets": [
+    "LIN-810"
+   ],
+   "incident": "Heading-keyed ledger gate caused a review/close-out loop",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2872",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Reads substance fuzzily by design (LIN-810)."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1142,
+   "summary": "Do not proceed past the gate until the ledger is satisfied; everything after is irreversible.",
+   "bytes": 172,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restated by the Ledger Gate section and the All-Clear condition in the same prompt."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1143,
+   "summary": "Merge only after the gate passes, re-checking CI (or substitute) on a fresh read of the exact commit.",
+   "bytes": 216,
+   "tickets": [
+    "LIN-550",
+    "LIN-1455"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "autopilot-kickoff",
+    "docs/autopilot-operating-manual.md",
+    "meta-prompt"
+   ],
+   "signature": "--match-head-commit",
+   "class": "convert-to-code",
+   "class_reason": "A merge wrapper using --match-head-commit plus a checks query refuses a stale or red head."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1144,
+   "summary": "Verify on the landed commit and set Done in-session; no \"confirm it works\" follow-up.",
+   "bytes": 286,
+   "tickets": [
+    "LIN-1579"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3755",
+   "duplicated_in": [
+    "self",
+    "meta-prompt",
+    "docs/worker-lane-prompt.md",
+    "lib/completion-signals.js"
+   ],
+   "signature": "verified on the landed commit",
+   "class": "retire",
+   "class_reason": "Restated in full by \"Close the bookkeeping here\" and All-Clear item 2."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1145,
+   "summary": "Summary comment: what merged, how each ledger item was discharged or accepted, and final CI state.",
+   "bytes": 216,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "discharged",
+   "class": "convert-to-code",
+   "class_reason": "Summary must carry one line per ledger item plus CI state: structurally checkable."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1146,
+   "summary": "Archive a pre-prune snapshot, then prune superseded stage-artifact sections.",
+   "bytes": 155,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2984",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restated as All-Clear item 4 and the Archive & Prune section."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1147,
+   "summary": "File remaining outside follow-ups, routed, linked, with priority and type label, after checking none exists.",
+   "bytes": 324,
+   "tickets": [
+    "LIN-2309",
+    "LIN-3006",
+    "LIN-2991",
+    "LIN-3022"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3194",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Summary of All-Clear item 5 and Follow-up Triage in the same prompt."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1158,
+   "summary": "Don't re-review; author a change only if review named its exact content and it is trivial, else hold and route.",
+   "bytes": 870,
+   "tickets": [
+    "LIN-3033"
+   ],
+   "incident": "Close-out merged content review never saw",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2664",
+   "duplicated_in": [
+    "autopilot-kickoff",
+    "docs/autopilot-operating-manual.md",
+    "meta-prompt"
+   ],
+   "signature": "implementation, then review",
+   "class": "keep-prose",
+   "class_reason": "LIN-3033 amends LIN-2825/550; \"review-named\" is judgement, size half is mechanical (see hunk bound)."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1166,
+   "summary": "Never merge or set Done while any ledger item is undischarged; route depends on inside/outside mark.",
+   "bytes": 205,
+   "tickets": [
+    "LIN-550",
+    "LIN-1871"
+   ],
+   "incident": "Irreversible finish had no owner or gate",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2536",
+   "duplicated_in": [
+    "autopilot-kickoff",
+    "lib/proxy-instructions.js",
+    "lib/proxy-preamble.js",
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "ledger item",
+   "class": "convert-to-code",
+   "class_reason": "Central gate is prose-only: proxy could refuse Done absent a recorded Approve; per-item discharge stays judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1167,
+   "summary": "Inside item discharges only by cited done-evidence or a justified explicit drop; filing never discharges; no Done otherwise.",
+   "bytes": 1025,
+   "tickets": [
+    "LIN-2825",
+    "LIN-3006"
+   ],
+   "incident": "Inside-scope work was discharged by filing follow-up tickets",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2565",
+   "duplicated_in": [
+    "review",
+    "meta-prompt"
+   ],
+   "signature": "explicit drop",
+   "class": "keep-prose",
+   "class_reason": "LIN-3006 amends LIN-2825 (materiality bar); evidence quality is judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1167,
+   "summary": "Self-authored discharge must quote review verbatim, be at most 2 files/3 hunks, add no tests or logic, and re-run CI.",
+   "bytes": 826,
+   "tickets": [
+    "LIN-3033"
+   ],
+   "incident": "Close-out merged content review never saw",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2651",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "--match-head-commit",
+   "class": "convert-to-code",
+   "class_reason": "File, hunk and line counts plus \"no test file touched\" are a git diff --numstat check."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1168,
+   "summary": "Outside item discharges by a follow-up ticket that stands alone for a reader without this task.",
+   "bytes": 326,
+   "tickets": [
+    "LIN-2825"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2579",
+   "duplicated_in": [
+    "review",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Self-sufficiency of a ticket is judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1169,
+   "summary": "Any item may be explicitly accepted by a human who names the exact precondition exercised.",
+   "bytes": 121,
+   "tickets": [
+    "LIN-2825"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2540",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "precondition",
+   "class": "keep-prose",
+   "class_reason": "Judging a named precondition is judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1171,
+   "summary": "Green CI never discharges a ledger item; a human \"validated\" without a named precondition does not either.",
+   "bytes": 269,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2895",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Floor on evidence quality; judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1173,
+   "summary": "Low-risk prompt/docs change: routing to post-merge observation is itself the discharge, citing review's name.",
+   "bytes": 706,
+   "tickets": [
+    "LIN-898"
+   ],
+   "incident": "Prompt-wording change required human sign-off for unprovable claims",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3607",
+   "duplicated_in": [
+    "review",
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "post-merge observation",
+   "class": "retire",
+   "class_reason": "LIN-1579/LIN-2917 amend LIN-898; the named-monitor/rollback routes below re-scope this lane."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1174,
+   "summary": "Accept a named monitor from review; a ticket is not a monitor; reject entries lacking review's justification line.",
+   "bytes": 724,
+   "tickets": [
+    "LIN-1579",
+    "LIN-2917"
+   ],
+   "incident": "31 of 50 ticket-as-monitor discharges were never worked",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3742",
+   "duplicated_in": [
+    "review",
+    "meta-prompt"
+   ],
+   "signature": "monitor",
+   "class": "convert-to-code",
+   "class_reason": "Presence of a named monitor and review's justification line are fields a ledger lint could require."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1175,
+   "summary": "Accept a named rollback (revert commit or flag value) meeting the reversibility conditions.",
+   "bytes": 334,
+   "tickets": [
+    "LIN-1579"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3733",
+   "duplicated_in": [
+    "review",
+    "meta-prompt"
+   ],
+   "signature": "rollback",
+   "class": "keep-prose",
+   "class_reason": "Reversibility judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1177,
+   "summary": "Unnamed monitor or rollback does not get the lane; never supply names; floors unchanged.",
+   "bytes": 1029,
+   "tickets": [
+    "LIN-1579"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3772",
+   "duplicated_in": [
+    "self",
+    "review",
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the two named-route bullets above and the green-CI floor stated earlier in the same prompt."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1179,
+   "summary": "Recorded Approve plus discharged ledger is authorization; no fresh human go-ahead; no verdict means route to review.",
+   "bytes": 893,
+   "tickets": [
+    "LIN-810",
+    "LIN-1365"
+   ],
+   "incident": "Autopilot held at merge gate despite an Approve the day before",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2926",
+   "duplicated_in": [
+    "autopilot-kickoff",
+    "lib/proxy-instructions.js",
+    "lib/proxy-preamble.js",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "LIN-1365 amends LIN-810 amends LIN-550; authority framing is disposition."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1183,
+   "summary": "An explicitly empty ledger is a no-op pass-through; don't manufacture doubt.",
+   "bytes": 327,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2879",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "ledger empty",
+   "class": "keep-prose",
+   "class_reason": "Anti-overreach disposition."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1187,
+   "summary": "Perform the irreversible set only when every item is discharged and CI is green on the exact commit.",
+   "bytes": 220,
+   "tickets": [
+    "LIN-550",
+    "LIN-1455"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4698",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates workflow steps 3-4 and the Ledger Gate in the same prompt."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1188,
+   "summary": "Merge; any conflict resolution is authoring, never review-named: hold the merge and route to implementation.",
+   "bytes": 873,
+   "tickets": [
+    "LIN-3033"
+   ],
+   "incident": "Close-out merged content review never saw",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2674",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "implementation, then review",
+   "class": "convert-to-code",
+   "class_reason": "Whether landing needed conflict resolution is mechanically detectable from the merge."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1189,
+   "summary": "Verify on the landed commit, then set Done.",
+   "bytes": 69,
+   "tickets": [
+    "LIN-1579"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2543",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates workflow step 5."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1190,
+   "summary": "Post the summary comment: merged, ledger resolution, final CI state.",
+   "bytes": 103,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2971",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates workflow step 6."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1191,
+   "summary": "Archive a pre-prune snapshot, then prune stage artifacts.",
+   "bytes": 134,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2972",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates workflow step 7."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1192,
+   "summary": "File remaining outside follow-ups, routed, linked, with priority and type label.",
+   "bytes": 208,
+   "tickets": [
+    "LIN-3006",
+    "LIN-2309"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3197",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates workflow step 8."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1194,
+   "summary": "Close bookkeeping on merge; elapsed-time claims go to a named monitor, never an open task or follow-up.",
+   "bytes": 601,
+   "tickets": [
+    "LIN-1579"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3757",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement of what needs elapsed time."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1196,
+   "summary": "When the gate cannot pass, hold the merge, leave open, and name the next action kind.",
+   "bytes": 596,
+   "tickets": [
+    "LIN-550",
+    "LIN-3033"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2690",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "next action",
+   "class": "keep-prose",
+   "class_reason": "Routing judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1200,
+   "summary": "Only outside items may be filed; dropped or undischarged inside items are never filed; \"file\" only for outside.",
+   "bytes": 519,
+   "tickets": [
+    "LIN-3006"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2589",
+   "duplicated_in": [
+    "review",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Restates the Ledger Gate clause; a rulings/issue-create field for the inside mark would make it refusable."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1200,
+   "summary": "A close-out-raised \"do it here\" ruling is never review-named: hold the merge, route to implementation.",
+   "bytes": 502,
+   "tickets": [
+    "LIN-3033"
+   ],
+   "incident": "Close-out merged content review never saw",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2699",
+   "duplicated_in": [
+    "self",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Already covered by the Role's list and \"Always name a next action\" in the same prompt."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1200,
+   "summary": "Every filed follow-up carries a priority and a type label, never provider default.",
+   "bytes": 237,
+   "tickets": [
+    "LIN-2309"
+   ],
+   "incident": "Close-out follow-ups landed untriaged (27/30 in one wave)",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3154",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "priorityLevel",
+   "class": "convert-to-code",
+   "class_reason": "Issue-create from a close-out dispatch could require priority and label."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1201,
+   "summary": "Before filing, search relations and search for an existing ticket; link instead of refiling.",
+   "bytes": 337,
+   "tickets": [
+    "LIN-2991",
+    "LIN-3022"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2785",
+   "duplicated_in": [
+    "review",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "related",
+   "class": "keep-prose",
+   "class_reason": "Matching the same finding is judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1202,
+   "summary": "Before raising a DECISION, check rulings incl. resolved; never re-raise a covered finding.",
+   "bytes": 377,
+   "tickets": [
+    "LIN-2991",
+    "LIN-3022"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2786",
+   "duplicated_in": [
+    "review",
+    "docs/autopilot-operating-manual.md",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "includeResolved",
+   "class": "convert-to-code",
+   "class_reason": "Rulings route holds the data to refuse a duplicate DECISION on the same anchor."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1203,
+   "summary": "Derive priority from the finding's risk, state why in one line, set via priorityLevel (4 = highest).",
+   "bytes": 271,
+   "tickets": [
+    "LIN-2309",
+    "LIN-2311"
+   ],
+   "incident": "Native descending scale would file urgent follow-ups as Low",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3160",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "priorityLevel",
+   "class": "keep-prose",
+   "class_reason": "Risk judgement; the scale half is already fixed by the API field."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1204,
+   "summary": "Type label from the workspace label catalog, never invented; say so if none fits.",
+   "bytes": 236,
+   "tickets": [
+    "LIN-2309"
+   ],
+   "incident": "Close-out follow-ups landed untriaged (27/30 in one wave)",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3176",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Issue-create could validate the label against the catalog."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1205,
+   "summary": "Priority/label is best-effort: if a provider drops it, note it; never retry or fail the close.",
+   "bytes": 249,
+   "tickets": [
+    "LIN-2309"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3184",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Fallback disposition."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1209,
+   "summary": "Archive & prune only after merge and Done on the all-clear path, never on a cannot-close branch.",
+   "bytes": 292,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3021",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Precondition is a state check (Done + merged) the description-write route could enforce."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1211,
+   "summary": "Before editing the description, call brief?noRefresh=1 to capture the pre-prune snapshot.",
+   "bytes": 459,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2990",
+   "duplicated_in": [
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "The description PATCH route could snapshot before every write, removing the step."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1212,
+   "summary": "Confirm via snapshots that the archive landed before pruning.",
+   "bytes": 335,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "Archive call is fire-and-forget and swallows its errors",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2991",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Same: server-side snapshot-before-write makes verification unnecessary."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1213,
+   "summary": "If the snapshot cannot be verified, skip the prune, record it, and still close the task.",
+   "bytes": 352,
+   "tickets": [
+    "LIN-1772"
+   ],
+   "incident": "Archive step had no fallback once merge and Done had landed",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3050",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "prune was skipped",
+   "class": "convert-to-code",
+   "class_reason": "Patch on LIN-1770 that disappears if the server snapshots before writes."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1214,
+   "summary": "Prune via PATCH: replace plan/research/scoping sections with a stub naming work, PR, deviations, history.",
+   "bytes": 497,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2999",
+   "duplicated_in": [
+    "meta-prompt",
+    "autopilot-kickoff"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "What is superseded is judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1215,
+   "summary": "Never prune problem statement, acceptance criteria, repro steps, scope, or referenced sections.",
+   "bytes": 272,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3000",
+   "duplicated_in": [
+    "meta-prompt",
+    "autopilot-kickoff",
+    "lib/completion-signals.js"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Section identification is judgement."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1216,
+   "summary": "The stub must keep \"fits one session\"/\"needs multiple sessions\" or an \"Implementation Plan\" heading verbatim.",
+   "bytes": 331,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "Deterministic readers break when the literals are pruned",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3009",
+   "duplicated_in": [
+    "meta-prompt",
+    "autopilot-kickoff",
+    "lib/completion-signals.js"
+   ],
+   "signature": "fits one session",
+   "class": "convert-to-code",
+   "class_reason": "Description PATCH could refuse a write that drops these literals."
+  },
+  {
+   "source": "close-out",
+   "sampled": false,
+   "line": 1218,
+   "summary": "The prune edits the description only; comments are untouched.",
+   "bytes": 267,
+   "tickets": [
+    "LIN-2923"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3027",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Low cost clarification; nothing to check."
+  },
+  {
+   "source": "formatters",
+   "sampled": true,
+   "line": 482,
+   "summary": "Determine once, boundedly, whether CI exists (config + one settle); never arm a Monitor on unobserved checks.",
+   "bytes": 539,
+   "tickets": [
+    "LIN-1455",
+    "LIN-1358"
+   ],
+   "incident": "Monitor armed on a nonexistent check set: 195-minute stall (LIN-1358 wedge).",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4662",
+   "duplicated_in": [
+    "implementation",
+    "review",
+    "close-out",
+    "meta-prompt"
+   ],
+   "signature": "CI is genuinely absent",
+   "class": "convert-to-code",
+   "class_reason": "CI presence is mechanically detectable (workflow files, statusCheckRollup); the server or runner could determine and inject it once."
+  },
+  {
+   "source": "formatters",
+   "sampled": true,
+   "line": 553,
+   "summary": "Treat the ticket as a hypothesis; git log referenced paths since creation and re-read changed source at HEAD.",
+   "bytes": 568,
+   "tickets": [
+    "LIN-353",
+    "LIN-435"
+   ],
+   "incident": "Ticket descriptions invalidated by later commits were trusted as ground truth.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4021",
+   "duplicated_in": [],
+   "signature": "git log --since",
+   "class": "keep-prose",
+   "class_reason": "Reconciling ticket prose with current code is judgement; the git-log half could be precomputed but the rule is appended once, deterministically."
+  },
+  {
+   "source": "formatters",
+   "sampled": true,
+   "line": 649,
+   "summary": "When attachments exist, fetch and actually perceive every one, including images, before any grounding claim.",
+   "bytes": 212,
+   "tickets": [
+    "LIN-872"
+   ],
+   "incident": "Worker claimed grounding on three of four attachments, skipping an image.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4567",
+   "duplicated_in": [
+    "research",
+    "plan",
+    "review",
+    "meta-prompt"
+   ],
+   "signature": "perceived attachments:",
+   "class": "keep-prose",
+   "class_reason": "Actual perception cannot be checked; already self-gated to tasks with attachments. The enumerate-by-id sibling is checkable."
+  },
+  {
+   "source": "formatters",
+   "sampled": true,
+   "line": 682,
+   "summary": "A terminal task with no open subtasks: do not redo it; verify, capture missing follow-ups, close out.",
+   "bytes": 430,
+   "tickets": [
+    "LIN-353"
+   ],
+   "incident": "Container-descent bug: recommender redid finished tasks as if unstarted.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:769",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "Task Already Complete",
+   "class": "keep-prose",
+   "class_reason": "Already code-gated to render only on terminal tasks, so it costs nothing on ordinary dispatches."
+  },
+  {
+   "source": "formatters",
+   "sampled": true,
+   "line": 754,
+   "summary": "Leave the bug label in place once fixed; Done marks resolution, label is the lasting bug record.",
+   "bytes": 145,
+   "tickets": [
+    "LIN-548",
+    "LIN-366"
+   ],
+   "incident": "Prompts removed the bug label on fix, losing bug-vs-feature reporting.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt",
+    "bug (lib/prompt-template-defs.js:165)"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Removing a named label is a write the proxy label seam could refuse; restated three times across paths."
+  },
+  {
+   "source": "formatters",
+   "sampled": true,
+   "line": 899,
+   "summary": "Match output depth to the task's actual scale; small single-surface tasks get a short result.",
+   "bytes": 442,
+   "tickets": [
+    "LIN-260"
+   ],
+   "incident": "Small tasks received template-sized output.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2132",
+   "duplicated_in": [
+    "meta-prompt",
+    "research"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judging a task's true scale is model judgement (eval-prompt-scaling.mjs measured it, not enforces it)."
+  },
+  {
+   "source": "formatters",
+   "sampled": true,
+   "line": 918,
+   "summary": "Before parking BLOCKED, try local resolution; orchestrator-owned gaps are PENDING-EXTERNAL, not BLOCKED.",
+   "bytes": 335,
+   "tickets": [
+    "LIN-2202"
+   ],
+   "incident": "Workers parked BLOCKED on things only the orchestrator needed to supply.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4293",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md",
+    "meta-prompt"
+   ],
+   "signature": "PENDING-EXTERNAL",
+   "class": "keep-prose",
+   "class_reason": "Whether a gap genuinely needs a person is judgement (lib/escalation-kpis.js only measures it)."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 928,
+   "summary": "Set the issue status to \"In Progress\" at start if not already.",
+   "bytes": 88,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan",
+    "research"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "A status transition the dispatch seam could perform itself when an implementation dispatch starts."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 930,
+   "summary": "Work on a feature branch; never commit straight to main.",
+   "bytes": 139,
+   "tickets": [
+    "LIN-523"
+   ],
+   "incident": "Commit, PR, CI, merge, close lifecycle had no clear owner",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "feat/",
+   "class": "convert-to-code",
+   "class_reason": "Branch protection or a pre-push check enforces this mechanically."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 933,
+   "summary": "Commit with a message referencing the issue identifier, then push the branch.",
+   "bytes": 97,
+   "tickets": [
+    "LIN-523"
+   ],
+   "incident": "Commit, PR, CI, merge, close lifecycle had no clear owner",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Commit-message lint for the identifier."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 934,
+   "summary": "Open a PR targeting main that references the identifier; the PR is the deliverable.",
+   "bytes": 156,
+   "tickets": [
+    "LIN-523"
+   ],
+   "incident": "Commit, PR, CI, merge, close lifecycle had no clear owner",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "PR #",
+   "class": "convert-to-code",
+   "class_reason": "PR existence is queryable; a completion check could require it."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 935,
+   "summary": "Done only when PR open and CI green (or substitute recorded); otherwise say why; never merge yourself.",
+   "bytes": 476,
+   "tickets": [
+    "LIN-523",
+    "LIN-1455"
+   ],
+   "incident": "Review owned both sides of the merge boundary",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js",
+    "formatters"
+   ],
+   "signature": "CI green",
+   "class": "convert-to-code",
+   "class_reason": "CI state on the PR head is queryable; the no-merge half could be a token scope."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 936,
+   "summary": "Add a summary comment with the PR link.",
+   "bytes": 70,
+   "tickets": [
+    "LIN-523"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "PR:",
+   "class": "convert-to-code",
+   "class_reason": "Presence of a PR URL in the final comment is checkable."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 949,
+   "summary": "Implement only within the defined scope; flag scope expansion for approval instead of absorbing it.",
+   "bytes": 196,
+   "tickets": [
+    "LIN-114"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "scope expansion",
+   "class": "keep-prose",
+   "class_reason": "Scope judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 951,
+   "summary": "Confirm the plan's files and surfaces still exist; if drifted, stop and recommend re-planning.",
+   "bytes": 223,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "recommend re-planning",
+   "class": "keep-prose",
+   "class_reason": "File existence is mechanical but surface mapping is judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 957,
+   "summary": "Follow plan and research; where they disagree the research's reasoning wins; flag the conflict.",
+   "bytes": 162,
+   "tickets": [
+    "LIN-698"
+   ],
+   "incident": "Implementer blindly trusted a lossy plan over its research",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4216",
+   "duplicated_in": [
+    "formatters",
+    "meta-prompt"
+   ],
+   "signature": "research's reasoning wins",
+   "class": "retire",
+   "class_reason": "Restates formatPlanFidelityCheck's closing sentence, inlined just above in the same prompt."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 958,
+   "summary": "Make each change self-contained, specifying behaviour and its cleanup/teardown contract.",
+   "bytes": 130,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Design judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 959,
+   "summary": "For a first-time dependency, verify all required setup beyond API calls.",
+   "bytes": 108,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement; already conditional on a new dependency."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 960,
+   "summary": "Write tests for new or changed behaviour, covering plan-flagged interactions.",
+   "bytes": 104,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Which behaviours need tests is judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 961,
+   "summary": "Verify all tests pass before completing.",
+   "bytes": 42,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Superseded by workflow step 8 and the CI-gate section, which require green CI."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 965,
+   "summary": "Observe your acceptance-witness test fail against unfixed code (or a mutation) before trusting it; record what you saw.",
+   "bytes": 706,
+   "tickets": [
+    "LIN-2219"
+   ],
+   "incident": "Implementation asked for green, never for red",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4490",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "observed it fail",
+   "class": "keep-prose",
+   "class_reason": "Running the red check could be automated, but choosing the witness is judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 966,
+   "summary": "Keep changes minimal and focused on the task.",
+   "bytes": 47,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 967,
+   "summary": "Distrust \"behaviour-preserving\" labels: enumerate old behaviours and verify each, ideally with a characterization test.",
+   "bytes": 366,
+   "tickets": [
+    "LIN-698"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4227",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "characterization test",
+   "class": "keep-prose",
+   "class_reason": "Enumerating behaviours is judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 971,
+   "summary": "Keep behaviours converging on shared code isolated; document non-obvious interactions in comments.",
+   "bytes": 171,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Design judgement."
+  },
+  {
+   "source": "implementation",
+   "sampled": false,
+   "line": 971,
+   "summary": "Plan-flagged cross-cutting concerns must appear in the relevant implementation step, not be deferred to review.",
+   "bytes": 146,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement of placement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 103,
+   "summary": "Use the deterministic frontier facts for the defer-vs-breakdown decision instead of re-counting children.",
+   "bytes": 266,
+   "tickets": [
+    "LIN-433",
+    "LIN-389"
+   ],
+   "incident": "Model re-derived child counts at the defer-vs-breakdown fork.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Facts are already computed in code (lib/recommendation-facts.js); the remaining healthy-container call is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 117,
+   "summary": "When the ticket lacks a detail, tell the consumer to find it in the codebase, never supply it.",
+   "bytes": 457,
+   "tickets": [
+    "LIN-277"
+   ],
+   "incident": "Generated prompts invented paths, schemas and specifics absent from the ticket.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Spotting invented specifics in generated prose needs judgement; no reliable lint exists."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 124,
+   "summary": "Multi-surface, cross-cutting, migration or uncertain tasks get the full prompt structure.",
+   "bytes": 124,
+   "tickets": [
+    "LIN-260"
+   ],
+   "incident": "Prompts were sized to the template rather than the task.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "formatters"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Scale judgement; mirrored by formatScaleToTask on the handwritten path."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 130,
+   "summary": "Recommend exactly one action, following the decision tree in order.",
+   "bytes": 74,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/openrouter.js:1677",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "parseRecommendedAction already takes a single `→ **action**`; a strict one-arrow check would retire this and its restatements (L339-340)."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 138,
+   "summary": "Terminal task with open children: do not short-circuit to review/close; descend to the open child.",
+   "bytes": 243,
+   "tickets": [
+    "LIN-353"
+   ],
+   "incident": "Container-descent bug: terminal parent short-circuited despite open children.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:699",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "The condition is computed in code (isTerminal && hasOpenChildren); routing to the frontier child could be deterministic."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 145,
+   "summary": "Reviewed, merged and Done work routes to retrospective-audit, never another review or close-out.",
+   "bytes": 812,
+   "tickets": [
+    "LIN-2261"
+   ],
+   "incident": "Retrospective sweep had to borrow pre-merge review for already-merged work.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2376",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Done state is machine-readable but spotting a recorded review verdict in the trail is reading, not a check."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 147,
+   "summary": "A plan-review verdict is never review evidence for close-out, header or not.",
+   "bytes": 755,
+   "tickets": [
+    "LIN-1603",
+    "LIN-810"
+   ],
+   "incident": "A plan-review Approve could authorize close-out on unimplemented work.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:891",
+   "duplicated_in": [
+    "self",
+    "plan-review"
+   ],
+   "signature": "### Plan Review Verdict",
+   "class": "convert-to-code",
+   "class_reason": "Which kind posted a verdict is in dispatch history; tagging it in code would replace this; restated verbatim at L194."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 153,
+   "summary": "Route to research when doing the deliverable well depends on knowledge not yet gathered.",
+   "bytes": 577,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Whether needed knowledge is in hand is a judgement no check can make."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 159,
+   "summary": "Apply the core test using signals: external sources, unpinned dependencies, hedged wording, surfaces named only by description.",
+   "bytes": 1149,
+   "tickets": [
+    "LIN-557"
+   ],
+   "incident": "Research under-fired on 'everywhere'/consistency tickets.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Heuristic cue list feeding a judgement call."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 170,
+   "summary": "Do not loop research when findings and a validated approach exist, including approved breakdown-child plan slices.",
+   "bytes": 734,
+   "tickets": [
+    "LIN-3049"
+   ],
+   "incident": "Breakdown children of an approved plan were re-routed to research.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:3193",
+   "duplicated_in": [],
+   "signature": "covered by <parent>'s approving plan-review",
+   "class": "keep-prose",
+   "class_reason": "Core call is judgement; only the breakdown-child sub-clause keys on a checkable literal line (LIN-3049 amends the LIN-1603 gate)."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 174,
+   "summary": "If the substance is in hand and the approach validated, skip to Step 2.",
+   "bytes": 97,
+   "tickets": [
+    "LIN-54"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Arrow summary restating Step 1's core test and over-fire guards in the same prompt."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 183,
+   "summary": "If blocked, first check whether blocking dependencies are already resolved before full analysis.",
+   "bytes": 301,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1452",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Blocker resolution is a relation-plus-state lookup the recommender could precompute like frontier facts; restated in the Blocked-prompts rule."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 188,
+   "summary": "Re-investigate only if findings are missing, contradicted or unvalidated; fix only on a confirmed standing root cause.",
+   "bytes": 567,
+   "tickets": [
+    "LIN-586"
+   ],
+   "incident": "A fix advanced on a root cause a later comment had refuted.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "formatters"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Whether a cause still stands at the end of the trail needs reading; mirrored in formatBugInvestigatedNote."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 193,
+   "summary": "Landed work with red CI or a surfaced blocker routes to that blocker, not implementation or review.",
+   "bytes": 1083,
+   "tickets": [
+    "LIN-474"
+   ],
+   "incident": "Landed work with red CI kept cycling through review.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2336",
+   "duplicated_in": [
+    "self",
+    "review"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "CI red is machine-readable but the coordinator cannot see CI (L192); feeding CI status would replace inference. Overlaps Step 0 L149."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 194,
+   "summary": "Close-out requires positive evidence a review ran; a complete-looking description is not evidence.",
+   "bytes": 231,
+   "tickets": [
+    "LIN-811"
+   ],
+   "incident": "Close-out recommended on a complete-looking description with no review.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2318",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Verbatim repeat of the Step 0 sentence at L147 in the same prompt."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 194,
+   "summary": "Only an actual review verdict authorizes close-out; with none or ambiguous evidence, recommend review.",
+   "bytes": 357,
+   "tickets": [
+    "LIN-811"
+   ],
+   "incident": "Close-out recommended with no review on the trail.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:831",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Verbatim repeat of the closing sentences at L147 in the same prompt."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 198,
+   "summary": "If work has not landed, check the description for a plan and a session-fit answer.",
+   "bytes": 432,
+   "tickets": [
+    "LIN-448"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:765",
+   "duplicated_in": [],
+   "signature": "fits one session",
+   "class": "convert-to-code",
+   "class_reason": "Plan presence and the session-fit literal are already regex-detected in lib/recommendation-facts.js:50."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 204,
+   "summary": "Never re-recommend research/plan when its deliverable already exists; route a settled plan onward.",
+   "bytes": 2044,
+   "tickets": [
+    "LIN-588"
+   ],
+   "incident": "A fully planned ticket got another plan instead of breakdown.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1005",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Plan block plus session-fit literal with no children is detectable; recommendation-facts.js already parses session-fit."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 206,
+   "summary": "Recommend plan-review when a plan exists, the gate (a)-(d) or 'plan-review due: yes' holds, and no verdict yet.",
+   "bytes": 842,
+   "tickets": [
+    "LIN-1603"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:945",
+   "duplicated_in": [
+    "plan"
+   ],
+   "signature": "plan-review due: yes",
+   "class": "convert-to-code",
+   "class_reason": "Keys on the recorded 'plan-review due' literal and verdict absence; checkable at the recommend seam, criteria (b)-(d) aside."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 211,
+   "summary": "On plan-review Approve route by session-fit; never re-emit plan-review; Approve is never close-out evidence.",
+   "bytes": 353,
+   "tickets": [
+    "LIN-1603"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:995",
+   "duplicated_in": [
+    "plan-review"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Verdict plus session-fit literal to next kind is a lookup table."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 216,
+   "summary": "A plan saying 'needs multiple sessions' routes to breakdown.",
+   "bytes": 170,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "needs multiple sessions",
+   "class": "convert-to-code",
+   "class_reason": "The session-fit literal is already parsed (lib/recommendation-facts.js:50); routing on it is a table lookup."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 220,
+   "summary": "Recommend implementation only with a plan or in-hand small scope, prep done, no blockers, clear requirements.",
+   "bytes": 559,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1406",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Composite readiness judgement about scope and clarity."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 231,
+   "summary": "On a node, first decide node-level work (breakdown, close, triage) before deferring to a child.",
+   "bytes": 681,
+   "tickets": [
+    "LIN-328",
+    "LIN-364"
+   ],
+   "incident": "Recommender descended into finished children instead of closing the parent.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "formatters"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Node-vs-descend is judgement; the no-defer-into-finished-child bullet is already backstopped by lib/recommend-recurse.js:186."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 242,
+   "summary": "The generated prompt references the task; do not restate its description or comment thread.",
+   "bytes": 236,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restated in full by the Context section (L287) of the same prompt."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 263,
+   "summary": "With featureBranches on: create a feature branch from main.",
+   "bytes": 96,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "implementation",
+    "formatters"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Toggle-gated block superseded by the always-on branch/PR rule in Implementation clause (6) (LIN-523)."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 269,
+   "summary": "With self-review on: verify correctness against task requirements before committing.",
+   "bytes": 46,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "formatters",
+    "review"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Toggle-gated duplicate of formatSelfReview; the separate review stage covers it."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 272,
+   "summary": "With self-review on: confirm code style matches the codebase.",
+   "bytes": 65,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "formatters",
+    "review"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Toggle-gated duplicate of formatSelfReview and the review checklist."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 278,
+   "summary": "With CI/CD check on: do not mark Done until checks pass or the no-CI substitute is clean.",
+   "bytes": 124,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "formatters"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Superseded: implementation never marks Done; close-out owns Done and the CI gate (LIN-550, LIN-1455)."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 284,
+   "summary": "With PR review on: only mark Done after approval and merge.",
+   "bytes": 61,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "formatters"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Superseded by close-out owning merge and the Done transition (LIN-550)."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 299,
+   "summary": "Blocked prompts must front-load a status check on blocking dependencies.",
+   "bytes": 171,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Blocker resolution is a relation/state lookup; duplicates Step 2's blocked check (L183)."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 300,
+   "summary": "Triage prompts must confirm the task is in the correct project and move it if mis-filed.",
+   "bytes": 360,
+   "tickets": [
+    "LIN-734"
+   ],
+   "incident": "Triage left tasks unassigned or in the wrong project.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Having a project is checkable; choosing the right one for the scope is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 301,
+   "summary": "Bug prompts must include a class check once root cause is known; keep the fix minimal.",
+   "bytes": 547,
+   "tickets": [
+    "LIN-313"
+   ],
+   "incident": "Bug fixes patched one witness and missed sibling instances.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1693",
+   "duplicated_in": [
+    "review"
+   ],
+   "signature": "isolated, or one of a class",
+   "class": "keep-prose",
+   "class_reason": "Finding siblings of a failure pattern is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 301,
+   "summary": "Bug prompts must search wider than nearby code: prior investigations and diverging episodes.",
+   "bytes": 268,
+   "tickets": [
+    "LIN-585"
+   ],
+   "incident": "Investigations ignored prior diverging episodes of the same subsystem.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "research",
+    "self"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Where to look for prior art is judgement; restated in the Research-prompts rule."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 302,
+   "summary": "Research prompts must require an Audit the Layers pass: enumerate layers, brief each with cited sources.",
+   "bytes": 1533,
+   "tickets": [
+    "LIN-740"
+   ],
+   "incident": "Research missed an unnamed layer (LIN-735/LIN-295/LIN-579).",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2104",
+   "duplicated_in": [
+    "research"
+   ],
+   "signature": "Audit the Layers",
+   "class": "keep-prose",
+   "class_reason": "Exhaustive layer enumeration is judgement; already scale-gated by the small-change clause."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 302,
+   "summary": "A second representation of already-modelled data makes the Surface Assessment 'refactor required'.",
+   "bytes": 263,
+   "tickets": [
+    "LIN-697"
+   ],
+   "incident": "Local additions quietly duplicated an existing model.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2110",
+   "duplicated_in": [
+    "research"
+   ],
+   "signature": "refactor required",
+   "class": "keep-prose",
+   "class_reason": "Recognising a duplicate model needs design judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 303,
+   "summary": "Plan prompts must check whether requirements share a code path, state or interface and document interactions.",
+   "bytes": 222,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "plan",
+    "implementation"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Identifying cross-cutting interactions is design judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 303,
+   "summary": "Plan prompts must carry Strategy Framing (cost-of-doing vs not-doing, named gap) before Scope Assessment.",
+   "bytes": 954,
+   "tickets": [
+    "LIN-279"
+   ],
+   "incident": "Plans rationalised the cheap default after the fact.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "plan",
+    "plan-review"
+   ],
+   "signature": "none identified",
+   "class": "keep-prose",
+   "class_reason": "Block presence and order are checkable, but scoring strategies is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 303,
+   "summary": "A plan claiming a class for the first time must name it and its bound, ideally a reproducible query.",
+   "bytes": 812,
+   "tickets": [
+    "LIN-1871",
+    "LIN-1873"
+   ],
+   "incident": "Four tickets burned 4+ sessions each at enumeration with zero commits.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1805",
+   "duplicated_in": [
+    "plan",
+    "research",
+    "plan-review"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "How to bound a class is judgement; LIN-1871 revises LIN-1873."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 303,
+   "summary": "Do not manufacture a query or checklist to fill the slot; an honest 'no sweep' beats a false bound.",
+   "bytes": 390,
+   "tickets": [
+    "LIN-1871"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1881",
+   "duplicated_in": [
+    "plan"
+   ],
+   "signature": "no sweep, here is why",
+   "class": "keep-prose",
+   "class_reason": "Anti-gaming calibration of the class rule; not mechanically checkable."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 303,
+   "summary": "Plan prompts must record 'plan-review due: yes/no' naming which criteria (a)-(d) fired.",
+   "bytes": 613,
+   "tickets": [
+    "LIN-1603"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1012",
+   "duplicated_in": [
+    "plan"
+   ],
+   "signature": "plan-review due: no",
+   "class": "convert-to-code",
+   "class_reason": "The literal and the named criteria are lint-checkable at the description-write seam."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 303,
+   "summary": "A plan revision replaces the prior plan section, keeping only a short changelog line.",
+   "bytes": 559,
+   "tickets": [
+    "LIN-1770"
+   ],
+   "incident": "Plan revisions were appended, stacking superseded plans in the description.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3542",
+   "duplicated_in": [
+    "plan"
+   ],
+   "signature": "addresses plan-review findings",
+   "class": "convert-to-code",
+   "class_reason": "'Exactly one plan block in the description' is countable at the description-write seam."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 304,
+   "summary": "Breakdown prompts must check the ticket's own comment trail for a plan-review Approve first.",
+   "bytes": 295,
+   "tickets": [
+    "LIN-3049"
+   ],
+   "incident": "Breakdown read the grandparent's rendered Parent Task section for the Approve.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:3247",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Whether this ticket has an Approve plan-review verdict is a dispatch-history lookup."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 305,
+   "summary": "Plan-review verifies the plan's own claims; it must not redesign or add requirements.",
+   "bytes": 303,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3366",
+   "duplicated_in": [
+    "plan-review"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Distinguishing a finding from a preference is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 305,
+   "summary": "A verifier disputing a bound must argue about the bound, proposing and running an alternative.",
+   "bytes": 332,
+   "tickets": [
+    "LIN-1871"
+   ],
+   "incident": "Verifiers discovered members one at a time and plan-review looped.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1925",
+   "duplicated_in": [
+    "plan-review"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "How to argue a bound is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 305,
+   "summary": "Plan-review check 3: re-run git log on plan files; commit constraints must appear in the plan.",
+   "bytes": 286,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3351",
+   "duplicated_in": [
+    "plan-review",
+    "plan"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Running git log is mechanical; judging whether constraints are reflected is not."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 305,
+   "summary": "Plan-review check 6: a prerequisite-refactor subtask must name its in-task consumer, and vice versa.",
+   "bytes": 342,
+   "tickets": [
+    "LIN-1602",
+    "LIN-397"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3351",
+   "duplicated_in": [
+    "plan-review",
+    "plan",
+    "research"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Necessity of a refactor is design judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 305,
+   "summary": "A plan surviving all seven checks gets one line and an immediate handoff; don't manufacture doubt.",
+   "bytes": 211,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3367",
+   "duplicated_in": [
+    "plan-review"
+   ],
+   "signature": "claims verified; proceed to implementation",
+   "class": "keep-prose",
+   "class_reason": "Calibration against over-flagging; nothing mechanical to check."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 306,
+   "summary": "Implementation prompts must embed cross-cutting concerns in the relevant step, not a separate section.",
+   "bytes": 115,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "implementation"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Placement of concerns in steps is judgement about the plan's content."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 306,
+   "summary": "Implementation lands on a feature branch PR with CI established once (or substitute); merging is not this step.",
+   "bytes": 839,
+   "tickets": [
+    "LIN-523",
+    "LIN-1455"
+   ],
+   "incident": "A Monitor armed on nonexistent CI checks stalled 195 minutes (LIN-1358).",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4727",
+   "duplicated_in": [
+    "implementation",
+    "formatters",
+    "autopilot-kickoff"
+   ],
+   "signature": "CI is genuinely absent",
+   "class": "convert-to-code",
+   "class_reason": "Branch not main, PR open and CI rollup state are queryable via gh; a completion check could verify them."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 306,
+   "summary": "Implementation prompts must gate blockers on Principle 0 and carry the Principle 0 test verbatim.",
+   "bytes": 803,
+   "tickets": [
+    "LIN-2202",
+    "LIN-2977"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4383",
+   "duplicated_in": [
+    "self",
+    "formatters",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "PENDING-EXTERNAL",
+   "class": "retire",
+   "class_reason": "Restated nearly verbatim in the Blocked and Plan rules of the same prompt and in formatIfBlocked."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 308,
+   "summary": "Review prompts must cross-reference plan concerns against implementation steps; unaddressed ones are top priority.",
+   "bytes": 234,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "review"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Gap analysis between plan and implementation is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 308,
+   "summary": "Review prompts must assess test level; require e2e/integration where appropriate, not a fixed rule.",
+   "bytes": 359,
+   "tickets": [
+    "LIN-258"
+   ],
+   "incident": "Changes shipped with only low-level mocked tests.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "review"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Right test level is judgement by the rule's own wording."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 308,
+   "summary": "Review marks every class instance and ledger item inside or outside the ticket's bounded classes.",
+   "bytes": 1284,
+   "tickets": [
+    "LIN-1871",
+    "LIN-2825"
+   ],
+   "incident": "Inside-scope findings were discharged by filing tickets instead of doing them.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1079",
+   "duplicated_in": [
+    "review",
+    "close-out"
+   ],
+   "signature": "inside the ticket's bounded classes",
+   "class": "keep-prose",
+   "class_reason": "Mark presence is checkable but classification is judgement; LIN-2825 amends LIN-1871 and the LIN-550 ledger."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 308,
+   "summary": "Review must write a '### What CI Did Not Prove' ledger, each item marked and dischargeable, proportional to risk.",
+   "bytes": 1162,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "Review closed work whose un-CI-provable claims were never checked.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2278",
+   "duplicated_in": [
+    "review"
+   ],
+   "signature": "### What CI Did Not Prove",
+   "class": "convert-to-code",
+   "class_reason": "Section presence is a heading check; lib/follow-on-ratio.js:161 already regex-detects it but only measures."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 308,
+   "summary": "Keep the ledger distinct from the class check; say 'ledger empty' when CI covers everything.",
+   "bytes": 706,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "review"
+   ],
+   "signature": "ledger empty",
+   "class": "keep-prose",
+   "class_reason": "Breadth-vs-depth distinction is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 308,
+   "summary": "Conditional Approve only if close-out can discharge every item within its trivial bound; else Request Changes.",
+   "bytes": 520,
+   "tickets": [
+    "LIN-3033",
+    "LIN-3056"
+   ],
+   "incident": "Conditional Approves handed close-out work needing new tests or code.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1309",
+   "duplicated_in": [
+    "review"
+   ],
+   "signature": "Approve — conditional on close-out discharging the ledger",
+   "class": "keep-prose",
+   "class_reason": "Per-item fit to close-out's bound is judgement; amendment chain LIN-3056 amends LIN-3033 amends LIN-550."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 308,
+   "summary": "Landed work with red CI or a hidden blocker: file a blocks ticket, name it next, never loop review.",
+   "bytes": 663,
+   "tickets": [
+    "LIN-474"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2281",
+   "duplicated_in": [
+    "review",
+    "self"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Recognising a hidden blocker is judgement; overlaps Step 0/Step 3 routing text."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 309,
+   "summary": "Close-out may author a change only when review named its exact content and it is trivially small.",
+   "bytes": 588,
+   "tickets": [
+    "LIN-3033"
+   ],
+   "incident": "Close-out authored substantive unreviewed changes before merging.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1231",
+   "duplicated_in": [
+    "close-out",
+    "autopilot-kickoff"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Quoted-text match plus 2-file/3-hunk bound is a diff-stat check at the merge seam."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 309,
+   "summary": "Outside items discharge by a self-contained follow-up ticket; any item by a human naming the precondition.",
+   "bytes": 354,
+   "tickets": [
+    "LIN-2825"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1094",
+   "duplicated_in": [
+    "close-out"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Whether a ticket stands on its own terms is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 309,
+   "summary": "Close-out gates on a recorded review Approve plus discharged/empty ledger; that is authorization, no fresh go-ahead.",
+   "bytes": 940,
+   "tickets": [
+    "LIN-810"
+   ],
+   "incident": "Close-out blocked on a missing ledger heading despite a recorded Approve.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2291",
+   "duplicated_in": [
+    "close-out",
+    "autopilot-kickoff",
+    "lib/proxy-instructions.js",
+    "lib/proxy-preamble.js"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Presence of a review-kind Approve is recoverable from dispatch history; a merge-seam refusal could enforce it once."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 309,
+   "summary": "After all-clear: merge, verify on landed commit, set Done, summarize, archive then prune, file follow-ups.",
+   "bytes": 860,
+   "tickets": [
+    "LIN-1579",
+    "LIN-1770"
+   ],
+   "incident": "Tasks held open for separate verification passes.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3807",
+   "duplicated_in": [
+    "close-out",
+    "autopilot-kickoff"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Merge, Done state, summary and snapshot existence are verifiable post-conditions."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 309,
+   "summary": "Only outside-scope items may be filed; a close-out-raised 'do it here' ruling is never review-named.",
+   "bytes": 756,
+   "tickets": [
+    "LIN-3006",
+    "LIN-2825"
+   ],
+   "incident": "Close-out filed inside-scope items as follow-ups instead of doing them.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/openrouter.test.js:1136",
+   "duplicated_in": [
+    "close-out",
+    "review"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Inside/outside classification is judgement; LIN-3006 amends LIN-2825."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 309,
+   "summary": "Every filed follow-up carries a risk-derived priorityLevel and a catalog type label, best-effort.",
+   "bytes": 830,
+   "tickets": [
+    "LIN-2309",
+    "LIN-2311"
+   ],
+   "incident": "Follow-ups were filed at provider-default priority with no type label.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3238",
+   "duplicated_in": [
+    "close-out"
+   ],
+   "signature": "priorityLevel",
+   "class": "convert-to-code",
+   "class_reason": "Priority and label presence on a created issue is a field check at the issue-create seam."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 311,
+   "summary": "Retrospective-audit must not re-verify overall correctness or re-run the suite; scope to what CI cannot see.",
+   "bytes": 207,
+   "tickets": [
+    "LIN-2261"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2387",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Scoping an audit to what CI cannot see is judgement."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 311,
+   "summary": "Retrospective-audit checks ownership orphans: hazards two sibling tickets each defer to the other.",
+   "bytes": 307,
+   "tickets": [
+    "LIN-2261"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2388",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Detecting mutual deferral across tickets needs reading both records."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 325,
+   "summary": "Block on inability to proceed, not missing checkboxes; simple tasks need simple validation.",
+   "bytes": 163,
+   "tickets": [
+    "LIN-29"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Calibration principle; no mechanical form."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 339,
+   "summary": "Follow the decision tree above in order.",
+   "bytes": 88,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates L130 ('Follow this decision tree IN ORDER') in the same prompt."
+  },
+  {
+   "source": "meta-prompt",
+   "sampled": true,
+   "line": 358,
+   "summary": "The action must be exactly one name, verbatim, from the vocabulary list, bold markers kept.",
+   "bytes": 253,
+   "tickets": [],
+   "incident": "Response-format directives leaked into output; off-list names fell to 'custom'.",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/prompt-templates.js:228",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "deriveDispatchKind silently maps unknown names to `custom`; an enum check with retry would replace the prose."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 47,
+   "summary": "Fly the ratified legs via child autopilots; do not re-plan the passage or second-guess a ratified leg's shape.",
+   "bytes": 444,
+   "tickets": [
+    "LIN-1812"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Scope-of-authority disposition; no check can tell re-planning from legitimate judgement."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 62,
+   "summary": "Anchors are related relations only, never blocks/blocked-by; leg-to-anchor mapping lives only in description text.",
+   "bytes": 349,
+   "tickets": [
+    "LIN-1812"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/passage-planner-prompt.md"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "Filtering relations by type and parsing leg anchor lines is deterministic; the kickoff generator could compute the anchor set."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 74,
+   "summary": "GET /brief is orientation only; it drops making-port criteria and budget, so never source leg fields from it.",
+   "bytes": 239,
+   "tickets": [
+    "LIN-1857"
+   ],
+   "incident": "Brief verified to drop every leg's making-port criteria and budget split.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Source-hierarchy instruction; restated in Hard rules (L227) and the preamble, so one copy could go."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 103,
+   "summary": "Launched runs have a dispatch row; hand-pasted runs don't, and must never fabricate a sessionId.",
+   "bytes": 591,
+   "tickets": [
+    "LIN-2175"
+   ],
+   "incident": "Format-valid but unreal sessionId is accepted and resolves to nothing.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "this leg-child is unsubscribed",
+   "class": "convert-to-code",
+   "class_reason": "The dispatch seam accepts unreal sessionIds; refusing an id with no matching dispatch row would enforce it once."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 118,
+   "summary": "For ordered, dependency-linked anchors, dispatch a lane child; not for genuinely independent anchors.",
+   "bytes": 952,
+   "tickets": [
+    "LIN-2242"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "lane child",
+   "class": "keep-prose",
+   "class_reason": "Judging whether anchor order is load-bearing is judgement."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 144,
+   "summary": "State budget accounting as asymmetric by leg shape: goal-only legs uncounted, single-anchor legs count one.",
+   "bytes": 611,
+   "tickets": [
+    "LIN-1812"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "counted against budget",
+   "class": "convert-to-code",
+   "class_reason": "Which child dispatches counted is derivable from rows (issueIdentifier present); a report could print it instead of the agent reciting."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 166,
+   "summary": "Don't set your own maxTasks; read it from your dispatch row and report null as undeclared.",
+   "bytes": 596,
+   "tickets": [
+    "LIN-2975"
+   ],
+   "incident": "Runner reported ratified pool as enforced when launcher never passed maxTasks.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "maxTasks: null",
+   "class": "convert-to-code",
+   "class_reason": "Reading a field off the dispatch row and printing it is mechanical; the landing report could be generated."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 183,
+   "summary": "Group list rows by sessionId client-side; verify stamping by reading the field, never assuming absence.",
+   "bytes": 603,
+   "tickets": [
+    "LIN-2975"
+   ],
+   "incident": "Misread of an unchecked field as absent/null.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Epistemic discipline; tests pin the code field set (contract-drift test :94), not this prose."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 207,
+   "summary": "Honor each leg's Wind down if triggers, citing trigger text verbatim from the leg block.",
+   "bytes": 170,
+   "tickets": [
+    "LIN-1812"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "Wind down if:",
+   "class": "convert-to-code",
+   "class_reason": "Verbatim citation is a substring check against the leg block, checkable on the wind-down comment."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 212,
+   "summary": "On 409 DUPLICATE_DISPATCH adopt the refusal's id and watch it; don't treat as failure or re-dispatch.",
+   "bytes": 180,
+   "tickets": [
+    "LIN-1870"
+   ],
+   "incident": "",
+   "enforcement": "runtime-code",
+   "enforcement_evidence": "lib/dispatch-factory.js:319",
+   "duplicated_in": [
+    "autopilot-kickoff"
+   ],
+   "signature": "DUPLICATE_DISPATCH",
+   "class": "retire",
+   "class_reason": "The server already refuses the duplicate and returns the live id; also restated in autopilot-kickoff and pinned by count (contract-drift test :152)."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 229,
+   "summary": "Hard rule: a malformed leg block gets a BLOCKED park naming the deviation, never a best-effort guess.",
+   "bytes": 99,
+   "tickets": [
+    "LIN-1812"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "BLOCKED",
+   "class": "retire",
+   "class_reason": "Verbatim restatement of Step 2 in the same prompt; the leg-block shape is itself parseable (convert Step 2 instead)."
+  },
+  {
+   "source": "passage-runner",
+   "sampled": true,
+   "line": 236,
+   "summary": "Hard rule: every plan revision, wind-down, and deviation is its own comment immediately, not batched.",
+   "bytes": 129,
+   "tickets": [
+    "LIN-1812"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates Step 5 of the same prompt nearly verbatim."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 866,
+   "summary": "Act as verifier only: never redesign, add requirements, or become a second planner.",
+   "bytes": 311,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3365",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "claims verified",
+   "class": "keep-prose",
+   "class_reason": "Deciding what counts as redesign versus a finding is judgement."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 868,
+   "summary": "Read the plan plus the research it came from; a claim the plan never makes is itself a finding.",
+   "bytes": 228,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement about which claims a plan should have made."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 872,
+   "summary": "Work all seven checks in order, reproducing each result yourself rather than trusting the plan.",
+   "bytes": 143,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3303",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Independent re-derivation is judgement; only the check order is pinned."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 874,
+   "summary": "Check 1: re-derive each class bound; name any missed class and all its members; missed class = Request Changes.",
+   "bytes": 1123,
+   "tickets": [
+    "LIN-1871",
+    "LIN-1873"
+   ],
+   "incident": "Four tickets burned 4+ sessions each finding members one at a time",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1195",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan",
+    "research"
+   ],
+   "signature": "bounded the class",
+   "class": "keep-prose",
+   "class_reason": "LIN-1871 revises LIN-1873; bounding a class is reasoning a check cannot do."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 875,
+   "summary": "If you dispute a bound, argue the bound itself: propose the query or reasoning and show its output.",
+   "bytes": 406,
+   "tickets": [
+    "LIN-1871"
+   ],
+   "incident": "Four tickets each burned 4+ sessions with zero commits at this step",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1227",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "the bound",
+   "class": "keep-prose",
+   "class_reason": "Amendment to check 1 (LIN-1871); argumentative judgement."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 876,
+   "summary": "A class declared un-sweepable passes if the reason and alternative bound are sound; demand a sweep only with a named query.",
+   "bytes": 442,
+   "tickets": [
+    "LIN-1873"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1241",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan",
+    "research"
+   ],
+   "signature": "no sweep",
+   "class": "keep-prose",
+   "class_reason": "Judging whether a reason is sound; patch on check 1 (LIN-1873, kept by LIN-1871)."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 877,
+   "summary": "Check 2: a routed-around contract gap must be named by ticket identifier or explicit \"none identified\".",
+   "bytes": 318,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3289",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan"
+   ],
+   "signature": "none identified",
+   "class": "convert-to-code",
+   "class_reason": "Presence of a ticket id or \"none identified\" in the plan's Strategy Framing is lintable."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 878,
+   "summary": "Check 3: re-run git log -15 on plan files; constraints from repeated commits must appear in the plan.",
+   "bytes": 301,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3290",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan"
+   ],
+   "signature": "git log --oneline -15",
+   "class": "keep-prose",
+   "class_reason": "The git log could be precomputed, but judging whether constraints are covered is judgement."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 879,
+   "summary": "Check 4: a \"fits one session\" answer beside specific nameable catches is a contradiction to flag.",
+   "bytes": 345,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3291",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan"
+   ],
+   "signature": "fits one session",
+   "class": "keep-prose",
+   "class_reason": "Weighing whether catches are specific is judgement."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 880,
+   "summary": "Check 5: flag any loosened validation, contract or guard lacking a named re-tightening follow-up as Request Changes.",
+   "bytes": 320,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3292",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan"
+   ],
+   "signature": "relaxation",
+   "class": "keep-prose",
+   "class_reason": "Recognising a loosening is judgement."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 881,
+   "summary": "Check 6: a prerequisite-refactor subtask must name its in-task consumer line; a necessary refactor must not be absorbed.",
+   "bytes": 380,
+   "tickets": [
+    "LIN-1602",
+    "LIN-397"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3293",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan",
+    "research"
+   ],
+   "signature": "consumer:",
+   "class": "keep-prose",
+   "class_reason": "Necessity judgement; the consumer-line citation part is lintable."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 882,
+   "summary": "Check 7: confirm each inherited data source is authoritative; a lossy source carrying load-bearing data is Request Changes.",
+   "bytes": 545,
+   "tickets": [
+    "LIN-1859"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3294",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "primary source",
+   "class": "keep-prose",
+   "class_reason": "Judging authority and load-bearing data is judgement."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 886,
+   "summary": "End with an explicit Approve / Request Changes / Needs Discussion verdict, one-line justification, citing the producing check.",
+   "bytes": 312,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3363",
+   "duplicated_in": [
+    "review",
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "**Approve**",
+   "class": "convert-to-code",
+   "class_reason": "Verdict vocabulary is parseable; a comment parser could require exactly one verdict. plan-review-round-trips.js only measures it."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 888,
+   "summary": "A clean plan gets one line \"claims verified; proceed to implementation\"; do not manufacture doubt.",
+   "bytes": 257,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3367",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "claims verified; proceed to implementation",
+   "class": "keep-prose",
+   "class_reason": "Anti-overreach disposition, not checkable."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 892,
+   "summary": "Plan-review is write-only: never edit the plan, implement, or file follow-ups; hand back to plan or implementation.",
+   "bytes": 383,
+   "tickets": [
+    "LIN-1602"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3371",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "A plan-review-kind token could refuse description writes and issue creation; today read-only is prose convention."
+  },
+  {
+   "source": "plan-review",
+   "sampled": false,
+   "line": 905,
+   "summary": "Record findings and verdict in a comment headed \"### Plan Review Verdict\"; leave the plan untouched.",
+   "bytes": 606,
+   "tickets": [
+    "LIN-1603",
+    "LIN-810"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3491",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan"
+   ],
+   "signature": "### Plan Review Verdict",
+   "class": "convert-to-code",
+   "class_reason": "Header presence is lintable, but LIN-810 forbids keying a gate on it: a warning lint, not a block."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 188,
+   "summary": "Workflow step 1: set the issue status to In Progress in the tracker if not already.",
+   "bytes": 89,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "research",
+    "implementation",
+    "meta-prompt",
+    "formatters"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "A status transition; the dispatch seam could set In Progress deterministically instead of reciting it in every write-shaped template."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 207,
+   "summary": "The plan must list files to modify, key changes per file, risks/edge cases, and testing approach.",
+   "bytes": 150,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:599",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "Files to modify",
+   "class": "keep-prose",
+   "class_reason": "Content of the plan is judgement; presence of headings is checkable but the substance is not."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 246,
+   "summary": "Before drafting, check comments for a prior plan-review verdict; if none, plan normally.",
+   "bytes": 295,
+   "tickets": [
+    "LIN-1603"
+   ],
+   "incident": "Second plan generated blind to plan-review findings; one-cycle bound unsatisfiable.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3473",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "### Plan Review Verdict",
+   "class": "convert-to-code",
+   "class_reason": "Whether a prior verdict comment exists is a lookup the prompt generator could do and inject, rather than asking the agent to search."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 252,
+   "summary": "Record in the description a short changelog line naming which plan-review findings the revision addresses.",
+   "bytes": 339,
+   "tickets": [
+    "LIN-1603"
+   ],
+   "incident": "Next plan-review had to re-derive revision against verdict from scratch.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3483",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "Revision 2 — addresses plan-review findings",
+   "class": "convert-to-code",
+   "class_reason": "Presence of a revision changelog line after a Request Changes verdict is a mechanically checkable description field."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 264,
+   "summary": "Name any routed-around contract gap with a ticket identifier or explicit 'none identified'.",
+   "bytes": 337,
+   "tickets": [
+    "LIN-279"
+   ],
+   "incident": "Cheap default strategies silently routed around tracked contract gaps.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:669",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan-review",
+    "lib/completion-signals.js"
+   ],
+   "signature": "none identified",
+   "class": "convert-to-code",
+   "class_reason": "A ticket-id-or-'none identified' field in the Strategy Framing block is a presence/format check; plan-review check 2 re-verifies it by hand."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 270,
+   "summary": "The chosen strategy feeds Scope Assessment; session-fit answers against it, not the cheapest default.",
+   "bytes": 142,
+   "tickets": [
+    "LIN-279"
+   ],
+   "incident": "Post-hoc justification of the cheap default strategy.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Ordering is pinned by a test (prompt-templates.test.js:656) but answering against the chosen strategy is reasoning quality."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 278,
+   "summary": "List the surfaces the plan touches; merge surfaces sharing dependencies and failure modes, else separate.",
+   "bytes": 396,
+   "tickets": [],
+   "incident": "CRUD tasks over-sent to implementation; executor dropped per-operation edges.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:688",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "Surfaces:",
+   "class": "keep-prose",
+   "class_reason": "Deciding what counts as one surface is design judgement."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 284,
+   "summary": "A class with no possible sweep (new-code destinations, production-data populations) may be declared so, with its shape.",
+   "bytes": 754,
+   "tickets": [
+    "LIN-1873"
+   ],
+   "incident": "Plans forced to fabricate sweeps for un-sweepable classes.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1123",
+   "duplicated_in": [
+    "meta-prompt",
+    "research",
+    "plan-review"
+   ],
+   "signature": "no sweep, here is why",
+   "class": "keep-prose",
+   "class_reason": "Whether members lie outside the source tree is judgement; LIN-1873 amends the LIN-1871 cited-sweep rule."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 290,
+   "summary": "For each surface note two or three edges that are easiest to miss.",
+   "bytes": 45,
+   "tickets": [],
+   "incident": "Executor completed happy path, silently dropping edge cases per operation.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Identifying easy-to-miss edges is model judgement; a count check would only check form."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 296,
+   "summary": "Write the session-fit answer in the description as literally 'fits one session' or 'needs multiple sessions'.",
+   "bytes": 243,
+   "tickets": [],
+   "incident": "Topology labels mis-routed small multi-step tasks to breakdown.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3448",
+   "duplicated_in": [
+    "meta-prompt",
+    "close-out"
+   ],
+   "signature": "fits one session",
+   "class": "convert-to-code",
+   "class_reason": "Literal phrase is already parsed by lib/recommendation-facts.js:50; a post-plan check could refuse a plan lacking it."
+  },
+  {
+   "source": "plan",
+   "sampled": true,
+   "line": 316,
+   "summary": "None of (a)-(d) firing is common; do not volunteer plan-review for a plan meeting no criterion.",
+   "bytes": 291,
+   "tickets": [
+    "LIN-1603",
+    "LIN-1600"
+   ],
+   "incident": "Plan-review gate must not tax plans that do not need it.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3460",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "plan-review due: no",
+   "class": "convert-to-code",
+   "class_reason": "Criteria (a)-(d) are mostly checkable fields (session-fit phrase, gap id); the router could compute plan-review-due instead of the agent."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 515,
+   "summary": "Workflow step 1: set the issue status to In Progress in the tracker if not already.",
+   "bytes": 88,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "plan",
+    "implementation",
+    "meta-prompt",
+    "formatters"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "A status transition the dispatch seam could perform deterministically instead of reciting per template."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 533,
+   "summary": "When comments exist, review prior research on the task and build on existing findings.",
+   "bytes": 78,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Already rendered only when comments exist; weighing prior findings is judgement."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 544,
+   "summary": "Confirm a metric actually tracks the real outcome before optimizing against it; validate or replace it.",
+   "bytes": 371,
+   "tickets": [
+    "LIN-585"
+   ],
+   "incident": "Research optimized against measurements that read green while outcome was wrong.",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "measurement tracks the outcome",
+   "class": "keep-prose",
+   "class_reason": "Whether a signal tracks the outcome is irreducible analytical judgement."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 564,
+   "summary": "Audit the Layers applies only to shared/multi-surface work; small single-surface changes record file and fix.",
+   "bytes": 295,
+   "tickets": [
+    "LIN-740",
+    "LIN-697"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2089",
+   "duplicated_in": [
+    "formatters",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates formatScaleToTask, inlined ~25 lines earlier in the same research prompt; one scale-down gate would do."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 570,
+   "summary": "Brief each layer from actual code/docs/history, cite file:line or commit per claim; derive per-layer axes.",
+   "bytes": 1347,
+   "tickets": [
+    "LIN-740"
+   ],
+   "incident": "A layer never looked for broke (LIN-735/LIN-295/LIN-579 gaps).",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2026",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "file:line",
+   "class": "keep-prose",
+   "class_reason": "Deciding what each layer must hold true against is judgement; citation presence is checkable but not their truth."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 585,
+   "summary": "Name each class the task touches, say how it was bounded, and list every member found.",
+   "bytes": 383,
+   "tickets": [
+    "LIN-1871",
+    "LIN-1873"
+   ],
+   "incident": "Four tickets each burned 4+ sessions discovering members one at a time.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1043",
+   "duplicated_in": [
+    "plan",
+    "plan-review",
+    "review",
+    "meta-prompt"
+   ],
+   "signature": "bounded by",
+   "class": "keep-prose",
+   "class_reason": "Bounding a class is reasoning; LIN-1871 revises LIN-1873 and moves the rule upstream from plan to research."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 598,
+   "summary": "End research with an explicit Surface Assessment asking whether the feature's shape demands structural change.",
+   "bytes": 418,
+   "tickets": [
+    "LIN-192",
+    "LIN-397"
+   ],
+   "incident": "Refactor recommendations never surfaced to the plan step on the handwritten path.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1937",
+   "duplicated_in": [
+    "meta-prompt",
+    "plan"
+   ],
+   "signature": "Surface Assessment: [lands cleanly]",
+   "class": "convert-to-code",
+   "class_reason": "Presence of a 'Surface Assessment: [...]' line with one of three verdicts is a parseable format check."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 609,
+   "summary": "Who-pays test: classify each touched consumer as beneficiary or bystander, citing each bystander's new tax.",
+   "bytes": 476,
+   "tickets": [
+    "LIN-397"
+   ],
+   "incident": "Refactors taxed bystander consumers for one feature's need.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1944",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "bystander",
+   "class": "keep-prose",
+   "class_reason": "Cost/benefit weighing of a refactor across consumers is design judgement."
+  },
+  {
+   "source": "research",
+   "sampled": true,
+   "line": 624,
+   "summary": "Comment output: full notes with per-layer audit, class list, exploration process, and Surface Assessment.",
+   "bytes": 220,
+   "tickets": [
+    "LIN-740"
+   ],
+   "incident": "Plan could not read a Surface Assessment left only in the description.",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1958",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "Surface Assessment:",
+   "class": "convert-to-code",
+   "class_reason": "Presence of the named sections in the research comment is mechanically checkable at completion."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1006,
+   "summary": "Verify against requirements; do not add new requirements.",
+   "bytes": 158,
+   "tickets": [
+    "LIN-114"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "plan-review",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1008,
+   "summary": "Check recorded scope matches what changed; flag plan overrun or staleness as a finding rather than pressing on.",
+   "bytes": 279,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1020,
+   "summary": "Run git log -30 on modified files; verify the change does not reintroduce a previously fixed bug.",
+   "bytes": 161,
+   "tickets": [
+    "LIN-240"
+   ],
+   "incident": "Local fixes regressed previously fixed behaviour",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "The log could be precomputed; spotting a reintroduced bug is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1023,
+   "summary": "Where a recent commit fixed the same behaviour, read it and confirm the fix is intact.",
+   "bytes": 154,
+   "tickets": [
+    "LIN-240"
+   ],
+   "incident": "Local fixes regressed previously fixed behaviour",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1024,
+   "summary": "Verify the change does not re-apply anything a recent commit reverted.",
+   "bytes": 115,
+   "tickets": [
+    "LIN-240"
+   ],
+   "incident": "Local fixes regressed previously fixed behaviour",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Detecting re-applied reverted hunks is possible but brittle; judgement today."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1028,
+   "summary": "Cross-reference each cross-cutting concern and acceptance criterion against the implementation steps followed.",
+   "bytes": 204,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1030,
+   "summary": "Treat plan requirements not addressed by any implementation step as highest-priority gaps.",
+   "bytes": 184,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1031,
+   "summary": "Focus attention on those gaps rather than re-verifying completed work.",
+   "bytes": 92,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Attention guidance."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1035,
+   "summary": "Check whether the change is one of a class; name the class and mark unhandled siblings inside/outside, or state isolated.",
+   "bytes": 676,
+   "tickets": [
+    "LIN-313"
+   ],
+   "incident": "Narrow task done in isolation; parent then hit the next sibling",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:944",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "isolated",
+   "class": "keep-prose",
+   "class_reason": "Finding siblings is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1039,
+   "summary": "Mark every unhandled instance and ledger item inside/outside the bounded classes; inside is own scope, never filed.",
+   "bytes": 1095,
+   "tickets": [
+    "LIN-2825",
+    "LIN-1871",
+    "LIN-3006"
+   ],
+   "incident": "Inside-scope work was discharged by filing follow-up tickets",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2556",
+   "duplicated_in": [
+    "close-out",
+    "meta-prompt",
+    "docs/autopilot-operating-manual.md",
+    "docs/worker-lane-prompt.md"
+   ],
+   "signature": "inside",
+   "class": "keep-prose",
+   "class_reason": "LIN-3006 amends LIN-2825; class membership by kind is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1039,
+   "summary": "If a ruling is raised, inside items offer only \"do it here\" or \"drop\"; \"file\" only for outside items.",
+   "bytes": 152,
+   "tickets": [
+    "LIN-3006"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2697",
+   "duplicated_in": [
+    "close-out",
+    "meta-prompt"
+   ],
+   "signature": "do it here",
+   "class": "convert-to-code",
+   "class_reason": "If rulings carried the inside/outside mark as a field, the rulings API could refuse a \"file\" option for inside items."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1039,
+   "summary": "Inside/outside marking is orthogonal to risk lanes; unprovable inside items still route through monitor/rollback lanes.",
+   "bytes": 295,
+   "tickets": [
+    "LIN-2825"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2640",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Patch reconciling LIN-2825 with LIN-898/1579 lanes; exists only because two rule chains overlap."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1041,
+   "summary": "Before filing an outside item, search relations and search for an existing ticket; link it instead of refiling.",
+   "bytes": 366,
+   "tickets": [
+    "LIN-2991",
+    "LIN-3022"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2785",
+   "duplicated_in": [
+    "close-out",
+    "docs/autopilot-operating-manual.md"
+   ],
+   "signature": "related",
+   "class": "keep-prose",
+   "class_reason": "Matching \"same file and finding\" is judgement; the search itself is mechanical."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1043,
+   "summary": "Before raising a DECISION, query rulings incl. resolved; never re-raise a finding an existing row covers.",
+   "bytes": 410,
+   "tickets": [
+    "LIN-2991",
+    "LIN-3022"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2786",
+   "duplicated_in": [
+    "close-out",
+    "docs/autopilot-operating-manual.md",
+    "lib/proxy-instructions.js"
+   ],
+   "signature": "includeResolved",
+   "class": "convert-to-code",
+   "class_reason": "The rulings route already holds the data (includeResolved); it could refuse a duplicate DECISION for the same anchor."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1047,
+   "summary": "For cross-module or user-facing behaviour, verify e2e/integration tests exist where appropriate.",
+   "bytes": 280,
+   "tickets": [
+    "LIN-258"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1691",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "e2e",
+   "class": "keep-prose",
+   "class_reason": "Test-level appropriateness is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1049,
+   "summary": "Flag changes that add only low-level tests for behaviour needing end-to-end coverage.",
+   "bytes": 90,
+   "tickets": [
+    "LIN-258"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement; overlaps the checklist item."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1050,
+   "summary": "Choose the test level from the change itself; do not enforce a fixed rule.",
+   "bytes": 146,
+   "tickets": [
+    "LIN-258"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Explicitly a judgement instruction."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1051,
+   "summary": "Mutation-check load-bearing tests: remove each claimed code path, confirm red, revert, report the mutation.",
+   "bytes": 736,
+   "tickets": [
+    "LIN-2274",
+    "LIN-2303"
+   ],
+   "incident": "Tests stayed green with their claimed code path never wired in",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:984",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "mutation",
+   "class": "convert-to-code",
+   "class_reason": "A mutation-testing run over changed lines in CI checks this mechanically, once, instead of per-review prose."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1055,
+   "summary": "Checklist: implementation matches task requirements.",
+   "bytes": 46,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1056,
+   "summary": "Checklist: tests cover new/changed behaviour.",
+   "bytes": 38,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1057,
+   "summary": "Checklist: tests exist at the appropriate level (e2e/integration where needed).",
+   "bytes": 122,
+   "tickets": [
+    "LIN-258"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1693",
+   "duplicated_in": [
+    "self",
+    "lib/completion-signals.js"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the Test Quality Check bullets earlier in the same prompt."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1058,
+   "summary": "Checklist: tests verify no unintended side effects; state left clean.",
+   "bytes": 87,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1059,
+   "summary": "Checklist: interactions between features sharing a code path are tested.",
+   "bytes": 87,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1060,
+   "summary": "Checklist: load-bearing new/changed tests were mutation-checked, not merely inspected.",
+   "bytes": 155,
+   "tickets": [
+    "LIN-2274"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:992",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the mutation-check bullet earlier in the same prompt."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1061,
+   "summary": "Checklist: no security vulnerabilities introduced.",
+   "bytes": 44,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:742",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "scope-to-risk-tier",
+   "class_reason": "Security review sensible for auth/credential/data surfaces; recited on every review including docs-only."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1062,
+   "summary": "Checklist: error handling is appropriate.",
+   "bytes": 35,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1063,
+   "summary": "Checklist: code style consistent with the codebase.",
+   "bytes": 45,
+   "tickets": [
+    "LIN-523"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:743",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "A linter/formatter in CI checks style mechanically."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1064,
+   "summary": "Checklist: no performance regressions.",
+   "bytes": 32,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:744",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "No benchmark exists; judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1065,
+   "summary": "Checklist: CI passes on the PR, or CI is absent and the substitute run is recorded.",
+   "bytes": 107,
+   "tickets": [
+    "LIN-1455"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the CI-gate section and hand-off precondition in the same prompt."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1066,
+   "summary": "Checklist: no regressions introduced.",
+   "bytes": 31,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the Regression Check section in the same prompt."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1067,
+   "summary": "Checklist: class check answered (isolated, or class named with unhandled instances).",
+   "bytes": 84,
+   "tickets": [
+    "LIN-313"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:959",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Restates the class-check section in the same prompt."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1068,
+   "summary": "Checklist: code is ready for production.",
+   "bytes": 34,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Adds no criterion beyond the verdict it precedes."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1072,
+   "summary": "For visual or behavioural changes, verify the result directly rather than relying on tests alone.",
+   "bytes": 122,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1073,
+   "summary": "If a spec/mockup attachment exists, view it and the result side-by-side before judging fidelity.",
+   "bytes": 214,
+   "tickets": [
+    "LIN-872"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4598",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "side-by-side",
+   "class": "keep-prose",
+   "class_reason": "Perception judgement; renders only with attachments."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1075,
+   "summary": "Flag anything the agent cannot verify for human testing, with specific check instructions.",
+   "bytes": 186,
+   "tickets": [],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "human testing",
+   "class": "keep-prose",
+   "class_reason": "Judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1079,
+   "summary": "Write the \"What CI Did Not Prove\" ledger: every unexercised claim, marked inside/outside with its discharge route.",
+   "bytes": 1031,
+   "tickets": [
+    "LIN-550",
+    "LIN-2825"
+   ],
+   "incident": "Irreversible finish had no owner or gate",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2866",
+   "duplicated_in": [
+    "meta-prompt",
+    "autopilot-kickoff",
+    "lib/completion-signals.js"
+   ],
+   "signature": "### What CI Did Not Prove",
+   "class": "keep-prose",
+   "class_reason": "Enumerating unproven claims is judgement; follow-on-ratio.js only measures ledger presence."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1081,
+   "summary": "Keep the ledger (verification depth) distinct from the class check (breadth).",
+   "bytes": 521,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Conceptual guidance."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1083,
+   "summary": "Unprovable claims become hard gate items only on runtime, data, security or external-contract changes.",
+   "bytes": 554,
+   "tickets": [
+    "LIN-898"
+   ],
+   "incident": "Prompt-wording change required human sign-off for unprovable claims",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3589",
+   "duplicated_in": [
+    "close-out",
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "post-merge observation",
+   "class": "keep-prose",
+   "class_reason": "Already a risk-tiering rule; judging the surface is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1085,
+   "summary": "Unprovable-in-principle claim: name a firing monitor and write why nothing short of production proves it.",
+   "bytes": 1144,
+   "tickets": [
+    "LIN-1579",
+    "LIN-2917"
+   ],
+   "incident": "31 of 50 ticket-as-monitor discharges were never worked",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3689",
+   "duplicated_in": [
+    "close-out",
+    "meta-prompt",
+    "autopilot-kickoff",
+    "lib/completion-signals.js"
+   ],
+   "signature": "monitor:",
+   "class": "keep-prose",
+   "class_reason": "LIN-2917 amends LIN-1579 amends LIN-898; the justification line itself is lintable."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1086,
+   "summary": "Low-risk reversible change: name the rollback commit or flag; data, security, contract surfaces excluded.",
+   "bytes": 744,
+   "tickets": [
+    "LIN-1579"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3717",
+   "duplicated_in": [
+    "close-out",
+    "meta-prompt",
+    "autopilot-kickoff",
+    "lib/completion-signals.js"
+   ],
+   "signature": "rollback:",
+   "class": "keep-prose",
+   "class_reason": "Reversibility is judgement; LIN-1579 amends LIN-898."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1088,
+   "summary": "Key the lane on risk surface and what you can name, never size or file type; the ledger never shrinks.",
+   "bytes": 824,
+   "tickets": [
+    "LIN-898",
+    "LIN-1579"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:3596",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Judgement; restates the floors of the two lanes above."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1090,
+   "summary": "If CI covers everything, say \"CI covers the deliverable; ledger empty\"; don't manufacture doubt.",
+   "bytes": 276,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2883",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "CI covers the deliverable; ledger empty",
+   "class": "keep-prose",
+   "class_reason": "Anti-overreach disposition."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1092,
+   "summary": "With CI absent, record the substitute run's known limits as ledger items.",
+   "bytes": 358,
+   "tickets": [
+    "LIN-1455"
+   ],
+   "incident": "LIN-1358: agent wedged 195 minutes waiting on nonexistent CI",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:4685",
+   "duplicated_in": [
+    "formatters"
+   ],
+   "signature": "substitute",
+   "class": "retire",
+   "class_reason": "Restates formatCiGateCheck's residue sentence, inlined just below in the same prompt."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1098,
+   "summary": "Conclude with an explicit Approve / Request Changes / Needs Discussion verdict and one-line justification.",
+   "bytes": 214,
+   "tickets": [
+    "LIN-523"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1758",
+   "duplicated_in": [
+    "plan-review",
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "**Approve**",
+   "class": "convert-to-code",
+   "class_reason": "Verdict vocabulary is parseable at the comment seam."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1098,
+   "summary": "A non-empty ledger requires \"Approve — conditional on close-out discharging the ledger\", never bare Approve.",
+   "bytes": 280,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1747",
+   "duplicated_in": [
+    "meta-prompt",
+    "autopilot-kickoff",
+    "lib/completion-signals.js"
+   ],
+   "signature": "Approve — conditional on close-out discharging the ledger",
+   "class": "convert-to-code",
+   "class_reason": "Ledger non-empty implies conditional wording: a parser can check the pair."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1098,
+   "summary": "Conditional Approve only if close-out can discharge every item within its trivial bound; else Request Changes.",
+   "bytes": 530,
+   "tickets": [
+    "LIN-3033",
+    "LIN-3056"
+   ],
+   "incident": "Inside items needing new tests got conditional Approves",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2755",
+   "duplicated_in": [
+    "meta-prompt",
+    "docs/worker-lane-prompt.md",
+    "lib/completion-signals.js"
+   ],
+   "signature": "Request Changes",
+   "class": "keep-prose",
+   "class_reason": "LIN-3056 amends LIN-550 via LIN-3033; judging required authoring is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1098,
+   "summary": "Review does not merge, mark Done, or file close-out follow-ups.",
+   "bytes": 102,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1745",
+   "duplicated_in": [
+    "self",
+    "autopilot-kickoff",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Stated three times in this prompt (Verdict, Hand Off, Completion)."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1102,
+   "summary": "Review is write-only: deliverable is ledger plus verdict; merge, Done and follow-ups belong to close-out.",
+   "bytes": 297,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "Irreversible finish had no owner or gate",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1743",
+   "duplicated_in": [
+    "autopilot-kickoff",
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "convert-to-code",
+   "class_reason": "The proxy could refuse a Done transition from a review-kind dispatch; merge via gh is outside Harbour."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1102,
+   "summary": "Do not try to confirm a merge that has not happened yet.",
+   "bytes": 91,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "Review demanded proof of a merge that happens after it",
+   "enforcement": "prose-only",
+   "enforcement_evidence": "",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Patch left from LIN-523/550 when review owned the merge; implied by write-only."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1102,
+   "summary": "Before Approve confirm CI green (or substitute independently re-run) and all checks satisfied; red CI = Request Changes.",
+   "bytes": 465,
+   "tickets": [
+    "LIN-550",
+    "LIN-1455"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1744",
+   "duplicated_in": [
+    "meta-prompt",
+    "lib/completion-signals.js"
+   ],
+   "signature": "CI green",
+   "class": "convert-to-code",
+   "class_reason": "PR check state is queryable; an Approve comment on a red head could be refused or flagged."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1104,
+   "summary": "On Approve hand off to close-out; review's job ends at verdict plus ledger comment.",
+   "bytes": 378,
+   "tickets": [
+    "LIN-523",
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1749",
+   "duplicated_in": [
+    "close-out",
+    "autopilot-kickoff"
+   ],
+   "signature": "",
+   "class": "retire",
+   "class_reason": "Describes close-out's duties, restated in close-out itself; review side duplicates write-only."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1106,
+   "summary": "When handing an edit to close-out, quote the exact change; if you cannot, or it is not trivial, Request Changes.",
+   "bytes": 463,
+   "tickets": [
+    "LIN-3033"
+   ],
+   "incident": "Close-out merged content review never saw",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2705",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "before → after",
+   "class": "keep-prose",
+   "class_reason": "Exactness partly lintable (\"e.g.\" detection); triviality is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1108,
+   "summary": "Cannot-close branch (red CI or hidden blocker): do not loop into another review or hand to close-out.",
+   "bytes": 290,
+   "tickets": [
+    "LIN-474",
+    "LIN-523"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1764",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "cannot-close",
+   "class": "keep-prose",
+   "class_reason": "Judgement of a blocker."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1109,
+   "summary": "Create or link the surfaced work as a blocks relation on the current task.",
+   "bytes": 151,
+   "tickets": [
+    "LIN-474"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1765",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "blocks",
+   "class": "keep-prose",
+   "class_reason": "Relation creation is an action; deciding blocker scope is judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1110,
+   "summary": "Name the blocker's kind (bug/plan/implementation) as next action, never another review.",
+   "bytes": 261,
+   "tickets": [
+    "LIN-474"
+   ],
+   "incident": "A blocks relation does not make the engine descend",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1766",
+   "duplicated_in": [
+    "meta-prompt"
+   ],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Routing judgement."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1111,
+   "summary": "Leave the task open with Request Changes/Needs Discussion until the blocker resolves and CI is green.",
+   "bytes": 319,
+   "tickets": [
+    "LIN-523"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1768",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Sequencing guidance."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1113,
+   "summary": "Keep a review-time closure blocker distinct from a plan-phase prerequisite-refactor subtask.",
+   "bytes": 216,
+   "tickets": [
+    "LIN-474"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:1770",
+   "duplicated_in": [],
+   "signature": "",
+   "class": "keep-prose",
+   "class_reason": "Conceptual distinction."
+  },
+  {
+   "source": "review",
+   "sampled": false,
+   "line": 1117,
+   "summary": "Summary comment must hold ledger, verdict and CI state; never mark Done or merge.",
+   "bytes": 603,
+   "tickets": [
+    "LIN-550"
+   ],
+   "incident": "",
+   "enforcement": "prose-pinned-by-test",
+   "enforcement_evidence": "tests/unit/prompt-templates.test.js:2867",
+   "duplicated_in": [
+    "self"
+   ],
+   "signature": "### What CI Did Not Prove",
+   "class": "convert-to-code",
+   "class_reason": "Comment must contain three parseable parts; a lint at comment-write could check."
+  }
+ ]
+}
