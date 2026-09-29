@@ -92,7 +92,7 @@ import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable 
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getBindingCredentials, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
+import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getBindingCredentials, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, isActiveBinding, normalizeProvider, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
@@ -3202,7 +3202,7 @@ app.get('/workspace/:urlKey/settings', workspaceFromUrl, async (req, res) => {
     scope: b.scope,
     displayName: getProvider(b.provider)?.ui?.displayName || b.provider,
     token: getBindingCredentials(b)?.token,
-    active: b.provider === workspace.provider && getBindingCredentials(b)?.token === workspace.accessToken,
+    active: isActiveBinding(workspace, b),
   }));
   // One-shot session flash (LIN-2803): read and delete unconditionally, even
   // when this load carries no matching `provider_ok` (or none at all) — a

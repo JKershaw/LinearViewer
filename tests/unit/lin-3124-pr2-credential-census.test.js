@@ -32,7 +32,7 @@ import assert from 'node:assert';
 import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
 
 const D15_READ_CENSUS = 12;
-const D15_WORKSPACE_MIRROR_WRITER_CENSUS = 4;
+const D15_WORKSPACE_MIRROR_WRITER_CENSUS = 5;
 
 // Files whose `.credentials` occurrences belong to a different D15 sub-class.
 const D15_EXCLUDED_FILES = new Set([

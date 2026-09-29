@@ -37,6 +37,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import * as workspaceModule from '../../lib/workspace.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
+import { mirrorRefreshedCredentialIntoOwnerRows } from '../../lib/workspace-token-refresh.js';
 
 const { getWorkspaceToken } = workspaceModule;
 // Added by S0. Absent before the accessors exist; bound into the assertions
@@ -137,12 +138,12 @@ const GRID = [
   },
 ];
 
-// Assert the accessor reproduces the golden once it exists. Before S0 the
-// export is absent and only the literal-expression golden is checked.
+// Assert the accessor reproduces the golden. S0 has landed, so the export MUST
+// exist — a missing accessor is a hard failure (PR3 checkpoint B hardening;
+// before it, this silently skipped and hid a dropped export).
 function assertAccessorGolden(name, accessor, ws, golden) {
-  if (typeof accessor === 'function') {
-    assert.strictEqual(accessor(ws), golden, `${name} must reproduce the pre-change golden (raw mirror precedence)`);
-  }
+  assert.strictEqual(typeof accessor, 'function', `${name} must be exported (S0 landed)`);
+  assert.strictEqual(accessor(ws), golden, `${name} must reproduce the pre-change golden (raw mirror precedence)`);
 }
 
 describe('LIN-3124 PR1 T1 — S0 accessor identity grid (E1/E2, diverged state)', () => {
@@ -351,15 +352,32 @@ describe('LIN-3124 PR1 T3 — headless mirror then resolve, pinned as-is (charac
     };
   }
 
-  // Exactly what doRefresh's mirror loop does (lib/workspace-token-refresh.js:201-202).
-  function headlessMirror(workspace, token, expiresAt) {
-    workspace.accessToken = token;
-    workspace.tokenExpiresAt = expiresAt;
+  // PR3 checkpoint B hardening: drive the REAL mirror loop
+  // (`mirrorRefreshedCredentialIntoOwnerRows`) instead of hand-copying its two
+  // assignment lines, so T3 notices if the loop drifts.
+  function ownerSessions(workspace) {
+    return [{ _id: 'sid-1', session: { accountId: 'acct-1', workspaces: [workspace] } }];
   }
 
-  test('after the headless mirror the raw E2 accessors see NEW, but Jira call scope / E1 still carry OLD', () => {
+  test('after the real headless mirror loop the raw E2 accessors see NEW, but Jira call scope / E1 still carry OLD', async () => {
     const ws = jiraWorkspace();
-    headlessMirror(ws, 'NEW-oauth-access', Date.now() + 3_600_000);
+    ws.urlKey = 'jira-ws';
+    const persisted = [];
+    let ownerWorkspace;
+    try {
+      ownerWorkspace = await mirrorRefreshedCredentialIntoOwnerRows({
+        sessions: ownerSessions(ws),
+        urlKey: 'jira-ws',
+        ownerAccountId: 'acct-1',
+        token: 'NEW-oauth-access',
+        expiresAt: Date.now() + 3_600_000,
+        persistSession: async (sid) => { persisted.push(sid); },
+      });
+    } catch (err) {
+      assert.fail(`the real mirror loop must run: ${err.message}`);
+    }
+    assert.strictEqual(ownerWorkspace, ws, 'the mirrored workspace is returned');
+    assert.deepStrictEqual(persisted, ['sid-1'], 'the row is persisted once');
 
     // E2 raw mirror: refreshed.
     assert.strictEqual(mirrorExpr(ws), 'NEW-oauth-access');

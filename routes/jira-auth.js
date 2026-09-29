@@ -61,6 +61,7 @@ import {
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { respondToAccountConflict } from '../lib/account-conflict.js'
 import { writeConnection } from '../lib/connection-store.js'
+import { isConnectionBacked } from '../lib/connection-binding.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
 import {
@@ -242,6 +243,24 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         workspaceUrlKey,
         error: INVALID_SITE_MESSAGE,
       }))
+    }
+
+    // LIN-3124 PR3 (D2a): refuse a Basic link onto a (jira, normalizedSite)
+    // already held by a CONNECTION-BACKED OAuth binding. linkProvider merges
+    // credentials, so this state — which cannot exist before the read cutover —
+    // would otherwise produce an OAuth/Basic hybrid binding. Silently merging
+    // Basic credentials onto the OAuth binding would reproduce that hybrid, so
+    // the conservative choice is to refuse and ask the user to remove the OAuth
+    // connection first. User-visible post-cutover edge (plan §9, Flag).
+    const alreadyConnectionBacked = (workspace.bindings || []).some(
+      b => b && b.provider === 'jira' && b.scope === normalizedSite && isConnectionBacked(b)
+    )
+    if (alreadyConnectionBacked) {
+      return res.status(409).send(renderErrorPage(
+        'Jira already connected',
+        'This Jira site is already connected through OAuth. Remove that connection first, then add it with an API token.',
+        { action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings` }
+      ))
     }
 
     // Validate BEFORE linking — a lightweight read probe (GET /rest/api/3/myself)
