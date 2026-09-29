@@ -2606,6 +2606,7 @@ async function attemptSuspectCredentialRefresh({ fingerprint, urlKey, ownerAccou
     // the seam).
     adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredentialForUrlKey(args),
     refreshConnection: (args) => connectionAccess.refreshConnectionForSuspect(args),
+    ownerHasConnection: (args) => connectionAccess.ownerHasConnection(args),
   });
 }
 
