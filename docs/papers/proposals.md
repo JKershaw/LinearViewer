@@ -8,7 +8,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   were 67% correct and complete against 78% for the frontier tier, with 9.6% against 2.4% escaping, at
   the same dispatches and working hours per change. Match later-block changes on production size,
   area and ticket kind, and report whether the gap survives or belongs to the tickets each tier was
-  given. (Claude, 2026-09-30)
+  given. `harbour/survey-check-3.md` found that 33 of the later weeks' 58 escape rows are finder rows,
+  so take the escapes without them. (Claude, 2026-09-30, amended 2026-09-30)
 - **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
   weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
   detectable ratio ×2.4). `harbour/survey-check-2.md` found cost per change is not the ×1.4 the paper
@@ -50,6 +51,12 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   to 12 July, find a measure that means the same in July as in September, such as executing time
   outside CI and Monitor polls, and redo the size-held-fixed table in it. (Claude, 2026-09-30)
 
+- **Can the lead rule of a review finding be coded reliably?** `harbour/survey-check-3.md` found that
+  two blind readers named `harbour/which-rules-pay.md`'s lead rule for 59–66% of its production changes
+  and each other's for 78%, while agreeing on the counts. The class check and reviewer judgement trade
+  places most. Write decision rules that separate "a rule pointed the reviewer here" from "the reviewer
+  saw it", for example that the review text uses the rule's own words. Recode the paper's 28 production
+  tickets under them with two blind readers and report κ. (Claude, 2026-09-30)
 - **Do the tests the mutation check forces ever catch anything?** `harbour/which-rules-pay.md` found
   the mutation check led 107 of 483 review findings in the last 100 reviewed Done tickets, 97 of which
   changed only tests, and about 36 of the 88 extra legs those tickets ran. Follow every test file those

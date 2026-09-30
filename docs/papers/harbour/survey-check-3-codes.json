@@ -1,0 +1,3563 @@
+{
+ "ticket": "LIN-3167",
+ "codedAt": "2026-09-30",
+ "method": "A fresh blind recode of which-rules-pay.md (LIN-3156). Sample: every 2nd coded ticket with a production change and every 8th of the rest, by ticket number, skipping the paper's two second-read samples (scripts/survey-check-3.mjs sample). Two readers (A, B), each an in-session subagent of the frontier tier, coded all 16 tickets from the paper's own digests, rubric and rule list only, without sight of the paper, its codes or each other; B read in reverse order. Each reader was split across two sessions of 8 tickets.",
+ "sample": [
+  "LIN-2645",
+  "LIN-2758",
+  "LIN-2771",
+  "LIN-2804",
+  "LIN-2830",
+  "LIN-2872",
+  "LIN-2934",
+  "LIN-2974",
+  "LIN-3011",
+  "LIN-3049",
+  "LIN-2715",
+  "LIN-2811",
+  "LIN-2964",
+  "LIN-2992",
+  "LIN-3036",
+  "LIN-3127"
+ ],
+ "readers": {
+  "A": {
+   "tickets": [
+    {
+     "id": "LIN-2645",
+     "consequences": [
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "New .fc-obs-stale panel line has no CSS rule; renders un-deemphasised, breaks panel rhythm (L1)",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "c50296d3"
+       ],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "Narrating LLM actually stating folded count unprovable pre-merge; post-merge monitor named (L2)",
+       "rules": [
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "Sibling: flight-companion-gate seed turn gates surface on fossil-filtered attentionCount (L3, outside)",
+       "rules": [
+        "class-check",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high",
+       "followUp": "LIN-2849"
+      }
+     ],
+     "unattributed": [],
+     "note": "Close-out authored the L1 CSS fix itself. Shadow review (comment 2) not coded; non-gating."
+    },
+    {
+     "id": "LIN-2758",
+     "consequences": [
+      {
+       "comment": 9,
+       "leg": "review",
+       "finding": "Completion summary prints total not ok; vanished-row and top-guard paths untallied, over-reports applied",
+       "rules": [
+        "general-judgement",
+        "requirements"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "c63f3b9c"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 9,
+       "leg": "review",
+       "finding": "Plan-mandated render assertions missing; aria-live stripped leaves all tests green (M9)",
+       "rules": [
+        "mutation-check",
+        "requirements",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "c63f3b9c"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 9,
+       "leg": "review",
+       "finding": "Partial-failure rows need a fourth 'need retry' summary bucket; currently counted applied",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2807"
+      },
+      {
+       "comment": 12,
+       "leg": "review",
+       "finding": "Stopped-early 'remain selected' arithmetic undercounts after a pre-Stop failure",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2807"
+      },
+      {
+       "comment": 12,
+       "leg": "review",
+       "finding": "Real screen-reader coalescing of up to 117 polite announcements unproven; post-merge monitor",
+       "rules": [
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 12,
+       "leg": "review",
+       "finding": "Behaviour at 117 rows untested (tests use 3); post-merge observation",
+       "rules": [
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 12,
+       "leg": "review",
+       "finding": "Cross-browser beforeunload unproven (Chromium only); post-merge monitor",
+       "rules": [
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      }
+     ],
+     "unattributed": [],
+     "note": "Re-review ledger read via close-out table (re-review text truncated). First-review section 3 text truncated; inferred from later comments."
+    },
+    {
+     "id": "LIN-2771",
+     "consequences": [
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Server-rendered data-fc-ai-configured producer-consumer contract untested on renderer side",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "da72235f"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Reload while tab hidden ignores resume anchor; reveal schedules full backoff step",
+       "rules": [
+        "requirements",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "da72235f"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "No end-to-end coverage of reload-resume across route, sessionStorage and client timer",
+       "rules": [
+        "test-adequacy",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "da72235f"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "ai-not-configured keep-stopped never observed against a real unconfigured server",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "ad729f14",
+       "why": "separate docs PR recording close-out repro"
+      }
+     ],
+     "note": "Comment 4 labelled review is the implementation report. Shadow review L1 (comment 3, non-gating) accepted, not coded."
+    },
+    {
+     "id": "LIN-2804",
+     "consequences": [
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "Replacement /search hint is itself capability-gated; 422s on Jira and GitHub Projects",
+       "rules": [
+        "general-judgement",
+        "class-check"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "f66c82ec"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "No test renders real registered providers; endpoint-support parity unproven (ledger 1)",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "f66c82ec"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "Unscoped goal-only bearer-token dispatch never resolves capability; still advertises 422 reads",
+       "rules": [
+        "requirements",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": true,
+       "commits": [
+        "f66c82ec"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "Sibling prompt surfaces carry unconditional /issues/{id} and /search hints (collective, flight-companion kickoff)",
+       "rules": [
+        "class-check",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-2814"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "Real-provider parity covered only for scoped/prose branches; extend grid over whole render space",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2814"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "/api/proxy/instructions still advertises all six capability-gated reads",
+       "rules": [
+        "ledger",
+        "class-check"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2816"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "353fb43f",
+       "why": "LIN-2992 commit, unrelated to review findings"
+      }
+     ],
+     "note": "Fix commit 63f582a8 landed only via squash f66c82ec. Comment 4 labelled review is implementation report. Finding 2 deferred in-code with pins; also filed LIN-2815."
+    },
+    {
+     "id": "LIN-2934",
+     "consequences": [
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Feed shows no n-of-N on general goal-only runs; anchorless sessions never read bounds",
+       "rules": [
+        "requirements"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Archive-hop persistence of maxSessionsPerTask untested; mutation M11 survives",
+       "rules": [
+        "mutation-check",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "recommend-and-dispatch 201s do not echo budgetPosition or bounds",
+       "rules": [
+        "class-check",
+        "requirements"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Surviving mutants M9/M10/M19, no force-bypass test, no fail-closed note test",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "sessionPosition uses last first-seen task, not most recently dispatched (A-B-A wrong)",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "trimSessionBudget fires no write notify; feed chip denominator stays stale",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "low"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Doc and instruction prose drift: BUDGET_EXHAUSTED docs, refusal comment scope, unverified bound unstated",
+       "rules": [
+        "class-check",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "PR conflicts with main: BUILDER_VERSION 12-to-13 collision makes cache bump inert",
+       "rules": [
+        "regression-history",
+        "ci-green-exact-commit"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "R6 trim-notify untested; mutation N14 survives full suite",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "LLM arm maxSessionsPerTask echo unpinned; mutation N9 survives",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "liveDispatchOnAnchor matches null to null; live general run forces record effect on rulings",
+       "rules": [
+        "general-judgement",
+        "class-check"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "General anchors share one null bucket; iteration wrong, breaks materializer byte-identity",
+       "rules": [
+        "general-judgement",
+        "class-check"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "pointReadSession builds old orphan session for general runs, missing anchor extraItems",
+       "rules": [
+        "class-check",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "seedTitle fallback takes title-less general anchor; cards regress to placeholder title",
+       "rules": [
+        "class-check",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "Null-anchored ruling with record effect posts reply to /api/comments/null",
+       "rules": [
+        "class-check",
+        "ledger-discharge"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "Identifier-less anchor never matches its own agent-status rows; lingers running",
+       "rules": [
+        "general-judgement",
+        "ledger-discharge"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "v1 Go path maxSessionsPerTask prose threading unpinned; mutation M26 survives",
+       "rules": [
+        "mutation-check",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "Feed followUpTo exclusion unpinned; mutation M08 survives",
+       "rules": [
+        "mutation-check",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "Scoped-only kickoff prose contradicts itself: 'open-ended, no finish line' beside per-task bound",
+       "rules": [
+        "general-judgement",
+        "ledger-discharge"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Observation budget chip never DOM-asserted; mutation M21 survives (L3)",
+       "rules": [
+        "ledger",
+        "test-adequacy",
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "low"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Live seam witness of sessionsPerTask 409 and durable note not performed (L1)",
+       "rules": [
+        "ledger"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Orchestrator hand-back comment naming bound and ledger unproven (L2)",
+       "rules": [
+        "ledger"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "Merge-order BUILDER_VERSION must be re-checked right before merge (L4)",
+       "rules": [
+        "ledger",
+        "regression-history"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 18,
+       "leg": "review",
+       "finding": "T2 fix misses issue-scoped builds; materialized and point-read docs diverge from full build",
+       "rules": [
+        "class-check",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b2817d55"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "New {urlKey, dispatchId} agent-status query has no index on write-hot materializer path",
+       "rules": [
+        "quality-checklist",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "8086c565"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      }
+     ],
+     "unattributed": [],
+     "note": "Comments 12, 14, 17 are implementation summaries labelled close-out/review. Summary cites 05b83fa5; digest commit b9698d99 carries R1-R7. L1-L3 origin comment uncertain."
+    },
+    {
+     "id": "LIN-2715",
+     "consequences": [
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Witness red on CI's Linux runner unproven; mutation only run on macOS",
+       "rules": [
+        "ledger",
+        "mutation-check"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Real-device 100dvh behaviour unverified; all evidence emulated Chromium",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high",
+       "followUp": "LIN-2769"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Clipped playbook scroll has no affordance; discoverability is operator's call",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-2769"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Merged tree never CI-run; branch one commit behind main",
+       "rules": [
+        "ledger",
+        "ci-green-exact-commit"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Brief falsely claims fix already landed on main; PR still open",
+       "rules": [
+        "ledger",
+        "general-judgement"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "cda38e28",
+       "why": "squash-merge of the reviewed change, no new work"
+      },
+      {
+       "sha": "7700f6d8",
+       "why": "LIN-2830 commit, unrelated"
+      }
+     ],
+     "note": "Unconditional Approve that still carried a five-item ledger; close-out discharged or routed each. Implementation commit 0b30d2e5 appears only as squash."
+    },
+    {
+     "id": "LIN-2811",
+     "consequences": [
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "window.ChatUI.isPinnedToBottom export contract has no direct test",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "84535004"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "Exact 60px threshold boundary unpinned; M7 only proves non-zero",
+       "rules": [
+        "ledger",
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "84535004"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "No browser-level witness that a scrolled-up reader is no longer yanked",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "prompt-section.js carries duplicate inline near-bottom predicate (outside, untracked)",
+       "rules": [
+        "class-check",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2987"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "b1c5170e",
+       "why": "sibling ticket LIN-2812 work"
+      },
+      {
+       "sha": "d1f12b6b",
+       "why": "LIN-2987 later work on prompt-section duplicate"
+      }
+     ],
+     "note": "Close-out authored the test-only discharge commit itself. Items 4-5 outside and routed to existing tickets without recorded notes; not coded."
+    },
+    {
+     "id": "LIN-2964",
+     "consequences": [
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "D2 star cull floor unwitnessed (M3 green); commit message mutation claim inaccurate",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "644090a9"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Breakpoint-crossing focus cull has no focus assertion in resize witness",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      }
+     ],
+     "unattributed": [],
+     "note": "Ticket is itself a review blocker spun out of LIN-2959. Outside/accepted ledger items not coded."
+    },
+    {
+     "id": "LIN-2830",
+     "consequences": [
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "Effort rows clipped: fixed ~792px grid tracks inside ~263px cards under overflow-x clip; columns invisible",
+       "rules": [
+        "direct-verification",
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "7700f6d8"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "Published workerSessions[] catalog/doc examples omit new harness field (two instances)",
+       "rules": [
+        "class-check",
+        "ledger",
+        "follow-up-filing"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high",
+       "followUp": "LIN-2844"
+      },
+      {
+       "comment": 4,
+       "leg": "review",
+       "finding": "52rem floor makes kind cards single-column at desktop; readability needs human check post-deploy",
+       "rules": [
+        "direct-verification",
+        "risk-lanes",
+        "ledger"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      }
+     ],
+     "unattributed": [],
+     "note": ""
+    },
+    {
+     "id": "LIN-2872",
+     "consequences": [
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Launch-time exemption misses all three motivating incidents: [working] Session launched beat counted as work",
+       "rules": [
+        "requirements",
+        "direct-verification",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "1e7edddf",
+        "e0a304c9"
+       ],
+       "rounds": 2,
+       "confidence": "medium"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Class sibling: [working] regex misses categorized [working · cat] heartbeat, would wrongly exempt real work",
+       "rules": [
+        "class-check",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "1e7edddf"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 8,
+       "leg": "review",
+       "finding": "Allow-list over-fires on opencode: no work-evidence member reachable on failed rows, removes window entirely",
+       "rules": [
+        "requirements",
+        "direct-verification",
+        "ledger"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-2900"
+      },
+      {
+       "comment": 8,
+       "leg": "review",
+       "finding": "Claude-code heartbeat shapes proving work (resumed, no-tool-calls total, stalled?) read as liveness",
+       "rules": [
+        "class-check",
+        "ledger"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-2900"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "proxy-instructions catalog for recommend-and-dispatch omits new followUpTo/force fields",
+       "rules": [
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "8dd15773"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "New test header falsely claims launch-time exemption coverage at factory seam",
+       "rules": [
+        "general-judgement",
+        "ledger"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "8dd15773"
+       ],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "Verb-override arm's LIN-805/LIN-1429 logic unpinned; mutations M11/M12 survive",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "8dd15773"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "Sibling: autopilot/kickoff drops force and followUpTo, no escape hatch from duplicate guard",
+       "rules": [
+        "class-check",
+        "inside-outside",
+        "follow-up-filing"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high",
+       "followUp": "LIN-2901"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "e35bae0f",
+       "why": "half-2 re-landed on fresh branch per split ruling"
+      },
+      {
+       "sha": "e5eb5063",
+       "why": "LIN-3139 store-fake change, unrelated ticket"
+      }
+     ],
+     "note": "Half-1 rework commits 1e7edddf/e0a304c9 were on PR #1493, closed unmerged; half 1 moved to LIN-2900, half 2 merged via #1497."
+    },
+    {
+     "id": "LIN-2974",
+     "consequences": [
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "No test covers authorization on /known-repos; removing authenticateProxyToken survives (M4)",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "2518b833"
+       ],
+       "rounds": 2,
+       "confidence": "high"
+      },
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "Drift script exit codes and path print untested at process boundary; S3/S4 survive",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "3c03754"
+       ],
+       "rounds": 2,
+       "confidence": "high"
+      },
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "known-repos endpoint missing from proxy-instructions catalog and docs; route docblock names .mjs",
+       "rules": [
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "2518b833"
+       ],
+       "rounds": 2,
+       "confidence": "medium"
+      },
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "PR CI ran on stale base; needs green CI on head including current main",
+       "rules": [
+        "ci-green-exact-commit",
+        "ledger"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [
+        "3d95c3ed"
+       ],
+       "rounds": 2,
+       "confidence": "medium"
+      },
+      {
+       "comment": 28,
+       "leg": "close-out",
+       "finding": "Live drift check inconclusive: tracker inventory empty, inventory fetch at 8s timeout so guard fails open",
+       "rules": [
+        "ledger-discharge",
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "e90c7cd3"
+       ],
+       "rounds": 2,
+       "confidence": "low"
+      }
+     ],
+     "unattributed": [],
+     "note": "e90c7cd3 is split-out LIN-3007 fix committed under LIN-2974; SD #243 (3c03754) closed unmerged; alias removal was host config, not repo."
+    },
+    {
+     "id": "LIN-3011",
+     "consequences": [
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Lean path gives queued live items runtime.dispatchedAt null instead of ISO in served JSON",
+       "rules": [
+        "direct-verification",
+        "class-check",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Abort crossCheck and F1 same-millisecond guard unpinned; M10/M14/M14b survive",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Digest abort harvest status==='aborted' check unpinned; M16 survives",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "dashboard.js runs[].toolPeak use of digest peak unpinned; M20 survives",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Self-heal re-read-finds-nothing branch undecided and unpinned; M28 survives",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "W1 persist/read comparison coalesces null/[] hiding omitted-vs-null drift; M22s/M24s survive",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "mongo-smoke L3 parity array missing healed-legacy and version-less fv0 shapes; M29 not caught by L3",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Production-scale output-equivalence unproven (L8)",
+       "rules": [
+        "ledger",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3014"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Fill-size and first-deploy heal load unproven (L9)",
+       "rules": [
+        "ledger",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3014"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "e7737f0e",
+       "why": "LIN-3013 swipe page change, other ticket"
+      }
+     ],
+     "note": "L8/L9 handed to LIN-3014 with a close-out handoff comment; ledger text truncated in digest."
+    },
+    {
+     "id": "LIN-3049",
+     "consequences": [
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Live A/B: change routes diverged stale slices to implementation; two guards lack divergence condition",
+       "rules": [
+        "direct-verification",
+        "requirements"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "5a0f07be",
+        "07810a0c"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Positive eval case passes on main too; PR's fix-works claim over-reads it",
+       "rules": [
+        "test-adequacy",
+        "direct-verification"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "5a0f07be"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "AI-path aiHint precondition and fallback unpinned; M3/M4 survive",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "5a0f07be"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Handwritten fallback points at deleted per-surface acceptance-criteria bullet; restore and pin",
+       "rules": [
+        "general-judgement",
+        "mutation-check"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "5a0f07be"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Change-log row cites nonexistent gate record",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "5a0f07be"
+       ],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 16,
+       "leg": "review",
+       "finding": "aiHint.workflow own-trail target and fallback unpinned (R3 sibling); M4w/M4w2 survive",
+       "rules": [
+        "mutation-check",
+        "class-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "033160ef"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 16,
+       "leg": "review",
+       "finding": "No-false-session-fit caveat unpinned on both approved paths; M13/M15 survive",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "033160ef"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 18,
+       "leg": "review",
+       "finding": "Change-log row placeholder must cite the squash-merge SHA (L6)",
+       "rules": [
+        "ledger",
+        "trivial-edit-bound"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "7db0ce05"
+       ],
+       "rounds": 0,
+       "confidence": "medium"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "380fbf39",
+       "why": "squash-merge of PR #1579 carrying all rounds"
+      }
+     ],
+     "note": "Branch commits 5a0f07be/07810a0c/033160ef named in comments, landed via squash 380fbf39. Prompt text under lib/ coded prod."
+    },
+    {
+     "id": "LIN-2992",
+     "consequences": [
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "Generated watcher's loopback(host, port) call site unpinned; M3 leaves CI green while gate blind",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "d1ee9621"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "NODE_USE_ENV_PROXY native-fetch path unexercised by any test or witness",
+       "rules": [
+        "ledger",
+        "class-check"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "Workflow comment still claims native fetch ignores HTTPS_PROXY, stale rationale",
+       "rules": [
+        "requirements",
+        "ledger"
+       ],
+       "effect": "tooling",
+       "realFault": false,
+       "commits": [
+        "d1ee9621"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      }
+     ],
+     "unattributed": [],
+     "note": "Close-out authored the L1 pin test and L3 comment itself."
+    },
+    {
+     "id": "LIN-3036",
+     "consequences": [
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "classifyLoop withdrawal placement unpinned: superseded/non-blocked cases; M11/M12 survive",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "46caba41"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Caller 3 selectFossilRows has no withdrawal case; M10 leaves it green",
+       "rules": [
+        "mutation-check",
+        "class-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "46caba41"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Branching lineage: feed drops withdrawn group while classifyLoop keeps sibling blocked",
+       "rules": [
+        "class-check",
+        "inside-outside"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Stale answered-only shelf-gate comment and includeResolved docblock",
+       "rules": [
+        "class-check",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-3038"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Whole-branch CI never ran; CI is PR-only",
+       "rules": [
+        "ci-green-exact-commit",
+        "ledger"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-3038"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "End-to-end withdrawal flow not exercised",
+       "rules": [
+        "test-adequacy",
+        "ledger"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3038"
+      }
+     ],
+     "unattributed": [],
+     "note": "Subtask with no own PR; L1/L2 tests authored in a leg labelled close-out; shared PR owned by LIN-3038."
+    },
+    {
+     "id": "LIN-3127",
+     "consequences": [
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "GitHub/GH-Projects new-container seam #6 unpinned; removing it survives (M1)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "trivial-edit-bound"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "5bb76fda"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "N3 no-read guard misses dynamic import, direct collection reads, renamed .get",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "Pre-existing Jira scope normalization (L3), outside",
+       "rules": [
+        "ledger",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3124"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "Plaintext credential copies and merge-orphan rows (L4), outside",
+       "rules": [
+        "ledger",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3124"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "5388ce40",
+       "why": "LIN-1892 merge paths work, other ticket"
+      },
+      {
+       "sha": "5f822087",
+       "why": "LIN-3124 store layer, other ticket"
+      }
+     ],
+     "note": "L3/L4 text truncated in digest; coded from close-out dispositions."
+    }
+   ]
+  },
+  "B": {
+   "tickets": [
+    {
+     "id": "LIN-2964",
+     "consequences": [
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "D2 star cull floor unwitnessed (mutation M3 green); commit message's mutation-check claim inaccurate",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "644090a9"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Breakpoint-crossing focus cull has no regression pin; resize witness asserts counts only",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      }
+     ],
+     "unattributed": [],
+     "note": "Out-of-scope labelNodes cull gap left with LIN-2959 coverage without a recorded note; not coded."
+    },
+    {
+     "id": "LIN-2811",
+     "consequences": [
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "window.ChatUI.isPinnedToBottom export contract has no direct test",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "84535004"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "Exact 60px threshold boundary unpinned; <60 vs <=60 indistinguishable",
+       "rules": [
+        "ledger",
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "84535004"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "No browser-level witness that a scrolled-up reader is no longer yanked",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "prompt-section.js carries duplicate inline near-bottom predicate, untracked",
+       "rules": [
+        "class-check",
+        "ledger"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2987"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "b1c5170e",
+       "why": "LIN-2812 sibling ticket's own work"
+      },
+      {
+       "sha": "d1f12b6b",
+       "why": "LIN-2987 follow-up work (hoist predicate), later ticket"
+      }
+     ],
+     "note": "Ledger items 1-2 discharged by close-out's own test commit, no extra leg. LIN-2987 link to item 6 inferred from commit message only."
+    },
+    {
+     "id": "LIN-2715",
+     "consequences": [
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Witness never shown red on CI's Linux runner; font metrics could mask regression",
+       "rules": [
+        "ledger",
+        "mutation-check"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Real-device 100dvh behaviour unverified; all evidence emulated Chromium",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-2769"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Scrollable empty state has no scroll affordance; discoverability is operator's call",
+       "rules": [
+        "ledger",
+        "general-judgement"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-2769"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "CI green on branch commit only; merged tree never run",
+       "rules": [
+        "ci-green-exact-commit",
+        "ledger"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Brief falsely claims fix already landed on main; PR still open",
+       "rules": [
+        "ledger",
+        "general-judgement"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "cda38e28",
+       "why": "squash-merge of reviewed PR"
+      },
+      {
+       "sha": "7700f6d8",
+       "why": "LIN-2830 unrelated fix"
+      }
+     ],
+     "note": "Unconditional Approve with a ledger; close-out discharged items by CI scratch run and merged-tree CI."
+    },
+    {
+     "id": "LIN-2934",
+     "consequences": [
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "R1: feed shows no n-of-N on general (goal-only) runs; no anchor loop",
+       "rules": [
+        "requirements",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "R2: archive-hop persistence of maxSessionsPerTask untested; mutation M11 survives",
+       "rules": [
+        "mutation-check",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "R3: recommend-and-dispatch 201s don't echo budgetPosition or bounds",
+       "rules": [
+        "class-check",
+        "requirements"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "R4: surviving mutants M9/M10/M19; no force or fail-closed note tests",
+       "rules": [
+        "mutation-check",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "R5: sessionPosition uses last first-seen task, wrong on A-B-A runs",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "R6: trim doesn't notify materializer, chip denominator stays stale",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "R7: refusal docs name only maxTasks; proxy-instructions prose narrower than kickoff",
+       "rules": [
+        "general-judgement",
+        "class-check"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "b9698d99"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "L3: Observation budget chip never rendered/asserted in DOM (M21 survives)",
+       "rules": [
+        "ledger",
+        "test-adequacy",
+        "direct-verification"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "L1: no live seam witness of sessionsPerTask 409 and proxy-event note",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "L2: orchestrator hand-back comment naming bound and ledger unproven",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "S1: BUILDER_VERSION 12->13 collides with main's LIN-3022 bump, making bump inert",
+       "rules": [
+        "regression-history",
+        "ci-green-exact-commit"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "S2: R6 trim-notify untested; N14 survives; summary's mutation-verified claim inaccurate",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "S3: LLM-arm maxSessionsPerTask echo unpinned (N9 survives)",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "S4: rulings liveDispatchOnAnchor matches null to null, forcing record effect",
+       "rules": [
+        "general-judgement",
+        "class-check"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "S5: general runs share one null bucket, iteration numbered across runs",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "S6: pointReadSession builds old orphan session for general runs",
+       "rules": [
+        "class-check",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 13,
+       "leg": "review",
+       "finding": "S7: title fallback reads title-less general anchor; terminality side effect undocumented",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "d43ba7dd"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "T1: null-anchored record ruling reply posts to /api/comments/null",
+       "rules": [
+        "class-check",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "T2: identifier-less anchor never matches its own agent-status rows",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "T3: v1 Go path maxSessionsPerTask prose threading unpinned (M26 survives)",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "T4: feed followUpTo exclusion unpinned (M08 survives)",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 15,
+       "leg": "review",
+       "finding": "T5: scoped-only kickoff prose contradicts itself (open-ended vs per-task bound)",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "eaf4ff5b"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 18,
+       "leg": "review",
+       "finding": "D1: T2 fix misses issue-scoped builds; materialized/point-read docs diverge from full build",
+       "rules": [
+        "class-check",
+        "general-judgement"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "b2817d55"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "P1: new dispatchId agent-status query unindexed on write-hot materializer path",
+       "rules": [
+        "quality-checklist",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "8086c565"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      }
+     ],
+     "unattributed": [],
+     "note": "Comments 12, 14, 17 are implementation summaries labelled close-out/review. Several review comments truncated; S6/S7/T2-T5 details taken from follow-on comments. L4 folded into S1."
+    },
+    {
+     "id": "LIN-2804",
+     "consequences": [
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "Replacement fallback advertises /search, itself 422 on Jira and GitHub Projects",
+       "rules": [
+        "class-check",
+        "direct-verification"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "63f582a8"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "Unscoped/goal-only bearer-token dispatch never resolves capability; still advertises 422 hints",
+       "rules": [
+        "requirements",
+        "general-judgement"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [
+        "63f582a8"
+       ],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-2815"
+      },
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "No test renders real registered providers; endpoint support never checked against receiving provider",
+       "rules": [
+        "test-adequacy",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "63f582a8"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "Sibling prompt files also carry unconditional /search; follow-up must cover both hint families",
+       "rules": [
+        "class-check"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-2814"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "Real-provider parity tests cover only scoped/prose branch, not whole render space",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-2814"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "/api/proxy/instructions still advertises all six capability-gated reads",
+       "rules": [
+        "ledger",
+        "class-check"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2816"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "f66c82ec",
+       "why": "squash-merge of whole PR at close-out"
+      },
+      {
+       "sha": "353fb43f",
+       "why": "LIN-2992 unrelated test classification"
+      }
+     ],
+     "note": "Comment 4 labelled review is the implementation round. F2 deferral added boundary tests and code comments, fix filed as LIN-2815."
+    },
+    {
+     "id": "LIN-2771",
+     "consequences": [
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Server-rendered data-fc-ai-configured producer-consumer contract pinned by no test",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "da72235f"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Reload while tab hidden ignores resume anchor; reveal schedules full backoff step",
+       "rules": [
+        "requirements",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "da72235f"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "No end-to-end coverage of reload-resume across route, attribute, sessionStorage, timer",
+       "rules": [
+        "test-adequacy",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "da72235f"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "ai-not-configured keep-stopped never observed against a real unconfigured server",
+       "rules": [
+        "ledger",
+        "direct-verification"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 3,
+       "leg": "review",
+       "finding": "Shadow L1: user-turn failure mid-window then reload leaves stored anchor unchanged",
+       "rules": [
+        "ledger",
+        "general-judgement"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "ad729f14",
+       "why": "separate ledger-edition docs PR, not a fix"
+      }
+     ],
+     "note": "Comment 3 (labelled implementation) is a non-gating shadow review; comment 4 (labelled review) is the implementation report."
+    },
+    {
+     "id": "LIN-2758",
+     "consequences": [
+      {
+       "comment": 9,
+       "leg": "review",
+       "finding": "Completion summary prints total not ok; two untallied paths over-report applied",
+       "rules": [
+        "general-judgement",
+        "requirements"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "c63f3b9c"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 9,
+       "leg": "review",
+       "finding": "Plan-mandated render assertions omitted; aria-live stripped leaves every test green (M9)",
+       "rules": [
+        "mutation-check",
+        "requirements"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "c63f3b9c"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 9,
+       "leg": "review",
+       "finding": "Partial-failure rows need a fourth retry bucket; summary claims all applied",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2807"
+      },
+      {
+       "comment": 12,
+       "leg": "review",
+       "finding": "Stopped-early remain-selected count undercounts after a pre-Stop failure",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-2807"
+      }
+     ],
+     "unattributed": [],
+     "note": "Post-merge observation items (screen reader, 117 rows, cross-browser) routed to monitors; not coded."
+    },
+    {
+     "id": "LIN-2645",
+     "consequences": [
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": ".fc-obs-stale has no CSS rule; summary line renders loud, breaks panel rhythm",
+       "rules": [
+        "direct-verification",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "c50296d3"
+       ],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "flight-companion-gate seed turn gates surface on fossil-filtered attentionCount",
+       "rules": [
+        "class-check",
+        "ledger"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high",
+       "followUp": "LIN-2849"
+      }
+     ],
+     "unattributed": [],
+     "note": "Close-out authored the L1 CSS fix itself. Shadow review in comment 2 (labelled implementation) truncated; no changes traced to it. L2 rides monitor."
+    },
+    {
+     "id": "LIN-3127",
+     "consequences": [
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "GitHub/GitHub-Projects new-container seam #6 unpinned; mutation M1 survives; add post-step-1 witness assertions (L1)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "5bb76fda"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 10,
+       "leg": "review",
+       "finding": "CI ran on MangoDB not production Mongo; real-login connection writes need post-merge check, monitor, rollback (L2)",
+       "rules": [
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "5388ce40",
+       "why": "LIN-1892 merge-path work, unrelated to review"
+      },
+      {
+       "sha": "5f822087",
+       "why": "LIN-3124 store layer, separate ticket"
+      }
+     ],
+     "note": "Close-out comment 11 held merge on L1 (same finding, coded once). L5 guard gaps optional, accepted residual; F6 nit unchanged."
+    },
+    {
+     "id": "LIN-3036",
+     "consequences": [
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "classifyLoop withdrawal placement unpinned: M11/M12 (outside supersession guard, any lifecycle) survive (L1)",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "46caba41"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Caller 3 selectFossilRows has no withdrawal case; M10 leaves its suite green (L2)",
+       "rules": [
+        "class-check",
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "46caba41"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Whole-branch CI never run (CI PR-only); carried to LIN-3038 shared PR (L3)",
+       "rules": [
+        "ledger",
+        "ci-green-exact-commit",
+        "cannot-close"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-3038"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "End-to-end withdrawal flow unproven; allocated to LIN-3038 and runner tickets (L4)",
+       "rules": [
+        "ledger",
+        "test-adequacy"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3038"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Branching lineage: feed shows 0 rows while classifyLoop returns blocked; plan-level, routed to LIN-3038 review (L5)",
+       "rules": [
+        "class-check",
+        "ledger"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3038"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Stale answered-only shelf-gate comment and includeResolved docblock; Surface 13 belongs to LIN-3038 (L6)",
+       "rules": [
+        "general-judgement",
+        "ledger",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low",
+       "followUp": "LIN-3038"
+      }
+     ],
+     "unattributed": [],
+     "note": "Comment 8 labelled close-out is really the implementation beat that authored L1/L2 tests. Subtask of shared-branch PR owned by LIN-3038."
+    },
+    {
+     "id": "LIN-2992",
+     "consequences": [
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "Generated watcher's loopback(host, port) call site unpinned; mutation M3 leaves CI green (L1)",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "d1ee9621"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "NODE_USE_ENV_PROXY native-fetch escapes not exercised; discharge by one-shot witness (L2)",
+       "rules": [
+        "ledger",
+        "class-check"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 5,
+       "leg": "review",
+       "finding": "Workflow test.yml comment still says native fetch ignores HTTPS_PROXY; missed docs site (L3)",
+       "rules": [
+        "requirements",
+        "class-check",
+        "ledger"
+       ],
+       "effect": "tooling",
+       "realFault": false,
+       "commits": [
+        "d1ee9621"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      }
+     ],
+     "unattributed": [],
+     "note": "Close-out authored the L1 test pin and workflow comment fix itself. L4 outside, owned by LIN-2369, not acted on."
+    },
+    {
+     "id": "LIN-3049",
+     "consequences": [
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Change weakens re-derive-on-divergence: live A/B routes stale diverged slice to implementation (R1)",
+       "rules": [
+        "direct-verification",
+        "requirements"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "5a0f07be",
+        "07810a0c",
+        "380fbf39"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Positive eval case already passes on main; PR's 'fix works' claim over-reads it (R2)",
+       "rules": [
+        "mutation-check",
+        "test-adequacy"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "5a0f07be",
+        "380fbf39"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "AI-path aiHint precondition unpinned; mutations M3/M4 stay green (R3)",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "5a0f07be",
+        "380fbf39"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Handwritten no-Approve fallback points at deleted wording; restore per-surface bullet, say (a)-(e) (R4)",
+       "rules": [
+        "general-judgement",
+        "mutation-check"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "5a0f07be",
+        "380fbf39"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "Change-log row cites a gate record that does not exist (m1)",
+       "rules": [
+        "general-judgement"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "5a0f07be"
+       ],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 11,
+       "leg": "review",
+       "finding": "LIN-APB-neg cannot fail and does not test the protected case (m2)",
+       "rules": [
+        "test-adequacy"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "5a0f07be"
+       ],
+       "rounds": 0,
+       "confidence": "low"
+      },
+      {
+       "comment": 16,
+       "leg": "review",
+       "finding": "Sibling aiHint.workflow string unpinned; M4w/M4w2 stay green (R5)",
+       "rules": [
+        "class-check",
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "033160ef",
+        "380fbf39"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 16,
+       "leg": "review",
+       "finding": "No-false-session-fit caveat unpinned on both paths; M13/M15 stay green (R6)",
+       "rules": [
+        "mutation-check"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "033160ef",
+        "380fbf39"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 18,
+       "leg": "review",
+       "finding": "Change-log row needs the squash-merge SHA filled in at close-out (L6)",
+       "rules": [
+        "ledger"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "7db0ce05"
+       ],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 18,
+       "leg": "review",
+       "finding": "Per-subtask research/plan session lineages vs baseline only observable post-merge; named monitor (L5)",
+       "rules": [
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "low"
+      }
+     ],
+     "unattributed": [],
+     "note": "Branch commits 5a0f07be/07810a0c/033160ef known only from comments; landed via squash 380fbf39. Halt for OpenRouter limit delayed round 2."
+    },
+    {
+     "id": "LIN-3011",
+     "consequences": [
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Queued live items get telemetry.runtime.dispatchedAt null on lean path; served in API JSON (L1)",
+       "rules": [
+        "direct-verification",
+        "class-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "F1 guard > vs >= and post-abort crossCheck unpinned; M10/M14/M14b survive (L2)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Digest harvest status==='aborted' check unpinned; M16 survives (L3)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "dashboard runs[].toolPeak use of digest value unpinned; M20 survives (L4)",
+       "rules": [
+        "mutation-check",
+        "test-adequacy",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Self-heal re-read-finds-nothing branch undecided and unpinned; M28 survives (L5)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "W1 persist/read comparison coalesces null/omitted, masking M22s/M24s (L6)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "mongo-smoke L3 parity array missing healed-legacy and fv0 shapes; M29 not killed by L3 (L7)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "365c2ec1"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Production-scale output-equivalence unproven; routed to Phase 6 ticket with handoff note (L8)",
+       "rules": [
+        "ledger",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-3014"
+      },
+      {
+       "comment": 7,
+       "leg": "review",
+       "finding": "Fill-size and first-deploy heal load unproven; routed to Phase 6 ticket (L9)",
+       "rules": [
+        "ledger",
+        "inside-outside"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium",
+       "followUp": "LIN-3014"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "e7737f0e",
+       "why": "LIN-3013 sibling phase, unrelated to review"
+      }
+     ],
+     "note": "Close-out comment 8 refused merge with L1-L7 undischarged; L5 prod change is a log line plus rationale comment."
+    },
+    {
+     "id": "LIN-2974",
+     "consequences": [
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "No test covers /known-repos authorization; removing authenticateProxyToken (M4) passes all tests (L1)",
+       "rules": [
+        "mutation-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "2518b833"
+       ],
+       "rounds": 2,
+       "confidence": "high"
+      },
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "Drift script exit codes and path print untested at process boundary; S3/S4 survive (L2)",
+       "rules": [
+        "mutation-check",
+        "test-adequacy",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "3c03754"
+       ],
+       "rounds": 2,
+       "confidence": "medium"
+      },
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "New endpoint missing from proxy-instructions catalog and docs; route docblock names wrong filename (L3)",
+       "rules": [
+        "class-check",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "2518b833"
+       ],
+       "rounds": 2,
+       "confidence": "medium"
+      },
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "#1544 CI ran on stale base; need green CI on head including current main (L4)",
+       "rules": [
+        "ci-green-exact-commit",
+        "ledger",
+        "ledger-discharge"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [
+        "3d95c3ed"
+       ],
+       "rounds": 2,
+       "confidence": "medium"
+      },
+      {
+       "comment": 21,
+       "leg": "review",
+       "finding": "Live namespace drift check not yet run; run after deploy, spot-check repo:null routing (L5)",
+       "rules": [
+        "ledger",
+        "ledger-discharge",
+        "cannot-close"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 2,
+       "confidence": "medium"
+      },
+      {
+       "comment": 28,
+       "leg": "close-out",
+       "finding": "Live check exposed inventory fetch at 8s timeout: guard fails open, mistyped repo accepted",
+       "rules": [
+        "direct-verification",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "e90c7cd3"
+       ],
+       "rounds": 1,
+       "confidence": "medium"
+      }
+     ],
+     "unattributed": [],
+     "note": "L5 dropped by ruling; its pursuit found live alias misrouting (host-config fix). SD #243 closed unmerged. Comment 41 reviews LIN-3007 work, not coded."
+    },
+    {
+     "id": "LIN-2872",
+     "consequences": [
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "Exemption never fires on the three motivating incidents: [working] Session launched beat defeats it (F1)",
+       "rules": [
+        "requirements",
+        "direct-verification"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [
+        "1e7edddf",
+        "e0a304c9"
+       ],
+       "rounds": 3,
+       "confidence": "medium",
+       "followUp": "LIN-2900"
+      },
+      {
+       "comment": 2,
+       "leg": "review",
+       "finding": "[working] regex misses categorized [working · cat] heartbeat; wrongly exempts once F1 fixed (F2)",
+       "rules": [
+        "class-check"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [
+        "1e7edddf"
+       ],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-2900"
+      },
+      {
+       "comment": 8,
+       "leg": "review",
+       "finding": "Allow-list over-fires: on opencode no work evidence reachable, so every failed dispatch exempted (F1)",
+       "rules": [
+        "requirements",
+        "direct-verification"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [
+        "e35bae0f"
+       ],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-2900"
+      },
+      {
+       "comment": 8,
+       "leg": "review",
+       "finding": "Claude-code heartbeat shapes proving work (resumed, no tool calls, stalled) read as liveness (F2)",
+       "rules": [
+        "class-check"
+       ],
+       "effect": "follow-up",
+       "realFault": true,
+       "commits": [],
+       "rounds": 1,
+       "confidence": "medium",
+       "followUp": "LIN-2900"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "proxy-instructions catalog for recommend-and-dispatch omits followUpTo and force (finding 1)",
+       "rules": [
+        "class-check",
+        "ledger"
+       ],
+       "effect": "prod",
+       "realFault": false,
+       "commits": [
+        "8dd15773"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "New test header falsely claims launch-time exemption is pinned at factory seam (finding 2)",
+       "rules": [
+        "general-judgement",
+        "ledger"
+       ],
+       "effect": "docs-wording",
+       "realFault": false,
+       "commits": [
+        "8dd15773"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "Verb-override arm's LIN-805/LIN-1429 logic unpinned; M11/M12 survive (finding 3)",
+       "rules": [
+        "mutation-check",
+        "ledger"
+       ],
+       "effect": "tests",
+       "realFault": false,
+       "commits": [
+        "8dd15773"
+       ],
+       "rounds": 0,
+       "confidence": "high"
+      },
+      {
+       "comment": 20,
+       "leg": "review",
+       "finding": "Sibling autopilot/kickoff drops force and followUpTo; no escape hatch from duplicate guard (finding 4)",
+       "rules": [
+        "class-check",
+        "follow-up-filing"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high",
+       "followUp": "LIN-2901"
+      }
+     ],
+     "unattributed": [
+      {
+       "sha": "e5eb5063",
+       "why": "LIN-3139 store fakes, unrelated"
+      }
+     ],
+     "note": "Half 1 never landed: three legs on closed PR #1493 (commits from comments only), then split; half 2 re-landed as e35bae0f. Close-out authored ledger fixes."
+    },
+    {
+     "id": "LIN-2830",
+     "consequences": [
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "Rows clipped: fixed 792px grid tracks in ~263px cards under overflow-x clip hide columns",
+       "rules": [
+        "direct-verification",
+        "requirements",
+        "test-adequacy"
+       ],
+       "effect": "prod",
+       "realFault": true,
+       "commits": [
+        "7700f6d8"
+       ],
+       "rounds": 1,
+       "confidence": "high"
+      },
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "Cost endpoint workerSessions[] catalog/doc examples omit harness; outside, route as follow-up",
+       "rules": [
+        "class-check",
+        "ledger",
+        "follow-up-filing"
+       ],
+       "effect": "follow-up",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "high",
+       "followUp": "LIN-2844"
+      },
+      {
+       "comment": 1,
+       "leg": "review",
+       "finding": "Deployed-instance parity unprovable pre-merge; named monitor and rollback",
+       "rules": [
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      },
+      {
+       "comment": 4,
+       "leg": "review",
+       "finding": "Single-column desktop layout readability needs human check after deploy",
+       "rules": [
+        "direct-verification",
+        "ledger",
+        "risk-lanes"
+       ],
+       "effect": "nothing",
+       "realFault": false,
+       "commits": [],
+       "rounds": 0,
+       "confidence": "medium"
+      }
+     ],
+     "unattributed": [],
+     "note": "Comment 2 labelled review is actually the implementation response carrying the CSS fix and geometry witness."
+    }
+   ]
+  }
+ },
+ "earlierSample": {
+  "method": "14 merged Done changes with code a month, systematic by ticket number, from measuring-throughput.md's scorecard (scripts/survey-check-3.mjs earlier); read over the local proxy 2026-09-30",
+  "months": {
+   "June": [
+    "LIN-334",
+    "LIN-392",
+    "LIN-427",
+    "LIN-476",
+    "LIN-522",
+    "LIN-566",
+    "LIN-609",
+    "LIN-652",
+    "LIN-740",
+    "LIN-799",
+    "LIN-857",
+    "LIN-911",
+    "LIN-980",
+    "LIN-1038"
+   ],
+   "July": [
+    "LIN-1001",
+    "LIN-1116",
+    "LIN-1145",
+    "LIN-1203",
+    "LIN-1252",
+    "LIN-1292",
+    "LIN-1333",
+    "LIN-1366",
+    "LIN-1417",
+    "LIN-1470",
+    "LIN-1518",
+    "LIN-1575",
+    "LIN-1697",
+    "LIN-1775"
+   ],
+   "August": [
+    "LIN-1557",
+    "LIN-1873",
+    "LIN-1963",
+    "LIN-2044",
+    "LIN-2128",
+    "LIN-2197",
+    "LIN-2242",
+    "LIN-2274",
+    "LIN-2325",
+    "LIN-2371",
+    "LIN-2433",
+    "LIN-2509",
+    "LIN-2541",
+    "LIN-2641"
+   ]
+  }
+ }
+}
