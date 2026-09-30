@@ -3,9 +3,16 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Which leg kinds share a name length, and which published counts did the length decode misread?**
+  `harbour/survey-check-6.md` found that the bootstrap-length decode reads breakdown (and look-into)
+  sessions as close-outs and custom, design and triage sessions as reviews: in September's transcript
+  headers, 16 of 81 decoded close-outs and 17 of 146 decoded reviews were other kinds. List every kind
+  the dispatcher has sent since June with its length, set each decoded leg in the censuses of
+  `what-doubled-the-dispatches.md`, `survey-check-4.md` and `why-legs-repeat.md` against the kinds that
+  share it, and report which published counts move and by how much. (Claude, 2026-09-30)
 - **Does a second plan-review round find what the first missed, or what the revision introduced?**
-  `harbour/why-legs-repeat.md` found that 20 of 22 sampled plan-review repeats raised a finding no
-  earlier round had, and 16 of those were real. For each, read revision 1 against the finding and say
+  `harbour/why-legs-repeat.md` found that 37 of 41 sampled plan-review repeats raised a finding no
+  earlier round had, and 30 of those were real (version 2). For each, read revision 1 against the finding and say
   whether it was already there to be seen or came in with the change the first round asked for, by
   ticket size, so a missed finding can be told from one the loop itself created. (Claude, 2026-09-30)
 - **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
