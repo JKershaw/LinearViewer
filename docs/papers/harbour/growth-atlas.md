@@ -1,12 +1,13 @@
 ---
 title: The growth atlas — how has Harbour grown since January, and where?
 kind: paper
-version: 1
+version: 2
 date: 2026-09-30
-authors: [Claude]
-model: frontier tier, claude-code, effort high; one bounded research session (dispatch 95ecbd59, kind custom), no plan, review or close-out legs, by the brief's design
+authors: [Claude (version 1, LIN-3147), Claude (version 2 corrections, LIN-3153)]
+model: "Version 1: frontier tier, claude-code, effort high; one bounded research session (dispatch 95ecbd59, kind custom), no plan, review or close-out legs, by the brief's design. Version 2: frontier tier, claude-code, the independent check's session (dispatch b82a90d8)."
+revision: "Version 2 corrects figures per docs/papers/harbour/survey-check.md (LIN-3153): the busiest week, the test-line rise after 31 August, the unit-test count comparison, the endpoint scope, the text-pin mix, the open pile's June base, August's Done count and what it does to the per-Done table, the CI time now, and the quiet weeks. Every git-derived multiple re-ran exactly. Judgement disagreements stay in the check."
 grounded_at: 4e566c2a (LinearViewer, origin/main); 3b1e734b (simple-dispatcher, origin/main)
-cites: [docs/papers/harbour/steady-base.md@4e566c2a, docs/papers/harbour/fleet-complexity-read.md@4e566c2a, docs/papers/harbour/ticket-record-and-quality.md@4e566c2a, docs/papers/harbour/writing-length.md@4e566c2a, docs/papers/harbour/tasks-generate-tasks.md@4e566c2a, docs/papers/harbour/review-loops.md@4e566c2a, docs/papers/harbour/what-the-reviews-checked.md@4e566c2a, docs/papers/harbour/cheap-implementer.md@4e566c2a, scripts/steady-base-growth.mjs@4e566c2a, 937555cd (LIN-2245, #1339), 61ef9013 (LIN-1880, #1371), d4f749c1 (LIN-2896), 4ffe830 (simple-dispatcher, LIN-910), LIN-3147 (2026-09-30)]
+cites: [docs/papers/harbour/survey-check.md (LIN-3153), docs/papers/harbour/steady-base.md@4e566c2a, docs/papers/harbour/fleet-complexity-read.md@4e566c2a, docs/papers/harbour/ticket-record-and-quality.md@4e566c2a, docs/papers/harbour/writing-length.md@4e566c2a, docs/papers/harbour/tasks-generate-tasks.md@4e566c2a, docs/papers/harbour/review-loops.md@4e566c2a, docs/papers/harbour/what-the-reviews-checked.md@4e566c2a, docs/papers/harbour/cheap-implementer.md@4e566c2a, scripts/steady-base-growth.mjs@4e566c2a, 937555cd (LIN-2245, #1339), 61ef9013 (LIN-1880, #1371), d4f749c1 (LIN-2896), 4ffe830 (simple-dispatcher, LIN-910), LIN-3147 (2026-09-30)]
 ---
 
 # The growth atlas — how has Harbour grown since January, and where?
@@ -19,13 +20,13 @@ dispatch and fleet code grew tenfold and simple-dispatcher's hook and state mach
 2.3–2.6×.
 
 Process weight is outrunning delivered product. Product code grew 2.9× across both repos and
-endpoints 2.2×. Test lines grew 10.6×, text pins 12.2× and comment lines 7.1×. The gap shows
+Harbour's endpoints 2.2×. Test lines grew 10.6×, text pins 12.2× and comment lines 7.1×. The gap shows
 per delivered ticket too:
 
 - the product code each Done ticket brings has held at 24–41 lines a month;
 - the test lines it brings went from 75 in June to 184–237;
 - the comment words posted went from about 1,600 to 6,000–7,500;
-- the dispatches went from about 18, from mid-July to August, to 22 in September.
+- the dispatches went from about 16–18, from mid-July to August, to about 22 in September.
 
 The one process series that tracks delivery is the reading load. It adds a steady 36–41 KB a
 week, about 0.4–0.8 KB per Done ticket in every month. Almost nothing has shrunk. There was one
@@ -39,8 +40,11 @@ product code, which has stayed at about 2,800 lines a week.
 
 **Process weight is outrunning delivered product, and the gap holds per delivered ticket.**
 The figure indexes each series to the week of 1 June. The process series finished 4.6× (what
-agents read) to 12.2× (text pins) above their June level. Product finished 2.2× by endpoints and
-2.9× by code with no comments and no prompt text. It finished 7.0× by cumulative Done tickets,
+agents read, both repos; Harbour alone 3.7×) to 12.2× (text pins) above their June level.
+Product finished 2.2× by Harbour's endpoints and 2.9× by code with no comments and no prompt
+text. June is a step, so every multiple depends on the base week: from 8 June, pins are 7.4×
+and product code 2.6×; from 6 July, 2.5× and 1.7×. At every base from 25 May to 6 July each
+process series still outgrows product code. It finished 7.0× by cumulative Done tickets,
 but that measure starts from a small base: the tracker held only about 250 Done tickets before
 the fleet. Divided by the tickets Done in each month (both repos' git; the tracker sample for
 Done and comments):
@@ -54,7 +58,10 @@ Done and comments):
 
 A Done ticket brings about one merged PR and a similar amount of product code in every month.
 It brings 2.5 to 3 times the tests and about 4 times the written conversation it did in June.
-September eased from August's peak but stayed well above June. The reading load is the
+September stayed well above June. The Done counts are a one-in-ten sample, good to about ±15%
+a month. A second one-in-ten sample (every Done ticket numbered …5) puts August at 500, and
+the two together at 445. On that count August brings 37 product lines, 213 test lines and
+about 6,600 comment words per Done ticket, level with September rather than a peak above it. The reading load is the
 exception. It grows in step with delivery, not ahead of it. `ticket-record-and-quality.md`
 found that, over 184 Done tickets, the size of this written record predicts nothing about
 first-pass review approval. `review-loops.md` found that the review loops, which write much
@@ -64,11 +71,12 @@ of it, cost about a third of session time.
 
 **June is the step in every series, and 31 August is a second one in the tests.** Harbour merged
 300 PRs in the 21 weeks to the end of May, about 14 a week. It merged 970 in the 13 weeks from June to August, about 75 a week.
-Harbour's production code went from 1,835 net lines a week before June to 5,998 after. The week of
-31 August was the busiest week of the year: 115 Harbour PRs and 27 simple-dispatcher PRs,
-29,781 net test lines in Harbour, and 2,288 dispatches. That week has no single cause. Its
-largest test additions came from eight different tickets. After it, net test lines per week
-roughly doubled, from 9,711 over June to August to 18,172 since. Harbour's product code did not
+Harbour's production code went from 1,835 net lines a week before June to 5,998 after. The week of 31 August added the most test lines of any week, 29,781 net in Harbour, with 115
+Harbour PRs, 27 simple-dispatcher PRs and 2,288 dispatches. More PRs merged in the weeks of 22
+and 29 June (134 and 136), and more dispatches ran in the week of 21 September (3,725). The
+week has no single cause. Its largest test additions came from eight different tickets. Net
+test lines per week rose from 9,711 over June to August to 18,172 from 31 August on, or 15,269
+in the weeks after the step week itself. Harbour's product code did not
 follow: 2,872 net lines a week, excluding comments and prompt text, from June to August, and 2,709 since.
 
 **The code grew most in the fleet's own machinery.** Between the weeks of 1 June and 28 September:
@@ -101,13 +109,14 @@ lowest in the UI, at 33%.
 
 **Tests outgrew the code in both repos, and the suite's run time grew faster still.** Test lines
 per production line went from 0.66 to 1.66 in Harbour and from 0.52 to 2.62 in
-simple-dispatcher. Harbour's test cases went from 2,059 to 14,097. Local `node --test` counts
-13,690 unit tests at HEAD, so the regex is close. Text pins are assertions that a string is or is not in
+simple-dispatcher. Harbour's test cases went from 2,059 to 14,097. The regex count includes 1,566 e2e and 80
+visual cases. Its unit-only count, 12,451, is 9% under the 13,690 that `node --test` reports at
+HEAD. Text pins are assertions that a string is or is not in
 some text. Harbour's went from 580 to 6,234 and simple-dispatcher's from 28 to 1,195.
 `steady-base.md` counted only the prompt test files and found 279 at the end of June and 493
-at the end of September, so most pins are outside the prompt tests. One pass of Harbour's unit suite on CI took 0.23 minutes in the
-last week of June, 0.85 in the first week of August, 1.38 in the week of 31 August and 1.87 now.
-That is 8× since late June, while test lines grew 4.2×. `fleet-complexity-read.md` found about
+at the end of September, so most pins are outside the prompt tests. One pass of Harbour's unit suite on CI took 0.23 minutes in the last week of June, 0.85 in the
+first week of August, 1.38 in the week of 31 August and 1.9–2.2 in the last week, depending on
+which run is read. That is 8–10× since late June, while test lines grew 4.2×. `fleet-complexity-read.md` found about
 70% of the lines added in three sampled PRs were tests. The weekly series says the same of the
 whole repo: tests were 40% of Harbour's net added lines before June, 62% from June to August, and
 75% since 31 August. Since LIN-1880 (4 September), CI runs the suite twice, so the unit job itself
@@ -156,8 +165,9 @@ simple-dispatcher's 18. The declines we found:
   found in either repo. The same week added more
   than it took away, so no weekly total fell.
 
-The only plateaus in the whole period come before June. Harbour had four quiet weeks in February and
-early March, of 4 to 9 commits each, and no commits from 27 April to 10 May. simple-dispatcher had no commits
+The only plateaus in the whole period come before June. Harbour had three quiet weeks from 9
+February to 1 March, of 4 to 9 commits each, two more in late March and mid-April, and no
+commits from 26 April to 15 May. simple-dispatcher had no commits
 from March to May. Since June, no series has levelled off. The one flat thing is a rate:
 product code grows by about 2,800 lines a week.
 
@@ -166,8 +176,10 @@ The one-in-ten sample puts June to August at 2,100 tickets created and 1,160 Don
 for every Done. From 13 July to 30 August the ratio was 2.2, which matches
 `tasks-generate-tasks.md`'s 2.1 over the sixty days to 12 September. Since 31 August it has been
 1.8. Done ran about 108 a week from 1 June to 12 July, 73 a week from 13 July to 30 August, and
-95 a week since. The open pile, meaning tickets neither Done, canceled nor duplicate, was about
-20 on 1 June and is about 1,140 now. The census agrees: it counts 1,144 open today, 857 of them
+95 a week since. The open pile, meaning tickets neither Done, canceled nor duplicate, was at least about 20 on
+1 June and is about 1,140 now. The June figure rests on two sampled tickets. 45 pre-June
+tickets were canceled or marked duplicate on dates the proxy does not give, so the June pile
+could have been as large as about 75. The census agrees: it counts 1,144 open today, 857 of them
 in Backlog. This series has no plateau. What grew per ticket is the conversation, not the
 statement of the task:
 
@@ -188,8 +200,8 @@ of Harbour's 20,449 dispatches have been follow-up beats. Of the 5,295 fresh ses
 13 July, 68% ran at the frontier tier, 27% at mid and 5% at cheap. The cheap tier ran 8 to 18
 sessions a week in July and none in August. From the week of 7 September it ran 23 to 125 a
 week. That week holds `cheap-implementer.md`'s trial of 12–13 September. The week of 14 September is the only visible dip in the fleet: Harbour had no commits on 15 or 16 September. Per Done ticket, fresh sessions held
-at 6.3 from 13 July to 30 August and 5.5 since 31 August. All dispatches rose from 17.8 to
-22.3, and follow-up beats account for all of that rise.
+at 6.3 from 13 July to 30 August and 5.5 since 31 August. All dispatches rose from 17.8 to 22.3, and follow-up beats account for all of that rise. On
+the two samples' Done count together, the rise is 16.2 to 22.6.
 
 ## Method
 
@@ -252,15 +264,17 @@ node scripts/survey-growth-chart.mjs                                   # draws f
   overstates comment share, most of all in the prompt-text area. The trend holds in areas
   with no prompt text, such as fleet, credentials and simple-dispatcher's hook code.
 - **The text-pin count is wide.** `.includes(` also matches list membership in test logic,
-  which overstates pins at every date. The growth multiple is biased only if test style changed.
+  which overstates pins at every date. Test style did change. On 1 June, 522 of Harbour's 580
+  pins were `.includes(` calls. Across both repos `assert.match` and `assert.doesNotMatch` grew
+  57× and `.includes(` 6.0×, so the 12.2× depends on the mix.
 - **Reading load is bytes on disk, not bytes read.** No single agent reads the whole 861 KB,
   so the series overstates what one session carries (`steady-base.md` puts the dispatched
   prompt at about 2%). Leaving out the proxy catalogue understates the total by 106 KB now.
   Before September the catalogue sat inside `routes/proxy.js` and counted as product code.
   That overstates product code before 3 September by about 660 lines, which makes product
   growth look slightly smaller.
-- **Endpoints are a regex count.** Routers mounted or built dynamically are missed at both ends.
-  The count understates the surface, and its growth is only as good as the stability of style.
+- **Endpoints are a regex count, and Harbour's only.** The index leaves out simple-dispatcher's
+  `http.js`. Routers mounted or built dynamically are missed at both ends. The count understates the surface, and its growth is only as good as the stability of style.
 - **CI is one run per week.** Each week's suite pass comes from that week's last green run, and
   step times are whole seconds. The June base, about two seconds, is too coarse to index
   against, which is why the index figure leaves CI out. Counting only green first attempts
@@ -294,8 +308,7 @@ node scripts/survey-growth-chart.mjs                                   # draws f
   mid-July. Follow-up beats into held sessions doubled after 31 August, from about 800 a week to
   about 1,600. Trace a sample of beats to what each changed: a commit, a ticket state, a comment,
   or nothing.
-- **Why does the unit suite slow faster than it grows?** One pass took 8× longer from late June
-  to now, while test lines grew 4.2×. A per-file timing census of `node --test` at each month
+- **Why does the unit suite slow faster than it grows?** One pass took 8–10× longer from late June to now, while test lines grew 4.2×. A per-file timing census of `node --test` at each month
   end would say whether a few files or the whole suite carry the time.
 - **Is about 2,800 product lines a week a ceiling, and on what?** Net product code per week has
   been flat since June while everything around it accelerated. Compare the weeks above and
