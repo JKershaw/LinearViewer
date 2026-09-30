@@ -58,7 +58,7 @@ the session workspace that made them, and were not re-fetched.
 **The measurement, size and band findings hold.** The ticket-naming share, the production lines
 inside ticket-naming commits, merged-but-not-Done, the naive PR counts, the medians of 70 and 67,
 the three bands (×0.46, ×0.49, ×0.44), churn and net lines per change, and the 13,700 and 19,200 net
-lines all match. Two additions go into version 2. Changes with no production lines fell only
+lines all match. Two additions go into version 3. Changes with no production lines fell only
 ×0.67. On the three weeks wholly in June the bands fell ×0.55, ×0.57 and ×0.43, still about half.
 
 **June's block ends on 5 July, and the split turns on that week.** `survey-check-2.md` found that
@@ -91,7 +91,7 @@ through such rows.
 | Correct share's part of the fall, paper's weeks | 22% | 18% |
 
 June has none. The correctness part of the fall is therefore a fifth or less on the paper's weeks,
-and the escape rise is about 1.1% to 3%. Version 2 says so. The reading is a text match on the
+and the escape rise is about 1.1% to 3%. Version 3 says so. The reading is a text match on the
 verdicts' reasons, one reader, not blind.
 
 **The plan-review leg came two weeks after the step.** The paper lists it among the measures that
@@ -117,7 +117,7 @@ fallen, and the leg left no step of its own.
 The tier switch (LIN-1285 and LIN-1282, both on 12 July) is the one change dated to the step. The
 UI slowdown and the dispatch jump fall in the same fortnight. So "June looks like an early burst on
 a lighter process" holds as a description of the blocks. As a timing claim it holds only for the
-tier. Version 2 rewrites the process finding and the answer to say this.
+tier. Version 3 rewrites the process finding and the answer to say this.
 
 **The UI finding holds, and "only in Harbour" is by definition.** `survey-halving-git.mjs` counts
 every simple-dispatcher path as runner, so UI can only be Harbour's. The paths classified as server
@@ -136,7 +136,7 @@ in June.
 The other cited lines say what the paper says. The dated commits are right: `b39648b` and
 `88dba96e` on 12 July, and #50 on 2 July.
 
-**Smaller slips, each corrected in version 2.** Leaving out review residue, the ratio is ×0.41,
+**Smaller slips, each corrected in version 3.** Leaving out review residue, the ratio is ×0.41,
 not ×0.40.
 
 **Seen, not re-measured: the tier claim.** LIN-3165 re-derived it in `model-choice.md`, which
