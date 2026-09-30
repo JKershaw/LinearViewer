@@ -88,8 +88,8 @@ for (const t of wrp.tickets) {
     byRound[round === 1 ? 'first' : 'later'].push({ ...c, id: t.id, round });
   }
 }
-const eff = (cs) => ({ n: cs.length, tickets: new Set(cs.map((c) => c.id)).size, effect: tally(cs, (c) => c.effect), prod: share(cs.filter((c) => c.effect === 'prod').length, cs.length), realFault: cs.filter((c) => c.realFault).length });
-res.wrpByRound = { dated, undated, first: eff(byRound.first), later: eff(byRound.later), wrpTickets: wrp.tickets.length, inCensus: wrp.tickets.filter((t) => tmap.has(t.id)).length, withDetail: wrp.tickets.filter((t) => proxy.details[t.id]).length };
+const eff = (cs) => ({ n: cs.length, tickets: new Set(cs.map((c) => c.id)).size, effect: tally(cs, (c) => c.effect), prod: share(cs.filter((c) => c.effect === 'prod').length, cs.length), realFault: cs.filter((c) => c.realFault).length, realFaultTickets: tally(cs.filter((c) => c.realFault), (c) => c.id), prodTickets: new Set(cs.filter((c) => c.effect === 'prod').map((c) => c.id)).size });
+res.wrpByRound = { dated, undated, reviewTicketsWithLaterRound: wrp.tickets.filter((t) => tmap.get(t.id) && tmap.get(t.id).rounds.review > 1).length, first: eff(byRound.first), later: eff(byRound.later), wrpTickets: wrp.tickets.length, inCensus: wrp.tickets.filter((t) => tmap.has(t.id)).length, withDetail: wrp.tickets.filter((t) => proxy.details[t.id]).length };
 
 // ---- 4. Convergence: rounds of each gate per ticket, against size, area, repo, tier and plan length.
 // Plan length is the first comment whose heading reads as a plan: later revisions grow with the rounds, so the first is the one that went in.

@@ -23,7 +23,7 @@ const fmt = (w) => new Date(w + 'T00:00:00Z').toLocaleDateString('en-GB', { day:
   const W = 940, H = 790, weeks = A.census.weekly;
   let s = svgOpen(W, H, 'Planning, review and close-out legs per active Done ticket by week, first against repeat, and why the sampled repeats ran');
   s += text(20, 24, 'Legs per active ticket, by week of launch: first of its kind on the ticket, or a repeat', { size: 13, fill: C.ink, weight: 600 });
-  s += text(20, 41, `Done tickets, both repos, 27 Jul–30 Sep. Active ticket: any of these legs launched that week. ${A.census.legs.n} legs, ${A.census.legs.repeat} repeats.`, { size: 10 });
+  s += text(20, 41, `Done tickets, both repos, legs launched 1 Aug–30 Sep, by week starting Monday. Active ticket: any of these legs launched that week. ${A.census.legs.n} legs, ${A.census.legs.repeat} repeats.`, { size: 10 });
   const per = weeks.map((w) => LEGS.map((k) => (w[k].first + w[k].repeat) / w.tickets));
   const max = Math.ceil(Math.max(...per.flat()) * 5) / 5 + 0.2;
   const pw = 205, ph = 190, top = 62, gap = 26;

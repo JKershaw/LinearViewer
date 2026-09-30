@@ -27,8 +27,9 @@ real repeats, 57 are the next round of a send-back loop. None was a duplicate la
 re-grounding, added scope or red CI. What a repeat buys depends on its kind. A repeated plan
 changed the plan's substance in 10 of 13. A repeated plan-review raised something no earlier
 round had in 20 of 22, and in 16 it was real. A repeated review changed production code in 2
-of 14. A repeated close-out changed nothing in 11 of 11: it re-checks a hold after the fix has
-landed. In September the repeats cost 3.1 of the 39.4 dispatches per correct change (7.8%),
+of 14. Later review rounds do catch real faults, but 20 of the 21 in `which-rules-pay.md`'s
+codes sit on three tickets. A repeated close-out changed nothing in 11 of 11: it re-checks a
+hold after the fix has landed. In September the repeats cost 3.1 of the 39.4 dispatches per correct change (7.8%),
 10% of the tokens and 6% of the session-hours. Tickets that go round three or more times are
 the large ones, and most rounds after the second follow a ruling by John or a coordinator.
 
@@ -48,8 +49,8 @@ kinds on a ticket that is Done now, launched 1 August to 30 September, in both r
 | All | 2,271 | 840 | 37% |
 
 Repeat plan-reviews outnumber first ones, 201 to 181, as `survey-check-4.md` found for
-September's unexplained legs (84 to 69). Across the two months they are level in August, 95 to 97,
-and ahead in September, 106 to 84. By repo the share is about the same: LinearViewer 567 of
+September's unexplained legs (84 to 69). In August the two are level, 95 repeats to 97 first
+ones; in September repeats lead, 106 to 84. By repo the share is about the same: LinearViewer 567 of
 1,618 legs (35%, 416 tickets), simple-dispatcher 111 of 303 (37%, 73 tickets). The 15 tickets
 that merged into both repos repeated 62 of 109 (57%). The 60 tickets that closed without a merge
 repeated 100 of 241 (41%). The review count overstates August's repeats; see Limits.
@@ -57,8 +58,8 @@ repeated 100 of 241 (41%). The review count overstates August's repeats; see Lim
 **Repeats bunch on a few tickets, and they follow quickly.** 263 of the 564 tickets (47%) had no
 repeat. The tenth of tickets with the most repeats (56) carry 42% of them, up to 18 on one
 ticket. A repeat usually starts within the hour after the last leg of its kind. The median gap is
-0.4 hours for plans and plan-reviews, 0.6 for reviews and 0.9 for close-outs. 84% of plan repeats and 85% of
-plan-review repeats start within the hour. So the loop turns in about the time one leg takes: a
+0.4 hours for plans and plan-reviews, 0.6 for reviews and 0.9 for close-outs. 84% of plan
+repeats and 85% of plan-review repeats start within the hour. So the loop turns in about the time one leg takes: a
 leg's median session runs 8 to 9 minutes.
 
 **Nearly every repeat is the next round of a send-back.** The sample is every 13th repeat by
@@ -99,15 +100,31 @@ this sample a ruling is also what starts most third rounds.
 
 A repeated plan is the revision that answers the send-back, so it nearly always changes the
 plan. A repeated review mostly checks the fix. It raised something new in 10 of 14 and something
-real in 7, but only 2 led to a production change. Round three and later bought substance as often as
-round two did, 13 of 26 against 12 of 38 (all 64).
+real in 7, but only 2 led to a production change. Round three and later bought substance at
+least as often as round two did, 13 of 26 against 12 of 38 (all 64).
 
 **Plan-review's second round usually finds something the first missed, and it is usually real.**
 20 of the 22 sampled plan-review repeats raised a finding no earlier round had (91%). 16 of those
-were real (73% of the 22, 52–87%): a new defect or gap that the next revision fixed. Examples: an
+were real (73% of the 22, 52–87%): a new defect or gap that the next revision or the
+implementation fixed. Examples: an
 inverted premise; a predicate that can never be reached because it compares a string with a
 Date; a class wrongly excluded by a hand-drawn bound; a cancellation witness the plan claimed
-but that did not exist. The other four were non-blocking notes. [WRP-ROUND]
+but that did not exist. The other four were non-blocking notes.
+
+**Later review rounds find real faults, but on three tickets.** `which-rules-pay-codes.json`
+follows 478 review findings on 83 recent Done tickets to what each changed. By the round that
+raised them:
+
+| Review round | Findings | Tickets | Changed production code | Real faults | Tickets with a real fault |
+|---|--:|--:|--:|--:|--:|
+| First | 309 | 74 | 42 (14%) | 20 | 15 |
+| Second or later | 169 | 36 | 33 (20%) | 21 | 4 |
+
+Per finding, a later round is no emptier than the first. But LIN-3124, LIN-2934 and LIN-2837 hold
+20 of the later rounds' 21 faults, the clusters `which-rules-pay.md` names. Most of LIN-2934's
+were bugs that its own fixes had created. So the sample's picture and this one agree. The typical
+review repeat checks the fix and changes no production code (7 of the 14 real ones changed
+nothing). The few tickets that keep failing review carry most of what later rounds catch.
 
 **Tickets that take three or more rounds are the big ones.** The number of plan-review rounds
 per ticket, by production lines the ticket changed:
@@ -123,8 +140,9 @@ per ticket, by production lines the ticket changed:
 Two plan-review rounds is the norm: 117 of 184 tickets (64%), with 34 in one and 33 in three or
 more. For tickets that converged in one plan-review round the median change is 97 production lines;
 for those that took three or more it is 278. For review the medians are 45 and 194. The first plan
-comment is longer on tickets that went round more: [PLANWORDS]. Tier separates little. By the
-writer tier in the commit trailers, frontier-written tickets averaged 1.94 plan-review rounds (36
+comment is a little longer on tickets that went round more. On the 86 plan-reviewed tickets whose
+comments were read, its median is 282 words for one round, 343 for two and 408 for three or
+more. Tier separates little. By the writer tier in the commit trailers, frontier-written tickets averaged 1.94 plan-review rounds (36
 tickets) and mid-written 2.13 (89). For review it was 1.51 against 1.63. Nearly every
 implementation leg ran at mid tier, so the implementer's tier cannot be compared. Tickets touching both
 repos averaged 3.0 plan-review rounds (11 tickets), and `lib` tickets 2.24 (58). Three or more
@@ -174,7 +192,8 @@ fetched.
 
 **Findings by review round.** `which-rules-pay-codes.json` records, for each of its 483 coded
 findings, the comment that raised it. The comment's time, set against the ticket's review legs,
-gives the round.
+gives the round. All 478 review findings were dated this way; the five close-out findings are left
+out.
 
 **Cost.** September's dispatches per correct change are `what-doubled-the-dispatches.md`'s, on the
 same day's runner snapshot and scorecard: 5,520 dispatches over 140 correct code changes. A
@@ -219,7 +238,7 @@ node scripts/survey-repeats-analyse.mjs; node scripts/survey-repeats-figures.mjs
 - **Tokens and hours exist for September's Claude Code sessions only.** Hours include waiting
   inside a session, and cache reads dominate the tokens. The shares compare like with like, but
   the absolute figures are not a bill.
-- **Plan length is on a third of tickets**, and on only a handful that converged in one round.
+- **Plan length is on a third of tickets**, and on only 11 that passed plan-review in one round.
 
 ## Next
 
