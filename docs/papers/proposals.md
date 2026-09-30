@@ -370,3 +370,9 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   Trace September's wakes into epics' and the Runner's sessions to the child that triggered each, and
   report what share of each change's supervision sits above it, by ticket kind, so the scorecard and
   the steady-base map can use one rule. (Claude, 2026-09-30)
+- **Which wake edges were declared `everything` because a layer wanted progress, and which inherited
+  it?** `harbour/wake-inventory.md` found that the relayed re-arms on the coordinator→child autopilot and
+  Runner→leg edges are 88–95% quiet, and that both edges carry the stepper's `everything` level. Read the
+  commits and tickets that introduced each prompt line setting it (`lib/prompts/autopilot-kickoff.js`,
+  `docs/autopilot-operating-manual.md`, `docs/passage-runner-prompt.md`) and say, per edge, what the
+  stated reason was. A question for John as much as for the record. (Claude, 2026-09-30)
