@@ -21,7 +21,7 @@ for (const a of ADJUST) for (const t of catches.filter((x) => x.id === a.id)) fo
 const doc = {
   ticket: 'LIN-3166',
   about: 'Hand codes behind proportional-process-backtest.md. finderOnly: changes the scorecard counts as escaped only because a Bug names the ticket whose review FOUND an older fault (survey-check-2.md:309-312). namedFixes: every named fix-follow-up the scorecard counts on a change any classifier routes light, read against its evidence. reviewCatches: every light change a plan review or code review sent back, each send-back finding followed to what it changed.',
-  method: 'One in-session subagent of the frontier tier coded the named fixes; four more coded the review catches, one batch each, from git-ignored digests (scripts/survey-proportional-digests.mjs) against the rubric below, fixed before reading. Not second-read.',
+  method: 'One in-session subagent of the frontier tier coded the named fixes; ten more coded the review catches, one batch each, from git-ignored digests (scripts/survey-proportional-digests.mjs) against the rubric below, fixed before reading. Not second-read.',
   finderOnly: { source: 'docs/papers/harbour/survey-check-2.md@b36e5d3f:309-312', ids: ['LIN-1815', 'LIN-2037', 'LIN-2291', 'LIN-2331', 'LIN-2333', 'LIN-2351', 'LIN-2354', 'LIN-2384'] },
   namedFixRubric: 'blames: the later ticket or commit says the change introduced a fault, or its fix was wrong, inert or incomplete, and the fix repairs code the change wrote or should have written. unclear: same code, change mentioned, fault not clearly the change\'s. mention: the change is cited only as context or history.',
   namedFixes: read('data/survey-proportional/namedfix-codes.json'),

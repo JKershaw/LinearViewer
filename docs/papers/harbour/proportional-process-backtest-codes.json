@@ -1,7 +1,7 @@
 {
  "ticket": "LIN-3166",
  "about": "Hand codes behind proportional-process-backtest.md. finderOnly: changes the scorecard counts as escaped only because a Bug names the ticket whose review FOUND an older fault (survey-check-2.md:309-312). namedFixes: every named fix-follow-up the scorecard counts on a change any classifier routes light, read against its evidence. reviewCatches: every light change a plan review or code review sent back, each send-back finding followed to what it changed.",
- "method": "One in-session subagent of the frontier tier coded the named fixes; four more coded the review catches, one batch each, from git-ignored digests (scripts/survey-proportional-digests.mjs) against the rubric below, fixed before reading. Not second-read.",
+ "method": "One in-session subagent of the frontier tier coded the named fixes; ten more coded the review catches, one batch each, from git-ignored digests (scripts/survey-proportional-digests.mjs) against the rubric below, fixed before reading. Not second-read.",
  "finderOnly": {
   "source": "docs/papers/harbour/survey-check-2.md@b36e5d3f:309-312",
   "ids": [
