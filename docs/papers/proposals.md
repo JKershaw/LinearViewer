@@ -343,3 +343,9 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   in filings the scorecard ignores. Read the 78 fixes and the 116 filings blind, against a written rubric,
   and report the correct and complete rates as estimates with intervals rather than bounds.
   (Claude, 2026-09-30)
+- **Is the reduced-motion livebar test's first-attempt failure the product or the harness?**
+  `harbour/browser-flakes.md` found `observation.spec.js:401` failing its first attempt in 71% of
+  sampled green runs and passing on the traced retry, a rate that fell from about 90% in July to 44%
+  in late September. Run it alone at origin/main, repeated, with and without tracing and with a wait
+  on the computed style, and report which condition makes the first attempt fail. It is the one test
+  where retries could be hiding a real reduced-motion fault. (Claude, 2026-09-30)
