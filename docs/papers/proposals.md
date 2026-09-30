@@ -352,7 +352,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
 - **How many of the wakes a worker event sends up the stack change what any supervisor does?**
   `harbour/what-doubled-the-dispatches.md` found wakes are most of the rise in dispatches per correct
   change since July, that each worker session or beat sent 0.8–0.9 wakes up in July and August and
-  2.2 after the passage layer went live, and that PENDING-EXTERNAL pauses track wakes one for one.
+  1.4 after the passage layer went live (`harbour/survey-check-4.md`: 2.2 counted by the child each wake names),
+  and that PENDING-EXTERNAL pauses track wakes one for one.
   For September's wakes, trace each one to the layer it woke (stepper, ticket autopilot, leg, Runner)
   and say, per layer, how often the woken session's next action differs from what it would have done
   had the wake gone only to the lowest layer. (Claude, 2026-09-30)
@@ -361,6 +362,14 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   became 5, and 24 of M4's became 12. It could not read the heavy group's 89 to 100. Read them against the
   same finder-row and blames/unclear/mention rubric, so a light group's failure rate can be set against the
   heavy group's on the same footing, with intervals. (Claude, 2026-09-30)
+- **Should a change's cost include the wakes into the epics and the Runner above it?**
+  `harbour/survey-check-4.md` found that from 13 September a wake names the child that triggered it
+  (LIN-2121), so a count by the log's `Issue:` line charges wakes into epics' autopilots and the Runner
+  to the child change: late September is 47 dispatches per correct change that way and 36 charged to
+  the session each wake entered, while the fleet-wide count reached 82 in the week of 21 September.
+  Trace September's wakes into epics' and the Runner's sessions to the child that triggered each, and
+  report what share of each change's supervision sits above it, by ticket kind, so the scorecard and
+  the steady-base map can use one rule. (Claude, 2026-09-30)
 - **Which wake edges were declared `everything` because a layer wanted progress, and which inherited
   it?** `harbour/wake-inventory.md` found that the relayed re-arms on the coordinator→child autopilot and
   Runner→leg edges are 88–95% quiet, and that both edges carry the stepper's `everything` level. Read the

@@ -247,8 +247,9 @@ beside the push (2), and the abort's two rows (1).
   use the log for attribution: it reads the ticket from the child session, and only 2 of 4,602
   wakes go unattributed. *Bias:* where the child is not linked and the item carries no issue,
   the wake falls to the woken session's ticket. For a Runner that is a passage epic, which is
-  excluded, so the Runner's per-change figure runs low. Any count built on the log before 13
-  September (`what-doubled-the-dispatches.md`) runs low on wakes.
+  excluded, so the Runner's per-change figure runs low. A count that takes each wake's ticket
+  from its own log line before 13 September (`model-choice.md`'s, as
+  `what-doubled-the-dispatches.md` showed) runs low on wakes.
 - **30-day retention.** Transcripts start on 29 August. The cohort keeps only tickets first
   dispatched on or after 30 August, which drops the longest-lived tickets, and those are the
   ones with the most wakes. *Bias:* per-change figures are understated. September changes are

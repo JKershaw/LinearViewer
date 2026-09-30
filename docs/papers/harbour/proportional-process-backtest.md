@@ -1,11 +1,12 @@
 ---
 title: Had a simple size-and-risk classifier sorted Harbour's past tickets, how many could have taken a lighter process, and what would have escaped among them?
 kind: paper
-version: 1
+version: 2
 date: 2026-09-30
-authors: [Claude (LIN-3166), for John Kershaw]
-model: "Frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 70d38765, kind custom, LIN-3166), effort not recorded in the dispatch item. One bounded session, with no research, plan, review or close-out legs, by the brief's design. Twelve in-session subagents of the same tier: one read the prior papers, one coded the named fixes, ten coded the review catches, one batch each. Nothing was second-read."
-grounded_at: c65b7dd8 (LinearViewer, the scorecard's head); 3b1e734 (simple-dispatcher). Papers cited at 0c1f03ed.
+authors: [Claude (version 1, LIN-3166), Claude (version 2 corrections, LIN-3171), for John Kershaw]
+model: "Version 1: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 70d38765, kind custom, LIN-3166), effort not recorded in the dispatch item. One bounded session, with no research, plan, review or close-out legs, by the brief's design. Twelve in-session subagents of the same tier: one read the prior papers, one coded the named fixes, ten coded the review catches, one batch each. Nothing was second-read. Version 2: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 2d541647, kind custom, LIN-3171), effort not recorded in the dispatch item; the independent check `survey-check-4.md`."
+revision: "Version 2 corrects statements per docs/papers/harbour/survey-check-4.md (LIN-3171): the light groups cost less per change mostly because they are smaller, and with diff size held fixed they took about the same dispatches as heavy changes, so they are not already on a lighter process; the ceiling is also given in dispatches (21% and 30%), and costing the uncovered changes moves the hours share by at most a point; steady-base's 77% is a per-ticket ratio it never offered as a saving, and this census gives 64% of the median change's dispatches, 69% of its hours and 38% of its tokens; the light groups fail a tenth (M1, M2) to three-quarters (P2) as often as their heavy groups on the scorecard's terms, not a third to a tenth; two of the three named fixes removed from M3 were coded unclear, not mentions; the 72 read changes were those a plan review or code review sent back; three real-fault findings were kept off main by descoping, not fixed; plan review found most catches on the merge-time light groups, not almost all catches (P2's came mostly from code review); LIN-2934 has 22 production changes here, not 18, and 10 and 15 without plan review, the same as which-rules-pay. Every printed rate, count and interval reproduces, and the figures are unchanged."
+grounded_at: c65b7dd8 (LinearViewer, the scorecard's head); 3b1e734 (simple-dispatcher). Papers cited at 0c1f03ed. Version 2 at 25421c7c (LinearViewer).
 cites:
   - "docs/papers/harbour/measuring-throughput.md@0c1f03ed:41-43 (change, correct, complete)"
   - "docs/papers/harbour/measuring-throughput.md@0c1f03ed:62-70 (the 998 mature changes and why 235 fail)"
@@ -22,29 +23,33 @@ cites:
   - "docs/papers/harbour/fleet-complexity-read.md@0c1f03ed:27-28 (the process is sized for a credential migration)"
   - "docs/steady-base.md@0c1f03ed:25 (the 77% figure) and :102 (lever 7, size the process to the change)"
   - "scripts/survey-proportional-classifiers.mjs@bff7e149 (the six rules, committed before any outcome was read)"
+  - "docs/papers/harbour/survey-check-4.md (LIN-3171, the independent check behind version 2)"
   - "LIN-3166 (2026-09-30)"
 ---
 
 # Had a simple size-and-risk classifier sorted Harbour's past tickets, how many could have taken a lighter process, and what would have escaped among them?
 
 Between a tenth and a third of them, depending on the rule. Very little escaped in any light
-group, but the full process did catch things there. It caught them almost all at plan review, and
-almost all on changes whose paths looked safe. Six rules were fixed and committed before any
-outcome was read. They were run over the 1,282 Done changes merged since 1 June in both repos. The
-two docs-and-tests-only rules route 11% light. Not one of those changes went wrong after merge
+group, but the full process did catch things there, on changes whose paths looked safe. On the
+merge-time light groups most of those catches came at plan review (13 of 17 findings under M4).
+Six rules were fixed and committed before any outcome was read. They were run over the 1,282
+Done changes merged since 1 June in both repos. The two docs-and-tests-only rules route 11% light. Not one of those changes went wrong after merge
 once the scorecard's failures were read (95% interval 0 to 4 in 100). The small-and-low-risk-path
 rule routes 26% light. Five of its 249 mature changes went wrong after reading (2 in 100). Its
 light group used 13% of the working hours. On the price side, a plan review or code review caught
 a real fault before merge on 5 of the docs-only changes and on 8 of the small-and-low-risk ones.
-In both groups most of these came from plan review. The docs-only catches were not in docs: two
-were parent tickets whose code shipped under child tickets, one was a runbook whose commands could
-not run, and two were prompt text served to agents. The plan-time rule reads only the ticket's
-text. It is the cheapest to apply and the least safe to trust: 3 of its 116 mature light changes
-went wrong, and review caught 36 real faults on its light group. Among them were agent reads that
-would have widened to the whole workspace, and one ticket with 15 faults. The light groups were
-already cheaper to run, at about half the dispatches and hours and a third of the tokens of the
-heavy groups. So the effort a lighter process could save is capped by what they cost now. That is
-at most 18% of working hours (M4) and 13% for the small-and-low-risk rule, not the 77% that a per-ticket cost ratio might suggest.
+In both groups most of these came from plan review. The docs-only catches were not ordinary
+docs: two were parent tickets whose code shipped under child tickets, one was a runbook whose
+commands could not run, and two were prompt text served to agents. The plan-time rule reads only
+the ticket's text. It is the cheapest to apply and the least safe to trust: 3 of its 116 mature
+light changes went wrong, and review caught 36 real faults on its light group. Among them were agent reads that
+would have widened to the whole workspace, and one ticket with 15 faults. The merge-time light
+groups cost about half the dispatches and hours of the heavy groups per change, and a third of the
+tokens. That is mostly because they are smaller. Held to the same diff size, a docs-or-tests-only
+change took about the same dispatches as a production change, so the process is not lighter on
+light work today. Even so, the most a lighter process could save is what the light groups cost
+now: at most 18% of working hours (M4) and 13% for the small-and-low-risk rule, or 30% and 21% of
+dispatches.
 
 ![Each classifier's share routed light, against what went wrong in its light group and what review caught there](figures/proportional-process-backtest/light-share-vs-escapes.svg)
 
@@ -58,7 +63,9 @@ scorecard's own tests, an escaped Bug naming the change or a later fix commit na
 ticket whose review found an older fault (`survey-check-2.md:301-312`). The second is named fixes
 that only mention the change. *Review caught a real fault* means a plan review, code review or
 close-out hold sent the change back over a defect that would otherwise have shipped on main, and
-the defect was then fixed before merge. Every number covers both repos unless a repo is named.
+the defect was then kept off main. For 47 of the 50 it was fixed before merge. For three (LIN-2511,
+and two on LIN-2872) the faulty part was descoped to its own ticket. Every number covers both
+repos unless a repo is named.
 
 ## Findings
 
@@ -75,8 +82,8 @@ the repository paths that text names.
 | P1 plan-time, docs or tests named | the text names a path, every named path is docs or tests, and no risk word appears |
 | P2 plan-time, nothing risky named | the text names a path, none is risky, invariant or process text, and no risk word appears |
 
-**How many go light, and what they used.** The light groups are small, cheap changes already.
-None of them used more than 18% of the working hours.
+**How many go light, and what they used.** The light groups are small changes, so each costs
+less. None of them used more than 18% of the working hours, or 30% of the dispatches.
 
 | Rule | Light | Harbour | runner | Share of dispatches | of working hours | of tokens | Median dispatches, light / heavy | Median working hours | Median tokens (M) |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
@@ -99,12 +106,29 @@ None of them used more than 18% of the working hours.
   its heavy group. M3's light group was code-reviewed as often as its heavy group (69% and 68%),
   and sent back half as often (11% and 21%). The heavy figures are weighted from the 1-in-4
   sample.
-- **Why the saving is bounded.** A docs- or tests-only change costs about a third of a heavy
-  change in tokens, and three-fifths to two-thirds in dispatches and hours. So the "77%" in
-  `docs/steady-base.md:25` is not the saving on offer: it compares a docs-only ticket with the
-  median ticket, from a sample of 87 (`where-the-effort-goes.md:155-163`). The most any light lane
-  could save is what its group costs now: 7% (M1) to 18% (M4) of working hours, less whatever
-  the light process still spends.
+- **Why the light groups cost less: size, not process.** Per change, a docs- or tests-only
+  change used about a third of a heavy change's tokens and three-fifths to two-thirds of its
+  dispatches and hours. The light groups' median diff is 98 to 155 lines, docs and tests
+  included; the heavy groups' is 300 to 430. Compared within bands of the same total lines
+  changed (1–49, 50–149, 150–499, 500+), weighted by the light group's mix:
+  - a docs- or tests-only change used 0.96 of a production change's dispatches, 0.78 of its
+    hours and 0.54 of its tokens;
+  - an M3 light change used 0.85, 0.80 and 0.79 of an M3 heavy change's;
+  - among changes of at most 49 production lines in at most 3 files, those heavy only because of
+    their paths used the same dispatches and hours as M3's light ones (ratios 1.00 and 1.04).
+
+  So today's process spends about as much on light work as on heavy work of its size.
+- **Why the saving is bounded.** The bound is arithmetic. The most any light lane could save is
+  what its group costs now, less whatever the light process still spends: 7% (M1) to 18% (M4) of
+  working hours, 12% to 30% of dispatches, 8% to 17% of tokens.
+  - Hours cover only changes from 12 July. Costing the uncovered changes at their group's
+    covered mean moves the hours share by at most a point (M1 6.2%, M3 12.9%, M4 17.8%). June is
+    not richer in docs-only changes than the rest (12% against 11% overall); September is (18%).
+  - The "77%" in `docs/steady-base.md:25` is a per-ticket ratio, not a total saving: a docs-only
+    ticket against the median ticket, in weighted tokens, from a sample of 87
+    (`where-the-effort-goes.md:155-163`). On this census a docs- or tests-only change used 64% of
+    the median change's dispatches and 69% of its hours, close to it, but 38% of its tokens (raw
+    tokens, September, 30 changes).
 
 **Almost nothing escaped in the light groups, and the escapes that did were visible in the
 code.** Every mature light change that the scorecard counts as not correct was read.
@@ -120,8 +144,8 @@ code.** Every mature light change that the scorecard counts as not correct was r
 
 The heavy column is the scorecard's rate before reading, so it is not directly comparable with
 the light column after reading. Both fall on reading, because both carry finder rows and mere
-mentions (Limits). On the scorecard's own terms, every light group fails a third to a tenth as
-often as its heavy group.
+mentions (Limits). On the scorecard's own terms, the docs-and-tests-only groups fail a tenth as
+often as their heavy groups, M3 a third as often, M4 about half as often and P2 three-quarters.
 
 Every escape in a light group, by name:
 
@@ -140,7 +164,8 @@ Every escape in a light group, by name:
     - LIN-1485: a `length === LIMIT` truncation test (LIN-1494).
     - LIN-2123: a resume-marker fix that never fired (LIN-2268).
   - Removed on reading: three finder rows (LIN-2037, LIN-2291, LIN-2331) and three named fixes
-    that only mention the change (LIN-805, LIN-1492, LIN-2262).
+    the reading did not find to blame the change (LIN-805 and LIN-1492 unclear, LIN-2262 a
+    mention).
 - **M4.** M3's five, plus seven changes on risky paths:
   - LIN-1318, kickoff prompt wording that defeated push wake;
   - LIN-1471, runner `dispatcher.js`, duplicate wakes;
@@ -164,9 +189,9 @@ was in token handling behind an innocuous path. Of the seven named fixes that bl
 by reading the diff (`reviewCouldCatch` in `proportional-process-backtest-codes.json`).
 
 **The full process did catch real faults on light changes, mostly at plan review.** Every light
-change that a plan review, code review or close-out sent back was read: 72 changes, 116 genuine
-send-backs, 369 findings. Of those findings, 170 changed only wording, 76 only tests, 37 were
-filed as follow-ups and 84 changed production code. 50 were real faults, on 21 changes; three
+change that a plan review or code review sent back was read, close-out holds on it included: 72
+changes, 116 genuine send-backs, 369 findings. Of those findings, 170 changed only wording, 76
+only tests, 37 were filed as follow-ups and 84 changed production code. 50 were real faults, on 21 changes; three
 more were found only after merge, and those are counted above as escapes or fixes, not here.
 This is what each light group would have put at stake:
 
@@ -271,6 +296,8 @@ node scripts/survey-proportional-digests.mjs      # reading digests of light cha
 node scripts/survey-proportional-codes.mjs        # assemble the committed hand codes
 node scripts/survey-proportional-backtest.mjs     # re-run with the codes
 node scripts/survey-proportional-chart.mjs        # the two SVGs
+node scripts/survey-check-4-proportional.mjs size    # version 2: light against heavy with diff size held fixed
+node scripts/survey-check-4-proportional.mjs shares  # version 2: the ceiling in hours, dispatches and tokens, and coverage-adjusted
 ```
 
 - **The rules came first.** `survey-proportional-classifiers.mjs` was committed as `bff7e149`
@@ -282,7 +309,12 @@ node scripts/survey-proportional-chart.mjs        # the two SVGs
     grant, encrypt, revoke, login, password, migration, schema, database, mongo, data loss,
     state-store, sessions.json, invariant, meta-prompt and prompt template.
   - Paths are read from git at the scorecard's heads with `survey-effort-git.mjs`'s attribution
-    rule. They reproduce its production-line count for all 1,311 changes with no mismatch.
+    rule. They reproduce its production-line count for all 1,311 changes with no mismatch. A
+    re-run later in the day loses one June merge of LIN-295, because git reads a bare `--since`
+    date at the current time of day. LIN-295 is heavy under every rule, so no figure moves.
+- **Size held fixed** (version 2). `scripts/survey-check-4-proportional.mjs size` compares light
+  and heavy changes within bands of total lines changed, production, tests and docs together,
+  noise excluded. Each band's ratio of medians is weighted by the light group's count in it.
 - **Population and outcomes.** These are the scorecard's per-change fields, from
   `data/survey/scorecard.json` (cut 30 September, window 30 days), filtered to Done. The escape
   list is recomputed with its window and checked equal to its count. Named fixes are recovered
@@ -294,8 +326,8 @@ node scripts/survey-proportional-chart.mjs        # the two SVGs
   - Review rounds come from comment headings, using `survey-rules-timeline.mjs`'s `legOf` and
     `verdictOf`.
   - Comments come from three sources: the tracker and rules snapshots already on disk, and 560
-    proxy fetches. The fetches cover every change any rule routes light (558, a census) and a
-    systematic 1-in-4 sample of changes every rule routes heavy (184, weighted 4).
+    proxy fetches. Together they cover every Done change any rule routes light (558, a census)
+    and a systematic 1-in-4 sample of Done changes every rule routes heavy (184, weighted 4).
 - **Reading.** `docs/papers/harbour/proportional-process-backtest-codes.json` holds every hand
   code.
   - *Finder rows* are `survey-check-2.md`'s eight changes named only by them.
@@ -348,9 +380,14 @@ node scripts/survey-proportional-chart.mjs        # the two SVGs
     the token medians are indicative only.
 - **Small counts.** Every light-group rate rests on 0 to 12 events. The intervals are printed;
   P1's is 0 to 32 in 100.
+- **Size is held fixed only roughly.** Four bands of total lines are coarse. Within a band a light
+  change can still be smaller than a heavy one, which makes light work look cheaper than it is,
+  so the ratios near 1 are if anything low. The token bands are thin: 2 to 11 docs- or tests-only
+  changes each.
 - **One coder per item, not second-read.**
-  - LIN-2934's codes overlap `which-rules-pay`'s. Here it has 15 real faults and 18 production
-    changes; there it has 10 and 15, with plan review excluded. The direction agrees.
+  - LIN-2934's codes overlap `which-rules-pay`'s. Here it has 15 real faults and 22 production
+    changes. Without plan review it has 10 and 15, the same as there, where plan review was
+    excluded.
   - Marginal calls are listed in each batch's codes: docs errors as real faults, and
     approve-conditional items as close-out findings.
 
@@ -359,7 +396,8 @@ node scripts/survey-proportional-chart.mjs        # the two SVGs
 What John would need to decide, not what to build:
 
 - **What price is acceptable.** Under M3, a lighter process would have put at stake the faults
-  review caught on 8 of 328 changes, to save at most 13% of hours. It also carries the 5 escapes
+  review caught on 8 of 328 changes, to save at most 13% of hours (21% of dispatches). It also
+  carries the 5 escapes
   that happened anyway. Is that the right trade, and is it the same for Harbour and the runner?
 - **Whether "light" means fewer legs or lighter legs.** On merge-time light changes, most real
   faults came from plan review, not code review. Which legs a light lane keeps decides most of
