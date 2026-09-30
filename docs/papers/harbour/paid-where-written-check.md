@@ -66,8 +66,10 @@ here, for John.
   citations left; #462's 19%, 38,643 and 72,812; 493 and 279 pins; the comment shares; 688 plan
   labels; 2.94 test lines per production line; 89 tickets with medians of 10 comments and 6,063
   words; 96 cited tickets with 42 runtime.
-- **Quotations.** The budget test's message, LIN-435's sentence, LIN-1270's commit message and
-  John's framing in the LIN-3144 description all match their sources word for word.
+- **Quotations.** The budget test's message, LIN-435's sentence and LIN-1270's commit message
+  match their sources word for word. John's framing is a fair paraphrase of the LIN-3144
+  description ("about 2 hours of full concentration"; "thorough, consistent and runs
+  constantly").
 
 **Eleven figures change. Each is corrected in the essay's version 2.**
 
@@ -253,7 +255,64 @@ The base rate matters anyway. A sunset default in Texas mostly produces reformed
 removals. A firing record in Harbour might do the same, and that would not by itself show the
 base was steady.
 
-**Missing sources.** MISSING-SOURCES-PLACEHOLDER
+**Missing sources: two would most strengthen the essay, two would most challenge it.** Each
+was read at a primary text, and the URLs are below. The essay cites none of them.
+
+- **Strengthen: Tainter on the cost of complexity.** Tainter, "Social complexity and
+  sustainability", *Ecological Complexity* 3 (2006), DOI 10.1016/j.ecocom.2005.07.004. Read in
+  full from the USDA Forest Service copy
+  (https://research.fs.usda.gov/download/treesearch/61158.pdf). It states the essay's mechanism
+  in almost its words: complexity "grows perniciously, by small steps, each necessary, each a
+  reasonable solution". It also states the budget remedy: "costs and benefits must be connected
+  so explicitly that the tendency for complexity to grow can be constrained by its costs". It is
+  about societies and institutions, so it is a mechanism, not an estimate.
+- **Strengthen: the flight-deck checklist.** Degani and Wiener, *Human Factors of Flight-Deck
+  Checklists: The Normal Checklist*, NASA CR-177549 (1990). Read in full at NTRS
+  (https://ntrs.nasa.gov/citations/19910017830). It is the closest outside match to Harbour's
+  close-out lineage. Items added to show "that a specific problem is settled" turn the checklist
+  into a "dumping site", and "the importance attached to the procedure by the pilots is reduced".
+  A long list carries the risk that pilots "conduct it poorly because of its length". The same
+  report insists on keeping the critical "killer" items. That is the essay's deep-where-it-
+  matters point, from a field with decades of incident data.
+- **Challenge: Rasmussen on defence in depth.** Rasmussen, "Risk management in a dynamic
+  society: a modelling problem", *Safety Science* 27 (1997), DOI
+  10.1016/S0925-7535(97)00052-0. Read in full from DTU's repository
+  (https://backend.orbit.dtu.dk/ws/files/158016663/SAFESCI.pdf). This is Chesterton's fence as a
+  mechanism. With redundant defences, "a local violation of one of the defences has no immediate,
+  visible effect", so "the defences are likely to degenerate systematically through time, when
+  pressure toward cost-effectiveness is dominating". A steady base that removes rules which show
+  no effect, under a cost argument, is the migration he describes. The essay needs an answer to
+  him more than to Chesterton.
+- **Challenge: Safety-II on measuring prevention.** Hollnagel, Leonhardt, Licu and Shorrock,
+  *From Safety-I to Safety-II: A White Paper*, EUROCONTROL (2013). Read in full
+  (https://skybrary.aero/sites/default/files/bookshelf/2437.pdf). "A perfect level of safety means
+  that there are no adverse outcomes, hence nothing to measure." A rule that prevents perfectly
+  leaves a firing record of zero. That is the essay's firing measure failing by construction.
+
+Four more bear on the argument. Three of them were read only in part, and none is relied on
+above.
+- **Lehman's second law cuts both ways.** Lehman, "Programs, life cycles, and laws of software
+  evolution", *Proc. IEEE* 68(9), 1980, DOI 10.1109/PROC.1980.11805, read in full from a scanned
+  copy (https://users.ece.utexas.edu/~perry/education/SE-Intro/lehman.pdf). A program's
+  complexity "increases unless work is done to maintain or reduce it". That supports the ratchet.
+  It says it of code, which undercuts "paid once".
+- **Chesterton himself allows removal.** *The Thing* (1929), "The Drift from Domesticity", read
+  at https://catholiclibrary.org/library/view?docId=/Contemporary-EN/XCT.165.html&chunk.id=00000011.
+  The reformer may clear the fence once he can "tell me that you do see the use of it". His test
+  is whether a rule's purpose is still served. A firing count does not ask that. The paper's
+  provenance tag, which records the ticket behind each rule, is the part of its design closest to
+  asking it.
+- **Surgical checklists: abstracts only.** Haynes and others, *NEJM* 360 (2009), DOI
+  10.1056/NEJMsa0810119: after a 19-item checklist was introduced, deaths fell from 1.5% to
+  0.8%. Urbach and others, *NEJM* 370 (2014), DOI 10.1056/NEJMsa1308261: the same checklist,
+  mandated across Ontario, showed no significant change. Together they suggest that written
+  procedure pays when it is short and owned, not when it is imposed, which fits both sides.
+- **Two sources seen only at secondary hand.** Vaughan's *The Challenger Launch Decision*
+  (1996) was read only as the publisher's page. On normalisation of deviance, a rule routinely
+  waived, as the review gate is by briefs like the one behind this check, may be worse than no
+  rule. Schulz, "Limits to bureaucratic growth", *ASQ* 43(4) (1998), DOI 10.2307/2393618, was
+  read only as an index abstract. It says rule births slow as rules accumulate, which would
+  temper an unbounded ratchet. Both need reading at source before anyone cites them.
 
 ## Method
 
@@ -281,7 +340,8 @@ re-fetched the NAO report and re-extracted summary paragraph 8, paragraphs 2.6 a
 "open to manipulation" and "many times greater" sentences. It also re-fetched the Texas home
 page and the Cunningham passage. All matched. A second sub-agent read the candidate missing
 sources at their primary texts or publisher pages, with the URL it read for each. It says where
-it saw only an abstract.
+it saw only an abstract. This session re-fetched the Tainter, Rasmussen, Lehman, Safety-II and
+Degani and Wiener texts, and found each quotation above in them.
 
 **Argument.** Each of the brief's three questions was answered from the essay's own sources, so
 that a finding rests on something the essay already cites. Where it leans on a source the essay
