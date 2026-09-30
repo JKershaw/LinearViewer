@@ -204,9 +204,11 @@ describe('fossil pass T20 — dry run is the default and writes nothing', () => 
   });
 
   test('a NON-EMPTY >30d bucket is reported as a FINDING, not as rows to stamp', () => {
-    // The retention edge: historyTtl (30d) and LOOKBACK_MS (30d) both bound
-    // the readable band, so this bucket should be empty in production. If it
-    // is not, the report must say so rather than quietly listing a count.
+    // LIN-3163 (LIN-3157 B): dispatch-history is now lifetime-retained, so a
+    // >30d row is no longer pruned — it is outside the LOOP LOOKBACK
+    // (LOOKBACK_MS, 30d), which still bounds the readable band. The bucket
+    // should be empty for that reason; a populated one is a finding about the
+    // loop reader, never a set of rows to stamp.
     const selection = {
       eligible: [{ loopId: 'ancient' }],
       skipped: [],
@@ -220,6 +222,8 @@ describe('fossil pass T20 — dry run is the default and writes nothing', () => 
     });
     assert.match(report, /FINDING/, 'a populated >30d bucket must be flagged');
     assert.match(report, /should be EMPTY/);
+    assert.doesNotMatch(report, /history TTL/, 'the finding must not blame the removed history TTL');
+    assert.match(report, /lookback/i, 'the finding names the loop lookback bound instead');
 
     // And the same report on an empty >30d bucket carries no such warning.
     const clean = buildFossilReport({

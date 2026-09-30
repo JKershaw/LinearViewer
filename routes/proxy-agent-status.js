@@ -104,7 +104,8 @@ export function createAgentStatusRoutes({ agentStatusStore, proxyLimiter, authen
   /**
    * GET /api/proxy/agent/status  (canonical)
    * GET /api/proxy/foreman/status  (forgiving alias, deprecated — pre-LIN-533 name)
-   * List recent agent status entries. Optional filters: tokenId (session) +
+   * List agent status entries over the full retained history (newest first).
+   * Optional filters: tokenId (session) +
    * taskIdentifier (task thread). Shared handler across both forms (LIN-528 pattern).
    */
   router.get(['/api/proxy/agent/status', '/api/proxy/foreman/status'], proxyLimiter, authenticateProxyToken, async (req, res) => {

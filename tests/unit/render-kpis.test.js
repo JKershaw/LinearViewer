@@ -273,7 +273,7 @@ describe('renderKpisPage', () => {
   test('titles the newly-windowed charts honestly (LIN-1846)', () => {
     const html = renderKpisPage(buildStats());
 
-    // The 35-day weekly span exceeded 30-day retention; it is now a genuine
+    // The 35-day weekly span exceeded the 30-day reporting window; it is now a genuine
     // 30-day daily-bucketed window, so the title drops "weekly".
     assert.ok(html.includes('dispatched work by kind · 30d'));
     assert.ok(!html.includes('dispatched work by kind · weekly'));

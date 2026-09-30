@@ -287,7 +287,7 @@ describe('collectKpiStats', () => {
     assert.strictEqual(research.counts[last - 10], 1);
     assert.strictEqual(autopilot.counts[last - 1], 1);
     // Out-of-window doc (35 days exceeded the old weekly span; 40 days here
-    // exceeds even the 30-day retention) contributes to no day
+    // exceeds even the 30-day reporting window) contributes to no day
     assert.strictEqual(research.counts.reduce((a, b) => a + b, 0), 2);
   });
 

@@ -220,7 +220,7 @@ Content-Type: application/json
 }
 ```
 
-Feedback entries are displayed in the dispatch history UI and inherit the 30-day history TTL.
+Feedback entries are displayed in the dispatch history UI and are **retained for the life of the project** (dispatch history has no time-based expiry; LIN-3157 B+D, LIN-3163).
 
 ### Minting a Broker Bootstrap Token
 

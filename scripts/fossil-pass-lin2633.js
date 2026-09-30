@@ -113,12 +113,13 @@ import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 export const STAMP_REASON = 'fossil-pass-lin2633';
 
 // Age buckets for the dry-run report, on `now - loopLastActivityMs(loop)`.
-// `>30d` MUST come back empty: the history TTL (`historyTtl`, 30 days,
-// `lib/dispatch-store.js:170`) and the loop lookback (`LOOKBACK_MS`, 30 days,
-// `lib/pipeline-loops.js:32`) both bound the readable band, so a row older
-// than that is already pruned or already outside the read. A NON-EMPTY `>30d`
-// bucket is therefore a FINDING about one of those two bounds, not a row to
-// stamp — report it, do not quietly stamp it.
+// `>30d` MUST come back empty, but for a different reason since LIN-3163:
+// dispatch-history is now lifetime-retained (no history TTL), so a >30d row is
+// no longer pruned from storage — it is simply OUTSIDE the loop lookback
+// (`LOOKBACK_MS`, 30 days, `lib/pipeline-loops.js`), which still bounds the
+// readable band this pass reconstructs loops from. A NON-EMPTY `>30d` bucket is
+// therefore a FINDING about the loop lookback bound (or a bug in the loop
+// reader), not a row to stamp — report it, do not quietly stamp it.
 export const AGE_BUCKETS = [
   { key: '7-10d', minDays: 7, maxDays: 10 },
   { key: '10-14d', minDays: 10, maxDays: 14 },
@@ -473,7 +474,7 @@ export function buildFossilReport({ perWorkspace, now, headSha = null, execute =
   lines.push('By age bucket (on `now - loopLastActivityMs`):');
   for (const bucket of AGE_BUCKETS) {
     const note = bucket.key === '>30d' && bucketTotals[bucket.key] > 0
-      ? '   <-- FINDING: history TTL and the loop lookback are both 30d, so this bucket should be EMPTY. Investigate before stamping; do not treat these as rows to retire.'
+      ? '   <-- FINDING: the loop lookback (LOOKBACK_MS, 30d) bounds the readable band, so this bucket should be EMPTY. History is lifetime-retained, so a >30d LOOP is outside the read, not pruned. Investigate before stamping; do not treat these as rows to retire.'
       : '';
     lines.push(`  ${bucket.key.padEnd(8)} ${String(bucketTotals[bucket.key]).padStart(5)}${note}`);
   }

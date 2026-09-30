@@ -2,8 +2,8 @@
 // Usage: HARBOUR_LOCAL_BASE=http://127.0.0.1:NNNN node scripts/survey-effort-fetch.mjs [--months 2026-09] [--per-month 146] [--git data/survey-effort/git.json] [--cache data/survey-effort/cache]
 // Reads the population from survey-effort-git.mjs's output, keeps tickets whose tracker state is Done, and takes every k-th
 // ticket per merge month (sorted by number, from the first) so each month contributes about --per-month; the default is every second
-// September ticket, since about half have no lineage left to read. Dispatch history is kept 30 days
-// (lib/dispatch-store.js historyTtl), so only tickets merged inside that window have lineages to read. Every response is cached to disk
+// September ticket, since about half have no lineage left to read. When this survey was taken dispatch history
+// was kept 30 days (it is lifetime-retained since LIN-3163, LIN-3157 B+D), so only tickets merged inside that window had lineages to read. Every response is cached to disk
 // under the git-ignored data/ tree, so a re-run makes no proxy calls. Paced at one call per 4.2 s (≤15/min).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';

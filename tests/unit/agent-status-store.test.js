@@ -162,6 +162,19 @@ describe('AgentStatusStore.listStatus (real MangoDB tmpdir, LIN-3162 A2)', () =>
     assert.strictEqual(result.items.length, 2);
   });
 
+  test('until alone reaches a >30d row (lifetime retention, LIN-3163 B)', async () => {
+    const now = Date.now();
+    // A row older than 30 days, well inside an `until` bound of an hour ago.
+    await seedRaw({ _id: 'ancient', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 40 * DAY_MS) });
+    // A row after the `until` bound, which must stay excluded.
+    await seedRaw({ _id: 'after-until', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 60 * 1000) });
+    const until = new Date(now - 60 * 60 * 1000);
+
+    const result = await store.listStatus('ws-1', { until });
+    assert.strictEqual(result.total, 1, 'the >30d row is read: no default horizon is injected');
+    assert.deepStrictEqual(result.items.map(i => i.id), ['ancient']);
+  });
+
   test('isolates entries per urlKey', async () => {
     for (let i = 0; i < 5; i++) await seed({ _id: `a${i}`, urlKey: 'ws-1' });
     for (let i = 0; i < 3; i++) await seed({ _id: `b${i}`, urlKey: 'ws-2' });

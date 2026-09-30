@@ -485,7 +485,9 @@ describe('recoverAction (B4, NB3)', () => {
   test('the orphan copy is honest: rows stay taken, a waiting Autopilot hangs, re-dispatch the task', () => {
     const r = recoverAction(ledger, { currentTokenId: 'tok-A', sessionId: 's-new' });
     assert.match(r.orphanCopy, /stay `taken`/);
-    assert.match(r.orphanCopy, /30 days/);
+    // LIN-3163 (LIN-3157 B): history is lifetime-retained, so the copy must not
+    // claim the rows expire on a 30-day timer.
+    assert.doesNotMatch(r.orphanCopy, /30 days/, 'no 30-day expiry claim in the orphan copy');
     assert.match(r.orphanCopy, /re-dispatch/i);
   });
 });

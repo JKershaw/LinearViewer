@@ -330,8 +330,9 @@ test('Shape B (/stack) threads owner_signed_out through to auth envelope (LIN-15
 // Everything above pins the reason reaching the *response envelope* — which is
 // ephemeral. LIN-1538's diagnostic had the same weakness one layer down: its
 // only sink was a console.warn, so the discriminating field could never be
-// counted. `workspaceUnavailable` already wrote a durable, 30-day-TTL audit row
-// on this exact path, but dropped the in-scope `reason`, so every 503 landed as
+// counted. `workspaceUnavailable` already wrote a durable audit row
+// on this exact path (proxy-events; lifetime-retained since LIN-3163), but
+// dropped the in-scope `reason`, so every 503 landed as
 // an indistinguishable `note: null`. Passing it through as the existing `note`
 // breadcrumb (the LIN-961 field) makes 503s countable BY REASON with no schema
 // change. These tests pin the write side; the read side already returned `note`.

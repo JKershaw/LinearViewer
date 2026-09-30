@@ -45,7 +45,7 @@ describe('server.js cleanup scheduler roster (LIN-3163 B)', () => {
 });
 
 describe('evidence-store evictors are deleted (LIN-3163 B)', () => {
-  test('none of the six evidence stores expose a cleanup method', () => {
+  test('none of the four evictor-bearing evidence stores expose a cleanup method', () => {
     for (const Store of [PromptTraceStore, LlmCallLogStore, AgentStatusStore, ProxyEventStore]) {
       assert.equal(typeof Store.prototype.cleanup, 'undefined', `${Store.name} must not define cleanup`);
     }
