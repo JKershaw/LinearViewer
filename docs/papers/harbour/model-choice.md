@@ -1,32 +1,36 @@
 ---
 title: What does each model tier really cost per correct change, once a ticket's afterlife is counted, and how has model choice changed?
 kind: paper
-version: 1
+version: 2
 date: 2026-09-30
-authors: [Claude, for John Kershaw]
-model: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch e86a0765, kind custom, LIN-3165); effort not recorded in the dispatch item; one bounded session with no research, plan, review or close-out legs, by the brief's design
-grounded_at: f38acdf7 (LinearViewer), 3b1e734b (simple-dispatcher)
-cites: [docs/papers/harbour/measuring-throughput.md@f38acdf7:15-17, docs/papers/harbour/survey-check-2.md@cba8b7ae:301-316, docs/papers/harbour/survey-check-2.md@cba8b7ae:518-520, docs/papers/harbour/why-throughput-halved.md@f38acdf7:23-25, docs/papers/harbour/why-throughput-halved.md@f38acdf7:73-79, docs/papers/harbour/why-throughput-halved.md@f38acdf7:83-94, docs/papers/harbour/why-throughput-halved.md@f38acdf7:180-183, docs/papers/harbour/cheap-implementer.md@f38acdf7:39-44, docs/papers/harbour/cheap-implementer.md@f38acdf7:197, docs/papers/harbour/reliability-baseline.md@f38acdf7:37-40, docs/papers/harbour/why-throughput-halved.md@f38acdf7:79-81, docs/papers/harbour/where-the-effort-goes.md@f38acdf7:21, docs/papers/harbour/review-loops.md@f38acdf7:14-16, docs/reviews/model-effort-routing-proposal-2026-09-11.md@f38acdf7:11-36, docs/reviews/model-effort-routing-proposal-2026-09-11.md@f38acdf7:54-66, simple-dispatcher b39648b (LIN-1285, 2026-07-12), simple-dispatcher a5c7714 (LIN-1077, 2026-07-05), simple-dispatcher c97b26f (LIN-1694, 2026-08-07), simple-dispatcher 3f2fc6b (LIN-2567, 2026-09-05), LinearViewer fddf5271 (LIN-1094, 2026-07-06), LinearViewer a13880b4 (LIN-1390, 2026-07-17), LIN-3165 (2026-09-30)]
+authors: [Claude (version 1, LIN-3165), Claude (version 2 corrections, LIN-3171), for John Kershaw]
+model: Version 1: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch e86a0765, kind custom, LIN-3165); effort not recorded in the dispatch item; one bounded session with no research, plan, review or close-out legs, by the brief's design. Version 2: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 2d541647, kind custom, LIN-3171), effort not recorded in the dispatch item; the independent check `survey-check-4.md`
+revision: "Version 2 corrects two inputs per docs/papers/harbour/survey-check-4.md (LIN-3171). Implementer tier: from 13 July to 30 August no change had a cost lineage, so version 1 took every tier from commit trailers, and 32 of the 69 trailer-frontier changes the runner can read were implemented by mid-tier sessions (a frontier close-out, review or autopilot wrote the final commit); 84 of the 91 readable 'tier not stated' changes were mid. Version 2 takes the tier from the runner's own implementation launches where there is no lineage. Dispatches: version 1 counted only dispatches whose log line names the ticket, which missed wakes until 13 September (what-doubled-the-dispatches.md); version 2 follows each follow-up to its root. Changed: whole-life hours per correct change (frontier 2.9-3.0, mid 3.2-3.3), the escape counts (13 of 302 against none of 60, p = 0.09 in those weeks), dispatches per correct change, now counting each follow-up for the session it entered (21 and 22; at the step 7.9 to 18.6 and 8.1 to 21.0; September 52, 32 and 37), the afterlife shares, the by-repo and standardised figures, the routing timeline (implementation ran at frontier 23-27 July; plan moved to mid on 28 July) and the selection limit. Working hours barely move: follow-ups carry no hours of their own. The conclusion that tier did not move cost per change stands. Two figures are redrawn from the corrected inputs."
+grounded_at: f38acdf7 (LinearViewer), 3b1e734b (simple-dispatcher); version 2 at 25421c7c (LinearViewer)
+cites: [docs/papers/harbour/survey-check-4.md (LIN-3171), docs/papers/harbour/what-doubled-the-dispatches.md@25421c7c:25-27, docs/papers/harbour/what-doubled-the-dispatches.md@25421c7c:38-43, docs/papers/harbour/measuring-throughput.md@f38acdf7:15-17, docs/papers/harbour/survey-check-2.md@cba8b7ae:301-316, docs/papers/harbour/survey-check-2.md@cba8b7ae:518-520, docs/papers/harbour/why-throughput-halved.md@f38acdf7:23-25, docs/papers/harbour/why-throughput-halved.md@f38acdf7:73-79, docs/papers/harbour/why-throughput-halved.md@f38acdf7:83-94, docs/papers/harbour/why-throughput-halved.md@f38acdf7:180-183, docs/papers/harbour/cheap-implementer.md@f38acdf7:39-44, docs/papers/harbour/cheap-implementer.md@f38acdf7:197, docs/papers/harbour/reliability-baseline.md@f38acdf7:37-40, docs/papers/harbour/why-throughput-halved.md@f38acdf7:79-81, docs/papers/harbour/where-the-effort-goes.md@f38acdf7:21, docs/papers/harbour/review-loops.md@f38acdf7:14-16, docs/reviews/model-effort-routing-proposal-2026-09-11.md@f38acdf7:11-36, docs/reviews/model-effort-routing-proposal-2026-09-11.md@f38acdf7:54-66, simple-dispatcher b39648b (LIN-1285, 2026-07-12), simple-dispatcher a5c7714 (LIN-1077, 2026-07-05), simple-dispatcher c97b26f (LIN-1694, 2026-08-07), simple-dispatcher 3f2fc6b (LIN-2567, 2026-09-05), LinearViewer fddf5271 (LIN-1094, 2026-07-06), LinearViewer a13880b4 (LIN-1390, 2026-07-17), LIN-3165 (2026-09-30)]
 ---
 
 # What does each model tier really cost per correct change, once a ticket's afterlife is counted?
 
 About the same for the frontier and mid tiers, and the afterlife barely changes that. In the
 weeks where both tiers were in use and every change has had 30 days to show a fault (13 July to
-30 August, both repos), a correct, complete change cost **3.25–3.4 working hours** over its whole
-life when a mid-tier session implemented it, and **3.4–3.5** when a frontier session did. That
+30 August, both repos), a correct, complete change cost **3.2–3.3 working hours** over its whole
+life when a mid-tier session implemented it, and **2.9–3.0** when a frontier session did. That
 covers its own sessions plus the rework it later caused; the range runs from the fixes that name
-the change to every fix on its files. Rework is under a tenth of either figure. A third to two-fifths
-of it lands within a week, and a fifth to a third comes after day 30. Mid-tier changes do escape more often: 11 of 187 here against none
-of 85. That count sets aside escape rows that name the ticket whose review found an older fault.
-LIN-3155's "four times" (9.6% against 2.4%) counted those rows too. On its own weeks, without
-them, the figures are 14 of 365 against none of 171. But an escape's fix costs a fraction of the process around the original ticket, so escapes move the
-whole-life cost by tenths of an hour. What moved the cost per change was not the tier. At the
-12 July step dispatches per correct change doubled for frontier-implemented changes too (5.3 to
-10.4). Since then they have kept climbing. In September's provisional weeks the figures are 37
-(frontier), 27 (mid) and 48 (cheap, whose work is cut into many short beats). The cheap tier's
-changes are all younger than the 30-day window. Provisionally they cost what mid-tier changes
-cost in hours (3.3 against 3.0) and less in dollars. LIN-3155's fall in frontier-written changes
+the change to every fix on its files. The gap is within the noise: frontier's cost is 0.91 of
+mid's, with a 95% interval of 0.70 to 1.21. Rework is under a tenth of either figure. A quarter
+to three-fifths of it lands within a week, and a fifth to a quarter comes after day 30. Mid-tier
+changes do escape more often: 13 of 302 here against none of 60, though in these weeks alone
+that is not significant (one-sided p = 0.09). That count sets aside escape rows that name the
+ticket whose review found an older fault. LIN-3155's "four times" (9.6% against 2.4%) counted
+those rows too. On its own weeks, without them, the figures are 14 of 365 against none of 171.
+But an escape's fix costs a fraction of the process around the original ticket, so escapes move
+the whole-life cost by about a tenth of an hour. What moved the cost per change was not the
+tier. At the 12 July step dispatches per correct change rose about two-and-a-half-fold for
+frontier-implemented changes too (7.9 to 18.6). Since then they have kept climbing. In
+September's provisional weeks the figures are 52 (frontier), 32 (mid) and 37 (cheap). The cheap
+tier's changes are all younger than the 30-day window. Provisionally they cost what mid-tier
+changes cost in hours (3.2 against 3.0) and less in dollars. LIN-3155's fall in frontier-written changes
 (84 to 12 a week) and its equal cost per change reproduce. Its escape rates do not, so
 `why-throughput-halved.md` is corrected to version 2 in the same PR.
 
@@ -49,8 +53,9 @@ lived in runtime config, not in code, so the timeline below comes from the runne
 |---|---|---|---|
 | 1 | 5 Jul | Cheap-tier harness (OpenRouter via opencode) added; first real tickets on 8 Jul | SD `a5c7714`, run logs |
 | 2 | 12 Jul | Sessions run at the dispatch's tier: implementation and close-out mid; autopilot, research, plan and review frontier | SD `b39648b`; first tier aliases in that day's log |
-| 3 | ~20 Jul | Close-out back to frontier | last mid close-out 17 Jul, first frontier 20 Jul |
-| — | 19–29 Jul | About fifteen tickets implemented at the cheap tier, then back to mid | run logs |
+| 3 | ~20 Jul | Close-out back to frontier | mid close-outs through 20 Jul, frontier after, by prompt length in the run logs |
+| — | 19–29 Jul | About fifteen tickets implemented at the cheap tier | run logs |
+| — | 23–27 Jul | Implementation at frontier (64 of 67 implementation launches), then mid again; plan moves from frontier to mid on 28 Jul | run logs, by prompt length |
 | 4 | 7 Aug | Harness resolved before model; unmappable models refused | SD `c97b26f` (LIN-1694) |
 | 5 | 8–14 Sep | Cheap-implementer bake-off (LIN-2828); review and close-out stay frontier | `cheap-implementer.md:39-44` |
 | 6 | 11 Sep | Review and close-out effort high → medium; tier unchanged | proposal `:11-36`, run log |
@@ -79,7 +84,11 @@ name, and a change is correct and complete on `measuring-throughput.md`'s rule. 
 complete, with 2.3% escaping (4 of 171). Mid-tier changes were 66.6%, with 9.6% escaping (35 of
 365). LIN-3155 reports 83.5, 12.1, 78%/2.4% and 67%/9.6% (`why-throughput-halved.md:73-94`).
 Its script, read afterwards, uses the same trailer-majority rule, which is why the figures agree
-to the first decimal. Those escapes, though, come straight from the scorecard. The independent
+to the first decimal. A trailer names the session that wrote a commit, though, not the one that
+implemented the change. From 13 July a frontier close-out, review or autopilot often wrote the
+last commit on a change a mid-tier session implemented. By the runner's own implementation
+launches, about 9 frontier-implemented changes a week were correct and complete in the later
+weeks, so the fall is if anything larger. Those escapes, though, come straight from the scorecard. The independent
 check that landed today (`survey-check-2.md`) found that many of its escape rows name the ticket
 whose review *found* an older fault. It also found that the scorecard's window opens two days
 before the merge. Applying the check's own reading rule ("pre-existing", "predates", "older
@@ -90,59 +99,72 @@ code", "left out of scope") and requiring the Bug to be filed after the change m
 
 So mid does escape more; a one-sided Fisher exact test gives p = 0.004. But neither 9.6% against
 2.4% nor "four times" holds: with no frontier escapes, the ratio has no upper bound, and the data
-say only that it is above about 1.7. On the same corrected basis the correct, complete shares are
+say only that it is above about 1.5. Taking the tier from the implementation sessions instead of
+the trailers (the rule the rest of this paper uses) gives none of 129 against 16 of 517 (3.1%),
+p = 0.03. On the same corrected basis the correct, complete shares are
 79.5% and 69.6%. The tier's part of the June-to-July fall stays at about 3 to 4 of 48 changes a
 week. `why-throughput-halved.md` version 2 makes exactly these corrections. Every escape figure
-below uses this strict count.
+below uses this strict count, with the tier taken from the implementation sessions.
 
-**Per correct change, the two tiers cost the same, before and after the afterlife is counted.**
+**Per correct change, the two tiers cost about the same, before and after the afterlife is counted.**
 Code changes only, 13 July to 30 August (every one past its 30-day window):
 
 | Implementer | Changes | Correct and complete | Escaped | Dispatches per correct change | Own hours per correct change | Whole-life hours per correct change | Rework hours per change |
 |---|---|---|---|---|---|---|---|
-| frontier | 85 | 71% | 0% (0) | 13.9 | 3.08 | 3.36–3.46 | 0.20–0.27 |
-| mid | 187 | 63% | 5.9% (11) | 13.1 | 2.92 | 3.25–3.37 | 0.21–0.29 |
-| tier not stated | 109 | 72% | 2.8% (3) | 11.4 | 2.32 | 2.61–2.71 | 0.21–0.29 |
+| frontier | 60 | 72% | 0% (0) | 21.1 | 2.77 | 2.93–3.01 | 0.12–0.18 |
+| mid | 302 | 66% | 4.3% (13) | 22.3 | 2.88 | 3.21–3.33 | 0.22–0.29 |
+| tier not stated | 18 | 72% | 5.6% (1) | 13.8 | 2.37 | 3.02–3.19 | 0.47–0.59 |
 
-By repo, the picture is the same. LinearViewer: frontier 3.7 and mid 3.3 whole-life hours per
-correct change, with 0 and 9 escapes. simple-dispatcher: frontier 3.2 and mid 4.1, with 0 and 3
-escapes. Holding size band and area fixed (15 cells both tiers reach, weighted to their pooled
-mix), the escape gap stays (none against 6.0%) and the cost gap stays small, now slightly in
-mid's favour: 2.2 against 1.8 own hours per change, and 2.4 against 2.1 whole-life. In dollars,
+One more change was implemented at the cheap tier. Frontier's whole-life cost is 0.91 of mid's
+(bootstrap 95% interval 0.70–1.21), so the data cannot tell the tiers apart on hours. By repo
+the picture differs but stays inside that noise. LinearViewer: frontier 3.4 and mid 3.3
+whole-life hours per correct change, with 0 and 11 escapes. simple-dispatcher: frontier 2.1 and
+mid 3.8, with 0 and 3 escapes, on 17 frontier changes. Holding size band and area fixed (17 cells
+both tiers reach, weighted to their pooled mix), the escape gap stays (none against 4.3%) and the
+cost gap all but closes: 2.0 against 1.9 own hours per change, and 2.2 against 2.2 whole-life. In dollars,
 the priced lineage covers only September's dispatches, so it prices only provisional weeks.
 The figure is ticket-scoped: it leaves out autopilot and wake sessions, which `/cost` reports
 under every ticket they touch. On that basis a correct change cost $101 frontier-implemented
 (13 correct changes), $53 mid and $31 cheap. The frontier figure rests on 13 changes and is 41%
 imputed. The rework that September's changes have caused so far, on the ceiling, adds $22, $10
-and $9 per change. Hours in the same weeks keep the tiers close: 4.1, 3.0 and 3.3 own hours per
-correct change. The tier's price shows up in dollars, not in time.
+and $9 per change. Hours in the same weeks: 4.5, 3.0 and 3.2 own hours per correct change, with
+frontier on only 26 timed changes. The tier's price shows up in dollars, not in time.
 
 **An escape is cheap next to the ticket that caused it, so tier barely moves whole-life cost.**
 Per 100 changes in those weeks, frontier-implemented work caused no escaped Bug and mid-tier
-work 6; each had 9 later fixes that named it. Each also had follow-up filings (31 and 24 per
-100), which this paper counts as carried scope, not rework. The rework those escapes and fixes
-caused came to 0.2–0.3 hours per change for either tier. That is under a tenth of the 3 hours
-each change cost itself. So the tier's escape gap turns into a few hundredths of an hour.
+work 5; they had 10 and 8 later fixes that named them. Each also had follow-up filings (32 and 23
+per 100), which this paper counts as carried scope, not rework. The rework those escapes and
+fixes caused came to 0.1–0.2 hours per change for frontier and 0.2–0.3 for mid. That is under a
+tenth of the 3 hours each change cost itself. So the tier's escape gap turns into about a tenth
+of an hour.
 Hours are not the operator's attention, though: `reliability-baseline.md` records who found each
 escape, and this paper does not price the finding.
 
-**The afterlife is front-loaded but has a tail past 30 days.** For changes merged 13 July to
-1 August, followed for 60 days on the same-file ceiling, a third to two-fifths of the rework hours
-land in the first week (42% frontier, 33% mid). By day 30 the share is 69% and 77%, and the rest
-arrives by day 60. Mid-tier changes accumulate more of it: 0.43 against 0.36 hours per change by
-day 60. The gap opens between days 10 and 26, which is when the mid tier's escaped Bugs are filed
-and fixed. So the 30-day whole-life figures above miss about 0.1 hour per change, at either tier.
-Reopens barely register: 2% of either tier's changes landed again three or more days after they
-first merged.
+**The afterlife is front-loaded for mid, later for frontier, and has a tail past 30 days.** For
+changes merged 13 July to 1 August, followed for 60 days on the same-file ceiling, 27% of
+frontier's rework hours and 57% of mid's land in the first week. By day 30 the share is 73% and
+80%, and the rest arrives by day 60. Mid-tier changes accumulate about twice as much: 0.54
+against 0.26 hours per change by day 60. The gap opens in the first week and widens to day 26.
+So the 30-day whole-life figures above miss about 0.1 hour per change, at either tier. Reopens
+barely register: 1–3% of either tier's changes landed again three or more days after they first
+merged.
 
 **The 12 July step is a natural experiment, and it says the cost rise is not the tier.** On
 12 July the rule moved implementation from frontier to mid overnight, while review, plan and
 research stayed frontier. In the two weeks either side:
 
 - Merged code changes fell from 125 a week to 65.
-- Frontier-implemented changes fell from 102 a week to 27, while mid rose only from 12.5 to 21.
-- Dispatches per correct change doubled at *both* tiers: frontier 5.3 to 10.4, mid 7.1 to 12.9.
-  The frontier tier did not change for those tickets, so the doubling is not a tier effect.
+- Frontier-implemented changes fell from 102 a week to 26.5, while mid rose from 12.5 to 34.5.
+  Before 16 July no session's kind can be read, so the before-fortnight's tiers are the trailers'.
+- Dispatches per correct change rose about two-and-a-half-fold at *both* tiers: frontier 7.9 to
+  18.6, mid 8.1 to 21.0. The frontier tier did not change for those tickets, so the rise is not a
+  tier effect.
+
+In the same merge weeks (20 July to 2 August), the changes the rule itself sent to frontier
+(23–27 July) cost 2.6–2.7 whole-life hours per correct change and the mid-tier ones 4.0–4.2.
+That is 0.64 of mid's, with a 95% interval of 0.41 to 1.07, on 41 and 54 changes, and the plan-review leg
+arrived in the middle of that fortnight. It is too few, and too mixed with process changes, to
+read as a tier effect either way.
 
 The same day also brought the runner's new hook state machine (the oplog starts that afternoon).
 Dispatch presets followed on 17 July and the plan-review leg on 26 July. So the step changed who
@@ -161,16 +183,30 @@ escaped yet. All twelve are younger than the 30-day window, and twelve is too fe
   same-day scorecard snapshot. Cost comparisons use code changes only: 1,164 of the 1,318
   changes since June, leaving out docs-only tickets such as papers.
 - **Implementer tier.** Where the cost lineage records an implementation session, the tier of
-  those sessions. Otherwise, the tier most of the change's commits' `Co-Authored-By` trailers
-  name. The product-to-tier map lives in the scripts (`tierOfModel`, `tierOfModelName`); every
-  OpenRouter model counts as cheap. 228 changes have a lineage tier. Where a change has both a
-  lineage tier and a trailer tier, the two agree 137 times in 178; the disagreements are mostly
-  a later session at another tier making the commits. 199 code and docs changes have neither
-  and are shown as *tier not stated*.
-- **Own cost.** Dispatches come from the runner's logs, one per dispatch item naming the ticket,
-  from 20 June. Working hours come from the runner's oplog, from 12 July: each session's working
-  phases, each interval capped at 2 hours, shared among the dispatches that ran in it. A
-  follow-up beat inherits the tier its session launched at. API-equivalent dollars come from
+  those sessions. Otherwise, the payload tier of the ticket's fresh implementation sessions in
+  the runner's logs: the kind is read from a transcript from 29 August, and before that from the
+  logged length of the bootstrap prompt, which names the kind from 16 July
+  (`what-doubled-the-dispatches.md`'s decoder). Otherwise, the tier most of the change's commits'
+  `Co-Authored-By` trailers name. The product-to-tier map lives in the scripts (`tierOfModel`,
+  `tierOfModelName`); every OpenRouter model counts as cheap. 228 changes have a lineage tier;
+  where they also have a runner tier, the two agree 165 times in 182. 339 more take the runner's
+  tier, which differs from the trailer's for 144. Lineage and trailer agree 137 times in 178: a
+  trailer names the session that wrote the commit, often a frontier close-out, review or
+  autopilot after a mid-tier implementation, and a tie between tiers goes to frontier. 91 code
+  and docs changes have no tier and are shown as *tier not stated*.
+- **Own cost.** Dispatches come from the runner's logs, from 20 June: every fresh session whose
+  log block names the ticket, plus every follow-up charged to the ticket of the session it
+  entered (the root of its `followUpTo` chain), whatever its own log line says. One rule serves
+  every period. Wakes named no ticket in the log until 13 September (LIN-2121), so counting only
+  named items leaves out 40–47% of a ticket's dispatches before then
+  (`what-doubled-the-dispatches.md:25-27`). From 13 September a wake's log line names the child
+  whose boundary triggered it, not the session it enters, so a count by log line would charge
+  wakes into epic autopilots and passage Runners to the child. That count gives 60, 35 and 48 for
+  September; before 13 September the two counts agree. Working hours come from the runner's oplog, from
+  12 July: each session's working phases, each interval capped at 2 hours, shared among the
+  launches and cold resumes that ran in it. A warm follow-up carries no session in the log, so its
+  time stays with the launch that opened the session, and the same fix moves hours by only 2–5%.
+  A follow-up beat inherits the tier its session launched at. API-equivalent dollars come from
   `/issues/{id}/cost` for 671 changes merged from 20 July. A session at an unpriced model is
   imputed at its tier's median dollars per hour, and opencode rows are scaled by 1/0.55 for the
   known 45% under-report.
@@ -194,16 +230,29 @@ escaped yet. All twelve are younger than the 30-day window, and twelve is too fe
 - **Scripts.** `scripts/survey-model-git.mjs`, `survey-model-runner.mjs`,
   `survey-model-cost-fetch.mjs` (proxy, about 4.9 s a call), `survey-model-analyse.mjs` and
   `survey-model-figures.mjs`. Snapshots go to the git-ignored `data/survey-model/`, and the
-  scorecard and tracker snapshots are reused from the same day's `data/survey/`.
+  scorecard and tracker snapshots are reused from the same day's `data/survey/`. Version 2's
+  inputs come from `scripts/survey-check-4-model.mjs variant <dir> --rule root`, which writes the runner and
+  git snapshots with both corrections applied (it reads `what-doubled-the-dispatches.md`'s
+  `data/survey-doubling/` snapshots); `survey-model-analyse.mjs` and `survey-model-figures.mjs`
+  then run unchanged in that directory.
 
 ## Limits
 
 - **The tier was not assigned at random, and after 12 July frontier implementation is the
-  exception.** The rule sent implementation to mid, so frontier-implemented changes came from
-  autopilot, research, custom or hand sessions. They were larger (median 139 against 89
-  production lines) and riskier (20% against 11% in a high-risk path). *Bias:* this inflates
+  exception.** Of the 60 frontier-implemented changes of 13 July to 30 August, 44 had frontier
+  implementation sessions, and 41 of those merged in the weeks of 20 and 27 July, when the rule
+  itself ran implementation at frontier. The other 16 have no implementation session the logs can
+  read and take the trailer's tier. Frontier's changes were larger (median 122 against 84
+  production lines) and riskier (20% against 14% in a high-risk path). *Bias:* this inflates
   frontier's raw cost and, if harder work escapes more, its escape rate too. So the escape gap is,
-  if anything, understated. Standardising on size and area leaves both gaps as reported.
+  if anything, understated. Standardising on size and area leaves the escape gap and closes the
+  cost gap.
+- **The runner's implementation tier is decoded, not recorded, before 29 August.** It rests on the
+  bootstrap prompt's length, which agrees with the lineage 165 times in 182 where both exist.
+  Before 16 July no kind can be read. *Bias:* a misread kind moves a change between tiers in
+  either direction. Taking trailers instead (version 1) gave frontier 3.4–3.5 and mid 3.25–3.4
+  whole-life hours, a ratio of 1.02 (95% 0.75–1.30), so the conclusion does not rest on the
+  choice.
 - **The strict escape count reads reasons by rule, not by hand.** The rule drops 20 finder rows,
   where the check's reader found 35 of 66. So some finder rows may remain, and the scorecard's
   *correct* also inherits the check's mention-matched named fixes. *Bias:* both push escapes up
@@ -217,19 +266,19 @@ escaped yet. All twelve are younger than the 30-day window, and twelve is too fe
   (`why-throughput-halved.md:79-81`). *Bias:* direction unknown. Mid-tier work may be read more
   suspiciously, which would overstate its escapes. Or quiet frontier faults may simply go
   unfound.
-- **A quarter of later changes have no stated tier.** A cheap-tier session or a person leaves no
-  trailer. They are shown separately, never merged into a tier. *Bias:* if most are frontier,
-  frontier's count after July is understated. Their cost and correctness sit between the two
-  tiers.
+- **Some later changes still have no stated tier.** A change with no lineage, no readable
+  implementation session and no model trailer (18 code changes in 13 July–30 August) is shown
+  separately, never merged into a tier. *Bias:* small. Of the changes trailers left untiered, the
+  runner shows 84 of 91 implemented at mid.
 - **Hours start on 12 July.** Before that date there are dispatches but no hours. The
-  multi-beat follow-up design also changed what one dispatch is around the step. *Bias:* this
-  overstates the rise in dispatches for both tiers alike, so it does not affect the
-  between-tier reading.
+  multi-beat follow-up design also changed what one dispatch is around the step, and the run logs
+  are thin before 1 July and missing for 6–11 July. *Bias:* this overstates the rise in dispatches
+  for both tiers alike, so it does not affect the between-tier reading.
 - **Rework attribution.** The same-file ceiling over-counts on hot files: a fix is shared among
   every change that touched the file in the window, so it is spread thin rather than left out.
   The named floor misses fixes that name nothing. The truth lies between the two, and both
-  bounds are reported. Follow-ups are left out of rework. Counting them would favour mid (24
-  against 31 per 100).
+  bounds are reported. Follow-ups are left out of rework. Counting them would favour mid (23
+  against 32 per 100).
 - **Dollars.** Lineage exists only for dispatches in the last few weeks, some models are unpriced
   (imputed per tier), and Claude sessions run on the subscription, so a dollar here is quota, not
   cash. 77% of all lineage dollars are imputed from duration. Most of those are long orchestrator
@@ -238,7 +287,7 @@ escaped yet. All twelve are younger than the 30-day window, and twelve is too fe
   frontier and mid dollars are understated.
 - **The cheap tier is barely measured here.** Its 38 September changes, including the bake-off,
   are all younger than the 30-day window. Their strict escapes so far (2 of 38) will rise as the
-  window closes, as will mid's (3 of 160) and frontier's (0 of 51). `cheap-implementer.md` is the
+  window closes, as will mid's (3 of 165) and frontier's (0 of 50). `cheap-implementer.md` is the
   evidence for that tier to date. *Bias:* September figures understate every tier's escapes and
   rework, most for the latest changes, which are mostly cheap.
 
@@ -249,7 +298,9 @@ escaped yet. All twelve are younger than the 30-day window, and twelve is too fe
 - **After 25 September's move to cheap implementers has had 30 days, does the whole-life cost
   per correct change change, and where does the rework land?** Re-run `survey-model-analyse.mjs`
   in late October.
-- **What made dispatches per correct change climb from about 5 in June to between 27 and 48 in
+- **What made dispatches per correct change climb from about 7 in June to between 32 and 52 in
   September, at every tier?** Which legs grew, and did they grow alike for every ticket kind?
+  `what-doubled-the-dispatches.md` answers this for all tiers together; why frontier-implemented
+  changes took the most in September is still open.
 
 The first two go into `proposals.md`.
