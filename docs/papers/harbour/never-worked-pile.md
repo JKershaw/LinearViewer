@@ -45,7 +45,7 @@ a claim that failed (LIN-1520's "exactly five", LIN-2753's two selectors still l
 after the parent gave them a `Date.now()`). The 17 on the no side are genuinely separate: a
 different token store (LIN-1598), a deliberate carry-over the parent's own constraint forbade
 touching (LIN-1618), a structural class with no live instance (LIN-1718, LIN-2098), a human's
-own request (LIN-2198), a flaky test in another repo (LIN-2413).
+own request (LIN-2198 — the retention ruling it was owed has since landed as LIN-3163, on Harbour's evidence stores), a flaky test in another repo (LIN-2413).
 
 **Cross-tabulated, the two axes barely interact.**
 

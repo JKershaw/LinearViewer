@@ -2938,13 +2938,11 @@ test.describe('Proxy API - North Star (real-server wiring, LIN-1810)', () => {
 // partitioned rather than merely passed different `urlKey` strings to the same
 // fake. This drives the real server end to end for exactly those properties.
 //
-// KNOWN LIMIT, not papered over: the seconds-vs-ms `historyTtl` conversion
-// (the beat-3 trap) is NOT covered here. It is structurally unreachable by
-// e2e — the real take-path archives `dispatchedAt = now`, which reads
-// `recent` under BOTH the correct and the broken conversion, so an assertion
-// here would pass unconditionally and prove nothing about the conversion.
-// That trap stays pinned at the unit layer with a fake store whose
-// `historyTtl` is deliberately expressed in seconds.
+// LIN-3163 (LIN-3157 B): the old seconds-vs-ms `historyTtl` conversion no
+// longer exists — dispatch-history is lifetime-retained, the store carries no
+// `historyTtl`, and the route feeds the fold the shared 30-day READ horizon.
+// The property "the route ignores a store-supplied retention value" stays
+// pinned at the unit layer (tests/unit/proxy-periodicals-route.test.js).
 test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
   // A real, live registry id (lib/periodicals.js) — the route's
   // foldPeriodicalRuns() call is fed the real getPeriodicals() registry, not

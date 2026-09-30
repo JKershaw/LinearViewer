@@ -43,19 +43,25 @@ further than June.** Each measure, its source, and how far back the data goes:
 | Complete | No `kind:follow-up` ticket and no routed Bug names it as origin | tracker | June |
 | Cost: dispatches | Every dispatch the runner claimed that week, across Harbour's workspaces | runner run logs | 13 July (logs from 20 June; dated by the oplog from 12 July) |
 | Cost: working hours | Session time in SUMMARIZING, RESUMING or EXECUTING, each interval capped at 2 h | runner oplog | 13 July |
-| Cost: weighted tokens | Claude usage weighted to frontier-input equivalents | local transcripts | 31 August only (**30-day retention**) |
+| Cost: weighted tokens | Claude usage weighted to frontier-input equivalents | local transcripts | 31 August only (30-day retention when this series was built; see the retention update below) |
 | Elapsed | Changes per calendar day | git | June |
 | Human attention | Entries into BLOCKED (a ruling or park); share of changes that ever waited on a human | oplog | 13 July |
 | Proportionality | A change's dispatches ÷ the median of its size × risk cell; rank correlation of dispatches with size | git + run logs | 13 July |
 | Process weight | Net lines of the text agents are told to read, added or removed by the change | git, both repos | June |
 
-Three sources are kept for only 30 days: dispatch feedback with its `[usage]` lines
-(`historyTtl`, `lib/dispatch-store.js:248`), local session transcripts, and the app-call log.
+Three sources were kept for only 30 days when this series was built: dispatch feedback with
+its `[usage]` lines, local session transcripts, and the app-call log.
 So token cost, per-lineage cost and app-call spend cannot go back past 31 August, and each
 re-run moves that window forward. Dispatch counts and session time survive because the
 runner's own logs are not pruned. *Reopened* cannot be measured. The proxy exposes no state
 history, and the house habit is to file a new ticket rather than reopen
 (`reliability-baseline.md:138-146`). The named fix commit stands in for it.
+
+**Update (30 September 2026):** Harbour's evidence stores — dispatch history, the app-call
+log, prompt traces, agent status and proxy events — are now retained for the life of the
+project (LIN-3157 B+D, LIN-3163), so the 31-August floor is a property of this historical
+series, not of series built from now on. Local Claude Code transcripts were separately given
+a long retention (`cleanupPeriodDays`).
 
 **Correct and complete removes a quarter of merged tickets, and each class removes a
 different part.** Of the 998 changes old enough to have closed their 30-day window:
@@ -249,7 +255,8 @@ git-ignored `data/survey/scorecard.json`.
   incomplete, against 8% and 20% in the mature weeks since mid-July; at mature rates it would
   have about 50 correct, complete changes, not 65. The week of 31 August would lose about 5.
 - **Cost is Claude-heavy, and the budget era starts on 13 July.**
-  - Tokens exist only for 31 August onwards, and only for Claude sessions. `/cost`
+  - Tokens exist only for 31 August onwards, and only for Claude sessions — a floor of this
+    historical series (see the retention update above), not of future ones. `/cost`
     under-reports opencode by about 45%, but the cheap tier is under 0.1% of weighted tokens.
   - Working hours count EXECUTING while a session sits in a CI poll, which biases them up.
     The 2-hour cap biases them down for genuinely long turns.

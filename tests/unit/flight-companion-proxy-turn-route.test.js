@@ -109,7 +109,6 @@ function makeDispatchQueueStore() {
       calls.push({ urlKey, item });
       return { _id: 'queued-1', urlKey, ...item };
     },
-    historyTtl: 30 * 24 * 60 * 60,
   };
 }
 

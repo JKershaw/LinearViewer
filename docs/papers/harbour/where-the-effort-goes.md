@@ -236,8 +236,8 @@ or `survey-effort-fleet.mjs`.
 
   Re-orientation is the turns before the task prompt arrives. Working time is the sum of gaps
   of at most two minutes between transcript entries.
-- **Per-ticket sample (proxy).** Dispatch history is kept for 30 days (`historyTtl`,
-  `lib/dispatch-store.js:248`), so the sample is the Done tickets merged in September. Every
+- **Per-ticket sample (proxy).** Dispatch history was kept for 30 days when this sample was taken
+  (`historyTtl`, since removed — evidence is lifetime-retained, LIN-3163), so the sample is the Done tickets merged in September. Every
   second one by ticket number was taken, 146 candidates. For each, the script read
   `GET /issues/{id}/cost` for its lineages and `GET /dispatch/{root}` for each lineage's
   feedback. That came to 724 cached responses, fetched over three runs, paced at one per 4.2 s.
@@ -270,12 +270,16 @@ or `survey-effort-fleet.mjs`.
 
 ## Limits
 
-- **No monthly token series.** Dispatch history, local transcripts and the app-call log are each
-  kept for 30 days, so tokens exist only from 31 August. The monthly march is shown in
+- **No monthly token series.** Dispatch history, local transcripts and the app-call log were each
+  kept for 30 days when this series was built, so tokens exist only from 31 August. The monthly march is shown in
   dispatches and session time, and in tokens only week by week. September is the month
   passages started, so the supervision share it shows may be higher than the summer's. The
   direction of that bias is up for supervision. `fleet-complexity-read.md` found the
   orchestrator already dominant on single tickets, which limits how much higher.
+  **Update (30 September 2026):** Harbour's evidence stores now retain their records for the
+  life of the project (LIN-3157 B+D, LIN-3163), so the 31-August floor is a property of this
+  historical series, not of future ones. Local Claude Code transcripts also carry a long
+  retention now (`cleanupPeriodDays`). The June/early-July gaps below remain.
 - **June is invisible, and early July is thin.** The runner's logs start on 20 June and its
   phase clock on 12 July, and the logs have no record of 6–11 July. The runner script also
   skips `dispatcher.log` and the `dispatcher.run-manual-*` logs of 1 July. Only 2 of June's 335

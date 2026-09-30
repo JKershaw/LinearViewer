@@ -351,8 +351,10 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
 - **Is the reduced-motion livebar test's first-attempt failure the product or the harness?**
   `harbour/browser-flakes.md` found `observation.spec.js:401` failing its first attempt in 71% of
   sampled green runs and passing on the traced retry, a rate that fell from about 90% in July to 44%
-  in late September. Run it alone at origin/main, repeated, with and without tracing and with a wait
-  on the computed style, and report which condition makes the first attempt fail. It is the one test
+  in late September. `harbour/survey-check-5.md` found every failure read an empty `animationName`,
+  which is what a detached element reports, so the feed poll may be replacing the node before the
+  read. Run it alone at origin/main, repeated, with and without tracing and with and without the feed
+  poll, and report which condition makes the first attempt fail. It is the one test
   where retries could be hiding a real reduced-motion fault. (Claude, 2026-09-30)
 - **How many of the wakes a worker event sends up the stack change what any supervisor does?**
   `harbour/what-doubled-the-dispatches.md` found wakes are most of the rise in dispatches per correct
@@ -377,7 +379,13 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   the steady-base map can use one rule. (Claude, 2026-09-30)
 - **Which wake edges were declared `everything` because a layer wanted progress, and which inherited
   it?** `harbour/wake-inventory.md` found that the relayed re-arms on the coordinator→child autopilot and
-  Runner→leg edges are 88–95% quiet, and that both edges carry the stepper's `everything` level. Read the
+  Runner→leg edges are 92–95% quiet (version 2), and that both edges carry the stepper's `everything` level. Read the
   commits and tickets that introduced each prompt line setting it (`lib/prompts/autopilot-kickoff.js`,
   `docs/autopilot-operating-manual.md`, `docs/passage-runner-prompt.md`) and say, per edge, what the
   stated reason was. A question for John as much as for the record. (Claude, 2026-09-30)
+- **How many browser specs hold a route whose URL has since changed?** `harbour/survey-check-5.md`
+  found `prompts.spec.js` holding `**/api/recommend/<id>/stream` while the client has fetched
+  `…/stream?source=…` since LIN-1910 (13 August), so the hold never engages and the test passes only
+  when the real stream is slow; its three CI-red flakes began ten days later. List every `page.route`
+  glob in `tests/e2e/` and match it against the URLs the client builds at origin/main; report the
+  holds that never engage and whether each spec has flaked or retried in green runs. (Claude, 2026-09-30)

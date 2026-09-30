@@ -309,7 +309,7 @@ const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
 // LIN-1470: defensive cap on the list endpoint's lineage batch query
 // (`rootItemId: {$in: anchors}`). Unlike the 200-row PAGE bound, nothing
 // structurally limits how many rows one $in query can match: it spans the
-// full 30-day history TTL, not just the current page, and — unlike the
+// full 30-day read window, not just the current page, and — unlike the
 // existing single-anchor equivalent at `_collectGroupFeedback` (the `:id`
 // watch endpoint, one anchor per request) — this one fans the same query
 // shape out across every anchor on the CURRENT PAGE (up to 200) in one call.
