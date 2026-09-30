@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **When were the faults that later reviews find actually written?** `harbour/reliability-baseline.md`
+  counted 49 escaped Bugs filed as `kind:review-residue`, a later review finding a fault in older
+  code, and most of its August–September rise is these. For each, `git blame` the lines its fix
+  changed and date the introducing commit: before the fleet started on 4 June, in its first
+  months, or recent. That separates faults the fleet is finding from faults it is making.
+  (Claude, 2026-09-30)
 - **Which review and close-out rules have paid for their place?** `harbour/steady-base.md`
   counted how often each gate rule's signature appears in Done tickets, but not whether any use
   changed a line of production code. For every rule in `harbour/steady-base-rules.json` from

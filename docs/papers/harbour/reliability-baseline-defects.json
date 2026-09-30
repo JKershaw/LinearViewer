@@ -1,0 +1,2668 @@
+{
+ "ticket": "LIN-3149",
+ "classifiedAt": "2026-09-30",
+ "population": "Every Bug-labelled ticket in the LinearViewer team (both repos) listed on 2026-09-30, 265 tickets, LIN-26 to LIN-3122.",
+ "method": "Each ticket read from its title, labels, state, own merged PRs, description (first 3,500 chars) and the tickets it names, by five in-session subagents working one batch each against this rubric, fixed before reading. Not second-read; see the paper Limits.",
+ "rubric": {
+  "escaped": "reports a fault in behaviour already merged to main in either repo (code, prompt/template text, config, UI): wrong output, crash, hang, broken page, security or credential flaw, data loss, a shipped change that did not take effect, or a false close-out claim that hid a fault; found after merge and not filed from the shipping ticket's own review/close-out ledger. A fault in older code found while reviewing a different ticket is escaped.",
+  "escaped-test": "the fault is only in tests, CI, fixtures or dev tooling.",
+  "routed": "the fault was named by the review, plan-review or close-out of the very ticket that shipped it and filed from that ledger: the gate saw it and it shipped anyway.",
+  "not-defect": "feature request, enhancement, research, docs-only, process or prompt-policy wish with no faulty behaviour, external/environment problem outside both repos, or duplicate.",
+  "unclear": "the text does not decide.",
+  "introducedBy": "the LIN id of the shipped change the text says introduced, exposed or left the fault unhandled, only if named. For escapes found by a later review (label kind:review-residue) it can name the reviewing ticket that deferred the fault rather than the one that wrote the code, so those rows are left out of the size, depth and merge-month analyses.",
+  "repo": "where the faulty behaviour lives, from the ticket's own PRs first, then the text.",
+  "foundBy": "human (the operator reports or observed it) / agent (a later agent session, another ticket's review, a periodical or monitor) / unclear."
+ },
+ "verdicts": [
+  {
+   "identifier": "LIN-26",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Tree builder skipped issues with no project, hiding them from views.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-53",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Subtasks with different/no project not shown under parent; grouping bug in buildForest.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-62",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Generated prompt skips research when description looks detailed.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-64",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Generated prompt wrapped in stray quote/fence markers.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-106",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "JSON parse error after login from MangoDB race; fixed via LinearViewer PR.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-111",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "\"Show reasoning\" link visible before AI prompt generated.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-141",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Preference to redirect to settings instead of audit after OpenRouter auth.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-143",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Mobile workspace/team selector misplaced with incorrect padding.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-144",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Prompts page footer shows date only; no JS loaded to format time.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-146",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "\"View on Linear\" link only shows after toggling, inconsistent with default expansion.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-153",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "AI suggest button does not hide/show other prompts consistently.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-157",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Task ordering differs between project and In Progress/Done views.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-190",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "AI prompts still copied with markdown fences despite existing server-side strip.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-191",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Dispatch/copy buttons enabled while prompt still generating.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-274",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Proxy returns comments in non-chronological order.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-276",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Duplicate-state tasks still shown as active instead of treated as cancelled.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-278",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Expired Linear auth not refreshed; proxy writes fail until re-auth.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-286",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Prompts instruct preparing-label add/remove; agents struggle in projects without labels.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-303",
+   "verdict": "unclear",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Screenshot-only \"improve swim view\" ticket; no fault described in text.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-304",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Proxy GET relations endpoint always fails: GraphQL variable typed ID! not String!.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-305",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Feature idea: LLM-summarised descriptions via proxy to reduce context pollution.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-345",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Periodical dispatch throws \"issue with id and identifier is required\".",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-346",
+   "verdict": "escaped",
+   "introducedBy": "LIN-329",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Parent recommend SSE idles and hits H15; post-LIN-329 breadcrumbs only fire on defer hops.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-353",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Autopilot found container descent loops re-descending into already-Done child.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-358",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Meta-prompt licensed unblock prompt to proceed into implementation, breaking single-step contract.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-382",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Documentation-only: proxy write endpoint response shapes undocumented; from periodical review.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-401",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Proxy by-ID reads return trashed issues with no trashed signal; found during LIN-397 research.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-430",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Autopilot prompts never enforced merge-on-green; autopilot merged red PRs in another project.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-525",
+   "verdict": "escaped",
+   "introducedBy": "LIN-442",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "+proxy toggle desync after LIN-442 lazy-load, silent token injection, token cache bugs.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-548",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Prompts remove bug tag, causing reports to gloss over bugs.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-549",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Runner terminal [done] fires early before CI green or never fires on hung waits.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-555",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Research task: expand routing eval suite and baseline; eval harness enhancement.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-608",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "New Observation page crashes with application error, missing summaries, stale in-progress items.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-609",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Unhandled errors crash app showing host error page.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-613",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Dispatched sessions panel stuck on \"Loading sessions\" then errors.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-617",
+   "verdict": "escaped",
+   "introducedBy": "LIN-615",
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Observation page stuck connecting: unbounded per-poll scans; LIN-615 keepalive lets request hang.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-622",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Observation sessions poll rebuilds unbounded history causing R15 memory crash.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-623",
+   "verdict": "escaped",
+   "introducedBy": "LIN-622",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Observation feed cold-start 25-47s; LIN-622 fan-out throttle adds latency, no indexes.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-637",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Run with multiple subtasks reports done while work still in progress.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-645",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Autopilot run suggestions omit proxy details needed by dispatched sessions.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-697",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Retro-driven prompt enhancement: add horizontal-obligations reasoning to research template.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-698",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Implementation template overrides its read-everything instruction; trusts plan over research.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-727",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Team selection resets when navigating between workspaces.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-732",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Dispatch button broken on second appearance of a task open in In Progress.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-735",
+   "verdict": "escaped",
+   "introducedBy": "LIN-717",
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "LIN-717 fix incomplete and LIN-728 fix inert; provider add flows still broken.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-753",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Completion sentinel returns PENDING for out-of-scope external waits when task is done.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-768",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Autopilot saw null feedback fields; inconsistent proxy field names versus instructions.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-778",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Review session idle with 0 tool calls, no sentinel; found validating unrelated LIN-767.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-790",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "Runner SIGTERM teardown loses unflushed Claude transcripts, so --resume fails.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-799",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Six observation e2e tests flake every CI run; found in flakiness sweep.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-800",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "tree-sections e2e lazy-mount/toggle timing flakes.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-801",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Ship layout determinism e2e flake from seed id collisions; fixed in test seed.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-822",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Pre-existing pipeline-scenarios e2e timing flake found in autopilot sweep.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-831",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Session wedged in follow-up hold while its own CI poll completed; needed manual stop-hook cancel.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-881",
+   "verdict": "escaped",
+   "introducedBy": "LIN-843",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Stepper beats carried hold but not wake; shipped wake-half (LIN-843) not taking effect, deadlock.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-924",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "Launches fail under load: iTerm windows never closed, create-window osascript times out.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-925",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "SD never closes dispatched iTerm windows at reap; accumulation degrades launches. Split from LIN-924.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-946",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Operator reports autopilot runs leave many session windows open despite close-on-done change.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-949",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "John: mobile screenshot upload in feedback widget fails with read error.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-951",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Planned phase 2 of LIN-946: new runner skip contract; nothing emitted cascades yet.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-957",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Feature request: detect parent folder of repos and refresh subfolders.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-969",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Operator saw AppleScript syntax error in launch.scpt failing every iTerm launch.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1023",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Session page renders question as [object Object]; plus UI improvement asks.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1059",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Parent orchestrator hung: follow-up itemId repoint severed up-chain wake edge; human intervened.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1083",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Operator: dispatched session auto-resumes while in use; resume drops remote-control flag.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1098",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Claude Code security update made stop-hook instructions look injected; prompt tweak for third-party change.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1101",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": null,
+   "foundBy": "unclear",
+   "reason": "Session-viewer/MangoDB string-length ceiling; code lives outside both repos.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1113",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Stale Monitor wait defers forever, then falsely FAILs completed session; found on LIN-1092 autopilot.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1132",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Feedback widget dispatches ignored model/harness defaults; fixed at HEAD before planning.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1134",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "both",
+   "foundBy": "human",
+   "reason": "Claude upgrade now blocks prompt-injected credentials; redesign epic for third-party behaviour change.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1135",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Autopilot kickoff dropped model/harness so child dispatches reverted to defaults.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1147",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "copyHomeDotFiles copies huge HOME dot-dirs; ENOSPC crashes SD on opencode launch.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1158",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Malformed JSON body returns 500 not 400; found while researching LIN-1157.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1185",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Week newspaper generation returns no results.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1203",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Edition generation over 30 seconds shows user an error.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1204",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Dispatched agents fall back to free tier despite workspace paid OpenRouter key.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1227",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Triage prompt/token lets triage rewrite scope and create follow-ups.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1228",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Asks to allow orientation mode when roadmap outdated; gating not shown faulty.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1266",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "SD stop hook blocks past Claude Code cap; turn force-ended, needs env var raise.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1313",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": null,
+   "foundBy": "human",
+   "reason": "Queued child-terminal wake messages fire after runs, waking closed sessions; removal requested.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1323",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "Background poll wait overrides PENDING-EXTERNAL sentinel; follow-up wake locked out, ~90s late.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1324",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1318",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Standalone kickoff wording (LIN-1318) prescribes polling that defeats follow-up push wake.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1341",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Observation/session pages show follow-ups as separate tasks, not continuations.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1350",
+   "verdict": "routed",
+   "introducedBy": "LIN-1329",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Filed by LIN-1329 close-out: regenerate callback rejection hangs request; pre-existing, widened by LIN-1329.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1357",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Held stepper child not re-invoked by worker terminal; 31m stall until coordinator probe.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1373",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1366",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Proxy tokens lapse without creator web activity; owner-scoping in LIN-1366 exposed it.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1375",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "Credential flaw: working token returned as tool text, lands in transcripts.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1376",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1366",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Bootstrap mints lack createdBy; LIN-1366 owner scoping makes every dispatch 503.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1389",
+   "verdict": "routed",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "From LIN-1204 review/close-out: no test pins route-resolver principal hop; bug reintroducible green.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1393",
+   "verdict": "routed",
+   "introducedBy": "LIN-1341",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-1341 review ledger #1 straddle-split regression never discharged; shipped anyway.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1394",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1341",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Materializer sibling of LIN-1341 straddle bug, spotted in LIN-1393 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1413",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Proxy token 503 persists after owner re-auth; error envelope prescribes useless remedy.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1414",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Autopilot saw /recommend return another tenant's issues: cross-tenant leak.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1428",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1155",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Resumed workers get no proxy base; follow-ups never carry bootstrap token (stale LIN-805 invariant).",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1437",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1419",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "errored derived from optional error string; failed tools render clean. Pre-existing since LIN-1419.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1438",
+   "verdict": "routed",
+   "introducedBy": "LIN-1323",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "LIN-1323 review finding: newly reachable cold-park with live self-wake; filed from its close-out.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-1444",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1363",
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "Broker-armed nudge (LIN-1363) discards stall-failsafe re-ask; resumed session redoes task.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1455",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "both",
+   "foundBy": "agent",
+   "reason": "Prompts require CI green in repos without CI; agents wait unboundedly. Seen on LIN-1358.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1458",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "OpenRouter key resolver returns bare null on split account, silent fallback; filed at LIN-1413 close-out.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-1503",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "401-retry path removes GitHub workspaces instead of re-minting; found re-grounding LIN-1499.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1505",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Live Console pulse strip jerks (bucket re-quantisation); also zoom feature request.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1535",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Hard-dated test fixture aged out of 30-day lookback, main CI red.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1571",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Closed as Duplicate: heartbeats continue after DONE.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1576",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1447",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Ownerless tokens from LIN-1447 compat lane 503 every workspace verb; four trees halted.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1577",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Observability gap: no per-session credential health signal; monitoring feature, no health endpoint exists.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1594",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": null,
+   "foundBy": "unclear",
+   "reason": "Wake/autopilot dispatch items never leave taken; 37 zombie wake items.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1611",
+   "verdict": "routed",
+   "introducedBy": "LIN-1596",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Review finding F2 on LIN-1596's PR #1018, filed by LIN-1596 close-out; outcome link lands on empty chart.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1612",
+   "verdict": "routed",
+   "introducedBy": "LIN-1596",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Review finding F3 on LIN-1596's PR #1018; Date timestamps truncate abort tie-break; filed from its ledger.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1691",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Request to add /health endpoint and Railway deploy config to avoid deploy downtime; missing infrastructure feature.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1694",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "both",
+   "foundBy": "human",
+   "reason": "Operator saw Claude Code sessions launched with DeepSeek model; harness/model resolution crossed per-kind rows.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1731",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Found in LIN-1721 research: sticky refiredAt force-FAILs honestly BLOCKED sessions; older reaper code.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1739",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Dispatch failed with wrong repo folder; operator-diagnosed; root cause resolveWorkingDir path resolution in dispatcher.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1740",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "LIN-1739 investigation showed follow-up/abort items fail on non-owning instance in multi-instance topology.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1821",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1815",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Pre-existing launch path wedges 60m on blocked startup; LIN-1815 plan named and scoped it out.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1848",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Unit tests bypass fetch mock behind HTTPS_PROXY and hit live OpenRouter; test hermeticity fault.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1874",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1810",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "north-star resolver introduced by LIN-1810 collapses three conditions to ''; spotted during LIN-1458 close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1880",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Unit suite makes live authenticated api.linear.app calls; pre-existing, found at LIN-1848 close-out.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1881",
+   "verdict": "routed",
+   "introducedBy": "LIN-1848",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-1848 review F6: test mock can't discriminate branch; filed by LIN-1848 close-out as accepted ledger item.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1903",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1885",
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "John's manual Jira Phase 1 test: issue detail 404s because provider resolved per workspace not binding.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1917",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Older hook.js:678 raw refiredAt check misroutes follow-ups; found in LIN-1731 review, not LIN-1731's code.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1936",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Intermittent local e2e failure seen at LIN-1928 close-out; cause unproven, never failing in CI.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1937",
+   "verdict": "routed",
+   "introducedBy": "LIN-1928",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-1928 review finding F2: stale 'Last 24 hours' placeholder in degraded path; carried by close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-1970",
+   "verdict": "routed",
+   "introducedBy": "LIN-1685",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Found by LIN-1685 review of its own PR #1094: coverage figure contradiction and clipped waypoints.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2003",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Worker-session credential broker 401s mid-run; observed by worker and orchestrator sessions; ticket canceled.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2078",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1471",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Autopilot self-diagnosed duplicate wakes; LIN-1471's child-row post plus sessionId stamping violated once-wake criterion.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2158",
+   "verdict": "routed",
+   "introducedBy": "LIN-2155",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2155 review of PR #1151 found done tier's 7-day window drops completed issues; filed as blocker.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2259",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "Observed live: stall-refire re-ask on SUMMARIZING session manufactured false [done]; older reaper logic.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2263",
+   "verdict": "routed",
+   "introducedBy": "LIN-2133",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2133 review found timeToRespondMs measures runner's [usage] entry; blocks LIN-2133 close.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2272",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2252",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Retrospective review sweep proved LIN-2252's padding fix inert; FAB overlap unchanged.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2278",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Older selectOwnerSessionRow ranks sentinel expiry; named in LIN-2275 review, not LIN-2275's code.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2281",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Older dispatcher.js warm-hold post lacks rootItemId; sibling found by LIN-2268 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2282",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "opencode resume emits no resume marker; older runner code, sibling found by LIN-2268 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2283",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "computeIncumbentSignal reads non-lineage-merged feedback; LIN-2268's inherits-fix claim false; experiment-only consumer.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2285",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Pre-existing raw merged-side account id yields 500 dead-end; found at LIN-2265 close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2291",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1736",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "KPI unansweredRows matches decision_id across workspaces; introduced with LIN-1736; found in LIN-2262 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2293",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Client observation.js keys rulings on decision_id alone; pre-existing sibling found by LIN-2262 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2294",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Stepper beat-4 prompt variants never had blocked carve-out; found by LIN-2269 review class check.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2296",
+   "verdict": "routed",
+   "introducedBy": "LIN-2272",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2272's own FAB reserve wraps label at <=360px; ledger items L2/L4 routed at merge.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2297",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Once-only terminal-wake guard drops done after blocked on same row; pre-existing runtime gap from LIN-2269 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2298",
+   "verdict": "escaped",
+   "introducedBy": "LIN-783",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Observation page bottom padding (LIN-783) can't clear fixed FAB; reasoned from CSS, unmeasured; class from LIN-2272 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2299",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Fixed FAB covers footer feedback toggle at max scroll; pre-existing, measured by LIN-2272 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2300",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "GitHub/Jira add-source 409s leave stale session.accountId; pre-existing siblings from LIN-2266 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2301",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "runIsWaiting ignores agentState channel; pre-existing divergence found by LIN-2264 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2304",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Porting confirm-to-merge to GitHub/Jira; dead-end 409 is pre-existing design, not a regression.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2310",
+   "verdict": "routed",
+   "introducedBy": "LIN-2263",
+   "repo": "both",
+   "foundBy": "agent",
+   "reason": "Structural redesign after three review rounds on LIN-2259/LIN-2263 kept finding provenance-inference gaps.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2311",
+   "verdict": "routed",
+   "introducedBy": "LIN-2309",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2309 review ledger L2: shipped prompt names inverted-scale priority fields; spec defect.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2316",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Older triage template shows bare native priority int; sibling named by LIN-2311 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2317",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Older meta-prompt triage rule authorizes priority write without field; sibling from LIN-2316 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2327",
+   "verdict": "escaped",
+   "introducedBy": "LIN-1980",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-1980 suspect-credential lane loops silently on byte-identical refresh; diagnosed from Railway logs.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2329",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2097",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Byte-identical refresh logged as via:'rotated' despite LIN-2097 freeze; misled LIN-2327 investigation.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2331",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Within-class wake collisions pre-exist LIN-2297; review finding F2 of LIN-2297, not its code.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2333",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "both",
+   "foundBy": "agent",
+   "reason": "Four dispatcher.js [failed] follow-up markers omit rootItemId, anchor stays blocked; class sibling of LIN-2281.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2334",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Operating manual inlined into kickoff lacks blocked carve-out; found by LIN-2294 review class check.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2339",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Flight Companion observed ruling lost: stall-refire overwrote follow-up dispatchedPrompt in state.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2340",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Reported refresh-token leak proven unreachable; shipped only invariant pin and defensive cleanup.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2345",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Workspace create mutates session before establishAccount, leaves half-built workspace; pre-existing, LIN-2300 review F4.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2347",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Remaining confirm-to-merge port for seven dead-end 409s; design decision, pre-existing behaviour.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2349",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "selectExpiredOwnerRow can rank sentinel via installationId branch; latent, found by LIN-2278 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2354",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Instructions/preamble claim 'backed by Linear' on GitHub workspaces; found by LIN-2326 validation run.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2358",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2037",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Unvalidated rulerChangeAt yields false 0; pre-existing, not introduced by #1275; found in LIN-2037 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2363",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2351",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Kickoff branch forwards Linear-named detail; pre-existing latent sibling left out of LIN-2351 scope.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2366",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2333",
+   "repo": "both",
+   "foundBy": "agent",
+   "reason": "Pre-existing forced :798 [failed] lacks rootItemId; LIN-2333 deliberately excluded it; found in its review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2367",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2291",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Same-workspace decision_id collision predates LIN-2291; its partial fix left this sibling, found by review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2370",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2354",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Older browser copy blocks still claim Linear backing; LIN-2354 explicitly left them out of scope.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2371",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2354",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Older chat templates call every task Linear; deferred out of LIN-2354 scope.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2374",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Mutation runner aborts on non-unique anchor; pre-existing test tooling fault found during LIN-2338 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2385",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Periodical run-evidence gated on status taken, landed reviews read due; found by Headwinds review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2396",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Periodical prompt text blesses open report PR as terminal; operator had to merge PRs manually.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2403",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2384",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Pricing ignores long-context override tier, under-pricing; pre-existing, split from LIN-2384 review F4.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2408",
+   "verdict": "routed",
+   "introducedBy": "LIN-2395",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Observer pass shipped by LIN-2395 keeps degraded report sticky; filed from its close-out re-review F2.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2410",
+   "verdict": "routed",
+   "introducedBy": "LIN-2395",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2395 introduced page 500 on observer-state read failure; filed from its close-out re-review F4.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2414",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2331",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "findExpiredHolds readmits blocked holds; pre-existing path assigned out of LIN-2331 ruling.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2415",
+   "verdict": "routed",
+   "introducedBy": "LIN-2254",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2254 fix inert for Harbour workspace without backfill; review F1 routed operator re-paste to close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2442",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2435",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Errored turn consumes census delta; found by LIN-2435 research in existing route, deliberately deferred.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2445",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2443",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Older Task Chat pill never settles; sibling of LIN-2443 fix, deliberately left out of scope.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2447",
+   "verdict": "routed",
+   "introducedBy": "LIN-2442",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2442 reservation lease lacks headroom and unscoped commit CAS; filed from its WCDNP ledger.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2449",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2442",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Disconnect mid-turn commits baseline; pre-existing, not regression, found by LIN-2442 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2450",
+   "verdict": "routed",
+   "introducedBy": "LIN-2423",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Prompt example violates LIN-2423 isolation guard, markers dropped; ledger item from LIN-2423 review.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2451",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Production checkout left on stale feature branch; local host state, no code change shipped.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2468",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Follow-up signalled into dead-hook hold silently lost; latent pre-existing, found by LIN-2414 research.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2487",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2438",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Dead sweep still silent on no-census path; LIN-2438 deliberately left no-census alone.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2503",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Integration guide doc shows wrong marker shape; documentation-only, not read into prompts.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2507",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": null,
+   "foundBy": "unclear",
+   "reason": "Host git shim broken by macOS/Xcode mismatch; environment diagnostic research.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2510",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Stall failsafe waits 60 min then kills stuck RESUMING bootstrap; witnessed in outage, operator intervened.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2511",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Stall reaper force-FAILed healthy resumed session on unreset clock; operator relaunched run.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2515",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "Watchdog misses expired-login screen, sessions idle silently; John saw login prompt.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2550",
+   "verdict": "routed",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Assignee selector labels unapplied filter; LIN-2516 implementation review F1, filed at close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2551",
+   "verdict": "routed",
+   "introducedBy": "LIN-2527",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Fourth nav item overflows mobile widths; declared and deferred by LIN-2516 subtasks, review F2.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2553",
+   "verdict": "routed",
+   "introducedBy": "LIN-2522",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Roadmap team selector primary-binding only; made visible by LIN-2516 subtasks, review F5.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2556",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Three live-consumer pendingFollowUp sites lose follow-ups; pre-existing, found by LIN-2468 review.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2559",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "resolveAsyncWait omits Agent tool, holds swallow notifications; measured 57m and 42m dead lane.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2560",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "unclear",
+   "reason": "AWAITING_EXTERNAL falls through catch-all allow; woken park work invisible to Harbour.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2563",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2517",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Opencode notification arm posts [done] to repointed item; found in LIN-2517 research, excluded.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2565",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Description edit route returns 200 success:false instead of 502; found by LIN-2561 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2575",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Lane/batch dispatches lack periodicalId so landed reports read due; from Headwinds review.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2576",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Periodical report gate bypassed via session-auth write path; named by integration review.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2588",
+   "verdict": "routed",
+   "introducedBy": "LIN-2513",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "LIN-2513 made WATCH_INTERVAL arithmetic, suffix blanks escalation line; review F6 accepted at close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2597",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Blocked-startup allow-list misses and misdiagnoses modal dialogs; found by follow-up research captures.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2611",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Terminal.app capture() returns null, blocked-startup detection inert; pre-existing, found in LIN-2597.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2612",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2597",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Terminal usage-limit screens still idle silently; pre-existing, LIN-2597 deliberately withheld patterns.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2644",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2560",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "BLOCKED falls through catch-all allow with no backstop; explicitly out of LIN-2560 scope.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2657",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2563",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Opencode beat-1 duplicate [done] post; pre-existing, recorded out of scope in LIN-2563 review.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2668",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2556",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "hook.js park-revert sites delete pendingFollowUp unvalidated; left unowned by LIN-2556 scope.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2670",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Request to render Markdown in chat bubbles; plain text was deliberate posture.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2671",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Census reports answered decision as blocked; runner observed companion claiming blocked with no question.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2683",
+   "verdict": "routed",
+   "introducedBy": "LIN-2641",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Shipped caption falsely says LIN-2567 in progress; LIN-2566 review F1 routed from close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2685",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Observer report path throws on malformed attention rows; older code found by LIN-2661 class check.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2704",
+   "verdict": "routed",
+   "introducedBy": "LIN-2621",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Task-bound decisions unanswerable in Flight Companion; LIN-2621 review F1 root cause routed.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2705",
+   "verdict": "routed",
+   "introducedBy": "LIN-2621",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2621 turn cost sees only last hop, under-reports; review gate item routed at close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2709",
+   "verdict": "routed",
+   "introducedBy": "LIN-2707",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Throwing onResult wedges bulk-scan pool added by LIN-2707; review F3 ledger item.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2710",
+   "verdict": "unclear",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Select-all erases scan badges; bug-vs-accepted-limitation ruling explicitly left open for human.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2711",
+   "verdict": "routed",
+   "introducedBy": "LIN-2707",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-2707 bulk-scan classes ship with no CSS; review F5 ledger item routed at close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2712",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2707",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "window.api ignores flushed-200 statusCode; older gap found and routed around during LIN-2651/LIN-2707 work.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2720",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "human",
+   "reason": "John saw OpenCode autopilot stall: PENDING-EXTERNAL arm advertised a hold no process kept.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2722",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2621",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Pending-decisions page drops count/truncated; pre-existing since LIN-2621, found by LIN-2704 review.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2723",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2670",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Roadmap chat shows raw Markdown; older surface left out of LIN-2670 scope.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2729",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2227",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Outcome filter upstream of supersession resurfaces old rulings; dates to LIN-2227, found in LIN-2650 review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2739",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2444",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "markDecisionAnswered unconditional push allows duplicate stamps; older store code, scoped out by LIN-2444.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2762",
+   "verdict": "routed",
+   "introducedBy": "LIN-2719",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Free-marker pinning defect found in LIN-2719 implementation review, merged accepted not fixed.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2764",
+   "verdict": "routed",
+   "introducedBy": "LIN-2720",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "F5/F6 from LIN-2720 PR #230 review, filed by LIN-2720 close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2779",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2774",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Overflowing DECISION refused silently; older gate, headroom reduced by LIN-2774 which fenced it out.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2784",
+   "verdict": "routed",
+   "introducedBy": "LIN-2775",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Effect-flip destroys retry affordance; LIN-2775 review ledger L1, merged with it routed.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2787",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Label catalog teamId filter hides workspace labels; found at LIN-2759 close-out.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2798",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2755",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Cache clear undone by cold re-insert; pre-existing, made load-bearing by LIN-2755, found in its review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2804",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2355",
+   "repo": "LinearViewer",
+   "foundBy": "unclear",
+   "reason": "Prompts point workers at reads that 422 on non-Linear; LIN-2355 left preamble half unfixed.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2805",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2361",
+   "repo": "both",
+   "foundBy": "unclear",
+   "reason": "Ticket marker regex LIN-only; blank ticket walk for GitHub identifiers introduced by LIN-2361.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2806",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Stale CLAUDE.md sentence about opencode credential parity; documentation-only.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2814",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2804",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Sibling prompt surfaces keep unconditional 422 hints; older files left out of LIN-2804 scope.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2815",
+   "verdict": "routed",
+   "introducedBy": "LIN-2804",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Unscoped kickoff lane still gets 422 hints; LIN-2804 review named deferral, approved anyway.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2816",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2804",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "/instructions catalog advertises unsupported reads; older route deferred by LIN-2804.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2818",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Scoped kickoff silently discards goal; hit repeatedly by Flight Companion runner, filed on John's Go.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2822",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2820",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "GitHub listIssues etc silently cap at 100; older code scoped out by LIN-2820 review.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2845",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2671",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Waiting derivations ignore answer signal; older code left out of LIN-2671 scope.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2849",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2619",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Seed-turn gate reads fossil-only fleet as quiet; pre-existing since LIN-2619, found in LIN-2645 review.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2850",
+   "verdict": "routed",
+   "introducedBy": "LIN-2573",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Served-page scan zero-JS guard global; LIN-2573 close-out ledger L4, dropped from its scope.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2852",
+   "verdict": "routed",
+   "introducedBy": "LIN-2573",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Source secret scanner fail-open on read errors; LIN-2573 review note N3 routed out.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2854",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2637",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "getRecommendationStream ignores pre-aborted signal; older sibling explicitly dropped by LIN-2637 close-out.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-2882",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "GitHub install update-return dead-ended at state guard; user feedback-widget report.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2901",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Kickoff route drops force/followUpTo; found while closing out LIN-2872.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2905",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "human",
+   "reason": "Wake dispatches flood Live Console timeline and mislabel credentials; from John's screenshots.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2906",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2121",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Session page wake credential chip unknown; LIN-2121 wake issueIdentifier is root; found during LIN-2905.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2907",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2121",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Swipe session count inflated by wake rows via LIN-2121 inheritance; found bounding LIN-2905.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2909",
+   "verdict": "routed",
+   "introducedBy": "LIN-2905",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Folded wake tick culled with its bar; accepted consequence recorded in LIN-2905 close-out ledger N2.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2923",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Close-out template falsely says no comment-edit endpoint; found verifying adversarial review.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2960",
+   "verdict": "routed",
+   "introducedBy": "LIN-2956",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Star markers overlap at low zoom; LIN-2956 PR #1523 review F1/F2, dropped at close-out.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2974",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2886",
+   "repo": "both",
+   "foundBy": "unclear",
+   "reason": "LIN-2886 validation accepts repo names runner refuses; failed row burns duplicate guard; observed live.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2975",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Proxy dispatch list hides sessionId/maxTasks and POST drops maxTasks; observed on passage run.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2977",
+   "verdict": "routed",
+   "introducedBy": "LIN-2973",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Meta-prompt hand-copies Principle 0 sentence; LIN-2973 review ledger item 4 routed out.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2980",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "readSSEStream catch swallows handler errors and double-dispatches; pre-existing, noted by LIN-2969 review.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2981",
+   "verdict": "escaped-test",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Unit test makes live OpenRouter calls and flakes when key set; test-only fault.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2983",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2980",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Unguarded data.phase deref; older code made stream-aborting by LIN-2980, found in its review.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2984",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2980",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Server-side streaming catch swallows onEvent errors; older sites excluded from LIN-2980 PR.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2986",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Roadmap chat force-scrolls on every token; older unconditional write, review residue of scroll family.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2987",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2812",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "prompt-section.js duplicates predicate, samples after mutation; out-of-scope row in LIN-2812 ledger.",
+   "residueLabel": true,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2991",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "both",
+   "foundBy": "unclear",
+   "reason": "Same finding raised as ruling at every stage, file option unchecked; caught by conning session.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-2992",
+   "verdict": "escaped-test",
+   "introducedBy": "LIN-1880",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "LIN-1880 hermetic socket guard treats loopback-proxied escapes as clean; test tooling fault.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-3003",
+   "verdict": "not-defect",
+   "introducedBy": null,
+   "repo": null,
+   "foundBy": "agent",
+   "reason": "Blank project bodies were deliberate removal of repo= lines by John; closed not a bug.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-3007",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2886",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "fetchKnownRepos pages every issue, times out, repo check fails open; split from LIN-2974 close-out.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-3029",
+   "verdict": "routed",
+   "introducedBy": "LIN-2991",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "includeResolved (LIN-2991) misses earlier answered decisions; LIN-2991 review O1/L8, filed at close-out.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-3032",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2991",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "DECISION on defer/failed turns never posted; predates LIN-2991, found by its #245 review.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-3048",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2932",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Auto-backgrounded Bash registers no async wait, premature DONE; out-of-scope sibling of LIN-2932.",
+   "residueLabel": false,
+   "followUpLabel": true
+  },
+  {
+   "identifier": "LIN-3074",
+   "verdict": "routed",
+   "introducedBy": "LIN-2995",
+   "repo": "LinearViewer",
+   "foundBy": "agent",
+   "reason": "Halt copy/runbook still say runner ignores halt after LIN-2995; its outside-scope follow-up.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-3076",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2837",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "Pre-existing unguarded sentinel-arm terminal writes; found by LIN-2837 re-review, excluded from PR.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-3077",
+   "verdict": "escaped",
+   "introducedBy": "LIN-2837",
+   "repo": "simple-dispatcher",
+   "foundBy": "agent",
+   "reason": "runSentinelCheck silently degrades provider refusal to kind:none; unhandled sibling left by LIN-2837.",
+   "residueLabel": false,
+   "followUpLabel": false
+  },
+  {
+   "identifier": "LIN-3122",
+   "verdict": "escaped",
+   "introducedBy": null,
+   "repo": "both",
+   "foundBy": "human",
+   "reason": "After agent pkill outage, sessions wedged EXECUTING and wake poll warning misleading; John flagged.",
+   "residueLabel": false,
+   "followUpLabel": false
+  }
+ ]
+}
