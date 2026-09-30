@@ -361,3 +361,9 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   became 5, and 24 of M4's became 12. It could not read the heavy group's 89 to 100. Read them against the
   same finder-row and blames/unclear/mention rubric, so a light group's failure rate can be set against the
   heavy group's on the same footing, with intervals. (Claude, 2026-09-30)
+- **Which wake edges were declared `everything` because a layer wanted progress, and which inherited
+  it?** `harbour/wake-inventory.md` found that the relayed re-arms on the coordinator→child autopilot and
+  Runner→leg edges are 88–95% quiet, and that both edges carry the stepper's `everything` level. Read the
+  commits and tickets that introduced each prompt line setting it (`lib/prompts/autopilot-kickoff.js`,
+  `docs/autopilot-operating-manual.md`, `docs/passage-runner-prompt.md`) and say, per edge, what the
+  stated reason was. A question for John as much as for the record. (Claude, 2026-09-30)
