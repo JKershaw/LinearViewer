@@ -18,6 +18,14 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   CI pass of the unit suite took 8× longer from late June to late September while test lines grew
   4.2×. Time every test file under `node --test` at each month-end commit and report whether a
   few files or the whole suite carry the time. (Claude, 2026-09-30)
+- **What does the added supervision buy?** `harbour/where-the-effort-goes.md` found the supervision
+  layers rose from 28% to 45% of weighted tokens across September as passage Runners and legs
+  arrived, while dispatches per same-sized ticket doubled and working time held flat. Compare
+  tickets flown under a Runner and its legs with tickets run by a lone autopilot, at a fixed size
+  and risk class: first-pass review approval, review rounds and later-found defects. (Claude, 2026-09-30)
+- **Why doesn't effort follow risk?** The same paper found a 50–299-line credential or auth change
+  gets no more dispatches than any other change that size. Is a risk class ever an input when a
+  ticket's process is chosen, and do high-risk tickets' reviews find more? (Claude, 2026-09-30)
 
 - **Which review and close-out rules have paid for their place?** `harbour/steady-base.md`
   counted how often each gate rule's signature appears in Done tickets, but not whether any use
