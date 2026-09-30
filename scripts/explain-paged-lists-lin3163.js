@@ -66,13 +66,16 @@ export function collectPlanStages(plan, out = []) {
  * Pass criteria (design, LIN-3163): no COLLSCAN anywhere; no SORT stage; the
  * winning IXSCAN is the expected extended index; `totalDocsExamined` no more
  * than the page can hold (`maxDocs`); `totalKeysExamined` no more than
- * `skip + limit`.
+ * `skip + limit` for an ordinary page (or, for a task-bounded read, no more
+ * than the task's own row count — the permitted exception budget).
  *
  * The task-filtered agent-status read may instead win on
  * `urlKey_1_taskIdentifier_1` with a SORT bounded by that task's rows — allowed
  * only when `allowTaskBoundedIndex` names that index, there is still no
  * COLLSCAN, and `maxDocs` is set to the task's own row count (never the
- * workspace's).
+ * workspace's). Its key budget is that same task row count, not `skip + limit`:
+ * the read scans the task's key range, so a plan the design permits must not be
+ * refused merely because the task has more rows than the page limit.
  *
  * @param {object} args
  * @param {object} args.explain - the explain() result
@@ -103,9 +106,19 @@ export function evaluatePagedListExplain({
 
   const taskBounded = Boolean(allowTaskBoundedIndex) && indexName === allowTaskBoundedIndex
   const docBudget = maxDocs === undefined ? limit : maxDocs
+  // The key budget for an ordinary page is `skip + limit`. For the task-bounded
+  // agent-status exception the read scans the task's own key range, so the
+  // permitted budget is the task's row count (`maxDocs`) — never the workspace
+  // history. Without this the design-allowed exception is refused whenever the
+  // sampled task has more rows than the route limit.
+  const keyBudget = taskBounded ? docBudget : skip + limit
   const reasons = []
 
-  if (!winningPlan) reasons.push('no winningPlan in explain result')
+  if (explain?.error) {
+    reasons.push(`explain call failed: ${explain.error}`)
+  } else if (!winningPlan) {
+    reasons.push('no winningPlan in explain result')
+  }
   if (hasCollscan) reasons.push('plan contains a COLLSCAN')
   if (hasSort && !taskBounded) reasons.push('plan contains a blocking SORT stage')
   if (indexName !== expectedIndex && !taskBounded) {
@@ -116,8 +129,10 @@ export function evaluatePagedListExplain({
     reasons.push(`totalDocsExamined ${docsExamined} exceeds the page budget ${docBudget}`)
   }
   if (keysExamined === null) reasons.push('no executionStats.totalKeysExamined')
-  else if (keysExamined > skip + limit) {
-    reasons.push(`totalKeysExamined ${keysExamined} exceeds skip+limit ${skip + limit}`)
+  else if (keysExamined > keyBudget) {
+    reasons.push(taskBounded
+      ? `totalKeysExamined ${keysExamined} exceeds the task-bounded budget ${keyBudget} (task row count)`
+      : `totalKeysExamined ${keysExamined} exceeds skip+limit ${keyBudget}`)
   }
 
   return { pass: reasons.length === 0, reasons, indexName, hasSort, hasCollscan, docsExamined, keysExamined }

@@ -397,10 +397,15 @@ describe('db-indexes', () => {
         s.keySpec.issueIdentifier === undefined
       );
       assert.ok(spec, `${collection}: a urlKey+timestamp paged-list index must be declared`);
+      // Compare ORDERED key entries, not deep equality: a compound index is
+      // defined by key order, and `assert.deepStrictEqual` on objects ignores
+      // insertion order, so `{urlKey,timestamp,_id}` would equal
+      // `{urlKey,_id,timestamp}`. Each paged list's index key must be exactly
+      // `urlKey:1` followed by the sort keys in sort order.
       assert.deepStrictEqual(
-        spec.keySpec,
-        { urlKey: 1, ...cursor.sorts[0] },
-        `${collection}: the declared index key must equal the list sort with the urlKey prefix (LIN-3163)`
+        Object.entries(spec.keySpec),
+        [['urlKey', 1], ...Object.entries(cursor.sorts[0])],
+        `${collection}: the declared index key must equal the list sort with the urlKey prefix, in order (LIN-3163)`
       );
     }
   });

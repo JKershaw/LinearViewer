@@ -126,6 +126,71 @@ describe('evaluatePagedListExplain (LIN-3163)', () => {
     assert.strictEqual(verdict.pass, true, verdict.reasons.join('; '));
   });
 
+  // Review R2: the sampled task can hold more rows than the route limit. The
+  // permitted exception scans the task's key range, so its key budget is the
+  // task row count, not `skip + limit`; before the fix this design-allowed plan
+  // was wrongly refused ("totalKeysExamined 35 exceeds skip+limit 20").
+  function taskBoundedExplain({ keys, docs }) {
+    return {
+      queryPlanner: {
+        winningPlan: {
+          stage: 'LIMIT',
+          inputStage: { stage: 'FETCH', inputStage: { stage: 'SORT', inputStage: { stage: 'IXSCAN', indexName: 'urlKey_1_taskIdentifier_1' } } }
+        }
+      },
+      executionStats: { totalKeysExamined: keys, totalDocsExamined: docs }
+    };
+  }
+
+  test('PASS: the task-bounded exception budgets keys by task rows when the task exceeds the limit', () => {
+    const verdict = evaluatePagedListExplain({
+      explain: taskBoundedExplain({ keys: 35, docs: 35 }),
+      expectedIndex: EXTENDED,
+      limit: 20,
+      skip: 0,
+      maxDocs: 35,
+      allowTaskBoundedIndex: 'urlKey_1_taskIdentifier_1'
+    });
+    assert.strictEqual(verdict.pass, true, verdict.reasons.join('; '));
+    assert.strictEqual(verdict.keysExamined, 35);
+  });
+
+  test('FAIL: the task-bounded exception refuses a plan that examines the whole workspace', () => {
+    const verdict = evaluatePagedListExplain({
+      explain: taskBoundedExplain({ keys: 141449, docs: 141449 }),
+      expectedIndex: EXTENDED,
+      limit: 20,
+      skip: 0,
+      maxDocs: 35,
+      allowTaskBoundedIndex: 'urlKey_1_taskIdentifier_1'
+    });
+    assert.strictEqual(verdict.pass, false);
+    assert.ok(verdict.reasons.some(r => /totalDocsExamined/.test(r)), verdict.reasons.join('; '));
+  });
+
+  test('FAIL: the task-bounded exception still caps keys at the task row count', () => {
+    const verdict = evaluatePagedListExplain({
+      explain: taskBoundedExplain({ keys: 40, docs: 35 }),
+      expectedIndex: EXTENDED,
+      limit: 20,
+      skip: 0,
+      maxDocs: 35,
+      allowTaskBoundedIndex: 'urlKey_1_taskIdentifier_1'
+    });
+    assert.strictEqual(verdict.pass, false);
+    assert.ok(verdict.reasons.some(r => /task-bounded budget/.test(r)), verdict.reasons.join('; '));
+  });
+
+  test('FAIL: an errored explain surfaces the error, not only a missing winningPlan', () => {
+    const verdict = evaluatePagedListExplain({
+      explain: { error: 'connection reset by peer' },
+      expectedIndex: EXTENDED,
+      limit: 50
+    });
+    assert.strictEqual(verdict.pass, false);
+    assert.ok(verdict.reasons.some(r => /connection reset by peer/.test(r)), verdict.reasons.join('; '));
+  });
+
   test('FAIL: the task-bounded exception still refuses a COLLSCAN', () => {
     const explain = {
       queryPlanner: { winningPlan: { stage: 'SORT', inputStage: { stage: 'COLLSCAN' } } },
