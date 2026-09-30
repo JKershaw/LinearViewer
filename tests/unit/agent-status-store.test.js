@@ -108,18 +108,17 @@ describe('AgentStatusStore.listStatus (real MangoDB tmpdir, LIN-3162 A2)', () =>
     assert.strictEqual(page3.items.length, 5);
   });
 
-  test('defaults `since` to the shared 30-day read horizon and drops the expiry predicate (A2)', async () => {
+  test('has no default horizon bound: an un-scoped read pages over full retained history (LIN-3163 B)', async () => {
     const now = Date.now();
     await seedRaw({ _id: 'inside', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 5 * DAY_MS) });
     await seedRaw({ _id: 'outside-horizon', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 40 * DAY_MS) });
 
     const { items, total } = await store.listStatus('ws-1');
     const q = lastQuery();
-    assert.ok(q.timestamp?.$gte instanceof Date, 'a default timestamp bound must ride into the query');
-    assert.ok(Math.abs(q.timestamp.$gte.getTime() - (now - 30 * DAY_MS)) < 5000, 'bound is ~30 days ago');
+    assert.strictEqual(q.timestamp, undefined, 'the default 30-day `since` bound is gone from the paged list');
     assert.strictEqual(q.expiresAt, undefined, 'the expiry predicate is gone');
-    assert.strictEqual(total, 1);
-    assert.strictEqual(items[0].id, 'inside');
+    assert.strictEqual(total, 2, 'both rows are read over the full retained history');
+    assert.deepStrictEqual(items.map(i => i.id), ['inside', 'outside-horizon']);
   });
 
   test('windows by a since predicate, pushed into the query, excluding older entries (LIN-622 preserved)', async () => {
@@ -149,17 +148,17 @@ describe('AgentStatusStore.listStatus (real MangoDB tmpdir, LIN-3162 A2)', () =>
     assert.deepStrictEqual(result.items.map(i => i.id), ['mid', 'old']);
   });
 
-  test('until alone forms its own query bound; total stays pre-slice under limit', async () => {
+  test('until alone forms its own query bound with no default since; total stays pre-slice under limit (LIN-3163 B)', async () => {
     const now = Date.now();
     for (let i = 0; i < 5; i++) await seed({ _id: `d-${i}`, timestamp: new Date(now - i * 1000) });
     const until = new Date(now - 500);
 
     const result = await store.listStatus('ws-1', { until, limit: 2 });
     const q = lastQuery();
-    // A2: `since` defaults to the read horizon even when only `until` is given.
-    assert.ok(q.timestamp.$gte instanceof Date && Math.abs(q.timestamp.$gte.getTime() - (now - 30 * DAY_MS)) < 5000);
+    // B: no default `since` is injected when only `until` is supplied.
+    assert.strictEqual(q.timestamp.$gte, undefined, 'no default since when only until is given');
     assert.strictEqual(q.timestamp.$lt.getTime(), until.getTime());
-    assert.strictEqual(result.total, 4, 'the pre-slice windowed count, not the limited page size');
+    assert.strictEqual(result.total, 4, 'the pre-slice count, not the limited page size');
     assert.strictEqual(result.items.length, 2);
   });
 
@@ -183,15 +182,15 @@ describe('AgentStatusStore.listStatus (real MangoDB tmpdir, LIN-3162 A2)', () =>
   // A2 neutrality: the horizon keys on timestamp, not the expiry stamp.
   // ---------------------------------------------------------------------------
 
-  test('hides a row older than the horizon even when its stamped expiry is still live (A2)', async () => {
+  test('includes a row older than 30 days in the paged list (LIN-3163 B visibility change)', async () => {
     const now = Date.now();
     const future = new Date(now + 365 * DAY_MS);
     await seedRaw({ _id: 'still-stamped', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 31 * DAY_MS), expiresAt: future });
     await seedRaw({ _id: 'inside', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 29 * DAY_MS), expiresAt: future });
 
     const result = await store.listStatus('ws-1');
-    assert.strictEqual(result.total, 1, 'the lifetime-retention-shaped old row must stay hidden until B');
-    assert.strictEqual(result.items[0].id, 'inside');
+    assert.strictEqual(result.total, 2, 'listStatus now pages over the full retained history');
+    assert.deepStrictEqual(result.items.map(i => i.id), ['inside', 'still-stamped']);
   });
 
   test('returns a row with NO expiresAt field when it is inside the horizon (A2)', async () => {
@@ -429,5 +428,41 @@ describe('AgentStatusStore listSessions/listTaskThreads read the reporting windo
     await raw.insertOne({ _id: 'old', urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'a', status: 'completed', summary: 's', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
     const { tasks } = await store.listTaskThreads('ws-1');
     assert.deepStrictEqual(tasks, []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3163 (B): lifetime retention — no expiry stamp, no evictor.
+// ---------------------------------------------------------------------------
+
+describe('AgentStatusStore lifetime retention (LIN-3163 B)', () => {
+  let harness;
+  let raw;
+  let store;
+
+  before(async () => {
+    harness = createMangoTmpdir('lin-3163-agent-status-');
+    await harness.connect();
+  });
+
+  after(async () => {
+    await harness.close();
+  });
+
+  beforeEach(() => {
+    raw = harness.freshDb().collection('foreman-status');
+    store = new AgentStatusStore({ collection: raw });
+  });
+
+  test('recordStatus writes no expiresAt stamp', async () => {
+    const doc = await store.recordStatus({ urlKey: 'ws-1', taskIdentifier: 'LIN-1', action: 'research', status: 'completed', summary: 's' });
+    assert.ok(!('expiresAt' in doc), 'a lifetime-retained status row carries no expiresAt stamp');
+    const stored = await raw.findOne({ _id: doc._id });
+    assert.ok(!('expiresAt' in stored), 'the persisted row carries no expiresAt stamp');
+  });
+
+  test('the cleanup evictor is gone', () => {
+    assert.strictEqual(typeof AgentStatusStore.prototype.cleanup, 'undefined', 'cleanup must be deleted from the store');
+    assert.strictEqual(typeof store.cleanup, 'undefined');
   });
 });

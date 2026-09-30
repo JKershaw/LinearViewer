@@ -71,6 +71,9 @@ function makeStore() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Golden key sets, captured at e9c8b3f1 (unchanged code).
+// LIN-3163 (LIN-3157 B): the ARCHIVE key set no longer carries
+// `historyExpiresAt` — dispatch-history is lifetime-retained (the queue doc's
+// `expiresAt` TTL is unchanged).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ADD_ITEM_DOC_KEYS = [
@@ -86,7 +89,7 @@ const ADD_ITEM_DOC_KEYS = [
 const ARCHIVE_HISTORY_DOC_KEYS = [
   '_id', 'abort', 'abortTo', 'cascade', 'consumerLastSeenAt', 'dispatchedAt',
   'dispatchedBy', 'effort', 'feedbackDigest', 'feedbackVersion', 'followUpTo',
-  'force', 'harness', 'historyExpiresAt', 'issueId', 'issueIdentifier',
+  'force', 'harness', 'issueId', 'issueIdentifier',
   'issueTitle', 'issueUrl', 'kind', 'maxSessionsPerTask', 'maxTasks', 'model',
   'periodicalId', 'presetConfig', 'presetName', 'producingItemAttempt',
   'producingItemId', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'resolvedAt',

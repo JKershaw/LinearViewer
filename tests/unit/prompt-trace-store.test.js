@@ -94,8 +94,9 @@ describe('PromptTraceStore.record', () => {
     assert.strictEqual(doc.truncated, false);
     // bookkeeping
     assert.ok(doc.timestamp instanceof Date);
-    assert.ok(doc.expiresAt instanceof Date);
-    assert.ok(doc.expiresAt > doc.timestamp);
+    // LIN-3163 (B): prompt-traces are retained for the project's lifetime — no
+    // expiry/TTL stamp is written any more.
+    assert.ok(!('expiresAt' in doc), 'a lifetime-retained trace carries no expiresAt stamp');
     assert.ok(typeof doc._id === 'string' && doc._id.length > 0);
   });
 
@@ -202,14 +203,22 @@ describe('PromptTraceStore.listTraces (real MangoDB tmpdir, LIN-3162 A2)', () =>
     assert.deepStrictEqual(await new PromptTraceStore({}).listTraces('acme'), { items: [], total: 0 });
   });
 
-  test('hides rows older than the horizon even when their stamped expiry is still live (A2)', async () => {
+  test('pages over the full retained history: a >30d row is listed and counted (LIN-3163 B)', async () => {
     const now = Date.now();
-    await seed({ _id: 'old-live', prompt: 'gone', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
+    await seed({ _id: 'old-live', prompt: 'oldest', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
     await seed({ _id: 'kept', prompt: 'kept', timestamp: new Date(now - 5 * DAY_MS) });
 
     const { items, total } = await store.listTraces('acme');
-    assert.strictEqual(total, 1);
-    assert.strictEqual(items[0].prompt, 'kept');
+    assert.strictEqual(total, 2, 'lifetime retention: the >30d row is counted in total');
+    assert.deepStrictEqual(items.map(i => i.prompt), ['kept', 'oldest'], 'newest-first over the full retained history');
+  });
+
+  test('no default horizon bound: the paged query is urlKey-only (LIN-3163 B)', async () => {
+    await seed({ _id: 'x', prompt: 'x' });
+
+    await store.listTraces('acme');
+    const { query } = collection.__record.finds.at(-1);
+    assert.deepStrictEqual(Object.keys(query), ['urlKey'], 'the default 30-day `since` bound is gone from the paged list');
   });
 
   test('returns a row with no expiresAt field when it is inside the horizon (A2)', async () => {
@@ -265,28 +274,10 @@ describe('PromptTraceStore.listTraces (real MangoDB tmpdir, LIN-3162 A2)', () =>
   });
 });
 
-describe('PromptTraceStore.cleanup', () => {
-  let store;
-  let collection;
-
-  beforeEach(() => {
-    collection = createMockCollection();
-    store = new PromptTraceStore({ collection });
-  });
-
-  test('removes only expired records', async () => {
-    const expiredStore = new PromptTraceStore({ collection, ttl: -1 });
-    await expiredStore.record({ urlKey: 'acme', feature: 'recommend', prompt: 'old' });
-    await store.record({ urlKey: 'acme', feature: 'recommend', prompt: 'fresh' });
-
-    const removed = await store.cleanup();
-    assert.strictEqual(removed, 1);
-    assert.strictEqual(collection._docs.length, 1);
-    assert.strictEqual(collection._docs[0].prompt, 'fresh');
-  });
-
-  test('no collection ⇒ returns 0, does not throw', async () => {
-    assert.strictEqual(await new PromptTraceStore({}).cleanup(), 0);
+describe('PromptTraceStore.cleanup is removed (LIN-3163 B)', () => {
+  test('the evictor no longer exists — lifetime retention, no cleanup method', () => {
+    assert.strictEqual(typeof PromptTraceStore.prototype.cleanup, 'undefined', 'cleanup must be deleted from the store');
+    assert.strictEqual(typeof new PromptTraceStore({}).cleanup, 'undefined');
   });
 });
 

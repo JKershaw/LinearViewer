@@ -351,22 +351,27 @@ describe('db-indexes', () => {
     }
   });
 
-  test('preserves the pre-A2 expiry specs until B removes them (LIN-3162)', () => {
-    const retained = [
+  test('B removed the pre-A2 expiry specs; observation-sessions keeps its cleanup index (LIN-3163)', () => {
+    const removed = [
       ['dispatch-history', { historyExpiresAt: 1 }],
       ['proxy-events', { urlKey: 1, expiresAt: 1 }],
       ['foreman-status', { urlKey: 1, expiresAt: 1 }],
       ['llm-call-log', { urlKey: 1, expiresAt: 1 }],
       ['llm-call-log', { urlKey: 1, issueIdentifier: 1, expiresAt: 1 }],
-      ['prompt-traces', { urlKey: 1, expiresAt: 1 }],
-      ['observation-sessions', { historyExpiresAt: 1 }]
+      ['prompt-traces', { urlKey: 1, expiresAt: 1 }]
     ];
-    for (const [collection, keySpec] of retained) {
+    for (const [collection, keySpec] of removed) {
       const hasIt = INDEX_SPECS.some(s =>
         s.collection === collection && JSON.stringify(s.keySpec) === JSON.stringify(keySpec)
       );
-      assert.ok(hasIt, `${collection} must retain ${JSON.stringify(keySpec)} until B`);
+      assert.ok(!hasIt, `${collection} ${JSON.stringify(keySpec)} must be gone after B`);
     }
+    // observation-sessions is a TTL'd derived read-model, explicitly out of scope:
+    // it keeps its own {historyExpiresAt} cleanup index.
+    const keepsObservation = INDEX_SPECS.some(s =>
+      s.collection === 'observation-sessions' && JSON.stringify(s.keySpec) === JSON.stringify({ historyExpiresAt: 1 })
+    );
+    assert.ok(keepsObservation, 'observation-sessions keeps its cleanup index');
   });
 
   test('the A2 timestamp indexes are plain, not TTL; email-magic-links stays the only TTL (LIN-3162)', () => {

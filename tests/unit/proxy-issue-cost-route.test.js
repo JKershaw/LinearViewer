@@ -231,17 +231,12 @@ describe('GET /api/proxy/issues/:identifier/cost — store wiring', () => {
 
 describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
   test('end-to-end: worker + app costs joined, fully priced', async () => {
-    // Value pin: a real LlmCallLogStore built at its real default (no injected
-    // ttl) must actually carry .ttl === 30 days — not a hand-rolled object that
-    // hardcodes the very number this test asserts. summarizeByIssue is stubbed
-    // because a bare construction leaves this.collection undefined.
+    // LIN-3163 (LIN-3157 B): the call log is lifetime-retained and no longer
+    // exposes a `ttl`. The published /cost window is derived from the shared
+    // 30-day READ_HORIZON_DAYS (LIN-3161), never from a store retention value.
+    // summarizeByIssue is stubbed because a bare construction leaves
+    // this.collection undefined.
     const llmCallLogStore = new LlmCallLogStore();
-    // Falsy-default guard: routes/proxy.js falls back to `|| 30 * 24 * 60 *
-    // 60` when store.ttl is falsy (e.g. 0), which would silently restore
-    // days: 30 and keep the value pin below green even if the real default
-    // were changed to a falsy value. Pin the real default's ttl directly so
-    // that drift goes red too.
-    assert.equal(llmCallLogStore.ttl, 30 * 24 * 60 * 60);
     llmCallLogStore.summarizeByIssue = async (urlKey, identifier) => {
       assert.equal(urlKey, 'acme');
       assert.equal(identifier, 'LIN-42');

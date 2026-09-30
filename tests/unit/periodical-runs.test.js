@@ -1236,7 +1236,10 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
 
     const [result] = foldPeriodicalRuns([t], { historyRows }, {
       now: newer.dispatchedAt.getTime() + 1000,
-      historyTtlMs: store.historyTtl * 1000
+      // LIN-3163 (LIN-3157 B): dispatch-history is lifetime-retained, so the
+      // fold is fed the fixed 30-day READ horizon (DEFAULT_HORIZON_MS) — the
+      // store no longer carries a `historyTtl`. The route passes READ_HORIZON_MS.
+      historyTtlMs: DEFAULT_HORIZON_MS
     });
     assert.equal(result.lastDispatchedAt, newer.dispatchedAt.getTime());
     assert.equal(result.runs, 2);

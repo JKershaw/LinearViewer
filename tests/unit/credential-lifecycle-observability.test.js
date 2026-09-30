@@ -77,9 +77,12 @@ describe('CredentialLifecycleEventStore (LIN-2236, Block A — behavioural)', ()
     assert.deepEqual(doc.detail, { via: 'rotated' });
     assert.ok(doc.at instanceof Date);
     assert.match(doc._id, /^[0-9a-f-]{36}$/);
+    // LIN-3163 (B): credential-lifecycle events are lifetime-retained — no expiry stamp.
+    assert.ok(!('expiresAt' in doc), 'a lifetime-retained event carries no expiresAt stamp');
 
     const stored = await store.collection.findOne({ _id: doc._id });
     assert.equal(stored.kind, 'refresh_success');
+    assert.ok(!('expiresAt' in stored), 'the persisted row carries no expiresAt stamp');
   });
 
   test('null accountId/urlKey/provider are stored as explicit null, never omitted or coerced', async () => {
