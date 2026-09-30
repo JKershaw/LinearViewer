@@ -123,7 +123,19 @@ their errors:
   session waiting on it one extra attempt, a median of about 3½ minutes.
 - **Retries inside green runs:** these are not timed here. Each hidden retry reruns one test,
   with tracing on.
-- **Inside agent sessions** (both repos' transcripts, 31 August – 30 September): SESSIONS_COST.
+- **Inside agent sessions** (both repos' transcripts, 29 August – 30 September):
+  - **Who saw a red E2E shard:** of 2,016 sessions, 1,231 looked at CI, 37 saw it red and 15
+    saw a red E2E shard. All 15 were LinearViewer sessions, and one was a deliberate mutation
+    probe. Six of the 15 were the livebar test.
+  - **Diagnosis before acting:** every session read the CI log before acting, and none re-ran
+    blind.
+  - **What the reds cost:** three read the log, called it a flake and re-ran, for a median of
+    about 4 active minutes each. Four waited for a new push (62 active minutes in all, some of it
+    other work). Four edited code, and three never saw green in the session.
+  - **Flakes misread as real:** the rule for a session that diagnosed a flake as real and fixed
+    it flagged one episode. On a hand reading that was PR #1451, LIN-2797's real race, where the
+    session wrote "Not flaky. Deterministic". So none was found, but on 14 episodes that is thin.
+    The agent judgements were right in every hand-read case (8 of 8).
 
 **Masking: the bias runs both ways, and more often a flake hides a fault than the reverse.**
 
@@ -228,8 +240,9 @@ includes at least one fault that looked like a flake.
   not measured, so the hidden cost is under-stated.
 - **Wall-clock is runner time.** It is not the operator's or the session's waiting time, which
   includes the time to notice and re-run: a median of 1.1 minutes here.
-- **Session transcripts are kept about 30 days,** so session costs cover September only. Sessions
-  that never polled CI are invisible. Both under-state the cost in sessions.
+- **Session transcripts are kept about 30 days,** so session costs cover September only. That
+  misses August's burst. Sessions that never polled CI, and subagents, are invisible. All of this
+  under-states the cost in sessions, and 14 episodes support no rates.
 - **Causes are read, not reproduced.** No spec was re-run here. Each cause is the one the error
   and source support, or that a fixing commit states.
 
