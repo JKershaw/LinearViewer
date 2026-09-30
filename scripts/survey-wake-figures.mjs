@@ -77,17 +77,18 @@ const fmt = (n) => n.toLocaleString('en-GB');
 // ---- 2. What each delivery path led to, per correct code change, split by the woken session's most consequential act.
 {
   const rows = [
-    ['Terminal wake (Harbour)', ['wake-terminal']],
-    ['Pause wake (Harbour)', ['wake-pause']],
-    ['Beat into a held worker', ['beat', 'follow-up']],
-    ['Self-armed wake-up (harness)', ['task-notification', 'scheduled']],
-    ['Relayed ruling or note', ['relay']],
-    ['Stall-failsafe re-fire (runner)', ['failsafe-reconfirm', 'silence-refire']],
+    ['Terminal wake (Harbour)', ['wake-terminal'], 'terminal wake'],
+    ['Pause wake (Harbour)', ['wake-pause'], 'pause wake'],
+    ['Beat into a held worker', ['beat', 'follow-up'], 'beat or follow-up'],
+    ['Self-armed wake-up (harness)', ['task-notification', 'scheduled'], 'own wake-ups'],
+    ['Relayed ruling or note', ['relay'], 'relay'],
+    ['Stall-failsafe re-fire (runner)', ['failsafe-reconfirm', 'silence-refire'], 'stall failsafe'],
   ];
   const parts = [['changed nothing (read, re-arm)', C.orange, ['none', 'arm', 'read']], ['acted (write, push, PR, edit)', C.blue, ['act']], ['dispatched', C.aqua, ['dispatch']]];
-  const data = rows.map(([label, keys]) => {
+  const data = rows.map(([label, keys, group]) => {
     const xs = keys.map((k) => A.sources[k]).filter(Boolean); const n = xs.reduce((a, x) => a + x.n, 0);
-    const per = xs.reduce((a, x) => a + x.per.code, 0); const share = xs.reduce((a, x) => a + x.shareUnits, 0);
+    // The group's share is rounded once, as the paper's table rounds it (A.table), not as a sum of rounded per-source shares.
+    const per = xs.reduce((a, x) => a + x.per.code, 0); const share = A.table?.[group]?.unitsShare ?? xs.reduce((a, x) => a + x.shareUnits, 0);
     const seg = parts.map(([, , outs]) => xs.reduce((a, x) => a + outs.reduce((b, o) => b + (x.out[o] || 0), 0) * x.n, 0) / Math.max(1, n) / 100 * per);
     return { label, n, per, share, seg };
   });
