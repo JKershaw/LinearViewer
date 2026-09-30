@@ -240,12 +240,15 @@ describe('PromptTraceStore.listTraces (real MangoDB tmpdir, LIN-3162 A2)', () =>
   test('same-millisecond traces order by _seq desc, then _id, with a legacy no-_seq row last (A2)', async () => {
     const now = Date.now();
     const ts = new Date(now - 1000);
-    await seed({ _id: 'x-legacy', timestamp: ts });
-    await seed({ _id: 'x5', timestamp: ts, _seq: 5 });
-    await seed({ _id: 'x9', timestamp: ts, _seq: 9 });
+    // `_id`s deliberately contradict the `_seq` order: `_id`-descending alone
+    // would yield ['z', 'm-legacy', 'a']. Only a real `_seq` sort yields
+    // ['a', 'z', 'm-legacy'], so dropping `_seq` from the sort turns this red.
+    await seed({ _id: 'm-legacy', timestamp: ts });
+    await seed({ _id: 'z', timestamp: ts, _seq: 5 });
+    await seed({ _id: 'a', timestamp: ts, _seq: 9 });
 
     const { items } = await store.listTraces('acme');
-    assert.deepStrictEqual(items.map(i => i.id), ['x9', 'x5', 'x-legacy']);
+    assert.deepStrictEqual(items.map(i => i.id), ['a', 'z', 'm-legacy']);
   });
 
   test('same-millisecond ties page without duplicates or gaps (A2)', async () => {
@@ -468,14 +471,23 @@ describe('PromptTraceStore.summarizeProviderContext keys on the read horizon (re
     store = new PromptTraceStore({ collection: raw });
   });
 
-  test('counts a no-expiresAt row inside the horizon and hides a >30d row with a live stamp (A2)', async () => {
+  test('counts a no-expiresAt row inside the horizon (A2)', async () => {
     const now = Date.now();
     await raw.insertOne({ _id: 'no-stamp', urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {}, timestamp: new Date(now - 5 * DAY_MS) });
+
+    const result = await store.summarizeProviderContext('acme', { expectedUi: GITHUB_UI });
+    assert.strictEqual(result.traces, 1, 'the in-horizon row with no expiresAt is read');
+    assert.strictEqual(result.untracedContext, 1);
+    assert.strictEqual(result.divergent, 1);
+  });
+
+  test('hides a >30d row that still carries a live expiry stamp (A2)', async () => {
+    const now = Date.now();
     await raw.insertOne({ _id: 'old-live', urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {}, timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
 
     const result = await store.summarizeProviderContext('acme', { expectedUi: GITHUB_UI });
-    assert.strictEqual(result.traces, 1, 'only the in-horizon row is read');
-    assert.strictEqual(result.untracedContext, 1);
-    assert.strictEqual(result.divergent, 1);
+    assert.strictEqual(result.traces, 0, 'the out-of-horizon row with a live stamp is not read');
+    assert.strictEqual(result.untracedContext, 0);
+    assert.strictEqual(result.divergent, 0);
   });
 });
