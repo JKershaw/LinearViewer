@@ -1,6 +1,6 @@
 # Harbour steady base: proportional effort, measured
 
-*(The anchor for the steady-base work. It was written on 30 September 2026, during the V1 passage (LIN-3099), after a day of research John commissioned. It records what we learned, what that implies, what we intend and how it fits V1. The tracker holds live state; this page holds the scope and the results. Revise it by rewriting; git keeps the history. This version includes the third wave of research and the independent checks of the first two: `survey-check.md` and `survey-check-2.md` corrected several figures, and they are given here as corrected. The two newest papers, `why-throughput-halved.md` and `which-rules-pay.md`, are not yet checked, and are marked where cited.)*
+*(The anchor for the steady-base work. It was written on 30 September 2026, during the V1 passage (LIN-3099), after a day of research John commissioned. It records what we learned, what that implies, what we intend and how it fits V1. The tracker holds live state; this page holds the scope and the results. Revise it by rewriting; git keeps the history. This version includes the third wave of research and the independent checks of the first two: `survey-check.md` and `survey-check-2.md` corrected several figures, and they are given here as corrected. The later papers are checked too: `survey-check-3.md` checked `why-throughput-halved.md` (now v3) and `which-rules-pay.md` (now v2), and `model-choice.md` re-derived the tier claim independently.)*
 
 ## Why this exists
 
@@ -54,17 +54,24 @@ The evidence is in the documents listed at the end. Figures are as corrected by 
 10. **Single-session runs suit research, not changes to the system.**
     - Eleven papers and checks landed on 29–30 September, each as one bounded session, and none changed the product.
     - Changes to Harbour itself go through Harbour's process. An agent that once skipped it took a week to clean up after.
-11. **June was a different regime, not a lost level.** *(`why-throughput-halved.md`, unchecked)*
+11. **June was a different regime, not a lost level.** *(`why-throughput-halved.md` v3)*
     - A correct change kept its size: 70 production lines at the median in June, 67 later. Every size band halved.
-    - Four-fifths of the fall is fewer merged tickets (113 to 65 a week); a fifth is a lower correct, complete share (84% to 72%).
-    - It is almost all Harbour's (86 to 39 a week), and two-fifths of it is UI work (27 to 7 a week). Product lines fell by a third while test lines rose, so a correct change now carries 2.5× the test lines.
-    - The step lines up with 12 July (LIN-1285), when each dispatch began choosing its tier. Frontier-written changes fell from 84 a week to 12, and **the mid tier that replaced them cost the same per change but escaped about four times as often.** That claim is being re-derived independently (LIN-3165) before anything rests on it.
-12. **A few rules and reviewer judgement do the catching.** *(`which-rules-pay.md`, unchecked)*
+    - Most of the fall is fewer merged tickets (113 to 65 a week), and the rest a lower correct, complete share (84% to 72%): four-fifths and a fifth on the weeks of 8 June to 5 July, two-thirds and a third on the three weeks wholly in June. More than half of the escape rise is finder rows (faults the fleet's own reviews found in older code).
+    - It is almost all Harbour's (86 to 39 a week), and a third to two-fifths of it is UI work (27 to 7 a week). Product lines fell by a third while test lines rose, so a correct change now carries 2.5× the test lines.
+    - The step lines up with 12 July (LIN-1285), when each dispatch began choosing its tier; frontier-written changes fell from 84 a week to 12. The tier switch is the only change dated to the step: the plan-review leg arrived two weeks later (26 July), and test lines and prompts ramped up through July rather than stepping.
+    - The "four times the escapes" claim did not survive re-derivation; see point 13.
+12. **A few rules and reviewer judgement do the catching.** *(`which-rules-pay.md` v2)*
     - In the last 100 reviewed Done tickets (11–29 September), 483 review and close-out findings led to 78 production-code changes in 28 tickets; 44 fixed real faults, in 18 tickets, and 24 of those were in three tickets.
-    - Reviewer judgement that no rule names led the most (29 changes, 16 faults), then the class check (19, 12), verifying against the requirements (10, 7) and looking at the running result (6, 3).
-    - 16 of 24 rules led no production change, and 12 never appeared on one even as support. Many are gates, and a gate that works leaves no change behind, so zero is not proof of no value.
-    - The mutation check led 107 findings, 97 of which changed only tests, and about 36 of the 88 extra legs.
+    - Reviewer judgement that no rule names led the most (29 changes, 16 faults), then the class check (19, 12), verifying against the requirements (10, 7) and looking at the running result (6, 3). The counts stand, but which rule led each change is the soft call: a blind recode names the same lead rule 59–66% of the time, and the class check's 19 may be high by about a third. Only the class check and requirements clearly separate from the zero rules.
+    - 16 of 24 rules led no production change, and 12 never appeared on one even as support. About a third of those are gates, where a gate that works leaves no change behind. For most of the rest (record-keeping, filing, tests) zero is the design, and three rules existed for only the last six days.
+    - The mutation check led 107 findings, 97 of which changed only tests or wording, and about 36 of the 88 extra legs.
     - Tickets touching only simple-dispatcher got no production change from review.
+13. **Model tier is not what raised the cost.** *(`model-choice.md`)*
+    - Until 12 July every session ran at the frontier tier, whatever the dispatch asked. Seven routing changes since are dated from the runner's logs.
+    - For changes merged 13 July–30 August, a correct, complete change cost about the same whole-life working hours whether a frontier session implemented it (3.4–3.5 h) or a mid-tier one (3.25–3.4 h), counting the rework it caused.
+    - Mid-tier changes do escape more often (11 of 187 against none of 85; LIN-3155's "four times" counted finder rows). But rework adds only 0.2–0.3 hours per change, because an escape's fix costs a fraction of the process around the original ticket. A third to two-fifths of it lands in the first week, and a fifth to a third after day 30.
+    - **What moved cost per change was the process, not the tier.** At the 12 July step, dispatches per correct change doubled for frontier-implemented changes too (5.3 to 10.4), and they have kept climbing: in September's provisional weeks 37 (frontier), 27 (mid) and 48 (cheap, whose work is cut into many short beats).
+    - The cheap tier and all of September are provisional until their 30-day windows close.
 
 ## What this implies
 
@@ -72,6 +79,7 @@ The evidence is in the documents listed at the end. Figures are as corrected by 
 - **Proportionality is the second lever.** A docs-only ticket costs three-quarters of a median one, and nothing sizes effort to risk.
 - **Reliability is steady, so the baseline is clean.** We are not fixing a quality problem. We are removing cost that quality does not depend on, and the scorecard will say if we are wrong.
 - **Tests: fix the idling and the flakes first, loosen pins second.** The idling is fixed. The flakes are the biggest cause of red CI. The pins are friction, not run time.
+- **Choosing cheaper models is not the lever.** Whole-life cost per change is about the same at frontier and mid tier; what doubled cost per change at the 12 July step, for every tier, was the dispatch count around it. That is the process, which is where the map below aims.
 - **Review's value is concentrated.** A few rules and reviewer judgement make the production catches, mostly on a few risky tickets. That supports sizing the process to the change, and it says which checks a lighter path must keep. The mutation check's test-only rounds are the clearest candidate cost.
 - **Harbour changes itself through its own process,** measured against the baseline below.
 
@@ -84,7 +92,7 @@ The instrument is `scripts/survey-scorecard.mjs`, defined in `measuring-throughp
 - **Throughput** is correct, complete changes per week, per fleet dispatch and per working hour. Process weight added or removed is recorded per change.
 
 **Baseline:**
-- about **47 correct, complete changes a week since mid-July** (95 a week in the weeks of 8 to 29 June, 69 in June's calendar weeks; June was a different regime, see point 11);
+- about **47 correct, complete changes a week since mid-July** (95 a week in the weeks of 8 to 29 June, 86 in the three weeks wholly in June, 69 in June's calendar weeks; June was a different regime, see point 11);
 - **26–49 dispatches and 2.7–3.7 working hours per correct change** (July's 4.4 counted other workspaces' sessions);
 - 11–16M weighted tokens each in September.
 
@@ -109,10 +117,10 @@ This is the input for planning the epic. Savings are shares of the fleet's weigh
 | 2 | **Put the passage layer's bookkeeping in code.** The Runner is 97% mechanical and 94% of its wakes change nothing; it is invoked only on events that need judgement | The Runner and legs account for all of September's supervision rise (`survey-check`) | ~5–10% during passages | M | The Runner keeps its role and altitude; only its polling moves. Passage-level tests |
 | 3 | **A deterministic conductor for the supervision cycle.** The completion gate, re-arming, restating and liveness clocks move into the runner and dispatch code that already hold the answers; model sessions keep judging reports and writing beats | 77% of supervision tokens mechanical (86% on a blind recode); much of the answering is already in code, how much unmeasured (`what-supervisors-do` v2, `survey-check-2`) | up to ~27% in total, including 1 and 2 | L | The largest change. Build in slices behind the scorecard; every altitude kept |
 | 4 | **Fix the four idling test files** (the uncleared `withTimeout` timer). **Done, LIN-3158** | 31% of serial unit time (`test-estate` v2) | Serial unit suite 266 s → 175 s, plus 20–30 s of parallel wall-clock | S | None: the tests are unchanged |
-| 5 | **Make the flaky browser specs and unit flakes robust** (never skip). Unit flakes in progress, LIN-3159 | Flakes are the biggest cause of red CI (`test-estate` v2) | Fewer reruns and red-CI rounds | S–M | Positive: flakes hide real failures |
+| 5 | **Make the flaky browser specs and unit flakes robust** (never skip). Unit flakes done, LIN-3159 (a fixture clock race in `tree.test.js`); browser flakes census LIN-3168 | Flakes are the biggest cause of red CI (`test-estate` v2) | Fewer reruns and red-CI rounds | S–M | Positive: flakes hide real failures |
 | 6 | **Retire census pins in favour of an import-graph check** | About 18 tickets since June exist to repair or bump a pin, about five pure bumps; bumps at least match catches (`test-estate` v2, `fleet-complexity-read`) | Friction on every census change; the weekly rate is uncertain | S | Low. The import graph still guards drift |
 | 7 | **Size the process to the change,** classified by code from the paths touched: docs- and tests-only work, then small low-risk changes, get a lighter path. Credentials, auth, migration and security keep the full process | A docs-only ticket costs ~77% of the median; nothing sizes effort to risk (`where-the-effort-goes`); production catches concentrate in a few risky tickets (`which-rules-pay`). A backtest is running (LIN-3166) | Large per light ticket; total depends on the mix | M | Medium: a mis-sized ticket skips a check. Code-based classification; the correct rate per path |
-| 8 | **Stop review rounds that change nothing.** Close-out finishes wording and test-only items; text-only fixes don't re-trigger review | On LIN-3131: 43% of wall-clock, ~26% of tokens, no production change (`fleet-complexity-read`). Across 100 tickets the mutation check led 97 test-only changes and ~36 of 88 extra legs (`which-rules-pay`) | Per affected ticket, large | S | Low: CI still gates; the scorecard's correct rate |
+| 8 | **Stop review rounds that change nothing.** Close-out finishes wording and test-only items; text-only fixes don't re-trigger review | On LIN-3131: 43% of wall-clock, ~26% of tokens, no production change (`fleet-complexity-read`). Across 100 tickets the mutation check led 97 test-or-wording changes and ~36 of 88 extra legs (`which-rules-pay` v2) | Per affected ticket, large | S | Low: CI still gates; the scorecard's correct rate |
 | 9 | **Loosen text pins on prompt prose;** keep the pins on prompt branches | Prose pins caught 3 of 19 deleted lines; branch pins kill mutants (`test-estate`) | Friction on every prompt change | M | Low if branch pins stay |
 | 10 | **Keep the evidence for the project's lifetime.** In progress, LIN-3157 (four phases) | Every series stops at 30 days | Enables measurement | S | None |
 | 11 | **Freeze prompt sizes;** new lessons land as code first | Growth is steady; text is ~3% of carried context (`steady-base`) | Small directly; stops the ratchet | S | None |
@@ -130,10 +138,10 @@ V1 is one person, one task, one proven merge (`docs/v1.md`). A stranger's task r
 ## Open questions
 
 - **What is the right shape for Harbour's process,** not just a lighter version of today's? This needs John's thought as well as the data.
-- **What does each model tier really cost per correct change, once the rework after Done is counted?** `why-throughput-halved.md` says the mid tier cost the same per change as the frontier but escaped about four times as often. LIN-3165 is re-deriving that and measuring whole-life cost by tier.
-- **Which lessons behind today's rules are still earning their keep?** `which-rules-pay.md` gives the first firing record: 8 of 24 rules have led a production change. Rasmussen's warning applies: a defence's value is invisible until it is removed, and many of the zero rules are gates.
+- **Why did dispatches per correct change double at 12 July, and keep climbing?** `model-choice.md` shows it happened at every tier, so it is the process around the change. Which parts of the process added the dispatches is the next question for the epic.
+- **Which lessons behind today's rules are still earning their keep?** `which-rules-pay.md` gives the first firing record: 8 of 24 rules have led a production change. Rasmussen's warning applies: a defence's value is invisible until it is removed, and about a third of the zero rules are gates; for most of the rest, zero is the design.
 - **How much work could safely take a lighter path?** LIN-3166 is backtesting size-and-risk classifiers over past tickets.
-- **The two newest papers are unchecked:** `why-throughput-halved` and `which-rules-pay`. Their numbers should be checked before the epic is sized on them.
+- **`model-choice.md` is not yet checked by a second document.** Its tier comparison is the one to check before any routing decision rests on it.
 
 ## The evidence
 
@@ -150,8 +158,10 @@ V1 is one person, one task, one proven merge (`docs/v1.md`). A stranger's task r
 | [test-estate](papers/harbour/test-estate.md) (v2) | Which tests earn their keep, and what the rest cost |
 | [measuring-throughput](papers/harbour/measuring-throughput.md) (v2) | The scorecard, its baseline, and what it can detect |
 | [survey-check-2](papers/harbour/survey-check-2.md) | The independent check of the three papers above, and every figure it changed |
-| [why-throughput-halved](papers/harbour/why-throughput-halved.md) (unchecked) | Why correct changes a week halved from June to July |
-| [which-rules-pay](papers/harbour/which-rules-pay.md) (unchecked) | Which review and close-out rules have ever changed production code |
+| [why-throughput-halved](papers/harbour/why-throughput-halved.md) (v3) | Why correct changes a week halved from June to July |
+| [which-rules-pay](papers/harbour/which-rules-pay.md) (v2) | Which review and close-out rules have ever changed production code |
+| [survey-check-3](papers/harbour/survey-check-3.md) | The independent check of the two papers above, and every figure it changed |
+| [model-choice](papers/harbour/model-choice.md) (unchecked) | Who did the work at which tier since January, and each tier's whole-life cost per correct change |
 | Earlier: [ticket-record-and-quality](papers/harbour/ticket-record-and-quality.md), [review-loops](papers/harbour/review-loops.md), [what-the-reviews-checked](papers/harbour/what-the-reviews-checked.md), [cheap-implementer](papers/harbour/cheap-implementer.md), [tasks-generate-tasks](papers/harbour/tasks-generate-tasks.md) | The pieces that pointed this way first |
 
 ## Decisions
