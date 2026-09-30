@@ -738,4 +738,150 @@ describe('scripts/retention-lifetime-pass-lin3157.js — post-deploy retention p
   test('M19 — parseDropIndexArg refuses _id_ at the argument seam', () => {
     assert.throws(() => parseDropIndexArg('prompt-traces:_id_'), /refus/i, 'the explicit _id_ guard is load-bearing at parse time');
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Close-out pass — witnesses for review ledger L9–L12 (LIN-3164).
+  // L9 is the one code regression (fail-first, red on the reviewed head); L10,
+  // L11 and L12 pin behaviour the code already has, each provable only by its
+  // named mutation (M22/M25/M26).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // L9 — the R5 rewrite of `oldest` sorted ascending on `find({})`, so a
+  // missing/null time field (which sorts first ascending in both engines) made
+  // the report print `(none)` for a collection that has dated rows. The dry run
+  // exists to answer "age span per collection" for production, legacy rows
+  // included, so `oldest` must come from dated rows only.
+  test('L9 — the dry run reports the true oldest dated row when some rows lack the time field', async () => {
+    const db = freshDb();
+    await db.collection('dispatch-history').insertMany([
+      { _id: 'dh-dated', urlKey: URL_KEY, status: 'taken', dispatchedAt: daysAgo(40) },
+      { _id: 'dh-missing', urlKey: URL_KEY, status: 'taken' },
+      { _id: 'dh-null', urlKey: URL_KEY, status: 'taken', dispatchedAt: null }
+    ]);
+
+    const result = await runRetentionLifetimePass({ db, now: NOW, log: () => {} });
+    const entry = result.perCollection.find((e) => e.collection === 'dispatch-history');
+    assert.equal(entry.total, 3, 'three dispatch-history rows');
+    assert.notEqual(entry.oldest, null, 'oldest is not null despite time-less rows');
+    assert.equal(new Date(entry.oldest).getTime(), daysAgo(40).getTime(), 'oldest is the 40-day-old dated row');
+    assert.match(
+      result.report,
+      new RegExp(new Date(daysAgo(40)).toISOString()),
+      'the report shows the dated oldest, not (none)'
+    );
+    assert.doesNotMatch(
+      result.report,
+      /dispatch-history[^\n]*\(none\)/,
+      'dispatch-history does not report (none) beside a positive total'
+    );
+  });
+
+  // L10 / M22 — the membership branch (live replacement / withheld vestigial),
+  // not only the typo and disallowed-collection branches, must be validated
+  // before ANY write: `resolveDropTarget`'s name-exists check can stay early
+  // while the membership check slips after the writes (M22), so an execute run
+  // must leave every stamp in place when membership refuses.
+  test('L10/M22 — an execute run with a membership refusal leaves every stamp in place', async () => {
+    const assertStampsSurvive = async (db, label) => {
+      for (const collection of EVIDENCE) {
+        const rows = await db.collection(collection).find({}).toArray();
+        assert.ok(rows.length > 0, `${collection}: seeded row present`);
+        for (const row of rows) {
+          assert.ok(STAMP[collection] in row, `${collection} ${row._id}: stamp survives a refused ${label} drop`);
+        }
+      }
+    };
+
+    // (a) execute + the live LIN-3163 replacement index (membership refusal).
+    const liveDb = freshDb();
+    await seedOneStampedEach(liveDb);
+    await liveDb.collection('prompt-traces').createIndex(EXTENDED['prompt-traces']);
+    const liveName = await indexNameForKey(liveDb, 'prompt-traces', EXTENDED['prompt-traces']);
+    assert.equal(liveName, 'urlKey_1_timestamp_-1__seq_-1__id_-1', 'the live replacement auto-name matches the review');
+    await assert.rejects(
+      runRetentionLifetimePass({ db: liveDb, execute: true, dropIndex: `prompt-traces:${liveName}`, now: NOW, log: () => {} }),
+      /refus/i,
+      'the live replacement is refused before any write'
+    );
+    await assertStampsSurvive(liveDb, 'live-replacement');
+
+    // (b) execute + a withheld vestigial index (membership refusal).
+    const withheldDb = freshDb();
+    await seedOneStampedEach(withheldDb);
+    await withheldDb.collection('prompt-traces').createIndex(VESTIGIAL['prompt-traces']);
+    await withheldDb.collection('prompt-traces').createIndex(A2_SHAPE);
+    const withheldName = await indexNameForKey(withheldDb, 'prompt-traces', VESTIGIAL['prompt-traces']);
+    await assert.rejects(
+      runRetentionLifetimePass({ db: withheldDb, execute: true, dropIndex: `prompt-traces:${withheldName}`, now: NOW, log: () => {} }),
+      /refus/i,
+      'the withheld vestigial is refused before any write'
+    );
+    await assertStampsSurvive(withheldDb, 'withheld-vestigial');
+  });
+
+  // L11 / M25 — membership must be scoped to the (collection, name) pair, not
+  // the name alone: four collections share `urlKey_1_expiresAt_1`, so the same
+  // name gated on one collection must not authorise dropping the withheld
+  // instance on another.
+  test('L11/M25 — membership is collection-scoped for the shared urlKey_1_expiresAt_1 name', async () => {
+    const db = freshDb();
+    // foreman-status: vestigial candidate + its exact replacement -> gated.
+    await db.collection('foreman-status').createIndex(VESTIGIAL['foreman-status']);
+    await db.collection('foreman-status').createIndex(EXTENDED['foreman-status']);
+    // proxy-events: same candidate shape/name, replacement missing -> withheld.
+    await db.collection('proxy-events').createIndex(VESTIGIAL['proxy-events']);
+
+    const fsName = await indexNameForKey(db, 'foreman-status', VESTIGIAL['foreman-status']);
+    const peName = await indexNameForKey(db, 'proxy-events', VESTIGIAL['proxy-events']);
+    assert.equal(fsName, 'urlKey_1_expiresAt_1', 'foreman-status vestigial auto-name');
+    assert.equal(peName, 'urlKey_1_expiresAt_1', 'proxy-events vestigial auto-name is the same');
+
+    const audit = await runRetentionLifetimePass({ db, now: NOW, log: () => {} });
+    assert.ok(
+      audit.indexAudit.dropCandidates.some((c) => c.collection === 'foreman-status' && c.name === fsName),
+      'foreman-status: replacement present -> drop candidate'
+    );
+    assert.ok(
+      audit.indexAudit.withheld.some((w) => w.collection === 'proxy-events' && w.name === peName),
+      'proxy-events: replacement missing -> withheld'
+    );
+
+    await assert.rejects(
+      runRetentionLifetimePass({ db, dropIndex: `proxy-events:${peName}`, now: NOW, log: () => {} }),
+      /refus/i,
+      'the same name withheld on proxy-events is refused'
+    );
+    assert.ok(await indexPresent(db, 'proxy-events', VESTIGIAL['proxy-events']), 'the proxy-events vestigial survives');
+
+    const allowed = await runRetentionLifetimePass({ db, dropIndex: `foreman-status:${fsName}`, now: NOW, log: () => {} });
+    assert.ok(
+      allowed.dropped.some((d) => d.collection === 'foreman-status' && d.name === fsName),
+      'foreman-status with its replacement present is allowed'
+    );
+    assert.equal(await indexPresent(db, 'foreman-status', VESTIGIAL['foreman-status']), false, 'the gated foreman-status index is gone');
+  });
+
+  // L12 / M26 — a run that both unsets stamps and drops an index must be
+  // labelled and footed truthfully, naming both writes.
+  test('L12/M26 — an execute + drop-index run says EXECUTE + DROP-INDEX and its footer names both writes', async () => {
+    const db = freshDb();
+    await seedOneStampedEach(db);
+    await db.collection('prompt-traces').createIndex(VESTIGIAL['prompt-traces']);
+    await db.collection('prompt-traces').createIndex(EXTENDED['prompt-traces']);
+    const name = await indexNameForKey(db, 'prompt-traces', VESTIGIAL['prompt-traces']);
+
+    const result = await runRetentionLifetimePass({ db, execute: true, dropIndex: `prompt-traces:${name}`, now: NOW, log: () => {} });
+    assert.equal(result.execute, true, 'the run executed');
+    assert.equal(result.dropped.length, 1, 'the run dropped one index');
+
+    const header = result.report.split('\n')[0];
+    assert.match(header, /EXECUTE \+ DROP-INDEX/, 'the header carries the combined mode label');
+    assert.doesNotMatch(header, /— DRY RUN|— EXECUTE \(|— DROP-INDEX \(/, 'the header is not a single-mode label');
+    assert.match(
+      result.report,
+      /Execute \+ drop-index — stamps unset on the six evidence collections; the named index was dropped\./,
+      'the footer names both the stamp unset and the index drop'
+    );
+    assert.doesNotMatch(result.report, /nothing was written/i, 'the combined run never says nothing was written');
+  });
 });

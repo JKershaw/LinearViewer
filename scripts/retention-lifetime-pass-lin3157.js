@@ -33,8 +33,9 @@
  *
  * ─── SAFETY INVARIANTS ────────────────────────────────────────────────────
  * - Dry run performs only reads: `countDocuments` for the counts, a
- *   `find().sort({time:1}).limit(1)` for the oldest row, and `listIndexes`. It
- *   never loads a whole collection into memory (LIN-3164 R5).
+ *   `find({[time]:{$exists:true,$ne:null}}).sort({time:1}).limit(1)` for the
+ *   oldest dated row (L9), and `listIndexes`. It never loads a whole collection
+ *   into memory (LIN-3164 R5).
  * - `--execute` touches the six evidence collections only — never
  *   `email-magic-links`, `observation-sessions`, or the dispatch queue.
  * - `--drop-index` is resolved and FULLY validated BEFORE any write (LIN-3164
@@ -415,7 +416,10 @@ export async function runRetentionLifetimePass({
     const total = await coll.countDocuments({});
     const stamped = await coll.countDocuments({ [stamp]: { $exists: true } });
     const pastStamp = await coll.countDocuments({ [stamp]: { $lt: nowDate, $exists: true } });
-    const oldestDocs = await coll.find({}).sort({ [time]: 1 }).limit(1).toArray();
+    // L9: filter to dated rows only. A missing/null field sorts first ascending,
+    // so an unfiltered top-1 would report `oldest (none)` for a collection that
+    // has real dated rows. Bounded (sort + limit 1), read-only.
+    const oldestDocs = await coll.find({ [time]: { $exists: true, $ne: null } }).sort({ [time]: 1 }).limit(1).toArray();
     const oldestMs = oldestDocs.length > 0 ? epochMs(oldestDocs[0][time]) : null;
     perCollection.push({
       collection,
