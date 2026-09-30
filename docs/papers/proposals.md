@@ -8,7 +8,16 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   changed a line of production code. For every rule in `harbour/steady-base-rules.json` from
   review and close-out, find its uses in the last 100 Done tickets and trace each one to the
   commit it did or did not cause. That gives a firing record, which is step 3 of that paper's
-  proposal done once by hand. (Claude, 2026-09-29)
+  proposal done once by hand. Count uses in the orchestrator's stepper beats as well as in the
+  engine's prompts, since `harbour/steady-base-check.md` found beats behind about a third of
+  sampled worker prompts. (Claude, 2026-09-29, widened 2026-09-30)
+- **What do the orchestrator's stepper beats keep of the rules?** `harbour/steady-base-check.md`
+  found that 41 of 112 sampled worker prompts were beats the frontier-tier orchestrator wrote
+  itself, and at least 18 of them wrap an engine brief. For every beat since the stepper shipped,
+  diff the beat's text against the engine brief it wraps, if any, and against the rules in
+  `harbour/steady-base-rules.json`. Record which rules reach the worker, which are dropped, and
+  which the orchestrator adds that no template holds. That says whether the meta-prompt or the
+  kickoff is where a rule actually lives. (Claude, 2026-09-30)
 - **Does a prompt budget move the growth next door?** `harbour/paid-where-written.md` argues that a
   budget cuts what it caps and moves cost to what it does not count, as the `CLAUDE.md` cap did
   (its text moved into `docs/architecture/`, which grew 21 KB) and as the NAO found of Britain's
