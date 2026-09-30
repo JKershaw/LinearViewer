@@ -1,13 +1,13 @@
 ---
 title: Why did the weekly count of correct, complete changes halve from June to July?
 kind: paper
-version: 2
+version: 3
 date: 2026-09-30
-authors: [Claude (version 1, LIN-3155), Claude (version 2 tier corrections, LIN-3165), for John Kershaw]
-model: "Version 1: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 4e21fb08, kind custom, LIN-3155), default effort; one bounded session, with no research, plan, review or close-out legs, by the brief's design. Version 2: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch e86a0765, kind custom, LIN-3165), the model-choice survey's session, which re-derived the tier figures before reading this paper's scripts."
-revision: "Version 2 corrects the escapes by tier per docs/papers/harbour/model-choice.md (LIN-3165): the 2.4% against 9.6% counted rows that name the ticket whose review found an older fault (docs/papers/harbour/survey-check-2.md) and escapes filed before the change merged. Without them it is 0 of 171 against 14 of 365, so mid still escapes more, but not measurably four times. The 84-to-12 fall and the equal cost per change reproduce and stand."
-grounded_at: fd6b1352 (LinearViewer), 3b1e734 (simple-dispatcher)
-cites: [docs/papers/harbour/model-choice.md (LIN-3165), docs/papers/harbour/survey-check-2.md (LIN-3154), docs/papers/harbour/measuring-throughput.md@fd6b1352:19, docs/papers/harbour/measuring-throughput.md@fd6b1352:98, docs/papers/harbour/measuring-throughput.md@fd6b1352:238, docs/papers/harbour/growth-atlas.md@fd6b1352:80, docs/papers/harbour/growth-atlas.md@fd6b1352:178, docs/papers/harbour/growth-atlas.md@fd6b1352:189-190, docs/papers/harbour/steady-base.md@fd6b1352:49-56, docs/papers/harbour/steady-base.md@fd6b1352:188-189, docs/papers/harbour/reliability-baseline.md@fd6b1352:47-50, docs/papers/harbour/reliability-baseline.md@fd6b1352:64-65, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:20, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:280-281, docs/papers/harbour/what-supervisors-do.md@fd6b1352:218, docs/papers/harbour/tasks-generate-tasks.md@fd6b1352:24, docs/papers/harbour/writing-length.md@fd6b1352:31, simple-dispatcher b39648b (LIN-1285, 2026-07-12), LinearViewer 88dba96e (LIN-1282, 2026-07-12), simple-dispatcher PR #50 and #51 (LIN-910, LIN-911, 2026-07-02), LIN-3155 (2026-09-30)]
+authors: [Claude (version 1, LIN-3155), Claude (version 2 tier corrections, LIN-3165), Claude (version 3 corrections, LIN-3167), for John Kershaw]
+model: "Version 1: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 4e21fb08, kind custom, LIN-3155), default effort; one bounded session, with no research, plan, review or close-out legs, by the brief's design. Version 2: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch e86a0765, kind custom, LIN-3165), the model-choice survey's session, which re-derived the tier figures before reading this paper's scripts. Version 3: frontier tier, claude-code, the independent check's session (dispatch 121ae7b6, kind custom, LIN-3167)."
+revision: "Version 2 corrects the escapes by tier per docs/papers/harbour/model-choice.md (LIN-3165): the 2.4% against 9.6% counted rows that name the ticket whose review found an older fault (docs/papers/harbour/survey-check-2.md) and escapes filed before the change merged. Without them it is 0 of 171 against 14 of 365, so mid still escapes more, but not measurably four times. The 84-to-12 fall and the equal cost per change reproduce and stand. Version 3 corrects statements per docs/papers/harbour/survey-check-3.md (LIN-3167): the plan-review leg arrived on 26 July, two weeks after the step, not at it; test lines per change and prompt size ramped rather than stepped; the June block's last week is 29 June to 5 July, and on the three weeks wholly in June the split is two-thirds and one-third, and UI is a third of the loss; 33 of the later escape rows are finder rows; dispatches per change after mid-August; the residue-free ratio. Every printed number reproduces, and the figures are unchanged."
+grounded_at: fd6b1352 (LinearViewer), 3b1e734 (simple-dispatcher); version 3 at fe541ee9 (LinearViewer)
+cites: [docs/papers/harbour/survey-check-3.md (LIN-3167), docs/papers/harbour/survey-check-2.md@fe541ee9:337-351, LinearViewer a88c2cf7 and 7f1efdb8 (LIN-1602, LIN-1603, PR #1019 and #1024, 2026-07-26), docs/papers/harbour/model-choice.md (LIN-3165), docs/papers/harbour/survey-check-2.md (LIN-3154), docs/papers/harbour/measuring-throughput.md@fd6b1352:19, docs/papers/harbour/measuring-throughput.md@fd6b1352:98, docs/papers/harbour/measuring-throughput.md@fd6b1352:238, docs/papers/harbour/growth-atlas.md@fd6b1352:80, docs/papers/harbour/growth-atlas.md@fd6b1352:178, docs/papers/harbour/growth-atlas.md@fd6b1352:189-190, docs/papers/harbour/steady-base.md@fd6b1352:49-56, docs/papers/harbour/steady-base.md@fd6b1352:188-189, docs/papers/harbour/reliability-baseline.md@fd6b1352:47-50, docs/papers/harbour/reliability-baseline.md@fd6b1352:64-65, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:20, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:280-281, docs/papers/harbour/what-supervisors-do.md@fd6b1352:218, docs/papers/harbour/tasks-generate-tasks.md@fd6b1352:24, docs/papers/harbour/writing-length.md@fd6b1352:31, simple-dispatcher b39648b (LIN-1285, 2026-07-12), LinearViewer 88dba96e (LIN-1282, 2026-07-12), simple-dispatcher PR #50 and #51 (LIN-910, LIN-911, 2026-07-02), LIN-3155 (2026-09-30)]
 ---
 
 # Why did the weekly count of correct, complete changes halve from June to July?
@@ -15,25 +15,33 @@ cites: [docs/papers/harbour/model-choice.md (LIN-3165), docs/papers/harbour/surv
 Mostly because June was a different regime, not because the same work was counted or split
 differently. The measure holds up. In both periods about nine in ten commits on main named a
 ticket, and a correct change was the same size: a median of 70 production lines in June and 67
-later. Every band of production size fell by about half. Four-fifths of the fall is fewer merged tickets (113 a week in
-June, 65 later). The other fifth is a lower correct, complete share (84% to 72%). Product code
-landed fell by a third, from 4,290 to 2,880 net lines a week, while net test lines rose from
+later. Every band of production size fell by about half. Most of the fall is fewer merged
+tickets (113 a week in June, 65 later), and the rest is a lower correct, complete share (84% to
+72%). How it splits depends on June's last week, 29 June to 5 July, the busiest on record. With
+it, the split is four-fifths and one-fifth. On the three weeks wholly in June it is two-thirds and
+one-third, and the later level is 0.54 of June's rather than 0.49. Product code landed fell by a
+third, from 4,290 to 2,880 net lines a week, while net test lines rose from
 9,400 to 16,300 a week. So total lines landed rose by 40%, and a correct change now carries 2.5×
 the test lines. The fall is almost all Harbour's: 86 to 39 a week, against 9 to 8 in
-simple-dispatcher. Two-fifths of the lost changes are UI work, which fell from 27 a week to 7.
-The step lines up with 12 July, when sessions began to run at the tier each dispatch chose
+simple-dispatcher. A third to two-fifths of the lost changes are UI work, which fell from 27 a
+week to 7. The step lines up with 12 July, when sessions began to run at the tier each dispatch chose
 (LIN-1285). Changes written at the frontier tier fell from 84 a week to 12. The mid tier that
 replaced them costs the same per change and escapes more often, though not measurably four times. June looks like an early
-burst: a UI build-out, written at frontier tier on a lighter process, before the plan-review leg
-and the heavier test habit arrived. It is not a level the later process was built to hold. June's
-session count cannot be measured, so capacity can be neither ruled in nor ruled out.
+burst: a UI build-out, written at frontier tier on a lighter process. But the process did not step
+with the count. The plan-review leg arrived on 26 July, two weeks after the step, and the weeks
+either side of it ran at 48 and 46 a week. Test lines per change ramped through July and August,
+and the prompts grew fastest in the busiest week. The tier switch is the only candidate dated to
+the step itself. June is not a level the later process was built to hold. June's session count
+cannot be measured, so capacity can be neither ruled in nor ruled out.
 
 ![Correct, complete changes a week by tier, net lines landed, and the candidate drivers on the same weeks](figures/why-throughput-halved/weekly-drivers.svg)
 
-*June* is the four full weeks `measuring-throughput.md` used (8–29 June, 95 a week; `:98`).
-*Later* is the 11 full weeks from 13 July to 21 September (46.5 a week; `:19`). The week of
-6 July is the step itself, at 75, and belongs to neither. Every number is both repos together
-unless a repo is named.
+*June* is the four weeks `measuring-throughput.md` used, those beginning 8 to 29 June (95 a week;
+`:98`). The last of them runs to 5 July. June's calendar weeks, beginning 1 to 22 June, give 69
+(`survey-check-2.md`), but only 39% of the first-parent commits in the week of 1 June named a
+ticket, so 69 is low. The three weeks wholly in June give 86. *Later* is the 11 full weeks beginning 13 July to 21 September
+(46.5 a week; `:19`). The week of 6 July is the step itself, at 75, and belongs to neither. Every
+number is both repos together unless a repo is named.
 
 ![Each measure in the later weeks as a multiple of June, grouped by candidate explanation](figures/why-throughput-halved/june-vs-later.svg)
 
@@ -49,8 +57,9 @@ in simple-dispatcher. Dating a change by its last merge could move a few tickets
 
 **Ticket size is not the cause: it is fewer changes of the same size, not the same product split
 finer.** The median correct change had 70 production lines in June and 67 later. Correct
-changes of 1–49 lines fell ×0.46, of 50–299 lines ×0.49 and of 300 or more ×0.44. Production
-churn per correct change rose slightly, from 189 lines to 210. Net product lines per correct
+changes of 1–49 lines fell ×0.46, of 50–299 lines ×0.49 and of 300 or more ×0.44. On the three
+weeks wholly in June the same bands fell ×0.55, ×0.57 and ×0.43. Changes with no production
+lines, docs or tests only, fell less, ×0.67. Production churn per correct change rose slightly, from 189 lines to 210. Net product lines per correct
 change rose from 45 to 62. If anything, changes grew.
 
 **Product delivered fell by a third while tests grew, so the lines landed did not fall.** Net
@@ -62,18 +71,25 @@ correct change's test lines from 73 to 185. That is `steady-base.md`'s rising te
 ratio (1.04 in June, then 1.73, 2.10 and 2.94; `:188-189`) seen per change. Product and test
 together, the repos gained 13,700 net lines a week in June and 19,200 later.
 
-**Work mix explains about two-fifths of the lost changes: UI work collapsed, and only in
-Harbour.** A change's area is the one holding most of its production lines. Correct changes that
+**Work mix explains a third to two-fifths of the lost changes: UI work collapsed.** A
+change's area is the one holding most of its production lines. simple-dispatcher's code all
+counts as runner, so UI work is Harbour's by definition. Correct changes that
 are mainly UI fell from 27.0 to 7.5 a week (×0.28), and UI production churn from 8,090 to 2,310
 lines a week. Mainly-server changes fell from 37.8 to 21.8 (×0.58), runner changes from 9.0 to
 6.6 (×0.74), and docs-or-tests-only changes from 10.8 to 7.2. Of the 48 correct changes a week
-lost, 19.5 are UI and 15.9 server. By repo, Harbour went from 86 to 39 a week and
-simple-dispatcher from 9 to 8. Even outside UI, the count fell by 42%, so the mix does not explain
-it all.
+lost, 19.5 are UI and 15.9 server: two-fifths. On the three weeks wholly in June, UI is a third
+of the loss. By repo, Harbour went from 86 to 39 a week and simple-dispatcher from 9 to 8.
+simple-dispatcher's 9 leans on the week of 29 June: on the weeks wholly in June it had 5, so it
+rose. Even outside UI, the count fell by 42%, so the mix does not explain it all.
 
-**Correctness explains about a fifth, and part of that is the tier.** On a log scale, the fall is
-78% fewer merged tickets (×0.57) and 22% a lower correct, complete share (×0.86). The share of
-merged tickets with a named escape rose from 1.1% to 7.1%. The share that filed a follow-up rose
+**Correctness explains a fifth to a third, and part of that is the tier.** On a log scale, the
+fall is 78% fewer merged tickets (×0.57) and 22% a lower correct, complete share (×0.86). On the
+three weeks wholly in June it is 67% and 33%. The share of merged tickets with a named escape
+rose from 1.1% to 7.1%. More than half of that rise is finder rows: 33 of the later weeks' 58
+escape rows say, in their own reason, that the fault predates the change they name. Those Bugs
+name the ticket whose review found an older fault, not the one that wrote it (`survey-check-2.md`).
+Without them the escaped share is 3.1% and the later count 48.1 a week, and on the paper's weeks
+the correct share is 18% of the fall. June has no finder rows. The share that filed a follow-up rose
 from 9.7% to 18.1%. Named fixes barely moved, from 5.7% to 6.4%. Within the later weeks, changes
 written mainly at frontier tier were 78% correct and complete and mid-tier changes 67%. The
 escapes behind part of that gap need care. Some escape rows name the ticket whose review *found*
@@ -107,24 +123,36 @@ lines). So the tier explains the correctness part, not the volume. The volume is
 So June's work ran partly on engines that left no census. Days a week with a merge fell only from
 7.0 to 6.1.
 
-**Process weight rose at the step, but this data cannot separate cause from consequence.** Every
-per-change measure of process rose across 6–13 July:
-- Median test lines per correct change: ×2.5.
-- What agents are told to read: 323 KB in the week of 8 June, 592 KB at 13 July and 1,192 KB by
-  21 September.
+**Process weight was higher later, but most of it ramped rather than stepped, and this data
+cannot separate cause from consequence.** Every per-change measure of process is higher in the
+later weeks. Only some of them moved at the step:
+- Median test lines per correct change: ×2.5 between the blocks. By week it went 71 in the week of
+  29 June, then 112, 142 and 219 through July, and mostly 200 to 260 in August: a ramp, not a
+  step.
+- What agents are told to read, at each week's end: 323 KB in the week of 8 June, 385 KB in the
+  week of 22 June, 495 KB in the week of 29 June, 592 KB in the week of 13 July and 1,192 KB by
+  21 September. Its largest rise before late August, 110 KB, came in the week of 29 June, the
+  busiest on record. The prompt source files grew 27% in the week of 29 June and 7% in the week
+  of 6 July.
 - Median time from PR open to merge: 11 to 37 minutes in Harbour, and 5 to 31 in
   simple-dispatcher.
 - Median fleet dispatches per change: 2 to 5 in the only June and early-July weeks the logs cover,
-  then 12 to 15.
-- The plan-review leg did not exist in June and did in July.
-- The rendered close-out prompt went from 4,374 to 8,110 bytes, and the kickoff from 39 KB to
-  56 KB (`steady-base.md:49-56`).
+  then 12 to 15 in the weeks of 13 July to 10 August. After that the weekly median ranged from 2
+  to 29.
+- The plan-review leg arrived on 26 July (LIN-1602 and LIN-1603, PRs #1019 and #1024), two weeks
+  after the step. The weeks of 13 and 20 July ran at 48.5 a week before it, and the weeks after at
+  46.0, so it left no step of its own.
+- At month end, the rendered close-out prompt went from 4,374 bytes in June to 8,110 in July, and
+  the kickoff from 39 KB to 56 KB (`steady-base.md:49-56`). Month-end figures cannot place the
+  rise within July.
 - Comment words per Done ticket went from 1,702 to 8,180 (`growth-atlas.md:189-190`; also
   `writing-length.md:31`).
 
-These rose together with the tier switch and the UI slowdown, within the same week. A heavier
-process per change is consistent with fewer changes from a similar number of sessions, but the
-June session count needed to show it does not exist.
+Only the tier switch is dated to the step itself. The UI slowdown and the jump in dispatches came
+in the same fortnight. Test lines per change and prompt size were rising before it and kept rising
+after, and the plan-review leg came later. A heavier process per change is consistent with fewer
+changes from a similar number of sessions, but the June session count needed to show it does not
+exist.
 
 **Organisational: demand did not halve, and passages came later.** Tickets filed held at about
 186 a week in June and 166 later. The count is estimated from ticket numbers, and the open pile
@@ -132,7 +160,7 @@ grew throughout (`growth-atlas.md:178`; `tasks-generate-tasks.md:24`). Passages 
 17 September (`where-the-effort-goes.md:20`; `what-supervisors-do.md:218`), long after the step.
 What did change is where correct changes come from. Review-residue tickets rose from 7.3 to 10.5
 correct changes a week, from 8% of the count to 22%. Tickets with no kind label fell from 72.8 to 29.3.
-So, leaving out the process's own residue, the fall is steeper than the headline: ×0.40 against
+So, leaving out the process's own residue, the fall is steeper than the headline: ×0.41 against
 ×0.49. Human attention cannot be compared, because BLOCKED entries
 exist only from 13 July.
 
@@ -173,16 +201,28 @@ node scripts/survey-halving-chart.mjs        # the two SVGs
 - **Contributions.** Contributions to the fall are shares of the log ratio: merged tickets
   ln 0.57 and correct share ln 0.86, out of ln 0.49. The tier's part substitutes the frontier
   tier's later correct share (78.2%) for the observed 71.6%.
+- **Version 2's figures.** The other June blocks, the finder rows and the weeks either side of the
+  plan-review leg come from `node scripts/survey-check-3.mjs blocks` and `finder`, over the same
+  snapshots (`survey-check-3.md`). A finder row is an escape whose own reason says the fault
+  predates the change it names.
 
 ## Limits
 
 - **The design is a before-and-after across one week, when several things changed at once.** The
-  tier switch, the UI slowdown, the plan-review leg and the jump in dispatches all land between
-  29 June and 13 July. Nothing here separates them. Each finding says what moved with the count,
-  not what moved it.
+  tier switch, the UI slowdown and the jump in dispatches all land between 29 June and 13 July.
+  Nothing here separates them. Each finding says what moved with the count, not what moved it.
+- **June's block includes the first week of July.** The week of 29 June runs to 5 July and is the
+  busiest on record, at 121. It is also the week the SDK runner and the dash substrate left and
+  the first mid-tier changes appeared. With it, the split is four-fifths and one-fifth and UI is
+  two-fifths of the loss. On the three weeks wholly in June, the split is two-thirds and one-third
+  and UI a third.
 - **June's capacity is unmeasured.** The runner's census starts on 13 July, with fragments from
   20 June. June's engines (SDK runner, dash, hand-launched `claude/` sessions) left no count. If
   June ran more sessions, capacity explains more than this paper can credit.
+- **Escapes include finder rows.** 33 of the later weeks' 58 escape rows are Bugs that name the
+  ticket whose review found an older fault. The reading is by reason text, one reader, and not
+  blind. The tier comparison above sets them aside (`model-choice.md`); the block-level escape
+  share is given both ways.
 - **The tier comes from commit trailers.** 10% of June's correct changes and 26% of later ones
   have no tier stated. If most of those are frontier, the fall in frontier-written changes is
   overstated. The frontier-against-mid comparison inside the later block is observational: the

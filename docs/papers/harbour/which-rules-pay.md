@@ -1,12 +1,15 @@
 ---
 title: Which review and close-out rules have ever changed a line of production code?
 kind: paper
-version: 1
+version: 2
 date: 2026-09-30
-authors: [Claude (LIN-3156)]
-model: "Frontier tier, claude-code; effort not recorded in the dispatch item. One bounded research session (dispatch 5635a671, kind custom), no plan, review or close-out legs, by the brief's design. Eleven in-session subagents of the same tier coded the tickets, one more coded the escaped defects, and two more second-read samples blind."
-grounded_at: fd6b1352 (LinearViewer, origin/main); 3b1e734 (simple-dispatcher, origin/main)
+authors: [Claude (version 1, LIN-3156), Claude (version 2 corrections, LIN-3167)]
+model: "Version 1: frontier tier, claude-code; effort not recorded in the dispatch item. One bounded research session (dispatch 5635a671, kind custom), no plan, review or close-out legs, by the brief's design. Eleven in-session subagents of the same tier coded the tickets, one more coded the escaped defects, and two more second-read samples blind. Version 2: frontier tier, claude-code, the independent check's session (dispatch 121ae7b6, kind custom, LIN-3167)."
+revision: "Version 2 corrects statements per docs/papers/harbour/survey-check-3.md (LIN-3167): only two of the top four clear the zero rules' bound; seven tickets touched both repos, and two of them hold the seven fault fixes; about a third of the zero rules are gates, and most of the rest are not written to change production code; three rules existed for only the last six days of the window; the blind recode's agreement; how the population compares with earlier months; and three smaller wordings. Every printed number reproduces, and the table and figures are unchanged."
+grounded_at: fd6b1352 (LinearViewer, origin/main); 3b1e734 (simple-dispatcher, origin/main); version 2 at fe541ee9 (LinearViewer)
 cites:
+  - "docs/papers/harbour/survey-check-3.md and survey-check-3-codes.json (LIN-3167: the blind recode and the earlier-month sample)"
+  - "LinearViewer git log for each rule's earliest cited ticket: LIN-2274 2026-08-24, LIN-2309 2026-08-25, LIN-2991 2026-09-24, LIN-3033 2026-09-25"
   - "docs/papers/harbour/steady-base-rules.json@fd6b1352 (the census: 58 review and 44 close-out rules)"
   - "docs/papers/harbour/steady-base.md@fd6b1352:240-259 (signature counts), :416-420 (the proposal's step 3), :517-522 (Next)"
   - "docs/papers/harbour/paid-where-written-check.md@fd6b1352 (firing reaches only the cheapest rules; value invisible until removal)"
@@ -35,13 +38,17 @@ the changes came from four places:
 
 Four more rules led to 10 changes and 6 faults, and the quality checklist led 4 more with no
 faults. The other 16 rules led no finding that changed production code in these tickets. Twelve
-of them did not appear on a production change even as a supporting rule: risk lanes, follow-up filing, archive and prune, the verdict, and the rules on
-roles, authorization and holding the merge are among them. The mutation check is the busiest
-rule. It led 107 findings, 97 of which changed only tests, and it accounts for about 36 of the 88
-extra legs these tickets ran. Almost all of this is LinearViewer (Harbour). The ten tickets that
-touched only simple-dispatcher got no production change from review, and the two that touched
-both repos got seven fixes. Zero here does not mean a rule is worthless. Most of the zero rules
-are gates, and a gate that works leaves no change behind (see Limits).
+of them did not appear on a production change even as a supporting rule: risk lanes, follow-up
+filing, archive and prune, the verdict, and the rules on roles, authorization and holding the
+merge are among them. The mutation check is the busiest rule. It led 107 findings, 97 of which
+changed only tests or wording, and it accounts for about 36 of the 88 extra legs these tickets
+ran. Almost all of this is LinearViewer (Harbour). The ten tickets that touched only
+simple-dispatcher got no production change from review. Of the seven that touched both repos, two
+got all seven of that group's fault fixes. Zero here does not mean a rule is worthless. Most of
+the zero rules are not written to change production code. About a third are gates, and a gate
+that works leaves no change behind. Most of the rest govern the record and the tracker, and three
+existed for only the last six days of the window (see Limits). The counts hold on a fresh blind
+recode; which rule led each change is the soft call.
 
 ![Each rule's cost in words against the production changes its findings led to](figures/which-rules-pay/cost-vs-production-changes.svg)
 
@@ -104,10 +111,19 @@ Counted as a supporting rule on any production change, only 12 rules score zero:
 
 Together they wrote about 123,000 words into these tickets' comments by the paragraph measure
 below. They also carry about 1,300k prompt tokens across these tickets' review and close-out
-sessions. Risk lanes alone carry 599k and trivial-edit-bound 366k.
+sessions, and risk lanes alone carry 599k. The trivial-edit bound, which is not among the twelve,
+carries 366k.
+
+None of the twelve is written to change production code. Four are gates that stop a merge, a Done
+or a loop: authorization, role separation, the cannot-close branch and verify on the landed
+commit. The verdict is the form a review ends in. Six govern the record and the tracker: the
+summary comment, archive and prune, follow-up filing, search before filing, the rulings check and
+risk lanes. Test adequacy asks for tests, and it led 12 changes that were tests only. For all
+twelve, zero production changes is the design, not a miss. Three of the twelve and the trivial-edit
+bound also existed for only part of the window (Limits).
 
 **The mutation check changes tests, and it drives the most rounds.** It was exercised in 99 of
-the 100 tickets and led 107 findings. Of these, 97 changed only tests, usually one surviving
+the 100 tickets and led 107 findings. Of these, 97 changed only tests or wording, usually one surviving
 mutant pinned per finding. Three changed production code, and none of those was a real fault.
 Scaled to the 88 extra legs these tickets actually ran (review rounds after the first, plus
 close-out holds), the mutation check's findings account for about 36. The class check accounts
@@ -126,7 +142,7 @@ touched only simple-dispatcher raised 44 findings: 24 changed tests or wording a
 nothing. The 7 tickets that touched both repos had 7 fault fixes, 6 of them in LIN-2837. The
 other 83 tickets touched LinearViewer only and hold 37 of the 44 faults.
 
-**A quarter of the filed follow-ups later changed production code.** Findings filed 77
+**About a fifth of the filed follow-ups later changed production code.** Findings filed 77
 follow-ups, to 54 distinct tickets. On main, 12 of those 54 carry production-code commits. The
 class check filed the most: 28 of its 67 lead findings went to a follow-up. The table does not
 credit those later changes to the rule that filed them.
@@ -195,12 +211,15 @@ it. Reviewer judgement is last because it has no rule text or signature to cost.
 
 **How far to trust the ranking.**
 
-- The top four are separable from the zero group. Their production counts' intervals clear the
-  zero rules' upper bound of 3.7.
+- Only two of the top four are separable from the zero group. The class check's interval
+  (11.4–29.7) and the requirements rule's (4.8–18.4) clear the zero rules' upper bound of 3.7.
+  Direct verification's (2.2–13.1) and the quality checklist's (1.1–10.2) do not.
 - The top four are not separable from each other. Direct verification's first place rests on 6
   changes and a small word count.
 - The lead rule is the least stable call. In a blind second read of 7 production tickets, 3
-  swapped reviewer judgement for the ledger (Limits).
+  swapped reviewer judgement for the ledger. In a fresh blind recode of 16 tickets
+  (`survey-check-3.md`), a new reader named the same lead rule as this paper for 59–66% of the
+  production changes (Limits).
 - The word proxy moves the ranking more than the counts do. Rules whose vocabulary other rules
   also use look more expensive: "discharge", "inside" and "follow-up" appear across close-out
   text.
@@ -278,7 +297,8 @@ node scripts/survey-rules-analyse.mjs --sd ../simple-dispatcher    # every numbe
 
 - **It can mean the rule led none of these 483 findings to a production change within these
   tickets.** It cannot mean the rule prevented nothing. Several zero rules are gates: cannot-close,
-  CI green on the exact commit, authorization, role separation and ledger discharge. They act by
+  CI green on the exact commit, authorization, role separation, verify on the landed commit and
+  the trivial-edit bound. Ledger discharge is a gate too, and it led two fault fixes. Gates act by
   stopping a merge, a Done or a loop. When nothing is wrong, their correct output is no change.
   Their value would show only if they were removed, which is Rasmussen's point that
   `paid-where-written-check.md` carries. This bias makes the zero rules look worse than they
@@ -290,6 +310,12 @@ node scripts/survey-rules-analyse.mjs --sd ../simple-dispatcher    # every numbe
 - **It cannot see rare events.** Nineteen days and 100 tickets bound a zero at about 3.7 changes
   per 100 tickets (95%). A rule that pays once a quarter, such as regression history or risk
   lanes, would show zero here. This bias undercounts rare, high-value rules.
+- **Three rules were new.** Search before filing and the rulings check date from 24 September
+  (LIN-2991) and the trivial-edit bound from 25 September (LIN-3033). They applied to only the 46
+  and 34 tickets completed from those days, so their zeros bound at about 8 and 11 changes per 100
+  tickets, not 3.7. Their signatures also matched 3, 5 and 10 tickets completed before the rules
+  existed, so the Exercised column overstates them. The mutation check (24 August) and follow-up
+  filing (25 August) cover the whole window.
 - **It does not follow tests forward.** The mutation check's 97 test-only changes may later
   catch a regression. No finding was followed past its own ticket. This bias undercounts the
   mutation check and test adequacy.
@@ -312,6 +338,16 @@ the reviewer at the finding.
     judgement's 29 may include ledger-led changes, and the ledger's 4 may be too low.
   - The "changed nothing" count is the least stable. A second reader drops or merges about a
     third of those items, so the figure of 140 is soft in both directions.
+  - A fresh blind recode by two new readers, of 16 tickets outside both samples, holds the counts
+    and not the attribution (`survey-check-3.md`). It found 29 and 27 production changes where
+    this paper has 29, and 20 real faults each where it has 20, with the same tickets changed.
+    The readers named this paper's lead rule for 59–66% of the production changes, and each
+    other's for 78%. They gave the class check 7 each where this paper has 10, and reviewer
+    judgement 9 and 10 where it has 9. So the class check's 19 may be high by about a third, and
+    judgement's 29 is not overstated. Both credited regression history with one fault fix that
+    this paper gave to scope drift, so which rules make the eight is soft at the margin. Neither
+    credited the ledger as support on a judgement-led change, where this paper did on 5 of 9, so
+    the ledger's "16 of 44 faults" depends on the reader.
 - **"Real fault" is strict.** Mechanism code with no production caller yet was not counted as
   a fault, even when the finding was right. This undercounts faults.
 
@@ -336,6 +372,14 @@ All three undercount consequences.
 - **Parent tickets are thin.** LIN-3134 and LIN-2995 had their code land under their children
   and show little here.
 - **simple-dispatcher is small.** It has 17 of the 100 tickets, so its zero rests on 10.
+- **Nineteen days in September stand for review since July, not since June.** In a systematic
+  sample of 14 merged code changes a month (`survey-check-3.md`), review looked much the same in
+  July and August: 11 and 10 of the 14 went through code review, 36% and 40% of those were sent
+  back (32% here), and they averaged 1.8 and 2.0 review rounds (1.7 here). June did not: 7 of the
+  14 had a code review, none was sent back, and reviews ran 563 words against 2,776 here. The
+  rule set also changed. Ten of the 24 rules arrived after June, among them the mutation check
+  and follow-up filing, and five more on 29 June. What the late rules did before September
+  cannot be read from this population.
 
 **The cost proxies are rough.** Words are counted by paragraph signature match. A paragraph
 matching two rules counts for both, so the column sums to more than the 376,402 words the
