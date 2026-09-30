@@ -48,7 +48,8 @@ import { MangoClient } from '@jkershaw/mangodb';
 import {
   runRetentionLifetimePass,
   buildRetentionReport,
-  gateDropCandidate
+  gateDropCandidate,
+  parseDropIndexArg
 } from '../../scripts/retention-lifetime-pass-lin3157.js';
 
 const SCRIPT_PATH = fileURLToPath(new URL('../../scripts/retention-lifetime-pass-lin3157.js', import.meta.url));
@@ -709,5 +710,32 @@ describe('scripts/retention-lifetime-pass-lin3157.js — post-deploy retention p
     assert.deepEqual(violations, [], 'no unbounded find(...).toArray() over any collection');
     assert.equal(result.perCollection.length, EVIDENCE.length, 'the counts are still produced');
     assert.ok(result.perCollection.every((entry) => entry.total === 3), 'the counts remain correct');
+  });
+
+  // M9 witness: the allow-list is what keeps an audited-but-protected
+  // collection (observation-sessions) out of the drop set even when its TTL is
+  // a stray this run found. Without it the stray would be droppable.
+  test('M9 — a stray TTL on observation-sessions is audited but never droppable', async () => {
+    const db = freshDb();
+    await db.collection('observation-sessions').createIndex({ historyExpiresAt: 1 }, { expireAfterSeconds: 7200 });
+    const name = await indexNameForKey(db, 'observation-sessions', { historyExpiresAt: 1 });
+    const audit = await runRetentionLifetimePass({ db, now: NOW, log: () => {} });
+    assert.ok(
+      audit.indexAudit.strayTtls.some((s) => s.collection === 'observation-sessions' && s.name === name),
+      'the observation-sessions TTL is audited as a stray'
+    );
+    await assert.rejects(
+      runRetentionLifetimePass({ db, dropIndex: `observation-sessions:${name}`, now: NOW, log: () => {} }),
+      /refus/i,
+      'observation-sessions is never a drop target even when its TTL is a stray'
+    );
+    assert.ok(await indexPresent(db, 'observation-sessions', { historyExpiresAt: 1 }), 'the observation-sessions TTL survives');
+  });
+
+  // M19 witness: after the R3 membership gate, the explicit `_id_` refusal is
+  // defense-in-depth (membership would also reject it), so the end-to-end L5
+  // test no longer distinguishes it. This pins the guard at the parse seam.
+  test('M19 — parseDropIndexArg refuses _id_ at the argument seam', () => {
+    assert.throws(() => parseDropIndexArg('prompt-traces:_id_'), /refus/i, 'the explicit _id_ guard is load-bearing at parse time');
   });
 });

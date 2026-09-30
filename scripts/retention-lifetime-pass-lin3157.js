@@ -32,17 +32,27 @@
  * - The `email-magic-links` TTL index is NEVER dropped, by anyone.
  *
  * ─── SAFETY INVARIANTS ────────────────────────────────────────────────────
- * - Dry run performs only reads (`find`, `listIndexes`).
+ * - Dry run performs only reads: `countDocuments` for the counts, a
+ *   `find().sort({time:1}).limit(1)` for the oldest row, and `listIndexes`. It
+ *   never loads a whole collection into memory (LIN-3164 R5).
  * - `--execute` touches the six evidence collections only — never
  *   `email-magic-links`, `observation-sessions`, or the dispatch queue.
- * - `--drop-index` validates the target (one of the six evidence collections,
- *   name exists, never `_id_`, never `email-magic-links`) and fails loudly
- *   before any write. It drops exactly the named index and nothing else.
+ * - `--drop-index` is resolved and FULLY validated BEFORE any write (LIN-3164
+ *   R1/R3): argument shape and allow-list (`parseDropIndexArg`), the name must
+ *   exist in this run's `listIndexes`, and the target must be in this run's
+ *   allowed drop set. The allowed set is exactly
+ *   `indexAudit.dropCandidates ∪ indexAudit.strayTtls`, scoped to the six
+ *   evidence collections, minus `_id_`; it never includes `email-magic-links`
+ *   or `observation-sessions`. A refused target means NO write of any kind.
+ *   Exactly the one named index is dropped and nothing else.
  * - The replacement gate: a vestigial index is listed as a drop candidate only
  *   when the exact key shape of its replacement index is present on the same
  *   collection (order-sensitive). An older/insufficient shape (e.g. A2's
  *   `{urlKey:1,timestamp:-1}` without the `_id`/`_seq` tie-break) is treated as
  *   ABSENT, the candidate is withheld, and the report says so.
+ * - Report honesty (LIN-3164 R2): the mode label reflects what actually
+ *   happened (`DRY RUN`, `EXECUTE`, `DROP-INDEX`, or both); "nothing was
+ *   written" is printed only when nothing was written.
  */
 
 import { MongoClient } from 'mongodb';
@@ -215,7 +225,11 @@ export function buildRetentionReport({
   unsets = []
 } = {}) {
   const lines = [];
-  lines.push(`# Retention-lifetime pass — ${execute ? 'EXECUTE' : 'DRY RUN'} (LIN-3157 C / LIN-3164)`);
+  const modeLabel = execute && dropped.length > 0 ? 'EXECUTE + DROP-INDEX'
+    : execute ? 'EXECUTE'
+      : dropped.length > 0 ? 'DROP-INDEX'
+        : 'DRY RUN';
+  lines.push(`# Retention-lifetime pass — ${modeLabel} (LIN-3157 C / LIN-3164)`);
   lines.push('');
   lines.push(`Run at: ${new Date(now).toISOString()}`);
   lines.push(`HEAD: ${headSha || '(unknown — not a git checkout)'}`);
@@ -290,8 +304,12 @@ export function buildRetentionReport({
     lines.push('');
   }
 
-  if (execute) {
+  if (execute && dropped.length > 0) {
+    lines.push('Execute + drop-index — stamps unset on the six evidence collections; the named index was dropped. See the sections above.');
+  } else if (execute) {
     lines.push('Execute — stamps unset on the six evidence collections. No index was dropped unless named with --drop-index.');
+  } else if (dropped.length > 0) {
+    lines.push('Drop-index — the named index was dropped. The stamps were NOT unset (no --execute).');
   } else {
     lines.push('Dry run — nothing was written. Re-run with --execute to unset the stamps (after John\'s recorded yes, LIN-3164 comment 5d3433ad).');
   }
@@ -322,6 +340,38 @@ export function parseDropIndexArg(value) {
   }
   if (name === '_id_') {
     throw new Error('refused: cannot drop the _id index');
+  }
+  return { collection, name };
+}
+
+/**
+ * Resolve and fully validate a `--drop-index` target against this run's own
+ * reads, BEFORE any write (LIN-3164 R1/R3). The allowed set is exactly this
+ * run's `indexAudit.dropCandidates ∪ indexAudit.strayTtls`, scoped to the six
+ * evidence collections (`parseDropIndexArg` already refused every other
+ * collection and `_id_`). A live replacement index, a withheld candidate, or a
+ * typo is refused with a message saying why.
+ *
+ * @param {{collection: string, name: string}} target
+ * @param {Object<string, Array<{name: string, key: Object}>>} indexesByCollection
+ * @param {{dropCandidates: Array, strayTtls: Array}} indexAudit
+ * @returns {{collection: string, name: string}}
+ */
+export function resolveDropTarget(target, indexesByCollection, indexAudit) {
+  const { collection, name } = target;
+  const indexes = indexesByCollection[collection] || [];
+  const found = indexes.find((idx) => idx && idx.name === name);
+  if (!found) {
+    throw new Error(`refused: index ${name} not found on ${collection}`);
+  }
+  const isCandidate = indexAudit.dropCandidates.some((c) => c.collection === collection && c.name === name);
+  const isStray = indexAudit.strayTtls.some((s) => s.collection === collection && s.name === name);
+  if (!isCandidate && !isStray) {
+    throw new Error(
+      `refused: ${collection}:${name} is not in this run's allowed drop set ` +
+      '(drop candidates or stray TTLs on the six evidence collections); a live replacement index ' +
+      'and a withheld candidate must never be dropped'
+    );
   }
   return { collection, name };
 }
@@ -358,27 +408,20 @@ export async function runRetentionLifetimePass({
   // Validate the explicit drop target BEFORE any read or write.
   const dropTarget = dropIndex != null ? parseDropIndexArg(dropIndex) : null;
 
-  // ── Dry-run reads: per-collection counts ────────────────────────────────
+  // ── Dry-run reads: per-collection counts (LIN-3164 R5: no whole reads) ───
   const perCollection = [];
   for (const { collection, stamp, time } of EVIDENCE_COLLECTIONS) {
-    const docs = await db.collection(collection).find({}).toArray();
-    let stamped = 0;
-    let pastStamp = 0;
-    let oldestMs = null;
-    for (const doc of docs) {
-      if (doc && doc[stamp] != null) {
-        stamped += 1;
-        const stampMs = epochMs(doc[stamp]);
-        if (stampMs != null && stampMs < nowMs) pastStamp += 1;
-      }
-      const timeMs = epochMs(doc && doc[time]);
-      if (timeMs != null && (oldestMs == null || timeMs < oldestMs)) oldestMs = timeMs;
-    }
+    const coll = db.collection(collection);
+    const total = await coll.countDocuments({});
+    const stamped = await coll.countDocuments({ [stamp]: { $exists: true } });
+    const pastStamp = await coll.countDocuments({ [stamp]: { $lt: nowDate, $exists: true } });
+    const oldestDocs = await coll.find({}).sort({ [time]: 1 }).limit(1).toArray();
+    const oldestMs = oldestDocs.length > 0 ? epochMs(oldestDocs[0][time]) : null;
     perCollection.push({
       collection,
       stamp,
       time,
-      total: docs.length,
+      total,
       stamped,
       pastStamp,
       oldest: oldestMs == null ? null : new Date(oldestMs)
@@ -392,6 +435,11 @@ export async function runRetentionLifetimePass({
   }
   const indexAudit = auditIndexes(indexesByCollection);
 
+  // ── Resolve and FULLY validate the drop target BEFORE any write (R1/R3) ──
+  const resolvedDropTarget = dropTarget
+    ? resolveDropTarget(dropTarget, indexesByCollection, indexAudit)
+    : null;
+
   // ── --execute: unset the vestigial stamp on the six evidence collections ─
   const unsets = [];
   if (execute) {
@@ -400,22 +448,17 @@ export async function runRetentionLifetimePass({
         { [stamp]: { $exists: true } },
         { $unset: { [stamp]: 1 } }
       );
-      unsets.push({ collection, matched: result.matchedCount, modified: result.modifiedCount });
+      unsets.push({ collection, stamp, matched: result.matchedCount, modified: result.modifiedCount });
       log(`[retention-pass] ${collection}: unset ${result.modifiedCount} ${stamp}`);
     }
   }
 
   // ── Explicit --drop-index only; exactly one named index ─────────────────
   const dropped = [];
-  if (dropTarget) {
-    const indexes = indexesByCollection[dropTarget.collection] || await readIndexes(db, dropTarget.collection);
-    const found = (indexes || []).find((idx) => idx && idx.name === dropTarget.name);
-    if (!found) {
-      throw new Error(`refused: index ${dropTarget.name} not found on ${dropTarget.collection}`);
-    }
-    await db.collection(dropTarget.collection).dropIndex(dropTarget.name);
-    dropped.push({ collection: dropTarget.collection, name: dropTarget.name });
-    log(`[retention-pass] dropped ${dropTarget.collection}:${dropTarget.name}`);
+  if (resolvedDropTarget) {
+    await db.collection(resolvedDropTarget.collection).dropIndex(resolvedDropTarget.name);
+    dropped.push({ collection: resolvedDropTarget.collection, name: resolvedDropTarget.name });
+    log(`[retention-pass] dropped ${resolvedDropTarget.collection}:${resolvedDropTarget.name}`);
   }
 
   const report = buildRetentionReport({
@@ -446,10 +489,30 @@ export function readHeadSha() {
   }
 }
 
+/**
+ * Parse the CLI flags (LIN-3164 R6). A bare `--drop-index` — no value, or a
+ * following flag — is refused loudly rather than silently degrading to a dry
+ * run. Pure; exported so the seam is inspectable.
+ *
+ * @param {string[]} args - the flag list (no node/script preamble)
+ * @returns {{execute: boolean, dropIndex: string|null}}
+ */
+export function parseArgv(args = []) {
+  const execute = args.includes('--execute');
+  const at = args.indexOf('--drop-index');
+  let dropIndex = null;
+  if (at !== -1) {
+    const value = args[at + 1];
+    if (value == null || value === '' || value.startsWith('--')) {
+      throw new Error('refused: --drop-index requires a <collection>:<name> value');
+    }
+    dropIndex = value;
+  }
+  return { execute, dropIndex };
+}
+
 async function main() {
-  const execute = process.argv.includes('--execute');
-  const dropIndexAt = process.argv.indexOf('--drop-index');
-  const dropIndex = dropIndexAt !== -1 ? (process.argv[dropIndexAt + 1] || null) : null;
+  const { execute, dropIndex } = parseArgv(process.argv.slice(2));
 
   const dbClient = process.env.MONGODB_URI
     ? new MongoClient(process.env.MONGODB_URI)
