@@ -11,27 +11,37 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   (Claude, 2026-09-30)
 - **When were the faults that later reviews find actually written?** `harbour/reliability-baseline.md`
   counted 49 escaped Bugs filed as `kind:review-residue`, a later review finding a fault in older
-  code, and in LinearViewer most of its August–September rise is these. For each, `git blame` the lines its fix
+  code, and `harbour/survey-check.md` found at least 21 more with no residue label. In
+  LinearViewer they are all of its August–September rise. For each, `git blame` the lines its fix
   changed and date the introducing commit: before the fleet started on 4 June, in its first
   months, or recent. That separates faults the fleet is finding from faults it is making.
-  (Claude, 2026-09-30)
+  (Claude, 2026-09-30, widened 2026-09-30)
 - **What does a follow-up beat buy?** `harbour/growth-atlas.md` found fresh fleet sessions flat at
   about 450–530 a week since mid-July, while follow-up beats into held sessions doubled after
   31 August, from about 800 a week to about 1,600. Sample beats from simple-dispatcher's run logs and
   oplog, and trace each to what it changed: a commit, a ticket state, a comment, or nothing.
   (Claude, 2026-09-30)
 - **Why does Harbour's unit suite slow faster than it grows?** `harbour/growth-atlas.md` found one
-  CI pass of the unit suite took 8× longer from late June to late September while test lines grew
-  4.2×. Time every test file under `node --test` at each month-end commit and report whether a
+  CI pass of the unit suite took 8–10× longer from late June to late September while test lines
+  grew 4.2×. Time every test file under `node --test` at each month-end commit and report whether a
   few files or the whole suite carry the time. (Claude, 2026-09-30)
 - **What does the added supervision buy?** `harbour/where-the-effort-goes.md` found the supervision
-  layers rose from 28% to 45% of weighted tokens across September as passage Runners and legs
-  arrived, while dispatches per same-sized ticket doubled and working time held flat. Compare
-  tickets flown under a Runner and its legs with tickets run by a lone autopilot, at a fixed size
-  and risk class: first-pass review approval, review rounds and later-found defects. (Claude, 2026-09-30)
-- **Why doesn't effort follow risk?** The same paper found a 50–299-line credential or auth change
-  gets no more dispatches than any other change that size. Is a risk class ever an input when a
-  ticket's process is chosen, and do high-risk tickets' reviews find more? (Claude, 2026-09-30)
+  layers rose from 28% to 45% of weighted tokens across September, and `harbour/survey-check.md`
+  found the whole rise is the passage Runner and its legs, while dispatches per same-sized ticket
+  rose 1.2–1.8×, almost all of it warm beats, and working time held flat. Compare tickets flown
+  under a Runner and its legs with tickets run by a lone autopilot, at a fixed size and risk
+  class: first-pass review approval, review rounds and later-found defects. (Claude, 2026-09-30)
+- **Does effort follow risk at all?** The same paper found no detectable difference between a
+  credential or auth change and any other change of its size, on intervals wide enough to hide a
+  difference of half either way. Is a risk class ever an input when a ticket's process is chosen,
+  and do high-risk tickets' reviews find more? (Claude, 2026-09-30)
+- **Can a ticket's effort be compared month on month in one unit?** `harbour/survey-check.md`
+  found that a dispatch changed meaning over the summer (mostly fresh sessions in July, mostly
+  warm beats into held sessions in September), that the two working-time instruments disagree
+  2.5× on the same tickets, and that transcripts and dispatch history age out after 30 days, so
+  tokens exist only from 31 August. From simple-dispatcher's oplog and run logs, which reach back
+  to 12 July, find a measure that means the same in July as in September, such as executing time
+  outside CI and Monitor polls, and redo the size-held-fixed table in it. (Claude, 2026-09-30)
 
 - **Which review and close-out rules have paid for their place?** `harbour/steady-base.md`
   counted how often each gate rule's signature appears in Done tickets, but not whether any use

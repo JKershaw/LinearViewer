@@ -1,0 +1,347 @@
+{
+ "ticket": "LIN-3153",
+ "readAt": "2026-09-30",
+ "about": "The independent check's readings of reliability-baseline.md's Bug tickets (survey-check.md). Rubric: reliability-baseline-defects.json.",
+ "secondReading": {
+  "sample": "Every 6th Bug-labelled ticket by number, offset 3: 44 of 265. Read from title, labels, state, description and first two comments before the recorded verdict was opened; about 8 had been seen earlier with their recorded reasons, so not fully blind.",
+  "fields": [
+   "verdict",
+   "repo",
+   "finder",
+   "residueLike: 1 if read as a fault in older code found by another ticket's review, research or close-out and filed from its ledger, whatever its label"
+  ],
+  "verdicts": {
+   "LIN-64": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-146": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-276": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-345": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-430": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-609": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-645": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-753": [
+    "escaped",
+    "simple-dispatcher",
+    "human",
+    0
+   ],
+   "LIN-801": [
+    "escaped-test",
+    "LinearViewer",
+    "agent",
+    0
+   ],
+   "LIN-946": [
+    "not-defect",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-1059": [
+    "escaped",
+    "LinearViewer",
+    "unclear",
+    0
+   ],
+   "LIN-1134": [
+    "not-defect",
+    "both",
+    "human",
+    0
+   ],
+   "LIN-1204": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-1324": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    0
+   ],
+   "LIN-1376": [
+    "escaped",
+    "LinearViewer",
+    "unclear",
+    0
+   ],
+   "LIN-1428": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    0
+   ],
+   "LIN-1503": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-1594": [
+    "escaped",
+    "LinearViewer",
+    "unclear",
+    0
+   ],
+   "LIN-1739": [
+    "escaped",
+    "simple-dispatcher",
+    "human",
+    0
+   ],
+   "LIN-1881": [
+    "escaped-test",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2003": [
+    "unclear",
+    "simple-dispatcher",
+    "agent",
+    0
+   ],
+   "LIN-2278": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2293": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2300": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2317": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2339": [
+    "escaped",
+    "simple-dispatcher",
+    "agent",
+    0
+   ],
+   "LIN-2358": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2374": [
+    "escaped-test",
+    "simple-dispatcher",
+    "agent",
+    1
+   ],
+   "LIN-2414": [
+    "escaped",
+    "simple-dispatcher",
+    "agent",
+    1
+   ],
+   "LIN-2450": [
+    "escaped",
+    "LinearViewer",
+    "unclear",
+    0
+   ],
+   "LIN-2510": [
+    "escaped",
+    "simple-dispatcher",
+    "human",
+    0
+   ],
+   "LIN-2556": [
+    "escaped",
+    "simple-dispatcher",
+    "agent",
+    1
+   ],
+   "LIN-2576": [
+    "not-defect",
+    "LinearViewer",
+    "agent",
+    0
+   ],
+   "LIN-2657": [
+    "escaped",
+    "simple-dispatcher",
+    "agent",
+    1
+   ],
+   "LIN-2704": [
+    "routed",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2720": [
+    "escaped",
+    "simple-dispatcher",
+    "human",
+    0
+   ],
+   "LIN-2764": [
+    "routed",
+    "simple-dispatcher",
+    "agent",
+    1
+   ],
+   "LIN-2805": [
+    "escaped",
+    "LinearViewer",
+    "unclear",
+    0
+   ],
+   "LIN-2822": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    1
+   ],
+   "LIN-2882": [
+    "escaped",
+    "LinearViewer",
+    "human",
+    0
+   ],
+   "LIN-2923": [
+    "escaped",
+    "LinearViewer",
+    "agent",
+    0
+   ],
+   "LIN-2981": [
+    "escaped-test",
+    "LinearViewer",
+    "agent",
+    0
+   ],
+   "LIN-2992": [
+    "escaped-test",
+    "LinearViewer",
+    "agent",
+    0
+   ],
+   "LIN-3074": [
+    "routed",
+    "LinearViewer",
+    "agent",
+    1
+   ]
+  }
+ },
+ "unlabelledResidue": {
+  "rule": "An escaped Bug whose own text says another ticket's review, research or close-out found the fault in older code and filed it from that ledger, but which carries no kind:review-residue label. Found by a keyword pass over the verdict reasons, then a reading of each. A floor.",
+  "tickets": {
+   "2026-07 simple-dispatcher": [
+    "LIN-1731"
+   ],
+   "2026-08 simple-dispatcher": [
+    "LIN-1821"
+   ],
+   "2026-09 simple-dispatcher": [
+    "LIN-2468",
+    "LIN-2556",
+    "LIN-2611",
+    "LIN-2612",
+    "LIN-2657",
+    "LIN-2779",
+    "LIN-3032",
+    "LIN-3048",
+    "LIN-3076"
+   ],
+   "2026-09 LinearViewer": [
+    "LIN-2487",
+    "LIN-2712",
+    "LIN-2722",
+    "LIN-2723",
+    "LIN-2816",
+    "LIN-2822",
+    "LIN-2845",
+    "LIN-2849",
+    "LIN-2854",
+    "LIN-2980"
+   ]
+  }
+ },
+ "finderRows": {
+  "rule": "Escapes whose introducedBy names the ticket whose review found or deferred an older fault, not the ticket that wrote it.",
+  "droppedByLagFilter": [
+   "LIN-1821",
+   "LIN-2563",
+   "LIN-2612",
+   "LIN-2644",
+   "LIN-2657",
+   "LIN-2668",
+   "LIN-2712",
+   "LIN-2723",
+   "LIN-2779",
+   "LIN-2816",
+   "LIN-3076",
+   "LIN-3077"
+  ],
+  "keptInVersion1": [
+   "LIN-2487",
+   "LIN-2822",
+   "LIN-2845",
+   "LIN-2854",
+   "LIN-3032",
+   "LIN-3048"
+  ]
+ },
+ "reviewBlockers": {
+  "planReviewNotCodeReview": [
+   "LIN-2351"
+  ],
+  "alreadyRedOnCI": [
+   "LIN-1137"
+  ]
+ }
+}

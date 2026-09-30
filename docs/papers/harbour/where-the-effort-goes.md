@@ -1,29 +1,33 @@
 ---
 title: Where does a ticket's effort go, and does it scale with the size and risk of the change?
 kind: paper
-version: 1
+version: 2
 date: 2026-09-30
-authors: [Claude]
-model: frontier tier, claude-code, effort high; one bounded research session (dispatch f8d71367, kind custom), no plan, review or close-out legs, by the brief's design
+authors: [Claude (version 1, LIN-3148), Claude (version 2 corrections, LIN-3153)]
+model: "Version 1: frontier tier, claude-code, effort high; one bounded research session (dispatch f8d71367, kind custom), no plan, review or close-out legs, by the brief's design. Version 2: frontier tier, claude-code, the independent check's session (dispatch b82a90d8)."
+revision: "Version 2 corrects figures per docs/papers/harbour/survey-check.md (LIN-3153): July's dispatch count, which the run-log gap depresses; the claim that dispatches doubled at every size; what the September rise in supervision is made of; the pooled waiting share; the per-ticket sample, 52 of whose 75 gaps were cached fetch errors; and the reading of the risk table. Judgement disagreements stay in the check."
 grounded_at: 4e566c2a (LinearViewer, origin/main); 3b1e734 (simple-dispatcher, origin/main)
-cites: [docs/papers/harbour/fleet-complexity-read.md@4e566c2a, docs/papers/harbour/steady-base.md@4e566c2a, docs/papers/harbour/review-loops.md@4e566c2a, docs/papers/harbour/cheap-implementer.md@4e566c2a, docs/papers/harbour/ticket-record-and-quality.md@4e566c2a, docs/papers/harbour/efficiency-levers.md@4e566c2a, docs/papers/harbour/what-the-reviews-checked.md@4e566c2a, docs/papers/harbour/tasks-generate-tasks.md@4e566c2a, docs/papers/harbour/writing-length.md@4e566c2a, lib/dispatch-store.js@4e566c2a:248, lib/prompts/autopilot-kickoff.js@4e566c2a:184, docs/passage-runner-prompt.md@4e566c2a:47, simple-dispatcher/phases.js@3b1e734, LIN-3148 (2026-09-30)]
+cites: [docs/papers/harbour/survey-check.md (LIN-3153), docs/papers/harbour/fleet-complexity-read.md@4e566c2a, docs/papers/harbour/steady-base.md@4e566c2a, docs/papers/harbour/review-loops.md@4e566c2a, docs/papers/harbour/cheap-implementer.md@4e566c2a, docs/papers/harbour/ticket-record-and-quality.md@4e566c2a, docs/papers/harbour/efficiency-levers.md@4e566c2a, docs/papers/harbour/what-the-reviews-checked.md@4e566c2a, docs/papers/harbour/tasks-generate-tasks.md@4e566c2a, docs/papers/harbour/writing-length.md@4e566c2a, lib/dispatch-store.js@4e566c2a:248, lib/prompts/autopilot-kickoff.js@4e566c2a:184, docs/passage-runner-prompt.md@4e566c2a:47, simple-dispatcher/phases.js@3b1e734, LIN-3148 (2026-09-30)]
 ---
 
 # Where does a ticket's effort go, and does it scale with the size and risk of the change?
 
 Most of it goes to supervising and checking the work, not to writing it. The share going to
-supervision is rising, and effort follows the size of a change only loosely and its risk
-hardly at all. Over the last thirty days, the only window with token records, the layers that
+supervision rose in September with one new layer, and effort follows the size of a change only
+loosely and shows no detectable response to its risk. Over the last thirty days, the only window with token records, the layers that
 supervise a ticket took 35% of the fleet's weighted Claude tokens: the passage Runner,
-its legs, the stepper, the ticket's own autopilot and its wakes. Their share rose from 28% in
-the first week of September to 45% in the last, as passages started flying. Implementation
-took 24%, falling from 28% to 18%. Plan-review, review and close-out took 24% between them.
-Sessions mostly wait. Per ticket, the runner's own logs show median dispatches rising from 8 in
-July to 17 in September, while working hours stayed near an hour and a half. So a change of the
-same size now takes about twice the dispatches it took in July, for about the same work. Effort
-rises with production lines only weakly (rank correlation 0.19 for tokens, 0.21 for
-dispatches). It tracks test lines more closely than production lines. At a fixed size, a
-credential, auth or migration change gets no more dispatches than any other.
+its legs, the stepper, the ticket's own autopilot and its wakes. Their share rose from 28% in the first week of September to 45% in its last ten days, and
+the whole rise is the passage Runner and its legs, which arrived on 17 September: without
+them supervision was 28% in the first week and 26% in the last. Implementation took 24%,
+falling from 28% to 18% as the Runner joined the total. Plan-review, review and close-out took
+24% between them. Per ticket, the runner's own logs show median dispatches rising from 12 in
+the second half of July, the part its logs see whole, to 17 in September. Almost all of the
+rise is follow-up beats into sessions already open; fresh sessions went from 5 to 7. Working
+hours on the runner's phase clock stayed near an hour and a half. Effort rises with production
+lines only weakly in tokens and dispatches (rank correlation 0.19 and 0.21) and moderately in
+working hours (0.41). It tracks test lines more closely than production lines. At a fixed size,
+the data cannot tell whether a credential, auth or migration change gets more or fewer
+dispatches than any other.
 
 ![Where the weighted tokens go, week by week](figures/where-the-effort-goes/anatomy-tokens.svg)
 
@@ -51,7 +55,12 @@ take 35% of weighted tokens:
 
 The Runner and leg layers do not appear in the first half of the month and were a quarter
 of all weighted tokens in its last ten days. Supervision went from 28% to 45% of the week's
-tokens while implementation went from 28% to 18%. This is the fleet-wide version of what
+tokens, but not steadily: 28%, 24%, 32% and 45% by week, the last of them ten days long.
+Without the Runner and its legs it was 28%, 24%, 15% and 26%. One Runner session, flying
+LIN-3099 from 26 to 30 September, is 4.8% of the whole thirty days' tokens. Implementation went
+from 28% to 18% of a total the Runner had joined; without it, 28% to 24%. The direction holds
+at any cache-read weight from 0 to 0.25, but supervision's tokens are mostly cache reads of
+long waiting contexts, so at fresh input and output alone its share is 23%, not 35%. This is the fleet-wide version of what
 `fleet-complexity-read.md` found on three tickets, where the orchestrator was 36–59% of each
 ticket's weighted tokens and "the biggest single cost". Across the whole fleet the orchestrator
 is smaller than on those three, but it is growing. A supervisor is almost all waiting: an
@@ -85,8 +94,9 @@ still opens more sessions per ticket.
 billed to a sampled ticket's identifier come to 1% of that ticket's worker-plus-app units.
 The 30-day window of the app-call log is the same as for dispatches.
 
-**Sessions mostly wait, and the waiting share rose from 28% in July to 72% in September.** From the runner's
-phase clock, summed over every session filed under a merged Done ticket:
+**Pooled over all session-hours, sessions mostly wait, and the waiting share rose from 28% in
+July to 72% in September.** From the runner's phase clock, summed over every session filed
+under a merged Done ticket:
 
 | Merge month | Tickets timed | Working | Waiting on another session | Waiting on a human | Median working hours per ticket |
 |---|--:|--:|--:|--:|--:|
@@ -96,26 +106,37 @@ phase clock, summed over every session filed under a merged Done ticket:
 
 ![Runner session time per ticket, working vs waiting](figures/where-the-effort-goes/anatomy-time-monthly.svg)
 
-The work per ticket barely moved. What grew is the time sessions spend held open, waiting for
+The pooled share is carried by a few tickets. Ten hold 48% of September's waiting hours, and
+the median ticket waited 40% of its session time in July and 47% in September. The work per
+ticket barely moved. What grew is the time sessions spend held open, waiting for
 a child session or for a follow-up, because a supervisor now parks between beats rather than
 ending. In the per-ticket sample, a ticket's first dispatch to its last completion takes
 2.5 hours at the median, of which 0.6 hours have a session at work. `review-loops.md`
 found plan-review loops alone were a third of all session time in the thirty days to
 12 September.
 
-**Dispatches per ticket doubled at every size; working time did not.** Median dispatches per
-merged Done ticket, from the runner's logs, rose from 8 in July to 10 in August and 17 in
-September. The table holds size fixed, with median working hours in brackets:
+**Dispatches per ticket rose, most in the larger changes; working time barely moved.** Median
+dispatches per merged Done ticket, from the runner's logs, were 8 in July, 10 in August and 17
+in September. July's 8 is too low: the run logs have no record of 6–11 July, and 68 of July's
+225 tickets merged before the oplog began on 12 July, so part of their history is missing.
+Tickets merged from 12 July, the same ones the phase clock times, have a median of 12. The
+table uses them for July and holds size fixed, with median working hours in brackets:
 
 | Production lines changed | July | August | September |
 |---|--:|--:|--:|
-| 0 (docs or tests only) | 5 (0.98 h) | 7 (0.88 h) | 8 (1.14 h) |
-| 1–49 | 10 (1.11 h) | 7 (0.81 h) | 13 (1.03 h) |
-| 50–299 | 8 (1.53 h) | 13 (1.99 h) | 18 (1.68 h) |
-| 300 and over | 11 (1.95 h) | 14 (2.20 h) | 25 (2.47 h) |
+| 0 (docs or tests only) | 16 (0.98 h), n=7 | 7 (0.88 h) | 8 (1.14 h) |
+| 1–49 | 11 (1.11 h), n=42 | 7 (0.81 h) | 13 (1.03 h) |
+| 50–299 | 11 (1.53 h), n=85 | 13 (1.99 h) | 18 (1.68 h) |
+| 300 and over | 14 (1.95 h), n=23 | 14 (2.20 h) | 25 (2.47 h) |
 
-So yes, a same-sized change is getting dearer in dispatches: roughly twice July's count in
-every bin with enough tickets. It is not clearly dearer in working time. Tokens cannot be
+So a same-sized change is getting dearer in dispatches: 1.2× to 1.8× the late-July count in
+the three bins with enough tickets, and more in the larger ones. The dispatch figure in the
+chart below still uses version 1's full July. Nearly all the rise is warm follow-up beats: per
+ticket, the median of fresh sessions went 5, 6, 7 and of warm follow-ups 0, 3, 8. A beat is a
+message into a held session, so a dispatch in September is a smaller unit than one in July. It
+is not clearly dearer in working time, though the largest bin rose 27%, and the phase clock is
+the generous measure: on the same 71 September tickets the feedback-gap measure gives a median
+of 0.62 working hours where the phase clock gives 1.57. Tokens cannot be
 compared month on month (see Limits). Within September, the weekly shift of tokens towards
 supervision points the same way as the dispatch count.
 
@@ -129,15 +150,23 @@ supervision points the same way as the dispatch count.
 | Wall-clock span (sample) | 0.06 | 0.22 |
 | Review rounds (sample) | 0.16 | 0.32 |
 | Dispatches (census, n=732) | 0.21 | 0.36 |
-| Working hours (census, n=665) | 0.41 | – |
+| Working hours (census, n=665) | 0.41 | 0.49 |
 
 A tenfold difference in production lines moves the tokens far less than tenfold. A ticket that
 changes no production code at all still costs about 90% of the median ticket's weighted
-tokens. In the sample, a docs- or tests-only ticket (median 7.2M units) costs twice a 1–49-line change (3.6M). The five tickets over 1,000 lines have a lower median (4.0M) than those of 50–999 lines (9.8M and 11.0M). This matches `ticket-record-and-quality.md`, which found cost rising
+tokens. In the sample, a docs- or tests-only ticket (median 7.2M units) costs twice a 1–49-line
+change (3.6M). The five tickets over 1,000 lines have a lower median (4.0M) than those of
+50–999 lines (9.8M and 11.0M). The sample figures move with the sample. It lost 52 tickets to
+fetch errors that were cached as failures (Method), and 16 of the 17 that were re-read a few
+hours later returned data. With those 16 added, the token correlations are 0.27 with production
+and 0.37 with test lines, and a docs- or tests-only ticket costs about three-quarters of the
+median ticket. Test lines still lead once production size is held fixed (partial correlation
+with dispatches 0.32). Which way that runs is not known: reviews ask for tests, so more rounds
+may produce more test lines. This matches `ticket-record-and-quality.md`, which found cost rising
 from $13 to $79 across thirds of record length with no change in quality, and
 `cheap-implementer.md`'s flat per-review cost.
 
-**Risk hardly moves effort once size is held fixed.** Risk classes come from the production
+**At a fixed size, no effect of risk on effort can be detected.** Risk classes come from the production
 paths a ticket touched (Method). Across July to September:
 
 | Production lines | UI only | Rest | High (credentials, auth, tokens, sessions, security, migration) |
@@ -151,8 +180,12 @@ high-risk tickets had a median of 2 review rounds against 1 elsewhere, but also 
 485 production lines. High-risk tickets cost more in total
 (median 13 dispatches, 1.72 h), but that is because they are bigger: their median is 196
 production lines, against 100 for the rest. In the middle bin, where most tickets sit, a
-high-risk change gets fewer dispatches than an ordinary one. The process gives a credential
-change of a given size about the effort it gives any other change of that size.
+high-risk change gets fewer dispatches than an ordinary one, partly because half of those
+tickets merged in July, the month whose dispatches are undercounted. The classes are small and
+the intervals wide: bootstrapped, the difference in median dispatches between high risk and the
+rest runs from −8 to +14 at 1–49 lines, −8 to +4 at 50–299 and −6 to +13 at 300 and over. The
+data cannot tell equal effort from a difference of half either way. Nothing here shows that a
+credential change of a given size gets more effort than any other change of that size.
 `fleet-complexity-read.md` found the same mismatch from the other end: a full process applied
 to an inert 8-line change.
 
@@ -207,15 +240,19 @@ or `survey-effort-fleet.mjs`.
   `lib/dispatch-store.js:248`), so the sample is the Done tickets merged in September. Every
   second one by ticket number was taken, 146 candidates. For each, the script read
   `GET /issues/{id}/cost` for its lineages and `GET /dispatch/{root}` for each lineage's
-  feedback. That came to 724 cached responses, fetched over three runs proxy calls, paced at one per 4.2 s.
-  - 71 tickets had lineages and are analysed. 75 had none left to read.
+  feedback. That came to 724 cached responses, fetched over three runs, paced at one per 4.2 s.
+  - 72 tickets had lineages and 71 are analysed. 52 `/cost` reads failed with HTTP 404, and
+    `survey-effort-fetch.mjs` caches a failure as if it were an answer, so no later run
+    retried them. 22 had no lineage. A re-read of a third of the failures hours later returned
+    lineages for 16 of 17, so the sample could have held about 120 tickets.
   - Claude `[usage]` lines are cumulative per session and repeat. A lineage's total is the sum
     of each session's maximum; a drop in the running total marks a new session.
   - Cheap-tier lines are per beat and are summed.
   - A lineage rooted on another ticket, or on none, is a supervisor that the ticket's work woke:
     a parent autopilot, a leg or a stack walk. Only its usage between the ticket's first
     dispatch and its last completion counts.
-  - 9 lineages had aged out of the dispatch store and are left out.
+    - 9 lineage reads failed with the same cached 404 and are left out. None had aged out:
+    re-read later, all returned data.
   - Working time is the gaps of at most two minutes between feedback entries, since heartbeats
     come every 30 seconds or less.
   - Checked against the local transcript of one autopilot session, the last `[usage]` line was
@@ -239,14 +276,20 @@ or `survey-effort-fleet.mjs`.
   passages started, so the supervision share it shows may be higher than the summer's. The
   direction of that bias is up for supervision. `fleet-complexity-read.md` found the
   orchestrator already dominant on single tickets, which limits how much higher.
-- **June is invisible.** The runner's logs start on 20 June and its phase clock on 12 July.
-  Only 2 of June's 335 Done tickets appear in the census, and July's working times cover the
-  second half of the month.
-- **The sample misses cheap tickets and early-September work.** Half of the September
-  candidates had no lineage. That happens when a ticket was landed inside another ticket's lane
-  (`review-loops.md` found 81 of 410 in-window tickets with no lineage) or when its dispatches began before 31 August.
-  Lane tickets are the cheap ones, so per-ticket effort in the sample is biased up. A ticket
-  whose early legs aged out is under-counted, which biases it down.
+- **June is invisible, and early July is thin.** The runner's logs start on 20 June and its
+  phase clock on 12 July, and the logs have no record of 6–11 July. The runner script also
+  skips `dispatcher.log` and the `dispatcher.run-manual-*` logs of 1 July. Only 2 of June's 335
+  Done tickets appear in the census. July's working times cover the second half of the month,
+  and version 2 takes July's dispatch counts from the same tickets.
+- **A dispatch is not a fixed unit.** In July most dispatches opened a fresh session; in
+  September most are warm beats into a held one. A rise in dispatches is partly a change of
+  style.
+- **The sample lost a third of its tickets to fetch errors.** 52 of 146 candidates are cached
+  404s, which are not selected by cost, and only 22 (15%) truly had no lineage. Those happen
+  when a ticket was landed inside another ticket's lane (`review-loops.md` found 81 of 410
+  in-window tickets with no lineage) or when its dispatches began before 31 August. Lane
+  tickets are the cheap ones, so that part biases per-ticket effort up. A ticket whose early
+  legs aged out is under-counted, which biases it down.
 - **Per-ticket supervision is approximate.** A supervisor above the ticket appears in a ticket's
   `/cost` only if the ticket's work woke it, and it is counted only inside the ticket's window.
   Two errors pull in opposite directions:
@@ -261,13 +304,21 @@ or `survey-effort-fleet.mjs`.
   beat that opens most worker prompts is counted inside its phase.
 - **Working time is generous.** The phase clock counts EXECUTING as working even while a
   session sits in a CI or Monitor poll, which biases working up. Summed session-hours count
-  concurrent sessions twice, which inflates waiting shares when a supervisor waits on several
-  children at once.
+    concurrent sessions twice, which inflates waiting shares when a supervisor waits on several
+  children at once. On the September tickets both instruments cover, the phase clock gives 2.5
+  times the working time of the feedback-gap measure, so "working time held flat" rests on the
+  generous one.
+- **The fleet table cannot be re-run after the day.** Transcripts are deleted after about 30
+  days; a re-run eight hours later found 1,942 sessions, not 1,951. Weeks are the week a session
+  started, and the Runner that flew LIN-3099 ran past the stated cut-off.
 - **Size and risk are proxies.**
-  - Lines include comments, and `steady-base.md` found half of new production lines are
-    comments, so recent sizes are inflated. That flattens the size relation.
-  - The risk regex reads file names only. It puts `lib/render-account-home.js` in high and
-    would miss a credential change inside a file with a neutral name.
+    - Lines include comments, and `steady-base.md` found half of new production lines are
+    comments, so recent sizes are inflated. Leaving comment lines out moves every correlation
+    by 0.02 or less, so this does not flatten the size relation. `scripts/` counts as
+    production and is 19% of LinearViewer's production lines since June.
+    - The risk regex reads file names only. It puts `lib/render-account-home.js` in high and
+    misses credential handling in files with neutral names, such as `routes/proxy.js`,
+    `server.js` and simple-dispatcher's `clones.js`, which copies `~/.ssh` and the `gh` token.
   - The high-risk class is small (77 census tickets, 9 of them under 50 lines).
 
 ## Next
@@ -276,10 +327,12 @@ or `survey-effort-fleet.mjs`.
   its legs with tickets run by a lone autopilot. Measure first-pass review approval, review
   rounds and later-found defects, with size and risk class held fixed.
 - **Where do September's extra dispatches come from?** Split each ticket's dispatch count into
-  stepper beats, gate rounds and wakes. The count doubled while working time held flat.
-- **Why doesn't effort follow risk?** At a fixed size, a credential change gets no more
-  dispatches than any other. Check whether a risk class is ever an input when a ticket's
+  stepper beats, gate rounds and wakes. The median rose from 12 in late July to 17 while
+  working time held flat, and nearly all of the rise is warm beats.
+- **Does effort follow risk at all?** At a fixed size, no difference between a credential
+  change and any other can be detected, though the intervals are wide. Check whether a risk class is ever an input when a ticket's
   process is chosen, and whether high-risk tickets' reviews find more.
-- **Is waiting cheap?** The share of session time spent waiting went from 28% to 72%. Measure
+- **Is waiting cheap?** The pooled share of session time spent waiting went from 28% to 72%,
+  most of it on ten tickets. Measure
   what a held-open supervisor costs per hour in tokens, since each wake re-reads its growing
   context.
