@@ -14,7 +14,7 @@ cites:
   - "every line why-throughput-halved.md cites: measuring-throughput.md@fd6b1352:19, :98, :238; growth-atlas.md@fd6b1352:80, :178, :189-190; steady-base.md@fd6b1352:49-56, :188-189; reliability-baseline.md@fd6b1352:47-50, :64-65; where-the-effort-goes.md@fd6b1352:20, :279-282; what-supervisors-do.md@fd6b1352:218; tasks-generate-tasks.md@fd6b1352:24; writing-length.md@fd6b1352:31"
   - "LinearViewer a88c2cf7 and 7f1efdb8 (LIN-1602, LIN-1603, PR #1019 and #1024, 2026-07-26), 88dba96e (LIN-1282); simple-dispatcher b39648b (LIN-1285), ec0471d (#50)"
   - "docs/papers/harbour/reliability-baseline-defects.json@fe541ee9 (the escape verdicts and their reasons)"
-  - "docs/steady-base.md@fe541ee9"
+  - "docs/steady-base.md@fe541ee9 and @d0f1a9a9 (points 11 and 12 landed between them); docs/papers/harbour/model-choice.md@d0f1a9a9 (LIN-3165)"
   - "docs/papers/harbour/survey-check-3-codes.json and scripts/survey-check-3.mjs (this check's recode, earlier-month sample and analyses)"
   - "LIN-3167 description and brief; 42 earlier Done tickets listed in survey-check-3-codes.json: read over the workspace proxy 2026-09-30"
 ---
@@ -41,8 +41,9 @@ Only four or five of the twelve rules that never touched a production change are
 the record, so for most of them zero is the design. Three rules existed for only the last six days
 of the window. September's review looks like July's and August's, not June's.
 
-Each paper's version 2 corrects its statements. `docs/steady-base.md` at fe541ee9 cites neither
-paper and has no points 11 or 12. The lines it would change are listed below.
+Each paper's new version corrects its statements: version 3 of the halving paper, over
+LIN-3165's version 2, and version 2 of the rules paper. `docs/steady-base.md` gained points 11 and
+12, quoting both papers' version 1, while this check ran. The lines that change are listed below.
 
 ## Findings
 
@@ -138,9 +139,10 @@ The other cited lines say what the paper says. The dated commits are right: `b39
 **Smaller slips, each corrected in version 2.** Leaving out review residue, the ratio is ×0.41,
 not ×0.40.
 
-**Seen, not re-measured: the tier claim.** LIN-3165 is re-deriving it. Three things for that
-paper:
-- Its 9.6% and 2.4% escaping rest on the same `introducedBy` field, finder rows included.
+**Seen, not re-measured: the tier claim.** LIN-3165 re-derived it in `model-choice.md`, which
+landed while this check ran, and its version 2 of the paper already sets finder rows aside for the
+tier comparison (0 of 171 against 14 of 365). That agrees with this check's finder-row reading.
+Two more things this check saw:
 - Mid-tier changes appear from the week of 29 June, before LIN-1285.
 - The frontier tier still wrote 33 correct changes in the week of 20 July, so the switch was not a
   clean cut.
@@ -264,35 +266,37 @@ small: 10 and 11 reviewed tickets a month bound these rates to about ±30 points
 
 ### The lines of `docs/steady-base.md` that change
 
-The brief says the anchor already cites both papers, as points 11 and 12. At fe541ee9 it has ten
-points and cites neither paper. No branch or local checkout on the runner machine holds a version
-with points 11 or 12. This check did not edit the anchor. Four lines and the evidence table
-change because of these two papers, alongside the rows `survey-check-2.md` already gave for lines
-75, 121 and 123:
+When this check began, the anchor at fe541ee9 cited neither paper. Points 11 and 12, which quote
+both papers' version 1, landed on main while the check ran (e3a2a3d7, "fold in Wave 3", PR #1643).
+The lines below are at d0f1a9a9. This check did not edit the anchor. Lines 61 and 133 also change, because of
+`model-choice.md` (LIN-3165), not this check.
 
 | Line | Now | Should read |
 |---|---|---|
-| 75 | "(95 a week in June; why it halved is an open question)" | 95 a week in the weeks of 8 June to 5 July, 86 in the three weeks wholly in June; `why-throughput-halved` (v2) answers most of why |
-| 121 | "Why did correct, complete changes fall …? Is June an early burst, a change in ticket size, or a real loss?" | Answered in part (`why-throughput-halved` v2). Not ticket size, not measurement. Fewer merged tickets are two-thirds to four-fifths of the fall, and the lower correct share a fifth to a third, less without finder rows. It is Harbour's, and UI is a third to two-fifths of it. The tier switch is the only change dated to the step, and the plan-review leg came two weeks later. June's capacity is unmeasured |
-| 122 | "Which lessons behind today's rules are still earning their keep? The firing record … is proposed in `proposals.md`." | `which-rules-pay` (v2): in 100 September tickets, 8 of 24 rules led a production change. The class check, requirements and reviewer judgement lead. For most of the rest, zero is by design (gates, record-keeping), and three rules were measured over six days. Rasmussen's warning stands |
-| 123 | "The research papers themselves are unreviewed by a second document for this wave" | Both papers of this wave are checked by `survey-check-3.md`, and each has a version 2 |
-| 136–139 | the evidence table | rows for `why-throughput-halved` (v2), `which-rules-pay` (v2), `survey-check-2` and `survey-check-3` |
-
-The pending points 11 and 12 may quote either paper. If so, these version 1 figures change:
-- **The split.** "Four-fifths fewer merged tickets, one-fifth correct share" becomes two-thirds to
-  four-fifths and a fifth to a third, depending on the week of 29 June.
-- **UI.** "Two-fifths UI" becomes a third to two-fifths.
-- **Plan review.** "Before the plan-review leg arrived" becomes: the plan-review leg arrived two
-  weeks after the step.
-- **Escapes.** "Escapes 1.1% to 7.1%" becomes 1.1% to about 3%, without finder rows.
-- **Separability.** "The top four rules are separable from zero" becomes two of them.
-- **Gates.** "Most zero rules are gates" becomes a third; most of the rest govern the record.
+| 3 | "The two newest papers … are not yet checked, and are marked where cited." | Both are checked by `survey-check-3.md`: `why-throughput-halved` is at version 3, `which-rules-pay` at version 2 |
+| 57 | "*(`why-throughput-halved.md`, unchecked)*" | *(`why-throughput-halved.md` v3)* |
+| 59 | "Four-fifths of the fall is fewer merged tickets (113 to 65 a week); a fifth is a lower correct, complete share (84% to 72%)." | Most of the fall is fewer merged tickets (113 to 65 a week), and the rest a lower correct, complete share (84% to 72%). That is four-fifths and a fifth on the weeks of 8 June to 5 July, and two-thirds and a third on the three weeks wholly in June. More than half of the escape rise is finder rows |
+| 60 | "two-fifths of it is UI work (27 to 7 a week)" | a third to two-fifths of it is UI work (27 to 7 a week) |
+| 61 | "The step lines up with 12 July …" | Add: the tier switch is the only change dated to the step. The plan-review leg arrived two weeks later, and test lines and prompts ramped |
+| 62 | "*(`which-rules-pay.md`, unchecked)*" | *(`which-rules-pay.md` v2)* |
+| 64 | "Reviewer judgement … led the most (29 changes, 16 faults), then the class check (19, 12) …" | The counts stand. Which rule led each change is the soft call: a fresh blind recode names the same lead rule 59–66% of the time, and the class check's 19 may be high by about a third |
+| 65 | "Many are gates, and a gate that works leaves no change behind" | About a third are gates. For most of the rest (record-keeping, filing, tests) zero is the design, and three rules existed for only the last six days |
+| 66 | "97 of which changed only tests" | 97 of which changed only tests or wording |
+| 87 | "(95 a week in the weeks of 8 to 29 June, 69 in June's calendar weeks; …)" | Add: 86 in the three weeks wholly in June |
+| 115 | Row 8: "the mutation check led 97 test-only changes" | 97 test-or-wording changes |
+| 134 | "many of the zero rules are gates" | about a third of the zero rules are gates, and for most of the rest zero is the design |
+| 136 | "The two newest papers are unchecked …" | Checked by `survey-check-3.md`, and each has a new version |
+| 153–154 | "(unchecked)" on both rows | (v3) and (v2), with a row for `survey-check-3` |
 
 Unchanged and confirmed:
-- 70 → 67 lines, and every band about half.
-- The fall is Harbour's.
-- 8 of 24 rules, 78 changes, 44 faults and 29 (16) for judgement, as counts.
-- The mutation check's 107 findings and 97 test-or-wording changes, and about 36 of 88 extra legs.
+- Line 58: 70 → 67 lines, and every band about half.
+- Line 60: the fall is Harbour's (86 to 39), and a correct change carries 2.5× the test lines.
+- Line 63: 483 findings, 78 changes in 28 tickets, 44 faults in 18, and 24 in three tickets.
+- Line 66: about 36 of the 88 extra legs.
+- Line 67: no production change for simple-dispatcher-only tickets.
+- Line 75: review's value is concentrated. Only the class check and requirements clear the zero
+  bound, but a few rules and judgement do make the catches.
+- Line 114: row 7.
 
 ## Method
 
@@ -364,8 +368,8 @@ was tested by listing the largest server-classified files by churn in each block
   commit naming its earliest cited ticket.
 - **The ticket cache was not re-fetched.** The population is the author's. A ticket below LIN-2619
   that completed after 11 September would still be missing, as the paper says.
-- **The anchor's points 11 and 12 were not seen.** The table above lists lines at fe541ee9. The
-  figure list is for whatever cites the papers.
+- **The anchor moved while the check ran.** The table lists lines at d0f1a9a9. A later edit to the
+  anchor shifts them.
 
 ## Next
 
@@ -378,5 +382,5 @@ was tested by listing the largest server-classified files by churn in each block
 - **What shipped in the week of 29 June?** It is the busiest week on record, at 121 correct changes,
   and it moves the halving paper's split from two-thirds to four-fifths. Read which tickets merged
   that week, from which branches and engines, and whether they were June's work landing late.
-- Each paper's own Next stands. The halving paper's first Next, the tier comparison, is LIN-3165's.
-  It should take its escapes without finder rows.
+- Each paper's own Next stands. The halving paper's first Next, the tier comparison, is now
+  `model-choice.md`'s, and it already takes its escapes without finder rows.
