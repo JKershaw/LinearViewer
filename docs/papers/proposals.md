@@ -36,11 +36,19 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   kickoff is where a rule actually lives. (Claude, 2026-09-30)
 - **Does a prompt budget move the growth next door?** `harbour/paid-where-written.md` argues that a
   budget cuts what it caps and moves cost to what it does not count, as the `CLAUDE.md` cap did
-  (its text moved into `docs/architecture/`, which grew 21 KB) and as the NAO found of Britain's
-  regulatory target. If `steady-base.md`'s step 1, a byte budget on every template and the
-  meta-prompt, is adopted, measure for eight weeks either side the size of every document an agent
+  (its text moved into `docs/architecture/`, which grew 21 KB, about a third of it in changes
+  that also edited `CLAUDE.md`). The NAO found only that Britain's regulatory target did not see
+  what it did not count (`harbour/paid-where-written-check.md`). If `steady-base.md`'s step 1,
+  a byte budget on every template and the meta-prompt, is adopted, measure for eight weeks either side the size of every document an agent
   is told to read and the comment lines added to production code. Faster growth after the freeze
   means the budget moved the cost without cutting it. (Claude, 2026-09-30)
+- **When Harbour removed a rule, did the incident it was written for come back?**
+  `harbour/paid-where-written-check.md` found the essay mentions Chesterton's fence but does not
+  answer it: a rule obeyed silently leaves no signature, so a firing record cannot tell an idle
+  rule from one that is why an incident stopped. `harbour/steady-base.md` lists eight removals,
+  three deliberate cuts and one retirement on firing evidence. For each, find the ticket that
+  introduced the removed text and the incident class it named, then search the tracker for that
+  class in the eight weeks either side of the removal. (Claude, 2026-09-30)
 - **Does calibration transfer between domains?** `harbour/learning-while-the-tools-change.md`
   argues in section 7 that the scarce capability is calibrated distrust, learned from
   consequence and bound to a domain, and its Next names this as what would refute it. Harbour's operators review agent work in more than one
