@@ -838,3 +838,62 @@ test('rebuildForWrite for an issue in no session is a no-op (does not throw, wri
   const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
   assert.equal(sessions.length, 0);
 });
+
+// LIN-3161 (LIN-3157 A1): the materializer bounds each history read on the
+// shared 30-day horizon (matching lib/pipeline-loops.js), so a lifetime-retained
+// dispatch-history cannot re-derive sessions older than the read window.
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+test('every listHistory call during a rebuild is bounded on the shared 30-day horizon (LIN-3161)', async () => {
+  const ctx = setup();
+  seedSpanningFixture(ctx);
+  const { dispatchStore, materializer } = ctx;
+
+  const calls = [];
+  const orig = dispatchStore.listHistory.bind(dispatchStore);
+  dispatchStore.listHistory = async (urlKey, opts = {}) => {
+    calls.push(opts);
+    return orig(urlKey, opts);
+  };
+
+  await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-300' });
+
+  assert.ok(calls.length >= 1, 'the rebuild must issue at least one history read');
+  const expected = Date.now() - 30 * DAY_MS;
+  for (const opts of calls) {
+    assert.ok(opts.since instanceof Date, `each listHistory call must carry a Date since, got ${typeof opts.since}`);
+    assert.ok(Math.abs(opts.since.getTime() - expected) < 5000, 'since must be ~30d ago');
+  }
+});
+
+test('BOUNDARY BAND (m1): the materializer reads are bound on dispatchedAt, so a dispatch 30.5d ago is outside (LIN-3161)', async () => {
+  const ctx = setup();
+  const { dispatchStore, materializer, historyCollection } = ctx;
+
+  const nowMs = Date.now();
+  // Dispatched 30.5d ago, resolved 29.5d ago — the qualified band.
+  archive(historyCollection, {
+    id: 'band-root',
+    issueIdentifier: 'LIN-900',
+    dispatchedAtMs: nowMs - 30.5 * DAY_MS,
+    resolvedAtMs: nowMs - 29.5 * DAY_MS
+  });
+
+  const calls = [];
+  const orig = dispatchStore.listHistory.bind(dispatchStore);
+  dispatchStore.listHistory = async (urlKey, opts = {}) => {
+    calls.push(opts);
+    return orig(urlKey, opts);
+  };
+
+  await materializer.rebuildForWrite(URL_KEY, { issueIdentifier: 'LIN-900' });
+
+  assert.ok(calls.length >= 1, 'the rebuild must issue the issue-scoped history read');
+  const bandDispatchedAt = nowMs - 30.5 * DAY_MS;
+  for (const opts of calls) {
+    assert.ok(opts.since instanceof Date);
+    assert.ok(opts.since.getTime() > bandDispatchedAt, 'the since bound must sit after the 30.5-day-old dispatch, excluding it');
+  }
+  // The row still exists — it is the READ bound that excludes it, not deletion.
+  assert.strictEqual(historyCollection._docs.length, 1);
+});
