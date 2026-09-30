@@ -6,7 +6,7 @@ date: 2026-09-30
 authors: [Claude]
 model: frontier tier, claude-code; one bounded research session (dispatch c343596a, kind custom) with in-session subagents for data gathering, no plan, review or close-out legs, by the brief's design
 grounded_at: c65b7dd8 (LinearViewer, origin/main); 3b1e734 (simple-dispatcher, origin/main)
-cites: [docs/papers/harbour/growth-atlas.md@c65b7dd8:102, docs/papers/harbour/steady-base.md@c65b7dd8:169, docs/papers/harbour/fleet-complexity-read.md@c65b7dd8:56, docs/papers/harbour/reliability-baseline.md@c65b7dd8:106, docs/papers/harbour/cheap-implementer.md@c65b7dd8:206, lib/http-keepalive.js@c65b7dd8:21, .github/workflows/test.yml@c65b7dd8:47, simple-dispatcher/.github/workflows/ci.yml@3b1e734:53, simple-dispatcher/test/system/mutation/run-mutations.js@3b1e734, simple-dispatcher/reapers.js@3b1e734:689, simple-dispatcher/dispatcher.js@3b1e734:180, LIN-3133, LIN-3151 (2026-09-30)]
+cites: [docs/papers/harbour/growth-atlas.md@c65b7dd8:102, docs/papers/harbour/survey-check.md@01a6576a:73, docs/papers/harbour/steady-base.md@c65b7dd8:169, docs/papers/harbour/fleet-complexity-read.md@c65b7dd8:56, docs/papers/harbour/reliability-baseline.md@c65b7dd8:106, docs/papers/harbour/cheap-implementer.md@c65b7dd8:206, lib/http-keepalive.js@c65b7dd8:21, .github/workflows/test.yml@c65b7dd8:47, simple-dispatcher/.github/workflows/ci.yml@3b1e734:53, simple-dispatcher/test/system/mutation/run-mutations.js@3b1e734, simple-dispatcher/reapers.js@3b1e734:689, simple-dispatcher/dispatcher.js@3b1e734:180, LIN-3133, LIN-3151 (2026-09-30)]
 ---
 
 # Which of Harbour's tests earn their keep, and what does the rest cost?
@@ -44,7 +44,8 @@ behavioural ones (Method).
 | source scan (greps production source) | 216 | 3,390 | 5 s | 1 |
 | e2e / full-system | 1,646 | 29,371 | ~15 CI job-minutes | 84 (not in CI) |
 
-The 14,097 Harbour test cases match `growth-atlas.md`'s count. That paper counts 6,234
+The 14,097 Harbour test cases match `growth-atlas.md`'s count, and the 12,451 unit tests
+match `survey-check.md`'s. That paper counts 6,234
 "text pins" by assertion shape: every `.includes(` or `assert.match(` call. Most of those
 are behavioural checks on rendered HTML, messages and return values. Only about 1,400
 assertions in 490 tests pin the wording of a prompt or a doc. That is close to the 493
@@ -281,8 +282,8 @@ whole unit suite:
   sit silent. That is the population a loosening would actually touch.
 - **When did the four 25-second files start holding the suite open, and what holds them?**
   They arrived between 3 August and 12 September. One run per month-end of
-  `survey-tests-timing.mjs` would say how much of `growth-atlas.md`'s eightfold slowdown they
-  explain.
+  `survey-tests-timing.mjs` would say how much of the eight- to tenfold slowdown that
+  `growth-atlas.md` and `survey-check.md` measured they explain.
 - **Are the flaky e2e specs flaky in the product or in the harness?** Six specs carry most of
   the flakes. Reading their retry traces would say whether a real race is hiding among them.
 - **Does a deliberate red find anything?** Half of all in-session failures are probes the
