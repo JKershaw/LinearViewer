@@ -5,9 +5,10 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
 
 - **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
   `harbour/why-throughput-halved.md` found that, from 13 July, changes written mainly at the mid tier
-  were 67% correct and complete against 78% for the frontier tier, with 9.6% against 2.4% escaping, at
-  the same dispatches and working hours per change. Match later-block changes on production size,
-  area and ticket kind, and report whether the gap survives or belongs to the tickets each tier was
+  were 67% correct and complete against 78% for the frontier tier, with 14 of 365 against none of 171
+  escaping once rows naming the finder are set aside (version 2), at the same dispatches and working
+  hours per change. `harbour/model-choice.md` held size and area fixed and the gap stayed. Match
+  later-block changes on ticket kind as well, and report whether the gap survives or belongs to the tickets each tier was
   given. (Claude, 2026-09-30)
 - **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
   weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
@@ -50,6 +51,12 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   to 12 July, find a measure that means the same in July as in September, such as executing time
   outside CI and Monitor polls, and redo the size-held-fixed table in it. (Claude, 2026-09-30)
 
+- **Can the lead rule of a review finding be coded reliably?** `harbour/survey-check-3.md` found that
+  two blind readers named `harbour/which-rules-pay.md`'s lead rule for 59–66% of its production changes
+  and each other's for 78%, while agreeing on the counts. The class check and reviewer judgement trade
+  places most. Write decision rules that separate "a rule pointed the reviewer here" from "the reviewer
+  saw it", for example that the review text uses the rule's own words. Recode the paper's 28 production
+  tickets under them with two blind readers and report κ. (Claude, 2026-09-30)
 - **Do the tests the mutation check forces ever catch anything?** `harbour/which-rules-pay.md` found
   the mutation check led 107 of 483 review findings in the last 100 reviewed Done tickets, 97 of which
   changed only tests, and about 36 of the 88 extra legs those tickets ran. Follow every test file those
@@ -317,6 +324,18 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   as they caught a fault, on one or two catches a class (`harbour/survey-check-2.md`). Join each pin's age to every CI and session failure record to separate
   the pins that bump often from the ones that never fire, and say how much of the pin family each
   group is. (Claude, 2026-09-30)
+- **What does an escaped defect cost the operator, by implementer tier?** `harbour/model-choice.md`
+  found that mid-tier changes escape more often than frontier ones (11 of 187 against none of 85),
+  but that the rework adds only 0.2–0.3 working hours to a correct change's whole-life cost of 3.25–3.5 hours for either
+  tier. Hours leave out the person who finds, triages and re-dispatches each escape. Join
+  `reliability-baseline-defects.json`'s finder to the tracker's comment and state history, and
+  say how much operator attention each escape took, by the tier that wrote the change.
+  (Claude, 2026-09-30)
+- **Once the 25 September switch to cheap implementers has had 30 days, what does a correct change
+  cost over its whole life?** `harbour/model-choice.md` could not price the cheap tier, because its
+  changes are younger than the 30-day window. Re-run `scripts/survey-model-analyse.mjs` in late
+  October and report the cheap tier's whole-life hours, escapes and afterlife curve beside the two
+  tiers measured here. (Claude, 2026-09-30)
 - **Which of the scorecard's named fixes are fixes, and which follow-ups are the change's own?**
   `harbour/survey-check-2.md` found `scripts/survey-scorecard.mjs`'s correct and complete tests rest on text
   matches: 69 of its 78 named fixes are a mention of the change anywhere in a later ticket's description,
@@ -324,6 +343,12 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   in filings the scorecard ignores. Read the 78 fixes and the 116 filings blind, against a written rubric,
   and report the correct and complete rates as estimates with intervals rather than bounds.
   (Claude, 2026-09-30)
+- **Is the reduced-motion livebar test's first-attempt failure the product or the harness?**
+  `harbour/browser-flakes.md` found `observation.spec.js:401` failing its first attempt in 71% of
+  sampled green runs and passing on the traced retry, a rate that fell from about 90% in July to 44%
+  in late September. Run it alone at origin/main, repeated, with and without tracing and with a wait
+  on the computed style, and report which condition makes the first attempt fail. It is the one test
+  where retries could be hiding a real reduced-motion fault. (Claude, 2026-09-30)
 - **After the same reading, how many of the heavy group's scorecard failures survive?**
   `harbour/proportional-process-backtest.md` read every scorecard failure in its light groups: 11 of M3's
   became 5, and 24 of M4's became 12. It could not read the heavy group's 89 to 100. Read them against the

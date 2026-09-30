@@ -22,6 +22,7 @@ import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, deriveDispatchKind } from '../lib/prompt-templates.js';
 import { getPeriodicals } from '../lib/periodicals.js';
 import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
+import { READ_HORIZON_MS, READ_HORIZON_DAYS, readHorizonStart } from '../lib/read-horizon.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -654,9 +655,15 @@ export function createComputeRoutes({
         return badRequest.json(res, 'This endpoint requires the issue identifier (e.g. LIN-123), not a UUID — dispatch and call-log rows are keyed by identifier, so a UUID would silently match zero rows');
       }
 
+      // LIN-3161 (LIN-3157 A1): both the dispatch-history reads and the
+      // call-log summary are bounded on the shared 30-day read horizon, so a
+      // future lifetime retention cannot silently widen this window. The bound
+      // is on `dispatchedAt` (listHistory's own `since`) / `timestamp`.
+      const since = readHorizonStart();
+
       const [queued, history] = await Promise.all([
         dispatchQueueStore.listItems(req.proxyUrlKey, { issueIdentifier: identifier, projection: { prompt: 0 } }),
-        dispatchQueueStore.listHistory(req.proxyUrlKey, { issueIdentifier: identifier, projection: { prompt: 0 } })
+        dispatchQueueStore.listHistory(req.proxyUrlKey, { issueIdentifier: identifier, since, projection: { prompt: 0 } })
       ]);
       const ownRows = [
         ...queued.map(i => ({ ...i, status: 'queued', feedback: [] })),
@@ -672,6 +679,7 @@ export function createComputeRoutes({
         const { items: lineageSiblings, total: lineageTotal } = await dispatchQueueStore.listHistory(req.proxyUrlKey, {
           rootItemId: { $in: anchors },
           limit: LINEAGE_QUERY_LIMIT,
+          since,
           projection: { prompt: 0 }
         });
         if (lineageTotal > LINEAGE_QUERY_LIMIT) {
@@ -685,15 +693,14 @@ export function createComputeRoutes({
       }
 
       const appSummary = llmCallLogStore
-        ? await llmCallLogStore.summarizeByIssue(req.proxyUrlKey, identifier)
+        ? await llmCallLogStore.summarizeByIssue(req.proxyUrlKey, identifier, { since })
         : { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
 
       const result = buildTaskCost({ ownRows, siblingRowsByAnchor, appSummary });
 
-      const ttlSeconds = llmCallLogStore?.ttl || 30 * 24 * 60 * 60;
       const window = {
-        days: Math.round(ttlSeconds / 86400),
-        appCallsSince: new Date(Date.now() - ttlSeconds * 1000).toISOString()
+        days: READ_HORIZON_DAYS,
+        appCallsSince: since.toISOString()
       };
 
       logEvent(req, '/api/proxy/cost', 200);
@@ -922,7 +929,10 @@ export function createComputeRoutes({
       // Belt-and-suspenders only — the fold re-applies the horizon itself
       // (lib/periodical-runs.js), so this `since` is not load-bearing for
       // correctness, only for trimming the read.
-      const effectiveHorizonMs = Math.min(DEFAULT_HORIZON_MS, dispatchQueueStore.historyTtl * 1000);
+      // LIN-3161 (LIN-3157 A1): the window is the shared 30-day read horizon,
+      // NOT `dispatchQueueStore.historyTtl` — a longer store retention must no
+      // longer widen what "no evidence in-window" means.
+      const effectiveHorizonMs = Math.min(DEFAULT_HORIZON_MS, READ_HORIZON_MS);
 
       const [queueRows, history] = await Promise.all([
         dispatchQueueStore.listItems(req.proxyUrlKey, { projection: PERIODICAL_PROJECTION }),
@@ -966,9 +976,11 @@ export function createComputeRoutes({
         historyRows: filteredHistory
       }, {
         now,
-        // historyTtl is SECONDS (lib/dispatch-store.js:142) — mandatory
-        // conversion; see the correctness-gate note above.
-        historyTtlMs: dispatchQueueStore.historyTtl * 1000
+        // LIN-3161 (LIN-3157 A1): the fold's retention input is the shared
+        // 30-day read horizon (in ms), not the store's `historyTtl` (seconds).
+        // This keeps `never` meaning "no evidence in the 30-day read window"
+        // once storage retention is decoupled from the reporting window.
+        historyTtlMs: READ_HORIZON_MS
       });
 
       logEvent(req, '/api/proxy/periodicals', 200);

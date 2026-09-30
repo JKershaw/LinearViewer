@@ -20,7 +20,7 @@ const URL_KEY = process.env.MEASURE_URLKEY || 'linearviewer';
 const d = db.getSiblingDB(DBN);
 const H = d.getCollection('dispatch-history');
 const KPIS = EJSON.parse(__KPIS_EJSON__);
-const FRESH = KPIS.dispatchHistory.pipeline[0].$project.feedbackCount.$cond[0]; // the app's own FRESH_DIGEST
+const FRESH = KPIS.dispatchHistory.pipeline.find(s => s.$project).$project.feedbackCount.$cond[0]; // the app's own FRESH_DIGEST (LIN-3161: locate the $project — a leading $match now precedes it)
 const since = new Date(Date.now() - 30 * 24 * 3600e3);                         // LOOKBACK_MS, pipeline-loops.js:123
 const Q = { urlKey: URL_KEY, dispatchedAt: { $gte: since } };                   // dispatch-store.js:1054,1060
 const out = (o) => print(JSON.stringify(o));
