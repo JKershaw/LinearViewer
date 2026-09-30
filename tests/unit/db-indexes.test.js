@@ -329,4 +329,59 @@ describe('db-indexes', () => {
     assert.match(warnings[0], /db-indexes/);
     assert.match(warnings[0], new RegExp(failingCollection));
   });
+
+  // ---------------------------------------------------------------------------
+  // LIN-3162 (LIN-3157 A2): five plain, additive indexes backing the DB-side
+  // paged reads, added alongside (never replacing) the pre-A2 expiry specs.
+  // ---------------------------------------------------------------------------
+
+  test('declares the five A2 plain timestamp indexes (LIN-3162)', () => {
+    const expected = [
+      ['proxy-events', { urlKey: 1, timestamp: -1 }],
+      ['prompt-traces', { urlKey: 1, timestamp: -1 }],
+      ['llm-call-log', { urlKey: 1, timestamp: -1 }],
+      ['foreman-status', { urlKey: 1, timestamp: -1 }],
+      ['llm-call-log', { urlKey: 1, issueIdentifier: 1, timestamp: -1 }]
+    ];
+    for (const [collection, keySpec] of expected) {
+      const hasIt = INDEX_SPECS.some(s =>
+        s.collection === collection && JSON.stringify(s.keySpec) === JSON.stringify(keySpec)
+      );
+      assert.ok(hasIt, `${collection} must have a plain ${JSON.stringify(keySpec)} index (LIN-3162)`);
+    }
+  });
+
+  test('preserves the pre-A2 expiry specs until B removes them (LIN-3162)', () => {
+    const retained = [
+      ['dispatch-history', { historyExpiresAt: 1 }],
+      ['proxy-events', { urlKey: 1, expiresAt: 1 }],
+      ['foreman-status', { urlKey: 1, expiresAt: 1 }],
+      ['llm-call-log', { urlKey: 1, expiresAt: 1 }],
+      ['llm-call-log', { urlKey: 1, issueIdentifier: 1, expiresAt: 1 }],
+      ['prompt-traces', { urlKey: 1, expiresAt: 1 }],
+      ['observation-sessions', { historyExpiresAt: 1 }]
+    ];
+    for (const [collection, keySpec] of retained) {
+      const hasIt = INDEX_SPECS.some(s =>
+        s.collection === collection && JSON.stringify(s.keySpec) === JSON.stringify(keySpec)
+      );
+      assert.ok(hasIt, `${collection} must retain ${JSON.stringify(keySpec)} until B`);
+    }
+  });
+
+  test('the A2 timestamp indexes are plain, not TTL; email-magic-links stays the only TTL (LIN-3162)', () => {
+    const a2 = INDEX_SPECS.filter(s => s.keySpec && s.keySpec.timestamp === -1);
+    assert.ok(a2.length >= 5, 'the A2 timestamp indexes are present');
+    for (const spec of a2) {
+      assert.strictEqual(
+        spec.options?.expireAfterSeconds,
+        undefined,
+        `${spec.collection} ${JSON.stringify(spec.keySpec)} must be a plain index, not a TTL`
+      );
+    }
+    const ttlCollections = INDEX_SPECS
+      .filter(s => s.options && s.options.expireAfterSeconds !== undefined)
+      .map(s => s.collection);
+    assert.deepStrictEqual(ttlCollections, ['email-magic-links']);
+  });
 });
