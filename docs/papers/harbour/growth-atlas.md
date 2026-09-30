@@ -174,7 +174,7 @@ statement of the task:
 - **Descriptions stepped up in April, not June.** Across all 3,092 tickets, the median
   description was 96–147 words for tickets filed January to March, and 394–413 in April and
   May. It was 369, 334, 505 and 477 from June to September.
-- **Comment words posted per Done ticket grew fivefold.** They were 1,702 from 1 June to
+- **Comment words posted per Done ticket grew almost fivefold, then eased.** They were 1,702 from 1 June to
   12 July, 8,180 from 13 July to 30 August, and 6,037 since 31 August.
 
 This agrees with `writing-length.md` (1,201 comment words per issue in June against 4,332 in
@@ -187,8 +187,7 @@ sessions a week and signalled 809 follow-up beats into held ones. From 31 August
 of Harbour's 20,449 dispatches have been follow-up beats. Of the 5,295 fresh sessions since
 13 July, 68% ran at the frontier tier, 27% at mid and 5% at cheap. The cheap tier ran 8 to 18
 sessions a week in July and none in August. From the week of 7 September it ran 23 to 125 a
-week. That week holds `cheap-implementer.md`'s trial of 12–13 September. The one quiet week, 14 September, is the only visible dip in
-the fleet: Harbour had no commits on 15 or 16 September. Per Done ticket, fresh sessions held
+week. That week holds `cheap-implementer.md`'s trial of 12–13 September. The week of 14 September is the only visible dip in the fleet: Harbour had no commits on 15 or 16 September. Per Done ticket, fresh sessions held
 at 6.3 from 13 July to 30 August and 5.5 since 31 August. All dispatches rose from 17.8 to
 22.3, and follow-up beats account for all of that rise.
 
