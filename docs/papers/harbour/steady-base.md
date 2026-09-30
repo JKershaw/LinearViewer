@@ -134,7 +134,7 @@ a single paragraph of 1,371 words citing 16 tickets. The gate that everything el
 worker templates, the meta-prompt, the autopilot kickoff, the operating manual, the proxy
 preamble and the proxy instructions. No code refuses a merge or a Done without it.
 `lib/follow-on-ratio.js` parses the ledger heading, but only to measure afterwards. Two narrower
-gates are enforced in code:
+gates are enforced at runtime:
 - **GitHub's `main-protection` ruleset.** It has refused any merge to LinearViewer's `main` without
   a passing `CI success` check since 10 June. It requires no approval, and simple-dispatcher has no
   such rule.
