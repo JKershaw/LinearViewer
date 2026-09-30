@@ -25,15 +25,27 @@ import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-tele
 
 // Minimal in-memory mock of the collection surface kpi-stats uses:
 // find({}).toArray() and countDocuments({} | simple equality filter).
+// LIN-3161: `find()` honours equality and `$gte`/`$gt`/`$lt`/`$lte` bounds so
+// the A1 read-horizon filters are actually applied on the find path (a mock
+// that ignored them would make the new bound-assertions pass vacuously).
 function createMockCollection(docs = []) {
+  const fieldMatches = (value, condition) => {
+    if (condition && typeof condition === 'object') {
+      if ('$gte' in condition) return value >= condition.$gte;
+      if ('$gt' in condition) return value > condition.$gt;
+      if ('$lt' in condition) return value < condition.$lt;
+      if ('$lte' in condition) return value <= condition.$lte;
+    }
+    return value === condition;
+  };
+  const matches = (doc, filter) =>
+    Object.entries(filter || {}).every(([key, condition]) => fieldMatches(doc[key], condition));
   return {
-    find() {
-      return { toArray: async () => docs };
+    find(filter = {}) {
+      return { toArray: async () => docs.filter(doc => matches(doc, filter)) };
     },
     async countDocuments(filter = {}) {
-      return docs.filter(doc =>
-        Object.entries(filter).every(([key, value]) => doc[key] === value)
-      ).length;
+      return docs.filter(doc => matches(doc, filter)).length;
     }
   };
 }
@@ -169,7 +181,7 @@ describe('collectKpiStats', () => {
         event('GET', '/api/proxy/dispatch/:id', 0),
         event('POST', '/api/proxy/foreman/status', 3),
         event('PATCH', '/api/proxy/issues/:id', 3),
-        event('GET', '/api/proxy/me', 45) // outside the 30-day window: excluded from totals and buckets
+        event('GET', '/api/proxy/me', 45) // outside the 30-day window: excluded by the read bound from totals, buckets AND readsPerWrite
       ])
     });
 
@@ -182,8 +194,10 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.proxyCategories.reporting[last - 3], 1);
     assert.strictEqual(stats.proxyCategories.acting[last - 3], 1);
     assert.strictEqual(stats.totals.agentActions, 6);
-    // 4 GET reads vs 3 writes → 1.3 reads per write
-    assert.strictEqual(stats.vanity.readsPerWrite, 1.3);
+    // LIN-3161: readsPerWrite is now computed over the 30-day-bounded read, so
+    // the 45-day GET no longer inflates the read count. 3 in-window GET reads
+    // vs 3 writes → 1.0 (was 1.3 while the out-of-window row was still read).
+    assert.strictEqual(stats.vanity.readsPerWrite, 1.0);
     // Busiest day is today: 4 events vs 2 on day -3
     assert.ok(stats.vanity.busiestDay);
     assert.strictEqual(stats.vanity.busiestDay.count, 4);
@@ -608,19 +622,20 @@ describe('collectKpiStats — 30-day window exclusions (LIN-1846)', () => {
     assert.deepStrictEqual(stats.funnel, { dispatched: 1, taken: 1, reported: 1, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
   });
 
-  test('funnel counts a windowed dispatch as reported/completed even when its report timestamp falls outside a naive 30-day cutoff', async () => {
-    // The dispatch is unambiguously inside the window; its report lands
-    // outside it, at a timestamp a naive report-timestamp filter would
-    // exclude. The funnel must join on the DISPATCH's own window via
-    // dispatchId, not filter the report by its own timestamp (see the funnel
-    // comment in kpi-stats.js) — otherwise a report that lands outside its
-    // dispatch's window silently vanishes from `reported`/`completed`.
+  test('funnel joins a report to its in-window dispatch by dispatchId, not by the report timestamp (LIN-3161)', async () => {
+    // A1 bounds the agent-status read on `timestamp >= now-30d`. Any report for
+    // an in-window dispatch has timestamp >= its dispatch (>= activityWindowStart
+    // > now-30d), so the read bound never drops a report the funnel would count.
+    // The seed this replaced (dispatch 20d ago, report 31d ago) was temporally
+    // impossible — a report cannot predate its dispatch — and is now
+    // unrepresentable at the read. This pins the realistic shape: an in-window
+    // dispatch whose report lands later still joins by dispatchId.
     const collections = buildCollections({
       dispatchHistory: createMockCollection([
-        { _id: 'late-report', status: 'taken', dispatchedAt: daysAgo(20) }
+        { _id: 'in-window', status: 'taken', dispatchedAt: daysAgo(29) }
       ]),
       agentStatus: createMockCollection([
-        { dispatchId: 'late-report', status: 'completed', timestamp: daysAgo(31) }
+        { dispatchId: 'in-window', status: 'completed', timestamp: daysAgo(28.8) }
       ])
     });
 
@@ -1458,7 +1473,10 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.strictEqual(stats.proxyCategories.reporting[last - 3], 1);
     assert.strictEqual(stats.proxyCategories.acting[last - 3], 1);
     assert.strictEqual(stats.totals.agentActions, 6); // excludes the out-of-window event
-    assert.strictEqual(stats.vanity.readsPerWrite, 1.3);
+    // LIN-3161: the 45-day GET is excluded by the aggregation's leading $match,
+    // so readsPerWrite is 3 reads / 3 writes = 1.0 (was 1.3), matching the
+    // bounded find path.
+    assert.strictEqual(stats.vanity.readsPerWrite, 1.0);
     assert.strictEqual(stats.vanity.busiestDay.count, 4);
   });
 
@@ -1794,5 +1812,96 @@ describe('collectKpiStats (aggregation path, real MangoDB)', () => {
     assert.strictEqual(harnessOf(aggRows[0]), harnessOf(foundRows[0]));
     assert.strictEqual(usageOf(aggRows[0]).message, usageOf(foundRows[0]).message);
     assert.strictEqual(evidenceCountOf(aggRows[0]), evidenceCountOf(foundRows[0]));
+  });
+});
+
+// LIN-3161 (LIN-3157 A1): the three whole-collection activity reads are bounded
+// on the shared 30-day read horizon, derived from collectKpiStats' injected
+// `now`. Proven on doubles that actually honour the bound (the old
+// query-ignoring mock would pass vacuously) and on the recorded query/pipeline.
+describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1)', () => {
+  const HORIZON_START = new Date(NOW.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  function recordingAggregate() {
+    let pipeline = null;
+    return {
+      collection: {
+        aggregate(p) { pipeline = p; return { toArray: async () => [] }; },
+        find() { throw new Error('find() must not be called when aggregate() is available'); }
+      },
+      getPipeline: () => pipeline
+    };
+  }
+
+  test('loadProxyBins aggregation gets a leading $match on timestamp, before $group', async () => {
+    const { collection, getPipeline } = recordingAggregate();
+    await collectKpiStats(buildCollections({ proxyEvents: collection }), { now: NOW });
+    const pipeline = getPipeline();
+    assert.deepStrictEqual(pipeline[0], { $match: { timestamp: { $gte: HORIZON_START } } });
+    assert.ok(pipeline[1] && pipeline[1].$group, 'the existing $group must follow the leading $match');
+  });
+
+  test('loadDispatchHistory aggregation gets a leading $match on dispatchedAt (not resolvedAt), before $project', async () => {
+    const { collection, getPipeline } = recordingAggregate();
+    await collectKpiStats(buildCollections({ dispatchHistory: collection }), { now: NOW });
+    const pipeline = getPipeline();
+    assert.deepStrictEqual(pipeline[0], { $match: { dispatchedAt: { $gte: HORIZON_START } } });
+    assert.ok(pipeline[1] && pipeline[1].$project, 'the existing $project must follow the leading $match');
+  });
+
+  test('both find-path fallbacks carry the same bound', async () => {
+    const proxyFilters = [];
+    const historyFilters = [];
+    const proxyEvents = { find(f) { proxyFilters.push(f); return { toArray: async () => [] }; } };
+    const dispatchHistory = { find(f) { historyFilters.push(f); return { toArray: async () => [] }; } };
+    await collectKpiStats(buildCollections({ proxyEvents, dispatchHistory }), { now: NOW });
+
+    assert.deepStrictEqual(proxyFilters[0], { timestamp: { $gte: HORIZON_START } });
+    assert.deepStrictEqual(historyFilters[0], { dispatchedAt: { $gte: HORIZON_START } });
+  });
+
+  test('the agentStatus read is bounded on timestamp AND a 31-day-old row is neither loaded nor counted in workspaces', async () => {
+    let recordedFilter = null;
+    const docs = [
+      { urlKey: 'fresh-ws', action: 'review', status: 'completed', timestamp: daysAgo(2) },
+      { urlKey: 'dormant-ws', action: 'review', status: 'completed', timestamp: daysAgo(31) }
+    ];
+    const agentStatus = {
+      find(filter) {
+        recordedFilter = filter;
+        const gte = filter && filter.timestamp && filter.timestamp.$gte;
+        // Honour the bound; a query-ignoring double would pass vacuously.
+        return { toArray: async () => docs.filter(d => !gte || d.timestamp >= gte) };
+      }
+    };
+    const stats = await collectKpiStats(buildCollections({ agentStatus }), { now: NOW });
+
+    assert.deepStrictEqual(recordedFilter, { timestamp: { $gte: HORIZON_START } });
+    assert.strictEqual(stats.totals.workspaces, 1, 'only the in-window workspace counts');
+    assert.strictEqual(stats.totals.agentActions, 1, 'the 31-day-old status row is neither loaded nor counted');
+  });
+
+  test('in-window step outcomes, dispatchByDay and the funnel are unchanged by the bound', async () => {
+    // A fixture wholly inside the 30-day window: the bound must be a no-op.
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'd1', kind: 'implementation', status: 'taken', dispatchedAt: daysAgo(1), resolvedAt: daysAgo(1), feedback: [{ message: '[usage] {"costUsd":1}', kind: 'usage', timestamp: daysAgo(1) }] },
+        { _id: 'd2', kind: 'plan', status: 'taken', dispatchedAt: daysAgo(2), resolvedAt: daysAgo(2), feedback: [] }
+      ]),
+      agentStatus: createMockCollection([
+        { dispatchId: 'd1', action: 'implementation', status: 'completed', timestamp: daysAgo(1) },
+        { dispatchId: 'd2', action: 'plan', status: 'failed', timestamp: daysAgo(2) }
+      ])
+    });
+    const stats = await collectKpiStats(collections, { now: NOW });
+
+    assert.deepStrictEqual(stats.stepOutcomes, { completed: 1, failed: 1, blocked: 0, other: 0 });
+    // Both dispatches were reported against (any in-window agent-status row
+    // counts as a report); only d1 reports 'completed'.
+    assert.deepStrictEqual(stats.funnel, { dispatched: 2, taken: 2, reported: 2, completed: 1, reportedIsLowerBound: true, completedIsLowerBound: true });
+    assert.strictEqual(stats.dispatchByDay.days.length, ACTIVITY_WINDOW_DAYS);
+    const kinds = Object.fromEntries(stats.dispatchByDay.kinds.map(k => [k.label, k.counts.reduce((a, n) => a + n, 0)]));
+    assert.strictEqual(kinds.implementation, 1);
+    assert.strictEqual(kinds.plan, 1);
   });
 });
