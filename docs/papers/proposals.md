@@ -3,6 +3,21 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **When were the faults that later reviews find actually written?** `harbour/reliability-baseline.md`
+  counted 49 escaped Bugs filed as `kind:review-residue`, a later review finding a fault in older
+  code, and in LinearViewer most of its August–September rise is these. For each, `git blame` the lines its fix
+  changed and date the introducing commit: before the fleet started on 4 June, in its first
+  months, or recent. That separates faults the fleet is finding from faults it is making.
+  (Claude, 2026-09-30)
+- **What does a follow-up beat buy?** `harbour/growth-atlas.md` found fresh fleet sessions flat at
+  about 450–530 a week since mid-July, while follow-up beats into held sessions doubled after
+  31 August, from about 800 a week to about 1,600. Sample beats from simple-dispatcher's run logs and
+  oplog, and trace each to what it changed: a commit, a ticket state, a comment, or nothing.
+  (Claude, 2026-09-30)
+- **Why does Harbour's unit suite slow faster than it grows?** `harbour/growth-atlas.md` found one
+  CI pass of the unit suite took 8× longer from late June to late September while test lines grew
+  4.2×. Time every test file under `node --test` at each month-end commit and report whether a
+  few files or the whole suite carry the time. (Claude, 2026-09-30)
 - **What does the added supervision buy?** `harbour/where-the-effort-goes.md` found the supervision
   layers rose from 28% to 45% of weighted tokens across September as passage Runners and legs
   arrived, while dispatches per same-sized ticket doubled and working time held flat. Compare
@@ -11,12 +26,22 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
 - **Why doesn't effort follow risk?** The same paper found a 50–299-line credential or auth change
   gets no more dispatches than any other change that size. Is a risk class ever an input when a
   ticket's process is chosen, and do high-risk tickets' reviews find more? (Claude, 2026-09-30)
+
 - **Which review and close-out rules have paid for their place?** `harbour/steady-base.md`
   counted how often each gate rule's signature appears in Done tickets, but not whether any use
   changed a line of production code. For every rule in `harbour/steady-base-rules.json` from
   review and close-out, find its uses in the last 100 Done tickets and trace each one to the
   commit it did or did not cause. That gives a firing record, which is step 3 of that paper's
-  proposal done once by hand. (Claude, 2026-09-29)
+  proposal done once by hand. Count uses in the orchestrator's stepper beats as well as in the
+  engine's prompts, since `harbour/steady-base-check.md` found beats behind about a third of
+  sampled worker prompts. (Claude, 2026-09-29, widened 2026-09-30)
+- **What do the orchestrator's stepper beats keep of the rules?** `harbour/steady-base-check.md`
+  found that 41 of 112 sampled worker prompts were beats the frontier-tier orchestrator wrote
+  itself, and at least 18 of them wrap an engine brief. For every beat since the stepper shipped,
+  diff the beat's text against the engine brief it wraps, if any, and against the rules in
+  `harbour/steady-base-rules.json`. Record which rules reach the worker, which are dropped, and
+  which the orchestrator adds that no template holds. That says whether the meta-prompt or the
+  kickoff is where a rule actually lives. (Claude, 2026-09-30)
 - **Does a prompt budget move the growth next door?** `harbour/paid-where-written.md` argues that a
   budget cuts what it caps and moves cost to what it does not count, as the `CLAUDE.md` cap did
   (its text moved into `docs/architecture/`, which grew 21 KB) and as the NAO found of Britain's

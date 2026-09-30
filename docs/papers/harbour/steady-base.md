@@ -1,22 +1,23 @@
 ---
 title: Patches on patches — does Harbour converge to a steady base, or only grow?
 kind: paper
-version: 1
-date: 2026-09-29
-authors: [Claude]
-model: frontier tier, claude-code, effort high; one bounded research session (dispatch 7d0975b0, kind custom), no plan, review or close-out legs, by the brief's design
+version: 2
+date: 2026-09-30
+authors: [Claude (version 1, LIN-3143), Claude (version 2 corrections, LIN-3145)]
+model: "Version 1: frontier tier, claude-code, effort high; one bounded research session (dispatch 7d0975b0, kind custom), no plan, review or close-out legs, by the brief's design. Version 2: frontier tier, claude-code, the independent check's session (dispatch d220ff01)."
+revision: "Version 2 corrects figures per docs/papers/harbour/steady-base-check.md (LIN-3145): the close-out lineage's prompt bytes, the review-comment lengths, the date and level of the June rise, the acceleration at the gates, who writes the model-written prompts, the deliberate cuts, the gates that are enforced in code, and the restatement count. Judgement disagreements stay in the check."
 grounded_at: 8f5fe4aa (LinearViewer, origin/main)
-cites: [docs/papers/harbour/fleet-complexity-read.md@8f5fe4aa, docs/papers/harbour/efficiency-levers.md@8f5fe4aa, docs/papers/harbour/review-loops.md@8f5fe4aa, docs/papers/harbour/review-consumption.md@8f5fe4aa, docs/papers/harbour/what-the-reviews-checked.md@8f5fe4aa, docs/papers/harbour/close-out-claims.md@8f5fe4aa, docs/papers/harbour/writing-length.md@8f5fe4aa, docs/papers/harbour/root-task-ratio.md@8f5fe4aa, docs/architecture/prompt-system.md@8f5fe4aa, docs/reviews/intra-session-efficiency-review-2026-08-14.md@8f5fe4aa, scripts/prompt-template-change-log.md@8f5fe4aa, tests/unit/claude-md-line-budget.test.js@8f5fe4aa, 1403655c (#462), 35dc0e14 (LIN-1270), d4f749c1 (LIN-2896), LIN-3143 (2026-09-29)]
+cites: [docs/papers/harbour/steady-base-check.md (LIN-3145), docs/papers/harbour/fleet-complexity-read.md@8f5fe4aa, docs/papers/harbour/efficiency-levers.md@8f5fe4aa, docs/papers/harbour/review-loops.md@8f5fe4aa, docs/papers/harbour/review-consumption.md@8f5fe4aa, docs/papers/harbour/what-the-reviews-checked.md@8f5fe4aa, docs/papers/harbour/close-out-claims.md@8f5fe4aa, docs/papers/harbour/writing-length.md@8f5fe4aa, docs/papers/harbour/root-task-ratio.md@8f5fe4aa, docs/architecture/prompt-system.md@8f5fe4aa, docs/reviews/intra-session-efficiency-review-2026-08-14.md@8f5fe4aa, scripts/prompt-template-change-log.md@8f5fe4aa, tests/unit/claude-md-line-budget.test.js@8f5fe4aa, 1403655c (#462), 35dc0e14 (LIN-1270), d4f749c1 (LIN-2896), LIN-3143 (2026-09-29)]
 ---
 
 # Patches on patches — does Harbour converge to a steady base, or only grow?
 
-It only grows, and at the gates it is speeding up. Since the fleet started in June, every
-measure of process weight we could put a series on has risen, and none has levelled off.
+It only grows, and fastest at the gates. Since the fleet started in June, every measure of
+process weight we could put a series on has risen, and none has paused for more than four weeks.
 
 - **Prompts.** The close-out prompt is 4.5 times its June size. Review is 5 times its May size.
-  Together they gain more each month than the month before. The meta-prompt, from which a model
-  writes nine worker prompts in ten, is 5.7 times its May size.
+  Together they gain 5 to 10 KB a month, steadily rather than faster. The meta-prompt, from which
+  a cheap-tier model writes five to seven worker prompts in ten, is 5.7 times its May size.
 - **Code.** Half of every net new production line is a comment, and each new production line
   comes with nearly three lines of test.
 
@@ -35,13 +36,13 @@ what it caps. It also shows the growth moving next door.
 | Hypothesis | Verdict | The number that decides it |
 |---|---|---|
 | 1. Incident fixes mostly land as prose | **Supported for gate rules; not for prompt text as a whole** | Close-out lineage: 8 of 10 tickets prompt-only. But of 96 tickets cited in prompt text at HEAD, 42 also shipped runtime code |
-| 2. Nothing removes a rule | **Mostly supported** | 17 of 221 prompt-text commits shrank it; 5 of 101 citations ever left; the one large deliberate cut was regrown in 7 days |
+| 2. Nothing removes a rule | **Mostly supported** | 17 of 221 prompt-text commits shrank it; 5 of 101 citations ever left; of three deliberate cuts, #462 was regrown in 7 days and LIN-1850 is still 22% below its old size |
 | 3. Growth shows across several things | **Supported, with one exception** | Prompts, briefings, comments, code comments, test ratio and pins all rise. Ticket descriptions do not |
 | 4. Only a hard budget bent the curve | **Supported, with a correction** | `CLAUDE.md` fell from 153,845 to 9,174 bytes and has stayed under its cap, but the text moved verbatim to `docs/architecture/`, which has since grown 21 KB |
 
 ## Findings
 
-**The prompts grew five- to sixfold in the fleet era, and the gates are still accelerating.**
+**The prompts grew five- to sixfold in the fleet era, and the growth collects at the gates.**
 The table gives each template's *fixed* text: the prompt rendered for an empty ticket with no
 description, parent, siblings or comments, at the last commit of each month.
 
@@ -55,20 +56,27 @@ description, parent, siblings or comments, at the last commit of each month.
 | Sep | 10,985 | 14,278 | 7,677 | 7,741 | 19,760 | 19,799 | 67,910 | 103,568 |
 
 Bytes. Divide by four for tokens. The meta-prompt is the AI path. A model reads it to write a
-worker's prompt, and the next finding shows that this path writes nine prompts in ten. The six
+worker's prompt, and the next finding shows that this path shapes five to seven prompts in ten. The six
 handwritten templates of one pipeline pass now sum to 80,240 bytes, about 20,000 tokens. In May
 the four that existed summed to 13,010; plan-review and close-out came later. Where the growth goes matters more than how much there is.
 Research has barely moved since June, and the orchestrator kickoff is slowing: it gained
 16.7 KB in July and 6 KB in each month since. Review plus close-out gained 6.6 KB in July,
-8.3 KB in August and 10.5 KB in September. The weight collects at the gates.
+8.3 KB in August and 10.5 KB in September. Measured from mid-month to mid-month instead, they
+gained 9.5, 10.4 and 5.2 KB, so the month-end rise is not an acceleration. Most of September's
+gain came in one week (LIN-3006, 3033 and 3056). The weight collects at the gates at a steady
+rate.
 
-**Most workers never see the handwritten templates. A cheap model reads the whole rulebook and
-writes them a digest.** We fetched the first dispatch of each kind on every third ticket from
-LIN-2951 to LIN-3140. Of 112 dispatched worker prompts, 102 were model-written; the handwritten
-template's long fixed lines were absent. Only 10 were the handwritten template, mostly triage,
-blocked and a few implementations. On the AI path, a cheap-tier model reads the 103,568-byte
-meta-prompt, about 26,000 tokens, on every recommendation. It returns a task-specific prompt
-with a median size of about 7 KB:
+**Most workers never see the handwritten templates. A model writes them a digest: usually a cheap
+model reading the whole rulebook, sometimes the orchestrator itself.** We fetched the first
+dispatch of each kind on every third ticket from LIN-2951 to LIN-3140. Of 112 dispatched worker
+prompts, 102 were model-written; the handwritten template's long fixed lines were absent. Only 10
+were the handwritten template, mostly triage, blocked and a few implementations. The dispatch rows
+say who wrote the 102. The server wrote 61 from a recommendation. The orchestrator wrote 40 as
+stepper beats, sent with a plain `POST /dispatch`, and at least 18 of those wrap a brief the
+server wrote. Another caller wrote 1. So the meta-prompt path shaped between 61 and 79 of the
+112, five to seven in ten. On that path, a cheap-tier model reads the 103,568-byte meta-prompt,
+about 26,000 tokens, on every recommendation. It returns a task-specific prompt with a median size
+of about 7 KB:
 
 | Kind | Dispatches | Median bytes | Largest |
 |---|--:|--:|--:|
@@ -87,12 +95,15 @@ checks which rules the digest kept. The A/B eval for the review ledger exercises
 handwritten review prompt, by its own header (`scripts/eval-review-closeout.mjs`). That path
 wrote 1 of the 24 review prompts sampled. The handwritten templates still matter: the
 meta-prompt must mirror them and the tests pin them. But they are mostly not what a worker
-reads. The
-meta-prompt is, and it grew 5.7× from May to September.
+reads. The meta-prompt is the largest single text behind what workers read, and it grew 5.7× from
+May to September. The orchestrator's kickoff and handbook shape the rest. The review-ledger eval
+covers neither.
 
-**It is a step, then a steady slope.** In source bytes, the worker templates sat between 57 and
-65 KB from February to the end of May, reached 83 KB on 1 June and 203 KB by 28 September.
-June is when the autopilot fleet began. Every curve in this paper bends there. The meta-prompt,
+**It is a ramp, then a steady slope.** In source bytes, the worker templates sat between 57 and
+69 KB from February to the end of May. They reached 83 KB on 7 June, after eleven PRs in four
+days, and 203 KB by 27 September. About 29% of that source growth is JS comments and 11% code.
+The rendered table above counts prompt text only. June is when the autopilot fleet began. Every
+curve in this paper bends there. The meta-prompt,
 the AI path that writes prompts, rose in parallel, from 17 KB to 104 KB. From July to late
 September the worker templates gained about 5 KB a week on average, in uneven steps. This is not exponential
 compounding. It is a ratchet with a steady pull, and it is strongest on the review side.
@@ -103,26 +114,32 @@ head of the subject, or in the PR branch name) and measured what they changed:
 
 | Ticket | Landed | Prompt text added | Runtime code changed |
 |---|---|--:|---|
-| LIN-550 | 2026-06-29 | 25,342 B | registration only (`lib/workflow-config.js`) |
-| LIN-810 | 2026-06-29 | 2,120 B | none |
-| LIN-811 | 2026-06-29 | 1,540 B | none |
+| LIN-550 | 2026-06-29 | 12,671 B | a `lib/workflow-config.js` constant nothing reads; the working registration is the new template entry |
+| LIN-810 | 2026-06-29 | 1,060 B | none |
+| LIN-811 | 2026-06-29 | 770 B | none |
 | LIN-823 | 2026-06-30 | 1,360 B | none |
-| LIN-1365 | 2026-07-16 | 1,349 B | preamble text plumbing (`lib/proxy-preamble.js`, `routes/proxy.js`) |
+| LIN-1365 | 2026-07-16 | 1,349 B | string literals only (`lib/proxy-preamble.js`, `routes/proxy.js`) |
 | LIN-1579 | 2026-07-26 | 7,377 B | none |
 | LIN-2825 | 2026-09-12 | 6,488 B | none |
-| LIN-3006 | 2026-09-24 | 8,948 B | none |
-| LIN-3033 | 2026-09-25 | 15,592 B | none |
+| LIN-3006 | 2026-09-24 | 4,412 B | none |
+| LIN-3033 | 2026-09-25 | 7,793 B | none |
 | LIN-3056 | 2026-09-26 | 1,050 B | none |
 
-Ten tickets added 71 KB of prompt text. Some of it was rewritten later, which is why the
-templates are smaller than the sum. None added a check that fires at runtime. Each touched
+Ten tickets added 44 KB of prompt text. None added a check that fires at runtime, and nine of
+the ten changed no runtime behaviour at all. Each touched
 1–4 test files. The last four landed within 14 days of each other, and each of the last three
 amends a rule an earlier one set. The architecture doc's summary of the lineage is now
 a single paragraph of 1,371 words citing 16 tickets. The gate that everything else rests on is
 "merge and Done need a recorded review Approve plus a discharged ledger". It is written in the
 worker templates, the meta-prompt, the autopilot kickoff, the operating manual, the proxy
-preamble and the proxy instructions. We found no code that refuses a merge or a Done without it.
-`lib/follow-on-ratio.js` parses the ledger heading, but only to measure afterwards.
+preamble and the proxy instructions. No code refuses a merge or a Done without it.
+`lib/follow-on-ratio.js` parses the ledger heading, but only to measure afterwards. Two narrower
+gates are enforced at runtime:
+- **GitHub's `main-protection` ruleset.** It has refused any merge to LinearViewer's `main` without
+  a passing `CI success` check since 10 June. It requires no approval, and simple-dispatcher has no
+  such rule.
+- **The periodical report gate.** The proxy answers 409 to a Done on periodical tasks that lack a
+  persisted report and a recorded adversarial read (`lib/periodical-report-gate.js`, LIN-694).
 
 That is the gate rules. Taken as a whole, the prompt text is mostly not incident prose. Of the
 96 tickets cited anywhere in the prompt text at HEAD, 42 shipped runtime code in their own
@@ -135,7 +152,7 @@ plan-review.
 **Removal happens only by hand, and rarely sticks.** 221 commits on main changed the prompt text.
 Counting word-level diffs, they added 690,429 bytes and removed 204,851. Most removals are
 rewrites. Seventeen commits left the text smaller than they found it. Of 101 tickets ever cited
-in the prompt text, five no longer are: LIN-310, LIN-412, LIN-750, LIN-874 and LIN-1240. Two
+in the prompt text, five no longer are: LIN-310, LIN-412, LIN-750, LIN-874 and LIN-1240. Three
 removals were deliberate and argued:
 
 - **#462 (14 June)** cut the autopilot kickoff and handbook from 39,155 to 31,668 bytes (−19%).
@@ -145,6 +162,9 @@ removals were deliberate and argued:
 - **LIN-1270 (12 July)** reverted a grounding-freshness layer because it "never fires in practice",
   with "zero clean fired notes" as the evidence. This is the only retirement we found that was
   based on evidence that a rule never fired. It is the precedent for the proposal below.
+- **LIN-1850 (3 August)** revised the passage-planner prompt to a validated v0.1 draft, cutting it
+  from 19,204 to 9,405 bytes (−51%). It is the one large cut that stayed down: eight weeks later
+  the prompt is 14,961 bytes. It was a rewrite, not a retirement on firing evidence.
 
 Two things make removal harder than addition. First, the pins. The prompt test files carry 493
 text-match assertions, up from 279 at the end of June, so deleting a sentence fails the suite.
@@ -193,21 +213,23 @@ The dispatched prompt is about 2% of the context a leg carries, whether pooled o
 leg. That covers the whole prompt: the digested rules, the proxy preamble and the ticket's own
 content. The 26,000-token meta-prompt read is not in this table, because it happens on the
 cheap-tier lane, one call per dispatch. Most of the rest is the harness's own system prompt and
-tool definitions, and the model's own earlier turns. Cutting the digested rule text in half
-would save at most about 1% of a worker's input tokens. The rule set's direct token tax on the
-expensive models is real, but it is small.
+tool definitions, and the model's own earlier turns. Some rule text arrives outside the prompt.
+248 of the legs fetched the proxy's `/instructions` catalogue (0.57%), and `CLAUDE.md` reads add
+0.65%. With both, rule-bearing text is 2.8% pooled and 3.4% for the median leg. Cutting all of
+it in half would save at most about 1.5% of a worker's input tokens. The rule set's direct token
+tax on the expensive models is real, but it is small.
 
 The rules cost more through what they make agents do:
 
-- **Loops.** Plan-review and review, with the re-passes they cause, are 38% of dollars over thirty
-  days (`review-loops.md`).
+- **Loops.** Plan-review and review, with the re-passes they cause, are 38% of priced cost over
+  the thirty days to 12 September (`review-loops.md`).
 - **Post-PR rounds.** On LIN-3131, the rules turned test-only suggestions into two extra round
   trips: 26% of tokens and 43% of wall-clock, with zero production changes
   (`fleet-complexity-read.md`).
 - **Writing.** Across the 89 Done tickets from LIN-2951 to LIN-3140, the median ticket carries
   10 comments and 6,063 comment words. Its median description is 715 words. A review comment
-  runs a median 1,378 words in September (193 comments). It was 671 in July and 1,630 in August,
-  from thinner samples. `writing-length.md` measured comment words per issue at 1,201 in June and
+  runs a median 1,394 words in September (209 comments). It was 772 in July (50) and 1,796 in
+  August (44). `writing-length.md` measured comment words per issue at 1,201 in June and
   4,332 in August. Descriptions are the one measure with no trend. Across every fifteenth
   ticket, the median was 497 words in June, 317 in July, 584 in August and 521 in September,
   which matches `writing-length.md`. What grew is the conversation, not the statement of the
@@ -267,22 +289,30 @@ enforcement, where else it is restated, a signature phrase and a class.
 | plan-review | 16 | 6,420 | 0 | 15 | 1 | 15 |
 | **All census** | **213** | **78,046** | **8** | **131** | **74** | **175** |
 
-**No gate rule is enforced by code.** The eight rules with a runtime check are all in the
-orchestrator's kickoff:
+**No review or close-out rule is enforced by Harbour's code.** The eight rules with a runtime
+check are all in the orchestrator's kickoff:
 
 - the task and session budgets and the duplicate-dispatch refusal (`lib/dispatch-factory.js`);
 - the proxy's 60-a-minute limiter (`routes/proxy.js`).
 
 Across all 320 rules, three more are enforced: the meta-prompt's action-name parsing and one
 passage-runner line on the same 409. Everything in review, close-out, plan-review and
-implementation is prose. Six rules in ten carry a test, but the test pins the *text*. It checks
+implementation is prose in the repo's code. One close-out requirement is enforced outside it.
+GitHub's ruleset refuses a merge to LinearViewer's `main` without green CI, which covers the CI
+half of close-out's merge rules (lines 1143 and 1187). The column above does not credit it. Six
+rules in ten carry a test, but the test pins the *text*. It checks
 that the sentence is in the prompt, not that the agent obeyed it. Those pins are what keep a
 sentence from being deleted.
 
-**Four rules in five are said more than once.** 175 of the 213 census rules are restated in
-another prompt source: the meta-prompt, the autopilot kickoff, the operating manual, or the
-lane and passage prompts. Close-out restates 42 of its 44. The two-path rule requires this,
-and it is what makes each rule expensive to change.
+**Most rules are said more than once.** 175 of the 213 census records name a restatement.
+Of those, 21 name only the rule's own source, and 22 name only `docs/autopilot-kickoff.md`, a
+keep-in-sync document for people that no agent is handed. That leaves 132 restated in another
+prompt source: the meta-prompt, the autopilot kickoff, the operating manual, or the lane and
+passage prompts. Close-out restates 34 of its 44 on that count. The records under-find as well.
+The check's blind recode found a restatement for 40 of 45 sampled rules, most often in the
+handbook the kickoff inlines, so four in five is still the better estimate
+(`steady-base-check.md`). The two-path rule requires this, and it is what makes each rule
+expensive to change.
 
 **How the census classes:**
 
@@ -358,8 +388,9 @@ the evidence for the next. The first three change no gate's behaviour.
    | implementation | 7,741 |
    | plan-review | 7,677 |
 
-   The meta-prompt matters most, because it is what a model actually reads to write nine worker
-   prompts in ten. A new rule must displace text, or come with a raised number that John approves
+   The meta-prompt matters most, because it is what a cheap-tier model actually reads to write
+   five to seven worker prompts in ten. The kickoff budget covers the orchestrator, which writes
+   most of the rest. A new rule must displace text, or come with a raised number that John approves
    in the same PR. Unlike the `CLAUDE.md` cap, the overflow may not move into a doc the agent is
    told to read. It must go into code or be dropped. *Value:* it stops the ratchet, which last
    month added 20.7 KB to the meta-prompt and 10.5 KB to review and close-out, and it forces every
@@ -370,8 +401,10 @@ the evidence for the next. The first three change no gate's behaviour.
    line why none can. The first candidates are the checkable parts of the close-out lineage:
    - the merge and Done gate, which today is prose in six places. The check would be a refusal of
      the Done transition at the proxy, and a required status check on the merge, since merges
-     happen on GitHub and not through the proxy. `lib/follow-on-ratio.js` already parses the
-     ledger heading;
+     happen on GitHub and not through the proxy. Both have working precedents:
+     - the `main-protection` ruleset already requires `CI success`;
+     - the proxy already refuses Done on periodical tasks (`lib/periodical-report-gate.js`);
+     - `lib/follow-on-ratio.js` already parses the ledger heading;
    - LIN-3033's authoring bound (at most 2 files and 3 hunks) as a diff-stat check;
    - the ledger's inside/outside mark and the misfire-guard line as a format parser;
    - plan-label and ticket citations in production comments as a lint (688 and 6,508 lines).
@@ -439,7 +472,7 @@ node scripts/steady-base-render.mjs                   # run in a checkout of 8f5
 node scripts/steady-base-render-history.mjs 8f5fe4aa  # the same at each month end (throwaway worktrees)
 node scripts/steady-base-growth.mjs 8f5fe4aa          # source bytes, cited tickets, imperatives per ISO week
 node scripts/steady-base-churn.mjs 8f5fe4aa           # bytes added/removed per commit; citations that left
-node scripts/steady-base-provenance.mjs 8f5fe4aa      # what each cited ticket's own commits changed
+node scripts/steady-base-provenance.mjs 8f5fe4aa      # what each cited ticket's own commits changed (v2: each landing commit counted once)
 node scripts/steady-base-provenance.mjs 8f5fe4aa --tickets LIN-550,LIN-810,LIN-811,LIN-823,LIN-1365,LIN-1579,LIN-2825,LIN-3006,LIN-3033,LIN-3056
 node scripts/steady-base-code.mjs 8f5fe4aa            # production/test lines, comments, citations, pin files per month
 node scripts/steady-base-carry.mjs --since 2026-09-24 --until 2026-09-29T20:00:00Z   # needs this machine's ~/.claude/projects
@@ -475,8 +508,9 @@ The rule inventory was built by reading. Its sampling is stated with it.
   unattributed (24 of 96), and a runtime file a ticket touched may not be the rule's check.
 - **Pins are counted crudely.** They are counted by filename and by assertion shape, not read.
 - **The code measures are net lines.** A month that deletes as much as it writes shows as flat.
-- **Unchecked.** `standard.md` asks for a second document to check a paper. This version has
-  none. The brief ran it as one session on purpose.
+- **Checked once.** `steady-base-check.md` (LIN-3145) re-ran every measure and recoded a sample of
+  the inventory blind. It found the errors this version corrects. Its disagreements of judgement
+  are there, not here. The biggest is that the recode would retire more than twice as many rules.
 - **No counterfactual.** Nothing here shows the fleet would be as reliable with fewer rules. The
   proposal is built so that each step can be undone on the evidence it collects.
 
