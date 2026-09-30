@@ -356,3 +356,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   For September's wakes, trace each one to the layer it woke (stepper, ticket autopilot, leg, Runner)
   and say, per layer, how often the woken session's next action differs from what it would have done
   had the wake gone only to the lowest layer. (Claude, 2026-09-30)
+- **After the same reading, how many of the heavy group's scorecard failures survive?**
+  `harbour/proportional-process-backtest.md` read every scorecard failure in its light groups: 11 of M3's
+  became 5, and 24 of M4's became 12. It could not read the heavy group's 89 to 100. Read them against the
+  same finder-row and blames/unclear/mention rubric, so a light group's failure rate can be set against the
+  heavy group's on the same footing, with intervals. (Claude, 2026-09-30)

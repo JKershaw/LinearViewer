@@ -1,0 +1,3312 @@
+{
+ "ticket": "LIN-3166",
+ "about": "Hand codes behind proportional-process-backtest.md. finderOnly: changes the scorecard counts as escaped only because a Bug names the ticket whose review FOUND an older fault (survey-check-2.md:309-312). namedFixes: every named fix-follow-up the scorecard counts on a change any classifier routes light, read against its evidence. reviewCatches: every light change a plan review or code review sent back, each send-back finding followed to what it changed.",
+ "method": "One in-session subagent of the frontier tier coded the named fixes; four more coded the review catches, one batch each, from git-ignored digests (scripts/survey-proportional-digests.mjs) against the rubric below, fixed before reading. Not second-read.",
+ "finderOnly": {
+  "source": "docs/papers/harbour/survey-check-2.md@b36e5d3f:309-312",
+  "ids": [
+   "LIN-1815",
+   "LIN-2037",
+   "LIN-2291",
+   "LIN-2331",
+   "LIN-2333",
+   "LIN-2351",
+   "LIN-2354",
+   "LIN-2384"
+  ]
+ },
+ "namedFixRubric": "blames: the later ticket or commit says the change introduced a fault, or its fix was wrong, inert or incomplete, and the fix repairs code the change wrote or should have written. unclear: same code, change mentioned, fault not clearly the change's. mention: the change is cited only as context or history.",
+ "namedFixes": [
+  {
+   "id": "LIN-805",
+   "fixTicket": "LIN-1429",
+   "code": "unclear",
+   "reviewCouldCatch": "no",
+   "why": "Fix splits LIN-805's follow-up gate, but \"That was harmless under LIN-805\"; later LIN-1155/1375 token moves meant \"The suppression then silently became a credential bug.\""
+  },
+  {
+   "id": "LIN-1485",
+   "fixTicket": "LIN-1494",
+   "code": "blames",
+   "reviewCouldCatch": "yes",
+   "why": "\"LIN-1485 shipped lineageSiblings.length === LINEAGE_QUERY_LIMIT ... a proxy for truncation\"; \"false-positives on a lineage of exactly 2000 rows\". Was review finding F1 on PR #978."
+  },
+  {
+   "id": "LIN-1492",
+   "fixTicket": "LIN-1535",
+   "code": "unclear",
+   "reviewCouldCatch": "unclear",
+   "why": "Reverts \"dead, half-threaded\" deps.now seam from 3d4328e6, LIN-1535's own commit riding in LIN-1492's merge #987; LIN-1492's clamp-test work not faulted."
+  },
+  {
+   "id": "LIN-2123",
+   "fixTicket": "LIN-2268",
+   "code": "blames",
+   "reviewCouldCatch": "yes",
+   "why": "\"LIN-2123's fix is a production no-op\": regex keyed a marker \"posted without rootItemId\". Retrospective review caught it; needs sibling-repo emitter knowledge."
+  },
+  {
+   "id": "LIN-2262",
+   "fixTicket": "LIN-2291",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "\"Filed by LIN-2262 close-out as a named class sibling\"; \"deliberately out of that ticket's scope\"; defect \"Originally introduced with LIN-1736's code\"."
+  },
+  {
+   "id": "LIN-474",
+   "fixTicket": "LIN-811",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "Only \"Update the LIN-474 meta-prompt test accordingly\"; root cause is the recommender's soft review-evidence read, not LIN-474's change."
+  },
+  {
+   "id": "LIN-585",
+   "fixTicket": "LIN-586",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "Planned companion: LIN-585 names routing gap as \"LIN-586 (named, related)\"; LIN-586 \"Complements LIN-585\". No fault attributed."
+  },
+  {
+   "id": "LIN-810",
+   "fixTicket": "LIN-823",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "Cited as safety net: \"close-out's own LIN-810 self-gate (no ledger -> name review) is a second net\"; fix targets LIN-811's gate."
+  },
+  {
+   "id": "LIN-810",
+   "fixTicket": "LIN-811",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "\"Complements LIN-810 (#687...): this stops sending unreviewed work to close-out... LIN-810 makes close-out behave sanely... Keep both.\""
+  },
+  {
+   "id": "LIN-811",
+   "fixTicket": "LIN-823",
+   "code": "blames",
+   "reviewCouldCatch": "no",
+   "why": "\"LIN-811 gate misses the bug path\"; fix extends \"the LIN-811 gate sentence\". Surfaced only by live LLM routing on LIN-799, not visible in prompt diff."
+  },
+  {
+   "id": "LIN-1239",
+   "fixTicket": "LIN-1270",
+   "code": "blames",
+   "reviewCouldCatch": "unclear",
+   "why": "Reverts d3dfbf6 (LIN-1239): machinery \"is inert in practice — it never fires\"; established empirically (\"zero clean fired notes\"); firing gate itself was LIN-1240."
+  },
+  {
+   "id": "LIN-1362",
+   "fixTicket": "LIN-1429",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "Cited as history: \"LIN-1375/1362 moved it into broker process memory\"; fix repairs LIN-805's gate, LIN-1362 only swapped preamble prose."
+  },
+  {
+   "id": "LIN-1982",
+   "fixTicket": "LIN-2278",
+   "code": "unclear",
+   "reviewCouldCatch": "unclear",
+   "why": "\"The last unhandled instance of the class LIN-1982 and LIN-2275 closed\"; sibling selector extension, LIN-1982 not said to be wrong."
+  },
+  {
+   "id": "LIN-1982",
+   "fixTicket": "LIN-2275",
+   "code": "blames",
+   "reviewCouldCatch": "yes",
+   "why": "\"LIN-1982's close-out then declined it as 'a different question' ... which is the same question\"; LIN-1982 commit itself named the sibling as out of scope."
+  },
+  {
+   "id": "LIN-2124",
+   "fixTicket": "LIN-2269",
+   "code": "blames",
+   "reviewCouldCatch": "yes",
+   "why": "\"LIN-2124's specified clause rests on a provably false premise\"; \"keep waiting\" strands runs; fix restores adjudicated docs wording \"surface it to the human\"."
+  },
+  {
+   "id": "LIN-2227",
+   "fixTicket": "LIN-2893",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "\"Do NOT fix this by dropping the query-level filter. That filter is LIN-2227's deliberate cost control\"; \"Root cause (ordering, not the filter)\"."
+  },
+  {
+   "id": "LIN-2275",
+   "fixTicket": "LIN-2278",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "\"LIN-2275's fix is strictly correct\"; sibling \"deliberately kept out of that PR\"; \"LIN-2275's correctness does not depend on it.\""
+  },
+  {
+   "id": "LIN-442",
+   "fixTicket": "LIN-525",
+   "code": "unclear",
+   "reviewCouldCatch": "unclear",
+   "why": "Bug 1: lazily injected detail HTML \"(public/app.js:255, LIN-442)\" misses one-shot toggle restore; fix reworks toggle state, not LIN-442's lazy-load."
+  },
+  {
+   "id": "LIN-1021",
+   "fixTicket": "LIN-1341",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "History/churn check only: routes/dashboard.js churn \"dominated by the Heroku H12 30s-timeout class (LIN-1021/1022...)\"."
+  },
+  {
+   "id": "LIN-1021",
+   "fixTicket": "LIN-1022",
+   "code": "unclear",
+   "reviewCouldCatch": "unclear",
+   "why": "Class extension: \"LIN-1021 fixed ONE witness\"; applies \"the LIN-1021 remedy, per instance\" to sibling handlers; names one \"residual LIN-1021 left\"."
+  },
+  {
+   "id": "LIN-1261",
+   "fixTicket": "LIN-1494",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "History check only: \"recent work protects — ... LIN-1261 abort attribution ordering. This plan touches none of those mechanisms\"."
+  },
+  {
+   "id": "LIN-1736",
+   "fixTicket": "LIN-2367",
+   "code": "unclear",
+   "reviewCouldCatch": "yes",
+   "why": "Same-workspace decision_id collision dates to LIN-1736's .find, but ticket blames LIN-2291's composite key; LIN-1736 named only as test describe block."
+  },
+  {
+   "id": "LIN-1736",
+   "fixTicket": "LIN-2291",
+   "code": "blames",
+   "reviewCouldCatch": "yes",
+   "why": "\"Originally introduced with LIN-1736's code\": .find matches decision_id alone over cross-workspace rows, visible in the predicate."
+  },
+  {
+   "id": "LIN-2036",
+   "fixTicket": "LIN-2037",
+   "code": "mention",
+   "reviewCouldCatch": "unclear",
+   "why": "Items come from LIN-2035's review; LIN-2036 cited for sequencing only: \"Land LIN-2036 first, or coordinate\"."
+  },
+  {
+   "id": "LIN-2253",
+   "fixTicket": "LIN-2419",
+   "code": "unclear",
+   "reviewCouldCatch": "yes",
+   "why": "Names LIN-2253 part 1 seeding flags false (fixed by LIN-2418); live defect fixed is harness:null path \"LIN-2418's exclusion never covered\"; \"LIN-2253's shipped behaviour is untouched\"."
+  }
+ ],
+ "catchRubric": "# What review caught on a light-routed change — coding rubric (LIN-3166), fixed before reading\n\nYou read one digest per ticket: its title and description head, then every comment (leg and verdict\nlabelled from the comment's heading) interleaved with every commit naming the ticket in either repo\n(LinearViewer or simple-dispatcher). Each commit gives lines by class (prod / test / docs) and its files.\nCommits marked AFTER FIRST REVIEW came after the first CODE review comment.\n\nEvery ticket here was routed LIGHT by at least one classifier, and a plan review or code review sent it\nback (verdict request-changes) at least once. The question: what did the full process catch on it?\n\n## Unit: a finding\n\nA *finding* is one distinct problem a plan review or code review raised in a send-back (request-changes),\nfollowed to what it changed. A finding repeated in a later round is ONE finding. Nits / notes /\nnon-blocking items count only if something was actually changed for them. Close-out holds count as\nfindings too (leg `close-out`) when the close-out refused to proceed and something changed.\n\nFor each finding record:\n- `leg`: `plan-review`, `review` or `close-out`.\n- `finding`: ≤ 20 words, what it said.\n- `effect`: what it changed, judged from the commits and comments that followed:\n  - `prod` — a production-code change (a prod-line commit the following comments tie to this finding;\n    for a plan review, the plan changed AND the eventual code differs because of it in production lines)\n  - `tests` — only tests, witnesses, pins, fixtures changed\n  - `docs-wording` — only docs, plan text, PR/ticket/comment text changed\n  - `follow-up` — filed as a separate ticket rather than fixed here\n  - `nothing` — nothing traceable changed\n- `realFault`: true only if, without the change, a user- or operator-visible defect (wrong behaviour,\n  crash, data loss, security hole, broken contract) would have shipped on main. Missing tests, style,\n  wording, scope, process-compliance and \"prove it\" requests are NOT real faults. If unsure, false.\n- `confidence`: high / medium / low.\n\nAlso record per ticket: `sendBacks` (count of request-changes verdicts you confirm), and `note` (≤ 25 words:\nwhat the full process bought on this ticket, in plain words; \"nothing beyond evidence/wording\" is a valid answer).\n\nOutput: one JSON object per ticket: {\"id\", \"findings\": [...], \"sendBacks\", \"note\"}.\n",
+ "adjustments": [
+  {
+   "id": "LIN-2123",
+   "why": "post-merge verification review; the no-op fix had shipped (counted as a blamed named fix, LIN-2268)",
+   "set": {
+    "realFault": false
+   }
+  },
+  {
+   "id": "LIN-2124",
+   "why": "post-merge re-review; the stall had shipped (counted as a blamed named fix, LIN-2269)",
+   "set": {
+    "realFault": false
+   }
+  },
+  {
+   "id": "LIN-2252",
+   "why": "post-merge review; the inert CSS fix had shipped (counted as an escape, LIN-2272)",
+   "set": {
+    "realFault": false
+   }
+  }
+ ],
+ "reviewCatches": [
+  {
+   "id": "LIN-608",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Mockup-driven UI polish not implemented: pills, accent bar, header, runtime/model line, N/M count, tags, chips diverge.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Send-back only enforced remaining scope (mockup polish) once mockups arrived; no defect caught in the functional fixes."
+  },
+  {
+   "id": "LIN-907",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "findExhaustedRefires fails re-fired sessions legitimately parked in BLOCKED or completion hold (false FAILED)",
+     "effect": "nothing",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review found a real false-FAILED bug, but the PR merged over Request Changes; nothing changed on this ticket."
+  },
+  {
+   "id": "LIN-1033",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "landing-dark baselines byte-identical to light; dark capture failed, dark-safety coverage silently lost",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "pages/ deltas not header-only and unconfirmed; roadmap baseline turned out to be the landing page",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Caught two wrong visual baselines (dark==light, roadmap==landing) and fixed the capture setup; test-infrastructure only, outside CI, no product defect."
+  },
+  {
+   "id": "LIN-1137",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Next-run refactor drops next-run-dispatch-toggle class; 6 next-run E2E tests fail, CI red",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review confirmed CI-red regression: dropped toggle class, a hook used only by E2E selectors (no CSS/JS use). One-line fix restored it."
+  },
+  {
+   "id": "LIN-1358",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "iTerm window tail captured then discarded for all non-launch selectors; operator loses key diagnostic evidence",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Selector wiring in runStallFailsafe untested; bug-reinstating mutations stay green",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review caught a diagnostic regression the fix introduced (window tail dropped from [failed] messages) and got the selector wiring integration-tested."
+  },
+  {
+   "id": "LIN-1714",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "e2e-smoke.js builds 8 interactive claude launches by hand; Layer 1 prefix would not reach them.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Layer 2 justification contradicted: openKittyInstance already scrubs env on cold spawn, so no kitty path closed.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Layer 2 .command scrub timing, vacuous absence test and start_dispatcher test seam unspecified.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Env-poison kill-trigger gap routed to LIN-1699 without any trace on that ticket.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Unstated min claude version 2.1.172 for FORCE_SESSION_PERSISTENCE; stale test-count figures.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Rev 2 premise that open does not forward caller env contradicted by repo's live-verified note; prewarmApp sibling unmapped.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Poisoned-live-daemon gap's named owner LIN-1699 is Done on excluding scope; no live owner.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 3,
+   "note": "Plan review got the Layer 1 prefix extended to the eight e2e-smoke launches; Layer 2's refuted premises went to LIN-1738. No production defect caught."
+  },
+  {
+   "id": "LIN-1801",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": ".sess-seed-title display:block lands in the grid's label column, not value column; worst on mobile. Add layout test.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review caught the new title rendering in the label column on the reported mobile page; one-line CSS fix plus a bounding-box regression test."
+  },
+  {
+   "id": "LIN-1812",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Single-anchor stepper leg carries issueIdentifier, so it counts against runner maxTasks; flat budget claim false",
+     "effect": "docs-wording",
+     "realFault": true,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "V0 generator would ship with no consumer; cited precedent actually supports doc-only",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Scope enumeration silently omits CLAUDE.md map entry",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Corrected a wrong budget claim in the agent-facing runner prompt and cut V0 to doc-only; review's later precision findings were routed to LIN-1870."
+  },
+  {
+   "id": "LIN-1843",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Chronicle omitted the v0 to v0.1 compression and witness-rule re-homing arc, incl. dropped 'alongside'.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Writeout arithmetic wrong: 7+8+4+4 stated as summing to 26 (slack omitted).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Optional: drop decaying live-digest enumeration; reflow overlong line.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "45% reduction mis-scoped to section 9; it is the whole prompt's line reduction.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Docs-only chronicle: reviews added a missing arc and fixed an arithmetic error and a mis-scoped figure. Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-1858",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Plan still preserves two false preamble claims the amended scope says to correct",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Rewording header could delete Graduation-lift marker, making two preamble tests vacuous; decide explicitly",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Header edit falsifies hard-coded 'lines 1-37 / line 38' docstrings in generator and test",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Witness-removal test guard filed as optional; make it required",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Doc-only change; plan-reviews kept the plan aligned with amended scope, fixed stale docstrings, required a guard test. Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-1903",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Routed-around gap cites closed LIN-581; name an open tracker for sibling endpoints and disclosure variant",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan review forced filing LIN-1904 to track the 10 sibling endpoints; the fix itself was unchanged."
+  },
+  {
+   "id": "LIN-1908",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Cross-group first-fit order unspecified; inherited most-recent-first order makes packing a measured no-op (200 runs stay 200 rows)",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "No proposed test catches the no-op; two existing unit assertions inverted by the fix were unnamed",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Second fit-preset call site unnamed; fit button would still request a 24h span",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Section aria-label 'Last 24 hours' is a third hard-coded 24h promise missed by window-derived text",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "llms.txt staleness wider than line 392; connector re-verification instruction describes a test the packer cannot affect",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "computeTimelineFit minSpan unspecified; 5-min fit floor inverts zoom-in gesture assertions",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Default-window initializer must become a first-paint latch or each poll stomps the user's zoom",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Initial aria-pressed hard-coded to 24h button goes stale once default is fit",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "MIN_W-floor and pan e2e tests would pass vacuously or lose premises under fit default",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Plan's claim that the three phases' llms.txt edits are disjoint is false (A and C share line 421)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Plan review caught a packing order that would have shipped Phase A as a no-op, plus a missed fit-button call site; rest tests/wording."
+  },
+  {
+   "id": "LIN-1958",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "New e2e test env-dependent: PLAN_FEE_MONTHLY_USD not cleared in playwright webServer command",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "overheadUsd rendered as bare 'overhead', label derived from field name the handoff forbids",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Card lacks window label and issue-level sample/unpriced coverage pair (recommended)",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "formatShare rounds non-zero shares under 0.5% to a false '0%'",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review stopped a misleading 'overhead' label on the public /kpis card and an env-leaking e2e test; added disclosure spans."
+  },
+  {
+   "id": "LIN-1963",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Sufficiency floor uses rejected count formula: constant 33, tautological numerator, d=33 n=1 reported sufficient",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Round-trip distribution unconditioned on reaching gate: 45x dilution in the baseline artifact",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "H12 scoped-read guard is convention-only; empty identifier silently unscoped",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review stopped two wrong-number defects (false sufficiency verdict, 45x diluted distribution) from entering a perishable research baseline; fixed before merge."
+  },
+  {
+   "id": "LIN-2025",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Membership check always drops filter on teamless providers; Local /issues?teamId would return every issue",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Planned cycles-test assertion wrong (401 not 200); e2e tests would become live-network-dependent",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "No bounding assertion for relaxed states/:teamId path",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Persisted stale team selection behaviour unstated",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Well-formed unmatched team UUID silently widens agent proxy reads to whole workspace",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Unconditional fetchTeams ahead of isTestMode arm breaks roadmap LIN-1034 guard on test sessions",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "fetchTeams must be guarded on teamId so unfiltered issues pays no extra round trip",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Planned 404 via graphqlErrorStatus cannot work; TeamNotFoundError would surface as 500",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Add graceful-drop pinning test, settle helper home, name resolveTeamRef sibling deferral",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Raw ?team= persisted uncapped after UUID gate removed",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Jira-shaped ids, provider-not-called, page graceful drop and roadmap filter untested at route level",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "states/:teamId silently returns empty on unmatched team; TEAM_NOT_FOUND undocumented in catalog",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 3,
+   "note": "Plan-reviews stopped silent whole-workspace widening on agent proxy reads (human ruling: 404), a Local filter drop, and a 500-instead-of-404 error path."
+  },
+  {
+   "id": "LIN-2036",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "SUFFICIENCY_EFFECT_RATIO comment states old min(p1*RATIO, 1-e) model; falsified by change, not on surface list",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Function doc worked-example line states doubling-only p2 = p1*RATIO; needs capped form",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Nothing beyond wording: plan review added two stale in-code comments to the edit list; design and code unchanged."
+  },
+  {
+   "id": "LIN-2043",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "--limit is page size not population cap; planned smoke run would be a full-workspace read.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Negative test with cache undefined would throw TypeError and pass for the wrong reason.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan review replaced an unbounded smoke read with a bounded three-row run and hardened a negative test; guard code itself unchanged."
+  },
+  {
+   "id": "LIN-2046",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Plan falsely claims no client-side unit harness; must unit-test recommend-stream URL and cite parity test",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "public/session.js sibling defect needs a filed ticket, not 'no identifier yet'",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Context/Sessions rejection should cite LIN-1911 as existing owner",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Nothing beyond evidence/wording: added a unit test for the recommend URL, filed LIN-2084 for a pre-existing sibling, fixed a citation."
+  },
+  {
+   "id": "LIN-2075",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Third identical collapsed predicate (recommend-and-dispatch repo) missed; grep silently skipped binary-flagged routes/proxy.js",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "goal/repo null-accepted relaxation stated in tests and PR only, not in either doc surface",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Doc step targets wrong line (variant row) and leaves kickoff repo row uncapped",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Non-blocking plan-text corrections: helper call-site count, Body line cite, two MAX_NAME_LENGTH constants, regex equivalence",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Six new doc sentences claim every 400 carries received length; only the length branch does",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan review pulled a missed third opaque-error site into scope (shipped as code); the rest was doc accuracy. Solution shape unchanged."
+  },
+  {
+   "id": "LIN-2078",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Planned new abort/followUpTo mutex unit test premised falsely; rule already pinned in both e2e specs.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Keying note ignored inverse case: non-abort row whose followUpTo resolves into an abort row.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Accepted-tradeoff Note A recorded one of four arms where the parent gets no wake.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Fix unchanged by review; plan-review dropped a redundant test file and sharpened the recorded tradeoff. Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-2115",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Report §5.2 misstates which assertions R1b closed; its arithmetic contradicts 14/18",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "§5.2 descriptions of failing assertions do not map to the three failing tests",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Both population tables silently drop singleton rows; totals do not sum",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "'5.6% of the day' uses wrong denominator; inherited by LIN-2116",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "model-pricing line citation off by one in two remaining places",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Staleness and 'is unfixed' claims invalidated by LIN-2113 landing; anchor to SHA",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Research report; review corrected factual misstatements and missing disclosures. Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-2123",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Merged fix keys on '[working] Resumed session', which is only emitted on the follow-up path without rootItemId; no-op in production.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium",
+     "adjusted": "post-merge verification review; the no-op fix had shipped (counted as a blamed named fix, LIN-2268)"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Post-merge verification review showed the claimed fix was a no-op in production; the real fix landed as LIN-2268."
+  },
+  {
+   "id": "LIN-2124",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Carve-out says keep waiting for unblock, but blocked consumes the once-only wake: permanent stall",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium",
+     "adjusted": "post-merge re-review; the stall had shipped (counted as a blamed named fix, LIN-2269)"
+    },
+    {
+     "leg": "review",
+     "finding": "Stepper beat-4 and instruments-bullet wedged rules still lack the blocked carve-out",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "First review passed it; a post-merge re-review caught a stall defect the clause introduced, fixed next day via LIN-2269. Didn't stop it shipping."
+  },
+  {
+   "id": "LIN-2175",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Runner caveat misses three sibling dispatch-row-assuming statements; hand-pasted Runner would get contradictory instructions vs hard rule",
+     "effect": "docs-wording",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Scoped-kickoff prompt ranks goal below its own recommend-and-dispatch first act; launched session would work passage task, not act as Runner",
+     "effect": "docs-wording",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Test pins hand-copied goal literal, not the doc template; doc edits leave test green",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Planner non-201 rule contradicts itself (stop vs watch the live dispatch), conflicting with Flight Companion ownership",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan review fixed a self-contradicting served Runner prompt and a launch goal the kickoff scaffold would override; close-out forced doc-derived test and consistent non-201 wording."
+  },
+  {
+   "id": "LIN-2183",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "'One producer, always' contract unpinned; mutant sourcing decision from any waiting loop passes all tests.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "No-message branch overwrites provenance with last-scanned loop, contradicting plan; may drop a decision, point at wrong loop.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "review",
+     "finding": "deriveFeedStatusLine and recentRunKind lack provenance, unlike liveStatusLine (out of scope).",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review pinned the one-producer contract and forced a decided no-message provenance rule (small prod change). The fields had no consumer at merge."
+  },
+  {
+   "id": "LIN-2187",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Opencode leak-regression guard cannot fail: both sides of equality read same live export",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "e2e-smoke does inherit REFIRE_PROMPT; record failsafe re-run in CI-did-not-prove ledger",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Clause map says five sentinel tokens; there are six",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "reapers.js 'reuses verbatim' comment goes stale with composition",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan-review made the leak guard able to fail and corrected plan grounding and comments. Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-2202",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Blocked-template Principle 0 sentence added on handwritten path only; meta Blocked-prompts rule not mirrored",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Blocked-template addition has zero test coverage on either path",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Portable-pointer test name promises a guard it does not implement",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Brittle bullet-extraction regex throws unguarded TypeError on neighbour rename",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review made the meta-prompt path mirror the blocked-template change (both-paths rule) and hardened tests; no user-visible defect caught."
+  },
+  {
+   "id": "LIN-2203",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Regression test extraction covers only hook.js:359; half-fix leaving :363 passes green",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Widened predicate bound to composed a.reason: matches 4 lines, count assertion never green",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Two-line prompt fix unchanged from first plan; plan reviews only reshaped the regression test so it can't pass on a half-fix."
+  },
+  {
+   "id": "LIN-2212",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "New 'answered' e2e guard passes with the stamp disabled; must read back durable store outcome",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Spec comment overclaims UI assertions prove store recorded outcome 'answered'",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review caught a vacuous regression guard; a test-route read-back now makes it load-bearing. Test-only ticket, no production defect."
+  },
+  {
+   "id": "LIN-2218",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Plan's value argument falsified: named mutations already caught by existing suite; file adds no coverage",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Test 4 tautological: hasLiveSubscribedChild returns false at anchors.size===0 early return",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Re-ground evidence misstated (git log without --all hid in-window commit)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Operator-alarm surfaces (WAITING_WAKE_MARKERS, observer-sweep, unanswered-decisions) missing from surface table",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Wrong SHAs and line pointers (dashboard-routes :796, reapers :1217) would ship into witness comments",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Nothing beyond evidence/wording: an honest 'documentation witness' framing, a tautological test dropped, and corrected pointers in a test-only file."
+  },
+  {
+   "id": "LIN-2252",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Merged padding-bottom fix is a no-op; FAB still overlaps 'view earlier activity' at scroll offsets",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium",
+     "adjusted": "post-merge review; the inert CSS fix had shipped (counted as an escape, LIN-2272)"
+    },
+    {
+     "leg": "review",
+     "finding": "Post-merge verification a false positive: button measured below the fold",
+     "effect": "nothing",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Not page-specific: fixed FAB overlaps interactive content on any scrollable page; fix belongs FAB-side",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "No committed e2e geometry assertion for the control; green CI carries no signal",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Post-merge review found the shipped fix did nothing; the real fix (LIN-2272) and later FAB relocation came via follow-ups."
+  },
+  {
+   "id": "LIN-2253",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "noLineage tickets seeded unknownHarness/opencodeSummed false; ignorance shares on /kpis dilute ~12.5x as lane tickets grow",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Redundant issues.has guard presented as second independent protection; misleading comment",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Second LIN-2418 render guard unnamed; both planned options either break the guard or ship a false disclosure",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "LIN-2418 P2 guard flips null to 0 under harness propagation and is never named",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Issue-less DONE lineage undefined in component fold; would pull overhead spend into costUsd, breaching F4 invariant",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Reconciliation identity conditional, one fixture insufficient; missing e2e/CLAUDE.md surfaces; overbroad history claim",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Always-T denominator reintroduces opencodeSummedShare 12.5x dilution for null-harness lanes; rebuilt guard would not catch it",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "A1's second validation fixture does not exhibit the condition it claims; arithmetic wrong",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Headline divides per-issue costUsd by component-fold pricedTicketCount; overstates rate or goes dark",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Render layer still consumes deprecated noLineageCount alias instead of laneLandedCount",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "New headline divisor not disclosed on the /kpis card",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Issue-less overhead-lineage invariant unpinned; mutation M6 survived",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Measure lane markers in production: zero found, markers posted to wrong channel",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Two new KPI spans and /cost catalog gate prose unasserted",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 4,
+   "note": "Plan-reviews kept a disclosure-dilution regression and overhead-invariant breach out; code review caught a headline numerator/denominator mismatch. First-round defect had already shipped (fixed via LIN-2418)."
+  },
+  {
+   "id": "LIN-2271",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "freshStore() and Mango lifecycle scoped inside Block A describe; sibling blocks would ReferenceError",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "M2/M3 mutation pins elided/placeholder; M3 assertion would pass vacuously on undefined",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "File-2 comment old/new text did not match real wrapped comment lines",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Third resolveCanonicalAccountId site (credential-invariant-sweep.js:149) same mutation-blind class, unnamed in out-of-scope list",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Test-only ticket: review made the new witness actually runnable and non-vacuous and routed an unpinned sibling to LIN-2308; no production fault."
+  },
+  {
+   "id": "LIN-2274",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Mutation-check institutionalisation in both prompt paths shipped with nothing pinning it",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Class sibling stall-failsafe.test.js:450 has same real-filesystem precondition defect",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Class sibling: Date row in OS18_CASES unpinned, deleting branch leaves suite green",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Test-only ticket: review added pins for the prompt directive and routed two sibling mutation-blind tests to follow-ups."
+  },
+  {
+   "id": "LIN-2281",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Planned test would post nothing (no token seam, workspaces.json absent); zero-post expiry assertion passes vacuously.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Existing real-main() warm-hold harness already covers both seams; plan cited pure-function files as integration pattern.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Surface table missed lineage consumers (observer-efficacy resolved flip, task-cost, dispatch-store).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Observer-efficacy resolved flip cannot occur (own-row feedback); reclassify out; wrong function name.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "mergeLineageFeedback call-site enumeration wrong; dispatch-store.js:571 misclassified out of scope.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Merge withheld: commit-then-post ordering unpinned by any test; test comment falsely claims it witnesses ordering.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Production fix unchanged from first plan; process bought a non-vacuous test harness, a real ordering guard, and a corrected surface table."
+  },
+  {
+   "id": "LIN-2333",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "SD mirror omitted since filter; LinearViewer consumer pin must be mandatory, not optional.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Inconsistent honesty criteria: :687 included but :798 non-forced excluded; forced-only gate never fires for parked anchors.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "AWAITING_EXTERNAL half of the gate untested (mutant survives full suite).",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Test mirror's since gate, sort and anchor filter unpinned.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Forced subcase of :798 omits rootItemId; no ticket owns it.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan-review moved the :798 gate so the fix covers parked anchors on resume-launch failure; the rest was test hardening plus one follow-up."
+  },
+  {
+   "id": "LIN-2350",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Second in-code comment (Family B 'like the api reads above') becomes false; plan only rewrote the first",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "denyIfUnsupported call-site count stated as 31, actually 24",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Witness uses plain-object provider, cannot distinguish capability gate from existence gate (wrong-gate mutation passes)",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Four new NotImplementedError base stubs unwitnessed; providers.test declared-method loop lacked apiReads group",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "/issues list gating is owned by LIN-1573, not unowned; group comment corrected, LIN-1573 narrowed",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "low"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Nothing beyond evidence/wording: a stale comment and count fixed; close-out strengthened tests to pin capability-vs-existence gating. Production fix unchanged."
+  },
+  {
+   "id": "LIN-2353",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Missed sibling dispatch producer: enqueueFeedbackTriage generatePrompt call lacks providerUi; plan forbade touching workspace-api.js",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Planned 'estimate sections stripped' assertion unimplementable; estimates never consumed by applyPromptCapabilities",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "LLM-path test must use fetch-boundary capture via real route, not direct getRecommendation call",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Completeness claim overreaches; autopilot-kickoff and collective-participant hand-built prompts still emit hardcoded Linear",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Tests named byte-identical assert only substrings; site 5 lacks Linear/bare-fixture parity counterparts",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Plan review added a fifth, in-scope dispatched-prompt site (feedback triage) that would still say 'Linear'; rest was plan wording, tests, and routing siblings to LIN-2354."
+  },
+  {
+   "id": "LIN-2378",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Ticket-named routes/dashboard.js and lib/pipeline-loops.js dropped from plan scope",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Stale routes/proxy.js:1736 citation; LIN-2354 change mischaracterised as mechanical",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Diff attribution figures for LIN-2354 wrong (line counts, file count)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Live owner LIN-2360 missing from cross-links; proxy-credential-trail misattributed as unrelated clean module",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "routes/dispatch.js out-ranks carried surfaces yet unowned and ungraded",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Docs-only review report: plan reviews widened scope and corrected citations/ownership in the report; nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-2381",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Cold /swim and /ship wrongly ruled out as legacy redirects",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Cold list shrank against research: /auth/jira no-workspace and workspace-not-found dropped",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Merge consent flow only renderable in Linear variant; limit unnamed",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "/archive/4 live but omitted; never design-reviewed",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Tier-A bucket compressed, silently dropping renderUpstreamAwareErrorPage",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Review-only report: plan reviews restored dropped surfaces, which yielded report findings D4/D5; nothing beyond evidence/wording shipped."
+  },
+  {
+   "id": "LIN-2383",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Scope audit silently dropped five in-remit surfaces its own research named (decisions lane, account-merge, etc.)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Baseline surface count wrong (26 vs 24 scored + META)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Ship Journey citation misattributed (LIN-1684 vs LIN-1685 commits)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Session-fit claim contradicts ticket's accepted Tier 2 fallback",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Report misplaced presets CFG evidence and cited an unsupported R9 comment",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Staleness counts and refresh arithmetic wrong (drift-coherence refreshed; 'four refreshed' conflated populations)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Advisory review report: process made it more complete and accurate (surfaces added, counts and citations corrected). Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-2396",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Prompt text and test pin hard-code this repo's ci-success job in a location-agnostic periodical prompt.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Plan doesn't explain why periodical self-merge doesn't contradict review/close-out merge contract.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Existing 'left open' assertion would go false-green once new wording lands; tighten it.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Kept a repo-specific CI job name out of the shared prompt and closed a false-green assertion; otherwise wording."
+  },
+  {
+   "id": "LIN-2437",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "CLAUDE.md:44 says saved-chat CRUD gated on taskChat flag; widening falsifies it, missing from file list.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "No live-handler test that a flightCompanion-only session without accountId gets 401 from widened gate.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "public/llms.txt companion composer DOM map would miss the new #flight-companion-save control.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "deriveTitle fallback renders 'Chat about flight-companion' in saved-row title for assistant-only companion transcripts; plan masked only meta.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Fourth surface unmasked: appendBubble speaker pill shows raw flight-companion sentinel on every resumed assistant bubble.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 4,
+   "note": "Plan reviews added doc siblings and the title-leak case; code review caught an unmasked speaker pill. All latent label leaks: no companion save path existed yet."
+  },
+  {
+   "id": "LIN-2505",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Fallback-note status assertions pinned to a live api.linear.app 401; fail offline/no-egress",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Made the converted tests hermetic (no dependence on a live third-party 401); test-only, no production fault."
+  },
+  {
+   "id": "LIN-2511",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Same-pass pendingFollowUp guard sits on branch Change 1 routes away from; refire arm still deletes the wake",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Test premise wrong: existing tests do set resumedAt",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Hoisted guard unbounded: dead-hook sessions with a wake never repaired, orphan servers leaked",
+     "effect": "follow-up",
+     "realFault": true,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Plan review stopped an unbounded guard that would strand dead-hook sessions; Change 3 descoped to LIN-2517. Shipped fix was the uncontested Changes 1+2."
+  },
+  {
+   "id": "LIN-2543",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Half B reach probes mis-targeted (D hit group-A route, E nonexistent route, C wrong dereference)",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Largest deferrals (Half C, sibling composers) carry no ticket identifier",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Minor citation drift: server.js mount count, stale commit SHA, line numbers",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Test-only helper; plan review stopped probes that would have passed by coincidence, and got the deferrals ticketed (LIN-2590/2591)."
+  },
+  {
+   "id": "LIN-2575",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Live computeRecommendation derivation line unpinned; suite green with it deleted (tests hit test-mode twin only).",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Derivation x queue-branch interaction (in-flight stamped hop reads recent with runs 0) unpinned.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review found the shipping derivation line untested and got it pinned; production code unchanged. Nothing beyond evidence."
+  },
+  {
+   "id": "LIN-2592",
+   "findings": [
+    {
+     "leg": "close-out",
+     "finding": "hasRePassDispatch threading unpinned: hardcoding 'plan' (M5) survives full suite",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Aggregate wrapper's gate-pair forwarding unpinned: dropping it (M7) survives full suite",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Discharge test fixture degenerate; dropping only rePassKind (M7a) still green",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Sibling per-field forwarding gap at follow-on-ratio.js:494 survives mutation",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Implementation was right first time and never changed; review and a close-out hold only made the threading mutation-pinned. Nothing beyond evidence."
+  },
+  {
+   "id": "LIN-2637",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "runToolHop half of shared pre-abort guard pinned by no test (mutation survives)",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Setup-window test does not pin 'no transport call', only eventual rejection",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "getRecommendationStream has the same pre-aborted-signal bug, live-reachable",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "getRecommendation and linear-fetch keep abort-then-invoke-transport shape",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review added a runToolHop witness test and routed sibling abort bugs to LIN-2854/2855; code fix unchanged."
+  },
+  {
+   "id": "LIN-2701",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Sync-to-async handler under Express 4 would hang on a render throw; wrap whole body in try/catch, 500",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "recordScan terminal branch does not return row 'unchanged' (patches dueBasis fields)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Perf claim 'collection scan' overstated; it is an index scan",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Session-1 split would ship visible-but-inert Scan/Stop controls; move elements to Session 2",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Claimed cancellation/late-settlement witness does not exist in the witness set",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Residual 'unchanged' prose, stale llms.txt data line, sweep count 34 vs 39",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "public/llms.txt false at HEAD: says run control not yet shipped",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Run-surface result badge classes ship with no CSS",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Select-all after a run erases painted result badges (billed re-run to recover)",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Plan review caught an async-handler hang (real); rest was witness/wording. Close-out hold fixed llms.txt and routed two UI defects to human-ruled follow-ups."
+  },
+  {
+   "id": "LIN-2717",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "S4 unit seam unworkable: case-sensitive TEXTAREA guard vs lowercase fake, no layout metrics, so U7-U9 would pass vacuously.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Churn claim scoped to quiet lines; the real edit footprint (.value sites, insertion point) is the file's hottest region.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "F1: unconditional focus scrollIntoView yanks desktop page to top; gate to <=600px and add desktop witness.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "F2: min-width:0 comment asserts a false cols-driven floor mechanism; declaration is inert on textarea.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "L4: planned U6 unit witness for the Enter/Shift+Enter key handler was absent.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "L8/F5: programmatic focus-restore in finishTurn fires mobile reveal, moving page ~480-826px; close-out held.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "L7: plan's S3 render unit tests U1-U4 never implemented; close-out added them during the hold.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "close-out",
+     "finding": "L9/F6: new F5 witness threshold 126px borrowed from another scenario; tightened to 10px.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "close-out",
+     "finding": "L10: focus flag name reads general but is site-specific; caution comment recorded.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "low"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Review caught a desktop scroll-jump regression the PR introduced; the close-out hold forced a fix for a mobile page jump. Plan review hardened vacuous unit witnesses."
+  },
+  {
+   "id": "LIN-2719",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "E2E migration inventory names 6 of 7 specs; dispatch-defaults.spec.js holds key guards",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "'Migrate, do not delete' too vague; need PRESERVE/RE-EXPRESS/RETIRE disposition per assertion",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "modelPlaceholder default-model hint would go dead with select swap; carry it on blank option",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Obsolete datalist source-order guard test should be retired with rationale",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Sweep precision nit (purify.min.js filter)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "readDispatchExecControls lacks escape-hatch read branch; 'other…' would dispatch the sentinel as model",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Second plan review caught a silent wrong-model dispatch on all exec-control mounts; the rest was test-inventory and hint preservation."
+  },
+  {
+   "id": "LIN-2811",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "collective.js document-level near-bottom scroll write is an unclaimed same-class yank site.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Surface sweep grep lacked -E and matched zero lines; coverage claim rested on it.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "60px threshold justification one-sided; prior art also uses 120.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Both test-shim options mis-costed; option (a) duplicates the ordering logic and cannot catch sample-after-insert.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Planned scroll-gate tests can't fail on sample-after-insert: fake geometry frozen across insertion (10/10 mutant passes).",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Failure direction stated inverted; real defect is pinned reader abandoned, caught by tall-row pinned case.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Table-coverage claim still wider than evidence (unclassified query #6 hits, no scrollBy sweep).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "isPinnedToBottom export contract and exact 60px boundary unpinned by tests.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Made the scroll-gate tests genuinely falsifiable and filed one sibling yank site (LIN-2813); production design unchanged by review."
+  },
+  {
+   "id": "LIN-2830",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Seven fixed grid tracks (~792px) in ~263px cards under root overflow clip hide effort, cost, duration columns.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Catalog doc drift: proxy-instructions workerSessions example omits new harness field.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review caught that the new bake-off rows were clipped unreadable at every viewport; CSS fix plus geometry witness. Doc drift filed as LIN-2844."
+  },
+  {
+   "id": "LIN-2838",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Four surviving statements of superseded byte-exact rule, incl. live-served agent catalog in proxy-instructions.js.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Runtime fix was right first time; review only made the agent-facing catalog and comments state the new normalised rule."
+  },
+  {
+   "id": "LIN-2872",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Launch-time exemption never fires on the three motivating incidents: '[working] Session launched' counts as work.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "[working] regex misses categorized '[working · cat]' heartbeats; would wrongly exempt dispatches that ran once F1 fixed.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Allow-list rework over-fires on opencode: every failed opencode dispatch exempted, removing the duplicate window entirely.",
+     "effect": "follow-up",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Claude-code heartbeat shapes proving work ('[working] resumed', 'no tool calls · N total', '[stalled?]') read as liveness.",
+     "effect": "follow-up",
+     "realFault": true,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Review stopped a green-CI predicate that removed the duplicate guard on opencode; half 1 split to LIN-2900, only force/followUpTo forwarding shipped."
+  },
+  {
+   "id": "LIN-2917",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "F1: eval snapshot regeneration would fold ~5 weeks of unrelated drift; plan claimed two-line change.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "F2: prompt-system.md edit must also update the misfire-guard clause in the same sentence.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan review dropped a noisy eval-snapshot regeneration and widened one doc edit; nothing beyond plan and doc wording."
+  },
+  {
+   "id": "LIN-2925",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "27%->39% delegation figure attributed to wrong report and its reversal to 32% omitted.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "DORA archetype shares, fielding dates and 'verification tax' not on cited pages.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Cross-instrument subtraction unflagged; Microsoft authors' own retention reading omitted.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Revision mislabelled June 2026 Economic Index as same-user comparison; it is cross-surface, task-controlled.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Research paper: reviews caught misattributed and overstated source claims, all fixed in prose; no code involved."
+  },
+  {
+   "id": "LIN-2929",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "First-paper citation pinned to a commit where the file does not exist (three sites).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "DORA trust claim self-contradictory: 39% to 30% low-trust is a fall, not supporting 'trust falls as use rises'.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "SO 2023 publication date evidenced by a capture predating publication.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Research paper: review fixed a wrong citation and a reversed DORA claim that overstated the disconfirming evidence; wording only."
+  },
+  {
+   "id": "LIN-2930",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Sep 2026 frontier table row one cell short; gate column missing/misplaced",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "stackoverflow.blog citation 404s (truncated slug)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Quote attributed to ladder line 11, actually line 13",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "DORA 'Last updated' page not in cites",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "README row collapses March 2027 projection and confidence",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "'Two years by the first projection date' is 18 months, three occurrences",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Base-rate sentence argues opposite direction from its label",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Docs-only paper; review fixed table, citations and an arithmetic error. Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-2934",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Planned kind:'refusal' hand-back row collides with safety-refusal kind and orchestrator cannot write it; use proxy-event note",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Feed n-of-N misses materialized Observation cache; needs loop threading and BUILDER_VERSION bump or stale docs served 30 days",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "taskDispatches must de-duplicate by _id; archive overlap double-counts rows",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Fourth validation/builder path (workspace-api autopilot-prompt query param) omitted",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Feed n-of-N filter omits sessionId clause, over-counts on scoped runs (11 of 10)",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "budgetPosition.sessionsPerTask.count off by one after a task's first dispatch",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Fail-closed refusal body lacks bound, so durable note reads 'BUDGET_EXHAUSTED undefined'",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Feed shows no n-of-N on general (goal-only) budgeted runs: anchorless session drops the bounds",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Archive-hop persistence of maxSessionsPerTask untested (mutation survives)",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "recommend-and-dispatch 201s do not echo budgetPosition/maxSessionsPerTask",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "review",
+     "finding": "Surviving mutants: kickoff/dispatch 201 budgetPosition, watch field, force bypass, fail-closed note untested",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "'Most recently dispatched task' actually computed as last first-seen task (A-B-A wrong)",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Trim does not notify materializer, feed chip stale after trim",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "review",
+     "finding": "Doc/prompt prose drift: dispatch-integration names only maxTasks; hand-back instruction narrower than manual",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "BUILDER_VERSION collides with main's LIN-3022 bump; merge would make cache bump inert",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Trim-notify fix untested",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "LLM arm of recommend-and-dispatch maxSessionsPerTask echo unpinned",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "R1 fix keeps null-issue anchors; null-anchored rulings forced to 'record' by unrelated general runs",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Anchorless general runs share one null bucket, iteration numbered across unrelated runs",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "pointReadSession builds old orphan session for general runs (no anchor-aware construction)",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Session title fallback regresses to 'autopilot session' placeholder for general runs",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Null-anchored ruling reply posts to /api/comments/null",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Anchorless general anchor never matches its own agent-status rows",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "v1 Go path prose threading of maxSessionsPerTask unpinned; feed followUpTo exclusion unpinned",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Scoped-only kickoff prose contradicts itself ('open-ended, no finish line' plus a bound)",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Observation budget chip never DOM-asserted (mutation survives)",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "T2 fix never reaches issue-scoped builds; materialized/point-read docs diverge from full build",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "close-out",
+     "finding": "New {urlKey, dispatchId} agent-status query has no index",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Live seam witness and hand-back comment not on record before merge",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 5,
+   "note": "Heavy real catch: cache-bump miss and collision, off-by-one and over-count in n-of-N, general-run feed gap, and several regressions the R1 fix introduced."
+  },
+  {
+   "id": "LIN-2981",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "No test fails if the mock gate fix is removed; add deterministic dummy-key pin test.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Production fix was correct first time; review added a regression pin so CI can detect the fix's removal."
+  },
+  {
+   "id": "LIN-2994",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Dashboard halt page render awaits Linear (~46s) under degradation; plan must decide, became best-effort with proxy as degraded path.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Halt routes collide with /dispatch/:id (proxy GET 404) and DELETE /:itemId UUID guard (dashboard Resume 400); mount order needed.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Poll-response consumer enumeration incomplete (Chrome extension, e2e specs, docs example).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "setBy has a grounded per-account identity on dashboard path (req.session.accountId); plan said none.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Published-docs class missed runbook :6 and executive-summary :81; db-indexes grounding claim wrong.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Decision 2 overclaimed that bounded read closes degradation risk; Promise.race does not cancel query.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Held: bounded-timeout poll-halt witnesses hang the suite instead of failing by name under mutation.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Plan review caught halt-route collisions that would have broken dashboard Resume (400) and possibly proxy GET, plus a degraded-mode UX gap."
+  },
+  {
+   "id": "LIN-2995",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Stop sweep covered only ACTIVE sessions; AWAITING_FOLLOWUP/EXTERNAL/BLOCKED survive and failsafe refires them; sweep must precede runStallFailsafe.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Stop resume-hold in processPolledItem breaks LIN-897/LIN-2456 route-around, starving aborts and sibling workspaces behind a held head.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Unpolled workspace's halt never reaches the stop sweep because pollForPrompts returns early; latency unbounded.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Dependency arrows wrong: S3 conflated mechanism with Harbour wiring, so S3/S4/S5 not independently landable; plus test-file and arithmetic corrections.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Post-selection branch is a reason allowlist; lone held item under pause/stop would be launched or resumed.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Nothing stated that stop holds fresh launches; pause-only hold would launch then kill fresh work under stop.",
+     "effect": "prod",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "humanContinued sessions skipped by sweep still refired at failsafe sites while held at site #2; inconsistent.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Always-poll mode could log routedAroundHead naming a candidate never ahead of the winner.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Harbour-side 'pending LIN-2995' halt copy and runbook now false; no ticket owns it.",
+     "effect": "follow-up",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "README documents two of three halt sources; auto-pause and its option-(a) limit undocumented; close-out held.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "README auto-pause text wrong on recovery trigger and claims malformed knob doesn't disable the guard.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Two plan-review rounds caught several stop/pause safety holes (lone held item launched, incomplete stop sweep, starvation) that landed as prod code; later items docs only."
+  },
+  {
+   "id": "LIN-3001",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Restart-vs-rollback step cites authoritative comment for wording only the superseded comment contains; later clauses unsourced inferences.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Gate (c) wrongly claims no guard relaxed; runbook loosens investigator's railway-run ban for read-only mongosh.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Cascade-abort 'safe/harmless' contract statements under-enumerated: three members, not one, routed to LIN-2998.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "DB-stats SSH-path claim cited to wrong LIN-3000 comment.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Runbook rollback inference inverted: says roll back when go-live precedes onset is unlikely cause; evidence says the opposite.",
+     "effect": "docs-wording",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Amplifier story repeats superseded causal claim that cascade lookups produced the 546-573s holds; record contradicts itself.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Timeline clock provenance mixed (con self-labels vs createdAt vs dispatchedAt vs railway logs); rows mis-timed or mislabelled.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Non-blocking bundle: miscited sources, unverified railway subcommand, railway variables not forbidden, unsupported 'No data loss', polling-stop timing.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Row 19:25:38 'serves cleanly for rest of incident' contradicts source; same container showed long holds.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Runbook forbade the history find/explain read the incident record credits as the discriminating test.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Runbook mongosh command expands $MONGO_URL in host shell (empty) and uses wrong variable; cannot reach database.",
+     "effect": "docs-wording",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Fixed command's --eval inside sh -c strips $gt/$gte, so allowed operator queries become syntax errors.",
+     "effect": "docs-wording",
+     "realFault": true,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Shell-expansion rationale cited to a comment that does not say it.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Citation labels LIN-3001 review a531d11f as a LIN-2993 review.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Assorted non-blocking nits across rounds 2-5: deploy count, 19:40:51 precision, rollback sentence, linked-directory clause, scratch path.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    }
+   ],
+   "sendBacks": 7,
+   "note": "Docs-only runbook: review caught an inverted rollback rule and two unrunnable mongosh commands an operator would hit; rest was citation accuracy."
+  },
+  {
+   "id": "LIN-3027",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Runbook citation line numbers computed before Surface 1 edits shift them; line-number verification would not catch it.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Missing citation class and three dropped research findings (take not halt-checked, concurrent-write cache, runbook unlinked).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Poll halt shape omits that setBy can be null.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Wording implies halt has effect: 'DELETE to resume', host-side stop dropped, no honesty wording on surfaces 1,2,4.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Plan claims no code touched and surfaces independent; render-dispatch.js is code and Surface 3 depends on 1.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Held: guide-halt-note honesty wording has no test (M5 'runner is paused' mutation survived).",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Held: runbook says DB outage 500s the poll; it hangs to the 15s client timeout; 1.5s bounds halt read only.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Held: runbook honesty phrase inconsistent with required 'does not yet honor it (pending LIN-2995)'.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "close-out",
+     "finding": "Held: record shifted citation offsets for dated efficiency-levers paper in a ticket comment.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Nothing beyond evidence/wording: more accurate runbook caveats and citations, plus one honesty-copy test."
+  },
+  {
+   "id": "LIN-3056",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "F1: meta routing pin satisfied by pre-existing LIN-3033 sentence; scope assertion to the new clause.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "F2: change-log row separated by blank line renders outside the table.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "F3: trigger condition (inside item, authoring beyond bound) unpinned on both paths; inversions stay green.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "F4: dischargeable-route list unpinned; deleting it left suite green.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Prompt wording was right first time; two send-backs only tightened regex pins and fixed a changelog table row."
+  },
+  {
+   "id": "LIN-3078",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "Execution hypothesis still says runs execute on a Harbour-operated runner, contradicting LIN-2938 and the new In/out line.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review caught one remaining self-contradiction in docs/v1.md; docs wording only."
+  },
+  {
+   "id": "LIN-3102",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "N2 template-count class incomplete: missed executive-summary.md:132 and a stale spec comment.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "DC-dispatch-fields bounded against wrong route file; three listed fields are not proxy-accepted.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "CFG class bounded doc-vs-doc; must be code-vs-doc including simple-dispatcher env vars and count.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Guard inventory under-enumerated; 'prompt twins unguarded' false (repeated as review ledger item 4).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "H3 Linear-only framing residual list missing members in executive-summary.md.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Existing-ticket table missing LIN-2255 (llms.txt stale lines still hold).",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "High-churn history notes for catalog and source-map factually wrong; reverse catalog drift members added.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Session-fit 'mandated' second-read wording overstated.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Route-citation class swept docs only; 11 inline-comment members missing.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Plan marks re-verification 'done', freezing member lists; execution must re-run class queries at HEAD.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "LIN-1653 not cross-checked before minting N2 follow-up.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "review",
+     "finding": "Report dropped the resolved F1/F3/F4 trend-ledger row.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "H13 scope wording says both repos; all stale sites are LinearViewer only.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "routes/proxy-reads.js:28 is historical, not a stale route citation; counts 11 to 10, LIN-3116 corrected.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "simple-dispatcher area docs left unassessed; SD-H7 drift section added.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 3,
+   "note": "Docs-only audit report: reviews made it more complete and corrected wrong members and wording; plan-review loop hit its bound and was waived."
+  },
+  {
+   "id": "LIN-3103",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "Loose-JSON duplication class is 7 sites, not 5.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Client-module class: 6 of 8 public/*.js sub-board members undispositioned.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Long-function class lacks threshold/row; createDispatchRoutes name collision missed.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Largest cross-file duplicate cluster (mock builders) has no row.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Planned mints overlap open LIN-2793/LIN-1674 uncited; LIN-2397 misfiled as stale.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "Board query omits extension filter; arithmetic error on providers/linear/index.js.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "runStallFailsafe misfiled as observation-only; should be graded top finding.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "F-gate mechanism described wrongly; LIN-3113 remedy covers only the pipe form.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Four large handlers undispositioned; dispatch-request validation duplication pair missing; appendix unfilled.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "LIN-2568 locus :1969 stale; actual else-arm at reapers.js:2380-2381.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Review-only report ticket; reviews made the report more complete and accurate (runStallFailsafe re-graded, gate mechanism corrected); nothing beyond report/ticket wording."
+  },
+  {
+   "id": "LIN-3106",
+   "findings": [
+    {
+     "leg": "review",
+     "finding": "J2 trend delta says 'unchanged' though Local verdict moved (baseline misfiling)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "R2-8 claims token-mint AJAX-only; docs document the API",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "LIN-3059 given no disposition",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "No explicit decision on widening R1 to own-session runner (LIN-3080)",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "J5b overstates missing token guidance",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "'Four' pre-ticketed classes but five listed",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Findings not strictly severity-ordered; source-read items mislabelled Objective",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Citation line drift in render-landing.js",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Bare #1/#2/#3 autolink to unrelated PRs",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    },
+    {
+     "leg": "review",
+     "finding": "Misquote of task description ('evidentiary basis')",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 1,
+   "note": "Review report only; one send-back (posted twice) corrected trend deltas, dispositions and wording. Nothing beyond evidence/wording."
+  },
+  {
+   "id": "LIN-3134",
+   "findings": [
+    {
+     "leg": "plan-review",
+     "finding": "B1: four follow-up attachProxyContext branches bypass the resume helper, silently downgrading declared orchestrators once switched on.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "B2: S0 byte-identity vs S1 null-field writes contradiction; resolved by sparse writes in addItem/archive.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "N1: outward sinks for grantDeclaration unbounded; addItem return strip plus secrecy census added.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "N2/N6: helper must validate recorded record; factory must stop caller fields injecting grantDeclaration.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "N3: declaration read error treated as plain; must map to transient 503 and withdraw wake.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "N4/N5: per-branch truth table and negative wake cells unpinned.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "N7/N8: wrong fake-store churn figure; INVALID_GRANTS for corrupt record needs stated trade-off.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "R1: active-history-active lookup cannot close non-atomic take-hop window; needs bounded history re-read.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "medium"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "NB1-NB4: error-body relay, transient keyed on err.code, uncoded-throw wrapping, remove wantFollowUpProvisioning.",
+     "effect": "prod",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "plan-review",
+     "finding": "NB5-NB8: residual naming, test split between children, missing history refs, prose-harness question for T3.",
+     "effect": "docs-wording",
+     "realFault": false,
+     "confidence": "low"
+    },
+    {
+     "leg": "close-out",
+     "finding": "L1: writer census misses aliased/computed addItem writers; close-out held, 40-line census block added.",
+     "effect": "tests",
+     "realFault": false,
+     "confidence": "high"
+    }
+   ],
+   "sendBacks": 2,
+   "note": "Plan review found real design holes (bypassing branches, take-hop race) in an inert credential mechanism, fixed before code; close-out forced one census test."
+  }
+ ]
+}
