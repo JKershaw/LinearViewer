@@ -34,6 +34,7 @@ const SHIP_BISCUIT = read('lib/ship-biscuit.js');
 const SHIP_EDITOR = read('lib/prompts/ship-biscuit-editor.js');
 const DISPATCH_STORE = read('lib/dispatch-store.js');
 const READ_HORIZON = read('lib/read-horizon.js');
+const PASSAGE_PROMPT = read('docs/passage-runner-prompt.md');
 
 describe('lifetime-retention contract language (LIN-3163)', () => {
   test('the published instructions state lifetime retention and drop the old retention phrasing', () => {
@@ -139,5 +140,11 @@ describe('lifetime-retention stale-language reconciliation (LIN-3163 Finding 1)'
   test('read-horizon records the flip as done, not as "moving to lifetime retention"', () => {
     assert.doesNotMatch(READ_HORIZON, /moving to lifetime retention/);
     assert.match(READ_HORIZON, /retained for the life of the project/);
+  });
+
+  test('the passage-runner prompt calls the /cost gap a 30-day read window, not retention', () => {
+    assert.doesNotMatch(PASSAGE_PROMPT, /30-day app-call retention window/,
+      '/cost reads a fixed 30-day horizon; app-call evidence is lifetime-retained');
+    assert.match(PASSAGE_PROMPT, /30-day app-call read window/);
   });
 });
