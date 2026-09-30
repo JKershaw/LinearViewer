@@ -410,3 +410,22 @@ population.
 - The reliability paper's own Next, dating the introducing commit of each residue fault, should
   include the 21 unlabelled ones as well as the 49 labelled; its `proposals.md` line is widened to
   say so.
+- Two documents that landed on `main` while this check ran quote version 1 figures, and this
+  check did not edit them:
+  - **`docs/steady-base.md`**, the steady-base anchor (f9b2258d). In "What we learned":
+    - "dispatches doubled at every size, 8 to 17" should read 12 to 17, 1.2–1.8× by size, almost
+      all warm beats;
+    - "72% of session time is waiting" is pooled; the median ticket waited 40% in July and 47%
+      in September;
+    - the supervision rise from 28% to 45% is entirely the passage Runner and its legs;
+    - "a docs- or tests-only ticket costs about 90% of a median ticket" is about three-quarters
+      on the repaired sample;
+    - "risk gets no extra effort" is not established either way;
+    - "review stops 38–48%" is 35–45%, on an interval of about 25–63%, with 22 bugs in 9 tickets;
+    - "simple-dispatcher's rise ... the one reliability signal to treat as real": 9 of its 24
+      September escapes are residue, which leaves 27 per 100 PRs, within noise of June's 12;
+    - for LinearViewer, the rise from finding is all of it, not "much of it".
+  - **`measuring-throughput.md`** (LIN-3152) cites the 1.4-day median lag (`:71`) and "dispatches
+    doubled" (`:83`, `:106`). Its own 66 attributed escapes, filed a median of the same day,
+    read the same `introducedBy` field, so they probably include the rows that name the finder;
+    its check should test that.
