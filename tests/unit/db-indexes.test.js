@@ -17,6 +17,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
+import { ProxyEventStore } from '../../lib/proxy-events.js';
+import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
+import { LlmCallLogStore } from '../../lib/llm-call-log.js';
+import { AgentStatusStore } from '../../lib/agent-status-store.js';
+import { recordingCollection } from '../fixtures/mango-tmpdir.js';
 
 // Collections the audit deliberately left on the auto `_id` index.
 const EXCLUDED_COLLECTIONS = [
@@ -331,23 +336,77 @@ describe('db-indexes', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // LIN-3162 (LIN-3157 A2): five plain, additive indexes backing the DB-side
-  // paged reads, added alongside (never replacing) the pre-A2 expiry specs.
+  // LIN-3162 (LIN-3157 A2) / LIN-3163 (B, post-deploy index fix): the plain
+  // timestamp indexes backing the DB-side paged reads. LIN-3163 extends each
+  // paged-list key so it matches that list's sort key exactly (after the
+  // `urlKey:1` prefix) — the A2 `{urlKey, timestamp:-1}` shape did not cover
+  // the `_id`/`_seq` tie-break and lost to the vestigial expiry index in
+  // production, leaving a full-workspace blocking sort.
   // ---------------------------------------------------------------------------
 
-  test('declares the five A2 plain timestamp indexes (LIN-3162)', () => {
+  test('declares the four sort-matching paged-list indexes plus the per-issue successor (LIN-3163)', () => {
     const expected = [
-      ['proxy-events', { urlKey: 1, timestamp: -1 }],
-      ['prompt-traces', { urlKey: 1, timestamp: -1 }],
-      ['llm-call-log', { urlKey: 1, timestamp: -1 }],
-      ['foreman-status', { urlKey: 1, timestamp: -1 }],
+      ['proxy-events', { urlKey: 1, timestamp: -1, _id: -1 }],
+      ['prompt-traces', { urlKey: 1, timestamp: -1, _seq: -1, _id: -1 }],
+      ['llm-call-log', { urlKey: 1, timestamp: -1, _id: -1 }],
+      ['foreman-status', { urlKey: 1, timestamp: -1, _id: -1 }],
       ['llm-call-log', { urlKey: 1, issueIdentifier: 1, timestamp: -1 }]
     ];
     for (const [collection, keySpec] of expected) {
       const hasIt = INDEX_SPECS.some(s =>
         s.collection === collection && JSON.stringify(s.keySpec) === JSON.stringify(keySpec)
       );
-      assert.ok(hasIt, `${collection} must have a plain ${JSON.stringify(keySpec)} index (LIN-3162)`);
+      assert.ok(hasIt, `${collection} must have a ${JSON.stringify(keySpec)} index (LIN-3163)`);
+    }
+  });
+
+  test('the four superseded A2 {urlKey,timestamp:-1} specs are gone (LIN-3163)', () => {
+    // The A2 shape is a strict prefix of the extended key, so keeping both
+    // would cost a second index write on every insert while the planner still
+    // could not use the prefix for the tie-break.
+    for (const collection of ['proxy-events', 'prompt-traces', 'llm-call-log', 'foreman-status']) {
+      const hasPlainA2 = INDEX_SPECS.some(s =>
+        s.collection === collection && JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, timestamp: -1 })
+      );
+      assert.ok(!hasPlainA2, `${collection} must not keep the superseded {urlKey:1,timestamp:-1} spec`);
+    }
+  });
+
+  test('each paged list\'s cursor sort equals its declared index key after the urlKey prefix (LIN-3163 parity guard)', async () => {
+    // CI runs MangoDB, which has no query planner, so no test can observe the
+    // planner picking the index. This guard holds fixed the ONE thing that
+    // decides it: the index key must be the list's sort key with `urlKey:1`
+    // prepended. Change a list's sort or its index spec without the other and
+    // this fails — the exact drift that produced the production blocking sort.
+    const cases = [
+      { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listEvents('parity-ws', { limit: 5, offset: 0 }) },
+      { collection: 'prompt-traces', make: c => new PromptTraceStore({ collection: c }), list: s => s.listTraces('parity-ws', { limit: 5, offset: 0 }) },
+      { collection: 'llm-call-log', make: c => new LlmCallLogStore({ collection: c }), list: s => s.listCalls('parity-ws', { limit: 5, offset: 0 }) },
+      { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }) }
+    ];
+    for (const { collection, make, list } of cases) {
+      const recorded = recordingCollection(freshDb().collection(collection));
+      await list(make(recorded));
+      const cursor = recorded.__record.cursors.at(-1);
+      assert.ok(cursor, `${collection}: the paged list issued a find()`);
+      assert.strictEqual(cursor.sorts.length, 1, `${collection}: exactly one sort must be pushed into the cursor`);
+      const spec = INDEX_SPECS.find(s =>
+        s.collection === collection &&
+        s.keySpec.urlKey === 1 &&
+        s.keySpec.timestamp === -1 &&
+        s.keySpec.issueIdentifier === undefined
+      );
+      assert.ok(spec, `${collection}: a urlKey+timestamp paged-list index must be declared`);
+      // Compare ORDERED key entries, not deep equality: a compound index is
+      // defined by key order, and `assert.deepStrictEqual` on objects ignores
+      // insertion order, so `{urlKey,timestamp,_id}` would equal
+      // `{urlKey,_id,timestamp}`. Each paged list's index key must be exactly
+      // `urlKey:1` followed by the sort keys in sort order.
+      assert.deepStrictEqual(
+        Object.entries(spec.keySpec),
+        [['urlKey', 1], ...Object.entries(cursor.sorts[0])],
+        `${collection}: the declared index key must equal the list sort with the urlKey prefix, in order (LIN-3163)`
+      );
     }
   });
 
