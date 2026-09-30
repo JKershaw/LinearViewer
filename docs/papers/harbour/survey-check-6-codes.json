@@ -1,0 +1,3594 @@
+{
+ "ticket": "LIN-3175",
+ "checks": "LIN-3174 (why-legs-repeat.md)",
+ "codedAt": "2026-09-30",
+ "method": "A fresh random sample of 80 of the census's 840 repeat legs, none of the paper's 64: 40 from each month, seeded (3175), by scripts/survey-check-6-sample.mjs. Digests by the paper's own scripts/survey-repeats-digests.mjs. Two readers, A (digests in order) and B (in reverse), each split across five in-session subagents of the frontier tier with 16 digests, coded against the paper's rubric unchanged plus one field, ruling. Neither saw the other's codes, the paper or its codes. Disagreements were settled by the checker from the digest, with both codes in view; each reason is recorded.",
+ "rulingField": "ruling: did a ruling, decision, authorisation or redirection by a person or by a coordinator/autopilot acting on an escalation come between the previous leg of this kind and this repeat, and allow or direct this round? A gate verdict alone is not a ruling. yes | no | unclear.",
+ "readers": {
+  "A": [
+   {
+    "digest": "01",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-01T06:36:04.824Z; 2026-08-01T06:41:34.336Z; 636148ef",
+    "note": "Plan-review requested changes on dyno sweep; revised plan kept the errors.js/doc pair untouched and folded in two new comment sites, which then landed."
+   },
+   {
+    "digest": "02",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-01T16:14:42.974Z; 2026-08-01T16:46:05.178Z; 2026-08-01T17:00:43.865Z; 8eb9f93e",
+    "note": "Close-out held on F1/F2, fixes landed, re-review found the F1 regression guard test was inert; fix was test-only (prod 0)."
+   },
+   {
+    "digest": "03",
+    "reason": "duplicate-or-mistaken",
+    "reason2": "changes-requested",
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-08-01T14:15:34.419Z; 2026-08-02T06:25:11.231Z; 2026-08-02T06:29:59.702Z",
+    "note": "First close-out held for a human call, then merged and closed Done; a relayed human decision fired a second close-out on the Done ticket, which only re-verified."
+   },
+   {
+    "digest": "04",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-08-03T07:00:57.950Z; 2026-08-03T07:07:23.984Z; 2026-08-03T07:16:53.996Z",
+    "note": "Re-review of the revised plan approved all three fixes; it raised three residual observations explicitly not change requests, so the plan was unchanged."
+   },
+   {
+    "digest": "05",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "unclear",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-03T16:39:27.895Z; 2026-08-03T16:57:17.495Z; 2026-08-03T17:12:04.904Z; 42572181",
+    "note": "Re-review confirmed the deleteDurable false fix and approved conditionally; close-out discharged ledger with comment-only server.js edits and a new behaviour test."
+   },
+   {
+    "digest": "06",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-03T19:34:42.003Z; 2026-08-03T19:39:27.280Z; 2026-08-03T19:52:15.402Z; 2026-08-03T19:59:48.735Z",
+    "note": "Re-review confirmed the comment-only R1 fix and approved conditionally; merged as reviewed, L1 ledger item carried from first review awaited human yes."
+   },
+   {
+    "digest": "07",
+    "reason": "other",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-06T14:14:21.658Z; 2026-08-06T17:45:51.757Z; 2026-08-06T19:01:48.315Z; 2026-08-06T20:08:14.537Z",
+    "note": "The earlier review-kind leg was actually a triage; this was the first real review, whose llms.txt inaccuracy finding got a docs-only fix."
+   },
+   {
+    "digest": "08",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-08T07:19:30.933Z; 2026-08-08T07:36:00.981Z; 2026-08-08T08:08:36.734Z; 2026-08-08T10:45:08.064Z; 49178180",
+    "note": "Review-kind legs were plan-reviews; round 2 found G1 (ungated legacy read-through fallback) by execution, and implementation added the provider gate with a pin."
+   },
+   {
+    "digest": "09",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-08T07:54:54.405Z; 2026-08-08T08:11:42.548Z; 2026-08-08T08:19:58.418Z; ac6dc725",
+    "note": "The earlier close-out-kind leg was actually a breakdown; this genuine close-out merged Phase A as reviewed and routed ledger items to monitor and LIN-1930."
+   },
+   {
+    "digest": "10",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-08T21:37:17.860Z; 2026-08-08T21:48:02.856Z; 2026-08-08T22:00:59.406Z",
+    "note": "Plan-review requested changes; revised plan added harness-conditional summing for opencode, renamed modules, and dropped the task-cost lane change."
+   },
+   {
+    "digest": "11",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-08T22:06:57.961Z; 2026-08-09T02:19:24.308Z; 2026-08-09T02:28:04.512Z",
+    "note": "The earlier close-out-kind leg was actually a breakdown; this genuine parent close-out routed ledger items to follow-up tickets without code change."
+   },
+   {
+    "digest": "12",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-08-09T16:08:46.881Z; 2026-08-09T16:10:48.853Z; 2026-08-09T16:26:12.036Z; 2026-08-10T19:08:16.647Z",
+    "note": "Standing authorisation allowed a second revision; third-pass review found surface 2b already guarded (404), and John's ruling dropped it from the implemented scope."
+   },
+   {
+    "digest": "13",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-10T07:38:05.839Z; 2026-08-10T08:24:21.585Z; 2026-08-10T08:36:27.602Z; 2026-08-10T08:52:48.260Z",
+    "note": "Re-review verified the LIN-2005 dedupe fix and raised two new wording defects (inverted test name, overstated docs guarantee), both fixed wording-only at close-out."
+   },
+   {
+    "digest": "14",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-10T08:43:58.833Z; 2026-08-10T09:15:22.028Z; 2026-08-13T12:13:59.438Z; f39bec07",
+    "note": "Round-2 review found the /instructions contract copy and false PATCH self-verifying claim; John folded both into scope and they shipped."
+   },
+   {
+    "digest": "15",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-13T19:07:39.347Z; 2026-08-13T20:09:57.806Z; 2026-08-13T20:53:29.400Z",
+    "note": "The earlier close-out-kind leg was an aborted breakdown dispatch; this first genuine close-out merged both phases as reviewed and routed the ledger."
+   },
+   {
+    "digest": "16",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-14T12:31:43.782Z; 2026-08-14T12:56:21.488Z",
+    "note": "Plan-review raised F1-F4; revised plan re-derived stage from per-request fingerprint, gated A1 to Linear, and filtered B4 to caller's token."
+   },
+   {
+    "digest": "17",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-14T13:38:06.736Z; 2026-08-14T13:53:20.558Z; 2026-08-14T14:05:48.876Z; 2026-08-14T14:14:41.456Z; 2026-08-14T14:26:40.146Z",
+    "note": "Round-4 review after round-3 fix approved conditionally but raised a new secret-in-error-message exposure; close-out held on it and a prod redaction landed."
+   },
+   {
+    "digest": "18",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-16T14:00:09.049Z; 2026-08-16T14:17:37.876Z",
+    "note": "Revision beat 2 answered plan-review F2-F5: dropped the INDEX_SPECS entry for an exclusion, corrected session-fit to single session, named the start site."
+   },
+   {
+    "digest": "19",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-08-16T14:58:59.668Z; 2026-08-16T15:12:28.087Z; 2026-08-16T15:29:31.854Z; 2026-08-16T15:40:53.518Z",
+    "note": "Round-3 review verified the round-2 fixes and approved conditionally; its four new surviving mutants were coverage gaps, not defects, accepted or routed to follow-up tickets."
+   },
+   {
+    "digest": "20",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-16T18:18:03.963Z; 2026-08-16T18:44:25.480Z",
+    "note": "Plan revised after plan-review Request Changes: seventh unknown lane added, agent-status blocked channel unioned, loop-supersede reused; next plan-review approved."
+   },
+   {
+    "digest": "21",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-20T07:17:26.833Z; 2026-08-20T07:33:08.571Z; 2026-08-20T07:43:12.462Z; 2026-08-21T19:39:10.420Z; 2026-08-21T19:49:45.553Z",
+    "note": "Pass-2 plan-review found the new ?source= wiring used the wrong namespace; operator ruling afterwards dropped it and recorded the active-binding limitation in the plan."
+   },
+   {
+    "digest": "22",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-20T09:33:51.581Z; 2026-08-20T11:26:15.635Z; 2026-08-20T11:36:12.695Z",
+    "note": "The earlier close-out-kind leg actually ran breakdown; this is the real close-out after review approval, merging and routing F5 to LIN-2157."
+   },
+   {
+    "digest": "23",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-22T07:32:55.384Z; 2026-08-22T07:39:54.141Z",
+    "note": "Plan Revision 2 answered plan-review F1-F5: runIsWaiting tail skip, no enum widening, stamp threading moved to Phase 2, LIN-2201 filed."
+   },
+   {
+    "digest": "24",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-22T08:08:56.687Z; 2026-08-22T08:13:30.024Z",
+    "note": "Plan revision only resolved an inconsistently stated postComment signature by keeping today's positional form and rewording one rationale row; nothing else changed."
+   },
+   {
+    "digest": "25",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-22T09:59:43.254Z; 2026-08-22T10:10:29.403Z; 2026-08-22T10:21:13.712Z; 2026-08-22T10:31:37.922Z",
+    "note": "Re-review confirmed F1/F2 fixed and found a surviving mutant (L1); close-out added two tests killing it, test-only delta."
+   },
+   {
+    "digest": "26",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-08-22T18:06:59.439Z; 2026-08-22T18:49:44.311Z; 2026-08-22T18:58:21.490Z",
+    "note": "Prior close-out held on physical-device ledger item 4; operator ruling accepted it via named monitor and this close-out merged and set Done."
+   },
+   {
+    "digest": "27",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "unclear",
+    "real": "na",
+    "ruling": "unclear",
+    "evidence": "2026-08-23T19:31:00.121Z; 2026-08-24T18:48:02.307Z",
+    "note": "Retrospective review-sweep lane re-reviewed an already-Done ticket a day later; close stands, one earlier finding now discharged; no follow-on change shown."
+   },
+   {
+    "digest": "28",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-24T21:01:52.724Z; 2026-08-24T21:34:49.844Z; 2026-08-24T21:51:03.553Z; 2026-08-24T22:00:41.648Z",
+    "note": "Re-review after LIN-2303 pinned the institutionalisation confirmed F3 discharged and approved conditionally; F1/F2 were carried from round one; merge followed."
+   },
+   {
+    "digest": "29",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-27T09:22:29.075Z; 2026-08-27T09:36:50.355Z; 2026-08-27T09:52:05.101Z; 2026-08-27T10:00:48.874Z",
+    "note": "Close-out held on ledger item 6; a test was added and this round-4 review verified it by mutation and approved cleanly; merged."
+   },
+   {
+    "digest": "30",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-27T13:43:48.894Z; 2026-08-27T13:51:46.366Z; 2026-08-27T14:02:57.702Z; 2026-08-27T14:32:17.980Z; 2026-08-27T14:39:41.634Z",
+    "note": "Round-2 plan-review found the revised surface table's claimed resolved-flip impossible and consumer list wrong; corrected in scope via the implementation, no code change."
+   },
+   {
+    "digest": "31",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-27T15:03:24.187Z; 2026-08-27T15:11:17.102Z; 2026-08-27T15:22:07.178Z; 2026-08-27T15:29:35.157Z",
+    "note": "Prior close-out withheld merge over an unpinned ordering guard; after a test fix and approving re-review, this close-out merged and set Done."
+   },
+   {
+    "digest": "32",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-28T12:46:39.974Z; 2026-08-28T12:54:57.671Z; 2026-08-28T13:04:49.891Z",
+    "note": "Round-2 plan-review verified all eight round-1 findings discharged, sided with the plan on the disputed commit count, and approved."
+   },
+   {
+    "digest": "33",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-08-28T13:52:29.060Z; 2026-08-28T14:12:20.911Z; 2026-08-28T14:27:25.281Z; 2026-08-28T14:33:46.809Z",
+    "note": "Close-out held on undischarged ledger items 1-3; fixes landed; round-3 review approved, raising two new non-blocking findings accepted with reasons, then merged unchanged."
+   },
+   {
+    "digest": "34",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-29T19:29:56.250Z; 2026-08-29T19:40:22.949Z; 2026-08-29T19:51:43.682Z; 2026-08-29T20:03:16.203Z; 2026-08-29T20:26:38.019Z",
+    "note": "Re-review of the revised plan found new G1 (false staleness claim) and G2 (missed prompt-trace-store consumer), and escalated a decision that John ruled code-enforced; implemented."
+   },
+   {
+    "digest": "35",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-08-29T21:54:57.397Z; 2026-08-29T22:08:41.858Z; 2026-08-29T22:11:52.620Z; 2026-08-29T22:27:36.363Z",
+    "note": "Revision 2 re-reviewed; only new fail was drifted anchors from a newer commit; autopilot overrode to implementation, and the solution shape needed no change."
+   },
+   {
+    "digest": "36",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-30T06:51:43.792Z; 2026-08-30T07:07:06.185Z; 2026-08-30T07:23:41.777Z; 2026-08-30T07:47:33.044Z; 2026-08-30T07:54:59.106Z",
+    "note": "First close-out held on F1; fix and review followed; second close-out held on F6; operator later ruled route_followup, merged unchanged, F6 filed as LIN-2406."
+   },
+   {
+    "digest": "37",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-08-30T12:34:00.712Z; 2026-08-30T12:36:58.425Z; 2026-08-30T12:46:10.060Z; 2026-08-30T13:04:34.346Z",
+    "note": "Close-out held on ledger row 4; autopilot adjudication ordered N=3 tests; tests landed and reviewed; second close-out merged and set Done without new holds."
+   },
+   {
+    "digest": "38",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-30T13:59:13.322Z; 2026-08-30T16:11:06.873Z; 2026-08-30T16:21:14.752Z; 2026-08-30T16:57:41.916Z; 2026-08-30T18:54:19.354Z",
+    "note": "After LIN-2418 fixed round-1 findings, this leg seemingly ran a design pass finding the headline still anchor-denominated plus stale /cost docs; led to lane-denominated prod change."
+   },
+   {
+    "digest": "39",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-30T16:25:35.972Z; 2026-08-30T16:29:43.997Z; 2026-08-30T16:37:30.953Z; 2026-08-30T16:58:24.972Z",
+    "note": "Plan v2 re-review approved; its non-blocking note about a now-vacuous conclude-bullet assertion led only to a test tightening during implementation."
+   },
+   {
+    "digest": "40",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-31T18:27:05.142Z; 2026-08-31T18:39:28.445Z; 2026-08-31T18:51:26.866Z; 2026-08-31T19:29:51.772Z",
+    "note": "Rev 2 re-review approved but raised binding F6 (middleware 401 and non-JSON 500 handling), implemented in the client response matrix."
+   },
+   {
+    "digest": "41",
+    "reason": "failed-or-cut-off",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-01T22:44:34.877Z; 2026-09-02T02:57:39.837Z",
+    "note": "Plan beat 2 relaunched as a fresh session after the stepper's session wedged on the kitty fault; it failed again, posted nothing, and was superseded by a fresh plan."
+   },
+   {
+    "digest": "42",
+    "reason": "failed-or-cut-off",
+    "reason2": "rescue",
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-02T02:57:38.311Z; 2026-09-02T05:27:15.420Z",
+    "note": "Earlier close-out left no output after the terminal fault; operator scope note directed resumption; this close-out merged, routing ledger items to LIN-2447/2448 without code change."
+   },
+   {
+    "digest": "43",
+    "reason": "failed-or-cut-off",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-02T06:55:43.190Z; 2026-09-02T07:15:13.867Z",
+    "note": "Beat 3 ran as a fresh session because the beats 1-2 session's terminal wedged; added strategy framing, session fit and plan-review gate without changing plan substance."
+   },
+   {
+    "digest": "44",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-02T07:23:39.282Z; 2026-09-02T07:28:32.055Z; 2026-09-02T07:42:56.912Z; 2026-09-02T10:56:21.554Z",
+    "note": "Re-review confirmed both corrections, found a new missed doc sibling (public/llms.txt), which plan revision 2 added as a docs-only item."
+   },
+   {
+    "digest": "45",
+    "reason": "failed-or-cut-off",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-02T08:41:55.181Z",
+    "note": "Retry of plan revision 2 after the prior launch failed on the kitty substrate; this launch also failed, producing nothing."
+   },
+   {
+    "digest": "46",
+    "reason": "rescue",
+    "reason2": "failed-or-cut-off",
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-02T02:57:39.837Z; 2026-09-02T06:11:53.448Z; 2026-09-02T11:02:54.868Z; 2026-09-02T11:12:53.611Z",
+    "note": "Autopilot-kind session logged as close-out, part of the operator-ordered fresh chain after the terminal fault; no own output; review approved and a later close-out merged test-only."
+   },
+   {
+    "digest": "47",
+    "reason": "failed-or-cut-off",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "unclear",
+    "evidence": "2026-09-02T08:41:55.181Z; 2026-09-02T10:44:55.690Z",
+    "note": "Another relaunch of plan revision 2 after the autopilot halted on substrate failures; no output; revision 2 only ran later at 10:56 in a separate leg."
+   },
+   {
+    "digest": "48",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-05T00:28:01.851Z; 2026-09-05T00:36:30.027Z",
+    "note": "Plan revised after plan-review F1-F4: added omitted dispatch-entry surfaces, recommend-and-dispatch path, preset effort render/read and drop-gates, and corrected the docs rationale."
+   },
+   {
+    "digest": "49",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "unclear",
+    "ruling": "no",
+    "evidence": "2026-09-05T00:37:40.448Z; 2026-09-05T00:49:42.537Z; 2026-09-05T01:00:38.336Z; 2026-09-05T01:10:45.796Z",
+    "note": "Review 1 blocked on a stale census pin; merge-fix landed; re-review approved conditionally, its class probe apparently yielding an egress-census gap routed to LIN-2593; no code change followed."
+   },
+   {
+    "digest": "50",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-05T08:33:17.382Z; 2026-09-05T08:52:54.962Z; 2026-09-05T09:09:27.201Z; 2026-09-05T09:25:38.261Z",
+    "note": "Re-review after kickoff-validation fix approved conditionally with new unpinned-tier ledger items (M24-M27); close-out added tests for some and routed others, no prod change."
+   },
+   {
+    "digest": "51",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-05T16:32:22.049Z; 2026-09-06T01:05:31.936Z; 2026-09-06T01:08:08.345Z; 2026-09-06T01:15:04.997Z",
+    "note": "First close-out leg produced a breakdown; after four children merged, autopilot ruled the umbrella complete and a pinned close-out verified and set it Done with nothing to merge."
+   },
+   {
+    "digest": "52",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-06T12:49:19.325Z; 2026-09-06T12:59:40.869Z; 2026-09-10T07:12:13.265Z; 2026-09-10T07:33:44.689Z",
+    "note": "Re-review of F1/F2 revision posted only beat 1 (days later) with no verdict; a fresh plan-review leg then ran and approved, so this round changed nothing."
+   },
+   {
+    "digest": "53",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-10T09:41:18.943Z; 2026-09-10T10:06:17.329Z; 2026-09-10T10:20:50.588Z; 2026-09-10T10:23:53.260Z",
+    "note": "Re-review confirmed F1/F2/F3/F5 fixes by mutation and approved conditionally; only new items were nits (N2 copy, N3 harness); nothing changed afterwards."
+   },
+   {
+    "digest": "54",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-10T21:57:41.599Z; 2026-09-10T22:14:17.954Z; 2026-09-10T22:28:50.055Z; 2026-09-10T23:38:35.287Z",
+    "note": "Re-review verified the desktop-scroll fix and raised new F5 (mobile programmatic focus-restore yank), later fixed in production code 13fe0315 with an e2e witness."
+   },
+   {
+    "digest": "55",
+    "reason": "changes-requested",
+    "reason2": "staleness-regrounding",
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-11T00:57:58.935Z; 2026-09-11T01:14:47.819Z; 2026-09-11T01:27:48.895Z",
+    "note": "Plan revision 2 resolved D1-D4 (new G1 filter, A10 span, concrete fallback signatures, LOG-2 placement) and re-grounded after C3 landed; approved next."
+   },
+   {
+    "digest": "56",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-11T04:29:50.078Z; 2026-09-11T04:41:14.450Z; 2026-09-11T04:53:34.566Z; 2026-09-11T06:12:16.566Z; 2026-09-11T07:14:31.734Z",
+    "note": "Second plan-review found a missing escape-hatch read branch in readDispatchExecControls; John's later ruling made it a must-fix and it shipped in production code."
+   },
+   {
+    "digest": "57",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-09-11T09:05:39.218Z; 2026-09-11T09:08:29.898Z; 2026-09-11T09:22:27.497Z; 2026-09-11T09:33:02.548Z; 2026-09-11T09:49:22.752Z",
+    "note": "Autopilot disposition directed the F3 shared-lookup fix; third review approved conditionally with new N1-N4 (unasserted shelve loop id, docs, stale comment) discharged by tests and docs."
+   },
+   {
+    "digest": "58",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-09-11T19:17:11.661Z; 2026-09-11T19:19:35.694Z; 2026-09-11T19:38:34.224Z; 2026-09-11T19:51:57.581Z",
+    "note": "Autopilot chose to continue past the bound; round 4 found deliverRulingReply caller-contract collisions and a missed optionId site, reconciled in the plan before implementation."
+   },
+   {
+    "digest": "59",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-12T09:13:46.743Z; 2026-09-12T09:27:54.873Z; 2026-09-12T09:37:48.131Z",
+    "note": "Plan revision kept the design, corrected sweep evidence and the 60px justification, filed LIN-2813 and re-costed the test shim; changes were evidence, justification and test approach."
+   },
+   {
+    "digest": "60",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-20T17:26:02.336Z; 2026-09-20T17:48:42.567Z; 2026-09-20T17:52:43.602Z; 2026-09-20T18:07:49.564Z",
+    "note": "Review of test-only PR confirmed three label witnesses bite; its ledger named keyboard-reveal, opacity and fallback gaps, which close-out held and a test-only commit discharged."
+   },
+   {
+    "digest": "61",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-09-24T17:44:06.603Z; 2026-09-24T18:06:55.005Z; 2026-09-24T20:45:27.759Z; 2026-09-24T20:58:31.524Z",
+    "note": "John authorised a third plan pass; this review found D1 (single-valued stamp collision) and D4, leading to the answered-set redesign and a hook.js ok===true fix."
+   },
+   {
+    "digest": "62",
+    "reason": "changes-requested",
+    "reason2": "staleness-regrounding",
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-09-25T00:10:42.083Z; 2026-09-25T00:11:56.898Z; 2026-09-25T00:24:58.750Z; 2026-09-25T06:37:58.151Z; 2026-09-25T06:59:57.797Z",
+    "note": "Autopilot proceeded under standing rule; cycle-4 review found LIN-3022 had invalidated the plan's discharge design, prompting John's scope ruling and a re-grounded Revision 5."
+   },
+   {
+    "digest": "63",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-25T01:17:02.387Z; 2026-09-25T01:31:10.826Z; 2026-09-25T01:43:04.463Z; 2026-09-25T02:28:37.427Z",
+    "note": "Bounded re-review approved but raised C1: the routed-around gap's owner had closed; implementation folded in the HALT_MODES swap in routes/proxy-halt.js."
+   },
+   {
+    "digest": "64",
+    "reason": "changes-requested",
+    "reason2": "other",
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-25T01:34:52.121Z; 2026-09-25T01:44:56.716Z; 2026-09-25T01:51:04.635Z; 2026-09-25T01:56:25.717Z",
+    "note": "Close-out's live witness failed, exposing a self-check DECISION drop; this review approved the corrective PR, raising optional test gaps T1/T2 that close-out accepted as-is."
+   },
+   {
+    "digest": "65",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:05:04.063Z; 2026-09-25T07:20:46.035Z; 2026-09-25T07:31:00.886Z",
+    "note": "First close-out held on undischarged L1-L4; implementation discharged them; this close-out verified the ledger on dd6ba800, merged and set Done without changing anything."
+   },
+   {
+    "digest": "66",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:30:14.137Z; 2026-09-25T07:37:31.885Z; 2026-09-25T07:41:32.229Z; 2026-09-25T07:50:23.541Z",
+    "note": "Re-review of revised plan found F1 only half fixed, naming new unbounded authoring routes (non-gating nit, sibling fix); revision 3 generalised the limit to any close-out-authored change."
+   },
+   {
+    "digest": "67",
+    "reason": "other",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-24T22:17:50.169Z; 2026-09-25T07:53:01.660Z; 2026-09-25T07:55:54.479Z; 2026-09-25T08:11:34.883Z",
+    "note": "Earlier close-out-kind leg actually ran the breakdown; this was the parent's real close-out after review, discharging L1 live and holding L2, which a test-only fix then addressed."
+   },
+   {
+    "digest": "68",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:54:22.406Z; 2026-09-25T08:03:20.514Z",
+    "note": "Plan-review requested changes F1-F4; revision 2 widened the stop selector, reordered the sweep, moved the follow-up hold into pacing and added always-poll mode."
+   },
+   {
+    "digest": "69",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:50:36.089Z; 2026-09-25T08:05:08.264Z; 2026-09-25T08:12:00.911Z",
+    "note": "Cycle-8 plan-review re-verified revision 8's fix for cycle 7's REFIRE_PROMPT opencode leak and approved; only minor notes, nothing changed."
+   },
+   {
+    "digest": "70",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-25T08:10:12.497Z; 2026-09-25T08:12:42.221Z; 2026-09-25T08:21:24.122Z",
+    "note": "After second Request Changes the con relayed John's standing rule authorising a third revision; rev 3 added post-selection hold branches, stop holding fresh launches and humanContinued exemption."
+   },
+   {
+    "digest": "71",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-25T14:05:48.922Z; 2026-09-25T14:06:57.769Z; 2026-09-25T14:23:14.350Z",
+    "note": "Second plan-review asked for F4-F6; ruling chose one more plan pass; revision retargeted the Approve precondition to the ticket's own trail and fixed eval labels."
+   },
+   {
+    "digest": "72",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-26T07:10:48.784Z; 2026-09-26T07:26:32.981Z; 2026-09-26T07:31:06.479Z",
+    "note": "Prior re-review conditionally approved with L7 missing witnesses; tests were added; this re-review verified them by mutation and gave a plain Approve."
+   },
+   {
+    "digest": "73",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-26T07:37:23.323Z; 2026-09-26T07:45:51.691Z; 2026-09-26T07:50:46.050Z; 2026-09-26T07:54:29.488Z",
+    "note": "Re-review of the F3/F4 test-pin fixes gave conditional Approve; only a non-blocking residual pin note (F5) was raised and close-out merged without edits."
+   },
+   {
+    "digest": "74",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-27T07:15:47.623Z; 2026-09-27T07:48:50.648Z; 2026-09-27T07:50:10.339Z; 2026-09-27T08:14:53.581Z",
+    "note": "Re-review 2 confirmed N1-N3 fixed but found N4: PR #1594 merged after the pin and owns the Documentation dimension; report revised (docs-only) to fold it in."
+   },
+   {
+    "digest": "75",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-27T10:07:27.485Z; 2026-09-27T10:21:41.250Z",
+    "note": "Plan-review round 1 rejected shared-record deletes; revised plan dropped all Connection deletes, deferred them to LIN-3124, and corrected seam credential and key details."
+   },
+   {
+    "digest": "76",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-29T04:49:38.730Z; 2026-09-29T04:52:18.847Z; 2026-09-29T04:55:26.215Z",
+    "note": "Second Request Changes (R1 take-hop window) escalated; parent autopilot ruled fix-then-breakdown; rev 3 replaced the third active read with a bounded history re-read."
+   },
+   {
+    "digest": "77",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-29T05:51:27.617Z; 2026-09-29T06:02:19.430Z; 2026-09-29T06:09:56.177Z; 2026-09-29T06:20:36.270Z",
+    "note": "Re-review verified the four prior fixes but found further mutation-surviving witness gaps (each re-read, _id scoping, arg parity, guard ordering); fixed test-only in a0eae5b2."
+   },
+   {
+    "digest": "78",
+    "reason": "changes-requested",
+    "reason2": "plan-revised-after-research",
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-29T03:33:18.762Z; 2026-09-29T06:14:51.124Z; 2026-09-29T06:14:54.252Z; 2026-09-29T06:20:01.627Z",
+    "note": "Pass-5 Needs Discussion parked for John, who accepted the cross-device case as residual; revision 4a recorded residual (c), corrected contradicted invariant claims and added T20(k)."
+   },
+   {
+    "digest": "79",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-29T06:23:45.808Z; 2026-09-29T06:26:35.330Z; 2026-09-29T06:28:57.675Z",
+    "note": "Confirmation plan-review found one wrong count in planned test T20(k); revision 4b corrected that clause only, then plan-review approved."
+   },
+   {
+    "digest": "80",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-29T10:20:26.223Z; 2026-09-29T10:21:28.707Z; 2026-09-29T10:33:54.153Z; 2026-09-29T10:42:02.700Z",
+    "note": "First close-out held L1 (40-line test); autopilot ruling routed it to implementation and delta review; this close-out merged #1615 and set Done."
+   }
+  ],
+  "B": [
+   {
+    "digest": "80",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-29T10:20:26.223Z; 2026-09-29T10:21:28.707Z; 2026-09-29T10:33:54.153Z; 2026-09-29T10:42:02.700Z",
+    "note": "First close-out held L1 (40-line test); autopilot ruled impl-then-review; after L1 PR and delta Approve, this close-out merged #1615 and set LIN-3134 Done."
+   },
+   {
+    "digest": "79",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-29T06:23:45.808Z; 2026-09-29T06:26:35.330Z; 2026-09-29T06:28:57.675Z",
+    "note": "Pass-6 plan-review found T20(k) test-case text contradicting residual (c); rev 4b corrected only that clause and T20 header, then approved."
+   },
+   {
+    "digest": "78",
+    "reason": "plan-revised-after-research",
+    "reason2": "changes-requested",
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-29T03:33:18.762Z; 2026-09-29T06:14:51.124Z; 2026-09-29T06:14:54.252Z; 2026-09-29T06:20:01.627Z",
+    "note": "Plan-review parked at Needs Discussion; John ruled accept-residual; rev 4a added residual (c), corrected false invariant claims per session, added T20(k), Flag C."
+   },
+   {
+    "digest": "77",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-29T06:09:56.177Z; 2026-09-29T06:20:36.270Z; commit a0eae5b2 2026-09-29T07:15:19+01:00",
+    "note": "Re-review confirmed prior fixes but found three new test-only witness gaps (each re-read spacing, _id scoping, full arg parity); fixed test-only in a0eae5b2."
+   },
+   {
+    "digest": "76",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-29T04:49:38.730Z; 2026-09-29T04:52:18.847Z; 2026-09-29T04:55:26.215Z",
+    "note": "Second plan-review RC (R1) escalated; parent autopilot ruled fix-then-breakdown; rev 3 replaced the lookup with bounded history re-read plus NB1-NB8, later implemented."
+   },
+   {
+    "digest": "75",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-27T10:07:27.485Z; 2026-09-27T10:21:41.250Z",
+    "note": "Plan-review r1 RC on shared-record deletes; revised plan dropped all Connection deletion (deferred to LIN-3124), corrected categories, Jira field and seam credential source."
+   },
+   {
+    "digest": "74",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-27T07:15:47.623Z; 2026-09-27T07:38:04.452Z; 2026-09-27T07:48:50.648Z; 2026-09-27T08:14:53.581Z",
+    "note": "Re-review 2 confirmed N1-N3 on the docs-only report and raised new N4 (PR #1594 merged after pin); report revised docs-only. Autopilot verb override, not an escalation ruling."
+   },
+   {
+    "digest": "73",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-26T07:37:23.323Z; 2026-09-26T07:45:51.691Z; 2026-09-26T07:50:46.050Z; 2026-09-26T07:54:29.488Z",
+    "note": "Third review verified F3/F4 test pins and gave conditional Approve; only new item F5 was a non-blocking residual note; close-out merged without edits."
+   },
+   {
+    "digest": "72",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-26T07:10:48.784Z; 2026-09-26T07:26:32.981Z; 2026-09-26T07:31:06.479Z; 2026-09-26T07:35:25.323Z",
+    "note": "Prior conditional Approve needed L7 witnesses; after test-only fix this re-review approved with only an optional nit; PR merged unchanged."
+   },
+   {
+    "digest": "71",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-25T14:05:48.922Z; 2026-09-25T14:06:57.769Z; 2026-09-25T14:23:14.350Z",
+    "note": "Second plan-review RC hit loop bound; con relayed John's option 2; third plan fixed F4 (precondition checked wrong ticket), F5 eval labels, F6 timing."
+   },
+   {
+    "digest": "70",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-25T08:10:12.497Z; 2026-09-25T08:11:07.972Z; 2026-09-25T08:12:42.221Z; 2026-09-25T08:21:24.122Z",
+    "note": "Plan-review pass 2 RC (R1-R4) parked at bound; con authorised third revision under John's rule; rev 3 added hold branches, stop holds fresh launches, humanContinued decision."
+   },
+   {
+    "digest": "69",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:50:36.089Z; 2026-09-25T08:05:08.264Z; 2026-09-25T08:12:00.911Z",
+    "note": "Cycle 8 re-verified rev 8's harness split for F1 and approved; only minor non-blocking notes (e.g. e2e-smoke not listed) were new."
+   },
+   {
+    "digest": "68",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:54:22.406Z; 2026-09-25T08:03:20.514Z; 2026-09-25T08:10:12.497Z",
+    "note": "Plan-review RC F1-F4; rev 2 widened stop sweep to full non-terminal set, reordered before failsafe, folded follow-up hold into pacing, added always-poll mode."
+   },
+   {
+    "digest": "67",
+    "reason": "other",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-24T22:17:50.169Z; 2026-09-25T07:53:01.660Z; 2026-09-25T07:55:54.479Z; commit ff91480c 2026-09-25T09:05:54+01:00",
+    "note": "Earlier close-out-kind leg was actually the breakdown; this first true close-out ran after the implementation review, discharged L1 live, held L2, which got a test-only fix."
+   },
+   {
+    "digest": "66",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:30:14.137Z; 2026-09-25T07:41:32.229Z; 2026-09-25T07:50:23.541Z",
+    "note": "Second pass found F2 fixed and F1 only half fixed (residual F1-prime citing two more routes); rev 3 generalised the close-out authoring limit to class level."
+   },
+   {
+    "digest": "65",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-25T07:05:04.063Z; 2026-09-25T07:20:46.035Z; 2026-09-25T07:31:00.886Z",
+    "note": "First close-out held L1-L4 undischarged; follow-up commit discharged them; this close-out verified independently, merged #1576 and set Done without changes."
+   },
+   {
+    "digest": "64",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-25T01:34:52.121Z; 2026-09-25T01:44:56.716Z; 2026-09-25T01:51:04.635Z; 2026-09-25T01:56:25.717Z",
+    "note": "Close-out held on failed L1 witness and routed to corrective PR #245; this review approved it conditionally, its new T1/T2 test gaps were accepted as-is without change."
+   },
+   {
+    "digest": "63",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-25T01:17:02.387Z; 2026-09-25T01:31:10.826Z; 2026-09-25T01:43:04.463Z; 2026-09-25T02:28:37.427Z",
+    "note": "Re-review of revised plan after F1-F3 approved with new C1 (routed-around gap owner LIN-3025 already Done); implementation folded the HALT_MODES swap into prod code."
+   },
+   {
+    "digest": "62",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-09-25T00:10:42.083Z; 2026-09-25T00:11:56.898Z; 2026-09-25T00:24:58.750Z; 2026-09-25T06:37:58.151Z; 2026-09-25T06:59:57.797Z",
+    "note": "Autopilot applied John's standing rule to pending decision for Rev 4 review; review found plan stale after LIN-3022 landed, leading to John's scope ruling and substantive Rev 5."
+   },
+   {
+    "digest": "61",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-09-24T17:44:06.603Z; 2026-09-24T18:06:55.005Z; 2026-09-24T20:45:27.759Z; 2026-09-24T20:58:31.524Z",
+    "note": "John authorised a third plan pass; this review's D1-D4 showed option (a) still collided, prompting John's redirect to answered-set plus Surface 1 first with D4 in code."
+   },
+   {
+    "digest": "60",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-20T17:26:02.336Z; 2026-09-20T17:48:42.567Z; 2026-09-20T17:52:43.602Z; 2026-09-20T18:07:49.564Z",
+    "note": "Review of the test-only follow-up approved conditionally; its ledger gaps (keyboard reveal, opacity, fallback) held close-out and were closed by further test-only commits."
+   },
+   {
+    "digest": "59",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-12T09:13:46.743Z; 2026-09-12T09:27:54.873Z",
+    "note": "Plan revision after F1-F4: filed LIN-2813 for collective.js, corrected the broken sweep and 60px claim, and changed the test-shim approach; core design unchanged."
+   },
+   {
+    "digest": "58",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-11T19:17:11.661Z; 2026-09-11T19:19:35.694Z; 2026-09-11T19:38:34.224Z; 2026-09-11T19:51:57.581Z; 2026-09-11T22:42:54.019Z",
+    "note": "Autopilot self-continued without a ruling; round 4 found deliverRulingReply caller-contract collisions and a missed optionId site, both folded into plan and later witnessed."
+   },
+   {
+    "digest": "57",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-09-11T09:08:29.898Z; 2026-09-11T09:33:02.548Z; 2026-09-11T09:49:22.752Z",
+    "note": "Autopilot answered the reviewer's F3 disposition decision (land_fix); third review approved conditionally, its N1-N4 ledger was closed with tests and docs only."
+   },
+   {
+    "digest": "56",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-11T04:29:50.078Z; 2026-09-11T04:41:14.450Z; 2026-09-11T04:53:34.566Z; 2026-09-11T06:12:16.566Z; 2026-09-11T07:14:31.734Z",
+    "note": "Re-review of plan rev 2 found the missing escape-hatch read branch in readDispatchExecControls; John accepted and implemented it as a must-fix in production code."
+   },
+   {
+    "digest": "55",
+    "reason": "changes-requested",
+    "reason2": "staleness-regrounding",
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-11T00:57:58.305Z; 2026-09-11T01:14:47.819Z; 2026-09-11T01:27:48.895Z",
+    "note": "Plan revision 2 resolved D1-D4 with new fallback signatures, relocated logging and corrected anchors, and re-grounded after C3 landed mid-cycle."
+   },
+   {
+    "digest": "54",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-10T22:14:17.954Z; 2026-09-10T22:28:50.055Z; 2026-09-10T22:54:54.821Z; 2026-09-10T23:38:35.287Z",
+    "note": "Re-review after the desktop-scroll fix approved conditionally but raised F5 (mobile programmatic focus-restore yank), fixed in prod via a programmatic-focus flag."
+   },
+   {
+    "digest": "53",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-09-10T10:13:23.531Z; 2026-09-10T10:20:50.588Z; 2026-09-10T10:23:53.260Z; 2026-09-10T10:32:12.537Z",
+    "note": "Re-review confirmed F1/F2/F3/F5 fixed and approved conditionally; only nits and ledger rows followed, discharged by acceptance, and the PR merged unchanged."
+   },
+   {
+    "digest": "52",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-06T12:59:40.869Z; 2026-09-10T07:12:13.265Z; 2026-09-10T07:39:33.710Z",
+    "note": "Re-review of the F1/F2-revised plan appears to have posted only beat 1 days later (no verdict) before a fresh plan-review re-ran and approved."
+   },
+   {
+    "digest": "51",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-05T16:32:22.049Z; 2026-09-06T01:08:08.345Z; 2026-09-06T01:09:50.675Z; 2026-09-06T01:15:04.997Z",
+    "note": "Earlier close-out dispatch actually ran breakdown; after children landed, autopilot ruled the umbrella complete and pinned close-out, which merged nothing and set Done."
+   },
+   {
+    "digest": "50",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-05T08:52:54.962Z; 2026-09-05T09:09:27.201Z; 2026-09-05T09:25:38.261Z",
+    "note": "Re-review confirmed kickoff validation fix and approved conditionally; its new unpinned-tier ledger items were closed at close-out with tests or routed."
+   },
+   {
+    "digest": "49",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "unclear",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-05T00:49:42.532Z; 2026-09-05T01:00:38.336Z; 2026-09-05T01:10:45.796Z",
+    "note": "Re-review of the R1 merge-fix approved conditionally; ledger was discharged by checks, monitors and a routed follow-up, with no further code change."
+   },
+   {
+    "digest": "48",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-05T00:28:01.851Z (plan-review RC F1-F4); 2026-09-05T00:36:30.027Z (revised plan)",
+    "note": "Plan revision after plan-review Request Changes; added the missing recommend-and-dispatch path, preset effort render/read paths and extra drop-gates to the plan."
+   },
+   {
+    "digest": "47",
+    "reason": "failed-or-cut-off",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-02T08:41:55.181Z (autopilot halted: two plan revision 2 launches failed); 2026-09-02T10:44:55.690Z (kitty restarted ~10:40Z)",
+    "note": "Third attempt at plan revision 2 after the earlier launches failed on the kitty terminal fault; the substrate was still down, and the revision was only posted at 10:56 by a later leg."
+   },
+   {
+    "digest": "46",
+    "reason": "rescue",
+    "reason2": "failed-or-cut-off",
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-02T02:57:39.837Z and 2026-09-02T06:11:53.448Z (operator scope notes directing a fresh lane after the terminal fault); 2026-09-02T11:02:54.868Z (review approve)",
+    "note": "Autopilot-prompted relaunch driving the operator-ordered fresh lane after terminal faults orphaned earlier runs; the review approved and a later close-out merged test-only work."
+   },
+   {
+    "digest": "45",
+    "reason": "failed-or-cut-off",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-02T08:41:55.181Z (plan revision 2 and its retry both failed to launch kitty session)",
+    "note": "Retry of plan revision 2 after the 07:45 dispatch failed to launch; this retry also failed to launch, so nothing was produced."
+   },
+   {
+    "digest": "44",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-09-02T07:23:39.282Z (RC#1); 2026-09-02T07:42:56.912Z (RC#2 llms.txt); 2026-09-02T10:56:21.554Z (llms.txt added to file list)",
+    "note": "Re-review of revision 1 confirmed both corrections and found a new missed documentation sibling (public/llms.txt), added to the plan as a doc-only item."
+   },
+   {
+    "digest": "43",
+    "reason": "failed-or-cut-off",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "launch prompt (beats 1-2 session terminal wedged); 2026-09-02T07:15:13.867Z (beat 3 output)",
+    "note": "Fresh session for plan beat 3 because the wedged beats 1-2 session could not be resumed; it added strategy framing, session fit and the plan-review gate without changing the plan's approach."
+   },
+   {
+    "digest": "42",
+    "reason": "failed-or-cut-off",
+    "reason2": "rescue",
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-09-02T02:57:38.311Z (operator scope note: resume after terminal fault, dispatch close-out); 2026-09-02T05:27:15.420Z (close-out merged)",
+    "note": "Earlier close-out produced nothing amid the kitty fault; the operator directed a resume and this close-out merged PR #1320, routing ledger items to follow-ups."
+   },
+   {
+    "digest": "41",
+    "reason": "failed-or-cut-off",
+    "reason2": "other",
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-09-02T02:57:39.837Z (beat 2 failed twice on infra error; plan treated as partial notes)",
+    "note": "Plan beat 2 run in a fresh session after the kitty fault orphaned the warm session; it failed on the infra error, and the operator later restarted the plan from scratch."
+   },
+   {
+    "digest": "40",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-31T18:27:05.142Z (RC F1-F5); 2026-08-31T18:51:26.866Z (approve with F6); 2026-08-31T19:29:51.772Z (binding F6 implemented in client)",
+    "note": "Re-review of plan rev 2 approved it and raised new F6 (401 and non-JSON response handling), which the implementation built into production client code."
+   },
+   {
+    "digest": "39",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-30T16:25:35.972Z (RC); 2026-08-30T16:37:30.953Z (approve with notes); 2026-08-30T16:58:24.972Z (test assertion tightened per note 1)",
+    "note": "Re-review approved v2 and added non-blocking notes; the note that the new wording made an old assertion vacuous led to a test tightening."
+   },
+   {
+    "digest": "38",
+    "reason": "other",
+    "reason2": "changes-requested",
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-30T13:59:13.322Z (prior review RC); 2026-08-30T16:11:06.873Z (unblock check); 2026-08-30T16:21:14.752Z (design pass output); 2026-08-30T20:11:02.463Z",
+    "note": "Launched after the blocker (LIN-2418) cleared, this leg ran as a design pass. It found the stale /cost catalog and the anchor-denominated headline, and both led to production changes."
+   },
+   {
+    "digest": "37",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-08-30T12:34:00.712Z (close-out held on row 4); 2026-08-30T12:36:58.425Z (autopilot adjudication: close the gap); 2026-08-30T13:04:34.346Z",
+    "note": "The first close-out held on ledger row 4; the autopilot ruled to close it with N=3 tests. After re-review this close-out merged the change and set Done, with no further change."
+   },
+   {
+    "digest": "36",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-30T06:51:43.792Z (close-out held on F1); 2026-08-30T07:23:41.777Z (held again on F6); 2026-08-30T07:47:33.044Z (operator route_followup)",
+    "note": "The second close-out, after the F1 fix, held again on F6; the operator then ruled to merge and route F6 to LIN-2406, so no code changed on this ticket."
+   },
+   {
+    "digest": "35",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-08-29T21:39:56.492Z (RC r1); 2026-08-29T22:08:41.858Z (r2 verdict); 2026-08-29T22:11:52.620Z (autopilot override to implementation)",
+    "note": "Re-review confirmed revision 2 by execution; its only failure was new anchor drift from db2c262a. The autopilot overrode it as navigational and implementation went ahead without a plan change."
+   },
+   {
+    "digest": "34",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-29T19:29:56.250Z (RC F1-F4); 2026-08-29T19:51:43.682Z (RC G1/G2, escalation); 2026-08-29T20:03:16.203Z (John ruling); 2026-08-29T20:26:38.019Z",
+    "note": "Re-review raised new G1 (stale LinearViewer drift) and G2 (missed prompt-trace-store consumer) and escalated. John's ruling folded both in, and the escalated question produced a code-enforced startup check."
+   },
+   {
+    "digest": "33",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-08-28T13:52:29.060Z (close-out held on ledger 1-3); 2026-08-28T14:12:20.911Z (fixes); 2026-08-28T14:27:25.281Z (round-3 approve)",
+    "note": "Round-3 review after the close-out hold and ledger fixes approved; its two new non-blocking findings were explicitly accepted, not acted on."
+   },
+   {
+    "digest": "32",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-28T12:46:39.974Z; 2026-08-28T12:54:57.671Z; 2026-08-28T13:04:49.891Z",
+    "note": "Round-1 plan-review requested changes (8 findings); plan revised; this re-review approved all eight as discharged with only a close-out filing obligation noted."
+   },
+   {
+    "digest": "31",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-27T15:03:24.187Z; 2026-08-27T15:22:07.178Z; 2026-08-27T15:29:35.157Z",
+    "note": "First close-out held merge over the unpinned ordering guard; test fix and re-review approved; this close-out merged and closed with no new hold."
+   },
+   {
+    "digest": "30",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-27T13:43:48.894Z; 2026-08-27T14:02:57.702Z; 2026-08-27T14:05:26.209Z; 2026-08-27T14:39:41.634Z",
+    "note": "Re-review found new surface-table errors (F5/F6), verified correct by autopilot; corrections folded into PR description only, no code or plan-substance change."
+   },
+   {
+    "digest": "29",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-27T09:22:29.075Z; 2026-08-27T09:36:50.355Z; 2026-08-27T09:52:05.101Z",
+    "note": "Close-out held on ledger item 6; a test-only fix landed; this round-4 review verified it by mutation and approved; merged unchanged."
+   },
+   {
+    "digest": "28",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-08-24T21:01:52.724Z; 2026-08-24T21:34:49.844Z; 2026-08-24T21:51:03.553Z",
+    "note": "Review 1 blocked on unpinned institutionalization (fixed via LIN-2303); autopilot overrode engine's blocked verb to pin this re-review, which approved conditionally; merged."
+   },
+   {
+    "digest": "27",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "unclear",
+    "real": "na",
+    "ruling": "unclear",
+    "evidence": "2026-08-23T19:31:00.121Z; 2026-08-24T18:48:02.307Z",
+    "note": "Second review was a retrospective review-sweep lane over an already-closed ticket; it approved conditionally, close stands, nothing reopened or changed."
+   },
+   {
+    "digest": "26",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-08-22T18:06:59.439Z; 2026-08-22T18:49:44.311Z; 2026-08-22T18:58:21.490Z",
+    "note": "Previous close-out held on physical-device ledger item; operator ruling accepted it via named monitor; this close-out merged and set Done."
+   },
+   {
+    "digest": "25",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-22T09:59:43.254Z; 2026-08-22T10:21:13.712Z; 2026-08-22T10:31:37.922Z",
+    "note": "Delta re-review confirmed F1/F2 fixed and found a new surviving mutant (L1); close-out added two tests killing it, no production change."
+   },
+   {
+    "digest": "24",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-22T08:08:56.687Z; 2026-08-22T08:13:30.024Z; 2026-08-22T08:22:38.627Z",
+    "note": "Plan-review flagged postComment signature stated two ways; revision kept existing positional form and rewrote one rationale row, nothing else changed."
+   },
+   {
+    "digest": "23",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-22T07:32:55.384Z; 2026-08-22T07:39:54.141Z",
+    "note": "Revision 2 answered five plan-review findings: runIsWaiting tail skip, kind kept out of enum, stamp threading moved to Phase 2, LIN-2201 filed."
+   },
+   {
+    "digest": "22",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-20T09:33:51.581Z; 2026-08-20T11:26:15.635Z; 2026-08-20T11:36:12.695Z",
+    "note": "Earlier 'close-out' leg actually produced the breakdown; this was the real close-out after conditional approve, merging and routing F5 to LIN-2157."
+   },
+   {
+    "digest": "21",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-20T07:17:26.833Z; 2026-08-20T07:43:12.462Z; 2026-08-21T19:39:10.420Z; 2026-08-21T19:49:45.553Z",
+    "note": "Pass 2 found loop.source is live/history not a provider, so the tenancy fix was false; ruling dropped ?source= and plan recorded the limitation."
+   },
+   {
+    "digest": "20",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-16T18:18:03.963Z; 2026-08-16T18:44:25.480Z; 2026-08-16T19:15:51.071Z",
+    "note": "Revised plan added seventh unknown lane, unioned agent-status blocked channel, reused loop-supersede; implemented as planned."
+   },
+   {
+    "digest": "19",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "unclear",
+    "ruling": "no",
+    "evidence": "2026-08-16T14:58:59.668Z; 2026-08-16T15:29:31.854Z; 2026-08-16T15:40:53.518Z",
+    "note": "Round-3 review approved conditionally; four new green mutants classed as coverage gaps, accepted or routed to follow-up tickets; merged without further change."
+   },
+   {
+    "digest": "18",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-16T14:00:09.049Z; 2026-08-16T14:08:47.406Z; 2026-08-16T14:17:37.876Z",
+    "note": "Plan revision answered F1-F5: extend-on-success lease, dropped the index entry for the exclusion convention, session fit corrected to single, start site named."
+   },
+   {
+    "digest": "17",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-14T13:38:06.736Z; 2026-08-14T14:05:48.876Z; 2026-08-14T14:14:41.456Z; 2026-08-14T14:26:40.146Z",
+    "note": "Round-4 review approved the whitespace fix but raised a new secret-in-error-message exposure; close-out held and a production redaction landed."
+   },
+   {
+    "digest": "16",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-14T12:31:43.782Z; 2026-08-14T12:56:21.488Z",
+    "note": "Plan-review requested changes (F1-F4); revised plan changed stage derivation, added a Linear-only guard on A1 and a caller filter on B4."
+   },
+   {
+    "digest": "15",
+    "reason": "failed-or-cut-off",
+    "reason2": "duplicate-or-mistaken",
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-13T19:07:39.347Z; 2026-08-13T20:09:57.806Z; 2026-08-13T20:53:29.400Z",
+    "note": "Earlier close-out-kind dispatch f3b3b1ae was a mis-picked breakdown aborted by autopilot; this is the real close-out after review, merging reviewed PRs unchanged. Autopilot override was not an escalation ruling."
+   },
+   {
+    "digest": "14",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-10T08:43:58.833Z; 2026-08-10T09:15:22.028Z; 2026-08-13T12:13:59.438Z; 2026-08-13T12:47:25.528Z",
+    "note": "Re-review of revised plan found /instructions contract copy and false PATCH self-verifying claim; John folded both in and they were implemented."
+   },
+   {
+    "digest": "13",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-10T07:38:05.839Z; 2026-08-10T08:36:27.602Z; 2026-08-10T08:52:48.260Z",
+    "note": "Re-review of LIN-2005 fix confirmed the blocker resolved; raised two wording defects (test name, docs overclaim) fixed wording-only at close-out."
+   },
+   {
+    "digest": "12",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "yes",
+    "evidence": "2026-08-09T16:10:48.853Z; 2026-08-09T16:26:12.036Z; 2026-08-10T19:08:16.647Z",
+    "note": "Third plan-review, run under John's standing authorization, found surface 2b already guarded; John then cut the plan to the verified core, dropping 2b."
+   },
+   {
+    "digest": "11",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-08T22:06:57.961Z; 2026-08-09T02:19:24.308Z; 2026-08-09T02:28:04.512Z",
+    "note": "The earlier close-out-kind leg actually did the breakdown; this is the genuine close-out after implementation review, discharging the ledger by filing follow-ups."
+   },
+   {
+    "digest": "10",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-08T21:37:17.860Z; 2026-08-08T21:48:02.856Z",
+    "note": "Plan-review R1-R3 led to a revised plan with harness-aware opencode summing, renamed module, and the task-cost lane change dropped."
+   },
+   {
+    "digest": "09",
+    "reason": "other",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-08T07:54:54.405Z; 2026-08-08T07:56:58.480Z; 2026-08-08T08:11:42.548Z; 2026-08-08T08:19:58.418Z",
+    "note": "The earlier close-out-kind leg did a breakdown; this close-out merged reviewed Phase A unchanged and routed ledger items to monitor/follow-up."
+   },
+   {
+    "digest": "08",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-08T07:19:30.933Z; 2026-08-08T08:08:36.734Z; 2026-08-08T10:45:08.064Z",
+    "note": "Round-2 plan-review of Revision 2 approved but required G1, a provider gate on the legacy read-through fallback, which the implementation added and pinned."
+   },
+   {
+    "digest": "07",
+    "reason": "other",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-06T14:14:21.658Z; 2026-08-06T17:45:51.757Z; 2026-08-06T19:01:48.315Z",
+    "note": "The earlier review-kind leg was actually triage; this first real review approved conditionally, its llms.txt inaccuracy fixed docs-only before merge."
+   },
+   {
+    "digest": "06",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "no",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-03T19:34:42.003Z; 2026-08-03T19:52:15.402Z; 2026-08-03T19:59:48.735Z",
+    "note": "Re-review confirmed the comment-only R1 fix and approved conditionally; the reviewed head was merged unchanged, with L1 carried over from round 1."
+   },
+   {
+    "digest": "05",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "unclear",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-03T16:39:27.895Z; 2026-08-03T16:57:17.495Z; 2026-08-03T17:12:04.904Z",
+    "note": "Re-review verified the deleteDurable=false fix and approved conditionally; close-out answered its ledger with a behaviour test and comment-only edits."
+   },
+   {
+    "digest": "04",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "nothing",
+    "newFinding": "yes",
+    "real": "no",
+    "ruling": "no",
+    "evidence": "2026-08-03T07:00:57.950Z; 2026-08-03T07:16:53.996Z",
+    "note": "Round-2 plan-review verified F1-F3 fixed and approved, adding three residual observations explicitly not change requests; breakdown followed unchanged."
+   },
+   {
+    "digest": "03",
+    "reason": "duplicate-or-mistaken",
+    "reason2": "changes-requested",
+    "bought": "wording-tests",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "yes",
+    "evidence": "2026-08-01T13:17:44.815Z; 2026-08-01T14:15:34.419Z; 2026-08-02T06:25:11.231Z; 2026-08-02T06:29:59.702Z",
+    "note": "Held close-out had already merged and closed after a human ruling; a relayed John gate decision re-fired close-out, which ran as verification and fixed a bookkeeping gap."
+   },
+   {
+    "digest": "02",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "wording-tests",
+    "newFinding": "yes",
+    "real": "yes",
+    "ruling": "no",
+    "evidence": "2026-08-01T16:14:42.974Z; 2026-08-01T16:46:05.178Z; 2026-08-01T17:00:43.865Z",
+    "note": "Close-out hold sent fixes back; re-review found the new F1 regression guard inert (F1-a), fixed test-only plus a doc nit."
+   },
+   {
+    "digest": "01",
+    "reason": "changes-requested",
+    "reason2": null,
+    "bought": "substance",
+    "newFinding": "na",
+    "real": "na",
+    "ruling": "no",
+    "evidence": "2026-08-01T06:36:04.824Z; 2026-08-01T06:41:34.336Z",
+    "note": "Revised plan after plan-review: swept the dyno class, added two new sites and kept the errors.js/doc quote pair untouched; the ticket is still docs/comments only."
+   }
+  ]
+ },
+ "final": [
+  {
+   "digest": "01",
+   "issue": "LIN-1388",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-01T06:38:34.873Z",
+   "item": "5e366c42",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "02",
+   "issue": "LIN-1784",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-01T16:32:33.632Z",
+   "item": "76225d3c",
+   "repo": "simple-dispatcher",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "03",
+   "issue": "LIN-1775",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-02T06:26:48.096Z",
+   "item": "42135ce1",
+   "repo": "LinearViewer",
+   "reason": "duplicate-or-mistaken",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes",
+   "disagreed": [
+    "bought"
+   ],
+   "adjudication": "The repeat fired on a ticket already Done and ran as a verification pass; its one fix was to the tracker record, not to wording, docs or tests in either repo (06:29:59)."
+  },
+  {
+   "digest": "04",
+   "issue": "LIN-1811",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-03T07:09:35.436Z",
+   "item": "2de74e1b",
+   "repo": "no merge",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no"
+  },
+  {
+   "digest": "05",
+   "issue": "LIN-1503",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-03T16:50:24.502Z",
+   "item": "e61f0447",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "unclear",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "06",
+   "issue": "LIN-1458",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-03T19:44:31.754Z",
+   "item": "fa7c8671",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "no",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "07",
+   "issue": "LIN-1889",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-06T17:28:43.043Z",
+   "item": "d34204d9",
+   "repo": "LinearViewer",
+   "reason": "other",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "08",
+   "issue": "LIN-1887",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-08T08:00:10.720Z",
+   "item": "ba79d64a",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "09",
+   "issue": "LIN-1908",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-08T08:14:35.623Z",
+   "item": "4ce4512c",
+   "repo": "LinearViewer",
+   "reason": "other",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "10",
+   "issue": "LIN-1625",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-08T21:40:13.463Z",
+   "item": "f616ed6f",
+   "repo": "no merge",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "11",
+   "issue": "LIN-1625",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-09T02:22:23.665Z",
+   "item": "f571e2e0",
+   "repo": "no merge",
+   "reason": "other",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "12",
+   "issue": "LIN-1948",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 3,
+   "at": "2026-08-09T16:18:30.234Z",
+   "item": "6f06a72d",
+   "repo": "both",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "yes"
+  },
+  {
+   "digest": "13",
+   "issue": "LIN-1160",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-10T08:26:33.345Z",
+   "item": "0b22394c",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "14",
+   "issue": "LIN-1557",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-10T09:06:56.525Z",
+   "item": "e10b903a",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "15",
+   "issue": "LIN-1505",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-13T20:12:31.759Z",
+   "item": "9527198e",
+   "repo": "LinearViewer",
+   "reason": "other",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no",
+   "disagreed": [
+    "reason"
+   ],
+   "adjudication": "Both readers found the earlier 'close-out' leg was a breakdown dispatch, aborted: a nine-letter kind decoded as close-out. This is the ticket's first real close-out, so not a real repeat (19:07:39, 20:09:57)."
+  },
+  {
+   "digest": "16",
+   "issue": "LIN-2076",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-14T12:36:01.415Z",
+   "item": "8e34f4dd",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "17",
+   "issue": "LIN-2081",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 4,
+   "at": "2026-08-14T13:55:27.761Z",
+   "item": "6789a021",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "18",
+   "issue": "LIN-2128",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-16T14:08:54.635Z",
+   "item": "37d76455",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "19",
+   "issue": "LIN-2129",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 3,
+   "at": "2026-08-16T15:14:42.584Z",
+   "item": "5bc021f5",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no",
+   "disagreed": [
+    "real"
+   ],
+   "adjudication": "The round's new surviving mutants were accepted as coverage gaps or routed to follow-ups; nothing was shown wrong before (15:29:31)."
+  },
+  {
+   "digest": "20",
+   "issue": "LIN-2131",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-16T18:28:00.492Z",
+   "item": "85c1bac7",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "21",
+   "issue": "LIN-2154",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-20T07:35:37.941Z",
+   "item": "02385893",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "22",
+   "issue": "LIN-1870",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-20T11:30:19.090Z",
+   "item": "4481ad47",
+   "repo": "LinearViewer",
+   "reason": "other",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "23",
+   "issue": "LIN-1728",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-22T07:40:07.321Z",
+   "item": "aeaef044",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "24",
+   "issue": "LIN-2200",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-22T08:13:37.771Z",
+   "item": "42050e66",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "25",
+   "issue": "LIN-2200",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-22T10:13:23.996Z",
+   "item": "938b8bc0",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "26",
+   "issue": "LIN-2210",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 3,
+   "at": "2026-08-22T18:52:32.843Z",
+   "item": "774fdd54",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "27",
+   "issue": "LIN-2242",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-24T18:36:22.328Z",
+   "item": "13502ce6",
+   "repo": "LinearViewer",
+   "reason": "other",
+   "bought": "nothing",
+   "newFinding": "unclear",
+   "real": "na",
+   "ruling": "unclear"
+  },
+  {
+   "digest": "28",
+   "issue": "LIN-2274",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-24T21:36:04.927Z",
+   "item": "69f3fd02",
+   "repo": "both",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "no",
+   "real": "na",
+   "ruling": "no",
+   "disagreed": [
+    "ruling"
+   ],
+   "adjudication": "The autopilot overrode the engine's blocked verb on its own call; no person ruled and no escalation was answered. Coded like 58."
+  },
+  {
+   "digest": "29",
+   "issue": "LIN-2327",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 4,
+   "at": "2026-08-27T09:39:43.427Z",
+   "item": "eeead4a0",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "no",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "30",
+   "issue": "LIN-2281",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-27T13:54:03.358Z",
+   "item": "bb8eb122",
+   "repo": "simple-dispatcher",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no",
+   "disagreed": [
+    "bought"
+   ],
+   "adjudication": "The corrections went into the PR description only; A's own note says no code change, and the plan's substance did not change (14:02:57, 14:39:41)."
+  },
+  {
+   "digest": "31",
+   "issue": "LIN-2281",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-27T15:25:11.187Z",
+   "item": "fe3965ae",
+   "repo": "simple-dispatcher",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "32",
+   "issue": "LIN-2304",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-28T12:57:51.347Z",
+   "item": "1c23960b",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "no",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "33",
+   "issue": "LIN-2325",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 3,
+   "at": "2026-08-28T14:14:51.419Z",
+   "item": "e996c149",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no"
+  },
+  {
+   "digest": "34",
+   "issue": "LIN-2361",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-29T19:42:26.332Z",
+   "item": "acd4fc45",
+   "repo": "both",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "35",
+   "issue": "LIN-2352",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-29T21:57:38.958Z",
+   "item": "084aca49",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no"
+  },
+  {
+   "digest": "36",
+   "issue": "LIN-2384",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-30T07:19:40.437Z",
+   "item": "0c912018",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "37",
+   "issue": "LIN-2331",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-30T13:00:13.544Z",
+   "item": "adccee0f",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "38",
+   "issue": "LIN-2253",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-30T16:13:35.239Z",
+   "item": "4e23507a",
+   "repo": "LinearViewer",
+   "reason": "other",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no",
+   "disagreed": [
+    "reason"
+   ],
+   "adjudication": "A decoded six-letter leg that, by both readers' notes, ran as a design pass after the blocker cleared, not a code review of the fixes (16:21:14)."
+  },
+  {
+   "digest": "39",
+   "issue": "LIN-2396",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-08-30T16:31:40.756Z",
+   "item": "441f543d",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "40",
+   "issue": "LIN-2435",
+   "kind": "plan-review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-08-31T18:42:10.041Z",
+   "item": "b7650670",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "41",
+   "issue": "LIN-971",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-09-02T00:41:17.674Z",
+   "item": "b4db500d",
+   "repo": "LinearViewer",
+   "reason": "failed-or-cut-off",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "42",
+   "issue": "LIN-2442",
+   "kind": "close-out",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-02T05:08:59.250Z",
+   "item": "15c293c9",
+   "repo": "LinearViewer",
+   "reason": "failed-or-cut-off",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "43",
+   "issue": "LIN-2437",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-02T07:15:18.345Z",
+   "item": "6c8d4cc8",
+   "repo": "LinearViewer",
+   "reason": "failed-or-cut-off",
+   "bought": "wording-tests",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "44",
+   "issue": "LIN-2437",
+   "kind": "plan-review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-02T07:31:15.113Z",
+   "item": "10e23820",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "45",
+   "issue": "LIN-2437",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 5,
+   "at": "2026-09-02T08:11:17.361Z",
+   "item": "65c697e3",
+   "repo": "LinearViewer",
+   "reason": "failed-or-cut-off",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "46",
+   "issue": "LIN-971",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-09-02T08:24:38.148Z",
+   "item": "22945f3c",
+   "repo": "LinearViewer",
+   "reason": "rescue",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "47",
+   "issue": "LIN-2437",
+   "kind": "plan",
+   "kindHow": "decoded",
+   "round": 6,
+   "at": "2026-09-02T09:12:44.997Z",
+   "item": "9ce98182",
+   "repo": "LinearViewer",
+   "reason": "failed-or-cut-off",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no",
+   "disagreed": [
+    "ruling"
+   ],
+   "adjudication": "A relaunch after substrate failures; the digest shows no ruling that directed it (08:41:55)."
+  },
+  {
+   "digest": "48",
+   "issue": "LIN-2566",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-05T00:36:45.413Z",
+   "item": "6c3fefe1",
+   "repo": "no merge",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "49",
+   "issue": "LIN-2538",
+   "kind": "review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-05T00:51:20.606Z",
+   "item": "f80e1143",
+   "repo": "no merge",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "unclear",
+   "ruling": "no",
+   "disagreed": [
+    "newFinding",
+    "real"
+   ],
+   "adjudication": "The re-review's class probe raised an egress-census gap no earlier round had; it was routed to LIN-2593, so whether it was a defect in this change cannot be seen (01:00:38)."
+  },
+  {
+   "digest": "50",
+   "issue": "LIN-2615",
+   "kind": "review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-05T08:55:16.343Z",
+   "item": "29654ead",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "51",
+   "issue": "LIN-2649",
+   "kind": "close-out",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-06T01:10:33.222Z",
+   "item": "7b964468",
+   "repo": "no merge",
+   "reason": "other",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "52",
+   "issue": "LIN-2650",
+   "kind": "plan-review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-06T13:01:53.334Z",
+   "item": "b714ea8e",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "no",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "53",
+   "issue": "LIN-2650",
+   "kind": "review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-10T10:08:38.239Z",
+   "item": "2eec3c47",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no"
+  },
+  {
+   "digest": "54",
+   "issue": "LIN-2717",
+   "kind": "review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-10T22:16:33.093Z",
+   "item": "4683aff7",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "55",
+   "issue": "LIN-2737",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-11T01:15:08.203Z",
+   "item": "415e769a",
+   "repo": "simple-dispatcher",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "56",
+   "issue": "LIN-2719",
+   "kind": "plan-review",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-11T04:43:30.842Z",
+   "item": "26d95bd1",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "57",
+   "issue": "LIN-2756",
+   "kind": "review",
+   "kindHow": "exact",
+   "round": 3,
+   "at": "2026-09-11T09:24:58.268Z",
+   "item": "657fea47",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "yes"
+  },
+  {
+   "digest": "58",
+   "issue": "LIN-2754",
+   "kind": "plan-review",
+   "kindHow": "exact",
+   "round": 4,
+   "at": "2026-09-11T19:31:12.993Z",
+   "item": "cb11df9e",
+   "repo": "no merge",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no",
+   "disagreed": [
+    "ruling"
+   ],
+   "adjudication": "The autopilot continued past the plan-review bound on its own call; the digest shows no person's ruling (19:17:11, 19:19:35)."
+  },
+  {
+   "digest": "59",
+   "issue": "LIN-2811",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-12T09:21:53.243Z",
+   "item": "466353fa",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no",
+   "disagreed": [
+    "bought"
+   ],
+   "adjudication": "The core design was unchanged; the revision corrected evidence and a justification, filed a sibling ticket and changed the test approach (09:27:54)."
+  },
+  {
+   "digest": "60",
+   "issue": "LIN-2068",
+   "kind": "review",
+   "kindHow": "exact",
+   "round": 3,
+   "at": "2026-09-20T17:44:07.511Z",
+   "item": "ba7819ea",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "61",
+   "issue": "LIN-2991",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 3,
+   "at": "2026-09-24T17:59:29.291Z",
+   "item": "da213839",
+   "repo": "both",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "yes"
+  },
+  {
+   "digest": "62",
+   "issue": "LIN-2891",
+   "kind": "plan-review",
+   "kindHow": "exact",
+   "round": 4,
+   "at": "2026-09-25T00:21:08.885Z",
+   "item": "a25ebefd",
+   "repo": "both",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "yes"
+  },
+  {
+   "digest": "63",
+   "issue": "LIN-3026",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-09-25T01:33:50.722Z",
+   "item": "b2e703d0",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "64",
+   "issue": "LIN-2991",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 5,
+   "at": "2026-09-25T01:46:26.666Z",
+   "item": "65e29dc5",
+   "repo": "both",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no"
+  },
+  {
+   "digest": "65",
+   "issue": "LIN-3027",
+   "kind": "close-out",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-25T07:22:55.165Z",
+   "item": "db46f896",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "66",
+   "issue": "LIN-3033",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-09-25T07:38:44.085Z",
+   "item": "781b9bd4",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no",
+   "disagreed": [
+    "newFinding",
+    "real"
+   ],
+   "adjudication": "Round 2 named two authoring routes no earlier round had raised, and revision 3 generalised the limit because of them (07:37:31, 07:50:23)."
+  },
+  {
+   "digest": "67",
+   "issue": "LIN-2994",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-09-25T07:54:54.374Z",
+   "item": "2ffe9cff",
+   "repo": "LinearViewer",
+   "reason": "other",
+   "bought": "wording-tests",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "68",
+   "issue": "LIN-2995",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-25T08:03:35.447Z",
+   "item": "b168a1a4",
+   "repo": "simple-dispatcher",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "69",
+   "issue": "LIN-2891",
+   "kind": "plan-review",
+   "kindHow": "decoded",
+   "round": 8,
+   "at": "2026-09-25T08:06:49.708Z",
+   "item": "cc642eb8",
+   "repo": "both",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no",
+   "disagreed": [
+    "newFinding",
+    "real"
+   ],
+   "adjudication": "Only non-blocking notes were new (e.g. e2e-smoke not listed); by the rubric a new note is a new finding that is not real, as the paper coded such notes (08:05:08)."
+  },
+  {
+   "digest": "70",
+   "issue": "LIN-2995",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 3,
+   "at": "2026-09-25T08:22:02.738Z",
+   "item": "2aa23dab",
+   "repo": "simple-dispatcher",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "71",
+   "issue": "LIN-3049",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 3,
+   "at": "2026-09-25T14:23:43.127Z",
+   "item": "70297154",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "72",
+   "issue": "LIN-3046",
+   "kind": "review",
+   "kindHow": "exact",
+   "round": 3,
+   "at": "2026-09-26T07:27:46.013Z",
+   "item": "a4affaee",
+   "repo": "simple-dispatcher",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no",
+   "disagreed": [
+    "newFinding",
+    "real"
+   ],
+   "adjudication": "Only an optional nit was new; coded as 69 (07:26:32)."
+  },
+  {
+   "digest": "73",
+   "issue": "LIN-3056",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 3,
+   "at": "2026-09-26T07:46:52.693Z",
+   "item": "049d594c",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "yes",
+   "real": "no",
+   "ruling": "no"
+  },
+  {
+   "digest": "74",
+   "issue": "LIN-3110",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 3,
+   "at": "2026-09-27T07:38:42.220Z",
+   "item": "2b3c6539",
+   "repo": "no merge",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "75",
+   "issue": "LIN-3127",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 2,
+   "at": "2026-09-27T10:13:20.266Z",
+   "item": "61531479",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "76",
+   "issue": "LIN-3134",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 3,
+   "at": "2026-09-29T04:55:35.510Z",
+   "item": "d84d31d4",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  },
+  {
+   "digest": "77",
+   "issue": "LIN-3138",
+   "kind": "review",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-09-29T06:04:01.778Z",
+   "item": "5b90684a",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "yes",
+   "real": "yes",
+   "ruling": "no"
+  },
+  {
+   "digest": "78",
+   "issue": "LIN-3124",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 5,
+   "at": "2026-09-29T06:20:09.633Z",
+   "item": "cbba593b",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "substance",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes",
+   "disagreed": [
+    "reason"
+   ],
+   "adjudication": "The revision answered the plan-review's Needs Discussion, with John's ruling on the parked question; the gate's send-back is the direct cause, the ruling the second (03:33:18, 06:14:51)."
+  },
+  {
+   "digest": "79",
+   "issue": "LIN-3124",
+   "kind": "plan",
+   "kindHow": "exact",
+   "round": 6,
+   "at": "2026-09-29T06:26:40.590Z",
+   "item": "6bf1acea",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "wording-tests",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "no"
+  },
+  {
+   "digest": "80",
+   "issue": "LIN-3134",
+   "kind": "close-out",
+   "kindHow": "decoded",
+   "round": 2,
+   "at": "2026-09-29T10:35:44.108Z",
+   "item": "8199c0c2",
+   "repo": "LinearViewer",
+   "reason": "changes-requested",
+   "bought": "nothing",
+   "newFinding": "na",
+   "real": "na",
+   "ruling": "yes"
+  }
+ ],
+ "summary": {
+  "n": 80,
+  "tickets": 67,
+  "byKind": {
+   "review": 25,
+   "plan": 21,
+   "plan-review": 19,
+   "close-out": 15
+  },
+  "byMonth": {
+   "2026-08": {
+    "n": 40,
+    "reasons": {
+     "changes-requested": 32,
+     "other": 7,
+     "duplicate-or-mistaken": 1
+    },
+    "reasonsByKind": {
+     "plan": {
+      "changes-requested": 7
+     },
+     "plan-review": {
+      "changes-requested": 10
+     },
+     "review": {
+      "changes-requested": 11,
+      "other": 3
+     },
+     "close-out": {
+      "other": 4,
+      "changes-requested": 4,
+      "duplicate-or-mistaken": 1
+     }
+    },
+    "realN": 33,
+    "changesRequestedOfReal": {
+     "k": 32,
+     "n": 33,
+     "pct": 97,
+     "ci": [
+      85,
+      99
+     ]
+    },
+    "boughtByKind": {
+     "plan": {
+      "substance": 6,
+      "wording-tests": 1
+     },
+     "plan-review": {
+      "substance": 5,
+      "nothing": 3,
+      "wording-tests": 2
+     },
+     "review": {
+      "nothing": 5,
+      "wording-tests": 4,
+      "substance": 2
+     },
+     "close-out": {
+      "nothing": 5
+     }
+    },
+    "planReview": {
+     "n": 10,
+     "newFinding": 9,
+     "real": 7
+    },
+    "review": {
+     "n": 11,
+     "newFinding": 7,
+     "real": 5
+    },
+    "ruling": {
+     "round2": {
+      "k": 2,
+      "n": 34,
+      "pct": 6,
+      "ci": [
+       2,
+       19
+      ]
+     },
+     "round3plus": {
+      "k": 2,
+      "n": 6,
+      "pct": 33,
+      "ci": [
+       10,
+       70
+      ]
+     }
+    },
+    "notRealReviews": {
+     "2026-08 decoded": 3
+    },
+    "reviewsByMonth": {
+     "2026-08 real": 11,
+     "2026-08 not real": 3
+    }
+   },
+   "2026-09": {
+    "n": 40,
+    "reasons": {
+     "changes-requested": 32,
+     "failed-or-cut-off": 5,
+     "other": 2,
+     "rescue": 1
+    },
+    "reasonsByKind": {
+     "plan": {
+      "changes-requested": 10,
+      "failed-or-cut-off": 4
+     },
+     "plan-review": {
+      "changes-requested": 9
+     },
+     "review": {
+      "changes-requested": 11
+     },
+     "close-out": {
+      "other": 2,
+      "changes-requested": 2,
+      "failed-or-cut-off": 1,
+      "rescue": 1
+     }
+    },
+    "realN": 38,
+    "changesRequestedOfReal": {
+     "k": 32,
+     "n": 38,
+     "pct": 84,
+     "ci": [
+      70,
+      93
+     ]
+    },
+    "boughtByKind": {
+     "plan": {
+      "substance": 8,
+      "nothing": 3,
+      "wording-tests": 3
+     },
+     "plan-review": {
+      "substance": 6,
+      "nothing": 2,
+      "wording-tests": 1
+     },
+     "review": {
+      "nothing": 5,
+      "wording-tests": 5,
+      "substance": 1
+     },
+     "close-out": {
+      "nothing": 4
+     }
+    },
+    "planReview": {
+     "n": 9,
+     "newFinding": 8,
+     "real": 7
+    },
+    "review": {
+     "n": 11,
+     "newFinding": 11,
+     "real": 6
+    },
+    "ruling": {
+     "round2": {
+      "k": 4,
+      "n": 23,
+      "pct": 17,
+      "ci": [
+       7,
+       37
+      ]
+     },
+     "round3plus": {
+      "k": 7,
+      "n": 17,
+      "pct": 41,
+      "ci": [
+       22,
+       64
+      ]
+     }
+    },
+    "notRealReviews": {},
+    "reviewsByMonth": {
+     "2026-09 real": 11
+    }
+   }
+  },
+  "agreement": {
+   "reason": {
+    "n": 80,
+    "agree": 77,
+    "kappa": 0.89
+   },
+   "bought": {
+    "n": 80,
+    "agree": 77,
+    "kappa": 0.94
+   },
+   "newFinding": {
+    "n": 44,
+    "agree": 40,
+    "kappa": 0.73
+   },
+   "real": {
+    "n": 44,
+    "agree": 39,
+    "kappa": 0.8
+   },
+   "ruling": {
+    "n": 80,
+    "agree": 77,
+    "kappa": 0.89
+   }
+  },
+  "unresolved": [],
+  "disagreements": [
+   "03 close-out: bought nothing/wording-tests",
+   "15 close-out: reason other/failed-or-cut-off",
+   "19 review: real no/unclear",
+   "28 review: ruling no/yes",
+   "30 plan-review: bought substance/wording-tests",
+   "38 review: reason changes-requested/other",
+   "47 plan: ruling unclear/no",
+   "49 review: newFinding yes/unclear, real unclear/na",
+   "58 plan-review: ruling yes/no",
+   "59 plan: bought wording-tests/substance",
+   "66 plan-review: newFinding yes/no, real yes/na",
+   "69 plan-review: newFinding no/yes, real na/no",
+   "72 review: newFinding no/yes, real na/no",
+   "78 plan: reason changes-requested/plan-revised-after-research"
+  ],
+  "all": {
+   "n": 80,
+   "reasons": {
+    "changes-requested": 64,
+    "other": 9,
+    "failed-or-cut-off": 5,
+    "duplicate-or-mistaken": 1,
+    "rescue": 1
+   },
+   "reasonsByKind": {
+    "plan": {
+     "changes-requested": 17,
+     "failed-or-cut-off": 4
+    },
+    "plan-review": {
+     "changes-requested": 19
+    },
+    "review": {
+     "changes-requested": 22,
+     "other": 3
+    },
+    "close-out": {
+     "other": 6,
+     "changes-requested": 6,
+     "duplicate-or-mistaken": 1,
+     "failed-or-cut-off": 1,
+     "rescue": 1
+    }
+   },
+   "realN": 71,
+   "changesRequestedOfReal": {
+    "k": 64,
+    "n": 71,
+    "pct": 90,
+    "ci": [
+     81,
+     95
+    ]
+   },
+   "boughtByKind": {
+    "plan": {
+     "substance": 14,
+     "wording-tests": 4,
+     "nothing": 3
+    },
+    "plan-review": {
+     "substance": 11,
+     "nothing": 5,
+     "wording-tests": 3
+    },
+    "review": {
+     "nothing": 10,
+     "wording-tests": 9,
+     "substance": 3
+    },
+    "close-out": {
+     "nothing": 9
+    }
+   },
+   "planReview": {
+    "n": 19,
+    "newFinding": 17,
+    "real": 14
+   },
+   "review": {
+    "n": 22,
+    "newFinding": 18,
+    "real": 11
+   },
+   "ruling": {
+    "round2": {
+     "k": 6,
+     "n": 57,
+     "pct": 11,
+     "ci": [
+      5,
+      21
+     ]
+    },
+    "round3plus": {
+     "k": 9,
+     "n": 23,
+     "pct": 39,
+     "ci": [
+      22,
+      59
+     ]
+    }
+   },
+   "notRealReviews": {
+    "2026-08 decoded": 3
+   },
+   "reviewsByMonth": {
+    "2026-08 real": 11,
+    "2026-09 real": 11,
+    "2026-08 not real": 3
+   }
+  },
+  "paper": {
+   "n": 64,
+   "reasons": {
+    "changes-requested": 57,
+    "other": 4,
+    "plan-revised-after-research": 2,
+    "failed-or-cut-off": 1
+   },
+   "reasonsByKind": {
+    "plan": {
+     "changes-requested": 11,
+     "failed-or-cut-off": 1,
+     "plan-revised-after-research": 1
+    },
+    "plan-review": {
+     "changes-requested": 21,
+     "plan-revised-after-research": 1
+    },
+    "review": {
+     "changes-requested": 14,
+     "other": 4
+    },
+    "close-out": {
+     "changes-requested": 11
+    }
+   },
+   "realN": 60,
+   "changesRequestedOfReal": {
+    "k": 57,
+    "n": 60,
+    "pct": 95,
+    "ci": [
+     86,
+     98
+    ]
+   },
+   "boughtByKind": {
+    "plan": {
+     "substance": 10,
+     "wording-tests": 2,
+     "nothing": 1
+    },
+    "plan-review": {
+     "substance": 11,
+     "nothing": 6,
+     "wording-tests": 5
+    },
+    "review": {
+     "nothing": 7,
+     "wording-tests": 5,
+     "substance": 2
+    },
+    "close-out": {
+     "nothing": 11
+    }
+   },
+   "planReview": {
+    "n": 22,
+    "newFinding": 20,
+    "real": 16
+   },
+   "review": {
+    "n": 14,
+    "newFinding": 10,
+    "real": 7
+   },
+   "notRealReviews": {
+    "2026-08 undefined": 4
+   },
+   "reviewsByMonth": {
+    "2026-09 real": 10,
+    "2026-08 not real": 4,
+    "2026-08 real": 4
+   }
+  },
+  "pooled": {
+   "n": 144,
+   "reasons": {
+    "changes-requested": 121,
+    "other": 13,
+    "failed-or-cut-off": 6,
+    "plan-revised-after-research": 2,
+    "duplicate-or-mistaken": 1,
+    "rescue": 1
+   },
+   "reasonsByKind": {
+    "plan": {
+     "changes-requested": 28,
+     "failed-or-cut-off": 5,
+     "plan-revised-after-research": 1
+    },
+    "plan-review": {
+     "changes-requested": 40,
+     "plan-revised-after-research": 1
+    },
+    "review": {
+     "changes-requested": 36,
+     "other": 7
+    },
+    "close-out": {
+     "changes-requested": 17,
+     "other": 6,
+     "duplicate-or-mistaken": 1,
+     "failed-or-cut-off": 1,
+     "rescue": 1
+    }
+   },
+   "realN": 131,
+   "changesRequestedOfReal": {
+    "k": 121,
+    "n": 131,
+    "pct": 92,
+    "ci": [
+     87,
+     96
+    ]
+   },
+   "boughtByKind": {
+    "plan": {
+     "substance": 24,
+     "wording-tests": 6,
+     "nothing": 4
+    },
+    "plan-review": {
+     "substance": 22,
+     "nothing": 11,
+     "wording-tests": 8
+    },
+    "review": {
+     "nothing": 17,
+     "wording-tests": 14,
+     "substance": 5
+    },
+    "close-out": {
+     "nothing": 20
+    }
+   },
+   "planReview": {
+    "n": 41,
+    "newFinding": 37,
+    "real": 30
+   },
+   "review": {
+    "n": 36,
+    "newFinding": 28,
+    "real": 18
+   },
+   "notRealReviews": {
+    "2026-08 undefined": 4,
+    "2026-08 decoded": 3
+   },
+   "reviewsByMonth": {
+    "2026-09 real": 21,
+    "2026-08 real": 15,
+    "2026-08 not real": 7
+   }
+  },
+  "representativeness": {
+   "2026-08": {
+    "census": {
+     "n": 413,
+     "kind": {
+      "plan": 0.27,
+      "plan-review": 0.23,
+      "review": 0.36,
+      "close-out": 0.14
+     },
+     "round3plus": 0.24
+    },
+    "paperSample": {
+     "n": 32,
+     "kind": {
+      "plan": 0.16,
+      "plan-review": 0.38,
+      "review": 0.25,
+      "close-out": 0.22
+     },
+     "round3plus": 0.28
+    },
+    "thisSample": {
+     "n": 40,
+     "kind": {
+      "plan": 0.17,
+      "plan-review": 0.25,
+      "review": 0.35,
+      "close-out": 0.23
+     },
+     "round3plus": 0.15
+    }
+   },
+   "2026-09": {
+    "census": {
+     "n": 427,
+     "kind": {
+      "plan": 0.27,
+      "plan-review": 0.25,
+      "review": 0.37,
+      "close-out": 0.12
+     },
+     "round3plus": 0.35
+    },
+    "paperSample": {
+     "n": 32,
+     "kind": {
+      "plan": 0.25,
+      "plan-review": 0.31,
+      "review": 0.31,
+      "close-out": 0.13
+     },
+     "round3plus": 0.53
+    },
+    "thisSample": {
+     "n": 40,
+     "kind": {
+      "plan": 0.35,
+      "plan-review": 0.23,
+      "review": 0.28,
+      "close-out": 0.15
+     },
+     "round3plus": 0.42
+    }
+   }
+  }
+ }
+}
