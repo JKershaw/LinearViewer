@@ -117,18 +117,33 @@ describe('lifetime-retention stale-language reconciliation (LIN-3163 Finding 1)'
       'dispatch-history carries no TTL to cap against');
     assert.doesNotMatch(PERIODICAL_RUNS, /store's historyTtl/,
       'the TypeError must not call the input the store\'s historyTtl');
+    assert.doesNotMatch(PERIODICAL_RUNS, /full window the store can still hold/,
+      'the `never` gloss is bounded by the 30-day read window, not by store capacity');
     assert.match(PERIODICAL_RUNS, /read-horizon input, in ms/,
       'the required-input TypeError names the read-horizon input');
     assert.match(PERIODICAL_RUNS, /lifetime-retained/);
   });
 
-  test('ship-biscuit and its editor no longer say source rows age out', () => {
-    assert.doesNotMatch(SHIP_BISCUIT, /source rows age out|source ages out|source TTL|sources TTL/,
-      'the pinned snapshot is the grounding guarantee; rows do not expire');
-    assert.match(SHIP_BISCUIT, /lifetime-retained/);
-    assert.doesNotMatch(SHIP_EDITOR, /30-day-TTL|age out|source TTL/,
-      'the editor prompt must not claim a 30-day source TTL');
-    assert.match(SHIP_EDITOR, /lifetime-retained/);
+  test('ship-biscuit grounds from the pinned snapshot, not a false all-sources lifetime claim', () => {
+    // The old false claim: every source row is lifetime-retained. Only the six evidence
+    // stores are; the observation-sessions read-model still ages out and the snapshot /
+    // report stores are capacity-capped.
+    assert.doesNotMatch(SHIP_BISCUIT, /source rows are lifetime-retained/,
+      'not all sources are lifetime-retained: observation-sessions still ages out at 30 days, and task snapshots / report history are capacity-capped');
+    assert.match(SHIP_BISCUIT, /from the snapshot itself/,
+      'the pinned snapshot is the grounding guarantee, independent of any later store read');
+    assert.match(SHIP_BISCUIT, /lifetime-retained \(LIN-3163\)/,
+      'the six evidence stores are lifetime-retained (LIN-3163)');
+    assert.match(SHIP_BISCUIT, /observation-sessions read-model still ages/,
+      'the observation-sessions read-model keeps its 30-day TTL (out of scope)');
+    assert.match(SHIP_BISCUIT, /report-history is capacity-capped/,
+      'the roadmap/report-history site names the capped store it reads from');
+
+    assert.doesNotMatch(SHIP_EDITOR, /source rows are lifetime-retained|all source rows are lifetime/,
+      'the editor prompt must not claim every source is lifetime-retained');
+    assert.match(SHIP_EDITOR, /grounding from the pinned snapshot/,
+      'the durable edition stays grounded from the pinned snapshot');
+    assert.match(SHIP_EDITOR, /lifetime-retained \(LIN-3163\)/);
   });
 
   test('dispatch-store records the flip as done, not as "moving to lifetime retention"', () => {
