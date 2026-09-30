@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
+  weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
+  detectable ratio ×2.4), while cost measured per change sees ×1.4 in four weeks. Re-run
+  `scripts/survey-scorecard.mjs` weekly for eight weeks and report whether the per-change detectable ratios
+  hold on new weeks, and whether the weekly count and per-change cost ever move in opposite directions.
+  (Claude, 2026-09-30)
 - **When were the faults that later reviews find actually written?** `harbour/reliability-baseline.md`
   counted 49 escaped Bugs filed as `kind:review-residue`, a later review finding a fault in older
   code, and in LinearViewer most of its August–September rise is these. For each, `git blame` the lines its fix
