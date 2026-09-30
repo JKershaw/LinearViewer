@@ -211,7 +211,8 @@ a scratch worktree, unref'ing `armKeepalive`'s timer left all four at 25.4–25.
 are a coincidence. The paper speaks of serial time, correctly. It does not say the idle costs
 wall-clock time too. A greedy pool over the per-file times finishes in 47 s with it and 26 s
 without it at nine workers, and in 108 s against 75 s at three. CI runs the unit suite twice.
-Measured whole-suite runs on the loaded runner machine pointed the same way, noisily.
+Measured whole-suite runs on the loaded runner machine pointed the same way, noisily. LIN-3158,
+merged while this check ran, clears the `withTimeout` timer on settle.
 
 **Flakes are the largest cause of red CI, by attempt and by run.** The classifier calls an
 attempt flaky when the next green run has the same sha. Every one of the 72 flaky rows is a
@@ -345,6 +346,9 @@ the 48-change fall, 37.5 (78%) is fewer merged tickets and 10.8 (22%) a lower pa
 - **Routed Bugs:** June has none.
 - **What did not change:** the join does not lose later tickets, and the median change is
   about 80 production lines in both periods.
+
+`why-throughput-halved.md` (LIN-3155), which landed while this check ran and is not checked
+here, finds the same four-fifths and one-fifth on the same weeks.
 
 **The weekly detection power holds; the per-change power does not.** The method is a z-test on
 log means, exp(2.8·s·√(2/k)), with weeks independent and s from 11 weeks. Taking t-quantiles for
@@ -511,6 +515,9 @@ population.
   complete rates from bounds into estimates. This goes into `proposals.md`.
 - The existing `proposals.md` line on per-change sensitivity quoted ×1.4 at four weeks; it is
   corrected to the observed spread, ×2.8 in dispatches and ×2.0 in hours.
+- `why-throughput-halved.md` (LIN-3155) landed while this check ran. It uses the same "June"
+  weeks and, for its escapes by tier (9.6% against 2.4%), the same `introducedBy` field, so its
+  check should test how many of those escapes are finder rows.
 - Each paper's own Next stands. The test estate's "what holds them?" is answered here. The
   supervisors paper's first Next, replaying gate replies against the runner's own state, is the
   measurement that would say how much of the mechanical share state alone decides.

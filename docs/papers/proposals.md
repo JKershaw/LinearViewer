@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
+  `harbour/why-throughput-halved.md` found that, from 13 July, changes written mainly at the mid tier
+  were 67% correct and complete against 78% for the frontier tier, with 9.6% against 2.4% escaping, at
+  the same dispatches and working hours per change. Match later-block changes on production size,
+  area and ticket kind, and report whether the gap survives or belongs to the tickets each tier was
+  given. (Claude, 2026-09-30)
 - **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
   weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
   detectable ratio ×2.4). `harbour/survey-check-2.md` found cost per change is not the ×1.4 the paper
@@ -44,14 +50,15 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   to 12 July, find a measure that means the same in July as in September, such as executing time
   outside CI and Monitor polls, and redo the size-held-fixed table in it. (Claude, 2026-09-30)
 
-- **Which review and close-out rules have paid for their place?** `harbour/steady-base.md`
-  counted how often each gate rule's signature appears in Done tickets, but not whether any use
-  changed a line of production code. For every rule in `harbour/steady-base-rules.json` from
-  review and close-out, find its uses in the last 100 Done tickets and trace each one to the
-  commit it did or did not cause. That gives a firing record, which is step 3 of that paper's
-  proposal done once by hand. Count uses in the orchestrator's stepper beats as well as in the
-  engine's prompts, since `harbour/steady-base-check.md` found beats behind about a third of
-  sampled worker prompts. (Claude, 2026-09-29, widened 2026-09-30)
+- **Do the tests the mutation check forces ever catch anything?** `harbour/which-rules-pay.md` found
+  the mutation check led 107 of 483 review findings in the last 100 reviewed Done tickets, 97 of which
+  changed only tests, and about 36 of the 88 extra legs those tickets ran. Follow every test file those
+  97 changes touched forward through CI on main and later PRs, and count how often one goes red on a
+  real regression before a reviewer or a Bug finds it. (Claude, 2026-09-30)
+- **What does reviewer judgement catch that no rule names?** The same paper found that the largest
+  single source of production changes from review, 29 changes and 16 real faults, was a reviewer
+  reading the code with no specific rule behind the finding. Read those findings for a common kind
+  of reading, and ask whether the named rules describe how faults are actually found. (Claude, 2026-09-30)
 - **What do the orchestrator's stepper beats keep of the rules?** `harbour/steady-base-check.md`
   found that 41 of 112 sampled worker prompts were beats the frontier-tier orchestrator wrote
   itself, and at least 18 of them wrap an engine brief. For every beat since the stepper shipped,

@@ -370,17 +370,22 @@ const RECOMMEND_DESCENT_BUDGET_MS = LLM_TIMEOUT_MS;
  * Race a promise against a timeout. Throws a TimeoutError if the promise
  * doesn't settle within `ms` milliseconds, giving the same error shape as
  * AbortSignal.timeout() so graphqlErrorStatus() maps it to 504.
+ *
+ * Clears its timer once the race settles (LIN-3158), mirroring fetchWithTimeout
+ * and the sibling helpers: an uncleared timer keeps the event loop alive for the
+ * full `ms` even after the real call already won the race, which idled the
+ * live-path unit files ~25 s each. Promise.race already swallows the timeout's
+ * later settle, so clearing changes no response semantics.
  */
 function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => {
-        const err = new DOMException('Upstream API request timed out', 'TimeoutError');
-        reject(err);
-      }, ms);
-    })
-  ]);
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new DOMException('Upstream API request timed out', 'TimeoutError');
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
