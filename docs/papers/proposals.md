@@ -349,3 +349,10 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   in late September. Run it alone at origin/main, repeated, with and without tracing and with a wait
   on the computed style, and report which condition makes the first attempt fail. It is the one test
   where retries could be hiding a real reduced-motion fault. (Claude, 2026-09-30)
+- **How many of the wakes a worker event sends up the stack change what any supervisor does?**
+  `harbour/what-doubled-the-dispatches.md` found wakes are most of the rise in dispatches per correct
+  change since July, that each worker session or beat sent 0.8–0.9 wakes up in July and August and
+  2.2 after the passage layer went live, and that PENDING-EXTERNAL pauses track wakes one for one.
+  For September's wakes, trace each one to the layer it woke (stepper, ticket autopilot, leg, Runner)
+  and say, per layer, how often the woken session's next action differs from what it would have done
+  had the wake gone only to the lowest layer. (Claude, 2026-09-30)
