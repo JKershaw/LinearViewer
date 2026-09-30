@@ -3,6 +3,16 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **What does a follow-up beat buy?** `harbour/growth-atlas.md` found fresh fleet sessions flat at
+  about 450–530 a week since mid-July, while follow-up beats into held sessions doubled after
+  31 August, from about 800 a week to about 1,600. Sample beats from simple-dispatcher's run logs and
+  oplog, and trace each to what it changed: a commit, a ticket state, a comment, or nothing.
+  (Claude, 2026-09-30)
+- **Why does Harbour's unit suite slow faster than it grows?** `harbour/growth-atlas.md` found one
+  CI pass of the unit suite took 8× longer from late June to late September while test lines grew
+  4.2×. Time every test file under `node --test` at each month-end commit and report whether a
+  few files or the whole suite carry the time. (Claude, 2026-09-30)
+
 - **Which review and close-out rules have paid for their place?** `harbour/steady-base.md`
   counted how often each gate rule's signature appears in Done tickets, but not whether any use
   changed a line of production code. For every rule in `harbour/steady-base-rules.json` from

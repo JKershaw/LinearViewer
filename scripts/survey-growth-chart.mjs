@@ -57,7 +57,8 @@ const readingKB = (r) => readingNoCatalogue(r) / 1024;
 // Harbour's unit tests got their own job on 6 April; before that one job ran unit and e2e together.
 // One pass of the unit suite is the longest unit-test step (LIN-1880 made CI run it twice from 4 September).
 const unitMinutes = (r) => r.jobs.find((j) => /^unit tests$/i.test(j.name))?.unitStepMinutes ?? null;
-const done = Object.fromEntries(tracker.map((r) => [r.week, r.closed]));
+// Four-week rolling sum ending at a week: the one-in-ten tracker sample is too thin for weekly ratios.
+const roll = (rows, wk, k) => { const end = Date.parse(wk); return rows.filter((r) => { const t = Date.parse(r.week); return t <= end && t > end - 28 * 864e5; }).reduce((s, r) => s + (r[k] || 0), 0); };
 
 // Figure 1: the atlas — every main series on one time axis.
 const PANELS = [
@@ -70,9 +71,9 @@ const PANELS = [
   ['Merged PRs per week', [{ label: 'Harbour', color: LV_C, points: pt(complete(lv), (r) => r.mergedPRs) }, { label: 'simple-dispatcher', color: SD_C, points: pt(complete(sd), (r) => r.mergedPRs) }]],
   ['Tickets created and Done per week (tracker)', [{ label: 'created', color: GREY, points: pt(complete(tracker), (r) => r.created) }, { label: 'Done', color: GREEN, points: pt(complete(tracker), (r) => r.closed) }]],
   ['Open pile (tracker)', [{ label: 'not Done, not canceled', color: GREY, points: pt(tracker, (r) => r.openPile) }]],
-  ['Comment words per ticket, by creation week (median)', [{ label: 'comments', color: GREY, points: pt(complete(tracker), (r) => r.medianCommentWordsPerTicket) }, { label: 'description', color: GREEN, points: pt(complete(tracker), (r) => r.medianDescWords) }]],
+  ['Comment words posted per Done ticket (4-wk)', [{ label: 'comment words posted ÷ tickets Done', color: GREY, points: complete(tracker).map((r) => [r.week, roll(tracker, r.week, 'closed') ? roll(tracker, r.week, 'commentWordsPosted') / roll(tracker, r.week, 'closed') : null]) }]],
   ['Dispatches per week (fleet, from SD logs)', [{ label: 'fresh sessions', color: SD_C, points: pt(complete(fleet), (r) => r.launch) }, { label: 'follow-up beats', color: SD_C, dash: true, points: pt(complete(fleet), (r) => r.followUp) }]],
-  ['Dispatches per Done ticket', [{ label: 'fresh sessions / Done', color: SD_C, points: complete(fleet).map((r) => [r.week, done[r.week] ? r.launch / done[r.week] : null]) }, { label: 'all dispatches / Done', color: SD_C, dash: true, points: complete(fleet).map((r) => [r.week, done[r.week] ? r.harbour / done[r.week] : null]) }]],
+  ['Dispatches per Done ticket (4-wk, from 13 Jul)', [{ label: 'fresh sessions / Done', color: SD_C, points: complete(fleet).filter((r) => r.week >= '2026-08-03').map((r) => [r.week, roll(fleet, r.week, 'launch') / roll(tracker, r.week, 'closed')]) }, { label: 'all dispatches / Done', color: SD_C, dash: true, points: complete(fleet).filter((r) => r.week >= '2026-08-03').map((r) => [r.week, roll(fleet, r.week, 'harbour') / roll(tracker, r.week, 'closed')]) }]],
 ];
 const COLS = 3, PW = 250, PH = 120, GX = 70, GY = 62, LEFT = 44, TOP = 70;
 const rowsN = Math.ceil(PANELS.length / COLS);
@@ -153,7 +154,7 @@ for (const [from, to, label] of [['2026-01-01', '2026-06-01', 'Jan–May'], ['20
   const weeks = tracker.filter((r) => r.week >= from && r.week < to).length;
   console.log(`${label}: ${weeks} weeks; created=${sumBy(tracker, (r) => r.created, from, to)} done=${sumBy(tracker, (r) => r.closed, from, to)} LV PRs=${sumBy(lv, (r) => r.mergedPRs, from, to)} SD PRs=${sumBy(sd, (r) => r.mergedPRs, from, to)} launches=${sumBy(fleet, (r) => r.launch, from, to)} followUps=${sumBy(fleet, (r) => r.followUp, from, to)}`);
 }
-console.log('tracker weeks:'); for (const r of tracker) console.log(`  ${r.week} created=${r.created} done=${r.closed} open=${r.openPile} descW=${r.medianDescWords} commentW=${r.medianCommentWordsPerTicket} posted=${r.commentWordsPosted} n=${r.sampleCreated} launches=${fleet.find((f) => f.week === r.week)?.launch ?? '-'} all=${fleet.find((f) => f.week === r.week)?.harbour ?? '-'}`);
+console.log('tracker weeks:'); for (const r of tracker) console.log(`  ${r.week} created=${r.created} done=${r.closed} open=${r.openPile} descW=${r.medianDescWords} commentW=${r.medianCommentWordsPerTicket} commentWDone=${r.medianCommentWordsDone} wordsPerDone=${r.closed ? Math.round(r.commentWordsPosted / r.closed) : '-'} posted=${r.commentWordsPosted} n=${r.sampleCreated} launches=${fleet.find((f) => f.week === r.week)?.launch ?? '-'} all=${fleet.find((f) => f.week === r.week)?.harbour ?? '-'}`);
 
 // What shrinks, and where a series levels off: weekly declines, and mean weekly change per period.
 const SERIES = [
@@ -176,4 +177,34 @@ for (const [repoName, rows] of [['LV', lv], ['SD', sd]]) for (const a of Object.
   const f = (r) => r.areas[a]?.lines || 0;
   const per = (x0, x1) => { const x = rows.filter((r) => r.week >= x0 && r.week < x1); if (x.length < 2) return '-'; const i0 = rows.indexOf(x[0]); return Math.round((f(x.at(-1)) - f(i0 ? rows[i0 - 1] : x[0])) / x.length); };
   console.log(`  ${repoName} ${a.padEnd(26)} ${per('2026-01-01', '2026-06-01')} | ${per('2026-06-01', '2026-08-31')} | ${per('2026-08-31', '2026-10-05')}`);
+}
+console.log('fleet and tracker by period (fleet dates are complete from 13 July):');
+for (const [from, to] of [['2026-06-01', '2026-07-13'], ['2026-07-13', '2026-08-31'], ['2026-08-31', PARTIAL]]) {
+  const f = (k) => sumBy(fleet, (r) => r[k], from, to), t = (k) => sumBy(tracker, (r) => r[k], from, to);
+  const weeks = (Date.parse(to) - Date.parse(from)) / (7 * 864e5);
+  console.log(`  ${from}..${to} (${weeks} wk): launches ${f('launch')} followUps ${f('followUp')} all ${f('harbour')}; created ${t('created')} done ${t('closed')}; created/done ${(t('created') / t('closed')).toFixed(2)}; launches/done ${(f('launch') / t('closed')).toFixed(1)}; all/done ${(f('harbour') / t('closed')).toFixed(1)}; comment words posted/done ${Math.round(t('commentWordsPosted') / t('closed'))}`);
+}
+// Tracking or outrunning, per unit delivered: what each Done ticket came with, by month (both repos' git, tracker, fleet).
+console.log('per Done ticket, by month: Done | product lines | test lines | comment lines | reading KB | comment words posted | dispatches (from 13 Jul) | merged PRs');
+for (const m of ['2026-06', '2026-07', '2026-08', '2026-09']) {
+  const inM = (rows) => rows.filter((r) => r.week.slice(0, 7) === m && r.week < PARTIAL);
+  const wk = lv.filter((r) => r.week.slice(0, 7) === m && r.week < PARTIAL).map((r) => r.week); // Harbour has a commit every week since June
+  const doneM = inM(tracker).reduce((s, r) => s + r.closed, 0);
+  const delta = (rows, f) => { const x = rows.filter((r) => wk.includes(r.week)); if (!x.length) return 0; const i0 = rows.indexOf(x[0]); return f(x.at(-1)) - f(rows[Math.max(0, i0 - 1)]); };
+  const g = (f) => delta(lv, f) + delta(sd, f);
+  const fl = inM(fleet).filter((r) => r.week >= '2026-07-13').reduce((s, r) => s + r.harbour, 0);
+  const prs = inM(lv).reduce((s, r) => s + r.mergedPRs, 0) + inM(sd).reduce((s, r) => s + r.mergedPRs, 0);
+  const per = (v) => (doneM ? (v / doneM).toFixed(1) : '-');
+  console.log(`  ${m} (${wk.length} wk) done=${doneM} | ${per(g(productCode))} | ${per(g((r) => r.testLines))} | ${per(g((r) => r.prodCommentLines))} | ${per(g(readingNoCatalogue) / 1024)} | ${per(inM(tracker).reduce((s, r) => s + r.commentWordsPosted, 0))} | ${fl ? per(fl) : '-'} | ${per(prs)}`);
+}
+console.log('fresh sessions by model tier, 13 July on (weekly frontier/mid/cheap):');
+const tiers = { frontier: 0, mid: 0, cheap: 0, unstated: 0 };
+for (const r of fleet.filter((q) => q.week >= '2026-07-13' && q.week < PARTIAL)) { for (const k in tiers) tiers[k] += r.tiers[k]; console.log(`  ${r.week} ${r.tiers.frontier}/${r.tiers.mid}/${r.tiers.cheap}`); }
+const nT = Object.values(tiers).reduce((a, b) => a + b, 0);
+console.log(`  total ${nT}: ${Object.entries(tiers).map(([k, v]) => `${k} ${v} (${(100 * v / nT).toFixed(1)}%)`).join(', ')}`);
+console.log('tests as a share of Harbour net added lines (tests + production):');
+for (const [a, b] of [['2026-01-01', '2026-06-01'], ['2026-06-01', '2026-08-31'], ['2026-08-31', '2026-10-05']]) {
+  const x = lv.filter((r) => r.week >= a && r.week < b), i = lv.indexOf(x[0]), prev = lv[Math.max(0, i - 1)];
+  const t = x.at(-1).testLines - prev.testLines, q = x.at(-1).prodLines - prev.prodLines;
+  console.log(`  ${a}..${b}: tests ${t}, production ${q}, test share ${(100 * t / (t + q)).toFixed(0)}%`);
 }

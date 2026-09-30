@@ -63,14 +63,14 @@ export function report(cache) {
   const weeks = new Set();
   for (const [, d] of sample) { weeks.add(isoWeek(d.createdAt)); if (d.completedAt) weeks.add(isoWeek(d.completedAt)); }
   const all = [...weeks].sort();
-  // Weekly series, scaled ×STEP back to the population; "closed" = completed (Done). Canceled tickets
-  // carry no close date on this read, so they leave the pile only if canceledAt is present.
+  // Weekly series, scaled ×STEP back to the population; "closed" = completed (Done). Canceled and
+  // duplicate tickets carry no close date on this read, so they are left out of the pile at every date.
   const rows = all.map((w) => {
     const end = new Date(w + 'T00:00:00Z'); end.setUTCDate(end.getUTCDate() + 7);
     const endIso = end.toISOString();
     const created = sample.filter(([, d]) => isoWeek(d.createdAt) === w);
     const closed = sample.filter(([, d]) => d.completedAt && isoWeek(d.completedAt) === w);
-    const open = sample.filter(([, d]) => d.createdAt < endIso && !(d.completedAt && d.completedAt < endIso) && !(d.canceledAt && d.canceledAt < endIso) && !(d.state === 'canceled' && !d.canceledAt));
+    const open = sample.filter(([, d]) => d.createdAt < endIso && !(d.completedAt && d.completedAt < endIso) && !(d.canceledAt && d.canceledAt < endIso) && !((d.state === 'canceled' || d.state === 'duplicate') && !d.canceledAt));
     const commentsInWeek = sample.flatMap(([, d]) => d.comments.filter((c) => isoWeek(c.createdAt) === w));
     return {
       week: w,
@@ -79,12 +79,26 @@ export function report(cache) {
       openPile: open.length * STEP,
       medianDescWords: median(created.map(([, d]) => d.descWords)),
       medianCommentWordsPerTicket: median(created.map(([, d]) => d.comments.reduce((s, c) => s + c.words, 0))),
+      // Tickets filed this week that are now Done: the conversation a delivered ticket carried.
+      medianCommentWordsDone: median(created.filter(([, d]) => d.state === 'completed').map(([, d]) => d.comments.reduce((s, c) => s + c.words, 0))),
       commentWordsPosted: commentsInWeek.reduce((s, c) => s + c.words, 0) * STEP,
       sampleCreated: created.length,
     };
   });
   const capped = sample.filter(([, d]) => d.comments.length >= 50).length;
-  return { population: list.length, byState, sampled: sample.length, commentsCappedAt50: capped, listFetchedAt: cache.listFetchedAt, weeks: rows };
+  // Description words over the whole census, by month filed. Identifiers are issued in order, so
+  // each ticket takes the filing month of the nearest sampled identifier at or below it.
+  const monthOf = new Map(sample.map(([k, d]) => [Number(k.slice(4)), d.createdAt.slice(0, 7)]));
+  const descByMonth = {};
+  for (const i of list) {
+    const n = Number(i.identifier.slice(4));
+    const m = monthOf.get(Math.max(STEP, n - (n % STEP)));
+    if (m) (descByMonth[m] ||= []).push(i.descWords);
+  }
+  const descMonths = Object.keys(descByMonth).sort().map((m) => ({ month: m, tickets: descByMonth[m].length, medianDescWords: median(descByMonth[m]) }));
+  // The census's own open pile today, to check the sample's last week against.
+  const openNow = list.filter((i) => ['backlog', 'unstarted', 'started', 'triage'].includes(i.state)).length;
+  return { population: list.length, byState, openNow, descMonths, sampled: sample.length, commentsCappedAt50: capped, listFetchedAt: cache.listFetchedAt, weeks: rows };
 }
 
 const isMain = import.meta.url === pathToFileURL(process.argv[1]).href;
@@ -95,9 +109,10 @@ if (isMain) {
     const out = report(JSON.parse(readFileSync(cachePath, 'utf8')));
     if (process.argv.includes('--json')) console.log(JSON.stringify(out, null, 1));
     else {
-      console.log(`population ${out.population} ${JSON.stringify(out.byState)}; sampled every ${STEP}th: ${out.sampled}; comments capped at 50: ${out.commentsCappedAt50}`);
-      console.log('week        created closed openPile medDescW medCommentW/ticket commentWordsPosted');
-      for (const r of out.weeks) console.log(`${r.week} ${String(r.created).padStart(7)} ${String(r.closed).padStart(6)} ${String(r.openPile).padStart(8)} ${String(r.medianDescWords).padStart(8)} ${String(r.medianCommentWordsPerTicket).padStart(18)} ${String(r.commentWordsPosted).padStart(18)}`);
+      console.log(`population ${out.population} ${JSON.stringify(out.byState)}; open now ${out.openNow}; sampled every ${STEP}th: ${out.sampled}; comments capped at 50: ${out.commentsCappedAt50}`);
+      console.log('census description words by month filed: ' + out.descMonths.map((r) => `${r.month} n=${r.tickets} median=${r.medianDescWords}`).join('; '));
+      console.log('week        created closed openPile medDescW medCommentW/ticket medCommentW/Done commentWordsPosted');
+      for (const r of out.weeks) console.log(`${r.week} ${String(r.created).padStart(7)} ${String(r.closed).padStart(6)} ${String(r.openPile).padStart(8)} ${String(r.medianDescWords).padStart(8)} ${String(r.medianCommentWordsPerTicket).padStart(18)} ${String(r.medianCommentWordsDone).padStart(16)} ${String(r.commentWordsPosted).padStart(18)}`);
     }
   } else { console.error('usage: fetch|report [cache] [--json]'); process.exit(1); }
 }
