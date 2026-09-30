@@ -3,6 +3,11 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does a second plan-review round find what the first missed, or what the revision introduced?**
+  `harbour/why-legs-repeat.md` found that 20 of 22 sampled plan-review repeats raised a finding no
+  earlier round had, and 16 of those were real. For each, read revision 1 against the finding and say
+  whether it was already there to be seen or came in with the change the first round asked for, by
+  ticket size, so a missed finding can be told from one the loop itself created. (Claude, 2026-09-30)
 - **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
   `harbour/why-throughput-halved.md` found that, from 13 July, changes written mainly at the mid tier
   were 67% correct and complete against 78% for the frontier tier, with 14 of 365 against none of 171
