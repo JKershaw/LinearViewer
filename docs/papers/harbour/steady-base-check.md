@@ -53,6 +53,7 @@ judgement disagreements stay here.
 | Code residue: production and test lines, ratios, comment share, ticket and plan-label comments, 0 → 26 pin-named files, net-new ratios 1.04/1.73/2.10/2.94 | identical | confirmed |
 | Inventory tables: 213 census rules, 78,046 bytes, 8/131/74, 175 restated, classes 111/55/45/2 | identical | confirmed (but see the inventory findings) |
 | Tracker: 89 Done tickets, median 10 comments and 6,063 words, 715-word descriptions, 497/317/584/521 by month, the kinds table, the signature table | identical on the LIN-3143 session's own cache | confirmed |
+| The same tracker figures from a fresh fetch of the same sample (30 September) | Kinds, sizes and the path split identical. The paper's cache had silently missed 10 of the 190 census tickets; with them, 93 Done tickets, not 89. The Done medians are unchanged (715, 10, 6,063), each signature count rises by 0 to 4, and each month's description median moves by at most 21 words | confirmed; the dropped tickets bias nothing that matters |
 | 102 of 112 prompts model-written | identical | confirmed; attribution wrong, see below |
 | Carried context: 330 legs, prompt 1.6% pooled, 1.9% median | 327 legs, every share within 0.2 points | confirmed (three transcripts have been rewritten since, so the window selects fewer) |
 | 1,371-word lineage paragraph citing 16 tickets | identical | confirmed |
@@ -253,6 +254,7 @@ node scripts/steady-base-provenance.mjs 8f5fe4aa --tickets LIN-550,LIN-810,LIN-8
 node scripts/steady-base-code.mjs 8f5fe4aa
 node scripts/steady-base-carry.mjs --since 2026-09-24 --until 2026-09-29T20:00:00Z
 node scripts/steady-base-tracker.mjs report <the LIN-3143 session's tracker-cache.json>
+node scripts/steady-base-tracker.mjs fetch fresh.json && node scripts/steady-base-tracker.mjs report fresh.json
 node scripts/steady-base-rules-recompute.mjs
 # the check's own measures
 node scripts/steady-base-check.mjs promptnames names.json      # ~4 min over the local proxy, one call per 3 s
@@ -296,7 +298,7 @@ and Cohen's κ per field.
 
 **The tracker cache.** The paper's report was re-run on the LIN-3143 session's own cache, 386
 tickets and 180 prompts, fetched 29 September. A fresh fetch of the same sample ran in this
-session (see Limits).
+session with the same script (a local copy paced at one call per 2 s, since the proxy's limit is shared), and the report was run on both.
 
 ## Limits
 
