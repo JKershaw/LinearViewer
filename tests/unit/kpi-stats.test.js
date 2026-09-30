@@ -154,7 +154,7 @@ describe('collectKpiStats', () => {
     // string, not a coverage share, is the honest disclosure (LIN-2325 F4).
     assert.strictEqual(
       stats.totals.workspacesBasis,
-      'workspaces with retained activity or stored preferences (older, quiet workspaces may be undercounted)'
+      'workspaces with activity in the 30-day read window or stored preferences (older, quiet workspaces may be undercounted)'
     );
   });
 

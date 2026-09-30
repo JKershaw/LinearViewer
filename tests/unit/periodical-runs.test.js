@@ -738,7 +738,7 @@ describe('foldPeriodicalRuns — effective horizon filters history rows, not jus
     assert.equal(result.state, 'never');
   });
 
-  test('a taken row older than the store\'s own retention (40d, 30d TTL) is excluded, not read as due', () => {
+  test('a taken row older than the 30-day read window (40d) is excluded, not read as due', () => {
     const t = template();
     const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(NOW - 40 * DAY_MS).toISOString() })] };
     const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });

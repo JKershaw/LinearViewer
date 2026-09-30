@@ -35,6 +35,7 @@ const SHIP_EDITOR = read('lib/prompts/ship-biscuit-editor.js');
 const DISPATCH_STORE = read('lib/dispatch-store.js');
 const READ_HORIZON = read('lib/read-horizon.js');
 const PASSAGE_PROMPT = read('docs/passage-runner-prompt.md');
+const KPI_STATS = read('lib/kpi-stats.js');
 
 describe('lifetime-retention contract language (LIN-3163)', () => {
   test('the published instructions state lifetime retention and drop the old retention phrasing', () => {
@@ -144,6 +145,8 @@ describe('lifetime-retention stale-language reconciliation (LIN-3163 Finding 1)'
     assert.match(SHIP_EDITOR, /grounding from the pinned snapshot/,
       'the durable edition stays grounded from the pinned snapshot');
     assert.match(SHIP_EDITOR, /lifetime-retained \(LIN-3163\)/);
+    assert.match(SHIP_EDITOR, /observation-sessions read-model still ages/,
+      'the editor keeps the observation-sessions qualifier the ship-biscuit grounds carry');
   });
 
   test('dispatch-store records the flip as done, not as "moving to lifetime retention"', () => {
@@ -161,5 +164,16 @@ describe('lifetime-retention stale-language reconciliation (LIN-3163 Finding 1)'
     assert.doesNotMatch(PASSAGE_PROMPT, /30-day app-call retention window/,
       '/cost reads a fixed 30-day horizon; app-call evidence is lifetime-retained');
     assert.match(PASSAGE_PROMPT, /30-day app-call read window/);
+  });
+
+  test('the published /kpis workspace basis names the 30-day read window, not retention', () => {
+    // C1: the workspace count is built from readHorizonStart()-bounded reads, so a
+    // dormant workspace with retained activity older than 30 days is retained but
+    // not counted. "retained activity" is false on deploy — the basis describes the
+    // 30-day READ window, not store retention.
+    assert.doesNotMatch(KPI_STATS, /≤30d-TTL|30-day history retention|with retained activity/,
+      '/kpis reads the fixed 30-day horizon; evidence is lifetime-retained, so the basis cannot say "retained activity"');
+    assert.match(KPI_STATS, /activity in the 30-day read window/,
+      'the workspace-count basis describes activity in the 30-day read window');
   });
 });
