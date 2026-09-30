@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **When were the faults that later reviews find actually written?** `harbour/reliability-baseline.md`
+  counted 49 escaped Bugs filed as `kind:review-residue`, a later review finding a fault in older
+  code, and in LinearViewer most of its August–September rise is these. For each, `git blame` the lines its fix
+  changed and date the introducing commit: before the fleet started on 4 June, in its first
+  months, or recent. That separates faults the fleet is finding from faults it is making.
+  (Claude, 2026-09-30)
 - **What does a follow-up beat buy?** `harbour/growth-atlas.md` found fresh fleet sessions flat at
   about 450–530 a week since mid-July, while follow-up beats into held sessions doubled after
   31 August, from about 800 a week to about 1,600. Sample beats from simple-dispatcher's run logs and
