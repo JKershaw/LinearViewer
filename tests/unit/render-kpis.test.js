@@ -148,11 +148,11 @@ describe('renderKpisPage', () => {
         workspaces: 4, users: 12, activeSessions: 3, agentActions: 1234, dispatches: 56,
         autopilotRuns: 8, feedbackNotes: 7, aiSummaries: 89, roadmapReports: 10, customPrompts: 2,
         localIssues: 5, localProjects: 1, activeTokens: 6,
-        workspacesBasis: 'workspaces with retained activity or stored preferences',
+        workspacesBasis: 'workspaces with activity in the 30-day read window or stored preferences',
         roadmapReportsBasis: 'newest 20 reports per workspace'
       }
     }));
-    assert.ok(html.includes('<span class="kpi-card-basis">workspaces with retained activity or stored preferences</span>'));
+    assert.ok(html.includes('<span class="kpi-card-basis">workspaces with activity in the 30-day read window or stored preferences</span>'));
     assert.ok(html.includes('<span class="kpi-card-basis">newest 20 reports per workspace</span>'));
   });
 
@@ -273,7 +273,7 @@ describe('renderKpisPage', () => {
   test('titles the newly-windowed charts honestly (LIN-1846)', () => {
     const html = renderKpisPage(buildStats());
 
-    // The 35-day weekly span exceeded 30-day retention; it is now a genuine
+    // The 35-day weekly span exceeded the 30-day reporting window; it is now a genuine
     // 30-day daily-bucketed window, so the title drops "weekly".
     assert.ok(html.includes('dispatched work by kind · 30d'));
     assert.ok(!html.includes('dispatched work by kind · weekly'));

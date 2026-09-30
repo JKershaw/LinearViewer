@@ -338,8 +338,8 @@ describe('credentialVerdict — the pure per-token predicate (LIN-1588 precondit
 });
 
 // The time bound is the whole reason this read is not `listEvents`. If a caller
-// can collapse it, the query degenerates to every non-expired row for the
-// workspace — the /kpis shape ea7abb56 fixed.
+// can collapse it, the query degenerates to every row for the workspace (events
+// are lifetime-retained, LIN-3163) — the /kpis shape ea7abb56 fixed.
 describe('credential-health window clamp', () => {
   test('an absurd window clamps to the cap rather than collapsing the bound', () => {
     assert.strictEqual(resolveCredentialHealthWindow(999999999999), CREDENTIAL_HEALTH_MAX_WINDOW_MS);

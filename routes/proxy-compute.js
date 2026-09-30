@@ -898,19 +898,19 @@ export function createComputeRoutes({
    * (queue docs carry no `status`/`feedback` at all) — that anti-double-
    * dispatch guard is unchanged.
    *
-   * historyTtl is stored in SECONDS (lib/dispatch-store.js:142); the fold
-   * wants milliseconds. This is a correctness gate, not a style point — a
-   * raw-seconds value is finite, so it passes the fold's Number.isFinite
-   * guard and silently collapses the horizon to ~30 minutes, reading every
-   * template as `never`. This endpoint must fail toward `recent`, never
-   * toward a false `never` — a false `never` would make the (unbuilt)
-   * LIN-1629 consumer read "nothing has ever run" and over-dispatch all 15
-   * templates at once.
+   * The fold's retention input is the shared 30-day READ horizon in
+   * milliseconds (lib/read-horizon.js, LIN-3161), not a store retention value:
+   * dispatch-history is lifetime-retained since LIN-3163, so there is no
+   * `historyTtl` to feed (and passing raw seconds would collapse the horizon to
+   * ~30 minutes, reading every template as `never`). This endpoint must fail
+   * toward `recent`, never toward a false `never` — a false `never` would make
+   * the (unbuilt) LIN-1629 consumer read "nothing has ever run" and over-dispatch
+   * all 15 templates at once.
    *
    * `now` is route-supplied (`Date.now()`), never a request parameter — no
    * `?days=`, which keeps the fold's `unknown` state unreachable via any
-   * request parameter (not unreachable by construction: an operator raising
-   * `historyTtl` above 30 days makes it live with no code change). `runs` is
+   * request parameter (retention is now lifetime, so an operator can no longer
+   * make it live by raising a store TTL). `runs` is
    * deliberately not published: no live consumer exists yet (LIN-1629 is
    * unbuilt) and reshaping a published field later is costlier than adding
    * one. No registry re-join: `mode`/`cadence` are fold output, carried
@@ -929,9 +929,9 @@ export function createComputeRoutes({
       // Belt-and-suspenders only — the fold re-applies the horizon itself
       // (lib/periodical-runs.js), so this `since` is not load-bearing for
       // correctness, only for trimming the read.
-      // LIN-3161 (LIN-3157 A1): the window is the shared 30-day read horizon,
-      // NOT `dispatchQueueStore.historyTtl` — a longer store retention must no
-      // longer widen what "no evidence in-window" means.
+      // LIN-3161 (LIN-3157 A1) / LIN-3163 (B): the window is the shared 30-day
+      // read horizon — the store is lifetime-retained, so this horizon is the
+      // only window and nothing can widen it.
       const effectiveHorizonMs = Math.min(DEFAULT_HORIZON_MS, READ_HORIZON_MS);
 
       const [queueRows, history] = await Promise.all([
@@ -976,10 +976,10 @@ export function createComputeRoutes({
         historyRows: filteredHistory
       }, {
         now,
-        // LIN-3161 (LIN-3157 A1): the fold's retention input is the shared
-        // 30-day read horizon (in ms), not the store's `historyTtl` (seconds).
-        // This keeps `never` meaning "no evidence in the 30-day read window"
-        // once storage retention is decoupled from the reporting window.
+        // LIN-3161 (LIN-3157 A1) / LIN-3163 (B): the fold's retention input is
+        // the shared 30-day read horizon (in ms), not a store value —
+        // dispatch-history is lifetime-retained, so there is no store TTL. This
+        // keeps `never` meaning "no evidence in the 30-day read window".
         historyTtlMs: READ_HORIZON_MS
       });
 

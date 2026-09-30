@@ -27,7 +27,7 @@ import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive, snapPulseWindowMs } 
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
 
-// Live window: peak memory tracks recent activity, not the 30-day retention.
+// Live window: peak memory tracks recent activity, not the 30-day window.
 const FEED_WINDOW_MS = 24 * 60 * 60 * 1000;      // 24h
 // History (view-more) reaches further back, still bounded.
 const HISTORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7d

@@ -76,8 +76,8 @@ describe('LlmCallLogStore.record', () => {
     assert.strictEqual(doc.completionTokens, 300);
     assert.strictEqual(doc.durationMs, 1834);
     assert.ok(doc.timestamp instanceof Date);
-    assert.ok(doc.expiresAt instanceof Date);
-    assert.ok(doc.expiresAt > doc.timestamp);
+    // LIN-3163 (B): the call log is retained for the project's lifetime — no expiry stamp.
+    assert.ok(!('expiresAt' in doc), 'a lifetime-retained call row carries no expiresAt stamp');
     assert.ok(typeof doc._id === 'string' && doc._id.length > 0);
   });
 
@@ -192,17 +192,17 @@ describe('LlmCallLogStore.listCalls (real MangoDB tmpdir, LIN-3162 A2)', () => {
     assert.strictEqual(items.length, 5);
   });
 
-  test('keys the read on the shared horizon and returns rows with no expiresAt (A2)', async () => {
+  test('has no default horizon bound and pages over full retained history (LIN-3163 B)', async () => {
     const now = Date.now();
     await seed({ _id: 'no-stamp', timestamp: new Date(now - 5 * DAY_MS), expiresAt: undefined });
     await seed({ _id: 'old-live-stamp', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
 
     const { items, total } = await store.listCalls('acme');
     const q = collection.__record.finds.at(-1).query;
-    assert.ok(q.timestamp?.$gte instanceof Date, 'a horizon bound must ride into the query');
+    assert.strictEqual(q.timestamp, undefined, 'the default 30-day `since` bound is gone from the paged list');
     assert.strictEqual(q.expiresAt, undefined, 'the expiry predicate is gone');
-    assert.strictEqual(total, 1, '>30d row hidden, no-expiresAt row readable');
-    assert.strictEqual(items[0].id, 'no-stamp');
+    assert.strictEqual(total, 2, 'the >30d row is listed over the full retained history');
+    assert.deepStrictEqual(items.map(i => i.id), ['no-stamp', 'old-live-stamp']);
   });
 
   test('orders same-millisecond rows by _id descending and pages without duplicates (A2)', async () => {
@@ -600,5 +600,16 @@ describe('LlmCallLogStore summaries key on the read horizon (real MangoDB tmpdir
     assert.strictEqual(s.pricedCalls, 1);
     assert.ok(Math.abs(s.meanUsd - 0.02) < 1e-9);
     assert.strictEqual(s.unknown, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3163 (B): lifetime retention — the llm-call-log evictor is deleted.
+// ---------------------------------------------------------------------------
+
+describe('LlmCallLogStore.cleanup is removed (LIN-3163 B)', () => {
+  test('the evictor no longer exists — lifetime retention, no cleanup method', () => {
+    assert.strictEqual(typeof LlmCallLogStore.prototype.cleanup, 'undefined', 'cleanup must be deleted from the store');
+    assert.strictEqual(typeof new LlmCallLogStore({}).cleanup, 'undefined');
   });
 });

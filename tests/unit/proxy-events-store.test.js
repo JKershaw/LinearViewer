@@ -123,23 +123,22 @@ describe('ProxyEventStore.listEvents (real MangoDB tmpdir, LIN-3162 A2)', () => 
       ['endpoint', 'id', 'method', 'note', 'status', 'timestamp', 'tokenId', 'tokenLabel'].sort());
   });
 
-  test('the query is keyed on the read horizon, not the expiry stamp (A2)', async () => {
+  test('the query is urlKey-only: no default horizon bound, no expiry predicate (LIN-3163 B)', async () => {
     await seed({ _id: 'e0' });
     await store.listEvents('ws1');
     const { query, options } = collection.__record.finds.at(-1);
-    assert.deepStrictEqual(Object.keys(query).sort(), ['timestamp', 'urlKey'], 'the expiry predicate is gone; a horizon bound replaces it');
-    assert.ok(query.timestamp.$gte instanceof Date);
+    assert.deepStrictEqual(Object.keys(query).sort(), ['urlKey'], 'the default 30-day `since` bound is gone; the expiry predicate is gone');
     assert.strictEqual(options, undefined, 'listEvents is still unprojected');
   });
 
-  test('hides rows older than the horizon even with a live stamped expiry, and reads no-expiresAt rows (A2)', async () => {
+  test('pages over the full retained history: a >30d row is listed and counted (LIN-3163 B)', async () => {
     const now = Date.now();
     await seed({ _id: 'no-stamp', timestamp: new Date(now - 5 * DAY_MS), expiresAt: undefined });
     await seed({ _id: 'old-live', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
 
     const { items, total } = await store.listEvents('ws1');
-    assert.strictEqual(total, 1);
-    assert.strictEqual(items[0].id, 'no-stamp');
+    assert.strictEqual(total, 2);
+    assert.deepStrictEqual(items.map(i => i.id), ['no-stamp', 'old-live']);
   });
 
   test('limit/offset paging works', async () => {
@@ -349,5 +348,41 @@ describe('ProxyEventStore.listSelfCredentialHealth (LIN-2076, real MangoDB tmpdi
     assert.ok(Array.isArray(query.$or), 'the stage/status union filter is preserved');
     assert.strictEqual(query.expiresAt, undefined, 'the redundant expiry predicate is gone');
     assert.strictEqual(occupancy.totalCalls, 1, 'the no-expiresAt provider-lane row is read');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3163 (B): lifetime retention — no expiry stamp, no evictor.
+// ---------------------------------------------------------------------------
+
+describe('ProxyEventStore lifetime retention (LIN-3163 B)', () => {
+  let harness;
+  let raw;
+  let store;
+
+  before(async () => {
+    harness = createMangoTmpdir('lin-3163-proxy-events-');
+    await harness.connect();
+  });
+
+  after(async () => {
+    await harness.close();
+  });
+
+  beforeEach(() => {
+    raw = harness.freshDb().collection('proxy-events');
+    store = new ProxyEventStore({ collection: raw });
+  });
+
+  test('recordEvent writes no expiresAt stamp', async () => {
+    const doc = await store.recordEvent({ urlKey: 'ws1', endpoint: '/x', status: 200 });
+    assert.ok(!('expiresAt' in doc), 'a lifetime-retained event carries no expiresAt stamp');
+    const stored = await raw.findOne({ _id: doc._id });
+    assert.ok(!('expiresAt' in stored), 'the persisted row carries no expiresAt stamp');
+  });
+
+  test('the cleanup evictor is gone', () => {
+    assert.strictEqual(typeof ProxyEventStore.prototype.cleanup, 'undefined', 'cleanup must be deleted from the store');
+    assert.strictEqual(typeof store.cleanup, 'undefined');
   });
 });

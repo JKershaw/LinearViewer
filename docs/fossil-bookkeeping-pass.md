@@ -124,13 +124,15 @@ would-stamp total.
 
 * **By age bucket**, on `now - loopLastActivityMs`: `7-10d`, `10-14d`, `14-21d`,
   `21-30d`, `>30d`.
-  **`>30d` should be empty.** The history TTL (`historyTtl`, 30 days) and the loop
-  lookback (`LOOKBACK_MS`, 30 days) both bound the readable band, so a row older than
-  that is already pruned or already outside the read. A non-empty `>30d` bucket is a
-  **finding about one of those two bounds** — the report flags it inline — not a set of
-  rows to stamp. Investigate before proceeding.
+  **`>30d` should be empty.** The loop lookback (`LOOKBACK_MS`, 30 days) bounds the
+  readable band the pass reconstructs loops from, so a loop older than that is outside
+  the read. History itself is now lifetime-retained (LIN-3163), so a `>30d` row is no
+  longer pruned from storage — it is simply beyond the lookback. A non-empty `>30d`
+  bucket is a **finding about the loop-lookback bound** (or the loop reader) — the report
+  flags it inline — not a set of rows to stamp. Investigate before proceeding.
   For the same reason, expect **fewer than 313**: the census's "silent since 2026-08-01"
-  rows were 35 days old as of 2026-09-05 and are already pruned.
+  rows were 35 days old as of 2026-09-05 and sit beyond the loop lookback (they are
+  retained, not pruned — the pass simply does not read loops that old).
 * **By lane**: `silent` / `blocked`, from `classifyLoop` before the bookkeeping branch.
 * **Would not touch**, itemised by *which* gate rejected each row: `not-taken`,
   `already-stamped`, `terminal`, `not-silent-or-blocked`, `superseded-by-follow-up`,

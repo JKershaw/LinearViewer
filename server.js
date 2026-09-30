@@ -4232,22 +4232,6 @@ const server = app.listen(PORT, () => {
       console.error('Proxy token cleanup error:', err)
     }
     try {
-      const removedCount = await proxyEventStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Proxy event cleanup: removed ${removedCount} expired events`)
-      }
-    } catch (err) {
-      console.error('Proxy event cleanup error:', err)
-    }
-    try {
-      const removedCount = await agentStatusStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Agent status cleanup: removed ${removedCount} expired entries`)
-      }
-    } catch (err) {
-      console.error('Agent status cleanup error:', err)
-    }
-    try {
       const removedCount = await observationSessionsStore.cleanup()
       if (removedCount > 0) {
         console.log(`Observation sessions cleanup: removed ${removedCount} expired derived docs`)

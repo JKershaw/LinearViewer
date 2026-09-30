@@ -121,10 +121,12 @@ disk accumulation "is not a current concern" (`clones.js@d0e809e3:5-11`); the bo
 `clones.js reap`, but "orphan" means only that the session record has gone, not that the code
 should. Claude Code transcripts persist under `~/.claude/projects/`, which is the property the box
 relies on to re-fire sessions after a reboot (LIN-1781). On the Harbour side the numbers exist and
-are short: dispatch queue items 24 hours, dispatch history 30 days
-(`lib/dispatch-store.js@d249ec51:170-171`). There is no retention policy for a user's code or
-transcripts on either path; LIN-2954 is where that one-page note on terms, retention and revocation
-is owed, and it is blocked on this milestone.
+are short: dispatch queue items 24 hours, dispatch history retained for the project's lifetime
+(was 30 days; LIN-3157 B+D, LIN-3163). There is no retention policy for a user's *code or
+transcripts* on either path; LIN-2954 is where that one-page note on terms, retention and revocation
+is owed, and it is blocked on this milestone. (LIN-3163 supplies the ruling for Harbour's own
+*evidence* stores — they are lifetime-retained — but that is a different surface from the user's
+code and transcripts, so LIN-2954's note is still owed.)
 
 **One run's SESSION COUNT is now capped on a single ticket (LIN-2934, shipped 2026-09-25); its
 SPEND is not, on either path, and the instrument that would cap spend is off.** `maxTasks` counts
@@ -233,7 +235,7 @@ stand up", and the box wins by being cheapest to stand up rather than by being r
 | **2. The clone** | *Exists:* a per-session filesystem copy of an operator-placed template (`executors.js:117-131`); `repo=` resolves basenames only. *Left:* everything — a URL from the payload, a per-task `git clone` with the account's token, and dropping it. Push identity today is the operator's `~/.ssh` + `gh` token (`harnesses.js:247-263`). | *Exists:* nothing, but the design is decided — `git clone <url>@<ref>` — with one open choice (Harbour supplies URL+ref, or SD resolves from `repo`). *Left:* all of it, plus `remote-execution-epic.md` §2.1's unrun capability check: can the sandbox push, open a PR and read CI? |
 | **3. Isolation** | *Exists:* per-session clone dir (LIN-558), per-session `TMPDIR` (LIN-1701), one non-root service user (`provision.sh:16,75`). *Left:* the temp dir is not `0700` (LIN-1712), all sessions share one Unix user, and every launch is `--dangerously-skip-permissions`. No per-account boundary at all. | *Exists:* nothing. *Designed:* container-per-task, which is a real boundary by construction and the one place this path is strictly better. *Left:* the runtime is undecided (Docker → Fargate / Cloud Run / K8s / Fly). |
 | **4. Hostile input** | Same three controls both paths inherit: `--strict-mcp-config` blocks the repo's own MCP servers (`executors.js:427-431`), `AskUserQuestion` denied, auto-updates off. Against them: the repo's own code runs in bypass mode, and the localhost broker accepts unauthenticated `/api/proxy/*` calls from anything in the session (`harbour-token-mcp-server.js:19-24,232-235`). Box-specific: CVE-2026-64600 local privesc, mitigated only by a reboot window; port 22 at `0.0.0.0/0` with the upstream firewall parked (LIN-2421). | The same three controls and the same broker hole. The container bounds the blast radius of what the repo's code can reach on the host — the one improvement — but it must then hold push credentials, which `remote-execution-epic.md` calls "the single most underestimated piece of P1". |
-| **5. Retention** | *Exists:* never delete (`clones.js:5-11`); a daily orphan reap on the box; transcripts persist under `~/.claude/projects/` by design, because the reboot recovery depends on it. Harbour side: 24h queue, 30d history (`dispatch-store.js:170-171`). *Left:* a written policy — none exists (LIN-2954, LIN-1635). | *Exists:* nothing. *By construction:* the container dies with the task, which answers the question for code but not for transcripts or feedback, which still land in Harbour under the same two TTLs. *Left:* the same written policy. |
+| **5. Retention** | *Exists:* never delete (`clones.js:5-11`); a daily orphan reap on the box; transcripts persist under `~/.claude/projects/` by design, because the reboot recovery depends on it. Harbour side: 24h queue, dispatch history now lifetime-retained (was 30d; LIN-3157 B+D, LIN-3163). *Left:* a written policy for the user's code and transcripts — none exists (LIN-2954, LIN-1635). | *Exists:* nothing. *By construction:* the container dies with the task, which answers the question for code but not for transcripts or feedback; feedback still lands in Harbour, now lifetime-retained. *Left:* the same written policy. |
 | **6. Spend** | *Exists:* `maxTasks` (distinct issue identifiers) plus the sibling `maxSessionsPerTask` (LIN-2934), which does bound a one-task run's worker-session count, shown in the feed. Fixed cost €16.49/mo. *Left:* a MONEY bound — the telemetry to enforce one is default-off (`config.js:1100-1102`) with no cheap-model pricing rows, and LIN-2934 deliberately shows spend without enforcing it. On the `claude-code` lane `costUsd` is null, so a money cap is not buildable there. | The same absent money cap, plus per-minute compute that is directly metered ($0.01–$0.055 a 20-minute run). On the `opencode` lane the harness reports OpenRouter's own USD (`opencode-runner.js:409-430`) and `reduceLineageCost` sums it with an explicit `fullyPriced` flag — so a real money cap **is** buildable, on either host, if the harness is `opencode`. |
 
 ## The recommendation
@@ -285,7 +287,9 @@ provisioning week and LIN-1303 in full.
    this recommendation, and it is a day of research, not a build.
 6. **The retention line.** What is kept of a user's code and transcripts, and for how long? The
    repository's current answer is "never delete", which is a default rather than a decision, and
-   LIN-2954 cannot write the note until this is ruled.
+   LIN-2954 cannot write the note until this is ruled. (LIN-3163 ruled Harbour's own *evidence*
+   retention — lifetime — but the user's code and transcripts remain unruled, so LIN-2954's note
+   is still owed.)
 
 ## Method
 
@@ -356,8 +360,9 @@ LIN-2934 (the spend bound), LIN-2883 and LIN-2884 (machine record and dispatch s
 user's code or transcripts, for how long, or how access is revoked. LIN-1635 records that `docs/`
 holds no threat model at all, and LIN-2954 is where the one-page note is owed but has not been
 written. The evidence required is the document itself — it cannot be derived from the repository,
-because the repository's behaviour is "never delete" plus two TTLs on a different collection, which
-is a default, not a policy.
+because the repository's behaviour is "never delete" plus lifetime-retained Harbour evidence
+(LIN-3157 B+D, LIN-3163 — a change to what Harbour records, not to the user's code or
+transcripts), which is a default, not a policy.
 
 **The adversarial pass.** The searches that would have surfaced a missed sibling, and what they
 returned: `cloud execution` → LIN-1301–1305, LIN-259, LIN-2114 and this milestone, no sixth path;
