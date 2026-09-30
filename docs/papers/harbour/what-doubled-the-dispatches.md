@@ -16,15 +16,15 @@ boundary. Fresh sessions per correct change rose once, in July, and have been fl
 August. Counting every dispatch rather than only those whose log line names the ticket, a
 correct code change took 7.6 dispatches in the fortnight before 12 July and 20.0 in the
 fortnight after (both repos). Of that rise, +3.0 is fresh sessions and +9.4 is follow-ups;
-8.0 of the later fortnight's follow-ups are wakes. The step came in two stages. Fresh sessions rose at 10–12 July, when finished
-sessions stopped being held open (LIN-1219) and several runner changes landed on the same
-days; this data cannot separate them. Follow-ups per held session rose from 15–16 July, when
+8.0 of the later fortnight's follow-ups are wakes. The step came in two stages. Fresh
+sessions rose at 10–12 July, when finished sessions stopped being held open (LIN-1219) and
+several runner changes landed on the same days; this data cannot separate them. Follow-ups per held session rose from 15–16 July, when
 every stepper beat began to wake its parent rather than only the first (LIN-1357). Since then
 the climb is almost all wakes: 8.0 per correct change in late July, 9.5 in August, 16.1 in
 early September and 28.8 after the passage layer went live on 17 September. Fresh sessions
 stayed at 10.6–11.5. Part of the climb that `model-choice.md` reported is an artefact of its
 count. Wakes began carrying an issue id in simple-dispatcher's log only on 13 September
-(LIN-2121), so before then its count left out about half of each ticket's dispatches. For
+(LIN-2121), so from July until then its count left out 40–47% of each ticket's dispatches. For
 September, the steady-base map's supervision rows cover 59% of the dispatches: quiet wakes
 10%, the passage layer 15%, and wakes and autopilot launches that acted 34%. Review rounds
 after the first and test or CI beats are at most 9%. The remaining 32% is the ordinary run of
