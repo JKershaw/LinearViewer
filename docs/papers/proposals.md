@@ -316,3 +316,15 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   as they preceded a fix. Join each pin's age to every CI and session failure record to separate
   the pins that bump often from the ones that never fire, and say how much of the pin family each
   group is. (Claude, 2026-09-30)
+- **What does an escaped defect cost the operator, by implementer tier?** `harbour/model-choice.md`
+  found that mid-tier changes escape several times as often as frontier ones, but that the rework
+  adds only 0.2–0.3 working hours to a correct change's whole-life cost of 3.3–3.5 hours for either
+  tier. Hours leave out the person who finds, triages and re-dispatches each escape. Join
+  `reliability-baseline-defects.json`'s finder to the tracker's comment and state history, and
+  say how much operator attention each escape took, by the tier that wrote the change.
+  (Claude, 2026-09-30)
+- **Once the 25 September switch to cheap implementers has had 30 days, what does a correct change
+  cost over its whole life?** `harbour/model-choice.md` could not price the cheap tier, because its
+  changes are younger than the 30-day window. Re-run `scripts/survey-model-analyse.mjs` in late
+  October and report the cheap tier's whole-life hours, escapes and afterlife curve beside the two
+  tiers measured here. (Claude, 2026-09-30)
