@@ -354,14 +354,33 @@ describe('GET /api/proxy/periodicals', () => {
     assert.equal(item.lastDispatchedAt, null);
   });
 
-  test('unknown is reachable when the store\'s retention exceeds the route\'s 30-day horizon (documented, not produced by any real deployment)', async () => {
-    // effectiveHorizonMs = min(DEFAULT_HORIZON_MS, historyTtlMs). Configuring a
-    // longer-than-30-day retention makes historyTtlMs the LARGER value, so the
-    // cap stops being conclusive and "unknown" (not "never") is correct.
-    const { app } = buildApp({ historyTtl: 60 * 24 * 60 * 60 }); // 60 days, in seconds
+  test('store retention longer than the horizon does NOT widen the window: `never`, not `unknown` (LIN-3161 / LIN-3157 A1)', async () => {
+    // Before A1 the route fed `dispatchQueueStore.historyTtl` to the fold, so a
+    // retention LONGER than 30 days made effectiveHorizonMs (= min(30d, ttl))
+    // differ from historyTtlMs, and no evidence read as "unknown". A1 feeds the
+    // shared READ_HORIZON_MS for BOTH inputs, so the horizon and the retention
+    // input are equal and the published state stays `never` — and the `since`
+    // trim is a 30-day window, not the store's 365-day one.
+    const { app, historyCalls } = buildApp({ historyTtl: 365 * 24 * 60 * 60 }); // 365 days, in seconds
     const { body } = await get(app);
     const item = findTemplateResult(body);
-    assert.equal(item.state, 'unknown');
+    assert.equal(item.state, 'never');
+
+    const since = historyCalls[0].since;
+    assert.ok(since instanceof Date, `expected a Date since, got ${typeof since}`);
+    const ageMs = Date.now() - since.getTime();
+    assert.ok(Math.abs(ageMs - 30 * DAY_MS) < 5000, `expected a ~30-day window, got ${Math.round(ageMs / DAY_MS)} days`);
+  });
+
+  test('run evidence older than the 30-day horizon does not count, even under 365-day retention (LIN-3161 / LIN-3157 A1)', async () => {
+    const { app } = buildApp({
+      historyTtl: 365 * 24 * 60 * 60,
+      history: { acme: [historyRow({ dispatchedAt: daysAgo(40) })] } // outside the 30-day read window
+    });
+    const { body } = await get(app);
+    const item = findTemplateResult(body);
+    assert.equal(item.state, 'never');
+    assert.equal(item.lastDispatchedAt, null);
   });
 
   // -- the false-`never` direction: real evidence must never be hidden ------
@@ -375,18 +394,13 @@ describe('GET /api/proxy/periodicals', () => {
     assert.notEqual(item.lastDispatchedAt, null);
   });
 
-  // -- the seconds-vs-ms retention trap --------------------------------------
+  // -- the read window is the shared horizon, not the store retention ---------
   //
-  // dispatchQueueStore.historyTtl is SECONDS; foldPeriodicalRuns wants ms. A
-  // raw-seconds value is finite, so it passes the fold's Number.isFinite
-  // guard and silently collapses the horizon to ~30 minutes — real evidence
-  // 10 days old then reads as `never`, which is the exact fleet-wide
-  // over-dispatch hazard this ticket exists to prevent. This test is written
-  // to fail if the route's `* 1000` conversion is removed — see the beat's
-  // sibling verification (`git diff` restore of routes/proxy.js) which
-  // deletes and restores the conversion to prove this test is load-bearing,
-  // not merely present.
-  test('a real run 10 days old reads `due`, not `never` — proves historyTtl seconds->ms conversion is applied', async () => {
+  // A1 (LIN-3161) feeds `READ_HORIZON_MS` to the fold, so the retention input
+  // is already in ms (no seconds->ms conversion at this call site). This test
+  // keeps exercising the positive direction: a real in-window run reads `due`
+  // (weekly cadence, 10 days elapsed), never `never`.
+  test('a real run 10 days old reads `due`, not `never` — the horizon keeps in-window evidence visible', async () => {
     const { app } = buildApp({
       historyTtl: HISTORY_TTL_SECONDS, // 2,592,000 (SECONDS) — finite, so an
       // unconverted value would silently pass the fold's guard and collapse
