@@ -1,12 +1,13 @@
 ---
 title: Why did the weekly count of correct, complete changes halve from June to July?
 kind: paper
-version: 1
+version: 2
 date: 2026-09-30
-authors: [Claude, for John Kershaw]
-model: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 4e21fb08, kind custom, LIN-3155), default effort; one bounded session, with no research, plan, review or close-out legs, by the brief's design
+authors: [Claude (version 1, LIN-3155), Claude (version 2 tier corrections, LIN-3165), for John Kershaw]
+model: "Version 1: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 4e21fb08, kind custom, LIN-3155), default effort; one bounded session, with no research, plan, review or close-out legs, by the brief's design. Version 2: frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch e86a0765, kind custom, LIN-3165), the model-choice survey's session, which re-derived the tier figures before reading this paper's scripts."
+revision: "Version 2 corrects the escapes by tier per docs/papers/harbour/model-choice.md (LIN-3165): the 2.4% against 9.6% counted rows that name the ticket whose review found an older fault (docs/papers/harbour/survey-check-2.md) and escapes filed before the change merged. Without them it is 0 of 171 against 14 of 365, so mid still escapes more, but not measurably four times. The 84-to-12 fall and the equal cost per change reproduce and stand."
 grounded_at: fd6b1352 (LinearViewer), 3b1e734 (simple-dispatcher)
-cites: [docs/papers/harbour/measuring-throughput.md@fd6b1352:19, docs/papers/harbour/measuring-throughput.md@fd6b1352:98, docs/papers/harbour/measuring-throughput.md@fd6b1352:238, docs/papers/harbour/growth-atlas.md@fd6b1352:80, docs/papers/harbour/growth-atlas.md@fd6b1352:178, docs/papers/harbour/growth-atlas.md@fd6b1352:189-190, docs/papers/harbour/steady-base.md@fd6b1352:49-56, docs/papers/harbour/steady-base.md@fd6b1352:188-189, docs/papers/harbour/reliability-baseline.md@fd6b1352:47-50, docs/papers/harbour/reliability-baseline.md@fd6b1352:64-65, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:20, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:280-281, docs/papers/harbour/what-supervisors-do.md@fd6b1352:218, docs/papers/harbour/tasks-generate-tasks.md@fd6b1352:24, docs/papers/harbour/writing-length.md@fd6b1352:31, simple-dispatcher b39648b (LIN-1285, 2026-07-12), LinearViewer 88dba96e (LIN-1282, 2026-07-12), simple-dispatcher PR #50 and #51 (LIN-910, LIN-911, 2026-07-02), LIN-3155 (2026-09-30)]
+cites: [docs/papers/harbour/model-choice.md (LIN-3165), docs/papers/harbour/survey-check-2.md (LIN-3154), docs/papers/harbour/measuring-throughput.md@fd6b1352:19, docs/papers/harbour/measuring-throughput.md@fd6b1352:98, docs/papers/harbour/measuring-throughput.md@fd6b1352:238, docs/papers/harbour/growth-atlas.md@fd6b1352:80, docs/papers/harbour/growth-atlas.md@fd6b1352:178, docs/papers/harbour/growth-atlas.md@fd6b1352:189-190, docs/papers/harbour/steady-base.md@fd6b1352:49-56, docs/papers/harbour/steady-base.md@fd6b1352:188-189, docs/papers/harbour/reliability-baseline.md@fd6b1352:47-50, docs/papers/harbour/reliability-baseline.md@fd6b1352:64-65, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:20, docs/papers/harbour/where-the-effort-goes.md@fd6b1352:280-281, docs/papers/harbour/what-supervisors-do.md@fd6b1352:218, docs/papers/harbour/tasks-generate-tasks.md@fd6b1352:24, docs/papers/harbour/writing-length.md@fd6b1352:31, simple-dispatcher b39648b (LIN-1285, 2026-07-12), LinearViewer 88dba96e (LIN-1282, 2026-07-12), simple-dispatcher PR #50 and #51 (LIN-910, LIN-911, 2026-07-02), LIN-3155 (2026-09-30)]
 ---
 
 # Why did the weekly count of correct, complete changes halve from June to July?
@@ -22,7 +23,7 @@ the test lines. The fall is almost all Harbour's: 86 to 39 a week, against 9 to 
 simple-dispatcher. Two-fifths of the lost changes are UI work, which fell from 27 a week to 7.
 The step lines up with 12 July, when sessions began to run at the tier each dispatch chose
 (LIN-1285). Changes written at the frontier tier fell from 84 a week to 12. The mid tier that
-replaced them costs the same per change but escapes four times as often. June looks like an early
+replaced them costs the same per change and escapes more often, though not measurably four times. June looks like an early
 burst: a UI build-out, written at frontier tier on a lighter process, before the plan-review leg
 and the heavier test habit arrived. It is not a level the later process was built to hold. June's
 session count cannot be measured, so capacity can be neither ruled in nor ruled out.
@@ -74,9 +75,14 @@ it all.
 78% fewer merged tickets (×0.57) and 22% a lower correct, complete share (×0.86). The share of
 merged tickets with a named escape rose from 1.1% to 7.1%. The share that filed a follow-up rose
 from 9.7% to 18.1%. Named fixes barely moved, from 5.7% to 6.4%. Within the later weeks, changes
-written mainly at frontier tier were 78% correct and complete, with 2.4% escaping. Mid-tier
-changes were 67%, with 9.6% escaping. At the frontier tier's rate, the later weeks would have
-counted about 51 rather than 46.5, so the tier accounts for about 4 of the 48. Some of the rise
+written mainly at frontier tier were 78% correct and complete and mid-tier changes 67%. The
+escapes behind part of that gap need care. Some escape rows name the ticket whose review *found*
+an older fault, not the one that wrote it (`survey-check-2.md`), and some were filed before the
+change merged. Set those aside and frontier-written changes escaped none of 171 times, against 14
+of 365 (3.8%) for mid. So mid does escape more (one-sided Fisher exact p = 0.004), but neither the
+2.4% and 9.6% nor a ratio of four holds. On the same corrected basis the correct, complete shares
+are 79.5% and 69.6%. At the frontier tier's rate the later weeks would have counted about 52
+rather than 48, so the tier accounts for about 3 to 4 of the 48 either way. Some of the rise
 is detection, not faults: the operator found 18 of June's 26 escapes, and agents found most of
 them from July (`reliability-baseline.md:64-65`).
 
@@ -198,8 +204,9 @@ node scripts/survey-halving-chart.mjs        # the two SVGs
 ## Next
 
 - **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
-  Within the later weeks, mid-tier changes were 67% correct and complete against 78%, with four
-  times the escapes, at the same cost. A matched comparison on size, area and ticket kind would
+  Within the later weeks, mid-tier changes were 67% correct and complete against 78%, with more
+  escapes (14 of 365 against none of 171), at the same cost. `model-choice.md` held size and area
+  fixed and the gap stayed; ticket kind is still open. A matched comparison on size, area and ticket kind would
   say whether that is the tier or the tickets it was given. This goes into `proposals.md`.
 - **What did June's sessions look like?** June's PRs, branch names and the tracker's
   dispatch-feedback comments may still show how many sessions ran in parallel and on which
