@@ -111,7 +111,7 @@ the wake and the layer it woke:
 
 The Runner's edge is small per correct change because few of its legs fly code changes: 617
 wakes reached the two Runners in the month. The edges from workers carry news: a beat or a
-leg ended, or a worker paused for a decision. The edges from supervisors carry progress. On
+worker's session ended, or a worker paused for a decision. The edges from supervisors carry progress. On
 those edges, 84–97% of wakes were caused by the child's handling of a wake of its own: the
 child was woken, judged or sent a beat, and re-armed. Its re-arm posted `[pending]`, and
 that post woke the parent.
