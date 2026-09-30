@@ -93,14 +93,30 @@ const changes = git.rows.filter((r) => r.lastMerge >= '2026-06-01').map((r) => {
 });
 const byId = new Map(changes.map((c) => [c.id, c]));
 
+// Strict escapes. survey-check-2.md (LIN-3154) found that many escapes' introducedBy names the ticket whose review *found* an
+// older fault ("finder rows"); it picks them out by their reasons ("pre-existing", "predates", "older code", "left out of scope").
+// A strict escape drops those rows and needs a non-negative lag of at most 30 days (the reliability script's rule; the
+// scorecard's window opens two days before the merge).
+const FINDER = /pre-?existing|predates|older code|left out of scope/i;
+const strictEsc = new Map(); const finderRows = [];
+for (const v of verdicts) {
+  if (v.verdict !== 'escaped' || !v.introducedBy || !byId.has(v.introducedBy)) continue;
+  const lag = (createdAt(v.identifier) - byId.get(v.introducedBy).merged) / DAY;
+  if (FINDER.test(v.reason || '')) { finderRows.push(v.identifier); continue; }
+  if (lag < 0 || lag > 30) continue;
+  strictEsc.set(v.introducedBy, (strictEsc.get(v.introducedBy) || 0) + 1);
+}
+for (const c of changes) c.escStrict = strictEsc.get(c.id) || 0;
+
 // ---- Afterlife events: [{ origin, fixer, kind, day, cost:{workH, usd, dispatches}, share }]
 const fixCost = (fid) => { const f = byId.get(fid); const o = own.get(fid); const l = lineage.get(fid); return { workH: o && o.timed ? o.workH : 0, dispatches: o?.dispatches || 0, usd: l ? l.usdScoped : 0, known: !!(o && o.timed) }; };
 const events = [];
 // Escaped Bugs naming an introducer: cost is the Bug ticket's own; day is when it was filed.
 for (const v of verdicts) {
-  if (v.verdict !== 'escaped' || !v.introducedBy || !byId.has(v.introducedBy)) continue;
+  if (v.verdict !== 'escaped' || !v.introducedBy || !byId.has(v.introducedBy) || FINDER.test(v.reason || '')) continue;
   const o = byId.get(v.introducedBy);
-  events.push({ origin: o.id, fixer: v.identifier, kind: 'escaped bug', day: (createdAt(v.identifier) - o.merged) / DAY, share: 1, cost: fixCost(v.identifier) });
+  const day = (createdAt(v.identifier) - o.merged) / DAY; if (day < 0) continue; // filed before the change merged: not its escape
+  events.push({ origin: o.id, fixer: v.identifier, kind: 'escaped bug', day, share: 1, cost: fixCost(v.identifier) });
 }
 // Later fix commits on the change's production files. Named when the fixing ticket's title, description or commit names the origin.
 const claimants = new Map(); // fixer sha -> number of changes it could belong to
@@ -146,7 +162,7 @@ function costTable(cs) {
   const wl = (xs, k, rk) => { const g = xs.filter((c) => c.good).length; return g ? (sum(xs.map((c) => c[k])) + sum(xs.map((c) => c.afterlife[rk]))) / g : null; };
   return {
     n: cs.length, good, goodShare: cs.length ? good / cs.length : null, correctShare: cs.length ? cs.filter((c) => c.correct).length / cs.length : null,
-    escapedShare: cs.length ? cs.filter((c) => c.escapes).length / cs.length : null, escaped: cs.filter((c) => c.escapes).length,
+    escapedShare: cs.length ? cs.filter((c) => c.escStrict).length / cs.length : null, escaped: cs.filter((c) => c.escStrict).length, escapedScorecard: cs.filter((c) => c.escapes).length,
     medProd: median(cs.map((c) => c.prodLines)),
     dispatchesPerGood: perGood(cs.filter((c) => c.dispatches != null), 'dispatches'), medDispatches: median(cs.map((c) => c.dispatches)),
     timed: timed.length, workHPerGood: perGood(timed, 'workH'), medWorkH: median(timed.map((c) => c.workH)),
@@ -176,7 +192,7 @@ const share = (k) => (xs) => (xs.length ? xs.filter((c) => c[k]).length / xs.len
 const meanOf = (k) => (xs) => { const ys = xs.map((c) => (typeof k === 'function' ? k(c) : c[k])).filter((x) => x != null); return ys.length ? sum(ys) / ys.length : null; };
 const standardised = {
   goodShare: standardise(chosen, 'frontier', 'mid', share('good')),
-  escapedShare: standardise(chosen, 'frontier', 'mid', (xs) => (xs.length ? xs.filter((c) => c.escapes).length / xs.length : null)),
+  escapedShare: standardise(chosen, 'frontier', 'mid', (xs) => (xs.length ? xs.filter((c) => c.escStrict).length / xs.length : null)),
   workH: standardise(chosen.filter((c) => c.workH != null), 'frontier', 'mid', meanOf('workH')),
   wholeLifeCeilH: standardise(chosen.filter((c) => c.workH != null), 'frontier', 'mid', meanOf((c) => c.workH + c.afterlife.reworkCeilH)),
   dispatches: standardise(chosen.filter((c) => c.dispatches != null), 'frontier', 'mid', meanOf('dispatches')),
@@ -186,11 +202,11 @@ const standardised = {
 const step = {};
 for (const [name, a, z] of [['before (29 Jun–12 Jul)', '2026-06-29', '2026-07-13'], ['after (13–26 Jul)', '2026-07-13', '2026-07-27']]) {
   const cs = scored.filter((c) => c.week >= a && c.week < z); const weeks = 2;
-  step[name] = { ...costTable(cs), perWeek: cs.length / weeks, goodPerWeek: cs.filter((c) => c.good).length / weeks, byImplementer: Object.fromEntries([...TIERS, null].map((t) => [t || 'unattributed', cs.filter((c) => c.implementer === t).length])), sizeMix: Object.fromEntries(['1-49', '50-299', '300+'].map((s) => [s, cs.filter((c) => c.size === s).length])), perImplementer: Object.fromEntries([...TIERS, null].map((t) => { const x = costTable(cs.filter((c) => c.implementer === t)); return [t || 'unattributed', { perWeek: x.n / weeks, goodPerWeek: x.good / weeks, dispatchesPerGood: r2(x.dispatchesPerGood), goodShare: r2(x.goodShare), escaped: x.escaped }]; })), uiShare: cs.filter((c) => c.area === 'UI').length / (cs.length || 1) };
+  step[name] = { ...costTable(cs), perWeek: cs.length / weeks, goodPerWeek: cs.filter((c) => c.good).length / weeks, byImplementer: Object.fromEntries([...TIERS, null].map((t) => [t || 'unattributed', cs.filter((c) => c.implementer === t).length])), sizeMix: Object.fromEntries(['1-49', '50-299', '300+'].map((s) => [s, cs.filter((c) => c.size === s).length])), perImplementer: Object.fromEntries([...TIERS, null].map((t) => { const x = costTable(cs.filter((c) => c.implementer === t)); return [t || 'unattributed', { perWeek: x.n / weeks, goodPerWeek: x.good / weeks, dispatchesPerGood: r2(x.dispatchesPerGood), goodShare: r2(x.goodShare), escaped: x.escaped, escapedScorecard: x.escapedScorecard }]; })), uiShare: cs.filter((c) => c.area === 'UI').length / (cs.length || 1) };
 }
 
 // ---- Mid-ticket tier switches: changes whose implementation ran at more than one tier.
-const switches = changes.filter((c) => c.switched).map((c) => ({ id: c.id, tiers: lineage.get(c.id).implTiers, sessions: lineage.get(c.id).sessions.filter((s) => s.kind === 'implementation').map((s) => `${s.at.slice(0, 10)} ${s.tier}${s.harness === 'opencode' ? ' (opencode)' : ''}`), good: c.good, escapes: c.escapes, mature: c.mature }));
+const switches = changes.filter((c) => c.switched).map((c) => ({ id: c.id, tiers: lineage.get(c.id).implTiers, sessions: lineage.get(c.id).sessions.filter((s) => s.kind === 'implementation').map((s) => `${s.at.slice(0, 10)} ${s.tier}${s.harness === 'opencode' ? ' (opencode)' : ''}`), good: c.good, escapes: c.escStrict, mature: c.mature }));
 
 // ---- Afterlife curve: cumulative rework hours per change by days since merge, by implementer tier (mature chosen-tier changes).
 const curve = {};
@@ -223,8 +239,8 @@ writeFileSync(out, JSON.stringify(result, null, 1));
 // ---- Report.
 const f = (x, d = 1) => (x == null ? '—' : typeof x === 'number' ? x.toFixed(d) : x);
 console.log('coverage', result.coverage, 'imputation $/h by tier', Object.fromEntries(Object.entries(rate).map(([k, v]) => [k, f(v, 2)])));
-console.log('\nperiod | implementer | n | good% | correct% | escaped (n) | medProd | disp/good | timed | ownH/good | wholeLife H/good floor–ceil | rework H/change floor–ceil | priced | $/good | wholeLife $/good floor–ceil | followUp% | relanded% | medReviews | >1 review%');
-for (const [k, v] of Object.entries(byTierPeriod)) if (v.n) console.log(k.replace('|', ' | '), '|', v.n, '|', f(v.goodShare * 100, 0), '|', f(v.correctShare * 100, 0), '|', f(v.escapedShare * 100), `(${v.escaped})`, '|', v.medProd, '|', f(v.dispatchesPerGood), '|', v.timed, '|', f(v.workHPerGood, 2), '|', f(v.wholeLifeFloorH, 2), '–', f(v.wholeLifeCeilH, 2), '|', f(v.reworkFloorHPerChange, 2), '–', f(v.reworkCeilHPerChange, 2), '|', v.priced, '|', f(v.usdPerGood, 2), '|', f(v.wholeLifeFloorUsd, 2), '–', f(v.wholeLifeCeilUsd, 2), '|', f(v.followUpShare * 100, 0), '|', f(v.relandedShare * 100, 0), '|', f(v.medReviews, 0), '|', f(v.extraReviewShare == null ? null : v.extraReviewShare * 100, 0));
+console.log('\nperiod | implementer | n | good% | correct% | strict escaped (n) [scorecard] | medProd | disp/good | timed | ownH/good | wholeLife H/good floor–ceil | rework H/change floor–ceil | priced | $/good | wholeLife $/good floor–ceil | followUp% | relanded% | medReviews | >1 review%');
+for (const [k, v] of Object.entries(byTierPeriod)) if (v.n) console.log(k.replace('|', ' | '), '|', v.n, '|', f(v.goodShare * 100, 0), '|', f(v.correctShare * 100, 0), '|', f(v.escapedShare * 100), `(${v.escaped}) [${v.escapedScorecard}]`, '|', v.medProd, '|', f(v.dispatchesPerGood), '|', v.timed, '|', f(v.workHPerGood, 2), '|', f(v.wholeLifeFloorH, 2), '–', f(v.wholeLifeCeilH, 2), '|', f(v.reworkFloorHPerChange, 2), '–', f(v.reworkCeilHPerChange, 2), '|', v.priced, '|', f(v.usdPerGood, 2), '|', f(v.wholeLifeFloorUsd, 2), '–', f(v.wholeLifeCeilUsd, 2), '|', f(v.followUpShare * 100, 0), '|', f(v.relandedShare * 100, 0), '|', f(v.medReviews, 0), '|', f(v.extraReviewShare == null ? null : v.extraReviewShare * 100, 0));
 console.log('\nchosen-tier period by repo:'); for (const [k, v] of Object.entries(byRepo)) if (v.n) console.log(k, 'n', v.n, 'good%', f(v.goodShare * 100, 0), 'escaped', v.escaped, 'ownH/good', f(v.workHPerGood, 2), 'wholeLifeCeilH/good', f(v.wholeLifeCeilH, 2), '$/good', f(v.usdPerGood, 2));
 console.log('\nstandardised (size × area, chosen-tier period):', JSON.stringify(standardised, (k, v) => (typeof v === 'number' ? +v.toFixed(3) : v)));
 console.log('\n12 July step:'); for (const [k, v] of Object.entries(step)) console.log(k, 'perWeek', f(v.perWeek), 'goodPerWeek', f(v.goodPerWeek), 'good%', f(v.goodShare * 100, 0), 'escaped', v.escaped, 'disp/good', f(v.dispatchesPerGood), 'ownH/good', f(v.workHPerGood, 2), 'timed', v.timed, 'implementer', JSON.stringify(v.byImplementer), 'size', JSON.stringify(v.sizeMix), 'UI', f(v.uiShare * 100, 0) + '%', 'medProd', v.medProd, '\n   by implementer', JSON.stringify(v.perImplementer));
@@ -252,3 +268,28 @@ const usdTot = sum(Object.values(usdRoles)); console.log('\nlineage USD by role|
 console.log('\nSeptember, ticket-scoped lineage USD (no autopilot/wake/blocked sessions) by implementer tier:');
 for (const t of TIERS) { const cs = scored.filter((c) => inP(c, PERIODS[2]) && c.implementer === t && c.usdScoped != null); const g = cs.filter((c) => c.good).length; const tot = sum(cs.map((c) => c.usdScoped)); const pr = sum(cs.map((c) => c.usdScopedPriced));
   console.log(' ', t, 'priced changes', cs.length, 'correct', g, '$/correct change', f(g ? tot / g : null, 2), 'median $/change', f(median(cs.map((c) => c.usdScoped)), 2), 'priced (not imputed) share', f((pr / (tot || 1)) * 100, 0) + '%', '| rework $ per change (ceiling)', f(sum(cs.map((c) => c.afterlife.reworkCeilUsd)) / (cs.length || 1), 2)); }
+
+// ---- LIN-3155's tier claim, re-derived on its own weeks (8–29 June; 13 July–21 September), and again without finder rows.
+// survey-check-2.md (LIN-3154) found that many escapes' introducedBy names the ticket whose review *found* an older fault; it
+// picks them out by their reasons ("pre-existing", "predates", "older code", "left out of scope"). The same rule is applied here,
+// and a strict escape also needs a non-negative lag (the reliability script's rule; the scorecard's window opens two days early).
+const wilson = (k, n) => { const z = 1.96, p = k / n, d = 1 + (z * z) / n, c = p + (z * z) / (2 * n), h = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n)); return [((c - h) / d) * 100, ((c + h) / d) * 100]; };
+const katz = (a, n1, b, n2) => { const r = (a / n1) / (b / n2); const se = Math.sqrt(1 / a - 1 / n1 + 1 / b - 1 / n2); return [r, r * Math.exp(-1.96 * se), r * Math.exp(1.96 * se)]; };
+console.log('\nLIN-3155 re-derived (all changes, writer tier from trailers, as that paper assigns it); finder rows found:', finderRows.length);
+const inW = (c, a, z) => c.week >= a && c.week <= z;
+const june = changes.filter((c) => c.scored && inW(c, '2026-06-08', '2026-06-29')); const later = changes.filter((c) => c.scored && inW(c, '2026-07-13', '2026-09-21'));
+console.log('  frontier-written correct, complete a week: June', f(june.filter((c) => c.writerTier === 'frontier' && c.good).length / 4), 'later', f(later.filter((c) => c.writerTier === 'frontier' && c.good).length / 11));
+const reco = {};
+for (const t of ['frontier', 'mid', 'unattributed']) {
+  const cs = later.filter((c) => c.writerTier === t); const n = cs.length;
+  const e = cs.filter((c) => c.escapes).length; const es = cs.filter((c) => strictEsc.get(c.id)).length;
+  reco[t] = { n, e, es };
+  console.log(' ', t, 'n', n, 'correct+complete', f((cs.filter((c) => c.good).length / n) * 100), '% | escaped (scorecard)', e, f((e / n) * 100) + '%', 'CI', wilson(e, n).map((x) => f(x)).join('–'), '| escaped without finder rows', es, f((es / n) * 100) + '%', 'CI', wilson(es, n).map((x) => f(x)).join('–'));
+}
+const [r1, lo1, hi1] = katz(reco.mid.e, reco.mid.n, reco.frontier.e, reco.frontier.n); const [r2_, lo2, hi2] = katz(reco.mid.es, reco.mid.n, Math.max(reco.frontier.es, 0.5), reco.frontier.n);
+const goodStrict = (c) => c.done && !c.escStrict && !c.namedFix && c.complete;
+const perWk = later.length / 11; const obs = later.filter(goodStrict).length / 11; const fr = later.filter((c) => c.writerTier === 'frontier');
+console.log('  without finder rows: correct+complete share frontier', f((fr.filter(goodStrict).length / fr.length) * 100), '% mid', f((later.filter((c) => c.writerTier === 'mid').filter(goodStrict).length / reco.mid.n) * 100), '% | later weeks observed', f(obs), 'a week; at frontier share', f(perWk * (fr.filter(goodStrict).length / fr.length)), '| June', f(june.filter(goodStrict).length / 4));
+console.log('  Fisher exact, one-sided, mid > frontier (strict):', (() => { const a = reco.frontier.es, n1 = reco.frontier.n, b = reco.mid.es, n2 = reco.mid.n, K = a + b, N = n1 + n2; const lc = (n, k) => { let x = 0; for (let i = 0; i < k; i++) x += Math.log(n - i) - Math.log(i + 1); return x; }; let p = 0; for (let k = 0; k <= a; k++) p += Math.exp(lc(n1, k) + lc(n2, K - k) - lc(N, K)); return f(p, 4); })());
+console.log('  mid/frontier escape ratio: scorecard', f(r1), `(95% ${f(lo1)}–${f(hi1)})`, '| without finder rows', f(r2_), `(95% ${f(lo2)}–${f(hi2)})`);
+for (const [name, cs] of [['chosen-tier code changes', chosen]]) for (const t of TIERS) { const x = cs.filter((c) => c.implementer === t); if (x.length) console.log(' ', name, t, 'escaped without finder rows', x.filter((c) => strictEsc.get(c.id)).length, 'of', x.length); }

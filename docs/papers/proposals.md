@@ -5,9 +5,10 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
 
 - **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
   `harbour/why-throughput-halved.md` found that, from 13 July, changes written mainly at the mid tier
-  were 67% correct and complete against 78% for the frontier tier, with 9.6% against 2.4% escaping, at
-  the same dispatches and working hours per change. Match later-block changes on production size,
-  area and ticket kind, and report whether the gap survives or belongs to the tickets each tier was
+  were 67% correct and complete against 78% for the frontier tier, with 14 of 365 against none of 171
+  escaping once rows naming the finder are set aside (version 2), at the same dispatches and working
+  hours per change. `harbour/model-choice.md` held size and area fixed and the gap stayed. Match
+  later-block changes on ticket kind as well, and report whether the gap survives or belongs to the tickets each tier was
   given. (Claude, 2026-09-30)
 - **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
   weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
@@ -318,8 +319,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   the pins that bump often from the ones that never fire, and say how much of the pin family each
   group is. (Claude, 2026-09-30)
 - **What does an escaped defect cost the operator, by implementer tier?** `harbour/model-choice.md`
-  found that mid-tier changes escape several times as often as frontier ones, but that the rework
-  adds only 0.2–0.3 working hours to a correct change's whole-life cost of 3.3–3.5 hours for either
+  found that mid-tier changes escape more often than frontier ones (11 of 187 against none of 85),
+  but that the rework adds only 0.2–0.3 working hours to a correct change's whole-life cost of 3.25–3.5 hours for either
   tier. Hours leave out the person who finds, triages and re-dispatches each escape. Join
   `reliability-baseline-defects.json`'s finder to the tracker's comment and state history, and
   say how much operator attention each escape took, by the tier that wrote the change.
