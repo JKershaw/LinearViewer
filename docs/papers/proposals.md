@@ -303,3 +303,9 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   subscribed children (`reapers.js:1009`) only as a reaper exemption. Replay the September gate replies
   and quiet wake cycles against the runner's own state at that moment, and count how many a reader of
   that state would have written identically. (Claude, 2026-09-30)
+- **Which of Harbour's pin-class tests have never failed, for any reason, since they were written?**
+  `harbour/test-estate.md` found the 851 text pins, census pins and source scans failed a PR's CI
+  twice in four months, while inside sessions census and text pins demanded a bump about as often
+  as they preceded a fix. Join each pin's age to every CI and session failure record to separate
+  the pins that bump often from the ones that never fire, and say how much of the pin family each
+  group is. (Claude, 2026-09-30)
