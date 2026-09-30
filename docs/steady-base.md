@@ -70,13 +70,30 @@ The evidence is in the documents listed at the end. Figures are as corrected by 
     - Until 12 July every session ran at the frontier tier, whatever the dispatch asked. Seven routing changes since are dated from the runner's logs.
     - For changes merged 13 July–30 August, a correct, complete change cost about the same whole-life working hours whether a frontier session implemented it (3.4–3.5 h) or a mid-tier one (3.25–3.4 h), counting the rework it caused.
     - Mid-tier changes do escape more often (11 of 187 against none of 85; LIN-3155's "four times" counted finder rows). But rework adds only 0.2–0.3 hours per change, because an escape's fix costs a fraction of the process around the original ticket. A third to two-fifths of it lands in the first week, and a fifth to a third after day 30.
-    - **What moved cost per change was the process, not the tier.** At the 12 July step, dispatches per correct change doubled for frontier-implemented changes too (5.3 to 10.4), and they have kept climbing: in September's provisional weeks 37 (frontier), 27 (mid) and 48 (cheap, whose work is cut into many short beats).
+    - **What moved cost per change was the process, not the tier.** At the 12 July step, dispatches per correct change doubled for frontier-implemented changes too (5.3 to 10.4), and they have kept climbing: in September's provisional weeks 37 (frontier), 27 (mid) and 48 (cheap, whose work is cut into many short beats). Part of that climb is a counting gap: wakes carried no issue id until 13 September, so earlier weeks under-count (see point 14).
     - The cheap tier and all of September are provisional until their 30-day windows close.
+14. **What doubled the dispatches: wakes into held autopilots.** *(`what-doubled-the-dispatches.md`, unchecked)*
+    - Counting every dispatch, a correct code change took 7.6 dispatches in the fortnight before 12 July and 20.0 in the fortnight after, in both repos.
+    - Fresh sessions per change rose on 10–12 July, lining up with LIN-1219 (finished sessions no longer held) and that week's runner changes; the data cannot separate them. Follow-ups per held session rose from 15–16 July, lining up with LIN-1357 (a wake for every stepper beat).
+    - Since August, fresh sessions have been flat at about 11 per correct change. **The growth is wakes:** 8, then 10, 16 and 29 per change. The last rise came after the passage layer went live on 17 September, which doubled the wakes each unit of work sends up.
+    - September's dispatches per correct change against the map: quiet wakes 10%, the passage layer 15%, supervision that acted 34% (a ceiling), review rounds after the first plus test and CI beats at most 9%. **32% sits in no candidate row.**
+15. **A lighter path for small work saves less than it looked.** *(`proportional-process-backtest.md`, unchecked)*
+    - Six size-and-risk rules were committed before any outcome was read, then run over 1,282 Done changes since June in both repos.
+    - The docs-and-tests-only rule routes 11% of changes light, and none of its 89 mature light changes went wrong afterwards. The small-and-low-risk rule routes 26% light; 5 of its 249 went wrong (2 in 100).
+    - The price: before merge, review caught real faults on 5 docs-only changes (parent tickets whose code shipped under children, a runbook, served prompt text) and 8 small low-risk ones, mostly at plan review.
+    - A rule that reads only the ticket's text routes large, faulty changes light: 36 real faults were caught in its light group. Classification has to use the paths actually touched.
+    - **Light work already costs about half of heavy work,** so the most a lighter process could save is 13–18% of working hours, not the 77% the docs-only cost ratio suggested.
+16. **Browser flakes are a few specs with three causes.** *(`browser-flakes.md`, unchecked)*
+    - There were no flakes before CI went to two Playwright workers on 24 June. Since then at least 64 of 138 red E2E attempts were flakes.
+    - Seven specs carry every flake with a known test; `observation`, `observation-rulings` and `dispatch-presets` carry two-thirds.
+    - The causes are server-side state shared between workers (the `urlKey` isolation LIN-625 owns), waits that do not wait for what they check, and a computed style read too early.
+    - They cost 38 red PR runs, 54 re-runs and about 7½ runner-hours. Retries hide more: 80% of sampled green runs passed a test only on an in-job retry.
 
 ## What this implies
 
 - **The largest saving is mechanical supervision, and it keeps every altitude.** About 27% of fleet tokens go to supervision steps that observable state fully decides. A supervisor keeps its role (context isolation, judgement of reports, the next beat) while code does the waiting, re-arming, polling, restating and gate-answering it does today in prose. The failure record points the same way: supervisors fail in the plumbing, not in judgement.
-- **Proportionality is the second lever.** A docs-only ticket costs three-quarters of a median one, and nothing sizes effort to risk.
+- **The wake plumbing is where the growth is.** Fresh sessions per change have been flat since August; wakes per change more than tripled. How often supervisors are woken, and how far up each wake travels, is a narrower and more mechanical target than "the process".
+- **Proportionality is a real but smaller lever.** Sized by the paths touched, a lighter path could save 13–18% of working hours at a price of about 2 escapes in 100 light changes and some faults review now catches before merge. It must classify on code, not ticket text.
 - **Reliability is steady, so the baseline is clean.** We are not fixing a quality problem. We are removing cost that quality does not depend on, and the scorecard will say if we are wrong.
 - **Tests: fix the idling and the flakes first, loosen pins second.** The idling is fixed. The flakes are the biggest cause of red CI. The pins are friction, not run time.
 - **Choosing cheaper models is not the lever.** Whole-life cost per change is about the same at frontier and mid tier; what doubled cost per change at the 12 July step, for every tier, was the dispatch count around it. That is the process, which is where the map below aims.
@@ -113,23 +130,24 @@ This is the input for planning the epic. Savings are shares of the fleet's weigh
 
 | # | Change | Evidence | Est. saving | Effort | Reliability risk and safety check |
 |---|---|---|---|---|---|
-| 1 | **Stop waking parents for "still waiting".** The runner already knows when a parent's children are live; stop delivering progress wakes that change nothing | 31% of wakes change nothing, 25% of the supervision bill (`what-supervisors-do` v2) | ~9% | S–M | Missed or lost wakes are the most common supervisor failure (15 of 25). Wake-delivery tests; the scorecard's hours per change |
-| 2 | **Put the passage layer's bookkeeping in code.** The Runner is 97% mechanical and 94% of its wakes change nothing; it is invoked only on events that need judgement | The Runner and legs account for all of September's supervision rise (`survey-check`) | ~5–10% during passages | M | The Runner keeps its role and altitude; only its polling moves. Passage-level tests |
+| 1 | **Stop waking parents for "still waiting".** The runner already knows when a parent's children are live; stop delivering progress wakes that change nothing | 31% of wakes change nothing, 25% of the supervision bill (`what-supervisors-do` v2) | ~9%; quiet wakes are 10% of September's dispatches per change (`what-doubled-the-dispatches`) | S–M | Missed or lost wakes are the most common supervisor failure (15 of 25). Wake-delivery tests; the scorecard's hours per change |
+| 2 | **Put the passage layer's bookkeeping in code.** The Runner is 97% mechanical and 94% of its wakes change nothing; it is invoked only on events that need judgement | The Runner and legs account for all of September's supervision rise (`survey-check`); the passage layer doubled the wakes each unit sends up, 15% of September's dispatches per change (`what-doubled-the-dispatches`) | ~5–15% during passages | M | The Runner keeps its role and altitude; only its polling moves. Passage-level tests |
 | 3 | **A deterministic conductor for the supervision cycle.** The completion gate, re-arming, restating and liveness clocks move into the runner and dispatch code that already hold the answers; model sessions keep judging reports and writing beats | 77% of supervision tokens mechanical (86% on a blind recode); much of the answering is already in code, how much unmeasured (`what-supervisors-do` v2, `survey-check-2`) | up to ~27% in total, including 1 and 2 | L | The largest change. Build in slices behind the scorecard; every altitude kept |
 | 4 | **Fix the four idling test files** (the uncleared `withTimeout` timer). **Done, LIN-3158** | 31% of serial unit time (`test-estate` v2) | Serial unit suite 266 s → 175 s, plus 20–30 s of parallel wall-clock | S | None: the tests are unchanged |
-| 5 | **Make the flaky browser specs and unit flakes robust** (never skip). Unit flakes done, LIN-3159 (a fixture clock race in `tree.test.js`); browser flakes census LIN-3168 | Flakes are the biggest cause of red CI (`test-estate` v2) | Fewer reruns and red-CI rounds | S–M | Positive: flakes hide real failures |
+| 5 | **Make the flaky browser specs and unit flakes robust** (never skip). Unit flakes done, LIN-3159 (a fixture clock race in `tree.test.js`); browser flakes next | Flakes are the biggest cause of red CI (`test-estate` v2); seven specs, three causes, none before two workers (`browser-flakes`) | Fewer reruns and red-CI rounds | S–M | Positive: flakes hide real failures |
 | 6 | **Retire census pins in favour of an import-graph check** | About 18 tickets since June exist to repair or bump a pin, about five pure bumps; bumps at least match catches (`test-estate` v2, `fleet-complexity-read`) | Friction on every census change; the weekly rate is uncertain | S | Low. The import graph still guards drift |
-| 7 | **Size the process to the change,** classified by code from the paths touched: docs- and tests-only work, then small low-risk changes, get a lighter path. Credentials, auth, migration and security keep the full process | A docs-only ticket costs ~77% of the median; nothing sizes effort to risk (`where-the-effort-goes`); production catches concentrate in a few risky tickets (`which-rules-pay`). A backtest is running (LIN-3166) | Large per light ticket; total depends on the mix | M | Medium: a mis-sized ticket skips a check. Code-based classification; the correct rate per path |
+| 7 | **Size the process to the change,** classified by code from the paths touched: docs- and tests-only work, then small low-risk changes, get a lighter path. Credentials, auth, migration and security keep the full process | A docs-only ticket costs ~77% of the median; nothing sizes effort to risk (`where-the-effort-goes`); production catches concentrate in a few risky tickets (`which-rules-pay`). Backtest: 11–26% of changes route light (`proportional-process-backtest`) | 13–18% of working hours at most | M | Medium: about 2 escapes in 100 light changes, and some pre-merge catches lost. Classify on paths touched, never ticket text; the correct rate per path |
 | 8 | **Stop review rounds that change nothing.** Close-out finishes wording and test-only items; text-only fixes don't re-trigger review | On LIN-3131: 43% of wall-clock, ~26% of tokens, no production change (`fleet-complexity-read`). Across 100 tickets the mutation check led 97 test-or-wording changes and ~36 of 88 extra legs (`which-rules-pay` v2) | Per affected ticket, large | S | Low: CI still gates; the scorecard's correct rate |
 | 9 | **Loosen text pins on prompt prose;** keep the pins on prompt branches | Prose pins caught 3 of 19 deleted lines; branch pins kill mutants (`test-estate`) | Friction on every prompt change | M | Low if branch pins stay |
-| 10 | **Keep the evidence for the project's lifetime.** In progress, LIN-3157 (four phases) | Every series stops at 30 days | Enables measurement | S | None |
+| 10 | **Keep the evidence for the project's lifetime.** In progress, LIN-3157 (third of four phases) | Every series stops at 30 days | Enables measurement | S | None |
 | 11 | **Freeze prompt sizes;** new lessons land as code first | Growth is steady; text is ~3% of carried context (`steady-base`) | Small directly; stops the ratchet | S | None |
-| 12 | **Hygiene in simple-dispatcher:** the stale mutation gate, the gate not in CI, the test that fails on the fleet's own machine. In progress, LIN-3160 | `test-estate` | Trust in the gates | S | Positive |
+| 12 | **Hygiene in simple-dispatcher:** the stale mutation gate, the gate not in CI, the test that fails on the fleet's own machine. **Done, LIN-3160** (three stale mutants re-anchored, 47/47; the AppleScript test needs iTerm2 running; the gate stays out of CI, as it needs a second checkout) | `test-estate` | Trust in the gates | S | Positive |
 
 **Reading the map:**
-- **Quick, reliability-neutral wins:** 4, 5, 6, 10 and 12. They run as ordinary tickets, and none changes how the fleet works. On 30 September John started 4 (done), 5's unit flakes, 10 and 12.
+- **Quick, reliability-neutral wins:** 4, 5, 6, 10 and 12. They run as ordinary tickets, and none changes how the fleet works. On 30 September John started 4, 5's unit flakes, 10 and 12; all but 10 are done.
 - **The large, structural win:** 1–3. It is the heart of the epic, needs careful design, and keeps every altitude.
-- **Proportionality:** 7 and 8. It comes next, once the scorecard is running.
+- **Proportionality:** 7 and 8. A real but smaller lever than first thought (13–18% of hours at most), best taken after the wake plumbing.
+- **Unexplained:** 32% of September's dispatches per change sits in no row. It needs finding before the epic's total can be sized.
 
 ## How it fits V1
 
@@ -138,10 +156,9 @@ V1 is one person, one task, one proven merge (`docs/v1.md`). A stranger's task r
 ## Open questions
 
 - **What is the right shape for Harbour's process,** not just a lighter version of today's? This needs John's thought as well as the data.
-- **Why did dispatches per correct change double at 12 July, and keep climbing?** `model-choice.md` shows it happened at every tier, so it is the process around the change. Which parts of the process added the dispatches is the next question for the epic.
+- **What is the 32% of September's dispatches per change that no candidate row explains?** `what-doubled-the-dispatches.md` answers the doubling (wakes into held autopilots) but leaves this remainder.
 - **Which lessons behind today's rules are still earning their keep?** `which-rules-pay.md` gives the first firing record: 8 of 24 rules have led a production change. Rasmussen's warning applies: a defence's value is invisible until it is removed, and about a third of the zero rules are gates; for most of the rest, zero is the design.
-- **How much work could safely take a lighter path?** LIN-3166 is backtesting size-and-risk classifiers over past tickets.
-- **`model-choice.md` is not yet checked by a second document.** Its tier comparison is the one to check before any routing decision rests on it.
+- **Four papers are not yet checked by a second document:** `model-choice`, `what-doubled-the-dispatches`, `proportional-process-backtest` and `browser-flakes`. The first three should be checked before the epic is sized on them.
 
 ## The evidence
 
@@ -162,6 +179,9 @@ V1 is one person, one task, one proven merge (`docs/v1.md`). A stranger's task r
 | [which-rules-pay](papers/harbour/which-rules-pay.md) (v2) | Which review and close-out rules have ever changed production code |
 | [survey-check-3](papers/harbour/survey-check-3.md) | The independent check of the two papers above, and every figure it changed |
 | [model-choice](papers/harbour/model-choice.md) (unchecked) | Who did the work at which tier since January, and each tier's whole-life cost per correct change |
+| [what-doubled-the-dispatches](papers/harbour/what-doubled-the-dispatches.md) (unchecked) | What doubled dispatches per correct change at 12 July, and what kept them climbing |
+| [proportional-process-backtest](papers/harbour/proportional-process-backtest.md) (unchecked) | How much past work a size-and-risk rule would have routed light, and what it would have let through |
+| [browser-flakes](papers/harbour/browser-flakes.md) (unchecked) | Which browser specs flake, why, and what they cost |
 | Earlier: [ticket-record-and-quality](papers/harbour/ticket-record-and-quality.md), [review-loops](papers/harbour/review-loops.md), [what-the-reviews-checked](papers/harbour/what-the-reviews-checked.md), [cheap-implementer](papers/harbour/cheap-implementer.md), [tasks-generate-tasks](papers/harbour/tasks-generate-tasks.md) | The pieces that pointed this way first |
 
 ## Decisions
