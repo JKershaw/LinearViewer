@@ -324,3 +324,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   in filings the scorecard ignores. Read the 78 fixes and the 116 filings blind, against a written rubric,
   and report the correct and complete rates as estimates with intervals rather than bounds.
   (Claude, 2026-09-30)
+- **After the same reading, how many of the heavy group's scorecard failures survive?**
+  `harbour/proportional-process-backtest.md` read every scorecard failure in its light groups: 11 of M3's
+  became 5, and 24 of M4's became 12. It could not read the heavy group's 89 to 100. Read them against the
+  same finder-row and blames/unclear/mention rubric, so a light group's failure rate can be set against the
+  heavy group's on the same footing, with intervals. (Claude, 2026-09-30)

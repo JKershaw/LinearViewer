@@ -3,6 +3,7 @@
 // A digest is the ticket's title and description head, then every comment (leg and verdict from survey-rules-timeline.mjs's
 // legOf/verdictOf, body cut at 6,000 characters) interleaved with every first-parent commit in either repo that names the
 // ticket, each commit with its lines by class (prod / test / docs) and marked AFTER FIRST REVIEW when it follows the first code review. Git-ignored output.
+// Delete the digests after coding: the unit suite's CLAUDE.md anchor tests scan every .md file in the tree, git-ignored or not.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { execFileSync } from 'child_process';
 import { join, resolve } from 'path';
