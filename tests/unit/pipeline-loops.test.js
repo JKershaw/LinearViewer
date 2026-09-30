@@ -29,6 +29,7 @@ import { createMockCollection } from '../fixtures/mock-collection.js';
 import { buildSessionCounts } from '../../lib/sessions-view.js';
 import { classifyLoop } from '../../lib/observer-sweep.js';
 import { isDecisionAnsweredInLineage } from '../../lib/unanswered-decisions.js';
+import { READ_HORIZON_MS } from '../../lib/read-horizon.js';
 
 const {
   _toDate,
@@ -2760,5 +2761,11 @@ describe('LIN-3013 — buildSessionCounts is identical for lean and non-lean loo
     assert.deepStrictEqual(nonLeanCounts, expected, 'non-lean counts must match the explicit expected object');
     assert.deepStrictEqual(leanCounts, expected, 'lean counts must match the explicit expected object, not merely equal non-lean');
     assert.deepStrictEqual(leanCounts, nonLeanCounts, 'lean and non-lean session counts must be identical');
+  });
+});
+
+describe('LOOKBACK_MS — shared read horizon (LIN-3161 / LIN-3157 A1)', () => {
+  test('is the shared READ_HORIZON_MS, and is still exported off __internal', () => {
+    assert.strictEqual(LOOKBACK_MS, READ_HORIZON_MS);
   });
 });

@@ -1,0 +1,2569 @@
+{
+ "about": "LIN-3154: a fresh blind double-coding of 160 supervisor steps from what-supervisors-do.md's census (the author's data/survey-supervise/steps.jsonl, 32,525 steps), drawn systematically with probability proportional to weighted tokens (session start then step order, start 0.37 of the interval), none of them among the paper's 220. Because each step's chance of selection is proportional to its tokens, the share of sampled steps coded M estimates the token-weighted mechanical share directly, with no rule classes and no layer weights. Cards were built exactly as scripts/survey-supervise-sample.mjs builds them. Codebook: the one committed in what-supervisors-do-codes.json, unchanged. Coders: two in-session frontier-tier subagents, each given only the codebook and the cards, blind to the paper, its codes, the rule classes and each other; coder 2 read the cards in reverse order. 'rule' is the paper's census rule class for the step, added afterwards for comparison.",
+ "codes": [
+  {
+   "id": "16109d58:113",
+   "layer": "autopilot",
+   "units": 23216.3,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING-EXTERNAL naming live children it waits on"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on live child autopilots"
+   }
+  },
+  {
+   "id": "c959989d:98",
+   "layer": "stepper",
+   "units": 25097.4,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks PR/CI state itself to verify worker's green claim"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Verifies claimed PR and CI state on GitHub"
+   }
+  },
+  {
+   "id": "c1ab0c4c:80",
+   "layer": "autopilot",
+   "units": 24067.2,
+   "rule": "poll",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Verifies reported PR #1321 and CI against GitHub"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Verifies reported PR and CI state on GitHub"
+   }
+  },
+  {
+   "id": "5bb41063:159",
+   "layer": "stepper",
+   "units": 37897.4,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Reads driver code ranges to check criteria of a step; unclear, conservative J"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Reads driver source against a specified criterion; purpose unclear, J conservatively"
+   }
+  },
+  {
+   "id": "ae22ce35:0",
+   "layer": "autopilot",
+   "units": 19544.7,
+   "rule": "orient",
+   "coder1": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Bootstrap project summary: lists workspace and API base"
+   },
+   "coder2": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Bootstrap: lists workspace to summarise project"
+   }
+  },
+  {
+   "id": "0621736c:110",
+   "layer": "autopilot",
+   "units": 28830,
+   "rule": "read",
+   "coder1": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Cross-checks related ticket for lurking references before advancing"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks related ticket for lurking CI flake after lane merge"
+   }
+  },
+  {
+   "id": "94bf7683:185",
+   "layer": "autopilot",
+   "units": 604284.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice; no action"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "94bf7683:331",
+   "layer": "autopilot",
+   "units": 52900.4,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches custom wake prompt"
+   }
+  },
+  {
+   "id": "94bf7683:440",
+   "layer": "autopilot",
+   "units": 67639.8,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Reports dispatch of F review and board status"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Reports re-review dispatch and board statuses"
+   }
+  },
+  {
+   "id": "94bf7683:522",
+   "layer": "autopilot",
+   "units": 1495214.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "18325b63:158",
+   "layer": "stepper",
+   "units": 43347.6,
+   "rule": "relay",
+   "coder1": {
+    "cls": "relay",
+    "mj": "J",
+    "note": "BLOCKED sentinel framing human decision after spent revision cycle"
+   },
+   "coder2": {
+    "cls": "relay",
+    "mj": "J",
+    "note": "Gate BLOCKED framing plan-authorisation decision for a human"
+   }
+  },
+  {
+   "id": "8bbaa86f:15",
+   "layer": "autopilot",
+   "units": 14199.9,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches ticket description headings and comments"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Reads issue description headings and comments while orienting"
+   }
+  },
+  {
+   "id": "d5b4bd4f:187",
+   "layer": "autopilot",
+   "units": 36023.9,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Verifies merge-commit CI and ticket states after child report"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Verifies CI on merge commit and ticket states for child S1"
+   }
+  },
+  {
+   "id": "d5b4bd4f:322",
+   "layer": "autopilot",
+   "units": 63411,
+   "rule": "relay",
+   "coder1": {
+    "cls": "relay",
+    "mj": "J",
+    "note": "BLOCKED escalation framing sourcing decision for John"
+   },
+   "coder2": {
+    "cls": "relay",
+    "mj": "J",
+    "note": "Gate BLOCKED framing sourcing decision for John with technical reason"
+   }
+  },
+  {
+   "id": "dacf6102:46",
+   "layer": "autopilot",
+   "units": 17608.8,
+   "rule": "read",
+   "coder1": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Checks revised description actually carries S7a-before-S5 inversion"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks issue description for expected revision markers"
+   }
+  },
+  {
+   "id": "6c003237:182",
+   "layer": "stepper",
+   "units": 35708,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches child dispatch feedback"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Reads child review dispatch feedback"
+   }
+  },
+  {
+   "id": "d1a6c34f:128",
+   "layer": "wake",
+   "units": 68530.2,
+   "rule": "work",
+   "coder1": {
+    "cls": "work",
+    "mj": "J",
+    "note": "Supervisor rewrites unit tests itself",
+    "fail": "doing worker's job (edits tests)"
+   },
+   "coder2": {
+    "cls": "work",
+    "mj": "J",
+    "note": "Supervisor rewrites unit test file itself per reviewer findings",
+    "fail": "supervisor edits tests itself (leaves altitude)"
+   }
+  },
+  {
+   "id": "d1a6c34f:244",
+   "layer": "wake",
+   "units": 69650.1,
+   "rule": "land",
+   "coder1": {
+    "cls": "land",
+    "mj": "M",
+    "note": "Merges approved green PR #1384 and verifies on main"
+   },
+   "coder2": {
+    "cls": "land",
+    "mj": "M",
+    "note": "Checks green checks and merges PR, verifies on main"
+   }
+  },
+  {
+   "id": "5e2f485b:57",
+   "layer": "stepper",
+   "units": 26685.7,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Reports verified beat and dispatch, explains CI correction to worker"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Reports beat 4 verification and correction of worker's no-CI claim"
+   }
+  },
+  {
+   "id": "1de62534:184",
+   "layer": "autopilot",
+   "units": 36262.3,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "1de62534:304",
+   "layer": "autopilot",
+   "units": 1023732.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "1de62534:399",
+   "layer": "autopilot",
+   "units": 78594.7,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING-EXTERNAL waiting on WS3 child"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING on WS3 child, restating grandchild progress"
+   }
+  },
+  {
+   "id": "1de62534:484",
+   "layer": "autopilot",
+   "units": 93631.4,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING sentinel after locally resolving child escalation",
+    "fail": "resolved escalation locally instead of John"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING restating locally resolved escalation and resumed child",
+    "fail": "resolved child escalation itself instead of John"
+   }
+  },
+  {
+   "id": "1de62534:556",
+   "layer": "autopilot",
+   "units": 99630.3,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "0b6dfb97:16",
+   "layer": "stepper",
+   "units": 21738.1,
+   "rule": "orient",
+   "coder1": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Reads /instructions to confirm dispatch shape"
+   },
+   "coder2": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Reads dispatch API instructions before decomposing beats"
+   }
+  },
+  {
+   "id": "9a3dbcb8:6",
+   "layer": "stepper",
+   "units": 6637.9,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches task prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches task prompt after bootstrap"
+   }
+  },
+  {
+   "id": "ac5893bf:155",
+   "layer": "stepper",
+   "units": 613532.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "40a85250:62",
+   "layer": "stepper",
+   "units": 31584.8,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Recommend-and-dispatch next step, engine picks verb"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Recommend-and-dispatch next step after verified plan step"
+   }
+  },
+  {
+   "id": "40a85250:205",
+   "layer": "stepper",
+   "units": 51624.7,
+   "rule": "orient",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Composes kickoff goal carrying John's ruling; hits length error"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Kickoff goal carries ruling and extended scope; fails over length cap"
+   }
+  },
+  {
+   "id": "40a85250:304",
+   "layer": "stepper",
+   "units": 66191.5,
+   "rule": "poll",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress-only wake acknowledged, no action needed"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress-only wake acknowledged; commentary but no action"
+   }
+  },
+  {
+   "id": "c0f3a375:122",
+   "layer": "stepper",
+   "units": 34695.8,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends judged-beat note to own state file"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends beat-2 judged/holds record to state file"
+   }
+  },
+  {
+   "id": "1bc87409:60",
+   "layer": "stepper",
+   "units": 24693.5,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING-EXTERNAL waiting on dispatched beat 5"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on dispatched beat 5"
+   }
+  },
+  {
+   "id": "61e06aba:85",
+   "layer": "stepper",
+   "units": 30429.4,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on re-dispatched beat 6"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on re-dispatched beat 6"
+   }
+  },
+  {
+   "id": "e8b3db12:119",
+   "layer": "stepper",
+   "units": 30853.6,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "e8b3db12:271",
+   "layer": "stepper",
+   "units": 55524.1,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "e8b3db12:371",
+   "layer": "stepper",
+   "units": 1368876.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "cf8622bc:27",
+   "layer": "stepper",
+   "units": 15215.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Writes run-state file with beats and ids"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Writes initial RUN.md state file with beat list"
+   }
+  },
+  {
+   "id": "9a88dc1d:191",
+   "layer": "stepper",
+   "units": 42619.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Logs progress wake, standing by"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress wake after logging; stands by"
+   }
+  },
+  {
+   "id": "e158b347:105",
+   "layer": "stepper",
+   "units": 28570.9,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks CI on merged head and landed commit after close-out claim"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks CI on merged head and landed main commit to verify close-out"
+   }
+  },
+  {
+   "id": "8c538182:121",
+   "layer": "stepper",
+   "units": 30938.6,
+   "rule": "decide",
+   "coder1": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Logs fix pass then asks engine recommend for next step"
+   },
+   "coder2": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Logs fix pass state then asks engine recommend (review)"
+   }
+  },
+  {
+   "id": "a1a9330a:190",
+   "layer": "stepper",
+   "units": 41175.1,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends wake/liveness log to RUN.md"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends wake and liveness notes to RUN.md"
+   }
+  },
+  {
+   "id": "3121fccd:8",
+   "layer": "stepper",
+   "units": 8000,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches task prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches task prompt after bootstrap"
+   }
+  },
+  {
+   "id": "c5156bd0:142",
+   "layer": "stepper",
+   "units": 35865.5,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Reads close-out summary text to check its archive claim"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Reads close-out summary comment to confirm archive/prune claim"
+   }
+  },
+  {
+   "id": "d0d2338f:107",
+   "layer": "stepper",
+   "units": 24549,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "bdf35b2f:74",
+   "layer": "stepper",
+   "units": 29116.2,
+   "rule": "decide",
+   "coder1": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Calls recommend after verifying review's blocking finding"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Verifies review's blocking finding at HEAD; asks engine next"
+   }
+  },
+  {
+   "id": "83f920a0:123",
+   "layer": "stepper",
+   "units": 35074,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING-EXTERNAL on C1 child"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on child autopilot"
+   }
+  },
+  {
+   "id": "307d4021:71",
+   "layer": "stepper",
+   "units": 29201,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Judges review ledger then recommend-and-dispatches close-out"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Weighs review ledger as real then recommend-and-dispatches close-out"
+   }
+  },
+  {
+   "id": "d5693910:99",
+   "layer": "stepper",
+   "units": 425718.1,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "8c672cec:50",
+   "layer": "stepper",
+   "units": 27571.9,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Writes beat 2 prompt carrying its own corrections"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Beat 2 prompt carries supervisor's own code corrections to worker"
+   }
+  },
+  {
+   "id": "dd0a5e89:91",
+   "layer": "stepper",
+   "units": 41895.2,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends judged beat record to RUNSTATE"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends beat-1 judged/holds record to RUNSTATE file"
+   }
+  },
+  {
+   "id": "dd0a5e89:235",
+   "layer": "stepper",
+   "units": 58007.8,
+   "rule": "read",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Confirms child's verdict string and ledger heading on ticket"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks child's review verdict and ledger exist on ticket"
+   }
+  },
+  {
+   "id": "20e37f94:110",
+   "layer": "stepper",
+   "units": 31475.2,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends verified fix and re-review to state file"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Appends verification and re-review dispatch line to run-state file"
+   }
+  },
+  {
+   "id": "2386fe27:20",
+   "layer": "stepper",
+   "units": 25863.9,
+   "rule": "orient",
+   "coder1": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Greps codebase for dispatch subscription contract"
+   },
+   "coder2": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Greps repo for dispatch subscription contract before beat design"
+   }
+  },
+  {
+   "id": "3e8d718c:134",
+   "layer": "stepper",
+   "units": 33182,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Status lines: revision verified, plan-review re-dispatched"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Reports verified plan revision and summarises substantive plan changes"
+   }
+  },
+  {
+   "id": "3e8d718c:276",
+   "layer": "stepper",
+   "units": 60174.9,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Reads close-out ledger acceptances before authorising merge"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Reads close-out ledger acceptances to judge before authorising merge"
+   }
+  },
+  {
+   "id": "42187aab:194",
+   "layer": "stepper",
+   "units": 50082.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on verdict beat 3/3"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on verdict beat just dispatched"
+   }
+  },
+  {
+   "id": "5d124fd5:91",
+   "layer": "stepper",
+   "units": 34109.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on child LIN-2796"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on child autopilot"
+   }
+  },
+  {
+   "id": "fc9579ae:55",
+   "layer": "autopilot",
+   "units": 16882,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Reports dispatch and override note, standing by"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Status lines: implementation dispatched, override note posted"
+   }
+  },
+  {
+   "id": "f438f2c7:29",
+   "layer": "autopilot",
+   "units": 13472.8,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches issue state, headings and last comment"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks issue description headings and last comment to verify plan written"
+   }
+  },
+  {
+   "id": "fa98bfdc:209",
+   "layer": "autopilot",
+   "units": 41974,
+   "rule": "judge",
+   "coder1": {
+    "cls": "recover",
+    "mj": "M",
+    "note": "Retries failed comment post"
+   },
+   "coder2": {
+    "cls": "recover",
+    "mj": "M",
+    "note": "Retries failed stop-lane comment post"
+   }
+  },
+  {
+   "id": "ee01b6e8:166",
+   "layer": "Runner",
+   "units": 41656,
+   "rule": "judge",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Relaunches kickoff after confirming no competing dispatch"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Relaunches autopilot kickoff after confirming no competing live worker"
+   }
+  },
+  {
+   "id": "ee01b6e8:299",
+   "layer": "Runner",
+   "units": 66205.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on two live children"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on two live children"
+   }
+  },
+  {
+   "id": "97947e0f:42",
+   "layer": "leg",
+   "units": 21570.4,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "States independent confirmation of worker's byte-growth claim"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Confirms worker's byte-growth claim and weighs guard revision; greps comment API"
+   }
+  },
+  {
+   "id": "8586bfd9:153",
+   "layer": "leg",
+   "units": 37653,
+   "rule": "poll",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Verifies PR merge and main CI after child done"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Verifies child's claims: PR merged, main tip, CI checks"
+   }
+  },
+  {
+   "id": "2a1f6dd2:63",
+   "layer": "leg",
+   "units": 16812.8,
+   "rule": "restate",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on two children at beat 2"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on two children advancing"
+   }
+  },
+  {
+   "id": "2a1f6dd2:254",
+   "layer": "leg",
+   "units": 795055.6,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "99c03aa8:35",
+   "layer": "leg",
+   "units": 29249.2,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Drips beat 3 prompt informed by CI finding"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Writes custom beat 3/4 prompt after weighing beat 2 and CI finding"
+   }
+  },
+  {
+   "id": "be2b83d8:13",
+   "layer": "autopilot",
+   "units": 20122.5,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches brief (502 error)"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches ticket brief at run start; server 502"
+   }
+  },
+  {
+   "id": "84c1e774:63",
+   "layer": "autopilot",
+   "units": 20658.5,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-INTERNAL with own CI watcher armed"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING-INTERNAL on own CI watcher"
+   }
+  },
+  {
+   "id": "ee2208b0:67",
+   "layer": "autopilot",
+   "units": 17918.9,
+   "rule": "restate",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Reports close-out dispatch, PENDING-EXTERNAL on it"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Reports close-out dispatch and PENDING on that child"
+   }
+  },
+  {
+   "id": "c2174fb0:79",
+   "layer": "stepper",
+   "units": 23994.1,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt and review dispatch record"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and review record feedback"
+   }
+  },
+  {
+   "id": "cac6e56a:137",
+   "layer": "stepper",
+   "units": 42009.2,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on dispatched review"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on dispatched review, restating verification"
+   }
+  },
+  {
+   "id": "9ddd761e:12",
+   "layer": "autopilot",
+   "units": 15386.1,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on review worker"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on just-dispatched review worker"
+   }
+  },
+  {
+   "id": "9ce48661:156",
+   "layer": "autopilot",
+   "units": 29220.7,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "9ce48661:316",
+   "layer": "autopilot",
+   "units": 53367,
+   "rule": "judge",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress wake acknowledged; PENDING-EXTERNAL, nothing to do"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress wake (review approved) and re-parks"
+   }
+  },
+  {
+   "id": "9ce48661:409",
+   "layer": "autopilot",
+   "units": 75330.1,
+   "rule": "relay",
+   "coder1": {
+    "cls": "relay",
+    "mj": "J",
+    "note": "BLOCKED sentinel putting L2 waiver decision to John"
+   },
+   "coder2": {
+    "cls": "relay",
+    "mj": "M",
+    "note": "Gate answered BLOCKED restating pending ruling for John"
+   }
+  },
+  {
+   "id": "94211f2b:28",
+   "layer": "stepper",
+   "units": 12617.5,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Searches workspaces for worker's lin-3008 branch; purpose unclear"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Locates worker's branch across workspaces to spot-check"
+   }
+  },
+  {
+   "id": "e2c93754:3",
+   "layer": "stepper",
+   "units": 9759.6,
+   "rule": "orient",
+   "coder1": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Bootstrap project summary text"
+   },
+   "coder2": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Bootstrap project summary from repo docs"
+   }
+  },
+  {
+   "id": "56508060:149",
+   "layer": "autopilot",
+   "units": 33241.7,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches PR list and latest ticket comment"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks PR list and latest ticket comment to verify fix worker output"
+   }
+  },
+  {
+   "id": "39bbd5ea:30",
+   "layer": "leg",
+   "units": 12790.5,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt and child dispatch feedback"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and plan-revision worker feedback"
+   }
+  },
+  {
+   "id": "4c1bc65d:201",
+   "layer": "autopilot",
+   "units": 38308.2,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "4c1bc65d:323",
+   "layer": "autopilot",
+   "units": 1064376,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "4c1bc65d:408",
+   "layer": "autopilot",
+   "units": 71663,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress-only wake acknowledged with PENDING-EXTERNAL"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress wake; sub-run handling fixes; re-parks"
+   }
+  },
+  {
+   "id": "94427c7f:13",
+   "layer": "stepper",
+   "units": 10216.3,
+   "rule": "orient",
+   "coder1": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Parses engine recommend result after retry"
+   },
+   "coder2": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Reads retried engine recommendation (plan) and saves prompt"
+   }
+  },
+  {
+   "id": "1895db62:36",
+   "layer": "autopilot",
+   "units": 13774,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and close-out feedback"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and close-out child feedback"
+   }
+  },
+  {
+   "id": "ca88d690:216",
+   "layer": "autopilot",
+   "units": 60760,
+   "rule": "judge",
+   "coder1": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Posts coordination status comment framing blocker analysis"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Coordination comment framing statuses and a blocker's reasoning"
+   }
+  },
+  {
+   "id": "ca88d690:318",
+   "layer": "autopilot",
+   "units": 64434.3,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt and child status"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and child dispatch status"
+   }
+  },
+  {
+   "id": "ca88d690:414",
+   "layer": "autopilot",
+   "units": 81011.2,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Kicks off next child autopilot with retry loop"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Kicks off planned next child autopilot F2 with retry loop"
+   }
+  },
+  {
+   "id": "e54ed233:45",
+   "layer": "stepper",
+   "units": 16936.5,
+   "rule": "read",
+   "coder1": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Reads engine recommend output"
+   },
+   "coder2": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Parses engine recommendation (implementation) and prompt"
+   }
+  },
+  {
+   "id": "067ba621:29",
+   "layer": "autopilot",
+   "units": 15695.9,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Checks CI run and reads PR diff for worker claims"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "J",
+    "note": "Spot-checks worker's CI claim and inspects test diff content; J conservatively"
+   }
+  },
+  {
+   "id": "77f9aa89:77",
+   "layer": "autopilot",
+   "units": 328296,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "9b00fa26:8",
+   "layer": "autopilot",
+   "units": 58414.7,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches brief and dispatch list"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches brief and dispatch list; brief auth error"
+   }
+  },
+  {
+   "id": "71364894:132",
+   "layer": "autopilot",
+   "units": 27810,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "56e4fad9:118",
+   "layer": "stepper",
+   "units": 33517.4,
+   "rule": "judge",
+   "coder1": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Asks engine recommend with retry"
+   },
+   "coder2": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Asks engine recommend for next step, with retry"
+   }
+  },
+  {
+   "id": "2a51951d:82",
+   "layer": "stepper",
+   "units": 26201.6,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Reads re-review ledger comment"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Reads re-review ledger comment on the ticket"
+   }
+  },
+  {
+   "id": "21e9e574:94",
+   "layer": "stepper",
+   "units": 432588,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "d977bafd:102",
+   "layer": "autopilot",
+   "units": 25694.8,
+   "rule": "poll",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Progress report: PR held, fixes dispatched"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Operator report summarising close-out's review fixes and new dispatch"
+   }
+  },
+  {
+   "id": "90e735a9:6",
+   "layer": "stepper",
+   "units": 23979.1,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches brief and relations"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches brief and relations; brief fails with auth error"
+   }
+  },
+  {
+   "id": "cb831675:60",
+   "layer": "autopilot",
+   "units": 25324.1,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on plan worker"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on just-dispatched plan worker"
+   }
+  },
+  {
+   "id": "69dc5831:15",
+   "layer": "autopilot",
+   "units": 14595.2,
+   "rule": "read",
+   "coder1": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Reads workspaces.json config"
+   },
+   "coder2": {
+    "cls": "orient",
+    "mj": "M",
+    "note": "Reads dispatcher workspaces config to find bearings"
+   }
+  },
+  {
+   "id": "77d05717:144",
+   "layer": "Runner",
+   "units": 38850.6,
+   "rule": "poll",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress-only wake; PENDING-EXTERNAL no change"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges no-change wake and re-parks"
+   }
+  },
+  {
+   "id": "77d05717:269",
+   "layer": "Runner",
+   "units": 74450.9,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on leg child"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on maintenance leg"
+   }
+  },
+  {
+   "id": "77d05717:358",
+   "layer": "Runner",
+   "units": 93372.2,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on leg child"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on maintenance leg"
+   }
+  },
+  {
+   "id": "77d05717:457",
+   "layer": "Runner",
+   "units": 21282.8,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on leg child"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on maintenance leg"
+   }
+  },
+  {
+   "id": "77d05717:640",
+   "layer": "Runner",
+   "units": 49815.4,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress wake acknowledged with PENDING-EXTERNAL"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress wake; re-parks on maintenance leg"
+   }
+  },
+  {
+   "id": "77d05717:748",
+   "layer": "Runner",
+   "units": 72132.4,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "77d05717:831",
+   "layer": "Runner",
+   "units": 89533.8,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "77d05717:995",
+   "layer": "Runner",
+   "units": 29635.8,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress wake acknowledged with PENDING-EXTERNAL"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress-only wake with PENDING status"
+   }
+  },
+  {
+   "id": "77d05717:1139",
+   "layer": "Runner",
+   "units": 60754.1,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "77d05717:1233",
+   "layer": "Runner",
+   "units": 88180.7,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Posts voyage log of verified landing"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Posts voyage log of verified landing statuses"
+   }
+  },
+  {
+   "id": "77d05717:1309",
+   "layer": "Runner",
+   "units": 97278.2,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Wake acknowledged; paused for cap, nothing dispatched"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges wake that children paused; restates positions and re-parks"
+   }
+  },
+  {
+   "id": "77d05717:1426",
+   "layer": "Runner",
+   "units": 34464.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on legs"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on children"
+   }
+  },
+  {
+   "id": "77d05717:1581",
+   "layer": "Runner",
+   "units": 60644.8,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Posts voyage log relaying leg's landing report"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Posts voyage log restating leg's reported landing, unverified by choice"
+   }
+  },
+  {
+   "id": "77d05717:1679",
+   "layer": "Runner",
+   "units": 87246.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on legs and John"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on legs and rulings"
+   }
+  },
+  {
+   "id": "77d05717:1757",
+   "layer": "Runner",
+   "units": 94638.8,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress wake acknowledged with PENDING-EXTERNAL"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress wake (rulings answered) and re-parks with status"
+   }
+  },
+  {
+   "id": "77d05717:1955",
+   "layer": "Runner",
+   "units": 52589.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on legs"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on children"
+   }
+  },
+  {
+   "id": "77d05717:2072",
+   "layer": "Runner",
+   "units": 77092.4,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on four children"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on four children"
+   }
+  },
+  {
+   "id": "77d05717:2159",
+   "layer": "Runner",
+   "units": 86373.4,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress wake acknowledged with PENDING-EXTERNAL"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress wake with updated PENDING status"
+   }
+  },
+  {
+   "id": "77d05717:2294",
+   "layer": "Runner",
+   "units": 21017.3,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "77d05717:2449",
+   "layer": "Runner",
+   "units": 61524.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on Go leg"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING listing children awaited"
+   }
+  },
+  {
+   "id": "77d05717:2555",
+   "layer": "Runner",
+   "units": 82769.3,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on children"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING listing children awaited"
+   }
+  },
+  {
+   "id": "77d05717:2637",
+   "layer": "Runner",
+   "units": 98703.7,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL during wind-down pause"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING waiting on leg to park"
+   }
+  },
+  {
+   "id": "77d05717:2726",
+   "layer": "Runner",
+   "units": 14438.9,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "c5e9c663:55",
+   "layer": "leg",
+   "units": 38543.3,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Beat 5 prompt with reconciliation instructions after judging corrective"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Beat 5 prompt carries reconciliation corrections after own spot-check"
+   }
+  },
+  {
+   "id": "ad6fb4ec:124",
+   "layer": "leg",
+   "units": 44890.9,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Sends templated verdict beat 3/3"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Sends templated verdict beat 3/3 of plan-review"
+   }
+  },
+  {
+   "id": "ad6fb4ec:240",
+   "layer": "leg",
+   "units": 64027.2,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Reports close-out beat 2 verified facts, beat 3 running"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Operator report of verified close-out beat 2 details and beat 3 launch"
+   }
+  },
+  {
+   "id": "c0501daf:184",
+   "layer": "leg",
+   "units": 890257.8,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe handshake"
+   }
+  },
+  {
+   "id": "598c7f93:150",
+   "layer": "leg",
+   "units": 47108.3,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and child feedback"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt and child feedback"
+   }
+  },
+  {
+   "id": "0ba06ac4:189",
+   "layer": "leg",
+   "units": 905723.8,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe handshake"
+   }
+  },
+  {
+   "id": "0ba06ac4:286",
+   "layer": "leg",
+   "units": 71863.6,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt carrying ruling"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt carrying a ruling"
+   }
+  },
+  {
+   "id": "0cb2f969:23",
+   "layer": "autopilot",
+   "units": 14256.9,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches plan-review dispatch record and issue"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches child's feedback and issue state"
+   }
+  },
+  {
+   "id": "052a27bf:31",
+   "layer": "leg",
+   "units": 16463.7,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks git state to judge beat 2 diff"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Checks branch/HEAD/status to judge worker's diff"
+   }
+  },
+  {
+   "id": "badefab9:129",
+   "layer": "leg",
+   "units": 47160.4,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Sends templated comment beat 4/4 after CI confirmed"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "M",
+    "note": "Sends templated beat 4/4 comment prompt after CI-confirmed acceptance"
+   }
+  },
+  {
+   "id": "4a7664f1:147",
+   "layer": "leg",
+   "units": 56481.6,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on ledger fix worker"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on dispatched implementation beat"
+   }
+  },
+  {
+   "id": "e02dc0cd:121",
+   "layer": "leg",
+   "units": 41482.6,
+   "rule": "recover",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Mechanically compares description drafts for preservation"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Scripted normalised diff of description draft vs original to verify preservation"
+   }
+  },
+  {
+   "id": "e02dc0cd:217",
+   "layer": "leg",
+   "units": 1243181.8,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe handshake"
+   }
+  },
+  {
+   "id": "e610605c:165",
+   "layer": "leg",
+   "units": 54649.8,
+   "rule": "judge",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Reports ledger held merge and item dispositions"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Operator report summarising review ledger items and merge hold"
+   }
+  },
+  {
+   "id": "1315ec21:68",
+   "layer": "leg",
+   "units": 62972.4,
+   "rule": "dispatch",
+   "coder1": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Plan beat 3 prompt with concrete dependency scope"
+   },
+   "coder2": {
+    "cls": "dispatch",
+    "mj": "J",
+    "note": "Sends plan beat 3/3 after accepting beat 2; prompt carries concrete blocker scope"
+   }
+  },
+  {
+   "id": "1315ec21:209",
+   "layer": "leg",
+   "units": 1079897.8,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "1315ec21:265",
+   "layer": "leg",
+   "units": 78146,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on S2b child"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate answered PENDING on child autopilot"
+   }
+  },
+  {
+   "id": "1315ec21:303",
+   "layer": "leg",
+   "units": 86372.5,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Failsafe gate PENDING-EXTERNAL citing ruling"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Failsafe gate answered with PENDING restating known ruling and owner"
+   }
+  },
+  {
+   "id": "6be29b43:53",
+   "layer": "leg",
+   "units": 20979.7,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and beat feedback"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt and child feedback"
+   }
+  },
+  {
+   "id": "83a490a7:122",
+   "layer": "leg",
+   "units": 36672.7,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "PENDING-EXTERNAL on just-dispatched beat 4/4"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "PENDING-EXTERNAL on the beat just dispatched"
+   }
+  },
+  {
+   "id": "83a490a7:205",
+   "layer": "leg",
+   "units": 55125.6,
+   "rule": "judge",
+   "coder1": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Recommend with kind=implementation after plan approved"
+   },
+   "coder2": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Asks engine for implementation recommendation and saves prompt"
+   }
+  },
+  {
+   "id": "83a490a7:309",
+   "layer": "leg",
+   "units": 81270.1,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Gate PENDING-EXTERNAL on PR3 beat 1"
+   },
+   "coder2": {
+    "cls": "rearm",
+    "mj": "M",
+    "note": "Answers gate PENDING-EXTERNAL on child it just dispatched"
+   }
+  },
+  {
+   "id": "83a490a7:388",
+   "layer": "leg",
+   "units": 1669553.5,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "b6e66f00:135",
+   "layer": "leg",
+   "units": 723069.5,
+   "rule": "rearm",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to failsafe handshake"
+   }
+  },
+  {
+   "id": "b6e66f00:247",
+   "layer": "leg",
+   "units": 65055.3,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress-only wake acknowledged"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress-only wake and re-parks"
+   }
+  },
+  {
+   "id": "b6e66f00:337",
+   "layer": "leg",
+   "units": 84311.7,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Progress-only wake acknowledged"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Acknowledges progress-only wake and re-parks"
+   }
+  },
+  {
+   "id": "b6e66f00:448",
+   "layer": "leg",
+   "units": 24298.1,
+   "rule": "poll",
+   "coder1": {
+    "cls": "recover",
+    "mj": "M",
+    "note": "Retries merge-hold comment after auth error"
+   },
+   "coder2": {
+    "cls": "recover",
+    "mj": "M",
+    "note": "Retries comment post after transient Linear auth error"
+   }
+  },
+  {
+   "id": "af1732d5:40",
+   "layer": "stepper",
+   "units": 27657.3,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Explains rejection of beat 3 and corrective"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Reports why beat 3 was not accepted; summarises judged claims"
+   }
+  },
+  {
+   "id": "d5a4d7e3:44",
+   "layer": "stepper",
+   "units": 18564.8,
+   "rule": "orient",
+   "coder1": {
+    "cls": "decide",
+    "mj": "M",
+    "note": "Accepts engine's design verb, reads recommended prompt"
+   },
+   "coder2": {
+    "cls": "decide",
+    "mj": "J",
+    "note": "Weighs engine's design pick against handbook and accepts; reads prompt"
+   }
+  },
+  {
+   "id": "d5a4d7e3:213",
+   "layer": "stepper",
+   "units": 54994.8,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   }
+  },
+  {
+   "id": "d5a4d7e3:303",
+   "layer": "stepper",
+   "units": 1399805.5,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake"
+   }
+  },
+  {
+   "id": "7e8976a9:90",
+   "layer": "leg",
+   "units": 29731.3,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake and review feedback"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt and child review feedback"
+   }
+  },
+  {
+   "id": "d3e08b64:76",
+   "layer": "stepper",
+   "units": 30836.1,
+   "rule": "judge",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Reports beat 1 accepted and beat 2 dispatched"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Operator report of accepted beat 1 results and beat 2 scope"
+   }
+  },
+  {
+   "id": "4b287b57:90",
+   "layer": "stepper",
+   "units": 30236.1,
+   "rule": "judge",
+   "coder1": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Locates worker's branch workspace to check beat"
+   },
+   "coder2": {
+    "cls": "judge",
+    "mj": "M",
+    "note": "Locates worker's branch checkout to spot-check its report"
+   }
+  },
+  {
+   "id": "bcd29e9b:78",
+   "layer": "leg",
+   "units": 400723.5,
+   "rule": "restate",
+   "coder1": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume notice"
+   },
+   "coder2": {
+    "cls": "poll",
+    "mj": "M",
+    "note": "Replies ready to resume handshake; no action"
+   }
+  },
+  {
+   "id": "cddfa067:39",
+   "layer": "leg",
+   "units": 15758.9,
+   "rule": "read",
+   "coder1": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches wake prompt"
+   },
+   "coder2": {
+    "cls": "read",
+    "mj": "M",
+    "note": "Fetches the wake prompt from the known dispatch URL"
+   }
+  },
+  {
+   "id": "a1f18d61:18",
+   "layer": "stepper",
+   "units": 22754.6,
+   "rule": "restate",
+   "coder1": {
+    "cls": "restate",
+    "mj": "M",
+    "note": "Reports beat 1 findings and beat 2 dispatch"
+   },
+   "coder2": {
+    "cls": "restate",
+    "mj": "J",
+    "note": "Operator report summarising beat 1 findings and beat 2 dispatch; free-text synthesis"
+   }
+  }
+ ]
+}

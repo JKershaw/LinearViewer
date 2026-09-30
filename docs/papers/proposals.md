@@ -11,10 +11,11 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   given. (Claude, 2026-09-30)
 - **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
   weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
-  detectable ratio ×2.4), while cost measured per change sees ×1.4 in four weeks. Re-run
-  `scripts/survey-scorecard.mjs` weekly for eight weeks and report whether the per-change detectable ratios
-  hold on new weeks, and whether the weekly count and per-change cost ever move in opposite directions.
-  (Claude, 2026-09-30)
+  detectable ratio ×2.4). `harbour/survey-check-2.md` found cost per change is not the ×1.4 the paper
+  printed, because changes in one week are not independent: on the observed spread of weekly means it
+  sees ×2.8 in dispatches and ×2.0 in hours over four weeks. Re-run `scripts/survey-scorecard.mjs` weekly
+  for eight weeks and report whether those detectable ratios hold on new weeks, and whether the weekly
+  count and per-change cost ever move in opposite directions. (Claude, 2026-09-30, corrected 2026-09-30)
 - **When were the faults that later reviews find actually written?** `harbour/reliability-baseline.md`
   counted 49 escaped Bugs filed as `kind:review-residue`, a later review finding a fault in older
   code, and `harbour/survey-check.md` found at least 21 more with no residue label. In
@@ -306,14 +307,14 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   report the share nothing reads. (Claude, 2026-09-19)
 - **Which of a supervisor's gate replies and quiet wakes could the runner already have answered?**
   `harbour/what-supervisors-do.md` found 24% of September's supervision tokens go to answering the
-  completion gate, and a third of wakes change nothing — while the runner holds each parent's live
-  subscribed children (`reapers.js:1009`) only as a reaper exemption. Replay the September gate replies
+  completion gate (20% to PENDING-EXTERNAL replies), and 31% of wakes change nothing — while the runner
+  holds each parent's live subscribed children (`reapers.js:1009`) only to exempt it from reaping. Replay the September gate replies
   and quiet wake cycles against the runner's own state at that moment, and count how many a reader of
   that state would have written identically. (Claude, 2026-09-30)
 - **Which of Harbour's pin-class tests have never failed, for any reason, since they were written?**
   `harbour/test-estate.md` found the 851 text pins, census pins and source scans failed a PR's CI
-  twice in four months, while inside sessions census and text pins demanded a bump about as often
-  as they preceded a fix. Join each pin's age to every CI and session failure record to separate
+  twice in four months, while inside sessions census and text pins demanded a bump at least as often
+  as they caught a fault, on one or two catches a class (`harbour/survey-check-2.md`). Join each pin's age to every CI and session failure record to separate
   the pins that bump often from the ones that never fire, and say how much of the pin family each
   group is. (Claude, 2026-09-30)
 - **What does an escaped defect cost the operator, by implementer tier?** `harbour/model-choice.md`
@@ -328,3 +329,10 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   changes are younger than the 30-day window. Re-run `scripts/survey-model-analyse.mjs` in late
   October and report the cheap tier's whole-life hours, escapes and afterlife curve beside the two
   tiers measured here. (Claude, 2026-09-30)
+- **Which of the scorecard's named fixes are fixes, and which follow-ups are the change's own?**
+  `harbour/survey-check-2.md` found `scripts/survey-scorecard.mjs`'s correct and complete tests rest on text
+  matches: 69 of its 78 named fixes are a mention of the change anywhere in a later ticket's description,
+  35 of 66 escapes name the ticket whose review found the fault, and 116 mature changes are named as origin
+  in filings the scorecard ignores. Read the 78 fixes and the 116 filings blind, against a written rubric,
+  and report the correct and complete rates as estimates with intervals rather than bounds.
+  (Claude, 2026-09-30)
