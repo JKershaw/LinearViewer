@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
+  `harbour/why-throughput-halved.md` found that, from 13 July, changes written mainly at the mid tier
+  were 67% correct and complete against 78% for the frontier tier, with 9.6% against 2.4% escaping, at
+  the same dispatches and working hours per change. Match later-block changes on production size,
+  area and ticket kind, and report whether the gap survives or belongs to the tickets each tier was
+  given. (Claude, 2026-09-30)
 - **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
   weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
   detectable ratio ×2.4), while cost measured per change sees ×1.4 in four weeks. Re-run
