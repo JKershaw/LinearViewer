@@ -266,8 +266,9 @@ small: 10 and 11 reviewed tickets a month bound these rates to about ±30 points
 
 The brief says the anchor already cites both papers, as points 11 and 12. At fe541ee9 it has ten
 points and cites neither paper. No branch or local checkout on the runner machine holds a version
-with points 11 or 12. This check did not edit the anchor. Four lines and the evidence table change because of these two
-papers, alongside the rows `survey-check-2.md` already gave for lines 75, 121 and 123:
+with points 11 or 12. This check did not edit the anchor. Four lines and the evidence table
+change because of these two papers, alongside the rows `survey-check-2.md` already gave for lines
+75, 121 and 123:
 
 | Line | Now | Should read |
 |---|---|---|
