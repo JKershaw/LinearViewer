@@ -1,0 +1,1499 @@
+{
+ "ticket": "LIN-3156",
+ "codedAt": "2026-09-30",
+ "population": "The 201 Bug tickets docs/papers/harbour/reliability-baseline-defects.json (LIN-3149) judged escaped or escaped-test, LIN-26 to LIN-3122, both repos.",
+ "method": "Each defect read from its one-line reason, repo, introducing ticket and finder in that file, by one in-session subagent against the rubric below, fixed before reading; at most two rules per defect. Not second-read.",
+ "rubric": {
+  "regression-history": "The fault re-breaks behaviour a previous commit had fixed, or re-applies something reverted.",
+  "class-check": "The fault is a sibling instance of a class another change fixed/handled (same bug in a second place, a missed caller/route/variant).",
+  "mutation-check": "Tests passed while the claimed code path was not wired in / the code did not take effect; a vacuous or non-load-bearing test.",
+  "test-adequacy": "The fault is cross-module or user-facing and would need an e2e/integration test that was absent.",
+  "direct-verification": "Visible only by looking at the running page/UI or real behaviour (visual/layout/rendering), not by tests.",
+  "requirements": "The shipped change did not meet its own ticket's stated requirement/acceptance criteria.",
+  "quality-checklist": "Security/credential flaw, error handling, performance regression.",
+  "inside-outside": "The fault was a known inside-scope item that was discharged by filing instead of doing it (with ledger-discharge).",
+  "ledger-discharge": "The fault was a known inside-scope item that was discharged by filing instead of doing it (with inside-outside).",
+  "trivial-edit-bound": "A close-out authored/merged content review never saw, and that content was faulty.",
+  "risk-lanes": "A claim that could only be proven in production, accepted without a firing monitor, that then failed.",
+  "archive-prune": "A fault in/caused by the description prune or archive step.",
+  "follow-up-filing": "Follow-ups filed untriaged/with wrong priority causing the fault to sit.",
+  "ci-green-exact-commit": "Merged on red CI or on a commit other than the reviewed one.",
+  "none": "No rule's class fits (e.g. provider/API behaviour change, environment, novel design gap)."
+ },
+ "codes": [
+  {
+   "identifier": "LIN-26",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Novel tree-building design gap; no rule targets it."
+  },
+  {
+   "identifier": "LIN-53",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "low",
+   "why": "Second instance of project-based grouping hiding issues, like LIN-26."
+  },
+  {
+   "identifier": "LIN-62",
+   "rules": [],
+   "confidence": "high",
+   "why": "Prompt-design judgement, not a rule-covered fault class."
+  },
+  {
+   "identifier": "LIN-64",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Stray fences visible only by inspecting real generated output."
+  },
+  {
+   "identifier": "LIN-106",
+   "rules": [],
+   "confidence": "high",
+   "why": "Datastore race after login; environment/novel concurrency."
+  },
+  {
+   "identifier": "LIN-111",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "medium",
+   "why": "UI element shown in wrong state; visible by looking at page."
+  },
+  {
+   "identifier": "LIN-143",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "high",
+   "why": "Mobile layout/padding fault, visible only on rendered page."
+  },
+  {
+   "identifier": "LIN-144",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "medium",
+   "why": "Missing client JS formatting visible only on rendered page."
+  },
+  {
+   "identifier": "LIN-146",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "medium",
+   "why": "Link visibility inconsistency visible only in running UI."
+  },
+  {
+   "identifier": "LIN-153",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "medium",
+   "why": "Inconsistent show/hide behaviour visible only in running UI."
+  },
+  {
+   "identifier": "LIN-157",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Ordering mismatch across views seen by looking at pages."
+  },
+  {
+   "identifier": "LIN-190",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Copy path missed by existing server-side fence strip; sibling path."
+  },
+  {
+   "identifier": "LIN-191",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Button state during generation visible in running UI."
+  },
+  {
+   "identifier": "LIN-274",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Provider returned comments unordered; API behaviour."
+  },
+  {
+   "identifier": "LIN-276",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Novel state-mapping gap."
+  },
+  {
+   "identifier": "LIN-278",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "low",
+   "why": "Missing auth-refresh error handling on expired token."
+  },
+  {
+   "identifier": "LIN-286",
+   "rules": [],
+   "confidence": "high",
+   "why": "Workflow prompt design gap."
+  },
+  {
+   "identifier": "LIN-304",
+   "rules": [
+    "test-adequacy"
+   ],
+   "confidence": "medium",
+   "why": "Endpoint always failed; no integration test against real GraphQL schema."
+  },
+  {
+   "identifier": "LIN-345",
+   "rules": [
+    "test-adequacy"
+   ],
+   "confidence": "low",
+   "why": "Cross-module dispatch call missing required id; no integration test."
+  },
+  {
+   "identifier": "LIN-346",
+   "rules": [
+    "risk-lanes"
+   ],
+   "confidence": "medium",
+   "why": "H15 fix only provable in production; accepted without monitor, failed."
+  },
+  {
+   "identifier": "LIN-353",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Novel descent-loop logic gap."
+  },
+  {
+   "identifier": "LIN-358",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Prompt contract design gap."
+  },
+  {
+   "identifier": "LIN-401",
+   "rules": [],
+   "confidence": "high",
+   "why": "Provider returns trashed issues without signal; API behaviour."
+  },
+  {
+   "identifier": "LIN-430",
+   "rules": [
+    "ci-green-exact-commit"
+   ],
+   "confidence": "high",
+   "why": "Autopilot merged red PRs; exactly the merge-on-green class."
+  },
+  {
+   "identifier": "LIN-525",
+   "rules": [
+    "test-adequacy",
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Cross-module toggle desync plus silent token injection credential flaw."
+  },
+  {
+   "identifier": "LIN-548",
+   "rules": [],
+   "confidence": "high",
+   "why": "Prompt wording choice, no rule class."
+  },
+  {
+   "identifier": "LIN-549",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Runner done-signal timing, not a merge-on-red fault."
+  },
+  {
+   "identifier": "LIN-608",
+   "rules": [
+    "direct-verification",
+    "test-adequacy"
+   ],
+   "confidence": "medium",
+   "why": "New page crashes on load; visible by opening it, no e2e."
+  },
+  {
+   "identifier": "LIN-609",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Unhandled errors crash app: error-handling checklist class."
+  },
+  {
+   "identifier": "LIN-613",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Panel stuck loading visible in running UI; cause unclear."
+  },
+  {
+   "identifier": "LIN-617",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Unbounded per-poll scans: performance regression."
+  },
+  {
+   "identifier": "LIN-622",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Unbounded history rebuild causes memory crash: performance."
+  },
+  {
+   "identifier": "LIN-623",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Throttle latency and missing indexes: performance regression."
+  },
+  {
+   "identifier": "LIN-637",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Novel multi-subtask completion logic gap."
+  },
+  {
+   "identifier": "LIN-645",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Prompt content omission; novel."
+  },
+  {
+   "identifier": "LIN-698",
+   "rules": [],
+   "confidence": "high",
+   "why": "Template instruction design gap."
+  },
+  {
+   "identifier": "LIN-727",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Navigation state reset visible only in real behaviour."
+  },
+  {
+   "identifier": "LIN-732",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Second-appearance button failure visible in running UI."
+  },
+  {
+   "identifier": "LIN-735",
+   "rules": [
+    "mutation-check",
+    "requirements"
+   ],
+   "confidence": "high",
+   "why": "LIN-728 fix inert and LIN-717 incomplete; claimed fixes did not take effect."
+  },
+  {
+   "identifier": "LIN-753",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Sentinel semantics design gap."
+  },
+  {
+   "identifier": "LIN-768",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Field-name inconsistency; novel contract gap."
+  },
+  {
+   "identifier": "LIN-778",
+   "rules": [],
+   "confidence": "high",
+   "why": "Session idle with no tool calls; runtime/provider behaviour."
+  },
+  {
+   "identifier": "LIN-790",
+   "rules": [],
+   "confidence": "medium",
+   "why": "SIGTERM teardown flush; environment/novel."
+  },
+  {
+   "identifier": "LIN-799",
+   "rules": [],
+   "confidence": "high",
+   "why": "E2E flakiness; test-only timing."
+  },
+  {
+   "identifier": "LIN-800",
+   "rules": [],
+   "confidence": "high",
+   "why": "E2E timing flake; test-only."
+  },
+  {
+   "identifier": "LIN-801",
+   "rules": [],
+   "confidence": "high",
+   "why": "Seed id collision flake; test-only."
+  },
+  {
+   "identifier": "LIN-822",
+   "rules": [],
+   "confidence": "high",
+   "why": "Pre-existing e2e timing flake."
+  },
+  {
+   "identifier": "LIN-831",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Hold/poll coordination design gap."
+  },
+  {
+   "identifier": "LIN-881",
+   "rules": [
+    "mutation-check"
+   ],
+   "confidence": "high",
+   "why": "Shipped wake-half (LIN-843) never took effect."
+  },
+  {
+   "identifier": "LIN-924",
+   "rules": [],
+   "confidence": "high",
+   "why": "iTerm/osascript environment under load."
+  },
+  {
+   "identifier": "LIN-925",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Window reaping never designed; environment accumulation."
+  },
+  {
+   "identifier": "LIN-946",
+   "rules": [
+    "mutation-check"
+   ],
+   "confidence": "medium",
+   "why": "Close-on-done change shipped but did not take effect."
+  },
+  {
+   "identifier": "LIN-949",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Mobile upload failure visible only on real device."
+  },
+  {
+   "identifier": "LIN-969",
+   "rules": [
+    "test-adequacy"
+   ],
+   "confidence": "medium",
+   "why": "Syntax error failing every launch; no real-launch integration test."
+  },
+  {
+   "identifier": "LIN-1023",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "high",
+   "why": "Renders [object Object]; visible only by viewing page."
+  },
+  {
+   "identifier": "LIN-1059",
+   "rules": [
+    "test-adequacy"
+   ],
+   "confidence": "low",
+   "why": "Cross-module wake-edge break from itemId repoint."
+  },
+  {
+   "identifier": "LIN-1083",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Resume behaviour design gap."
+  },
+  {
+   "identifier": "LIN-1113",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Stale wait handling design gap."
+  },
+  {
+   "identifier": "LIN-1132",
+   "rules": [],
+   "confidence": "low",
+   "why": "Defaults dropped; unknown originating change."
+  },
+  {
+   "identifier": "LIN-1135",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Second path dropping model/harness defaults, sibling of LIN-1132."
+  },
+  {
+   "identifier": "LIN-1147",
+   "rules": [],
+   "confidence": "medium",
+   "why": "HOME dot-dir size; environment."
+  },
+  {
+   "identifier": "LIN-1158",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Malformed body returns 500 not 400: error handling."
+  },
+  {
+   "identifier": "LIN-1185",
+   "rules": [],
+   "confidence": "low",
+   "why": "Cause unknown; no class evident."
+  },
+  {
+   "identifier": "LIN-1203",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Request exceeds 30s platform timeout: performance."
+  },
+  {
+   "identifier": "LIN-1204",
+   "rules": [],
+   "confidence": "low",
+   "why": "Key resolution gap; novel."
+  },
+  {
+   "identifier": "LIN-1227",
+   "rules": [],
+   "confidence": "high",
+   "why": "Triage token permissions design gap."
+  },
+  {
+   "identifier": "LIN-1266",
+   "rules": [],
+   "confidence": "high",
+   "why": "Claude Code cap behaviour; provider constraint."
+  },
+  {
+   "identifier": "LIN-1313",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Queued wake design gap."
+  },
+  {
+   "identifier": "LIN-1323",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Wait/sentinel interaction design gap."
+  },
+  {
+   "identifier": "LIN-1324",
+   "rules": [
+    "regression-history"
+   ],
+   "confidence": "medium",
+   "why": "New kickoff wording defeats previously shipped push-wake behaviour."
+  },
+  {
+   "identifier": "LIN-1341",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "low",
+   "why": "Follow-up grouping visible on rendered pages."
+  },
+  {
+   "identifier": "LIN-1357",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Stepper re-invocation design gap."
+  },
+  {
+   "identifier": "LIN-1373",
+   "rules": [
+    "test-adequacy"
+   ],
+   "confidence": "low",
+   "why": "Owner-scoping exposed token lapse; cross-module interaction."
+  },
+  {
+   "identifier": "LIN-1375",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Credential leaked into transcripts: security flaw."
+  },
+  {
+   "identifier": "LIN-1376",
+   "rules": [
+    "class-check",
+    "test-adequacy"
+   ],
+   "confidence": "medium",
+   "why": "Bootstrap mints are a missed variant of owner scoping; cross-module 503."
+  },
+  {
+   "identifier": "LIN-1394",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Materializer is sibling of LIN-1341 straddle bug."
+  },
+  {
+   "identifier": "LIN-1413",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Error envelope prescribes useless remedy: error handling."
+  },
+  {
+   "identifier": "LIN-1414",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Cross-tenant data leak: security."
+  },
+  {
+   "identifier": "LIN-1428",
+   "rules": [
+    "regression-history",
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Broke LIN-805 invariant; resumed/follow-up path missed."
+  },
+  {
+   "identifier": "LIN-1437",
+   "rules": [],
+   "confidence": "low",
+   "why": "Error derivation gap in older code."
+  },
+  {
+   "identifier": "LIN-1444",
+   "rules": [
+    "regression-history"
+   ],
+   "confidence": "medium",
+   "why": "Nudge discards earlier stall-failsafe re-ask behaviour."
+  },
+  {
+   "identifier": "LIN-1455",
+   "rules": [],
+   "confidence": "high",
+   "why": "Prompt CI assumption in CI-less repos; outside rubric classes."
+  },
+  {
+   "identifier": "LIN-1458",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Silent null fallback: error handling."
+  },
+  {
+   "identifier": "LIN-1503",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "401-retry deletes workspaces: error handling."
+  },
+  {
+   "identifier": "LIN-1505",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "high",
+   "why": "Visual jerk in pulse strip, only visible live."
+  },
+  {
+   "identifier": "LIN-1535",
+   "rules": [],
+   "confidence": "high",
+   "why": "Hard-dated fixture aged out; test-only."
+  },
+  {
+   "identifier": "LIN-1576",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Ownerless tokens again, sibling of LIN-1376 owner-scoping 503."
+  },
+  {
+   "identifier": "LIN-1594",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Queue state design gap."
+  },
+  {
+   "identifier": "LIN-1694",
+   "rules": [],
+   "confidence": "low",
+   "why": "Model/harness resolution crossing; novel."
+  },
+  {
+   "identifier": "LIN-1731",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Reaper logic design gap."
+  },
+  {
+   "identifier": "LIN-1739",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Path resolution novel gap."
+  },
+  {
+   "identifier": "LIN-1740",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Multi-instance topology; environment."
+  },
+  {
+   "identifier": "LIN-1821",
+   "rules": [
+    "inside-outside"
+   ],
+   "confidence": "low",
+   "why": "Named launch wedge scoped out by LIN-1815 plan; inside status unclear."
+  },
+  {
+   "identifier": "LIN-1848",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Test hermeticity under proxy env; environment."
+  },
+  {
+   "identifier": "LIN-1874",
+   "rules": [],
+   "confidence": "low",
+   "why": "Resolver logic collapse; novel."
+  },
+  {
+   "identifier": "LIN-1880",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Second live-network unit test, sibling of LIN-1848."
+  },
+  {
+   "identifier": "LIN-1903",
+   "rules": [
+    "test-adequacy"
+   ],
+   "confidence": "medium",
+   "why": "Cross-module provider resolution; caught only by manual end-to-end test."
+  },
+  {
+   "identifier": "LIN-1917",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Second raw refiredAt check, sibling of LIN-1731."
+  },
+  {
+   "identifier": "LIN-1936",
+   "rules": [],
+   "confidence": "high",
+   "why": "Unproven local flake."
+  },
+  {
+   "identifier": "LIN-2003",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Broker 401s; cause unproven."
+  },
+  {
+   "identifier": "LIN-2078",
+   "rules": [
+    "requirements"
+   ],
+   "confidence": "medium",
+   "why": "LIN-1471 violated the once-wake criterion."
+  },
+  {
+   "identifier": "LIN-2259",
+   "rules": [],
+   "confidence": "low",
+   "why": "Reaper logic; older code."
+  },
+  {
+   "identifier": "LIN-2272",
+   "rules": [
+    "direct-verification",
+    "mutation-check"
+   ],
+   "confidence": "high",
+   "why": "Padding fix inert; overlap visible only by measuring rendered page."
+  },
+  {
+   "identifier": "LIN-2278",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Older sentinel-ranking sibling named in LIN-2275 review."
+  },
+  {
+   "identifier": "LIN-2281",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "rootItemId omission sibling found by LIN-2268 review."
+  },
+  {
+   "identifier": "LIN-2282",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Resume-marker sibling found by LIN-2268 review."
+  },
+  {
+   "identifier": "LIN-2283",
+   "rules": [
+    "mutation-check"
+   ],
+   "confidence": "medium",
+   "why": "LIN-2268 claimed fix did not take effect on consumer."
+  },
+  {
+   "identifier": "LIN-2285",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "500 dead-end on raw id: error handling."
+  },
+  {
+   "identifier": "LIN-2291",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "low",
+   "why": "Cross-workspace id match; tenant scoping."
+  },
+  {
+   "identifier": "LIN-2293",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "decision_id keying sibling found by LIN-2262 review."
+  },
+  {
+   "identifier": "LIN-2294",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Prompt variants lacking carve-out; found by class check."
+  },
+  {
+   "identifier": "LIN-2297",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Guard logic runtime gap."
+  },
+  {
+   "identifier": "LIN-2298",
+   "rules": [
+    "direct-verification",
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "FAB overlap sibling of LIN-2272; unmeasured CSS."
+  },
+  {
+   "identifier": "LIN-2299",
+   "rules": [
+    "direct-verification",
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "FAB covers toggle; visual sibling measured by LIN-2272 review."
+  },
+  {
+   "identifier": "LIN-2300",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Add-source 409 siblings found by LIN-2266 review."
+  },
+  {
+   "identifier": "LIN-2301",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Channel divergence sibling found by LIN-2264 review."
+  },
+  {
+   "identifier": "LIN-2316",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Bare priority int sibling named by LIN-2311 review."
+  },
+  {
+   "identifier": "LIN-2317",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Priority-write rule sibling from LIN-2316 review."
+  },
+  {
+   "identifier": "LIN-2327",
+   "rules": [
+    "quality-checklist",
+    "risk-lanes"
+   ],
+   "confidence": "medium",
+   "why": "Silent refresh loop; production-only claim without monitor."
+  },
+  {
+   "identifier": "LIN-2329",
+   "rules": [
+    "mutation-check"
+   ],
+   "confidence": "low",
+   "why": "LIN-2097 freeze did not take effect on logging."
+  },
+  {
+   "identifier": "LIN-2331",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Within-class wake collisions, siblings of LIN-2297."
+  },
+  {
+   "identifier": "LIN-2333",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Four more rootItemId omissions, class sibling of LIN-2281."
+  },
+  {
+   "identifier": "LIN-2334",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Kickoff manual sibling found by LIN-2294 class check."
+  },
+  {
+   "identifier": "LIN-2339",
+   "rules": [],
+   "confidence": "medium",
+   "why": "State overwrite design gap."
+  },
+  {
+   "identifier": "LIN-2345",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Half-built workspace sibling from LIN-2300 review."
+  },
+  {
+   "identifier": "LIN-2349",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Second sentinel-ranking branch, sibling of LIN-2278."
+  },
+  {
+   "identifier": "LIN-2354",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Provider-neutral copy never designed."
+  },
+  {
+   "identifier": "LIN-2358",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "low",
+   "why": "Unvalidated input yields false value."
+  },
+  {
+   "identifier": "LIN-2363",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Latent sibling left out of LIN-2351 scope."
+  },
+  {
+   "identifier": "LIN-2366",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Remaining [failed] rootItemId site excluded by LIN-2333."
+  },
+  {
+   "identifier": "LIN-2367",
+   "rules": [
+    "class-check",
+    "inside-outside"
+   ],
+   "confidence": "high",
+   "why": "Partial LIN-2291 fix left same-class sibling filed."
+  },
+  {
+   "identifier": "LIN-2370",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Older copy blocks, sibling left out of LIN-2354."
+  },
+  {
+   "identifier": "LIN-2371",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Chat templates sibling deferred out of LIN-2354."
+  },
+  {
+   "identifier": "LIN-2374",
+   "rules": [],
+   "confidence": "high",
+   "why": "Test tooling anchor fault."
+  },
+  {
+   "identifier": "LIN-2385",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Evidence gate status logic; novel."
+  },
+  {
+   "identifier": "LIN-2396",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Prompt terminal-state wording; outside rubric classes."
+  },
+  {
+   "identifier": "LIN-2403",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Provider pricing tier not modelled."
+  },
+  {
+   "identifier": "LIN-2414",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Blocked-hold readmission sibling assigned out of LIN-2331."
+  },
+  {
+   "identifier": "LIN-2442",
+   "rules": [
+    "inside-outside"
+   ],
+   "confidence": "low",
+   "why": "Found in LIN-2435 research and deferred; inside status unclear."
+  },
+  {
+   "identifier": "LIN-2445",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Task Chat pill sibling of LIN-2443 fix."
+  },
+  {
+   "identifier": "LIN-2449",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Disconnect variant of LIN-2442 census-commit bug."
+  },
+  {
+   "identifier": "LIN-2468",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Dead-hook hold design gap."
+  },
+  {
+   "identifier": "LIN-2487",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "No-census variant left by LIN-2438."
+  },
+  {
+   "identifier": "LIN-2510",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Stall timeout design gap."
+  },
+  {
+   "identifier": "LIN-2511",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Unreset clock in reaper; novel."
+  },
+  {
+   "identifier": "LIN-2515",
+   "rules": [],
+   "confidence": "high",
+   "why": "Login-screen environment state."
+  },
+  {
+   "identifier": "LIN-2556",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Three follow-up-loss sites found by LIN-2468 review."
+  },
+  {
+   "identifier": "LIN-2559",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "low",
+   "why": "Agent tool a missed variant in async-wait resolution."
+  },
+  {
+   "identifier": "LIN-2560",
+   "rules": [],
+   "confidence": "low",
+   "why": "Catch-all allow design gap."
+  },
+  {
+   "identifier": "LIN-2563",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Opencode notification arm; excluded sibling."
+  },
+  {
+   "identifier": "LIN-2565",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "200 success:false instead of 502: error handling."
+  },
+  {
+   "identifier": "LIN-2575",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Lane/batch dispatch variant of LIN-2385 periodical gate."
+  },
+  {
+   "identifier": "LIN-2576",
+   "rules": [
+    "quality-checklist",
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Gate bypass via missed write route."
+  },
+  {
+   "identifier": "LIN-2597",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Allow-list coverage gap; novel."
+  },
+  {
+   "identifier": "LIN-2611",
+   "rules": [
+    "mutation-check"
+   ],
+   "confidence": "medium",
+   "why": "Terminal.app detection path inert, never took effect."
+  },
+  {
+   "identifier": "LIN-2612",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Withheld usage-limit patterns, sibling of LIN-2597."
+  },
+  {
+   "identifier": "LIN-2644",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "BLOCKED sibling of AWAITING_EXTERNAL catch-all, out of LIN-2560."
+  },
+  {
+   "identifier": "LIN-2657",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Duplicate [done] sibling recorded out of LIN-2563 scope."
+  },
+  {
+   "identifier": "LIN-2668",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "pendingFollowUp sites left unowned by LIN-2556."
+  },
+  {
+   "identifier": "LIN-2671",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Census derivation logic gap."
+  },
+  {
+   "identifier": "LIN-2685",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Malformed-row throw found by LIN-2661 class check."
+  },
+  {
+   "identifier": "LIN-2712",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Ignored status code: error handling gap."
+  },
+  {
+   "identifier": "LIN-2720",
+   "rules": [],
+   "confidence": "medium",
+   "why": "OpenCode hold design gap."
+  },
+  {
+   "identifier": "LIN-2722",
+   "rules": [],
+   "confidence": "low",
+   "why": "Older page drops fields; novel."
+  },
+  {
+   "identifier": "LIN-2723",
+   "rules": [
+    "class-check",
+    "direct-verification"
+   ],
+   "confidence": "high",
+   "why": "Raw Markdown surface left out of LIN-2670; visible only rendered."
+  },
+  {
+   "identifier": "LIN-2729",
+   "rules": [],
+   "confidence": "low",
+   "why": "Filter ordering logic gap."
+  },
+  {
+   "identifier": "LIN-2739",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Store duplicate-stamp sibling scoped out by LIN-2444."
+  },
+  {
+   "identifier": "LIN-2779",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Silent refusal: error handling."
+  },
+  {
+   "identifier": "LIN-2787",
+   "rules": [],
+   "confidence": "low",
+   "why": "Label filter logic gap."
+  },
+  {
+   "identifier": "LIN-2798",
+   "rules": [
+    "mutation-check"
+   ],
+   "confidence": "medium",
+   "why": "Cache clear made load-bearing but did not take effect."
+  },
+  {
+   "identifier": "LIN-2804",
+   "rules": [
+    "class-check",
+    "inside-outside"
+   ],
+   "confidence": "high",
+   "why": "LIN-2355 left preamble half unfixed."
+  },
+  {
+   "identifier": "LIN-2805",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "GitHub identifier variant missed by LIN-only regex."
+  },
+  {
+   "identifier": "LIN-2814",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Sibling prompt surfaces left out of LIN-2804."
+  },
+  {
+   "identifier": "LIN-2816",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Instructions route sibling deferred by LIN-2804."
+  },
+  {
+   "identifier": "LIN-2818",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Kickoff goal handling gap; novel."
+  },
+  {
+   "identifier": "LIN-2822",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Silent 100-cap siblings scoped out by LIN-2820."
+  },
+  {
+   "identifier": "LIN-2845",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Waiting derivations sibling left out of LIN-2671."
+  },
+  {
+   "identifier": "LIN-2849",
+   "rules": [],
+   "confidence": "low",
+   "why": "Seed-turn gate logic gap."
+  },
+  {
+   "identifier": "LIN-2854",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Aborted-signal sibling dropped by LIN-2637 close-out."
+  },
+  {
+   "identifier": "LIN-2882",
+   "rules": [],
+   "confidence": "medium",
+   "why": "State guard dead-end; novel."
+  },
+  {
+   "identifier": "LIN-2901",
+   "rules": [],
+   "confidence": "low",
+   "why": "Route drops fields; novel."
+  },
+  {
+   "identifier": "LIN-2905",
+   "rules": [
+    "direct-verification"
+   ],
+   "confidence": "medium",
+   "why": "Timeline flood and mislabels visible only in running UI."
+  },
+  {
+   "identifier": "LIN-2906",
+   "rules": [
+    "class-check",
+    "direct-verification"
+   ],
+   "confidence": "medium",
+   "why": "Wake chip sibling of LIN-2905 via LIN-2121."
+  },
+  {
+   "identifier": "LIN-2907",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Wake-row count inflation sibling of LIN-2905."
+  },
+  {
+   "identifier": "LIN-2923",
+   "rules": [],
+   "confidence": "medium",
+   "why": "Template factual error; outside rubric classes."
+  },
+  {
+   "identifier": "LIN-2974",
+   "rules": [
+    "test-adequacy"
+   ],
+   "confidence": "medium",
+   "why": "Validation and runner disagree; cross-module test absent."
+  },
+  {
+   "identifier": "LIN-2975",
+   "rules": [],
+   "confidence": "low",
+   "why": "Proxy field omission; novel."
+  },
+  {
+   "identifier": "LIN-2980",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Catch swallows handler errors: error handling."
+  },
+  {
+   "identifier": "LIN-2981",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Live OpenRouter unit test, sibling of LIN-1848/LIN-1880."
+  },
+  {
+   "identifier": "LIN-2983",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "medium",
+   "why": "Unguarded deref aborts stream: error handling."
+  },
+  {
+   "identifier": "LIN-2984",
+   "rules": [
+    "class-check",
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Server catch sites excluded from LIN-2980 PR."
+  },
+  {
+   "identifier": "LIN-2986",
+   "rules": [
+    "class-check",
+    "direct-verification"
+   ],
+   "confidence": "high",
+   "why": "Scroll-family sibling; visible only in running chat."
+  },
+  {
+   "identifier": "LIN-2987",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Duplicated predicate, out-of-scope row in LIN-2812."
+  },
+  {
+   "identifier": "LIN-2991",
+   "rules": [],
+   "confidence": "high",
+   "why": "Ruling re-raise process fault; outside rubric classes."
+  },
+  {
+   "identifier": "LIN-2992",
+   "rules": [
+    "mutation-check"
+   ],
+   "confidence": "medium",
+   "why": "Hermetic guard vacuous for loopback-proxied escapes."
+  },
+  {
+   "identifier": "LIN-3007",
+   "rules": [
+    "quality-checklist"
+   ],
+   "confidence": "high",
+   "why": "Unbounded paging timeout and fail-open check: performance/error handling."
+  },
+  {
+   "identifier": "LIN-3032",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Defer/failed-turn variant of DECISION posting."
+  },
+  {
+   "identifier": "LIN-3048",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Bash async-wait sibling of LIN-2932 fix."
+  },
+  {
+   "identifier": "LIN-3076",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "medium",
+   "why": "Unguarded sentinel writes excluded from LIN-2837 PR."
+  },
+  {
+   "identifier": "LIN-3077",
+   "rules": [
+    "class-check"
+   ],
+   "confidence": "high",
+   "why": "Unhandled refusal sibling left by LIN-2837."
+  },
+  {
+   "identifier": "LIN-3122",
+   "rules": [],
+   "confidence": "high",
+   "why": "pkill outage environment."
+  }
+ ]
+}
