@@ -27,6 +27,13 @@ const AGENT_ROUTE = read('routes/proxy-agent-status.js');
 const STEADY_BASE = read('docs/steady-base.md');
 const EFFORT = read('docs/papers/harbour/where-the-effort-goes.md');
 const THROUGHPUT = read('docs/papers/harbour/measuring-throughput.md');
+const LLM_CALL_LOG = read('lib/llm-call-log.js');
+const PROXY_EVENTS = read('lib/proxy-events.js');
+const PERIODICAL_RUNS = read('lib/periodical-runs.js');
+const SHIP_BISCUIT = read('lib/ship-biscuit.js');
+const SHIP_EDITOR = read('lib/prompts/ship-biscuit-editor.js');
+const DISPATCH_STORE = read('lib/dispatch-store.js');
+const READ_HORIZON = read('lib/read-horizon.js');
 
 describe('lifetime-retention contract language (LIN-3163)', () => {
   test('the published instructions state lifetime retention and drop the old retention phrasing', () => {
@@ -69,5 +76,68 @@ describe('lifetime-retention contract language (LIN-3163)', () => {
     assert.match(STEADY_BASE, /LIN-3163/);
     assert.match(EFFORT, /LIN-3163/);
     assert.match(THROUGHPUT, /LIN-3163/);
+  });
+});
+
+/**
+ * Review Finding 1 (ledger row 1): the stale retention language D missed
+ * across 7 files / ~14 sites. Each site is inside D's bounded stale-comment
+ * class — a comment/doc string that still describes evidence as expiring
+ * ("non-expired", a store retention window / TTL, or rows that "age out")
+ * instead of lifetime-retained with a fixed 30-day READ horizon. Guarding it
+ * here keeps the same class from drifting back.
+ */
+describe('lifetime-retention stale-language reconciliation (LIN-3163 Finding 1)', () => {
+  test('agent-status-store listStatus no longer calls retained rows "non-expired"', () => {
+    assert.doesNotMatch(AGENT_STORE, /non-expired/,
+      'status is retained for the life of the project; the list is not bounded by expiry');
+    assert.match(AGENT_STORE, /every retained entry/,
+      'the no-limit read returns the full retained set');
+  });
+
+  test('llm-call-log summarize names the 30-day read window, not a non-expired window', () => {
+    assert.doesNotMatch(LLM_CALL_LOG, /non-expired/,
+      'the call log is lifetime-retained; the aggregate reads a fixed 30-day horizon');
+    assert.match(LLM_CALL_LOG, /30-day read window/,
+      'the summarize window is a READ horizon, not a retention bound');
+  });
+
+  test('proxy-events listEvents comment no longer claims an in-memory non-expired read', () => {
+    assert.doesNotMatch(PROXY_EVENTS, /non-expired/,
+      'events are lifetime-retained; listEvents is not filtered on expiry');
+    assert.match(PROXY_EVENTS, /full retained history/,
+      'listEvents pages over the full retained history in the database');
+  });
+
+  test('periodical-runs documents historyTtlMs as a read window and the TypeError says so', () => {
+    assert.doesNotMatch(PERIODICAL_RUNS, /store's retention window/,
+      'historyTtlMs is a READ window input, not the store retention window');
+    assert.doesNotMatch(PERIODICAL_RUNS, /store's own TTL/,
+      'dispatch-history carries no TTL to cap against');
+    assert.doesNotMatch(PERIODICAL_RUNS, /store's historyTtl/,
+      'the TypeError must not call the input the store\'s historyTtl');
+    assert.match(PERIODICAL_RUNS, /read-horizon input, in ms/,
+      'the required-input TypeError names the read-horizon input');
+    assert.match(PERIODICAL_RUNS, /lifetime-retained/);
+  });
+
+  test('ship-biscuit and its editor no longer say source rows age out', () => {
+    assert.doesNotMatch(SHIP_BISCUIT, /source rows age out|source ages out|source TTL|sources TTL/,
+      'the pinned snapshot is the grounding guarantee; rows do not expire');
+    assert.match(SHIP_BISCUIT, /lifetime-retained/);
+    assert.doesNotMatch(SHIP_EDITOR, /30-day-TTL|age out|source TTL/,
+      'the editor prompt must not claim a 30-day source TTL');
+    assert.match(SHIP_EDITOR, /lifetime-retained/);
+  });
+
+  test('dispatch-store records the flip as done, not as "moving to lifetime retention"', () => {
+    assert.doesNotMatch(DISPATCH_STORE, /moving to lifetime retention/,
+      'dispatch-history has moved; the note must state it is retained');
+    assert.match(DISPATCH_STORE, /now lifetime-retained/);
+  });
+
+  test('read-horizon records the flip as done, not as "moving to lifetime retention"', () => {
+    assert.doesNotMatch(READ_HORIZON, /moving to lifetime retention/);
+    assert.match(READ_HORIZON, /retained for the life of the project/);
   });
 });

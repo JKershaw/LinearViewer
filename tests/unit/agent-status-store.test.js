@@ -5,7 +5,7 @@
  *
  * Covers the store's listStatus contract — specifically the "no limit means
  * return everything" semantics added to avoid silent truncation for callers
- * like pipeline-loops.js that need the full non-expired set.
+ * like pipeline-loops.js that need the full retained set.
  *
  * LIN-3162 (LIN-3157 A2): the listStatus reads moved to database-side
  * filter/sort/skip/limit + countDocuments, and the expiry predicate was

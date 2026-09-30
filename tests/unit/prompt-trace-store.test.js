@@ -403,7 +403,7 @@ describe('PromptTraceStore.summarizeProviderContext', () => {
     assert.deepStrictEqual(result, EMPTY_PROVIDER_CONTEXT);
   });
 
-  test('reads the whole non-expired window, not a page — and names the expected provider', async () => {
+  test('reads the whole 30-day read window, not a page — and names the expected provider', async () => {
     await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {} });
     await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: null, featureFlags: {} });
     await store.record({ urlKey: 'acme', feature: 'recommend', providerUi: GITHUB_UI, featureFlags: {} });
