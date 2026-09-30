@@ -26,6 +26,11 @@ function createMockCollection() {
         if (query.issueIdentifier && doc.issueIdentifier !== query.issueIdentifier) return false;
         if (query.feature && doc.feature !== query.feature) return false;
         if (query.expiresAt?.$gt && !(doc.expiresAt > query.expiresAt.$gt)) return false;
+        // LIN-3161: honour the `timestamp` bound (A1's additive read horizon).
+        // Without this the double silently ignores the operator and
+        // summarizeByIssue's `since` test would pass vacuously.
+        if (query.timestamp?.$gte && !(doc.timestamp >= query.timestamp.$gte)) return false;
+        if (query.timestamp?.$lt && !(doc.timestamp < query.timestamp.$lt)) return false;
         return true;
       });
       return { async toArray() { return results; } };
@@ -291,6 +296,46 @@ describe('LlmCallLogStore.summarizeByIssue', () => {
     assert.deepStrictEqual(await store.summarizeByIssue('acme'), empty);
     assert.deepStrictEqual(await store.summarizeByIssue(undefined, 'LIN-1'), empty);
     assert.deepStrictEqual(await new LlmCallLogStore({}).summarizeByIssue('acme', 'LIN-1'), empty);
+  });
+
+  // LIN-3161 (LIN-3157 A1): the additive `since` timestamp bound.
+  function pushRow(overrides) {
+    collection._docs.push({
+      _id: overrides._id, urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend',
+      cost: overrides.cost, timestamp: overrides.timestamp, expiresAt: overrides.expiresAt
+    });
+  }
+
+  test('a `since` bound excludes a row older than it even when its expiresAt is still live (LIN-3161)', async () => {
+    const now = Date.now();
+    const future = new Date(now + 365 * 24 * 60 * 60 * 1000);
+    // Outside the 30-day read window, but with a still-live stamped expiry —
+    // the exact shape lifetime retention would produce.
+    pushRow({ _id: 'old', cost: 5, timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: future });
+    // Inside the window.
+    pushRow({ _id: 'new', cost: 0.01, timestamp: new Date(now - 24 * 60 * 60 * 1000), expiresAt: future });
+
+    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const s = await store.summarizeByIssue('acme', 'LIN-1', { since });
+    assert.strictEqual(s.calls, 1);
+    assert.ok(Math.abs(s.costUsd - 0.01) < 1e-9);
+  });
+
+  test('omitting `since` keeps the pre-existing behaviour (every live-expiry row counts) (LIN-3161)', async () => {
+    const now = Date.now();
+    pushRow({ _id: 'old', cost: 5, timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: new Date(now + 365 * 24 * 60 * 60 * 1000) });
+    const s = await store.summarizeByIssue('acme', 'LIN-1');
+    assert.strictEqual(s.calls, 1);
+    assert.ok(Math.abs(s.costUsd - 5) < 1e-9);
+  });
+
+  test('the expiresAt predicate is still applied alongside `since` (A1 adds it, never removes it) (LIN-3161)', async () => {
+    const now = Date.now();
+    // Inside any `since` window, but its stamped expiry has already passed.
+    pushRow({ _id: 'expired', cost: 9, timestamp: new Date(now - 24 * 60 * 60 * 1000), expiresAt: new Date(now - 24 * 60 * 60 * 1000) });
+    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const s = await store.summarizeByIssue('acme', 'LIN-1', { since });
+    assert.strictEqual(s.calls, 0);
   });
 });
 
