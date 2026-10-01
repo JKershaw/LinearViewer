@@ -1,0 +1,703 @@
+{
+  "generatedBy": "scripts/eval/eval-dense.mjs",
+  "rescore": true,
+  "generatedFrom": "saved raw outputs (runs.jsonl); correctness recomputed against current fixtures",
+  "date": "2026-10-01",
+  "stub": false,
+  "models": [
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-5-mini",
+    "google/gemini-2.5-flash-lite",
+    "qwen/qwen3.6-flash"
+  ],
+  "repeats": 1,
+  "completedThisRun": 0,
+  "skippedResumed": 0,
+  "totalRuns": 200,
+  "spentThisRunUsd": 0,
+  "totalCostUsd": 6.667505,
+  "maxUsd": 10,
+  "halted": null,
+  "wallSeconds": 0,
+  "byModel": {
+    "openai/gpt-5.6-sol": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 27,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseOk": 10,
+      "smallOk": 30,
+      "denseActionHit": 10,
+      "smallActionHit": 17,
+      "denseDescentHit": 10,
+      "prodHit": 27,
+      "prodN": 40,
+      "denseProdHit": 10,
+      "denseProdN": 10,
+      "smallProdHit": 17,
+      "smallProdN": 30,
+      "costUsd": 4.212281999999999,
+      "denseCostUsd": 1.984566,
+      "smallCostUsd": 2.227716,
+      "promptOk": 40,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implement": 4,
+          "plan-review": 1
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "plan-review": 2
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "defer": 3,
+          "plan-review": 4,
+          "implement": 1
+        },
+        "blocked|implement|implementation": {
+          "blocked": 1,
+          "implement": 1
+        },
+        "blocked": {
+          "blocked": 2
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "research": 1
+        },
+        "plan|research": {
+          "research": 2
+        },
+        "breakdown|implement": {
+          "plan-review": 1
+        },
+        "plan-review": {
+          "plan-review": 2
+        },
+        "implementation": {
+          "implement": 2
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "lin2149Descent": {
+        "hit": 1,
+        "n": 1
+      },
+      "p50LatencyMs": 18542,
+      "p90LatencyMs": 28195,
+      "p50LatencyDenseMs": 18917,
+      "meanCostPerCall": 0.08962302127659573,
+      "meanCostPerDenseCall": 0.1984566,
+      "prodAccuracy": 0.675,
+      "labAccuracy": 0.675,
+      "wilsonProdAll": {
+        "lo": 0.5201774618987768,
+        "hi": 0.799154977682173
+      },
+      "wilsonProdSmall": {
+        "lo": 0.3919730700081361,
+        "hi": 0.7262251442353347
+      },
+      "wilsonProdDense": {
+        "lo": 0.7224672001371106,
+        "hi": 0.9999999999999999
+      }
+    },
+    "openai/gpt-5.4-mini": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 29,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseOk": 10,
+      "smallOk": 30,
+      "denseActionHit": 6,
+      "smallActionHit": 23,
+      "denseDescentHit": 10,
+      "prodHit": 29,
+      "prodN": 40,
+      "denseProdHit": 6,
+      "denseProdN": 10,
+      "smallProdHit": 23,
+      "smallProdN": 30,
+      "costUsd": 1.208661,
+      "denseCostUsd": 0.579731,
+      "smallCostUsd": 0.62893,
+      "promptOk": 40,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implementation": 1,
+          "implement": 2,
+          "breakdown": 1,
+          "retrospective-audit": 1
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "plan-review": 1
+        },
+        "breakdown": {
+          "implement": 1,
+          "breakdown": 1
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "implement": 6,
+          "implementation": 2
+        },
+        "blocked|implement|implementation": {
+          "implement": 1,
+          "close-out": 1
+        },
+        "blocked": {
+          "context": 1,
+          "plan": 1
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "plan": 1
+        },
+        "plan|research": {
+          "research": 1,
+          "plan": 1
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "plan-review": 1,
+          "implement": 1
+        },
+        "implementation": {
+          "implement": 2
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "lin2149Descent": {
+        "hit": 1,
+        "n": 1
+      },
+      "p50LatencyMs": 3379,
+      "p90LatencyMs": 6463,
+      "p50LatencyDenseMs": 6268,
+      "meanCostPerCall": 0.025716191489361703,
+      "meanCostPerDenseCall": 0.0579731,
+      "prodAccuracy": 0.725,
+      "labAccuracy": 0.725,
+      "wilsonProdAll": {
+        "lo": 0.5716504419378943,
+        "hi": 0.8389198375233267
+      },
+      "wilsonProdSmall": {
+        "lo": 0.5907167384187784,
+        "hi": 0.882076118555105
+      },
+      "wilsonProdDense": {
+        "lo": 0.3126737697336583,
+        "hi": 0.8318196702937638
+      }
+    },
+    "openai/gpt-5-mini": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 30,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseOk": 10,
+      "smallOk": 30,
+      "denseActionHit": 7,
+      "smallActionHit": 23,
+      "denseDescentHit": 10,
+      "prodHit": 30,
+      "prodN": 40,
+      "denseProdHit": 7,
+      "denseProdN": 10,
+      "smallProdHit": 23,
+      "smallProdN": 30,
+      "costUsd": 0.653568,
+      "denseCostUsd": 0.25947100000000006,
+      "smallCostUsd": 0.394097,
+      "promptOk": 38,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implement": 4,
+          "plan-review": 1
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "implement": 1,
+          "research": 1
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "implement": 7,
+          "plan-review": 1
+        },
+        "blocked|implement|implementation": {
+          "\u2192": 1,
+          "close-out": 1
+        },
+        "blocked": {
+          "blocked": 1,
+          "plan": 1
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "research": 1
+        },
+        "plan|research": {
+          "research": 2
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "plan-review": 1,
+          "implement": 1
+        },
+        "implementation": {
+          "implement": 2
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "lin2149Descent": {
+        "hit": 1,
+        "n": 1
+      },
+      "p50LatencyMs": 24246,
+      "p90LatencyMs": 32234,
+      "p50LatencyDenseMs": 28335,
+      "meanCostPerCall": 0.013905702127659575,
+      "meanCostPerDenseCall": 0.025947100000000008,
+      "prodAccuracy": 0.75,
+      "labAccuracy": 0.75,
+      "wilsonProdAll": {
+        "lo": 0.5980603857923198,
+        "hi": 0.8581288136090369
+      },
+      "wilsonProdSmall": {
+        "lo": 0.5907167384187784,
+        "hi": 0.882076118555105
+      },
+      "wilsonProdDense": {
+        "lo": 0.3967781474611453,
+        "hi": 0.8922087325936988
+      }
+    },
+    "google/gemini-2.5-flash-lite": {
+      "runs": 40,
+      "ok": 29,
+      "errors": 11,
+      "calls": 29,
+      "actionHit": 13,
+      "actionN": 29,
+      "descentHit": 27,
+      "descentN": 29,
+      "denseOk": 9,
+      "smallOk": 20,
+      "denseActionHit": 3,
+      "smallActionHit": 10,
+      "denseDescentHit": 9,
+      "prodHit": 13,
+      "prodN": 40,
+      "denseProdHit": 3,
+      "denseProdN": 10,
+      "smallProdHit": 10,
+      "smallProdN": 30,
+      "costUsd": 0.132724,
+      "denseCostUsd": 0.07885600000000001,
+      "smallCostUsd": 0.053868000000000006,
+      "promptOk": 29,
+      "promptN": 29,
+      "confusion": {
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "implement": 1,
+          "plan": 1
+        },
+        "close-out": {
+          "close-out": 1
+        },
+        "review": {
+          "implement": 3,
+          "review": 1
+        },
+        "implement": {
+          "blocked": 1,
+          "implement": 3,
+          "plan": 1
+        },
+        "blocked|implement|implementation": {
+          "review": 1,
+          "implement": 1
+        },
+        "implement|implementation": {
+          "implement": 2
+        },
+        "blocked": {
+          "review": 1,
+          "blocked": 1
+        },
+        "retrospective-audit": {
+          "close-out": 2,
+          "review": 1,
+          "implement": 1
+        },
+        "breakdown|plan|research": {
+          "implement": 1
+        },
+        "plan|research": {
+          "plan": 1
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "`implement`": 1
+        },
+        "implementation": {
+          "implement": 1
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "lin2149Descent": {
+        "hit": 0,
+        "n": 1
+      },
+      "p50LatencyMs": 3399,
+      "p90LatencyMs": 5720,
+      "p50LatencyDenseMs": 4193,
+      "meanCostPerCall": 0.004576689655172414,
+      "meanCostPerDenseCall": 0.007885600000000001,
+      "prodAccuracy": 0.325,
+      "labAccuracy": 0.4482758620689655,
+      "wilsonProdAll": {
+        "lo": 0.200845022317827,
+        "hi": 0.47982253810122333
+      },
+      "wilsonProdSmall": {
+        "lo": 0.1923049808367613,
+        "hi": 0.5121994835545615
+      },
+      "wilsonProdDense": {
+        "lo": 0.10779126740630099,
+        "hi": 0.6032218525388546
+      }
+    },
+    "qwen/qwen3.6-flash": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 34,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseOk": 10,
+      "smallOk": 30,
+      "denseActionHit": 8,
+      "smallActionHit": 26,
+      "denseDescentHit": 10,
+      "prodHit": 34,
+      "prodN": 40,
+      "denseProdHit": 8,
+      "denseProdN": 10,
+      "smallProdHit": 26,
+      "smallProdN": 30,
+      "costUsd": 0.46026999999999996,
+      "denseCostUsd": 0.18664799999999998,
+      "smallCostUsd": 0.273622,
+      "promptOk": 39,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implement": 4,
+          "breakdown": 1
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "breakdown": 1,
+          "plan-review": 1
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "implement": 8
+        },
+        "blocked|implement|implementation": {
+          "context": 1,
+          "blocked": 1
+        },
+        "blocked": {
+          "blocked": 2
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "breakdown": 1
+        },
+        "plan|research": {
+          "plan": 2
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "plan-review": 1,
+          "implement": 1
+        },
+        "implementation": {
+          "implement": 2
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "lin2149Descent": {
+        "hit": 1,
+        "n": 1
+      },
+      "p50LatencyMs": 14863,
+      "p90LatencyMs": 22654,
+      "p50LatencyDenseMs": 15398,
+      "meanCostPerCall": 0.009792978723404254,
+      "meanCostPerDenseCall": 0.0186648,
+      "prodAccuracy": 0.85,
+      "labAccuracy": 0.85,
+      "wilsonProdAll": {
+        "lo": 0.709276756335103,
+        "hi": 0.9293881228267964
+      },
+      "wilsonProdSmall": {
+        "lo": 0.703186733179637,
+        "hi": 0.9469034451594526
+      },
+      "wilsonProdDense": {
+        "lo": 0.4901624715366418,
+        "hi": 0.9433178485456247
+      }
+    }
+  },
+  "perAction": {
+    "implement|implementation": {
+      "hit": 17,
+      "n": 22,
+      "descentExpect": "LIN-APB-pos",
+      "dense": false
+    },
+    "implement|implementation|plan": {
+      "hit": 4,
+      "n": 4,
+      "descentExpect": "LIN-APB-neg",
+      "dense": false
+    },
+    "plan|plan-review|research": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "LIN-APB-diverged",
+      "dense": false
+    },
+    "breakdown": {
+      "hit": 2,
+      "n": 10,
+      "descentExpect": "FIX-830-pos",
+      "dense": false
+    },
+    "close-out": {
+      "hit": 9,
+      "n": 9,
+      "descentExpect": "FIX-812-approve-ledger",
+      "dense": false
+    },
+    "review": {
+      "hit": 17,
+      "n": 20,
+      "descentExpect": "FIX-812-noreview",
+      "dense": false
+    },
+    "implement": {
+      "hit": 25,
+      "n": 37,
+      "descentExpect": "HAR-616",
+      "dense": false
+    },
+    "blocked|implement|implementation": {
+      "hit": 5,
+      "n": 10,
+      "descentExpect": "LIN-1892",
+      "dense": true
+    },
+    "blocked": {
+      "hit": 6,
+      "n": 10,
+      "descentExpect": "LIN-3059",
+      "dense": true
+    },
+    "retrospective-audit": {
+      "hit": 16,
+      "n": 20,
+      "descentExpect": "LIN-3107",
+      "dense": true
+    },
+    "breakdown|plan|research": {
+      "hit": 4,
+      "n": 5,
+      "descentExpect": "LIN-215",
+      "dense": false
+    },
+    "plan|research": {
+      "hit": 9,
+      "n": 9,
+      "descentExpect": "LIN-202",
+      "dense": false
+    },
+    "breakdown|implement": {
+      "hit": 4,
+      "n": 5,
+      "descentExpect": "LIN-489",
+      "dense": false
+    },
+    "plan-review": {
+      "hit": 5,
+      "n": 9,
+      "descentExpect": "PR-1603-gated-recorded",
+      "dense": false
+    },
+    "implementation": {
+      "hit": 0,
+      "n": 9,
+      "descentExpect": "PR-1603-clean-small",
+      "dense": false
+    },
+    "plan": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "PR-1603-request-changes-1",
+      "dense": false
+    }
+  },
+  "promptQuality": {
+    "ok": 186,
+    "total": 189,
+    "bad": [
+      {
+        "model": "qwen/qwen3.6-flash",
+        "target": "FIX-830-neg",
+        "problems": [
+          "no-header"
+        ]
+      },
+      {
+        "model": "openai/gpt-5-mini",
+        "target": "LIN-596@implement",
+        "problems": [
+          "no-header"
+        ]
+      },
+      {
+        "model": "openai/gpt-5-mini",
+        "target": "PR-1603-clean-small",
+        "problems": [
+          "no-header"
+        ]
+      }
+    ]
+  },
+  "production": {
+    "hit": 133,
+    "n": 200,
+    "errors": 11
+  },
+  "lab": {
+    "hit": 133,
+    "n": 189
+  },
+  "costCorrection": {
+    "correctedAt": "2026-10-01",
+    "reason": "Pre-fix harness dropped the spend of failed/retried attempts.",
+    "lostAttempts": {
+      "model": "google/gemini-2.5-flash-lite",
+      "errorRuns": 11,
+      "attemptsPerErrorRun": 2,
+      "unrecordedAttempts": 22
+    },
+    "recovery": "not possible (no generation ids recorded; per-model daily activity needs a provisioning key on a completed UTC day and the key is shared with production, so it is contaminated)",
+    "bound": {
+      "method": "unrecordedAttempts x maxObservedPerCall",
+      "maxObservedPerCallUsd": 0.0180539,
+      "lostSpendUsdBound": 0.397186
+    },
+    "recordedTotalCostUsd": 6.667505,
+    "correctedTotalCostUsdBound": 7.064691,
+    "geminiMeanCostPerCallRecordedUsd": 0.004576672,
+    "geminiMeanCostPerCallCorrectedBoundUsd": 0.01039,
+    "note": "success-after-retry runs are not identifiable from the committed rows; any such loss is inside the bound. runs.jsonl is unchanged."
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "generatedBy": "scripts/eval/eval-dense.mjs",
+  "rescore": true,
+  "generatedFrom": "saved raw outputs (runs.jsonl); correctness recomputed against current fixtures",
+  "date": "2026-10-01",
+  "stub": false,
+  "models": [
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-5-mini",
+    "google/gemini-2.5-flash-lite",
+    "qwen/qwen3.6-flash"
+  ],
+  "repeats": 1,
+  "completedThisRun": 0,
+  "skippedResumed": 0,
+  "totalRuns": 40,
+  "spentThisRunUsd": 0,
+  "totalCostUsd": 0.605068,
+  "maxUsd": 10,
+  "halted": null,
+  "wallSeconds": 0,
+  "byModel": {
+    "qwen/qwen3.6-flash": {
+      "runs": 20,
+      "ok": 20,
+      "errors": 0,
+      "calls": 22,
+      "actionHit": 16,
+      "actionN": 20,
+      "descentHit": 20,
+      "descentN": 20,
+      "denseOk": 20,
+      "smallOk": 0,
+      "denseActionHit": 16,
+      "smallActionHit": 0,
+      "denseDescentHit": 20,
+      "prodHit": 16,
+      "prodN": 20,
+      "denseProdHit": 16,
+      "denseProdN": 20,
+      "smallProdHit": 0,
+      "smallProdN": 0,
+      "costUsd": 0.37472600000000006,
+      "denseCostUsd": 0.37472600000000006,
+      "smallCostUsd": 0,
+      "promptOk": 19,
+      "promptN": 20,
+      "confusion": {
+        "implement|implementation": {
+          "breakdown": 1,
+          "implement": 5
+        },
+        "blocked|implement|implementation": {
+          "close-out": 2,
+          "blocked": 2
+        },
+        "blocked": {
+          "context": 1,
+          "blocked": 1
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 8
+        }
+      },
+      "lin2149Descent": {
+        "hit": 2,
+        "n": 2
+      },
+      "p50LatencyMs": 16783,
+      "p90LatencyMs": 22085,
+      "p50LatencyDenseMs": 16783,
+      "meanCostPerCall": 0.017033000000000003,
+      "meanCostPerDenseCall": 0.018736300000000004,
+      "prodAccuracy": 0.8,
+      "labAccuracy": 0.8,
+      "wilsonProdAll": {
+        "lo": 0.5839825677481065,
+        "hi": 0.9193423374202021
+      },
+      "wilsonProdSmall": null,
+      "wilsonProdDense": {
+        "lo": 0.5839825677481065,
+        "hi": 0.9193423374202021
+      }
+    },
+    "openai/gpt-5-mini": {
+      "runs": 20,
+      "ok": 20,
+      "errors": 0,
+      "calls": 22,
+      "actionHit": 13,
+      "actionN": 20,
+      "descentHit": 20,
+      "descentN": 20,
+      "denseOk": 20,
+      "smallOk": 0,
+      "denseActionHit": 13,
+      "smallActionHit": 0,
+      "denseDescentHit": 20,
+      "prodHit": 13,
+      "prodN": 20,
+      "denseProdHit": 13,
+      "denseProdN": 20,
+      "smallProdHit": 0,
+      "smallProdN": 0,
+      "costUsd": 0.23034200000000002,
+      "denseCostUsd": 0.23034200000000002,
+      "smallCostUsd": 0,
+      "promptOk": 19,
+      "promptN": 20,
+      "confusion": {
+        "implement|implementation": {
+          "implement": 3,
+          "plan-review": 1,
+          "research": 2
+        },
+        "blocked|implement|implementation": {
+          "close-out": 3,
+          "plan": 1
+        },
+        "blocked": {
+          "blocked": 2
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 8
+        }
+      },
+      "lin2149Descent": {
+        "hit": 2,
+        "n": 2
+      },
+      "p50LatencyMs": 27772,
+      "p90LatencyMs": 36216,
+      "p50LatencyDenseMs": 27772,
+      "meanCostPerCall": 0.01047009090909091,
+      "meanCostPerDenseCall": 0.0115171,
+      "prodAccuracy": 0.65,
+      "labAccuracy": 0.65,
+      "wilsonProdAll": {
+        "lo": 0.43285427668523624,
+        "hi": 0.818808175898918
+      },
+      "wilsonProdSmall": null,
+      "wilsonProdDense": {
+        "lo": 0.43285427668523624,
+        "hi": 0.818808175898918
+      }
+    }
+  },
+  "perAction": {
+    "implement|implementation": {
+      "hit": 8,
+      "n": 12,
+      "descentExpect": "LIN-3125",
+      "dense": true
+    },
+    "blocked|implement|implementation": {
+      "hit": 2,
+      "n": 8,
+      "descentExpect": "LIN-1892",
+      "dense": true
+    },
+    "blocked": {
+      "hit": 3,
+      "n": 4,
+      "descentExpect": "LIN-3059",
+      "dense": true
+    },
+    "retrospective-audit": {
+      "hit": 16,
+      "n": 16,
+      "descentExpect": "LIN-3107",
+      "dense": true
+    }
+  },
+  "promptQuality": {
+    "ok": 38,
+    "total": 40,
+    "bad": [
+      {
+        "model": "openai/gpt-5-mini",
+        "target": "LIN-3059",
+        "problems": [
+          "no-header"
+        ]
+      },
+      {
+        "model": "qwen/qwen3.6-flash",
+        "target": "LIN-3135",
+        "problems": [
+          "no-header"
+        ]
+      }
+    ]
+  },
+  "production": {
+    "hit": 29,
+    "n": 40,
+    "errors": 0
+  },
+  "lab": {
+    "hit": 29,
+    "n": 40
+  }
+}
