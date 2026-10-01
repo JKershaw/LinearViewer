@@ -604,6 +604,37 @@ describe('sumTranscriptUsage and [usage] (NB5: the realised model)', () => {
   });
 });
 
+describe('sumTranscriptUsage on the LIN-3098 witness subagent (LIN-3212)', () => {
+  // Redacted copy of the real agent-a010f7d2462c56e56.jsonl behind the witness's `output 8`.
+  const lines = readFileSync(join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent-report.jsonl'), 'utf8').split('\n');
+  const assistant = lines.filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant');
+
+  test('reproduces the witness [usage] exactly', () => {
+    assert.deepEqual(sumTranscriptUsage(lines), {
+      harness: 'claude-code',
+      model: 'claude-opus-5-5',
+      inputTokens: 4,
+      outputTokens: 8,
+      cacheCreationInputTokens: 28668,
+      cacheCreation1hInputTokens: 0,
+      cacheReadInputTokens: 26344
+    });
+  });
+
+  test('every line is an unfinished (message_start) snapshot, and repeats are identical', () => {
+    // No line ever got its final usage (stop_reason stays null), so the transcript
+    // itself under-records output; no per-id fold (first, last or max) can recover it.
+    assert.ok(assistant.every((e) => e.message.stop_reason === null));
+    const usageById = new Map();
+    for (const e of assistant) {
+      const usage = JSON.stringify(e.message.usage);
+      if (usageById.has(e.message.id)) assert.equal(usage, usageById.get(e.message.id));
+      else usageById.set(e.message.id, usage);
+    }
+    assert.equal(usageById.size, 2);
+  });
+});
+
 describe('subagentModelFor (NB5: map model onto the subagent, ignore effort)', () => {
   const rows = [
     [null, null],
