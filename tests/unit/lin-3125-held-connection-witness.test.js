@@ -219,6 +219,11 @@ describe('LIN-3125 Phase 3 — acceptance witness: three repos, one connection',
     assert.equal(session.workspaces.length, 1);
     assert.equal(session.workspaces[0].urlKey, WORKSPACE);
 
+    // L6: capture freshness NOW, immediately after add #1, so assertion (6) below
+    // is a real before/after rather than a value read after the held adds.
+    const freshness = session.identityAuthenticatedAt;
+    assert.ok(freshness, 'add #1 stamped freshness');
+
     // Counter liveness: every counter that can fire on the first connect did.
     for (const [name, v] of Object.entries(h.counters)) assert.ok(v >= 1, `counter ${name} is live (${v})`);
     const mark = snap(h.counters);
@@ -261,14 +266,8 @@ describe('LIN-3125 Phase 3 — acceptance witness: three repos, one connection',
     assert.ok(heldTokens.length >= 2, 'the held adds built at least one client per add');
     assert.ok(heldTokens.every(t => t.startsWith('ghs_')), `held tokens are installation tokens, saw: ${JSON.stringify(heldTokens)}`);
 
-    // (6) no identity freshness stamp from the held adds.
-    const freshness = session.identityAuthenticatedAt;
-    assert.ok(freshness, 'add #1 stamped freshness');
-    // (re-run one more held add to be explicit that it does not move)
-    const before = snap(h.counters);
-    await heldAdd(h, session, REPOS[0]).catch(() => {}); // repo-a already bound -> idempotent/empties; counters must not move
-    assert.deepEqual(deltas(before, h.counters), { oauthExchange: 0, mint: 0, installationRead: 0, listUserInstallations: 0, beginAuth: 0, beginInstall: 0 });
-    assert.equal(session.identityAuthenticatedAt, freshness, 'identityAuthenticatedAt unchanged');
+    // (6) no identity freshness stamp from the held adds (before/after #2/#3).
+    assert.equal(session.identityAuthenticatedAt, freshness, 'identityAuthenticatedAt unchanged by held adds');
   });
 
   test('stale-token variant: exactly one refresh mint, zero oauth/installationRead/listUserInstallations', async () => {

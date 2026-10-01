@@ -144,13 +144,18 @@ export function createHeldConnectionRoutes({
     const heldEntry = req?.session?.heldEntry
     if (!heldEntry || heldEntry.provider !== provider.name) return sessionExpired(res)
 
-    // D11 (F2): off ⇒ back to today's bare flow, zero reads.
+    // D11 (F2): off ⇒ back to today's bare flow, zero reads. The held entry is
+    // kept (the picker test pins this); the POST D11 exit is the terminal one
+    // that consumes it.
     if (!writesEnabled()) return res.redirect(heldEntry.beginUrl || '/')
 
     const isNew = heldEntry.mode === 'new'
 
     const workspace = (!isNew && heldEntry.workspaceUrlKey) ? getWorkspaceByUrlKey(req.session, heldEntry.workspaceUrlKey) : null
-    if (!isNew && !workspace) return sessionExpired(res)
+    // L8 (finding 11): the add-source workspace vanished between the click and
+    // this GET. Falling through to a dead Session Expired page strands the user;
+    // return to the bare begin flow (heldEntry.beginUrl) instead.
+    if (!isNew && !workspace) return res.redirect(heldEntry.beginUrl || '/')
 
     let accountId
     try { accountId = await resolveCanonicalAccountId(req.session.accountId) } catch { accountId = null }
@@ -233,7 +238,13 @@ export function createHeldConnectionRoutes({
 
     // D11 (F2): off ⇒ retryable page with a link back to the bare begin flow,
     // zero writes and no legacy fallback (held mode has no credential to copy).
-    if (!writesEnabled()) return retryPage(res)
+    // L1: the held intent cannot proceed, so consume it; the action returns the
+    // user to the bare (unmarked) flow rather than a now-empty picker.
+    if (!writesEnabled()) {
+      const actionUrl = heldEntry.beginUrl || pickerUrl
+      delete req.session.heldEntry
+      return res.status(503).send(renderErrorPage(connectionRetry.title, connectionRetry.message, { action: `Back to ${displayNameOf(provider)}`, actionUrl }))
+    }
 
     const scope = String(req.body?.[surface.field] ?? '').trim()
     let accountId
@@ -256,7 +267,7 @@ export function createHeldConnectionRoutes({
     // `intent.fresh` predicate requires `supportsFreshContainer`, which
     // github-projects does not declare, so `resolveHeldEntry` never returns a
     // `mode=new` target for it.
-    const connectionId = await authorizedOfferedConnection({ accountId, provider, heldEntry, scope, pickerUrl, res })
+    const connectionId = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
     if (typeof connectionId !== 'string') return // response already sent
 
     const repoName = String(scope).split('/').pop()
@@ -278,7 +289,9 @@ export function createHeldConnectionRoutes({
       upsertWorkspace(req.session, container)
     } catch {
       // Identical 400 page as the credentials-mode flow; nothing else written,
-      // no referent, no edge.
+      // no referent, no edge. L1: the held intent is terminal here (no room to
+      // land the new workspace), so consume it.
+      delete req.session.heldEntry
       return res.status(400).send(renderWorkspaceLimitPage())
     }
 
@@ -287,7 +300,7 @@ export function createHeldConnectionRoutes({
       conversion = await persistBinding({
         connectionStore, session: req.session, accountId, workspace: container,
         provider: provider.name, scope, heldConnectionId: connectionId,
-        resolveCanonicalAccountId, writesEnabled: true, workspacesSnapshot: snapshot,
+        resolveCanonicalAccountId, writesEnabled: writesEnabled(), workspacesSnapshot: snapshot,
         convertToConnectionBacked,
       })
     } catch (err) {
@@ -302,7 +315,11 @@ export function createHeldConnectionRoutes({
     // identityAuthenticatedAt freshness stamp — a held add proves no identity).
     let edge = null
     try { edge = await accountWorkspaceStore.bindAccountToWorkspace(accountId, container.id) } catch (err) { console.error('[held-connection] owner-edge write failed:', err) }
-    if (!edge) {
+    // L4 (D7): `bindAccountToWorkspace` swallows a failed `_markOwnerIfFirstEdge`
+    // and returns the edge WITHOUT `role:'owner'` (`account-workspace-store.js`).
+    // A bound-but-ownerless workspace is the one C2 invariant the route must
+    // never leave behind, so a non-owner edge takes the same compensation path.
+    if (!edge || edge.role !== 'owner') {
       // C2: never leave a bound workspace ownerless. Compensate the referent the
       // converter just added, restore the session snapshot, show the retry page.
       try { await connectionStore.removeReferent(connectionId, { urlKey: container.urlKey, provider: provider.name, scope }) } catch (err) { console.error('[held-connection] referent compensation failed:', err) }
@@ -320,16 +337,22 @@ export function createHeldConnectionRoutes({
    * authorize the holding Connection. Returns the connectionId, or sends the
    * 409 page and returns null. Shared by add-source and mode=new.
    */
-  async function authorizedOfferedConnection({ accountId, provider, heldEntry, scope, pickerUrl, res }) {
+  async function authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res }) {
     const offeredConnectionId = heldEntry.offered?.[scope]
     if (!offeredConnectionId) {
+      // L1: this is the empty-offer RETRY arm — the picker is still live, so
+      // keep `heldEntry` and send the user back to it to choose another source.
       res.status(409).send(renderErrorPage('Source Unavailable', 'That source is no longer available. Please choose another.', { action: `Back to ${displayNameOf(provider)}`, actionUrl: pickerUrl }))
       return null
     }
     const connections = await listAuthorizedAccountConnections({ accountId, provider: provider.name })
     const connection = connections.find(c => c && c._id === offeredConnectionId)
     if (!connection) {
-      res.status(409).send(renderErrorPage('Connection Unavailable', 'That connection is no longer available. Please start again.', { action: `Back to ${displayNameOf(provider)}`, actionUrl: pickerUrl }))
+      // L1: terminal — the holding connection is gone, so consume the held
+      // intent and return to the bare begin flow (the picker would be empty).
+      const actionUrl = heldEntry.beginUrl || pickerUrl
+      delete req.session.heldEntry
+      res.status(409).send(renderErrorPage('Connection Unavailable', 'That connection is no longer available. Please start again.', { action: `Back to ${displayNameOf(provider)}`, actionUrl }))
       return null
     }
     return connection._id
@@ -337,7 +360,7 @@ export function createHeldConnectionRoutes({
 
   /** Add-source held binding onto an EXISTING workspace (beat 3). */
   async function bindAddSource(req, res, { provider, surface, heldEntry, workspace, scope, accountId, pickerUrl, retryPage }) {
-    const connectionId = await authorizedOfferedConnection({ accountId, provider, heldEntry, scope, pickerUrl, res })
+    const connectionId = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
     if (typeof connectionId !== 'string') return
 
     const snapshot = [...(req.session.workspaces || [])]
@@ -346,7 +369,7 @@ export function createHeldConnectionRoutes({
       conversion = await persistBinding({
         connectionStore, session: req.session, accountId, workspace,
         provider: provider.name, scope, heldConnectionId: connectionId,
-        resolveCanonicalAccountId, writesEnabled: true, workspacesSnapshot: snapshot,
+        resolveCanonicalAccountId, writesEnabled: writesEnabled(), workspacesSnapshot: snapshot,
         convertToConnectionBacked,
       })
     } catch (err) {

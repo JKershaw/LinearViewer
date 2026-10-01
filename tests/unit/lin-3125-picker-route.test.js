@@ -110,13 +110,13 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     });
   }
 
-  function buildRoute(connectionStore, { provider, writes = true, refreshConnection, convert = convertToConnectionBacked, reader } = {}) {
+  function buildRoute(connectionStore, { provider, writes = true, writesFn, refreshConnection, convert = convertToConnectionBacked, reader } = {}) {
     return createHeldConnectionRoutes({
       resolveProvider: () => provider,
       connectionStore,
       listAuthorizedAccountConnections: reader || ((args) => listAuthorizedAccountConnections({ connectionStore, ...args })),
       heldConnectionCredentials,
-      connectionBackedWritesEnabled: () => writes,
+      connectionBackedWritesEnabled: writesFn || (() => writes),
       refreshConnection,
       convertToConnectionBacked: convert,
       resolveCanonicalAccountId: (id) => id,
@@ -319,13 +319,21 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.equal(p.statusCode, 400);
   });
 
+  test('L8: GET with the add-source workspace removed => redirect to heldEntry.beginUrl', async () => {
+    const { connectionStore } = await store();
+    await seedConnection(connectionStore);
+    const session = makeSession({ workspaces: [] });
+    const res = await get(buildRoute(connectionStore, { provider: githubProvider() }), session);
+    assert.equal(res.redirectedTo, BEGIN, 'returns to the bare begin flow, not a dead Session Expired page');
+  });
+
   // -------------------------------------------------------------------------
   // POST success
   // -------------------------------------------------------------------------
   test('POST success: binding {provider, scope, connectionId} with no credentials, flash and redirect', async () => {
     const { connectionStore } = await store();
     await seedConnection(connectionStore);
-    const session = makeSession();
+    const session = makeSession({ identityAuthenticatedAt: 111 });
     const route = buildRoute(connectionStore, { provider: githubProvider() });
     await get(route, session);
     const res = await post(buildRoute(connectionStore, { provider: githubProvider() }), session, { repo: 'octo/a' });
@@ -336,9 +344,42 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.ok(!('credentials' in binding), 'no credentials on the binding');
     assert.deepEqual(session.providerAdded, { provider: 'github', scope: 'octo/a' });
     assert.equal(session.heldEntry, undefined, 'heldEntry cleared on success');
+    assert.equal(session.identityAuthenticatedAt, 111, 'a held add proves no identity (no freshness stamp)');
 
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [{ urlKey: 'acme', provider: 'github', scope: 'octo/a' }]);
+  });
+
+  // -------------------------------------------------------------------------
+  // L7 (M2): the offer map binds to the scope's OWN connection, not [0]
+  // -------------------------------------------------------------------------
+  test('L7 (M2): a scope offered by the SECOND connection binds to that connection', async () => {
+    const { connectionStore } = await store();
+    // Insertion order is the reader's order (no sort): "first" is connections[0].
+    await seedConnection(connectionStore, { _id: `${ACCT}::github::first`, unitId: 'first', credentials: { token: 'ghs_first', installationId: 'first', tokenExpiresAt: Date.now() + 3600_000 } });
+    await seedConnection(connectionStore, { _id: `${ACCT}::github::second`, unitId: 'second', credentials: { token: 'ghs_second', installationId: 'second', tokenExpiresAt: Date.now() + 3600_000 } });
+    const provider = {
+      name: 'github', scopeType: 'repository', ui: { displayName: 'GitHub Issues' },
+      supports: (m) => m === 'listConnectionScopes',
+      async listConnectionScopes(creds) {
+        return creds.token === 'ghs_second'
+          ? [{ slug: 'second/only', name: 'second/only', installationId: 'second' }]
+          : [{ slug: 'first/a', name: 'first/a', installationId: 'first' }];
+      },
+      heldScopeView(item = {}) { return { scope: item.slug, label: item.name, installationId: item.installationId }; },
+    };
+    const reader = (args) => listAuthorizedAccountConnections({ connectionStore, ...args });
+    const rows = await reader({ accountId: ACCT, provider: 'github' });
+    assert.deepEqual(rows.map(r => r._id), [`${ACCT}::github::first`, `${ACCT}::github::second`], 'second is NOT the first row');
+
+    const session = makeSession();
+    await get(buildRoute(connectionStore, { provider }), session);
+    assert.equal(session.heldEntry.offered['second/only'], `${ACCT}::github::second`, 'offered by the second connection');
+
+    const res = await post(buildRoute(connectionStore, { provider }), session, { repo: 'second/only' });
+    assert.equal(res.redirectedTo, '/workspace/acme/settings?provider_ok=github');
+    const binding = session.workspaces[0].bindings.find(b => b.scope === 'second/only');
+    assert.deepEqual(binding, { provider: 'github', scope: 'second/only', connectionId: `${ACCT}::github::second` });
   });
 
   // -------------------------------------------------------------------------
@@ -359,6 +400,26 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.ok(!JSON.stringify(session.workspaces[0].bindings).includes('credentials'), 'no legacy fallback binding');
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [], 'no referent on failure');
+  });
+
+  // -------------------------------------------------------------------------
+  // L5 (D8): the converter's D11 gate is re-read at conversion time
+  // -------------------------------------------------------------------------
+  test('L5 (D8): predicate true at the route check, off at conversion => 503, no referent', async () => {
+    const { connectionStore } = await store();
+    await seedConnection(connectionStore);
+    const session = makeSession();
+    await get(buildRoute(connectionStore, { provider: githubProvider() }), session); // offer map populated
+    let reads = 0;
+    const writesFn = () => { reads += 1; return reads === 1; }; // route check true; converter read false
+    const res = await post(buildRoute(connectionStore, { provider: githubProvider(), writesFn }), session, { repo: 'octo/a' });
+
+    assert.equal(reads, 2, 'the predicate is read once at the route check and once at conversion');
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /Connection Not Saved/);
+    assert.equal(session.workspaces[0].bindings.length, 0, 'no binding written');
+    const row = await connectionStore.collection.findOne({ _id: CONN_ID });
+    assert.deepEqual(row.referents, [], 'no referent');
   });
 
   // -------------------------------------------------------------------------

@@ -98,17 +98,39 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     return { connectionStore, accountWorkspaceStore };
   }
 
-  function buildRoute(connectionStore, accountWorkspaceStore, { provider = githubProvider(), writes = true, convert = convertToConnectionBacked } = {}) {
+  function buildRoute(connectionStore, accountWorkspaceStore, { provider = githubProvider(), writes = true, writesFn, convert = convertToConnectionBacked } = {}) {
     return createHeldConnectionRoutes({
       resolveProvider: () => provider,
       connectionStore,
       accountWorkspaceStore,
       listAuthorizedAccountConnections: createAuthorizedAccountConnectionReader({ connectionStore }),
       heldConnectionCredentials,
-      connectionBackedWritesEnabled: () => writes,
+      connectionBackedWritesEnabled: writesFn || (() => writes),
       convertToConnectionBacked: convert,
       resolveCanonicalAccountId: (id) => id,
     });
+  }
+
+  /**
+   * L4 (D7): a real `AccountWorkspaceStore` whose owner-mark `updateOne` throws
+   * (code 91). `_markOwnerIfFirstEdge` swallows it and returns false, so
+   * `bindAccountToWorkspace` returns the just-inserted edge WITHOUT
+   * `role:'owner'` — the exact "failed owner mark" shape the route must catch.
+   */
+  function roleMarkThrowingStore(realStore) {
+    const collection = new Proxy(realStore.collection, {
+      get(target, prop) {
+        if (prop === 'updateOne') {
+          return async (filter, update, opts) => {
+            if (update?.$set?.role === 'owner') throw Object.assign(new Error('owner mark down'), { code: 91 });
+            return target.updateOne(filter, update, opts);
+          };
+        }
+        const value = target[prop];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    return new AccountWorkspaceStore({ collection });
   }
 
   async function runToOffer(route, session) {
@@ -204,6 +226,26 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     assert.equal(await accountWorkspaceStore.collection.countDocuments({}), 0);
   });
 
+  test('L4 (D7) failed owner mark: role-less edge => 503, session restored, referent removed', async () => {
+    const { connectionStore, accountWorkspaceStore } = await stores();
+    const route = buildRoute(connectionStore, roleMarkThrowingStore(accountWorkspaceStore));
+    const session = makeSession();
+    await runToOffer(route, session);
+    const res = await bind(route, session, { repo: 'octo/a' });
+
+    assert.equal(res.statusCode, 503, 'a swallowed owner-mark failure is not success');
+    assert.match(res.body, /Connection Not Saved/);
+    assert.equal(session.workspaces.length, 1, 'new workspace rolled back');
+    assert.equal(session.workspaces.find(w => w.urlKey === 'a'), undefined, 'no bound, ownerless workspace survives');
+    const row = await connectionStore.collection.findOne({ _id: CONN_ID });
+    assert.deepEqual(row.referents, [], 'referent removed by C2 compensation');
+    assert.ok(session.heldEntry, 'heldEntry kept for retry');
+    // The unmarked edge insert did land, but never as an owner edge.
+    const edges = await accountWorkspaceStore.collection.find({}).toArray();
+    assert.equal(edges.length, 1, 'the role-less edge insert landed');
+    assert.equal(edges[0].role, undefined, 'owner mark did not land');
+  });
+
   test('D11 off at mode=new POST: retryable page, zero writes', async () => {
     const { connectionStore, accountWorkspaceStore } = await stores();
     const route = buildRoute(connectionStore, accountWorkspaceStore, { writes: false });
@@ -214,6 +256,24 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     assert.equal(session.workspaces.length, 1);
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, []);
+  });
+
+  test('L5 (D8) mode=new: predicate true at the route check, off at conversion => 503, no referent', async () => {
+    const { connectionStore, accountWorkspaceStore } = await stores();
+    const session = makeSession();
+    await runToOffer(buildRoute(connectionStore, accountWorkspaceStore), session); // offer map, writes on
+    let reads = 0;
+    const writesFn = () => { reads += 1; return reads === 1; }; // route check true; converter read false
+    const route = buildRoute(connectionStore, accountWorkspaceStore, { writesFn });
+    const res = await bind(route, session, { repo: 'octo/a' });
+
+    assert.equal(reads, 2, 'the predicate is read once at the route check and once at conversion');
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /Connection Not Saved/);
+    assert.equal(session.workspaces.length, 1, 'the upserted container was restored away');
+    assert.equal(session.workspaces.find(w => w.urlKey === 'a'), undefined);
+    const row = await connectionStore.collection.findOne({ _id: CONN_ID });
+    assert.deepEqual(row.referents, [], 'no referent');
   });
 
   // -------------------------------------------------------------------------

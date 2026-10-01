@@ -18,6 +18,7 @@ import { test, describe, before, after, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
+import { createGitHubProjectsAuthRoutes } from '../../routes/github-projects-auth.js';
 import { createHeldConnectionRoutes } from '../../routes/held-connection.js';
 import { reproofUrlForAccount, EMAIL_REPROOF_URL } from '../../lib/account-conflict.js';
 import { renderGitHubRepoSelectPage, renderGitHubProjectSelectPage, renderLoginPage } from '../../lib/render-pages.js';
@@ -76,6 +77,17 @@ function buildFlow({ listAuthorizedAccountConnections, connectionBackedWritesEna
   });
 }
 
+/** The github-projects consumer of the SAME shared flow (D2 cross-surface check). */
+function buildProjectsFlow({ listAuthorizedAccountConnections, connectionBackedWritesEnabled, provider = flowProvider({ name: 'github-projects' }) } = {}) {
+  return createGitHubProjectsAuthRoutes({
+    provider,
+    accountStore: { resolveCanonicalAccountId: async (id) => id },
+    accountWorkspaceStore: {},
+    listAuthorizedAccountConnections,
+    connectionBackedWritesEnabled,
+  });
+}
+
 /** Redirect targets differ only by the random CSRF `state`; normalise it for byte comparison. */
 const stripState = (url) => String(url).replace(/state=[0-9a-fA-F-]+/, 'state=STATE');
 
@@ -108,10 +120,12 @@ describe('LIN-3125 Phase 3 — held-connection entry', () => {
       await handler({ query: { mode: 'add-source', workspace: 'acme', heldConnection: '1' }, session }, res);
 
       assert.equal(res.redirectedTo, '/connect/github/held', 'redirects into the held picker, never to GitHub');
-      assert.deepEqual(session.heldEntry, {
+      const { at, ...heldShape } = session.heldEntry;
+      assert.deepEqual(heldShape, {
         provider: 'github', mode: 'add-source', workspaceUrlKey: 'acme',
         beginUrl: '/auth/github?mode=add-source&workspace=acme',
       });
+      assert.ok(Number.isFinite(at), 'heldEntry carries the L3 recency stamp');
       assert.deepEqual(calls, [{ accountId: 'acct-1', provider: 'github' }], 'one owner-scoped read, canonical account');
     });
 
@@ -252,6 +266,92 @@ describe('LIN-3125 Phase 3 — held-connection entry', () => {
       const res = makeRes();
       await getHandler(buildFlow(deps), 'get', '/auth/github/callback')({ query: { installation_id: '88', setup_action: 'update' }, session }, res);
       assert.equal(res.redirectedTo, '/auth/github?mode=add-source&workspace=other');
+    });
+
+    // D1 (L1): a stale held entry must not outlive an unmarked begin.
+    test('L1/D1: abandoned held picker + unmarked begin => later stateless return restarts to bare /auth/github', async () => {
+      const deps = { listAuthorizedAccountConnections: async () => [], connectionBackedWritesEnabled: () => true };
+      const session = makeSession({
+        heldEntry: { provider: 'github', mode: 'add-source', workspaceUrlKey: 'acme', beginUrl: '/auth/github?mode=add-source&workspace=acme', at: 1 },
+      });
+
+      // 1. An UNMARKED begin (no `heldConnection`) falls through to authorize and
+      //    must consume the abandoned held entry.
+      const begin = makeRes();
+      await getHandler(buildFlow(deps), 'get', '/auth/github')({ query: { mode: 'new' }, session }, begin);
+      assert.match(begin.redirectedTo, /^https:\/\/github\.com\/login\/oauth\/authorize\?/);
+      assert.equal(session.heldEntry, undefined, 'unmarked begin clears the stale heldEntry');
+      assert.equal(session.oauthIntent.mode, 'new');
+      assert.equal(session.oauthIntent.provider, 'github');
+
+      // 2. The normal round trip's callback consumes `oauthIntent` (and the link
+      //    arm its pending key), so a later stateless return has neither — it
+      //    must restart to the BARE base path, not the old add-source target.
+      delete session.oauthIntent;
+      const res = makeRes();
+      await getHandler(buildFlow(deps), 'get', '/auth/github/callback')({ query: { installation_id: '99', setup_action: 'install' }, session }, res);
+      assert.equal(res.redirectedTo, '/auth/github', 'restarts to the bare begin, not the stale add-source target');
+    });
+
+    // D3 (L3): the more recently stamped intent wins.
+    test('L3/D3: a NEWER held entry beats an OLDER oauthIntent (add-source target preserved)', async () => {
+      const deps = { listAuthorizedAccountConnections: async () => [], connectionBackedWritesEnabled: () => true };
+      const session = makeSession({
+        oauthIntent: { mode: 'new', provider: 'github', at: 1_000 },
+        heldEntry: { provider: 'github', mode: 'add-source', workspaceUrlKey: 'acme', beginUrl: '/auth/github?mode=add-source&workspace=acme', at: 2_000 },
+      });
+      const res = makeRes();
+      await getHandler(buildFlow(deps), 'get', '/auth/github/callback')({ query: { installation_id: '88', setup_action: 'update' }, session }, res);
+      assert.equal(res.redirectedTo, '/auth/github?mode=add-source&workspace=acme', 'the newer held entry wins');
+    });
+
+    test('L3/D3 companion: a NEWER stamped oauthIntent still beats an OLDER held entry', async () => {
+      const deps = { listAuthorizedAccountConnections: async () => [], connectionBackedWritesEnabled: () => true };
+      const session = makeSession({
+        oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'other', at: 3_000 },
+        heldEntry: { provider: 'github', mode: 'add-source', workspaceUrlKey: 'acme', beginUrl: '/auth/github?mode=add-source&workspace=acme', at: 2_000 },
+      });
+      const res = makeRes();
+      await getHandler(buildFlow(deps), 'get', '/auth/github/callback')({ query: { installation_id: '88', setup_action: 'update' }, session }, res);
+      assert.equal(res.redirectedTo, '/auth/github?mode=add-source&workspace=other', 'the newer oauthIntent wins');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // L2 (D2) — the held fallback is provider-matched to the receiving surface
+  // -------------------------------------------------------------------------
+  describe('L2 (D2) — held fallback respects the receiving surface provider', () => {
+    const githubHeldEntry = {
+      provider: 'github', mode: 'add-source', workspaceUrlKey: 'acme',
+      beginUrl: '/auth/github?mode=add-source&workspace=acme', at: 1,
+    };
+
+    test('a GitHub held entry does NOT steer a GitHub Projects stateless return', async () => {
+      const deps = { listAuthorizedAccountConnections: async () => [], connectionBackedWritesEnabled: () => true };
+      const session = makeSession({ heldEntry: { ...githubHeldEntry } });
+      const res = makeRes();
+      await getHandler(buildProjectsFlow(deps), 'get', '/auth/github-projects/callback')({ query: { installation_id: '88', setup_action: 'update' }, session }, res);
+      assert.equal(res.redirectedTo, '/auth/github-projects', 'restarts on its OWN surface, not github');
+    });
+
+    test('a GitHub held entry does NOT steer the GitHub Projects error-page Try again href', async () => {
+      const deps = { listAuthorizedAccountConnections: async () => [], connectionBackedWritesEnabled: () => true };
+      const session = makeSession({ heldEntry: { ...githubHeldEntry } });
+      const res = makeRes();
+      await getHandler(buildProjectsFlow(deps), 'get', '/auth/github-projects/callback')({ query: { error: 'access_denied' }, session }, res);
+      assert.equal(res.statusCode, 400);
+      assert.ok(res.body.includes('/auth/github-projects'), 'Try again points at its own surface');
+      assert.ok(!res.body.includes('/auth/github?mode=add-source'), 'never the other surface\'s add-source target');
+    });
+
+    test('a matching GitHub Projects held entry still steers its own surface', async () => {
+      const deps = { listAuthorizedAccountConnections: async () => [], connectionBackedWritesEnabled: () => true };
+      const session = makeSession({
+        heldEntry: { provider: 'github-projects', mode: 'add-source', workspaceUrlKey: 'acme', beginUrl: '/auth/github-projects?mode=add-source&workspace=acme', at: 1 },
+      });
+      const res = makeRes();
+      await getHandler(buildProjectsFlow(deps), 'get', '/auth/github-projects/callback')({ query: { installation_id: '88', setup_action: 'update' }, session }, res);
+      assert.equal(res.redirectedTo, '/auth/github-projects?mode=add-source&workspace=acme');
     });
   });
 
