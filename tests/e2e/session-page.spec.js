@@ -13,8 +13,15 @@ import { test, expect } from '../fixtures/test-base.js';
 
 let URL_KEY;
 
-test.beforeEach(({ workerUrlKey }) => {
+test.beforeEach(async ({ page, workerUrlKey }) => {
   URL_KEY = workerUrlKey;
+  // LIN-3198 Class A: drop the in-process comment-dedupe caches. Several tests
+  // here re-post the same comment body to the same (workspace, issue) every run
+  // (e.g. 'recorded' on LIN-1728, 'recording this decision' on LIN-1252); the
+  // 5-min server-side dedupe window would otherwise collapse a repeat run's
+  // fresh 201 into a deduped 200, making the exact-201 assertions retry-fatal.
+  // Global clear (the dedupe key is hashed, so it can't be urlKey-scoped).
+  await page.request.get('/test/clear-comment-dedupe');
 });
 
 async function clearRuns(page) {
