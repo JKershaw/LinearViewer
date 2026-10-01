@@ -15,6 +15,16 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   (break-even at 11k tokens if the step orients as fresh starts do today, 100k if it reads only the
   handoff). Replay a sample of acted wakes as fresh sessions in a sandbox, from the record and a short
   handoff, and report steps, tokens and whether the decision matches the held one. (Claude, 2026-10-01)
+- **Does a session handed the plan's named paths reach its first edit with fewer tokens, at the same correctness?**
+  `harbour/starting-context.md` found implementation orients for 1–18% of its tokens (24 calls to the first edit at the median) and
+  that the plan's named paths, resolved to files, find half of what the implementer edits at 55% precision. Over a week, put the
+  resolved paths at the top of every second implementation prompt; compare tokens and calls to first edit, tokens per correct change
+  and the review's findings with the other half. LIN-2115's single-task probe (93 tokens, 18 turns against 51) is the only direct
+  test so far. (Claude, 2026-10-01)
+- **When a code review re-reads what the implementer read, is it checking independently or just re-finding?**
+  `harbour/starting-context.md` found 82% of a code review's orientation reads repeat an earlier session's on the ticket. Code a
+  sample of review orientation spans for whether the reviewer looked beyond the implementer's files and whether that found
+  anything, so a pointer hand-over can be judged against the independence it might cost. (Claude, 2026-10-01)
 - **Which leg kinds share a name length, and which published counts did the length decode misread?**
   `harbour/survey-check-6.md` found that the bootstrap-length decode reads breakdown (and look-into)
   sessions as close-outs and custom, design and triage sessions as reviews: in September's transcript
@@ -408,6 +418,20 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   when the real stream is slow; its three CI-red flakes began ten days later. List every `page.route`
   glob in `tests/e2e/` and match it against the URLs the client builds at origin/main; report the
   holds that never engage and whether each spec has flaked or retried in green runs. (Claude, 2026-09-30)
+- **Can a signal visible before review tell the fleet-machinery changes whose review catches a real
+  fault from those whose review catches nothing?** `harbour/cost-mix.md` found that fleet machinery
+  (proxy, dispatch, prompts, wakes) took a quarter of September's weighted tokens and carries about
+  half of review's real catches and half of the named escapes, so how cheap it can safely be sets
+  the bound on correct work per budget. Take every fleet-machinery change in `which-rules-pay-codes.json`
+  and the 1-in-8 blockers sample, mark which had a real fault caught, and test size, paths touched,
+  a new endpoint or wake path, and a cross-repo contract as predictors, with intervals.
+  (Claude, 2026-10-01)
+- **How many weighted tokens is one point of the weekly meter today?** `harbour/cost-mix.md`
+  converted with the single calibration of 14 August (`lib/weekly-budget.js`), which puts September's
+  fleet at 0.87–1.06 weekly allowances a week; the range is the pricing-table correction alone. Two
+  dated meter readings a few hours apart, set against the transcripts' weighted tokens for the same
+  span, would pin the constant and show whether the meter counts cache reads as list prices do.
+  (Claude, 2026-10-01)
 - **Would a mid- or cheap-tier close-out make the same holds and filings as a frontier one?**
   `harbour/where-judgement-happens.md` found 17 of close-out's 23 consequential decisions on 36
   sampled September changes were calls a stated rule or a cheaper step could have made (holding on an
