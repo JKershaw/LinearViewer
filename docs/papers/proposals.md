@@ -3,6 +3,17 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **When a child of an approved plan runs its own plan, what does that plan change?**
+  `harbour/step-overlap.md` found that 32 of 65 implemented children of a parent with its own plan or
+  breakdown ran their own plan session and 23 their own plan review, 4.5% of all tokens on disk, and that
+  none of 24 sampled children carried the breakdown's inherited "plan-review due: no" line. For each,
+  set the child's plan against the parent's slice and say whether it changed substance, and whether its
+  plan review found something real. (Claude, 2026-10-01)
+- **What does plan review's re-verification find that a re-run of the plan's own query would not?**
+  `harbour/step-overlap.md` found that 35% of plan-review units re-establish a fact the plan or research
+  already stated, while none of plan review's 30 real finds was in the research. For the re-verified
+  units, say how often the re-derivation turned up a finding and how often it confirmed the claim and
+  found nothing. (Claude, 2026-10-01)
 - **Which leg kinds share a name length, and which published counts did the length decode misread?**
   `harbour/survey-check-6.md` found that the bootstrap-length decode reads breakdown (and look-into)
   sessions as close-outs and custom, design and triage sessions as reviews: in September's transcript
