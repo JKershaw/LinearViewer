@@ -6,7 +6,7 @@ date: 2026-10-01
 authors: [Claude (LIN-3177)]
 model: "Frontier tier, claude-code, effort high; one bounded research session (dispatch df74b692, kind custom), with no plan, review or close-out legs, by the brief's design. Ten in-session subagents of the same tier coded the sample: eight split reader A's 36 digests between them, and two were reader B on a blind sub-sample of ten, coded in reverse order."
 grounded_at: 26014544 (LinearViewer, origin/main); 3366748 (simple-dispatcher, origin/main); runner logs, oplog and local transcripts read 1 Oct 2026 about 06:50Z
-cites: [docs/steady-base.md@26014544, docs/papers/harbour/what-supervisors-do.md@26014544 (v2), docs/papers/harbour/wake-inventory.md@26014544 (v2), docs/papers/harbour/where-the-effort-goes.md@26014544 (v2), docs/papers/harbour/why-legs-repeat.md@26014544 (v2), docs/papers/harbour/close-out-claims.md@26014544, docs/papers/harbour/where-judgement-happens-codes.json, scripts/survey-judgement-codebook.md, simple-dispatcher PR #255 (CI run 36228946934, 26 Sep), LIN-2944 (In Progress, replaced in the sample), LIN-3177 (2026-10-01)]
+cites: [docs/steady-base.md@26014544, docs/papers/harbour/held-or-fresh.md@cce25f13, docs/papers/harbour/what-supervisors-do.md@26014544 (v2), docs/papers/harbour/wake-inventory.md@26014544 (v2), docs/papers/harbour/where-the-effort-goes.md@26014544 (v2), docs/papers/harbour/why-legs-repeat.md@26014544 (v2), docs/papers/harbour/close-out-claims.md@26014544, docs/papers/harbour/where-judgement-happens-codes.json, scripts/survey-judgement-codebook.md, simple-dispatcher PR #255 (CI run 36228946934, 26 Sep), LIN-2944 (In Progress, replaced in the sample), LIN-3177 (2026-10-01)]
 ---
 
 # Where in a ticket's life does a model's judgement change the outcome, and where could a program make the call?
@@ -145,7 +145,9 @@ than one layer, 17 needed a context reaction and John took part in 15. Examples:
 - an approved auto-pause that could never hold a fresh launch.
 
 For those 28 the readers judged a fresh session with the record could have decided in 18, could
-not in 2, and could not tell in 8. Red CI barely appears. The readers coded none, and GitHub shows
+not in 2, and could not tell in 8. `held-or-fresh.md` reaches the same place from the other side:
+in 48 blind-coded wakes that acted, no supervisor decision rested on a fact only the session's
+memory held. Red CI barely appears. The readers coded none, and GitHub shows
 one red attempt in 84 CI runs on the 44 merged PRs: simple-dispatcher PR #255 (LIN-2995), re-run
 green. Neither reader caught it, because the digests show only what the sessions said. Lost wakes
 appear once, though `wake-inventory.md` finds 15 on record fleet-wide; a wake that never arrives
@@ -167,7 +169,7 @@ shares overlap the steady-base map's rows and each other; they do not add.
 
 | # | Option | Estimated effect | Evidence | Risk to correctness | How the scorecard would see it |
 |---|---|---|---|---|---|
-| 1 | **Wake a supervising model only on events that carry a decision**: terminal reports, failures, human messages. Code takes the rest | Up to the supervisors' bookkeeping: 33–38% of their cost, 8–10% of ticket cost (inside map rows 1–3) | Supervisors make 2 decisions per ticket (73 of 260), in cycles that are 12–14% of their cost. 9–10% of wakes held a decision and 36–38% changed nothing | 22 of the supervisors' 37 context decisions rested on a worker's report, which arrives on a terminal wake. A filter that drops or delays a terminal report loses them | Supervisor decisions per ticket held; correct rate held; hours per change |
+| 1 | **Wake a supervising model only on events that carry a decision**: terminal reports, failures, human messages. Code takes the rest | Up to the supervisors' bookkeeping: 33–38% of their cost, 8–10% of ticket cost (inside map rows 1–3) | Supervisors make 2 decisions per ticket (73 of 260), in cycles that are 12–14% of their cost. 9–10% of wakes held a decision and 36–38% changed nothing. `held-or-fresh.md` models sending only the quiet wakes to code at −14% of fleet tokens (−21% to −13%) | 22 of the supervisors' 37 context decisions rested on a worker's report, which arrives on a terminal wake. A filter that drops or delays a terminal report loses them | Supervisor decisions per ticket held; correct rate held; hours per change |
 | 2 | **Put the rule-class calls in code**: escalate at the loop bound, retry once after a harness failure, proceed when a blocker is Done, merge on green where the brief says so | Under 1% of ticket cost directly (0.6% sits in these cycles); removes the engine's misroutes (9 on 6 tickets) | 21 decisions are class a; every engine misroute was corrected by one layer, 4 by a rule | Low. A coded rule acts when its state is stale (the engine's misroutes came from stale hold comments), so it must read current state | Overrides of the engine per ticket; misroutes |
 | 3 | **Run close-out at a cheaper tier, keeping a frontier step for the open questions** | 2–5% of ticket cost (close-out is 6%; a mid tier costs 0.6 of frontier, cheap 0.2) | 17 of close-out's 23 decisions are class a or b; cheap-tier close-outs already made 5 of them, holds and a filing, on LIN-2891, LIN-2995 and LIN-3163 | Six close-out decisions needed context. A cheaper close-out that misreads a ledger lets an undischarged item through; `close-out-claims.md` | Close-out holds overturned; escapes on items the ledger named |
 | 4 | **Retry service faults inside the tools sessions use**, with the duplicate guard in the tool | Not sized: each fault costs a step that re-reads its context, here on 20 of 36 tickets | 47 auth flaps, outages and host faults; none needed a second layer; 37 class a; one duplicate verdict post (LIN-3106) | Low, if the duplicate guard holds | Proxy error retries per ticket; duplicate writes |
@@ -263,6 +265,6 @@ every 8 seconds, for ticket records only; 10 calls answered 503 and were repeate
   John had, a preference), and so how many a standing-rules file would have settled.
 - **Do supervisors' context decisions arrive only on terminal reports?** That is option 1's
   premise. For each, read what woke the cycle; `wake-inventory.md` has the delivery classes.
-  Siblings in this wave: `held-or-fresh.md` asks whether a held context earns its cost, which bears
-  on the fresh-session finding; `cost-mix.md`, `starting-context.md`, `step-overlap.md` and
+  Siblings in this wave: `held-or-fresh.md` (landed during this session) prices holding a
+  supervisor against starting one fresh; `cost-mix.md`, `starting-context.md`, `step-overlap.md` and
   `how-process-changes-land.md` take the rest.
