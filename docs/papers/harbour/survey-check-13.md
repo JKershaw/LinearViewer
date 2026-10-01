@@ -36,7 +36,8 @@ What fails is in what the numbers are taken to mean:
   (`git log` over the changed files) survives in about 1% of written reviews, not 27%. Close-out
   has no regression check; the word sits in a CI-substitute paragraph.
 - **Principle 0 is an escalation rule.** It lives in the shared "If Blocked" section, and its
-  substance survives in a third to two-fifths of written plans and implementations.
+  substance survives in about a third of written plans (32%) and over two-fifths of
+  implementations (44%).
 - **The drop the paper missed is a routed marker.** The plan-review template's instruction to head
   its verdict `### Plan Review Verdict` survives in 70% of written plan-reviews. The plan template's
   instruction to read that verdict before re-planning survives in 36% of written plans.
@@ -60,7 +61,7 @@ Every count in finding A reproduces:
 
 **No item is counted twice; the beat route counts legs twice.** Items are keyed by id. 23 ids were
 printed by two enqueue calls; 6 of those carry two routes, and the first in file order is kept,
-which moves no figure by more than a unit. But a **beat** is a written follow-up into a held
+which moves no route's count by more than a few units. But a **beat** is a written follow-up into a held
 session. Of the 500 template-kind beats a session fetched, 498 went into a session whose header was
 already that kind. Beats are 923 of the 2,727, so a third of the census is messages into legs
 already counted in another route.
