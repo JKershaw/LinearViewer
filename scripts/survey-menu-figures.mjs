@@ -1,4 +1,4 @@
-// LIN-3194: draw steady-base-menu.md's SVG charts from survey-menu-analyse.mjs's output, by hand (no dependencies).
+// LIN-3194 (version 2, LIN-3195): draw steady-base-menu.md's SVG charts from survey-menu-analyse.mjs's output, by hand (no dependencies).
 // Usage: node scripts/survey-menu-figures.mjs [--in data/survey-menu/menu.json] [--out docs/papers/harbour/figures/steady-base-menu]
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
@@ -22,7 +22,7 @@ const svg = (W, H, body) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
   const tokenOpts = opts.filter((o) => !(o.factor === 'F5' && o.hi === 0));
   const hourOpts = opts.filter((o) => o.factor === 'F5' && o.hi === 0);
   const twoX = new Set(['M3', 'M4', 'M7', 'M8', 'M9', 'M10', 'M11', 'M12', 'M13', 'M14', 'M16', 'M17', 'M21']); // S4's members; M1, M2, M5 sit inside M3
-  const hollow = new Set(['M1', 'M2', 'M5', 'M6']);
+  const hollow = new Set(['M1', 'M2', 'M5', 'M6', 'M15']);
   const W = 1100, L = 150, R = 700, T = 96;
   const byRisk = RISK.map((_, i) => tokenOpts.filter((o) => o.risk === i).sort((p, q) => (q.hi || 0) - (p.hi || 0)));
   const rowH = byRisk.map((rows) => Math.max(44, 17 * rows.length + 16));
@@ -40,7 +40,7 @@ const svg = (W, H, body) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
   });
   byRisk.forEach((rows, i) => {
     rows.forEach((o, k) => {
-      const y = rowY[i] + 14 + k * 17; const col = FCOL[o.factor]; const inStack = twoX.has(o.id) || ['M1', 'M2', 'M5'].includes(o.id); const h = hollow.has(o.id);
+      const y = rowY[i] + 14 + k * 17; const col = FCOL[o.factor]; const inStack = twoX.has(o.id) || ['M1', 'M2', 'M5', 'M15'].includes(o.id); const h = hollow.has(o.id);
       const x0 = x(o.lo || xmin), x1 = x(o.hi);
       if (x1 - x0 > 1) s += `<line x1="${x0}" x2="${x1}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="${inStack ? 3 : 1.5}" stroke-opacity="${h ? 0.45 : 0.9}"/>`;
       s += `<circle cx="${x1}" cy="${y}" r="${inStack ? 5 : 4}" fill="${h ? '#fff' : col}" stroke="${inStack ? C.ink : col}" stroke-width="${inStack ? 2 : 1}"/>`;
