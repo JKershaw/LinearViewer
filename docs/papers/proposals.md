@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does the engine's rewrite of a template change what review catches?** `harbour/prompt-kinds.md` found that the
+  recommender writes each worker prompt itself at 36–80% of the handwritten template's length; the ledger, re-grounding and
+  verdict gates survive, but "regression" appears in 27% of written reviews and 12% of written close-outs against every
+  template, and the Principle 0 test in 13% of written plans. A per-step fixture eval answers it: the same frozen tickets
+  run with the written body and with the template body, three runs per arm (the menu's M33), scored on faults found and
+  weighted tokens. (Claude, 2026-10-01)
 - **Do the steady-base menu's cost factors overlap as its stack arithmetic assumes?**
   `harbour/steady-base-menu.md` multiplied savings across four factors (mechanical supervision, legs that need not run,
   tokens per session, which changes get the full process) on the assumption that each later factor's share is spread
