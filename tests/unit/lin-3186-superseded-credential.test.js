@@ -409,14 +409,23 @@ async function request(app, path) {
 const ISSUE_UUID = '266f0841-ef9a-40de-a7b4-e18890efbf05';
 
 describe('P4 — a repeat rejection of a superseded fingerprint is terminal (401)', () => {
-  test('superseded fingerprint, still believed-live -> 401, not the retryable 503', async () => {
+  test('superseded fingerprint, still believed-live -> 401, not the retryable 503; [credential-rejected] marks superseded:true', async () => {
     const registry = createRejectedCredentialRegistry();
     const fp = fingerprintCredential('linear-tok');
     registry.markSuspect(fp);
     registry.accept(fp, { supersededBy: fingerprintCredential('replacement'), source: 'durable-adopt' });
     const app = buildDataRouteApp({ rejectedCredentialRegistry: registry, credentialFingerprint: fp, expiresAt: Date.now() + 3600_000 });
-    const { status } = await request(app, `/api/proxy/issues/${ISSUE_UUID}`);
-    assert.equal(status, 401, 'a known-superseded credential is dead, not a rotation race');
+    // Capture console.warn around the REAL route: the trail line proves
+    // routes/proxy.js passed the registry to createCredentialTrail (review
+    // mutation I — omitting it leaves the whole suite green without this).
+    const { warns } = await withCapturedConsole(async () => {
+      const { status } = await request(app, `/api/proxy/issues/${ISSUE_UUID}`);
+      assert.equal(status, 401, 'a known-superseded credential is dead, not a rotation race');
+    });
+    const line = warns.find(args => args[0] === '[credential-rejected]');
+    assert.ok(line, 'the proxy must emit the [credential-rejected] trail line for this 401');
+    const payload = JSON.parse(line[1]);
+    assert.equal(payload.superseded, true, 'the registry must be wired into createCredentialTrail so the trail marks the fingerprint superseded');
   });
 
   test('an unsuperseded believed-live credential still says transient (503) on its first rejection — LIN-2216 pins stay green', async () => {
