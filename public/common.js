@@ -1740,7 +1740,9 @@ window.ProxyToggle = (function () {
    * tooling, and it was false.
    *
    * LIN-3136: when the minted token holds the dispatch grant (a driver copy),
-   * the closing line says so, and which routes it opens.
+   * the closing line says so, and which routes it opens; otherwise (the toggle
+   * path's grant-less copy) it says the token cannot enqueue, so the pasted
+   * session is not surprised by the 403.
    *
    * @param {string} token - single-use bootstrap
    * @param {string|null} [providerDisplayName] - declared provider display name, or null
@@ -1751,7 +1753,7 @@ window.ProxyToggle = (function () {
     const backing = providerDisplayName ? `; currently backed by ${providerDisplayName}` : '';
     const grantNote = Array.isArray(grants) && grants.includes('dispatch')
       ? ' It also holds the dispatch grant, so it can enqueue work (`POST /dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`) that runs on the operator\'s machine.'
-      : '';
+      : ' It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.';
     return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral${backing}). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nFirst, exchange your single-use bootstrap token for a working token:\n\n  curl -X POST -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/token\n\nThat returns { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> from here on. Then fetch the full API documentation:\n\n  curl -H "Authorization: Bearer <WORKING_TOKEN>" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.${grantNote}`;
   }
 

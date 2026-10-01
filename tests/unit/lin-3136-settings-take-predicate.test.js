@@ -145,3 +145,49 @@ describe('LIN-3136 S7 — runner rows are the take holders only', () => {
     assert.match(html, /\(consumed\)/);
   });
 });
+
+describe('LIN-3136 — the Settings "Generate agent prompt" states that a readWrite token cannot enqueue', () => {
+  function agentPrompt(scope) {
+    const generateBtn = makeEl({ closest: () => ({ dataset: { urlKey: 'acme' } }) });
+    const scopeSelect = makeEl({ value: scope });
+    const promptOutput = makeEl();
+    const feedback = makeEl();
+    const copied = [];
+    const sandbox = {
+      window: {
+        location: { origin: 'https://harbour.test' },
+        relativeTime: () => 'just now',
+        api: async (url) => (url.includes('/api/proxy/tokens') ? { token: 'BOOT', tokens: [], providerDisplayName: null } : {})
+      },
+      document: {
+        getElementById: (id) => ({
+          'proxy-generate-btn': generateBtn, 'proxy-scope-select': scopeSelect,
+          'proxy-prompt-output': promptOutput, 'proxy-generate-feedback': feedback
+        }[id] || null),
+        querySelector: () => null,
+        addEventListener() {}
+      },
+      navigator: { clipboard: { writeText: async (t) => { copied.push(t); } } },
+      setTimeout, clearTimeout, console,
+      escapeHtml: (v) => String(v),
+      confirm: () => false,
+      toast: () => {}
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(PROXY_SRC, sandbox, { filename: 'proxy.js' });
+    return { generateBtn, copied };
+  }
+
+  test('readWrite: the prompt ends with the cannot-enqueue clause; read: unchanged', async () => {
+    for (const [scope, expectClause] of [['readWrite', true], ['read', false]]) {
+      const { generateBtn, copied } = agentPrompt(scope);
+      assert.ok(generateBtn._handlers.click, 'the generate button is wired');
+      await generateBtn._handlers.click[0]();
+      await flush();
+      const text = copied[0] || '';
+      assert.ok(text.includes(`Your token scope is: ${scope}.`), `${scope}: ${text.slice(-200)}`);
+      assert.equal(text.includes('It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.'), expectClause, scope);
+    }
+  });
+});

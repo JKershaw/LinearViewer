@@ -22,6 +22,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
+import crypto from 'crypto';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
@@ -153,9 +154,29 @@ describe('LIN-3136 M1 — a kickoff declares [dispatch] for its child', () => {
 });
 
 describe('LIN-3136 M1 — refusals: nothing enqueued, nothing minted', () => {
-  test('a caller token with no stored workspace → 400 INVALID_GRANTS (fail closed, no urlKey fallback)', async () => {
+  test('an un-granted readWrite caller → 403 DISPATCH_GRANT_REQUIRED at the gate (criterion 6)', async () => {
     const w = world();
     const { token } = await w.store.createToken('acme', { scope: 'readWrite', createdBy: OWNER });
+    w.spy.plain.length = 0;
+    const res = await call(w.app, 'post', KICKOFF, { token, body: { goal: 'walk' } });
+    assert.equal(res.status, 403, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'DISPATCH_GRANT_REQUIRED');
+    assert.equal(w.items.length, 0, 'no item');
+    assert.equal(w.spy.grant.length + w.spy.plain.length, 0, 'no token minted');
+  });
+
+  test('a caller token with no stored workspace → 400 INVALID_GRANTS (fail closed, no urlKey fallback)', async () => {
+    const w = world();
+    // A grant-bearing row with no workspace binding (legacy or corrupt: the
+    // normal mint always stores one). It passes the dispatch gate, so this is
+    // M1's own fail-closed branch, not the gate's 403.
+    const token = crypto.randomBytes(24).toString('hex');
+    await w.store.collection.insertOne({
+      _id: crypto.randomUUID(), urlKey: 'acme', tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+      label: 'legacy', scope: 'readWrite', kind: 'standard', singleUse: false, createdBy: OWNER,
+      grants: ['dispatch'], parentTokenId: null, workspaceId: null, createdAt: new Date(), lastUsedAt: null,
+      expiresAt: null, consumed: false
+    });
     w.spy.plain.length = 0;
     const res = await call(w.app, 'post', KICKOFF, { token, body: { goal: 'walk' } });
     assert.equal(res.status, 400, JSON.stringify(res.body));

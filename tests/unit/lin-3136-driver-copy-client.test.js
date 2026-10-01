@@ -11,8 +11,7 @@
  *    cache), and states the dispatch grant in the block;
  *  - every refusal maps to `DRIVER_COPY_ERROR_COPY` and a forced append throws
  *    that text instead of appending anything (no grant-less fallback);
- *  - `buildBlock`'s grant-less closing line is unchanged (the toggle-path
- *    "cannot enqueue" sentence waits for the switch-on).
+ *  - `buildBlock`'s grant-less (toggle-path) block says it cannot enqueue.
  */
 process.env.NODE_ENV = 'test';
 
@@ -29,6 +28,7 @@ const COMMON_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8
 const TOGGLE_BODY = { label: 'prompt-proxy', scope: 'readWrite', bootstrap: true };
 const GRANT_LINE = 'It also holds the dispatch grant, so it can enqueue work (`POST /dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`) that runs on the operator\'s machine.';
 const SCOPE_LINE = 'Your token scope is: readWrite.';
+const CANNOT_LINE = 'It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.';
 
 /** Load public/common.js in a minimal DOM sandbox; the toggle on/off is `toggleOn`. */
 function load(apiImpl, { toggleOn = false } = {}) {
@@ -75,7 +75,7 @@ describe('LIN-3136 S6 — the toggle path is byte-for-byte unchanged', () => {
     const good = load(ok(), { toggleOn: true });
     const out = await good.toggle.maybeAppend('PROMPT', 'acme');
     assert.deepEqual(good.calls[0].body, TOGGLE_BODY);
-    assert.ok(out.endsWith(SCOPE_LINE), 'the grant-less block still closes on the scope line');
+    assert.ok(out.endsWith(`${SCOPE_LINE} ${CANNOT_LINE}`), 'the grant-less toggle block says it cannot enqueue');
 
     const bad = load(refusal(403, 'GRANT_OWNER_ONLY'), { toggleOn: true });
     const failed = await bad.toggle.getOrCreateToken('acme');
@@ -180,12 +180,12 @@ describe('LIN-3136 S6 — driver refusals map to copy and a forced append throws
 });
 
 describe('LIN-3136 S6 — buildBlock', () => {
-  test('with [dispatch] it states the grant; without, the closing line is unchanged', () => {
+  test('with [dispatch] it states the grant; without, it says the token cannot enqueue', () => {
     const { toggle } = load(ok());
     assert.ok(toggle.buildBlock('BOOT', null, ['dispatch']).endsWith(`${SCOPE_LINE} ${GRANT_LINE}`));
     for (const grants of [undefined, [], ['take']]) {
       const out = toggle.buildBlock('BOOT', null, grants);
-      assert.ok(out.endsWith(SCOPE_LINE), `grants=${JSON.stringify(grants)}`);
+      assert.ok(out.endsWith(`${SCOPE_LINE} ${CANNOT_LINE}`), `grants=${JSON.stringify(grants)}`);
       assert.ok(!out.includes('dispatch grant'));
     }
     assert.equal(toggle.buildBlock('BOOT', 'Jira'), toggle.buildBlock('BOOT', 'Jira', undefined),

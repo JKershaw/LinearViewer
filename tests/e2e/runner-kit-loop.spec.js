@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
+// fixture:LIN-3136
+import { mintDriverWriter } from '../fixtures/driver-writer.js';
+// /fixture:LIN-3136
 import { execFile, spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,10 +18,13 @@ import { fileURLToPath } from 'node:url';
  * The workspace comes from `append: true`, so the session's account is its
  * OWNER (LIN-1892) and can mint the runner copy (LIN-3131). Owner items are
  * enqueued through an owner-created proxy token (`dispatchedBy` = the owner).
- * The B1 non-owner item goes through the SAME real enqueue route, with a token
- * minted under a second session (the canonical Linear test account) in its own
- * request context, so no test-only queue writer is needed and the owner's
- * session is never touched.
+ * The B1 non-owner item is enqueued by a second session (the canonical Linear
+ * test account, in its own request context) through the real SESSION dispatch
+ * route, which stamps that account as `dispatchedBy`. Since LIN-3136 a non-owner
+ * can no longer hold an enqueue-capable proxy token (the proxy enqueue routes
+ * require the owner-minted `dispatch` grant), so the session route is the real
+ * path a non-owner's item reaches this queue by. No test-only queue writer, and
+ * the owner's session is never touched.
  *
  * Everything stays on loopback; broker sockets live in a short /tmp dir.
  */
@@ -76,6 +82,9 @@ test.beforeEach(async ({ page, request }) => {
   ownerAccountId = (await (await request.get('/test/session-account', { headers: { Cookie: header } })).json()).accountId;
   expect(ownerAccountId).toBeTruthy();
   ownerToken = (await (await request.get(`/test/create-proxy-token?urlKey=${urlKey}&scope=readWrite&label=owner-enqueue`, { headers: { Cookie: header } })).json()).token;
+  // fixture:LIN-3136: enqueue needs the dispatch grant, so the owner's writer is the owner's driver copy
+  ownerToken = (await mintDriverWriter(page, urlKey)).token;
+  // /fixture:LIN-3136
 
   // 1. Mint the runner credential (owner-only), then recover (a no-op) and login.
   home = mkdtempSync(join(existsSync('/tmp') ? '/tmp' : tmpdir(), 'rk-e2e-'));
@@ -159,17 +168,20 @@ test.describe('runner kit local loop (LIN-3098 S2)', () => {
     const other = await playwright.request.newContext({ baseURL: BASE });
     let foreign;
     try {
-      expect((await other.get('/test/set-session?urlKey=runner-kit-stranger')).ok()).toBe(true);
+      // LIN-3136 (ledger A6): the stranger is a non-owner MEMBER of this urlKey
+      // and enqueues through the session dispatch route; a non-owner cannot hold
+      // an enqueue-capable proxy token any more.
+      const features = encodeURIComponent(JSON.stringify({ dispatch: true }));
+      expect((await other.get(`/test/set-session?urlKey=${urlKey}&features=${features}`)).ok()).toBe(true);
       const strangerId = (await (await other.get('/test/session-account')).json()).accountId;
       expect(strangerId).toBeTruthy();
       expect(strangerId).not.toBe(ownerAccountId);
-      const strangerToken = (await (await other.get(`/test/create-proxy-token?urlKey=${urlKey}&scope=readWrite&label=stranger`)).json()).token;
-      const res = await other.post('/api/proxy/dispatch', {
-        headers: { Authorization: `Bearer ${strangerToken}`, 'Content-Type': 'application/json' },
-        data: { prompt: 'stranger work', harness: 'claude-code', sessionId: kickoff.id, subscription: 'terminal-only' }
+      const res = await other.post(`/workspace/${urlKey}/api/dispatch`, {
+        headers: { 'Content-Type': 'application/json' },
+        data: { prompt: 'stranger work', promptName: 'Stranger', harness: 'claude-code', target: 'cli', sessionId: kickoff.id, subscription: 'terminal-only' }
       });
-      expect(res.status()).toBe(201);
-      foreign = await res.json();
+      expect(res.status(), await res.text()).toBe(201);
+      foreign = (await res.json()).item;
       expect((await watch(request, foreign.id)).dispatchedBy).toBe(strangerId);
     } finally {
       await other.dispose();

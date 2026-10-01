@@ -165,7 +165,7 @@ function dispatchWatchChanged(baseline, item) {
  * @param {number} deps.RECOMMEND_DESCENT_BUDGET_MS - Shared cross-hop budget for the recommend recursion (module-scope)
  * @param {Function} deps.refuseIfBudgetExhausted - 409s a budget-exhausted dispatch error (closure-local)
  * @param {Function} deps.refuseIfDuplicateDispatch - 409s a duplicate dispatch error (closure-local)
- * @param {Function} deps.requireGrant - The dispatch grant gate middleware factory (module-scope in routes/proxy.js; declared here, not yet applied)
+ * @param {Function} deps.requireGrant - The grant gate middleware factory (module-scope in routes/proxy.js); gates POST /dispatch and /recommend-and-dispatch on the `dispatch` grant, after the scope check (LIN-3136)
  * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups F/H)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
@@ -217,7 +217,7 @@ export function createDispatchRoutes({
    * the server's own tty, which a remote consumer can't drive). This is the
    * write half the autopilot orchestrator uses to dispatch a chosen task.
    */
-  router.post('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
     if (!dispatchQueueStore) {
       logEvent(req, '/api/proxy/dispatch', 503);
       return jsonError(res, 503, 'Dispatch is not available');
@@ -685,7 +685,7 @@ export function createDispatchRoutes({
    * documented operator escape hatch (`dispatch-factory.js`) is now reachable
    * on both dispatch verbs.
    */
-  router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+  router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
     if (!dispatchQueueStore) {
       logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
       return jsonError(res, 503, 'Dispatch is not available');

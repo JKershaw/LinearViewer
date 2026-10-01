@@ -137,7 +137,7 @@ That returns { "token": "<WORKING_TOKEN>", "scope": "${scope}", "expiresAt": "..
 
 curl -H "Authorization: Bearer <WORKING_TOKEN>" ${instructionsUrl}
 
-This will return all available endpoints with examples. Your token scope is: ${scope}.`;
+This will return all available endpoints with examples. Your token scope is: ${scope}.${scope === 'readWrite' ? ' It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.' : ''}`;
   }
 
   // =========================================================================

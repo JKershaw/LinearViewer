@@ -9,10 +9,11 @@
  *
  * Built through the real composer (`buildApp`/`BASE_DEPS`) with a local
  * `validateToken` override, so the `read`/`readWrite` decision is made where
- * production makes it. The readWrite-no-grants control pins the "no enforcement
- * yet" half of criterion (a): T1 adds no grant gate, so a plain readWrite token
- * (no `grants`) still reaches the queue. This test stays valid after T3 because
- * `requireWriteScope` runs before any grant gate.
+ * production makes it. The readWrite-no-grants case is the grant gate itself
+ * (LIN-3136, T3): a plain readWrite token (no `grants`) is refused 403
+ * DISPATCH_GRANT_REQUIRED before the queue, and a readWrite + `dispatch` token
+ * still enqueues. The `read` cases are unchanged because `requireWriteScope`
+ * runs before the grant gate.
  *
  * A `dispatchQueueStore.addItem` spy proves refusal happens BEFORE the enqueue,
  * not merely that the response status is a non-201.
@@ -63,12 +64,18 @@ function buildEnqueueApp({ scope, grants } = {}) {
       // minting a bootstrap token; give the stub a working mint like
       // production so the readWrite control reaches the enqueue.
       createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
+      // fixture:LIN-3136: the kickoff's declared child mint (M1) for a dispatch holder
+      mintGrantBootstrap: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
+      // /fixture:LIN-3136
       validateToken: async () => ({
         tokenId: 't1',
         urlKey: ACME,
         label: 'test',
         scope,
         createdBy: 'u1',
+        // fixture:LIN-3136: a grant-bearing token always stores the workspace it was owner-checked in
+        workspaceId: 'ws-acme',
+        // /fixture:LIN-3136
         ...(grants === undefined ? {} : { grants }),
       }),
       listTokens: async () => [],
@@ -96,25 +103,18 @@ for (const route of ENQUEUE_ROUTES) {
     });
   }
 
-  if (route.path === '/api/proxy/autopilot/kickoff') {
-    // LIN-3136 (ledger A2, kickoff row, advanced to G3): the kickoff now declares
-    // the dispatch grant for its child (M1), owner-checked in the workspace the
-    // CALLER token was minted for. A grant-less readWrite token carries no such
-    // workspace, so the launch fails closed before the enqueue; no grant-less
-    // fallback. (G5's gate then refuses it earlier, with DISPATCH_GRANT_REQUIRED.)
-    test(`${route.name}: a readWrite token with no grants is refused before the enqueue (M1 fails closed)`, async () => {
-      const { app, added } = buildEnqueueApp({ scope: 'readWrite' });
-      const { status, body } = await call(app, 'post', route.path, { body: route.body });
-      assert.equal(status, 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
-      assert.equal(body.code, 'INVALID_GRANTS');
-      assert.equal(added.length, 0, 'a grant-less caller never reaches the enqueue');
-    });
-  } else {
-    test(`${route.name}: a readWrite token with no grants still enqueues (no grant gate yet)`, async () => {
-      const { app, added } = buildEnqueueApp({ scope: 'readWrite' });
-      const { status, body } = await call(app, 'post', route.path, { body: route.body });
-      assert.equal(status, 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
-      assert.equal(added.length, 1, 'the readWrite token still reaches the enqueue in T1');
-    });
-  }
+  test(`${route.name}: a readWrite token with no grants is refused 403 DISPATCH_GRANT_REQUIRED (LIN-3136)`, async () => {
+    const { app, added } = buildEnqueueApp({ scope: 'readWrite' });
+    const { status, body } = await call(app, 'post', route.path, { body: route.body });
+    assert.equal(status, 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert.equal(body.code, 'DISPATCH_GRANT_REQUIRED');
+    assert.equal(added.length, 0, 'a grant-less readWrite token never reaches the enqueue');
+  });
+
+  test(`${route.name}: a readWrite token with the dispatch grant still enqueues (positive control)`, async () => {
+    const { app, added } = buildEnqueueApp({ scope: 'readWrite', grants: ['dispatch'] });
+    const { status, body } = await call(app, 'post', route.path, { body: route.body });
+    assert.equal(status, 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
+    assert.equal(added.length, 1);
+  });
 }

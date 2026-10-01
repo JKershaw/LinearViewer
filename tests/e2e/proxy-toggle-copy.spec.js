@@ -98,6 +98,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toContain(PROXY_MARKER);
     expect(clip).not.toContain('It also holds the dispatch grant');
+    expect(clip).toContain('It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.');
   });
 
   test('copy does NOT append when +proxy is disabled', async ({ page }) => {

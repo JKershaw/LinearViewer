@@ -3,8 +3,8 @@
  *
  * THE test LIN-2884 MUST KEEP GREEN once it gates `dispatch` with
  * `requireGrant('dispatch')`: a grant-bearing runner working token can still
- * enqueue via `POST /api/proxy/dispatch`, and an ordinary `readWrite` token
- * still can too today (gating is LIN-2884's to add, not S1's).
+ * enqueue via `POST /api/proxy/dispatch`. Its twin is the gate itself (LIN-3136):
+ * an ordinary `readWrite` token without the grant is refused.
  *
  * File-local harness (no BASE_DEPS — S1 leaves tests/unit/lib/proxy-fake-deps.js
  * untouched): installHermeticLinearTransport, a REAL ProxyTokenStore over an
@@ -145,7 +145,7 @@ describe('LIN-3059 criterion — a grant-bearing runner token can dispatch', () 
     assert.match(captured.item.prompt, /run me/, 'the prompt reached the queue (proxy context may be appended)');
   });
 
-  test('twin: a plain readWrite token also gets 201 today (gating is LIN-2884)', async () => {
+  test('twin: a plain readWrite token is refused 403 DISPATCH_GRANT_REQUIRED (the LIN-2884 gate, LIN-3136)', async () => {
     const store = await newGrantStore();
     const captured = {};
     const app = buildApp(store, captured);
@@ -155,7 +155,8 @@ describe('LIN-3059 criterion — a grant-bearing runner token can dispatch', () 
       token,
       body: { prompt: 'run me', kind: 'implementation' }
     });
-    assert.equal(dispatched.status, 201, JSON.stringify(dispatched.body));
-    assert.ok(captured.item, 'the ordinary readWrite token still enqueues');
+    assert.equal(dispatched.status, 403, JSON.stringify(dispatched.body));
+    assert.equal(dispatched.body.code, 'DISPATCH_GRANT_REQUIRED');
+    assert.equal(captured.item, undefined, 'the ordinary readWrite token enqueues nothing');
   });
 });
