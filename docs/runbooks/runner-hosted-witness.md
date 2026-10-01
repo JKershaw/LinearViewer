@@ -117,6 +117,31 @@ Also check and note:
    Wait until it says the task is done
    (or blocked).
 
+## 4b. Post-T3: re-witness the Autopilot
+
+T3 (1 Oct, 17:13Z) put the dispatch
+grant in front of every enqueue. An
+Autopilot launched after it holds the
+grant, so its worker dispatches should
+enqueue and run. Confirm that: the run
+in step 4 shows new worker dispatches,
+not a `403 DISPATCH_GRANT_REQUIRED`.
+
+If you do see `403 DISPATCH_GRANT_REQUIRED`,
+the task's credential has no grant: it
+was launched before T3. Note it as a
+finding to post, not a pass, and
+re-launch the task from the app.
+
+First check the runner's take line for
+this item. If it says `apiAccess: false`,
+that is not the T3 grant: the task was
+launched with no harness (LIN-3211), and
+re-launching from the same button repeats
+it. Answer "stop, do not pass it", set
+Settings → Dispatch defaults → Harness to
+`claude-code`, and re-launch.
+
 ## 5. Done: paste this back
 
 1. Send this line to the runner:
