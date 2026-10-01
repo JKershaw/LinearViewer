@@ -700,6 +700,59 @@ describe('plan template', () => {
       'must explicitly allow a single-surface result so scope is a decision, not invented breadth'
     );
   });
+
+  // LIN-3202 (menu M14): the plan states what it adds beyond the research and
+  // cites the findings it relies on instead of restating them. Evidence base:
+  // the median plan restates ~440 words of research (`step-overlap` v2 B).
+  describe('cite, don\'t restate (LIN-3202)', () => {
+    test('states what the plan adds beyond the research and cites the rest', () => {
+      const result = generatePrompt('plan', mockIssue, mockContext);
+      assert.ok(result.prompt.includes('State what it adds, and cite the rest'),
+        'the plan prompt must carry the cite-don\'t-restate directive');
+      assert.ok(result.prompt.includes('what it adds beyond the research'),
+        'must ask what the plan adds beyond the research');
+      assert.ok(result.prompt.includes('the research findings it relies on instead of restating them'),
+        'must ask for citations of the findings relied on');
+    });
+
+    test('requires resolvable citations and forbids restatement to look self-contained', () => {
+      const result = generatePrompt('plan', mockIssue, mockContext);
+      assert.ok(result.prompt.includes('cite by comment (author/heading or id), file:line, or sha'),
+        'citations must be resolvable without the plan paraphrasing them');
+      assert.ok(result.prompt.includes('never restate a finding to "make the plan self-contained"'),
+        'must not instruct restating a finding to appear self-contained');
+      assert.ok(result.prompt.includes('there are no citations to manufacture'),
+        'the no-research case must forbid manufacturing citations');
+    });
+
+    test('states the no-research and disagreement cases as additions, not restatements', () => {
+      const result = generatePrompt('plan', mockIssue, mockContext);
+      assert.ok(result.prompt.includes('the plan stands alone'),
+        'a plan with no prior research must be allowed to stand alone');
+      assert.ok(result.prompt.includes('that is an addition, not a restatement'),
+        'a disagreement or stale finding must be named as an addition');
+      assert.ok(result.prompt.includes('the citation covers the member list, not the verdict'),
+        'the in/out-of-scope verdict stays the plan\'s own decision');
+    });
+
+    test('leaves the ordering invariant intact: Strategy Framing → Scope Assessment → session-fit → plan-review gate', () => {
+      const result = generatePrompt('plan', mockIssue, mockContext);
+      const sf = result.prompt.indexOf('### Strategy Framing');
+      const sa = result.prompt.indexOf('### Scope Assessment');
+      const fit = result.prompt.indexOf('does this fit one focused session');
+      const gate = result.prompt.indexOf('### Plan-review Gate');
+      assert.ok(sf > -1 && sa > -1 && fit > -1 && gate > -1, 'all four anchors must be present');
+      assert.ok(sf < sa, 'Strategy Framing precedes Scope Assessment');
+      assert.ok(sa < fit, 'Scope Assessment precedes the session-fit question');
+      assert.ok(fit < gate, 'the session-fit answer precedes the plan-review gate');
+    });
+
+    test('leaves the class-not-member bound text untouched', () => {
+      const result = generatePrompt('plan', mockIssue, mockContext);
+      assert.ok(result.prompt.includes('Record the class, its bound, and its members in the issue description alongside the plan, where plan-review will look for them'),
+        'the class bound must still have its stated destination');
+    });
+  });
 });
 
 // =============================================================================
