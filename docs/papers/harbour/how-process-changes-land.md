@@ -1,12 +1,13 @@
 ---
 title: When Harbour's process has changed, how did each change land, was it measured, and did it finish — and how should the next changes be trialled and measured?
 kind: paper
-version: 1
+version: 2
 date: 2026-10-01
-authors: [Claude (LIN-3182), for John Kershaw]
-model: "frontier tier, claude-code, dispatched by simple-dispatcher (dispatch 8ae2b27d, kind custom); effort not recorded in the dispatch item. One bounded research session with no plan, review or close-out legs, by the brief's design. Four in-session subagents of the same tier: three gathered and coded the history, the half-finished census and the accretion sample; a fourth re-coded the accretion sample blind."
+authors: [Claude (version 1, LIN-3182), Claude (version 2 corrections, LIN-3185), for John Kershaw]
+model: "frontier tier, claude-code, dispatched by simple-dispatcher (dispatch 8ae2b27d, kind custom); effort not recorded in the dispatch item. One bounded research session with no plan, review or close-out legs, by the brief's design. Four in-session subagents of the same tier: three gathered and coded the history, the half-finished census and the accretion sample; a fourth re-coded the accretion sample blind. Version 2: frontier tier, claude-code, the independent check's session (dispatch 1c1b8348, LIN-3185), whose subagent re-ran every script."
+revision: "Version 2 corrects statements per docs/papers/harbour/survey-check-9.md (LIN-3185): the 214 open process follow-ups are 100 follow-ups and 114 review-residue tickets, at a median of 53 days; holdout by ticket sees ×1.6–1.9 in working hours if changes under one supervisor move together, not ×1.5 alone; the anchor prints 2.8× (dispatches) and 2.0× (hours) at four weeks, and the ×2.1 is the weekly ratio; late September does not match what-doubled-the-dispatches.md v2, whose 36.3 is session-entered and 47.1 child-named, against this census's 33.6 and 29.2 like for like, which is unreconciled; the 42% is July's block; July's 4.4 working hours counted other workspaces' sessions; the 6:1 ratio rests on four removals (about 2:1 to 21:1). Every count reproduces; the figures are version 1's."
 grounded_at: cce25f13 (LinearViewer, origin/main); 3366748 (simple-dispatcher, origin/main). The scorecard snapshot is cut at 26014544 and 33667480.
-cites: [docs/steady-base.md@cce25f13:121-125, docs/steady-base.md@cce25f13:130, docs/steady-base.md@cce25f13:142-144, docs/steady-base.md@cce25f13:168, docs/papers/harbour/measuring-throughput.md@cce25f13:162-167, docs/papers/harbour/what-doubled-the-dispatches.md@cce25f13:18, docs/papers/harbour/what-doubled-the-dispatches.md@cce25f13:102-111, docs/papers/harbour/survey-check-4.md@cce25f13:128-131, docs/papers/harbour/survey-check-4.md@cce25f13:205-213, docs/papers/harbour/survey-check-4.md@cce25f13:404-406, docs/papers/harbour/wake-inventory.md@cce25f13:28-29, docs/papers/harbour/model-choice.md@cce25f13:44-62, docs/papers/harbour/what-supervisors-do.md@cce25f13:20, docs/papers/harbour/which-rules-pay.md@cce25f13:188-195, docs/papers/harbour/cheap-implementer.md@cce25f13:12-18, docs/papers/harbour/root-task-ratio.md@cce25f13:120-124, docs/papers/harbour/held-or-fresh.md@cce25f13, docs/papers/harbour/where-judgement-happens.md@0f82fcc2, scripts/prompt-template-change-log.md@cce25f13:45-75, simple-dispatcher/config.js@3366748, LIN-1661 (canceled 2026-09-12), LIN-2323 (comments 2026-08-26), LIN-2924 (comment 2026-09-25), LIN-2121, LIN-2834, LIN-2314]
+cites: [docs/steady-base.md@cce25f13:121-125, docs/steady-base.md@cce25f13:130, docs/steady-base.md@cce25f13:142-144, docs/steady-base.md@cce25f13:168, docs/papers/harbour/measuring-throughput.md@cce25f13:162-167, docs/papers/harbour/what-doubled-the-dispatches.md@cce25f13:18, docs/papers/harbour/what-doubled-the-dispatches.md@cce25f13:102-111, docs/papers/harbour/survey-check-4.md@cce25f13:128-131, docs/papers/harbour/survey-check-4.md@cce25f13:205-213, docs/papers/harbour/survey-check-4.md@cce25f13:404-406, docs/papers/harbour/wake-inventory.md@cce25f13:28-29, docs/papers/harbour/model-choice.md@cce25f13:44-62, docs/papers/harbour/what-supervisors-do.md@cce25f13:20, docs/papers/harbour/which-rules-pay.md@cce25f13:188-195, docs/papers/harbour/cheap-implementer.md@cce25f13:12-18, docs/papers/harbour/root-task-ratio.md@cce25f13:120-124, docs/papers/harbour/held-or-fresh.md@cce25f13, docs/papers/harbour/where-judgement-happens.md@0f82fcc2, scripts/prompt-template-change-log.md@cce25f13:45-75, simple-dispatcher/config.js@3366748, docs/papers/harbour/survey-check-9.md (LIN-3185), LIN-1661 (canceled 2026-09-12), LIN-2323 (comments 2026-08-26), LIN-2924 (comment 2026-09-25), LIN-2121, LIN-2834, LIN-2314]
 ---
 
 # When Harbour's process has changed, how did each change land, was it measured, and did it finish?
@@ -21,11 +22,12 @@ today, and none came with a condition for retiring it. Across all 652 process ch
 added a step, rule or wake outnumber those that removed one by about six to one. Only one added
 step carried a sunset condition (LIN-2323), and its review, due about 26 September, was never
 recorded. The process code today holds 21 switches that keep an old path or leave a new one off, 19 old paths kept beside new ones and
-7 parked experiments, and the tracker holds 214 open follow-ups on process work, at a median of
-about two months old. The scorecard cannot say what any one past change did to cost per correct
+7 parked experiments. The tracker holds 100 open follow-ups and 114 open review-residue tickets on
+process work, at a median of about 53 days old. The scorecard cannot say what any one past change did to cost per correct
 change: each landed within four weeks of 5 to 16 others. For the next changes, a before-and-after
 read sees about a doubling in four weeks a side. A holdout by ticket sees about ×1.8 in
-dispatches and ×1.5 in hours in four weeks, but only for costs paid inside a ticket's own
+dispatches and ×1.5 in hours in four weeks if changes are independent (×2.1–2.7 and ×1.6–1.9 if
+changes under one supervisor move together), but only for costs paid inside a ticket's own
 sessions. Shadow mode measures agreement rather than cost and suits the mechanical supervision
 the anchor targets. Each mode except before-and-after leaves a second path running until someone
 deletes it, which is how the half-finished items above came about. Which wake-charging rule
@@ -33,6 +35,8 @@ measures fairly depends on where a change saves: a ticket's own sessions, or the
 them.
 
 ![Process changes since June against cost per correct change, each change marked measured or not and finished or half-finished](figures/how-process-changes-land/timeline.svg)
+
+The figures were drawn for version 1. Nothing they show changed.
 
 ## Findings
 
@@ -87,13 +91,14 @@ the tier switch was coincidence and could tie only two mechanisms to the step, L
 LIN-1357 (`what-doubled-the-dispatches.md:18, 102-111`). What the scorecard's series can say, change by
 change, is in the chart. Fleet dispatches per correct, complete change ran 31–40 in the four weeks
 after each July change, 23–27 after each change of 1–22 August, 35.5 after 24 August, and 46–51
-after the September changes. Working hours per change fell from 4.4 to about 2.5 and held. Those moves belong to
-crowds of changes, not to any one of them.
+after the September changes. Working hours per change fell from 4.4 to about 2.5 and held, though July's 4.4 counted other
+workspaces' sessions (`steady-base.md:122`). Those moves belong to crowds of changes, not to any
+one of them.
 
 ### 2. Half-finished things today
 
-**The process code carries 47 half-finished items and the tracker 214 open process follow-ups,
-most of them older than a month.** Counted at HEAD, both repos, with every candidate the scan
+**The process code carries 47 half-finished items, and the tracker 100 open process follow-ups
+and 114 open review-residue tickets, most of them older than a month.** Counted at HEAD, both repos, with every candidate the scan
 found either coded or excluded with a reason (`survey-landing-halfdone.mjs`,
 `how-process-changes-land-halfdone.json`). Ages are in days to 1 October:
 
@@ -113,7 +118,8 @@ found either coded or excluded with a reason (`survey-landing-halfdone.mjs`,
 - **LinearViewer's dual paths are older.** The oldest are aliases and interfaces that predate the fleet: `isInReadyQueue` (262 days), `useMcp` (207 days) and an inline spawn mode (165 days).
 - **No process-code TODO names a ticket in either repo.** Unfinished work lives in the tracker, not the code.
 
-Follow-up ages are interpolated from ticket numbers for 204 of the 214 (see Limits).
+Follow-up ages are interpolated from ticket numbers for 204 of the 214 (see Limits). The median
+is 53.5 days for follow-ups and 53 for review residue.
 
 ### 3. Accretion
 
@@ -135,7 +141,8 @@ four after (7 of 27, 4 of 17, 4 of 19), while removals stayed at one or none a m
 of 27 agrees: 18 adds and 3 removals. So does the reading load agents carry, by a measure that
 does not need a reader: 274 changes since June net-added lines to it and 11 net-removed, and none
 removed any in September in either repo (`survey-scorecard.mjs`). A blind second reader agreed on 85% of the
-codes (κ 0.72) and put the ratio at about eight to one (Method).
+codes (κ 0.72) and put the ratio at about eight to one (Method). The ratio rests on four
+removals. Its 95% interval runs from about 2:1 to 21:1, so six and eight are one change apart.
 
 **One added process step came with a condition for retiring it, and nobody checked it.** No change in the
 catalogue of 27 states one, and one in the 80 does: LIN-2253's deprecated alias, "for one deprecation cycle"
@@ -161,7 +168,7 @@ over 13 July – 21 September, both repos together (`survey-landing-trials.mjs`)
 |---|---|---|---|---|
 | **Before and after** | k weeks against k weeks, whole fleet, pooled cost | ×2.9 in 2 weeks a side, ×2.1 in 4, ×1.7 in 8 (dispatches per change); ×2.9, ×2.1, ×1.7 (hours per change) | One switch, which the anchor allows only between passages ("the structure doesn't change mid-passage") | Low for the change itself: it lands whole. High for the read: of the 7 changes measured beforehand, 5 have had no after-read |
 | **Alternate weeks** | on weeks against off weeks | The same arithmetic, so twice the calendar time: ×2.1 needs 8 weeks | A passage sees the process flip every week; a weekly switch splits about 10% of changes | High: the switch must live as a flag for the whole trial, the class that is 21 strong and 67% older than a month today |
-| **Holdout by ticket** | changes in the same weeks, assigned at random | ×1.8–1.9 in dispatches in 4 weeks (session or child rule, September's spread), ×2.1–2.7 if changes under one supervisor move together; ×1.5 in working hours | Two processes live at once, often under one supervisor: 222 of 482 timed changes share a lineage with another (change-weighted mean lineage size 6.1) | High: the losing arm is a dual path until someone deletes it |
+| **Holdout by ticket** | changes in the same weeks, assigned at random | ×1.8–1.9 in dispatches in 4 weeks (session or child rule, September's spread), ×2.1–2.7 if changes under one supervisor move together; ×1.5 in working hours, ×1.6–1.9 clustered | Two processes live at once, often under one supervisor: 222 of 482 timed changes share a lineage with another (change-weighted mean lineage size 6.1) | High: the losing arm is a dual path until someone deletes it |
 | **Shadow mode** | code's answer against the agent's on each decision | Agreement, not cost: no disagreement in 1,000 paired decisions bounds the rate below 0.3%; September delivered about 1,450 follow-ups a week | None while the code only logs | Highest: a shadow is a second path by construction, finished only by a cutover and a deletion |
 
 - **Before and after is the scorecard's own design.** It sees only large changes, and it cannot separate a change from the crowd around it: every change in the history had 5–16 others within four weeks. `measuring-throughput.md` gives ×2.8 for dispatches per change at four weeks on the observed spread of weekly means. The ×2.1 here is its weekly-ratio figure (`measuring-throughput.md:162-167`).
@@ -197,11 +204,14 @@ is not in the work.
 | Share of claimed dispatches charged to any correct change, 13 – 30 Sep | | 55% | 49% | 67% | 100% |
 
 Means per correct, complete change, by the block its last merge fell in. The rules disagree most
-on what they leave out: the per-change rules charge only 42–55% of the dispatches the runner
-claimed to any correct change. The rest goes to epics, Runners, research, papers and work that
-never merged. Counted as `what-doubled-the-dispatches.md` counts (dispatches naming every change
-merged in the block, over the correct ones), late September is 36.9 by the child and 35.0 by the
-session. That matches its 36.3.
+on what they leave out. The per-change rules charge only 42% (13 July – 9 August, both rules) to
+55% (September, by the child named) of the dispatches the runner claimed to any correct change.
+The rest goes to epics, Runners, research, papers and work that never merged.
+
+This census does not match `what-doubled-the-dispatches.md`'s. For code changes merged 14–28
+September, that paper gives 47.1 dispatches per correct change by the child named and 36.3 by
+the session entered. For the same population this census gives 33.6 and 29.2
+(`survey-check-9.md`). Both read the same runner logs, and the difference is not yet explained.
 
 **What each rule does to the anchor's headline figures** (`steady-base.md:121-125` and the map):
 
@@ -215,12 +225,14 @@ session. That matches its 36.3.
 | September against the map: quiet wakes, passage layer, acted, in no row | 10%, 15%, 34%, 32% | 7%, 8%, 38%, 36% | not computed | – |
 | Repeat legs as a share of dispatches per change | 7.8% of 39.4 | 9.0% of 34.3 | not computed | – |
 | Small low-risk changes against the rest | 23.8 against 39.4 | 20.7 against 34.3 | not computed | – |
-| Detectable change at four weeks | – | – | – | ×2.1 (weekly ratio), as printed |
+| Detectable change at four weeks | – | – | – | ×2.1 on the weekly ratio; the anchor prints 2.8× (dispatches) and 2.0× (hours) on the per-change series |
 
 The figures in the first two columns are `survey-check-4.md:128-131, 205-213` and
-`wake-inventory.md:28-29`. The anchor's "about a third" is the gap on wakes, the figure most
-exposed to the rule. On dispatches per change it is about a tenth (25.2 against 22.8) and on the
-ratio a twentieth.
+`wake-inventory.md:28-29`. The anchor's "about a third" is the gap on wakes in
+`what-doubled-the-dispatches.md`'s census (29 against 18), the figure most exposed to the rule.
+On dispatches per change this census puts the gap at about a tenth across late September (25.2
+against 22.8), and 15% on code changes alone. `what-doubled-the-dispatches.md` puts it at 30%.
+Which is right waits on the two censuses being reconciled.
 
 **Which rule each kind of candidate change needs to be measured fairly.** Not a choice between
 them; that is John's.
@@ -325,6 +337,10 @@ retirement condition the first did not: LIN-215's note that parallel workers wai
   lineage rule splits equally, whatever the beneath-tickets' sizes. *Bias:* every per-change rule is
   low by the unmapped items. The lineage rule over-charges small changes in large trees and
   under-charges large ones.
+- **This census and `what-doubled-the-dispatches.md`'s differ.** They read the same runner logs
+  but give 33.6 against 47.1 dispatches per correct change, by the child named, on code changes
+  merged 14–28 September. *Bias:* unknown until they are joined item by item. Every per-change
+  figure in finding 5 carries it.
 - **The trial-mode sizes assume the noise of 13 July – 21 September holds.** The clustering
   correlation for holdout is assumed (0.1 and 0.3), not measured. September's provisional weeks
   are in the per-change spread. *Bias:* if the passage era is noisier, every mode sees less than
@@ -342,8 +358,8 @@ John decides.
 | 1 | **Every process change names its read and its retirement before it lands.** A number before, the date of the read after, the rule it will be judged by, and when it will be removed | No direct cost saving. Turns 2 in 27 changes measured on purpose into most of them, and gives 0 in 27 a retirement condition | 5 changes measured beforehand have no after-read; the change log has 18 "unknown" of 29; LIN-2323's sunset went unread | None. It adds a rule, so it should replace the change log's backfilled rows rather than sit beside them | The share of process changes with a completed read at four weeks; the count in finding 2 |
 | 2 | **One process change at a time, landed between passages, with nothing else in its four weeks** | Makes ×2 visible in four weeks a side instead of not at all; slows the rate of change from about 38 process changes a week | Every change shared its window with 5–16 others; the July step had five mechanisms in three days | Low. It delays fixes, so it needs an exception for repairs | Before and after on pooled dispatches and hours per correct change (×2.1 at four weeks) |
 | 3 | **Shadow mode for the mechanical supervision rows (map 1–3), with the cutover and the deletion of the old path in the same series** | Agreement on 1,000 decisions in under a week; the saving is the anchor's ~27% of tokens at most, read at cutover | 77% of supervision tokens mechanical; about 1,450 follow-ups a week to compare | Low while shadowing; the cutover carries the risk | Agreement rate, then before and after at the cutover, on pooled cost |
-| 4 | **Holdout by lineage for ticket-level changes (map rows 7–8)** | Sees about ×1.8–2.7 in dispatches and ×1.5 in hours in four weeks | Per-change spread; 301 lineages among 482 timed changes | Medium: two processes at once; the losing arm must be deleted on a date | Per-change dispatches by the session entered, with lineage spread beside it |
-| 5 | **Burn down what is half-finished before starting a new trial** | 47 items in code and 214 open follow-ups; the effect on cost is unmeasured | Finding 2: 21 switches (4 dark, 7 kept after rollout, 10 rollback), 19 dual paths, 7 parked experiments | Low for switches kept after rollout for more than 30 days; each removal is its own change | The count and age in finding 2, re-run; a removal does not have to move cost to count |
+| 4 | **Holdout by lineage for ticket-level changes (map rows 7–8)** | Sees about ×1.8–2.7 in dispatches and ×1.5–1.9 in hours in four weeks | Per-change spread; 301 lineages among 482 timed changes | Medium: two processes at once; the losing arm must be deleted on a date | Per-change dispatches by the session entered, with lineage spread beside it |
+| 5 | **Burn down what is half-finished before starting a new trial** | 47 items in code, 100 open follow-ups and 114 open review-residue tickets; the effect on cost is unmeasured | Finding 2: 21 switches (4 dark, 7 kept after rollout, 10 rollback), 19 dual paths, 7 parked experiments | Low for switches kept after rollout for more than 30 days; each removal is its own change | The count and age in finding 2, re-run; a removal does not have to move cost to count |
 | 6 | **Report the pooled headline and one per-change rule side by side, chosen by the candidate's kind** (finding 5's table) | No saving; prevents a change's saving from being read as zero, or as a step at 13 September | Per-change rules charge 42–55% of dispatches; LIN-2121 moved the child rule | None | Both columns in every read |
 
 ## Next
