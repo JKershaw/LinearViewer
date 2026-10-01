@@ -34,7 +34,8 @@ cites:
 
 Most of it goes where review rarely catches anything, and the part that must stay rigorous is
 small. In September the fleet spent 3.6 billion weighted tokens. A quarter of that went to
-proxy, dispatch and fleet machinery. A fifth went to work that merged no change of its own:
+proxy, dispatch and fleet machinery, over a third of it the rulings feed and the Flight
+Companion that the class's paths take in. A fifth went to work that merged no change of its own:
 parent tickets, unmerged tickets and sessions with no ticket. A tenth went to the survey papers.
 Credential and auth work took only a tenth. Review's real catches do not follow the budget. In
 the last 100 reviewed tickets every one of the 43 real faults found sat in a change of 50
