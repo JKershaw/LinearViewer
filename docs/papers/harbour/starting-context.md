@@ -234,7 +234,7 @@ no Claude transcript and are absent.
 **Role.** The transcript's `# LIN-n · kind` header, or the fetched dispatch item's kind. An
 autopilot is the passage Runner, a passage leg, a stepper or the ticket's own autopilot, by
 `survey-effort-fleet.mjs`'s rules. A custom session whose prompt name says paper, survey, check or
-research is a survey paper. Everything else is "other" (blocked, triage, breakdown, design …; 135).
+research is a survey paper. Everything else is "other" (blocked, triage, breakdown, design …; 146 sessions, 135 of them with a task beat).
 
 **Beats and the productive call.** A task beat starts where a task arrives: the fetched
 `/dispatch/{id}/prompt` result, or the Stop hook's "is ready. Fetch it now". Turns before the first

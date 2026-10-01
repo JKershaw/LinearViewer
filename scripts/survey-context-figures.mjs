@@ -51,7 +51,7 @@ const ROLES = ['research', 'plan', 'plan-review', 'implementation', 'review', 'c
   });
   s += legendRows(20, top + rows.length * rowH + 22, parts.map(([n, , f]) => [n, f]), 460, 2);
   s += text(20, H - 24, 'Source: scripts/survey-context-extract.mjs and survey-context-analyse.mjs over local transcripts. Units: frontier-input equivalents at list-price ratios.', { size: 9 });
-  s += text(20, H - 11, 'The passage Runner (2 sessions), survey papers (9) and other kinds (135) are in the all-sessions bar but not drawn alone; see the paper.', { size: 9 });
+  s += text(20, H - 11, 'The passage Runner (2 sessions), survey papers (9) and other kinds (146) are in the all-sessions bar but not drawn alone; see the paper.', { size: 9 });
   writeFileSync(join(outDir, 'orientation-by-role.svg'), s + '</svg>\n');
 }
 
