@@ -35,6 +35,10 @@ import { getWorkspaceCallScope, resolveIssueBinding } from '../../lib/workspace.
 const { privateKey: RSA_PRIVATE_KEY } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = RSA_PRIVATE_KEY.export({ type: 'pkcs1', format: 'pem' });
 
+// LIN-3125 L3: the begin handler stamps `at` (recency) on the session intent;
+// these exact-shape assertions compare the meaningful fields without it.
+const intentShape = ({ at, ...rest }) => rest;
+
 // ---------------------------------------------------------------------------
 // Provider acquisition primitives
 // ---------------------------------------------------------------------------
@@ -532,7 +536,8 @@ describe('GitHub auth routes', () => {
     const session = makeSession();
     await handler({ query: { mode: 'add-source' }, session }, res);
     assert.ok(session.oauthState, 'state nonce stored in session');
-    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'add-source', provider: 'github' });
+    assert.ok(Number.isFinite(session.oauthIntent.at), 'begin stamps a finite recency `at`');
     assert.ok(res.redirectedTo.includes(`state=${session.oauthState}`));
     // state is opaque — mode is NOT encoded into it (LIN-562)
     assert.ok(!res.redirectedTo.includes('add-source'));
@@ -563,7 +568,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: { mode: 'add-source', workspace: 'acme' }, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' });
     // urlKey rides in the session intent, never in the opaque OAuth state.
     assert.ok(!res.redirectedTo.includes('acme'));
   });
@@ -574,7 +579,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: { mode: 'add-source', workspace: 'not a valid key!' }, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'add-source', provider: 'github' });
   });
 
   test('GET callback mints from installation_id and renders the repo picker, holding the token in session', async () => {
@@ -1651,7 +1656,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: {}, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'new', provider: 'github' });
   });
 
   test('GET /auth/github defaults mode to "new" in the session intent when ?mode is garbage [LIN-2397 gap]', async () => {
@@ -1660,7 +1665,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: { mode: 'nonsense' }, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'new', provider: 'github' });
   });
 
   test('GET callback defaults pending.mode to "new" when oauthIntent.mode is absent [LIN-2397 gap]', async () => {
@@ -1791,7 +1796,7 @@ describe('GitHub auth routes', () => {
 
     assert.match(res.redirectedTo, /installations\/new\?state=real/, 'the install hop carries the same nonce');
     assert.equal(session.oauthState, 'real', 'the nonce survives for the return trip');
-    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'new', provider: 'github' });
   });
 
   // -------------------------------------------------------------------------

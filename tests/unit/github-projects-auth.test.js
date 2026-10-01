@@ -33,6 +33,10 @@ import { getWorkspaceCallScope, resolveIssueBinding } from '../../lib/workspace.
 const { privateKey: RSA_PRIVATE_KEY } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = RSA_PRIVATE_KEY.export({ type: 'pkcs1', format: 'pem' });
 
+// LIN-3125 L3: the begin handler stamps `at` (recency) on the session intent;
+// these exact-shape assertions compare the meaningful fields without it.
+const intentShape = ({ at, ...rest }) => rest;
+
 // ---------------------------------------------------------------------------
 // Provider acquisition + picker primitives
 // ---------------------------------------------------------------------------
@@ -374,7 +378,8 @@ describe('GitHub Projects auth routes', () => {
     const session = makeSession();
     await handler({ query: { mode: 'add-source' }, session }, res);
     assert.ok(session.oauthState, 'state nonce stored in session');
-    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github-projects' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'add-source', provider: 'github-projects' });
+    assert.ok(Number.isFinite(session.oauthIntent.at), 'begin stamps a finite recency `at`');
     assert.ok(res.redirectedTo.includes(`state=${session.oauthState}`));
     assert.ok(!res.redirectedTo.includes('add-source'), 'mode not encoded into opaque state');
   });
@@ -385,7 +390,7 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: { mode: 'add-source', workspace: 'acme' }, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github-projects', workspaceUrlKey: 'acme' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'add-source', provider: 'github-projects', workspaceUrlKey: 'acme' });
     assert.ok(!res.redirectedTo.includes('acme'), 'urlKey rides in session, not opaque state');
   });
 
@@ -1138,7 +1143,7 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: {}, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github-projects' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'new', provider: 'github-projects' });
   });
 
   test('GET /auth/github-projects defaults mode to "new" in the session intent when ?mode is garbage [LIN-2397 gap]', async () => {
@@ -1147,7 +1152,7 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: { mode: 'nonsense' }, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github-projects' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'new', provider: 'github-projects' });
   });
 
   test('GET callback defaults pending.mode to "new" when oauthIntent.mode is absent [LIN-2397 gap]', async () => {
@@ -1201,7 +1206,7 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     const session = makeSession();
     await handler({ query: { mode: 'add-source', workspace: 'not a valid key!' }, session }, res);
-    assert.deepEqual(session.oauthIntent, { mode: 'add-source', provider: 'github-projects' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'add-source', provider: 'github-projects' });
   });
 
   // LIN-2397 stage A, review finding (ledger item 1) — the Projects half, and the
@@ -1304,7 +1309,7 @@ describe('GitHub Projects auth routes', () => {
 
     assert.match(res.redirectedTo, /installations\/new\?state=real/, 'the install hop carries the same nonce');
     assert.equal(session.oauthState, 'real', 'the nonce survives for the return trip');
-    assert.deepEqual(session.oauthIntent, { mode: 'new', provider: 'github-projects' });
+    assert.deepEqual(intentShape(session.oauthIntent), { mode: 'new', provider: 'github-projects' });
   });
 
   // -------------------------------------------------------------------------

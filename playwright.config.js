@@ -1,4 +1,15 @@
 import { defineConfig } from '@playwright/test';
+import crypto from 'node:crypto';
+
+// LIN-3125 Phase 3: the held-connection e2e twin needs a server with the GitHub
+// App CONFIGURED (the /auth/github hook runs only after the config guard). The
+// default webServer deliberately runs unconfigured (many specs assert the
+// GitHub add affordances are honestly blocked), so the twin gets its own
+// GitHub-configured server on port 3002 with an isolated MangoDB dir and a
+// freshly generated, PEM-valid App key.
+const { privateKey: heldKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const HELD_GITHUB_PEM = heldKey.export({ type: 'pkcs1', format: 'pem' });
+const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN=';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -24,7 +35,8 @@ export default defineConfig({
       ],
     },
   },
-  webServer: {
+  webServer: [
+    {
     // Unset OpenRouter env keys so tests can deterministically exercise the
     // "no AI configured" 503 path regardless of the developer's local .env.
     // Tests that need an API key set it session-side via
@@ -64,11 +76,22 @@ export default defineConfig({
     // and local Resend keys can't send real mail (capture wins over Resend).
     // EMAIL_LINK_ORIGIN= (empty, which counts as unset) pins captured links to
     // this server's own origin, whatever a developer's .env points it at.
-    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN= node server.js',
+    command: `${UNCONFIGURED_ENV} PORT=3001 node server.js`,
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
     stdout: 'pipe',
     stderr: 'pipe',
-  },
+    },
+    {
+      // LIN-3125 Phase 3 held-connection twin: GitHub App configured, isolated
+      // MangoDB dir. The twin opts into this origin via `test.use({ baseURL })`.
+      command: `${UNCONFIGURED_ENV} PORT=3002 HARBOUR_DATA_DIR=./test-results/held-e2e-data GITHUB_CLIENT_ID=test-held-client GITHUB_CLIENT_SECRET=test-held-secret GITHUB_APP_ID=424242 GITHUB_APP_SLUG=held-test-app GITHUB_APP_PRIVATE_KEY='${HELD_GITHUB_PEM}' node server.js`,
+      url: 'http://localhost:3002',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
 });

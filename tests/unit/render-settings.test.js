@@ -394,8 +394,11 @@ describe('renderSettingsPage — Providers section (LIN-634)', () => {
     const html = renderSettingsPage('Acme', { ...BASE, githubEnabled: true });
     assert.match(html, /data-testid="settings-provider-new-workspace-github"/);
     // A link, never a button/form — must not perturb the pinned button counts.
-    const anchorMatch = html.match(/<a href="\/auth\/github"[^>]*data-testid="settings-provider-new-workspace-github"[^>]*>as a new workspace<\/a>/);
-    assert.ok(anchorMatch, 'expected an <a href="/auth/github"> anchor for the new-workspace verb');
+    // LIN-3125 Phase 3 (F1): the explicit "as a new workspace" verb now carries
+    // the opt-in held-entry marker (this literal update is the deliberate,
+    // approved one named in the plan §1).
+    const anchorMatch = html.match(/<a href="\/auth\/github\?heldConnection=1"[^>]*data-testid="settings-provider-new-workspace-github"[^>]*>as a new workspace<\/a>/);
+    assert.ok(anchorMatch, 'expected the new-workspace verb anchor to carry the held-entry marker (LIN-3125 F1)');
   });
 
   test('Jira and Linear never render a new-workspace verb (LIN-2803 — Jira withheld pending LIN-2819, Linear already creates one)', () => {
