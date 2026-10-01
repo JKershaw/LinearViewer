@@ -1,0 +1,565 @@
+{
+  "coder": "second reader, blind",
+  "codes": [
+    {
+      "id": "LIN-435",
+      "effect": "neither",
+      "reason": "Consolidates the four deterministic grounding rules into one shared post-pass both prompt paths run; same rules, one source.",
+      "evidence": "9dab8de3 lib/prompt-formatters.js, lib/prompts/meta-prompt-template.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-585",
+      "effect": "adds-rule",
+      "reason": "Bug/research dispatch prompts gain new required instructions: validate the acceptance witness, run the decisive experiment before proposing a fix, search wider into history.",
+      "evidence": "f832f0da lib/prompt-template-defs.js, lib/prompts/meta-prompt-template.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-329",
+      "effect": "neither",
+      "reason": "Streams the server-side defer descent live to the recommend UI; display plumbing over an existing automated recursion, no session step.",
+      "evidence": "4f600b6e lib/recommend-recurse.js, routes/workspace-api.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-520",
+      "effect": "adds-step",
+      "reason": "Registers a new Design & Interface Review periodical, a new periodical report sessions produce.",
+      "evidence": "0f2e87bb lib/periodicals.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-300",
+      "effect": "neither",
+      "reason": "Adds a roadmap orientation (compass bearings) LLM call inside the product roadmap pipeline; product prompt, not fleet process.",
+      "evidence": "97bb578d lib/prompts/roadmap-orientation-template.js, routes/workspace-api.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-742",
+      "effect": "neither",
+      "reason": "Feeds roadmap narrative into the Next Run suggester context and reframes run-size guidance; product next-run prompt.",
+      "evidence": "4299d38a lib/next-run.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-328",
+      "effect": "adds-rule",
+      "reason": "Recommender meta-prompt gains a node-vs-defer decision step and a rule that defer replies emit no prompt body, plus a structured DeferTo output line.",
+      "evidence": "76e38a05 lib/prompts/meta-prompt-template.js, lib/prompt-templates.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-638",
+      "effect": "neither",
+      "reason": "Enriches Next Run context display, summary intro and full titles; product next-run surface.",
+      "evidence": "ebc1ed2c lib/next-run.js, public/next-run.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-416",
+      "effect": "neither",
+      "reason": "Reshapes the roadmap digest prompt into a narrative lede; product roadmap prompt tuning.",
+      "evidence": "bea1d86a lib/prompts/roadmap-digest-template.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-215",
+      "effect": "adds-rule",
+      "reason": "Adds a CLAUDE.md E2E testing section instructing agents to prefer data-testid via helpers, keep seeding/selector seams separate, and not raise workers.",
+      "evidence": "aafecb58 CLAUDE.md",
+      "retirementCondition": "Parallel execution itself (workers > 1) is not enabled yet: it needs per-worker urlKey isolation threaded server-side and is owned by LIN-625. Do not raise workers in playwright.config.js without that isolation"
+    },
+    {
+      "id": "LIN-343",
+      "effect": "adds-rule",
+      "reason": "Rewrites the Documentation Review periodical prompt so the minted task must carry scope/method, bounding, definition of done and hand-off requirements.",
+      "evidence": "866367be lib/periodicals.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-286",
+      "effect": "removes-rule",
+      "reason": "Removes the instructions telling agents to add/remove the preparing label from prompts and workflow config.",
+      "evidence": "e455dd16 lib/prompt-template-defs.js, lib/prompt-formatters.js, lib/prompts/meta-prompt-template.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-349",
+      "effect": "adds-rule",
+      "reason": "Documentation Review periodical adds a quality-judgement dimension (subtractive fixes, report net doc delta) on top of drift.",
+      "evidence": "b86c40c8 lib/periodicals.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-453",
+      "effect": "adds-step",
+      "reason": "Adds a new advisory Stability Review periodical.",
+      "evidence": "4983230b lib/periodicals.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1192",
+      "effect": "neither",
+      "reason": "Shortens and simplifies newspaper front-page copy; product newspaper prompt.",
+      "evidence": "067bf41f lib/prompts/ship-biscuit-editor.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-685",
+      "effect": "neither",
+      "reason": "Doc-only CLAUDE.md update describing the GitHub-login auth surface; reference documentation, no rule.",
+      "evidence": "7380dabc CLAUDE.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1155",
+      "effect": "neither",
+      "reason": "Moves the bootstrap token from prompt prose to a structured dispatch-item field for claude-code; credential delivery plumbing, no net new step.",
+      "evidence": "71296984 lib/proxy-preamble.js, lib/dispatch-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-701",
+      "effect": "adds-rule",
+      "reason": "Test Coverage periodical remit widened to reliability with a capability-gated instruction to mine CI history.",
+      "evidence": "85f9d446 lib/periodicals.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1318",
+      "effect": "adds-rule",
+      "reason": "Autopilot kickoff gains new polling instructions: one background loop, skip timeout iterations, stay silent, respect rate limit.",
+      "evidence": "fee12368 lib/prompts/autopilot-kickoff.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1084",
+      "effect": "neither",
+      "reason": "Accepts, validates and forwards harness and model fields on dispatch; transport plumbing, no session step or rule.",
+      "evidence": "0c4eb0a4 lib/dispatch-validation.js, lib/dispatch-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1337",
+      "effect": "neither",
+      "reason": "Store hardening (atomic upserts, re-read) plus real-Mongo smoke tests; no flow step, rule or wake.",
+      "evidence": "0c0bc13b lib/workspace-store.js, lib/account-workspace-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1492",
+      "effect": "neither",
+      "reason": "Test proving the lineage .limit clamp over the cap plus a comment tweak; no process change.",
+      "evidence": "ffc5843e lib/pipeline-loops.js, tests/unit/mongo-smoke.test.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1067",
+      "effect": "neither",
+      "reason": "Task-chat product prompt wording and state-history tool for exact timestamps; product LLM prompt.",
+      "evidence": "60751cdd lib/prompts/task-chat-template.js, lib/chat-tools.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1656",
+      "effect": "adds-rule",
+      "reason": "New code-enforced gate refusing a same issue+kind dispatch within 5 minutes (409 DUPLICATE_DISPATCH), plus kickoff instruction to adopt the existing id rather than retry.",
+      "evidence": "08c80c49 lib/dispatch-factory.js, lib/prompts/autopilot-kickoff.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-922",
+      "effect": "adds-step",
+      "reason": "New Flight Companion session type: a kickoff prompt for a Claude Code session that orients, monitors dispatch feedback and proposes dispatches.",
+      "evidence": "574871b6 lib/prompts/flight-companion-kickoff.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1511",
+      "effect": "neither",
+      "reason": "Pagination cursor on the proxy issues read and its documentation; a capability, not a step or rule.",
+      "evidence": "37246a74 routes/proxy.js, docs/proxy-integration.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1059",
+      "effect": "neither",
+      "reason": "Repairs the up-chain terminal wake severed by the follow-up itemId repoint; restores the designed wake path.",
+      "evidence": "1850aa91 lib/dispatch-store.js, lib/dispatch-wake.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-901",
+      "effect": "both",
+      "reason": "Bubbling matrix: terminals and blocked now wake the parent on any edge regardless of subscription (added wake), while pending wakes only on 'everything' edges (removed wake on terminal-only edges).",
+      "evidence": "9bb02809 lib/dispatch-wake.js, lib/prompts/autopilot-kickoff.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1241",
+      "effect": "neither",
+      "reason": "Measurement close-out: before/after cohort split in transcript-spend tooling and a recorded result; no process change.",
+      "evidence": "776b309a lib/transcript-spend.js, docs/prompt-system-audit.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1206",
+      "effect": "removes-step",
+      "reason": "Autopilot no longer closes spent session windows per completion nor issues the end-of-run close --cascade; the runner owns DONE close.",
+      "evidence": "3d883c97 lib/prompts/autopilot-kickoff.js, docs/autopilot-operating-manual.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2180",
+      "effect": "neither",
+      "reason": "Adds 'decision' to accepted feedback-entry kinds so it is not dropped; inert transport plumbing.",
+      "evidence": "53cf3998 lib/dispatch-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2297",
+      "effect": "neither",
+      "reason": "Re-keys the once-only wake guard by marker class so a later done after blocked is not dropped; repair of the designed terminal wake.",
+      "evidence": "3e61f2fe lib/dispatch-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2142",
+      "effect": "neither",
+      "reason": "Test pins and docstring prose fixes on the observer state store; no runtime change.",
+      "evidence": "78fed694 lib/observer-state-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1853",
+      "effect": "adds-rule",
+      "reason": "Passage planner prompt now states the mandatory maintenance leg counts against the 2-4 leg cap, constraining plans.",
+      "evidence": "aea28f0f docs/passage-planner-prompt.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2311",
+      "effect": "neither",
+      "reason": "Drops the native priority field mention from the Follow-up Triage instruction to remove an inverted-scale hazard; wording fix.",
+      "evidence": "842db225 lib/prompt-template-defs.js, lib/prompts/meta-prompt-template.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2129",
+      "effect": "neither",
+      "reason": "New durable observer-state store (data layer for the observer harness); no session step, rule or wake.",
+      "evidence": "f5f76cff lib/observer-state-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2023",
+      "effect": "adds-rule",
+      "reason": "Adds a CLAUDE.md Unit Testing Pattern rule (bind tests/unit servers to 127.0.0.1, never hostless) enforced by a static guard test.",
+      "evidence": "7fc03d38 CLAUDE.md, tests/unit/test-server-listen-bind.test.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-694",
+      "effect": "adds-rule",
+      "reason": "Code-enforced gate: a periodical review task cannot transition to Done (409) without a comment citing a persisted report commit/PR.",
+      "evidence": "18843e64 lib/periodical-report-gate.js, routes/proxy.js, lib/periodicals.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2197",
+      "effect": "neither",
+      "reason": "Human-triggered LLM task-decision scan feeding the rulings surface; a product instrument, not an agent-session step, rule or wake.",
+      "evidence": "e968cf3a lib/scan.js, lib/task-decisions-store.js; 5963cc2b lib/unanswered-decisions.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2182",
+      "effect": "neither",
+      "reason": "Derives decision/decisionCase on the pipeline loop object and bumps builder version; inert derivation.",
+      "evidence": "b52ad4d9 lib/pipeline-loops.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1885",
+      "effect": "neither",
+      "reason": "Jira provider read path and settings wiring; product integration, only a CLAUDE.md file-map line touched",
+      "evidence": "ba3bccd8 lib/providers/jira/index.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2253",
+      "effect": "neither",
+      "reason": "Cost KPI denominator fix counting lane-landed tickets; metrics only, no session step, rule or wake",
+      "evidence": "fb8c023f lib/terminal-marked-task-cost.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1685",
+      "effect": "neither",
+      "reason": "Ship Journey page route/renderer behind a feature flag; product UI",
+      "evidence": "025aa9b8 routes/ship-journey.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2408",
+      "effect": "neither",
+      "reason": "Observer pass retries a degraded report instead of carrying it forward; repair of an automated model call, no session step or wake",
+      "evidence": "08416052 lib/observer-pass.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2404",
+      "effect": "neither",
+      "reason": "Records calibration provenance of DEFAULT_USD_PER_POINT and surfaces it; budget constant documentation",
+      "evidence": "97bac32d lib/weekly-budget.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2704",
+      "effect": "neither",
+      "reason": "Projects taskDecisionId and raw issueId so task-bound decisions can be answered from the companion; repair of an existing reply path",
+      "evidence": "e4ec02f3 lib/chat-tools.js, lib/proxy-instructions.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2934",
+      "effect": "adds-rule",
+      "reason": "New code-enforced maxSessionsPerTask budget gate (409 BUDGET_EXHAUSTED bound sessionsPerTask) plus instruction to comment the bound and ledger on the ticket when hit",
+      "evidence": "2c0122ec lib/dispatch-factory.js, lib/prompts/autopilot-kickoff.js, lib/proxy-instructions.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2634",
+      "effect": "neither",
+      "reason": "Adds a read-only proxy endpoint for the token creator's saved Flight Companion transcripts; new capability, no required step or rule",
+      "evidence": "a0f5782f routes/proxy-flight-companion.js, lib/proxy-instructions.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2121",
+      "effect": "neither",
+      "reason": "Stamps issueIdentifier onto wake dispatch rows for scoped listing; observability fix, wake triggers unchanged",
+      "evidence": "8372d336 lib/dispatch-wake.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-3010",
+      "effect": "neither",
+      "reason": "Passes feedbackVersion/feedbackDigest through history formatting and seeds them on archive; data plumbing for KPIs",
+      "evidence": "e9724589 lib/dispatch-store.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-3027",
+      "effect": "neither",
+      "reason": "Documents the already-shipped halt poll key/endpoints and flips the degraded-mode runbook to the real mechanism; docs of an existing path",
+      "evidence": "5fdb3ae0 docs/runbooks/harbour-degraded.md, docs/architecture/dispatch-and-proxy.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2773",
+      "effect": "neither",
+      "reason": "Harbour wire for optional on_answer parse and derived effect field on rulings feeds; read-contract plumbing, no rendered change or new required action",
+      "evidence": "de478d84 lib/unanswered-decisions.js, lib/proxy-instructions.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2618",
+      "effect": "adds-rule",
+      "reason": "Extracts one shared Flight Companion brief, and the pasted kickoff session gains a mandatory headline block plus multi-part readout shape, fossil-row and check-in rules",
+      "evidence": "8f15565e lib/prompts/flight-companion-brief.js, lib/prompts/flight-companion-kickoff.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2616",
+      "effect": "neither",
+      "reason": "Operator settings and presets surfaces for the effort axis; product UI",
+      "evidence": "df034348 lib/render-settings.js, routes/dispatch.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1938",
+      "effect": "adds-rule",
+      "reason": "Adds token-lifetime documentation and new Class-B retry guidance to proxy instructions ('Don't park on one 401' — retry provider-lane 401s over 10-15 min, never retry proxy-token 401s)",
+      "evidence": "c5cc2b8d lib/proxy-instructions.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2956",
+      "effect": "neither",
+      "reason": "Ship Journey walk continues from current position on north-star change; product visualization",
+      "evidence": "4b28d25c lib/ship-journey.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-624",
+      "effect": "neither",
+      "reason": "Richer launch-failure diagnostics (iTerm scrollback capture) and a readiness-gated write; runner automation, no session step/rule/wake.",
+      "evidence": "f9cb7f6 executors.js, reapers.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-827",
+      "effect": "adds-wake",
+      "reason": "Opt-in queueIfBusy follow-ups now wait unclaimed until a busy target reaches AWAITING_FOLLOWUP and are then signalled in, a new delivery path instead of failing; hold budget 30->60 min.",
+      "evidence": "715dd8a followup.js, dispatcher.js, config.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-549",
+      "effect": "adds-step",
+      "reason": "Stop hook injects a one-shot SELF_CHECK_PROMPT; the session must reply with a DONE:/PENDING: sentinel before completion, a new required beat.",
+      "evidence": "6178197 hook.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1434",
+      "effect": "neither",
+      "reason": "Remaps NotebookEdit's camelCase notebookPath in opencode tool-line rendering; bug fix.",
+      "evidence": "ec88d06 opencode-runner.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1315",
+      "effect": "neither",
+      "reason": "Adds an opt-in kitty TerminalDriver; substrate, no flow change.",
+      "evidence": "9f7826b terminal-driver.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-906",
+      "effect": "adds-wake",
+      "reason": "Completion hold flips to arm-by-default for DONE/FAILED/BLOCKED/PENDING-external stops, so every such session is held and can be woken in-session by a follow-up.",
+      "evidence": "e0ecc0a hook.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1280",
+      "effect": "adds-wake",
+      "reason": "Fixes the re-entry guard swallowing the self-check and widens the stall failsafe to plain silent EXECUTING sessions, which are now re-fired over resume.",
+      "evidence": "e67ed45 hook.js, reapers.js (findStalledExecuting); 8cdefa3 test only",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1580",
+      "effect": "adds-rule",
+      "reason": "Adds the first CI workflow and CLAUDE.md rules: the CI run is the number a review cites, a red CI is a real failure to fix, and whoever merges must read the check.",
+      "evidence": "539834d CLAUDE.md, README.md, .github/workflows/ci.yml",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1293",
+      "effect": "neither",
+      "reason": "Flag-gated tool-activity relay of transcript summaries to feedback; telemetry only.",
+      "evidence": "fc04fcc hook.js, transcript.js, config.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1420",
+      "effect": "neither",
+      "reason": "Flag-gated turn-seam tool-telemetry relay for opencode; telemetry only.",
+      "evidence": "02a1153 opencode-runner.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-907",
+      "effect": "adds-wake",
+      "reason": "Collapses three stall reapers into one ~60-min failsafe that resumes a silent session and re-fires the completion sentinel instead of assuming an outcome.",
+      "evidence": "c59af10 reapers.js, config.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1100",
+      "effect": "neither",
+      "reason": "Dispatcher reaper auto-closes the window on a DONE-sentinel finalize; runner automation that no session performs.",
+      "evidence": "dc5b148 reapers.js, hook.js, CLAUDE.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1156",
+      "effect": "neither",
+      "reason": "Delivers the bootstrap token through a one-tool MCP server instead of the prompt; a change of transport, not a new step or rule.",
+      "evidence": "dc0e034 harbour-token-mcp-server.js, harnesses.js, CLAUDE.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1290",
+      "effect": "neither",
+      "reason": "Default-off relay of full assistant text into feedback; telemetry only.",
+      "evidence": "2411d63 hook.js, transcript.js, links.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1767",
+      "effect": "neither",
+      "reason": "Emits lane on worker usage payloads; telemetry field.",
+      "evidence": "aaa3e02 hook.js, opencode-runner.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1783",
+      "effect": "neither",
+      "reason": "Linux clone-strategy registry for workspace prep; substrate.",
+      "evidence": "2c3b783 config.js, executors.js, docs/linux-substrate-findings.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1821",
+      "effect": "neither",
+      "reason": "Fast-fail watchdog for blocked-startup launches; runner reaper automation.",
+      "evidence": "02bdbaf reapers.js, config.js, CLAUDE.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2559",
+      "effect": "neither",
+      "reason": "Registers Agent tool uses as outstanding async waits so the existing hold-release probe works; repair of a designed path.",
+      "evidence": "10c2d1d heartbeat.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2736",
+      "effect": "neither",
+      "reason": "Lands an inert opencode-liveness.js reader seam; refactor, no call site.",
+      "evidence": "047dfc5 opencode-liveness.js, reapers.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2720",
+      "effect": "neither",
+      "reason": "Makes an opencode follow-up resume rather than fail after the runner dies, with an orderly park; repair of the designed resume path.",
+      "evidence": "f337a30 reapers.js; f169b4a reapers.js, opencode-runner.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-3160",
+      "effect": "neither",
+      "reason": "Test-gate hygiene (stale mutants, AppleScript skip, timing); tests and docs/testing-and-ci.md only.",
+      "evidence": "3366748 docs/testing-and-ci.md",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2567",
+      "effect": "neither",
+      "reason": "Threads a dispatch effort axis through launch, resume and telemetry; configuration plumbing.",
+      "evidence": "3f2fc6b harnesses.js, executors.js, dispatcher.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-1455",
+      "effect": "neither",
+      "reason": "Makes the existing CI-green gate capability-conditional with a named local-suite substitute in both repos; repair making an unsatisfiable designed gate workable",
+      "evidence": "5a0b7210 lib/prompt-formatters.js, lib/prompts/meta-prompt-template.js; simple-dispatcher 19e801d hook.js",
+      "retirementCondition": null
+    },
+    {
+      "id": "LIN-2891",
+      "effect": "adds-rule",
+      "reason": "New asker-driven WITHDRAW: instruction (required reason, asker-only) emitted by the runner and honoured by Harbour, and no-re-raise rule extended to withdrawn rows",
+      "evidence": "7dafd8c1 lib/proxy-instructions.js, lib/prompt-template-defs.js; simple-dispatcher 83d0aec hook.js",
+      "retirementCondition": null
+    }
+  ]
+}
