@@ -31,7 +31,7 @@ at all: keeping acted wakes held and sending only the quiet ones to code comes t
 (−21% to −13%).
 
 Little is lost by forgetting. In a blind-coded sample of 48 wakes that acted, no decision rested
-on a fact only the session's memory held. A third of the facts each decision used came from
+on a fact only the session's memory held. About a third of the facts the decisions used came from
 memory, but every one of them had first come from a record a fresh session could read. Of the 25
 supervisor failures on record, one recovery clearly depended on held memory (LIN-2078). Eleven
 of the failures, mostly lost wakes into held sessions, would not exist under a relay.
