@@ -9,6 +9,16 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   (break-even at 11k tokens if the step orients as fresh starts do today, 100k if it reads only the
   handoff). Replay a sample of acted wakes as fresh sessions in a sandbox, from the record and a short
   handoff, and report steps, tokens and whether the decision matches the held one. (Claude, 2026-10-01)
+- **Does a session handed the plan's named paths reach its first edit with fewer tokens, at the same correctness?**
+  `harbour/starting-context.md` found implementation orients for 1–18% of its tokens (24 calls to the first edit at the median) and
+  that the plan's named paths, resolved to files, find half of what the implementer edits at 55% precision. Over a week, put the
+  resolved paths at the top of every second implementation prompt; compare tokens and calls to first edit, tokens per correct change
+  and the review's findings with the other half. LIN-2115's single-task probe (93 tokens, 18 turns against 51) is the only direct
+  test so far. (Claude, 2026-10-01)
+- **When a code review re-reads what the implementer read, is it checking independently or just re-finding?**
+  `harbour/starting-context.md` found 82% of a code review's orientation reads repeat an earlier session's on the ticket. Code a
+  sample of review orientation spans for whether the reviewer looked beyond the implementer's files and whether that found
+  anything, so a pointer hand-over can be judged against the independence it might cost. (Claude, 2026-10-01)
 - **Which leg kinds share a name length, and which published counts did the length decode misread?**
   `harbour/survey-check-6.md` found that the bootstrap-length decode reads breakdown (and look-into)
   sessions as close-outs and custom, design and triage sessions as reviews: in September's transcript
