@@ -1770,6 +1770,18 @@ ${goal}`
           try {
             applyAccessTokenToWorkspace(workspace, adopted.token, adopted.expiresAt)
             await saveSession(req.session)
+            // LIN-3186: same observability shape as the headless lane's
+            // [credential-adopted] line — this lane's write-back is the request's
+            // own session row via applyAccessTokenToWorkspace. Digests only,
+            // never token bytes.
+            console.log('[credential-adopted]', JSON.stringify({
+              source: 'session-comment-recovery',
+              urlKey: workspace.urlKey,
+              provider: provider.name,
+              fromFingerprint: fingerprintCredential(token),
+              toFingerprint: fingerprintCredential(adopted.token),
+              writeBack: { rows: 1, ok: true },
+            }))
 
             // Re-resolve the binding to pick up the freshly-mirrored token.
             // `requestedSource` is null here (the eligibility check above),

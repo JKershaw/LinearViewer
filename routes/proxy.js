@@ -925,7 +925,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // Most recent credential resolution per (workspace, owner), for naming the
   // credential a 401 rejected — see lib/proxy-credential-trail.js for the full
   // rationale (2026-08-09 incident write-up, honest limits, eviction policy).
-  const { recordCredentialResolution, logCredentialRejection } = createCredentialTrail();
+  const { recordCredentialResolution, logCredentialRejection } = createCredentialTrail({ registry: rejectedCredentialRegistry });
 
   function logEvent(req, endpoint, status, note = null, { skipWitness = false } = {}) {
     // LIN-2236 (L5.2 of the LIN-2231 design): 503 joins 401 here — every 503
@@ -1116,6 +1116,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *    clears this counter along with every other mark — it does not survive
    *    a restart, and re-arming there is the correct failure direction.
    *
+   * 4. NOT a SUPERSEDED fingerprint (LIN-3186).
+   *    `rejectedCredentialRegistry.isSuperseded` reports a fingerprint that has
+   *    already been rejected and then replaced by a different credential.
+   *    `resolveWorkspaceAccess` adopts the replacement and records the
+   *    supersession; if the (possibly unmirrored) superseded row is served
+   *    again and rejected, this is a KNOWN-DEAD credential, not a
+   *    stale-serving/rotation race, so it must surface as a terminal 401, never
+   *    the retryable-503 grace. Unlike condition 3 this is not a count
+   *    threshold — a single supersession is enough. Read through optional
+   *    chaining on the METHOD so an older fake registry degrades to a no-op
+   *    (the same discipline as `isPastByteIdenticalThreshold?.` above); each of
+   *    these four conditions keeps its own test (LIN-2216/2327/3186).
+   *
    * @param {import('express').Request} req
    * @returns {boolean} true if this 401 should surface as a retryable 503
    */
@@ -1133,6 +1146,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // retryable-503 grace re-arms then too — this classifier change does not
     // prevent that.
     if (rejectedCredentialRegistry?.isPastByteIdenticalThreshold?.(req?.resolvedCredentialFingerprint, BYTE_IDENTICAL_ESCALATION_THRESHOLD)) return false;
+    // LIN-3186: a superseded fingerprint is terminal — never the retryable 503.
+    if (rejectedCredentialRegistry?.isSuperseded?.(req?.resolvedCredentialFingerprint)) return false;
     return true;
   }
 

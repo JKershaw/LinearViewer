@@ -20,6 +20,8 @@ import vm from 'node:vm';
 import { MangoClient } from '@jkershaw/mangodb';
 import { AccountStore } from '../../lib/account-store.js';
 import { UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from '../../lib/workspace-token-resolver.js';
+import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/superseded-selection.js';
+import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { CREDENTIAL_SOURCES, fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
 import { workspaceTokenCacheKey as realWorkspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
@@ -179,7 +181,7 @@ describe('resolveWorkspaceAccess canonicalization wiring (LIN-2234, Block B — 
     const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
     const resolveIdx = body.indexOf('accountStore.resolveCanonicalAccountId(');
     assert.ok(resolveIdx >= 0);
-    for (const marker of ['workspaceTokenCacheKey(', 'selectOwnerWorkspaceToken(', 'ownerCredentialStore.get(', 'classifyWorkspaceFailure(', 'refreshOwnerWorkspaceToken(']) {
+    for (const marker of ['workspaceTokenCacheKey(', 'selectOwnerWorkspaceTokenExcludingSuperseded(', 'ownerCredentialStore.get(', 'classifyWorkspaceFailure(', 'refreshOwnerWorkspaceToken(']) {
       const idx = body.indexOf(marker);
       assert.ok(idx >= 0, `sanity check failed: ${marker} not found inside resolveWorkspaceAccess`);
       assert.ok(resolveIdx < idx, `resolveCanonicalAccountId must precede ${marker} — every downstream consumer must inherit the canonical id`);
@@ -223,6 +225,12 @@ async function runResolveWorkspaceAccess({ urlKey, ownerAccountId, sessions, acc
   const context = vm.createContext({
     UNSCOPED, TOKEN_REFRESH_BUFFER_MS,
     selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution,
+    // LIN-3186: the real selection wrapper + a real registry, matching
+    // server.js's production wiring. The extracted body no longer calls the
+    // bare selector, so both names must be in scope (as connectionAccess was
+    // added for LIN-3124 PR3 C).
+    selectOwnerWorkspaceTokenExcludingSuperseded,
+    rejectedCredentialRegistry: createRejectedCredentialRegistry(),
     CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS,
     accountStore,
     workspaceTokenCacheKey: (urlKey, ownerAccountId) => {
