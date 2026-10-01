@@ -78,7 +78,7 @@ Where the record gives the onset's time, the median is 3 hours.
 **Reconciled** against the three earlier papers, the lost-wake record agrees: 11 of 15 in the
 runner. The detectors do not double-count rows 1–3 in tokens once the re-fires are moved. They do
 overlap row 3 in mechanism, since row 3 moves the liveness clocks into code. Both papers are at
-version 2 in this PR, with this check's author added. Eleven lines of `docs/steady-base.md` would
+version 2 in this PR, with this check's author added. Ten lines of `docs/steady-base.md` would
 change and three rows be added; they are listed below. This check does not edit the anchor.
 
 ## Findings
