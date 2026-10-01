@@ -1,0 +1,121 @@
+/*
+ * Runner setup page (LIN-3098 S4): /workspace/:urlKey/runner.
+ * Phone-first: one column, full-width controls with 44px touch targets, no
+ * horizontal scroll. Colours come only from the shared tokens (style.css), so
+ * the .theme-dark overrides apply unchanged. Machine facts (the prompt, the
+ * credential) are mono; prose and labels are the content face.
+ */
+.runner-setup-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 12px 32px;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+.runner-setup-lede,
+.runner-setup-steps,
+.runner-setup-facts,
+.runner-setup-note,
+.runner-setup-notice,
+.runner-setup-links,
+.runner-setup-error,
+.runner-setup-fallback {
+  font-family: var(--font-content);
+  color: var(--fg);
+  line-height: 1.5;
+}
+
+.runner-setup-steps,
+.runner-setup-facts {
+  padding-left: 1.25em;
+  margin: 8px 0;
+}
+
+.runner-setup-facts li {
+  margin-bottom: 8px;
+}
+
+.runner-setup-notice,
+.runner-setup-note {
+  border-left: 3px solid var(--yellow);
+  background: var(--bg-muted);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.runner-setup-error {
+  border-left: 3px solid var(--red);
+  background: var(--bg-muted);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.runner-setup-fallback {
+  color: var(--fg-dim);
+}
+
+.runner-setup-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.runner-setup-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  font-size: 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.runner-setup-feedback {
+  font-family: var(--font-structural);
+  color: var(--green);
+}
+
+.runner-setup-output {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 12em;
+  margin-top: 8px;
+  padding: 8px;
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  color: var(--fg);
+  background: var(--bg-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.runner-setup-prompt-details summary {
+  cursor: pointer;
+  font-family: var(--font-content);
+  color: var(--blue);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.runner-setup-prompt {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-muted);
+  color: var(--fg);
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .runner-setup-btn {
+    flex: 1 1 100%;
+  }
+}
