@@ -102,6 +102,17 @@ describe('parseModule', () => {
     assert.deepEqual(imports, []);
     assert.deepEqual(exportedNames, ['real']);
   });
+
+  test('ignores import/export text inside a multi-line block comment', () => {
+    // The lines below start at column 0, so the line-anchored statement
+    // regexes would match them on their own; only stripping the comment
+    // first keeps them out of the parsed edge/export set.
+    const { imports, exportedNames } = parseModule(
+      "/*\nimport { ghost } from './ghost.js';\nexport function alsoGhost() {}\n*/\nexport const real = 1;\n"
+    );
+    assert.deepEqual(imports, []);
+    assert.deepEqual(exportedNames, ['real']);
+  });
 });
 
 describe('direct import', () => {
