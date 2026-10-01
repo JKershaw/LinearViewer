@@ -305,6 +305,149 @@ describe(
       }
     });
 
+    // --- LIN-3142: the owner backfill under real interleaving (plan G11) ---
+    // MangoDB serialises writers, so only real MongoDB can show the backfill's
+    // one-owner guarantee under contention. `runOwnerBackfill` reads the bare
+    // `accounts`/`account-workspaces` collections, which this suite's suffixed
+    // `freshCollection` names can't provide, so every case gets its OWN
+    // database (never reused: a leftover owner edge would change the next
+    // case's targets) and drops it in `finally`. The module is loaded lazily
+    // so a load failure fails only these cases, not the whole real-Mongo suite.
+    const OB_PIN_ACCOUNT = 'e7e948a4-2951-4af4-b60e-572a473a491e';
+    const OB_PIN_LINEAR_SCOPE = 'beb9398c-83b5-4d06-b65e-78d19bb0d2f7';
+    const OB_PRE = new Date('2026-09-01T00:00:00.000Z');
+    const obSilent = { log() {}, info() {}, warn() {}, error() {}, debug() {} };
+    let obCounter = 0;
+
+    async function withOwnerBackfillDb(fn) {
+      const { runOwnerBackfill } = await import('../../lib/owner-backfill.js');
+      const caseDb = client.db(`${db.databaseName}_ownerbackfill_${obCounter++}`);
+      try {
+        await ensureIndexes(caseDb, { logger: { warn() {} } });
+        await caseDb.collection('accounts').insertOne({
+          _id: OB_PIN_ACCOUNT,
+          identities: [{ provider: 'linear', scope: OB_PIN_LINEAR_SCOPE }]
+        });
+        await fn({ caseDb, edges: caseDb.collection('account-workspaces'), runOwnerBackfill });
+      } finally {
+        await caseDb.dropDatabase();
+      }
+    }
+
+    function obEdge(accountId, workspaceId, extra = {}) {
+      return { _id: randomUUID(), accountId, workspaceId, createdAt: OB_PRE, ...extra };
+    }
+
+    function assertRunsClean(results, label) {
+      const rejected = results.filter((r) => r.status === 'rejected');
+      assert.deepStrictEqual(rejected, [], `${label}: runOwnerBackfill must never reject, got ${rejected.length}: ${rejected[0]?.reason}`);
+      for (const { value } of results) {
+        assert.strictEqual(value.skipped, null, `${label}: no gate skipped`);
+        assert.strictEqual(value.counts.failed, 0, `${label}: no failed write under contention`);
+        assert.strictEqual(
+          value.counts.assigned + value.counts.raced + value.counts.failed,
+          value.counts.targets,
+          `${label}: every target a run saw is assigned, raced or failed`
+        );
+      }
+    }
+
+    const sum = (results, key) => results.reduce((n, r) => n + r.value.counts[key], 0);
+
+    test('owner backfill: 8 concurrent runs over 20 ownerless workspaces give each exactly one owner and one John edge (LIN-3142 G11a)', async () => {
+      await withOwnerBackfillDb(async ({ caseDb, edges, runOwnerBackfill }) => {
+        const workspaceIds = Array.from({ length: 20 }, (_, i) => `ob-ws-${String(i).padStart(2, '0')}`);
+        // Even: John already a plain member (promote path). Odd: John absent (insert path).
+        await edges.insertMany(workspaceIds.flatMap((workspaceId, i) => [
+          obEdge(randomUUID(), workspaceId),
+          ...(i % 2 === 0 ? [obEdge(OB_PIN_ACCOUNT, workspaceId)] : [])
+        ]));
+
+        const results = await Promise.allSettled(
+          Array.from({ length: 8 }, () => runOwnerBackfill({ db: caseDb, write: true, logger: obSilent }))
+        );
+
+        assertRunsClean(results, 'G11a');
+        assert.strictEqual(sum(results, 'assigned'), 20, 'each workspace assigned exactly once across all runs');
+        for (const workspaceId of workspaceIds) {
+          assert.strictEqual(await edges.countDocuments({ workspaceId, role: 'owner' }), 1, `${workspaceId}: one owner`);
+          assert.strictEqual(await edges.countDocuments({ workspaceId, accountId: OB_PIN_ACCOUNT }), 1, `${workspaceId}: one John edge`);
+          assert.strictEqual(
+            (await edges.findOne({ workspaceId, role: 'owner' })).accountId,
+            OB_PIN_ACCOUNT,
+            `${workspaceId}: the owner is John`
+          );
+        }
+      });
+    });
+
+    test('owner backfill: 12 concurrent runs on one insert-path workspace leave one John edge and one owner; a pair-index E11000 is raced, never failed (LIN-3142 G11b)', async () => {
+      await withOwnerBackfillDb(async ({ caseDb, edges, runOwnerBackfill }) => {
+        const workspaceId = 'ob-ws-single';
+        await edges.insertOne(obEdge(randomUUID(), workspaceId));
+
+        const results = await Promise.allSettled(
+          Array.from({ length: 12 }, () => runOwnerBackfill({ db: caseDb, write: true, logger: obSilent }))
+        );
+
+        assertRunsClean(results, 'G11b');
+        assert.strictEqual(sum(results, 'assigned'), 1);
+        assert.strictEqual(await edges.countDocuments({ workspaceId, accountId: OB_PIN_ACCOUNT }), 1, 'one John edge');
+        assert.strictEqual(await edges.countDocuments({ workspaceId, role: 'owner' }), 1, 'one owner');
+      });
+    });
+
+    test('owner backfill vs a rival promote on 20 workspaces: one owner each, and no stray John edge where the rival won (LIN-3142 G11c)', async () => {
+      await withOwnerBackfillDb(async ({ caseDb, edges, runOwnerBackfill }) => {
+        const rivals = Array.from({ length: 20 }, (_, i) => obEdge(randomUUID(), `ob-ws-rival-${String(i).padStart(2, '0')}`));
+        await edges.insertMany(rivals);
+
+        const promoteRival = async (rival) => {
+          try {
+            await edges.updateOne({ _id: rival._id, role: { $ne: 'owner' } }, { $set: { role: 'owner' } });
+          } catch (err) {
+            if (err.code !== 11000) throw err;
+          }
+        };
+        const settled = await Promise.allSettled([
+          runOwnerBackfill({ db: caseDb, write: true, logger: obSilent }),
+          ...rivals.map(promoteRival),
+          runOwnerBackfill({ db: caseDb, write: true, logger: obSilent })
+        ]);
+
+        assert.deepStrictEqual(settled.filter((r) => r.status === 'rejected'), [], 'no rejection from either side');
+        assertRunsClean([settled[0], settled[settled.length - 1]], 'G11c');
+        for (const rival of rivals) {
+          const { workspaceId } = rival;
+          const owners = await edges.find({ workspaceId, role: 'owner' }).toArray();
+          assert.strictEqual(owners.length, 1, `${workspaceId}: exactly one owner`);
+          if (owners[0].accountId !== OB_PIN_ACCOUNT) {
+            assert.strictEqual(
+              await edges.countDocuments({ workspaceId, accountId: OB_PIN_ACCOUNT }),
+              0,
+              `${workspaceId}: the rival won, so no stray plain John edge`
+            );
+          }
+        }
+      });
+    });
+
+    test('owner backfill: a John edge with role:null is promoted on real MongoDB ($ne:\'owner\' matches null) (LIN-3142 G11d)', async () => {
+      await withOwnerBackfillDb(async ({ caseDb, edges, runOwnerBackfill }) => {
+        const workspaceId = 'ob-ws-null-role';
+        const john = obEdge(OB_PIN_ACCOUNT, workspaceId, { role: null });
+        await edges.insertMany([john, obEdge(randomUUID(), workspaceId)]);
+
+        const report = await runOwnerBackfill({ db: caseDb, write: true, logger: obSilent });
+
+        assert.strictEqual(report.counts.assigned, 1);
+        assert.strictEqual(report.counts.alreadyMember, 1);
+        assert.strictEqual(report.counts.raced, 0);
+        assert.strictEqual((await edges.findOne({ _id: john._id })).role, 'owner');
+        assert.strictEqual(await edges.countDocuments({ workspaceId }), 2, 'promoted in place, no edge added');
+      });
+    });
+
     // --- LIN-1338: linkIdentity cross-document race + unique backstop ---
 
     test('the accounts_identity_unique index (LIN-1338) builds on real MongoDB with unique and sparse set', async () => {
