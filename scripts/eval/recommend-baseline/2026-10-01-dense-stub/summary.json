@@ -1,0 +1,166 @@
+{
+  "generatedBy": "scripts/eval/eval-dense.mjs",
+  "date": "2026-10-01",
+  "stub": true,
+  "models": [
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-5-mini",
+    "google/gemini-2.5-flash-lite",
+    "qwen/qwen3.6-flash"
+  ],
+  "repeats": 1,
+  "completedThisRun": 200,
+  "skippedResumed": 0,
+  "totalRuns": 200,
+  "spentThisRunUsd": 0,
+  "totalCostUsd": 0,
+  "maxUsd": 10,
+  "halted": null,
+  "wallSeconds": 0,
+  "byModel": {
+    "openai/gpt-5.6-sol": {
+      "calls": 47,
+      "runs": 40,
+      "actionHit": 35,
+      "descentHit": 40,
+      "error": 0,
+      "costUsd": 0,
+      "promptOk": 40,
+      "promptTotal": 40,
+      "p50LatencyMs": 1
+    },
+    "openai/gpt-5.4-mini": {
+      "calls": 47,
+      "runs": 40,
+      "actionHit": 35,
+      "descentHit": 40,
+      "error": 0,
+      "costUsd": 0,
+      "promptOk": 40,
+      "promptTotal": 40,
+      "p50LatencyMs": 1
+    },
+    "openai/gpt-5-mini": {
+      "calls": 47,
+      "runs": 40,
+      "actionHit": 35,
+      "descentHit": 40,
+      "error": 0,
+      "costUsd": 0,
+      "promptOk": 40,
+      "promptTotal": 40,
+      "p50LatencyMs": 1
+    },
+    "google/gemini-2.5-flash-lite": {
+      "calls": 47,
+      "runs": 40,
+      "actionHit": 35,
+      "descentHit": 40,
+      "error": 0,
+      "costUsd": 0,
+      "promptOk": 40,
+      "promptTotal": 40,
+      "p50LatencyMs": 1
+    },
+    "qwen/qwen3.6-flash": {
+      "calls": 47,
+      "runs": 40,
+      "actionHit": 35,
+      "descentHit": 40,
+      "error": 0,
+      "costUsd": 0,
+      "promptOk": 40,
+      "promptTotal": 40,
+      "p50LatencyMs": 1
+    }
+  },
+  "perAction": {
+    "implement|implementation": {
+      "hit": 10,
+      "n": 10,
+      "descentExpect": "LIN-APB-pos"
+    },
+    "implement|implementation|plan": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "LIN-APB-neg"
+    },
+    "plan|plan-review|research": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "LIN-APB-diverged"
+    },
+    "breakdown": {
+      "hit": 10,
+      "n": 10,
+      "descentExpect": "FIX-830-pos"
+    },
+    "close-out": {
+      "hit": 10,
+      "n": 10,
+      "descentExpect": "FIX-812-approve-ledger"
+    },
+    "review": {
+      "hit": 20,
+      "n": 20,
+      "descentExpect": "FIX-812-noreview"
+    },
+    "implement": {
+      "hit": 20,
+      "n": 40,
+      "descentExpect": "HAR-616"
+    },
+    "implementation": {
+      "hit": 35,
+      "n": 35,
+      "descentExpect": "LIN-3125"
+    },
+    "blocked": {
+      "hit": 10,
+      "n": 10,
+      "descentExpect": "LIN-3059"
+    },
+    "retrospective-audit": {
+      "hit": 20,
+      "n": 20,
+      "descentExpect": "LIN-3107"
+    },
+    "breakdown|plan|research": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "LIN-215"
+    },
+    "plan|research": {
+      "hit": 5,
+      "n": 10,
+      "descentExpect": "LIN-202"
+    },
+    "breakdown|implement": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "LIN-489"
+    },
+    "plan-review": {
+      "hit": 10,
+      "n": 10,
+      "descentExpect": "PR-1603-gated-recorded"
+    },
+    "plan": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "PR-1603-request-changes-1"
+    }
+  },
+  "promptQuality": {
+    "ok": 200,
+    "total": 200,
+    "bad": []
+  },
+  "overall": {
+    "actionHit": 175,
+    "n": 200,
+    "descentHit": 200,
+    "errors": 0
+  }
+}
