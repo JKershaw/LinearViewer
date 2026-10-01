@@ -49,6 +49,30 @@ test.describe('Archive Pages', () => {
     await expect(page).toHaveTitle(/Learning While the Tools Change/);
   });
 
+  test('serves archive #8 (the expedition report) without authentication', async ({ page }) => {
+    const response = await page.goto('/archive/8');
+    expect(response.status()).toBe(200);
+    await expect(page).toHaveTitle(/Eight Lines, Forty-One Sessions/);
+  });
+
+  test('archive #8 loads its self-hosted faces and draws its five figures', async ({ page }) => {
+    // Its charts are inline SVG and HTML, with no scripts; a moved face would
+    // silently fall back to system fonts.
+    await page.goto('/archive/8');
+    const result = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return {
+        loaded: [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family),
+        figures: document.querySelectorAll('figure').length,
+        scripts: document.querySelectorAll('script').length,
+      };
+    });
+    expect(result.loaded).toContain('Inter');
+    expect(result.loaded).toContain('JetBrains Mono');
+    expect(result.figures).toBe(5);
+    expect(result.scripts).toBe(0);
+  });
+
   test('archive #7 loads its faces and every in-page link lands', async ({ page }) => {
     // Its superscript citations, back-links and section cross-references are
     // all fragment links; a renumbered entry would strand one silently.
