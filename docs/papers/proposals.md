@@ -36,8 +36,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
 - **How many steps does a fresh session take to reach the decision a held supervisor's wake made?**
   `harbour/held-or-fresh.md` re-priced September's acted wakes as fresh sessions on the assumption that
   a fresh step takes the steps the held wake took; the relay's result turns on that and on the handoff
-  (break-even at 11k tokens if the step orients as fresh starts do today, 100k if it reads only the
-  handoff). Replay a sample of acted wakes as fresh sessions in a sandbox, from the record and a short
+  (break-even at 21k tokens if the step orients as fresh starts do today, 100k if it reads only the
+  handoff; version 2). Replay a sample of acted wakes as fresh sessions in a sandbox, from the record and a short
   handoff, and report steps, tokens and whether the decision matches the held one. (Claude, 2026-10-01)
 - **Does a session handed the plan's named paths reach its first edit with fewer tokens, at the same correctness?**
   `harbour/starting-context.md` found implementation orients for 1–18% of its tokens (24 calls to the first edit at the median) and
@@ -49,6 +49,14 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   `harbour/starting-context.md` found 82% of a code review's orientation reads repeat an earlier session's on the ticket (67% of the repo files it opens). Code a
   sample of review orientation spans for whether the reviewer looked beyond the implementer's files and whether that found
   anything, so a pointer hand-over can be judged against the independence it might cost. (Claude, 2026-10-01)
+- **Which deliveries into a held supervisor can code tell are quiet before a model reads them?**
+  `harbour/survey-check-7.md` found that routing by delivery class (pause wakes, failsafe re-confirms,
+  silence re-fires, the Runner's deliveries) reaches 2,295 of September's 3,233 quiet wakes, 11.7% of
+  fleet tokens, and holds back 219 that acted; the other 938 quiet wakes, 4.5% of tokens, are terminal
+  and unlabelled deliveries indistinguishable by class from the ones that act. Read a sample of each
+  group's delivered text and the state code could see at that moment (the child's outcome line, the
+  parent's live children, the item's kind), and say which fields would have separated them, and at what
+  error. (Claude, 2026-10-01)
 - **Which leg kinds share a name length, and which published counts did the length decode misread?**
   `harbour/survey-check-6.md` found that the bootstrap-length decode reads breakdown (and look-into)
   sessions as close-outs and custom, design and triage sessions as reviews: in September's transcript

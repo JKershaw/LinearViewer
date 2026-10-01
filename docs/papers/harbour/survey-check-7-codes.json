@@ -1,0 +1,3269 @@
+{
+ "about": "LIN-3183 (survey-check-7.md). A fresh blind double-coding of where-judgement-happens.md: coders C and D (frontier tier, each split across three in-session agents, D reading in reverse order) coded every third of the 26 sampled tickets reader B did not code, from scripts/survey-judgement-codebook.md and the digests survey-judgement-digests.mjs rebuilt on 1 October, blind to reader A and to each other.",
+ "sample": {
+  "rule": "the 26 sampled tickets reader B did not code, in the codes file order; every third from offset 1",
+  "tickets": [
+   "LIN-3008",
+   "LIN-2702",
+   "LIN-2543",
+   "LIN-2456",
+   "LIN-2535",
+   "LIN-2716",
+   "LIN-2458",
+   "LIN-3129",
+   "LIN-2995"
+  ]
+ },
+ "coderC": {
+  "LIN-2456": {
+   "ticket": "LIN-2456",
+   "decisions": [
+    {
+     "cycle": "S1.0",
+     "type": "CE",
+     "role": "research",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state",
+      "code-at-head",
+      "ticket-text"
+     ],
+     "effect": "none-in-the-end",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Mechanism confirmed as latent defect, but the 15:07/15:15 motivating incident refuted: host log shows the dispatcher was not running during that window."
+    },
+    {
+     "cycle": "comment 09-02T17:02",
+     "type": "RT",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "worker-report"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "low",
+     "evidence": "Operator dispatches the implementation lane straight from research a8f4733d §5 fix shape, no plan step; branch + PR only, no merge, TDD; merge on John's go."
+    },
+    {
+     "cycle": "comment 09-02T18:41",
+     "type": "MG",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "ci",
+      "prior-verdict"
+     ],
+     "effect": "timing-only",
+     "class": "b",
+     "confidence": "low",
+     "evidence": "PR #204 squash-merged on John's go after review 396508e6 (Approve — conditional), CI green; close-out ledger discharge deferred to a later lane, ticket stays In Progress."
+    },
+    {
+     "cycle": "comment 09-02T18:41",
+     "type": "SC",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Review recorded F1/F2 test gaps and F3 logging as follow-up tickets for the operator; instead they were landed under this ticket as close-out work, producing PR #208."
+    },
+    {
+     "cycle": "S5.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes: F3's new log line fires on the all-held queued-busy fallback naming the selected item as routed around, unthrottled; hold reason survives garbage-constant mutation."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "tests-run",
+      "diff"
+     ],
+     "effect": "what-shipped",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Re-review Request Changes: queued-busy half of F3's hold-reason pin still unpinned; garbage-constant mutation at dispatcher.js:1403 leaves all 2156 tests green."
+    },
+    {
+     "cycle": "comment 09-02T20:45",
+     "type": "SC",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Carried non-blocking nit (unguarded head id .slice at the log site) filed as LIN-2478 rather than fixed in PR #208."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.0",
+     "type": "failed-session",
+     "cause": "infra",
+     "reacted": [
+      "research"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "'API Error: The response stopped arriving. The response above may be incomplete.' Research session continued and completed."
+    },
+    {
+     "cycle": "S1.0",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "research"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "no",
+     "classOfReaction": "c",
+     "evidence": "Ticket's motivating evidence was wrong: dispatcher down ~15:06–16:19, so the starvation incident did not occur as filed; defect stands as latent."
+    },
+    {
+     "cycle": "S2.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Broken Xcode toolchain on host: /usr/bin/git unusable (Symbol not found), 2 osacompile test failures; each session switched to Homebrew git and baselined the failures."
+    },
+    {
+     "cycle": "S4.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Linear lane auth-flapping: fetch 'Got it on the 5th attempt'; close-out 'Retrying with bounded backoff'; comment posts in retry loops."
+    },
+    {
+     "cycle": "S5.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Implementer's F3 log line claimed to fire only on route-around; review showed it fires on queued-busy fallback, contradicting PR body and CLAUDE.md; implementer: 'my original reasoning was wrong'."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Hand-back reported all four items fixed; re-review found item 3 'passes only halfway' — queued-busy reason unpinned; implementer added the reviewer's ready-made case."
+    }
+   ],
+   "notes": "The Flight Companion/Passage Runner's tier is not shown in the digest (frontier assumed). The implementation session S2 also ran unrelated host-hygiene custom tasks (S2.3, S2.6), not coded as decisions for this ticket."
+  },
+  "LIN-2458": {
+   "ticket": "LIN-2458",
+   "decisions": [
+    {
+     "cycle": "comment 09-02T17:03",
+     "type": "RT",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "ticket-text",
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "low",
+     "evidence": "Operator dispatches F1 + F2 straight to an implementation lane from the review's fix shapes, no research/plan; branch + PR only, TDD; merge on John's go."
+    },
+    {
+     "cycle": "comment 09-02T18:41",
+     "type": "MG",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "ci",
+      "prior-verdict"
+     ],
+     "effect": "timing-only",
+     "class": "b",
+     "confidence": "low",
+     "evidence": "PR #205 squash-merged on John's go after review 14db9cee (Approve — conditional), CI green; close-out of ledger items 1–3 deferred, ticket stays In Progress."
+    },
+    {
+     "cycle": "comment 09-02T18:41",
+     "type": "SC",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Review's F-A class sibling (consult side unpinned) was taken into this ticket as a follow-up lane rather than a separate ticket, producing PR #207."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "SC",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "code-at-head",
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Pins the consult side only through reapers.js's stall-failsafe seam; dispatcher.js runOnce consult gate flagged as a ready-to-file follow-up rather than covered."
+    },
+    {
+     "cycle": "comment 09-02T19:50",
+     "type": "SC",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "worker-report"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Review's ready-to-file follow-up (the dispatcher.js runOnce consult seam) filed as LIN-2467 at merge of PR #207."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Broken /usr/bin/git Xcode shim ('a hard blocker') and 2 host-only osacompile failures; each session switched to Homebrew git and baselined the failures against main."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Linear lane auth-flap/503: summary comment posted 'after 3 auth-flap retries'; review 'one 503 auth flap, succeeded on retry'; close-out 'the Linear lane 503'd'."
+    }
+   ],
+   "notes": "Runner (Flight Companion/Passage Runner) tier is not shown in the digest; frontier assumed. Both reviews were Approve — conditional with no blocking findings, so neither is coded as a decision."
+  },
+  "LIN-2535": {
+   "ticket": "LIN-2535",
+   "decisions": [
+    {
+     "cycle": "S1.73",
+     "type": "RT",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "tracker-state",
+      "ticket-text"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Verb override plan-review -> plan: engine's pick was a demonstrable miss, no Implementation Plan heading or plan-review gate line on the ticket; aborted cec89ed6 and pinned plan instead."
+    },
+    {
+     "cycle": "S5.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "code-at-head",
+      "ci"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Approve conditional on close-out discharging the ledger: LIN-2533/2534 each shipped an extraction pin-set test, LIN-2535 none; F1/F2 standing-mechanism gaps that close-out should record or route."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SC",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "code-at-head",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Reproduced F1/F2 first-hand, found no existing owner, filed LIN-2558 (proxyLimiter has no standing witness) and LIN-2557 (rateLimit census misses new sub-routers) rather than folding into this PR."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.73",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Engine recommended plan-review on a ticket with no plan; dispatch cec89ed6 reached taken before the autopilot aborted it (session f91d2b5e cancelled in SUMMARIZING) and pinned plan."
+    },
+    {
+     "cycle": "S4.4",
+     "type": "other",
+     "cause": "flake",
+     "reacted": [
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Local full npm test had 4 E2E failures; rerun showed 3 pre-existing flakes, the 4th (live-console geometry 334 vs 319) reproduced on unmodified main via git stash."
+    },
+    {
+     "cycle": "S4.12",
+     "type": "stuck",
+     "cause": "unknown",
+     "reacted": [
+      "code",
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Work and Linear comment finished by 16:02, but the session only reported DONE after failsafe reconfirm and silence re-fire at 16:53; parent noted 72m43s for a single-route move."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "close-out"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Close-out posted the completion summary with a wrong link label (item 1 read LIN-2557 while pointing at LIN-2558) and corrected it in place."
+    }
+   ],
+   "notes": "The decision to keep group C separate from group A was made at breakdown before this ticket's sessions and appears only in the description, so it is not coded. The review ledger table rows 1-5 are partly truncated."
+  },
+  "LIN-2543": {
+   "ticket": "LIN-2543",
+   "decisions": [
+    {
+     "cycle": "comment 09-04T22:14",
+     "type": "RT",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "worker-report",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Coordinator activates the parked ticket now: dep mis-classification fired on D, E, F; land the witness before H/I/Stage 7; dispatched in parallel with group F, not after it."
+    },
+    {
+     "cycle": "S2.0",
+     "type": "CE",
+     "role": "research",
+     "tier": "frontier",
+     "basis": [
+      "ticket-text",
+      "code-at-head"
+     ],
+     "effect": "none-in-the-end",
+     "class": "b",
+     "confidence": "low",
+     "evidence": "Research: ledger SHA 131ca98d 'does not exist in this repo'; autopilot posts a correction to its board comment; plan revision later replaces it with 63d78df7."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "SC",
+     "role": "plan",
+     "tier": "mid",
+     "basis": [
+      "code-at-head",
+      "ticket-text",
+      "worker-report"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Plan defers Half C and the remaining 23 error-path probes to follow-ups; 1 representative probe per group (5 of 28 silent deps), not all 28."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "RT",
+     "role": "plan",
+     "tier": "mid",
+     "basis": [
+      "plan-text"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "low",
+     "evidence": "plan-review due: yes, flagged because the plan makes a scope-narrowing call on the coordinator-escalated class-fix ticket; worth a second look."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes: check 7 fails; Half B probe paths mis-grounded (D targets group-A route, E nonexistent form), BASE_DEPS doesn't reach 200 for A or C, two deferrals without ticket ids; five fixes."
+    },
+    {
+     "cycle": "S7.0",
+     "type": "CE",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "tests-run",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Plan's export of BASE_DEPS/buildApp from the .test.js file double-executes its 69 tests when imported; relocated harness to new plain module tests/unit/lib/proxy-fake-deps.js."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.3",
+     "type": "stuck",
+     "cause": "unknown",
+     "reacted": [
+      "code",
+      "research"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Stall failsafe RESUMING, failsafe-reconfirm and silence-refire on the research session; autopilot: 'the sweep was genuinely long, not wedged. Good that I held off on the probe.'"
+    },
+    {
+     "cycle": "S2.0",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "research",
+      "autopilot",
+      "plan"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Autopilot's board comment cited 131ca98d (PR branch head) as Stage 1's landed head; research found it absent from main; autopilot posted correction, plan revision fixed the description."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "plan-review",
+      "autopilot",
+      "plan"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Plan's Half B probe table mis-grounded against source (wrong routes, line cites, harness overrides); plan-review Request Changes; plan revision re-grounded probes."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "plan-review",
+      "plan"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Description ended with a stray PLANEOF heredoc terminator and leaked wc -l line from the planning shell; flagged by plan-review, trimmed in revision."
+    },
+    {
+     "cycle": "S7.0",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "no",
+     "classOfReaction": "c",
+     "evidence": "Approved plan's export-from-test-file approach would double-execute 69 tests; found empirically by the implementer and fixed by relocating the harness."
+    }
+   ],
+   "notes": "Ticket's parent autopilot (LIN-679) cycles are shown only where they name this ticket, so coordinator reasoning about activation timing is visible mainly via the 22:14 comment. Merge at S9.1 was routine (Approve + green CI) and not coded."
+  },
+  "LIN-2702": {
+   "ticket": "LIN-2702",
+   "decisions": [
+    {
+     "cycle": "S3.3",
+     "type": "CE",
+     "role": "plan",
+     "tier": "frontier",
+     "basis": [
+      "code-at-head",
+      "plan-text",
+      "ticket-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Beat 2 found postScan is IIFE-private (window.ScanSection = { init }) so Phase 2 cannot reach it; raised decision lin2702-postscan-reachability with options widen-export vs defer-to-phase2, recommending widen-export."
+    },
+    {
+     "cycle": "S2.5",
+     "type": "RU",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "code-at-head",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Stepper confirmed the finding independently and ruled widen-export, named in the plan as a routed-around contract gap forcing plan-review due: yes; decision surfaced upward for veto with that default."
+    },
+    {
+     "cycle": "S2.7",
+     "type": "RT",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "worker-report"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Next action is plan-review, not implementation: the named contract gap trips a gate criterion, and the worker was told to name it that way rather than defaulting to the usual forward hop."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head",
+      "tests-run",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Approve with a condition: before LIN-2701 is planned, the requirement to add /scan.js to render-observation.js:218 must be recorded on LIN-2701. Stepper then posted the inbound-requirement comment on LIN-2701."
+    },
+    {
+     "cycle": "S7.1",
+     "type": "SB",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "ci",
+      "code-at-head",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Close-out verified merge-ready but held the merge on ledger L6 (pre-existing confident $0.00 on Settings panel) as unowned, 'a route to nowhere'; asked accept or file first."
+    },
+    {
+     "cycle": "S2.23",
+     "type": "RU",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "prior-verdict",
+      "code-at-head"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Stepper answered the L6 gate 'file first' and filed LIN-2703 to own it rather than asking the human; merge cannot move Settings behaviour; surfaced for veto. Close-out then merged."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.3",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Transient LINEAR_AUTH marked retryable on stepper reads; a bare retry succeeded, so treated as a wobble to ride through rather than an instrument halt."
+    },
+    {
+     "cycle": "S2.3",
+     "type": "other",
+     "cause": "unknown",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Plan beat 1 reported [done] instead of holding warm; stepper verified the real change and continued via followUpTo; later noted 'the warm hold worked this time' at beat 2."
+    },
+    {
+     "cycle": "S3.7",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "plan"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Transient LINEAR_AUTH blip (retryable) while writing the plan to the description; retrying cleared it."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "plan-review"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Local proxy provider lane intermittently 401ing (credential-health degraded, 4/9 calls failing); retries succeeded, verdict POST landed on second attempt."
+    },
+    {
+     "cycle": "S7.4",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "close-out"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "First Done PATCH returned 502 three times without applying; close-out re-read state before retrying; no write landed twice."
+    }
+   ],
+   "notes": "Middle of several cycles and the review ledger table are truncated, so how L1-L5 were routed is visible only from the description summary. Whether John saw or vetoed the two upward-surfaced decisions is not shown."
+  },
+  "LIN-2716": {
+   "ticket": "LIN-2716",
+   "decisions": [
+    {
+     "cycle": "comment 09-11T10:36",
+     "type": "RT",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "ticket-text",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Lane A mandate: ticket's Observed/Expected/Design notes/Acceptance are the plan of record; legs start at implementation, no research/plan unless design notes fail at HEAD."
+    },
+    {
+     "cycle": "S1.5",
+     "type": "CE",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "runtime-state"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Beat 2 recap asserts red-first evidence without giving any; stepper holds rather than advances and dispatches a corrective beat 2 demanding the evidence itself."
+    },
+    {
+     "cycle": "S1.7",
+     "type": "RS",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "runtime-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Second identical claim is the tell: dispatch feedback carries only the sentinel line. Stepper changes channel — evidence must be posted as a ticket comment before beat 3."
+    },
+    {
+     "cycle": "S2.5",
+     "type": "SC",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "ticket-text",
+      "code-at-head"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Wake-cadence state deliberately excluded from persistence, a named divergence from the ticket's Expected 'resuming rather than restarting'; later routed to LIN-2771."
+    },
+    {
+     "cycle": "S2.9",
+     "type": "SC",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "code-at-head",
+      "ticket-text"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Beat 4 admits the proposals read-only re-render boundary is not implemented: a live proposal vanishes on reload; carried as a gap, later LIN-2772."
+    },
+    {
+     "cycle": "S1.11",
+     "type": "ES",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report"
+     ],
+     "effect": "none-in-the-end",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Stepper rules against widening scope in-session and raises to John whether the two gaps land as follow-ups or back in this ticket; review later accepted them as follow-ups."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "running-app",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes: reorient clears sessionStorage but not in-memory chatHistory, so the next turn re-persists the cleared thread; blocker LIN-2770 filed, blocks LIN-2716."
+    },
+    {
+     "cycle": "S1.15",
+     "type": "ES",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Parks LIN-2716 for a product decision: LIN-2622 reorient is not a fresh start while LIN-2716 gave it a clear job; any fix picks a side, so it goes to John."
+    },
+    {
+     "cycle": "S1.16",
+     "type": "SC",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "While parked, files and links follow-ups LIN-2771 (cadence) and LIN-2772 (proposals) the reviewer required before close-out."
+    },
+    {
+     "cycle": "comment 09-11T12:23",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "human-message"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "John: reorient is 'not a fresh start'; runner reading: clear-storage job comes out, acceptance bullet withdrawn, fresh-session affordance a later ticket. Orders: fix on same branch, re-review, close-out."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SC",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Close-out routes re-review ledger items 1–4 (test-reach gaps) to new LIN-2776, amends the withdrawn Acceptance bullet and cancels LIN-2770 before merging."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.3",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Beat 1 closed with DONE rather than PENDING, which finalizes the session; stepper corrects its own framing so beats 2–4 declare PENDING to keep the warm hold."
+    },
+    {
+     "cycle": "S1.5",
+     "type": "lost-wake",
+     "cause": "infra",
+     "reacted": [
+      "stepper",
+      "implementation",
+      "stepper",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "unclear",
+     "classOfReaction": "c",
+     "evidence": "Beat 2's red-first evidence reported twice and neither reached the stepper: dispatch feedback carries only the one-line sentinel; resolved by posting evidence as ticket comment d1257f80."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "stepper",
+      "John",
+      "implementation"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "yes",
+     "freshSession": "no",
+     "classOfReaction": "c",
+     "evidence": "Beats 4–5 and stepper verification claimed reorient clears the stored session; review found the next turn re-persists it. Resolution needed John's product ruling, then a fix."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Finding 4: beat 4 overstated what the cap test reaches; mutations M4–M7 show guards redundantly implemented, not per-site pinned; routed to LIN-2776."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "close-out"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Snapshot verification failed: generation-disabled brief read returned status stale with empty body, so no pruning was performed; recorded in the close-out comment."
+    }
+   ],
+   "notes": "Runner (Flight Companion) tier is not shown in the digest; frontier assumed. The stepper's escalation at S1.11 is visible mainly through a truncated JSON tail and the run summary comment."
+  },
+  "LIN-2995": {
+   "ticket": "LIN-2995",
+   "decisions": [
+    {
+     "cycle": "S3.0",
+     "type": "SC",
+     "role": "plan",
+     "tier": "mid",
+     "basis": [
+      "code-at-head",
+      "ticket-text"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Plan split the work into six sequenced surfaces (S1 halt.js, S2 abort extraction, S3-S6 sources/logging) and determined 'needs multiple sessions', later enacted by breakdown as six child tickets."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes F1-F4: stop sweep selector must match abort route's flipToCancelled set, fold resume-hold into launchHoldReason, define sweep for unpolled tokens, correct dependency arrows; 'would ship a halt-stop that doesn't fully stop'."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Second Request Changes R1-R4: lone held item falls through post-selection branch and is claimed/resumed; nothing says stop holds fresh launches; humanContinued sessions refired; routed-around log names wrong item."
+    },
+    {
+     "cycle": "S1.11",
+     "type": "ES",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Second Request Changes hit the plan-review loop bound; autopilot parked and asked John to choose a third plan revision, straight to implementation with R1-R4 binding, or take the plan himself (recommended third-plan)."
+    },
+    {
+     "cycle": "S1.13",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "prior-verdict",
+      "worker-report"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Ruling (relayed by the con): third plan revision allowed, plan passes not skipped, so straight-to-implementation not taken; also asked plan to state whether clearing a stop re-wakes stopped parents."
+    },
+    {
+     "cycle": "S1.123",
+     "type": "RT",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "tracker-state",
+      "human-message"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "John's decision: finish LIN-3043, do not start LIN-3044-3046; wait for LIN-3049 so subtasks are rewritten to start at implementation rather than repeating research/plan/plan-review."
+    },
+    {
+     "cycle": "S10.9",
+     "type": "CE",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "runtime-state",
+      "tracker-state",
+      "human-message"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "The con aborted the three child autopilots: they started all at once, went straight into plan, descriptions not rewritten, contrary to John's order 41bca936; redo as rewrite first, then LIN-3044 alone, serially."
+    },
+    {
+     "cycle": "S10.46",
+     "type": "ES",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "worker-report"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "LIN-3046 review returned Needs Discussion (auto-pause never holds when workspaces <= threshold); autopilot parked PR #252 and put LIN-3055 options (a) accept as observability or (b) revise recovery to John."
+    },
+    {
+     "cycle": "S10.49",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "worker-report",
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "John chose option (a): auto-pause stays as logging, launches held only with at least threshold+1 workspaces; acceptance criteria amended, PR #252 merges without redesign."
+    },
+    {
+     "cycle": "S10.51",
+     "type": "RS",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "none-in-the-end",
+     "class": "a",
+     "confidence": "high",
+     "evidence": "Worker failed with opencode exit 1, PR #252 unchanged; 'first failure on this step, so I'm retrying with a fresh dispatch' (f842cd62), which also failed."
+    },
+    {
+     "cycle": "S10.53",
+     "type": "ES",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Found other items' opencode sessions also failing, concluded the opencode lane not the task was broken, stopped retrying and asked John to choose (credits recommended, or harness switch)."
+    },
+    {
+     "cycle": "S10.55",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "The con: every opencode session failed 4/4 on both models, host or harness fault; don't dispatch another opencode step or switch harness, post status and wait while John checks the host."
+    },
+    {
+     "cycle": "S10.57",
+     "type": "RS",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Credits topped up, so the 402 was the cause after all; autopilot resumes LIN-3046's implementation step."
+    },
+    {
+     "cycle": "S10.57",
+     "type": "RT",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "tracker-state",
+      "runtime-state"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Engine picked 'blocked' because it read autopilot's own earlier lane-failure comment; autopilot aborted that dispatch and re-dispatched implementation, overriding the engine."
+    },
+    {
+     "cycle": "S11.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "code-at-head",
+      "tests-run",
+      "ci",
+      "running-app",
+      "ticket-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Parent review: Approve conditional on ledger; README says nothing about auto-pause or its option-(a) limit (L1, inside scope); stale Harbour 'pending LIN-2995' copy needs a follow-up ticket (L7)."
+    },
+    {
+     "cycle": "S10.77",
+     "type": "SB",
+     "role": "close-out",
+     "tier": "cheap",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Close-out found L1 README section beyond its authoring gate (only reviewer-quoted text), did not mark Done, returned L1 to implementation; filed LIN-3074 for the out-of-scope Harbour copy."
+    },
+    {
+     "cycle": "S12.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run",
+      "ci"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "PR #255 review: conditional Approve; two README clauses factually wrong against code and tests, exact replacement text given as R1/R2 for close-out to apply before merge."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.39",
+     "type": "other",
+     "cause": "unknown",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "My first fetch of this wake came back unreadable; a plain retry worked."
+    },
+    {
+     "cycle": "S7.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "plan"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Writes against the issue's UUID path returned a LINEAR_AUTH error; using the LIN-2995 identifier in the URL worked for both PATCH and comment POST."
+    },
+    {
+     "cycle": "S9.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "plan"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Breakdown: Linear returned a temporary auth error (503, retryable) several times while creating children; retried after checking nothing landed, no duplicates."
+    },
+    {
+     "cycle": "S10.1",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "John",
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "yes",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Autopilot started LIN-3044/3045/3046 at once, missing John's order 41bca936; children went into plan, beats failed on repo override; the con aborted all three and the autopilot redid it serially."
+    },
+    {
+     "cycle": "S10.18",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Linear auth error marked retryable; 'the same error came and went earlier in this run, so I'm retrying'; recurred at S10.57 on an override note."
+    },
+    {
+     "cycle": "S10.51",
+     "type": "failed-session",
+     "cause": "infra",
+     "reacted": [
+      "autopilot",
+      "John"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "yes",
+     "freshSession": "unclear",
+     "classOfReaction": "b",
+     "evidence": "LIN-3046 implementation failed twice with opencode exit 1 (OpenRouter 402 credit limit); autopilot retried, then escalated; John held retries and topped up credits, then work resumed."
+    },
+    {
+     "cycle": "S10.57",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Engine routed LIN-3046 to 'blocked' from a stale comment; autopilot aborted it, but the stray blocked session ran to done anyway (S10.59); it only read and commented, no collision."
+    },
+    {
+     "cycle": "S12.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Docs implementation said the README subsection 'matches landed behaviour'; review found two clauses factually wrong against code and tests; close-out applied R1/R2 in 959890a."
+    }
+   ],
+   "notes": "Decisions and faults inside child tickets' own runs (LIN-3041-3046, LIN-3055: their plan-reviews, close-out holds, the LIN-3043 token leak, the LIN-3041 step-1 re-dispatch) were left to those tickets; 'the con' is coded as John/operator (tier human) though the digest does not show whether it is a model. The breakdown session is coded under role 'plan' because the codebook has no breakdown role."
+  },
+  "LIN-3008": {
+   "ticket": "LIN-3008",
+   "decisions": [
+    {
+     "cycle": "S4.5",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "code-at-head",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Verdict: Approve, conditional on close-out discharging ledger L1-L8; 8 surviving mutants inside scope, one (doc-not-array) needs a small code guard. Merge and Done stay gated on that."
+    },
+    {
+     "cycle": "S2.15",
+     "type": "RT",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Autopilot verb override: engine recommended close-out, but L1-L8 need test changes and L1/L8 need code changes, so running an implementation pass on PR #1555 first, then close-out."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "code-at-head",
+      "prior-verdict"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Re-review: Approve conditional on N1-N3; three new inside-scope gaps found by mutation checks, N1 a one-line code fix, N2/N3 missing pins. Merge and Done stay gated on N1-N3."
+    },
+    {
+     "cycle": "S2.23",
+     "type": "RT",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "ci"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "After N1-N3 fix, stepper called recommend-and-dispatch with kind close-out (engine had chosen a second review after new code before); says it will hand back rather than start another round."
+    },
+    {
+     "cycle": "S8.1",
+     "type": "SC",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Close-out filed LIN-3016 and LIN-3017 for outside-scope review items, and linked existing LIN-1612 for the /kpis sub-second bug instead of filing a duplicate, to land before Phase 4."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Lookup of the workspace's known repos failed (REPO_INVENTORY_UNAVAILABLE); stepper named no repo and told the worker to find LinearViewer from its own working directory."
+    },
+    {
+     "cycle": "S2.3",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Beat 1 reported done instead of pausing under the hold; stepper read its feedback and checked the branch before sending beat 2. Run summary: workers twice declared DONE mid-arc."
+    },
+    {
+     "cycle": "S3.6",
+     "type": "stuck",
+     "cause": "real-fault",
+     "reacted": [
+      "code",
+      "implementation",
+      "stepper"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Worker ended beat 2 with mislabelled PENDING-INTERNAL at 07:16; failsafe reconfirm and silence re-fire at 07:46 before the stepper got the wake (about 30 min idle)."
+    },
+    {
+     "cycle": "S4.5",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Correction to my beat 2 numbers: reported 36 mutations with 28 killed; the execution log shows 34 ran, 26 killed and 8 survived."
+    },
+    {
+     "cycle": "S5.3",
+     "type": "stuck",
+     "cause": "real-fault",
+     "reacted": [
+      "code",
+      "implementation",
+      "stepper"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Fix-up beat 1 ended PENDING-INTERNAL at 08:33; failsafe reconfirm and silence re-fire at 09:04, then reported DONE instead of pausing; stepper checked branch and resumed with beat 2."
+    },
+    {
+     "cycle": "S3.11",
+     "type": "other",
+     "cause": "flake",
+     "reacted": [
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Local full E2E run hit one unrelated pre-existing flake, diagnosed against origin/main as not a regression; CI on the PR was green."
+    }
+   ],
+   "notes": "Digest truncates the middle of many cycles and the review ledger tables, so finer detail of each ledger item is not visible. Whether the 4-beat split of each worker pass is the stepper's default method or a departure cannot be told from the digest."
+  },
+  "LIN-3129": {
+   "ticket": "LIN-3129",
+   "decisions": [
+    {
+     "cycle": "S2.7",
+     "type": "CE",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "plan-text",
+      "worker-report"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Didn't accept beat 3 (061d19ca): lineage revoke and the race re-read were applied to grant-less tokens, contrary to P3c and S1's no-behaviour-change invariant; corrective beat scoped them to grant-bearing docs."
+    },
+    {
+     "cycle": "comment 09-28T22:03",
+     "type": "CE",
+     "role": "implementation",
+     "tier": "cheap",
+     "basis": [
+      "code-at-head",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Declared deviation: A2 implemented as find-then-delete of grant-bearing children by id (portable; no array query operator on MangoDB)."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "code-at-head",
+      "plan-text",
+      "ci"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Approve conditional on close-out discharging L2 (R1: absent workspaceId fail-closed on the unwired owner seam) as a carry-forward note to LIN-3131 S2b; L1 discharged in-review with a real-store witness."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Server refused the dispatch's repo field (knownRepos is empty); stepper resent without it so the worker landed in the workspace's default folder."
+    },
+    {
+     "cycle": "S2.7",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "stepper",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "yes",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Beat 3 reported complete but applied lineage revoke and race re-read to grant-less tokens; stepper challenged it and a corrective beat (c943ab11) restored grant-less paths byte-identical."
+    }
+   ],
+   "notes": "Implementation ran on the cheap opencode tier with no transcript, so worker-side reasoning (including the A2 deviation) is visible only through the stepper's checks and the implementation comment. The review's middle ledger rows are truncated."
+  }
+ },
+ "coderD": {
+  "LIN-2456": {
+   "ticket": "LIN-2456",
+   "decisions": [
+    {
+     "cycle": "S1.0",
+     "type": "CE",
+     "role": "research",
+     "tier": "frontier",
+     "basis": [
+      "code-at-head",
+      "runtime-state",
+      "ticket-text"
+     ],
+     "effect": "none-in-the-end",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Research: 'mechanism confirmed, incident refuted' — host log shows the dispatcher was down ~15:06–16:19, so the motivating starvation was not this defect; ticket stands as a latent defect."
+    },
+    {
+     "cycle": "S2.3",
+     "type": "ES",
+     "role": "implementation",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "none-in-the-end",
+     "class": "c",
+     "confidence": "low",
+     "evidence": "Host-hygiene follow-up on this session: quarantined simple-dispatcher settings.local.json; left three harbour* siblings untouched, 'which checkout the dispatcher actually copies is the operator's call'."
+    },
+    {
+     "cycle": "S2.6",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "worker-report"
+     ],
+     "effect": "none-in-the-end",
+     "class": "c",
+     "confidence": "low",
+     "evidence": "Follow-up #2 remit answered the escalation: identify loadWorkspaces() template folders and check them plus flagged siblings; three more settings.local.json files quarantined (one held live Bearer values)."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "SC",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Approve — conditional; F1/F2 config threading behaviour-untested (shown by spike), F3 route-around path unlogged. Recorded as follow-ups for the operator; these became PR #208."
+    },
+    {
+     "cycle": "S4.0",
+     "type": "RT",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Instead of filing follow-up tickets as the review suggested, an implementation leg landed F1/F2/F3 on this ticket as PR #208 'per the operator's discharge instructions' before close-out."
+    },
+    {
+     "cycle": "S5.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes: F3's log line fires on the all-held queued-busy fallback naming the selected item, unthrottled every poll; hold reason survives a garbage-constant mutation. Four items handed back."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run",
+      "prior-verdict"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Re-review Request Changes: queued-busy half of 'pin the hold reason' still unpinned — garbage-constant mutation at dispatcher.js:1403 leaves all 2156 tests green; found by mutating each record site separately."
+    },
+    {
+     "cycle": "comment 09-02T20:45",
+     "type": "SC",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Carried non-blocking nit (unguarded routedAroundHead.id.slice at the log site), deliberately not taken by implementation, filed as LIN-2478 by the Passage Runner at merge."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "research"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "'API Error: The response stopped arriving. The response above may be incomplete.' Research carried on and completed."
+    },
+    {
+     "cycle": "S2.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Host Xcode toolchain broken: /usr/bin/git unusable (Symbol not found) and 2 osacompile test failures; sessions used Homebrew git and confirmed failures byte-identical on main."
+    },
+    {
+     "cycle": "S4.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Linear lane auth flaps: issue fetched 'on the 5th attempt'; close-out 'Linear lane is auth-flapping as the brief warned. Retrying with bounded backoff.'"
+    },
+    {
+     "cycle": "S5.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "PR #208 body and CLAUDE.md claim false: route-around log fires for a queued-busy head itself. Implementer: 'my original reasoning was wrong'; fixed with an identity guard."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Hand-back claimed all four items fixed; re-review found item 3 'passes only halfway' — queued-busy reason unpinned. Implementation added the reviewer's case verbatim."
+    }
+   ],
+   "notes": "The S2.3/S2.6 host-hygiene work was unrelated to the ticket's code but ran on its implementation session; who dispatched it and the #208 implementation leg is not shown, so it is attributed to the operator/Passage Runner with an assumed tier."
+  },
+  "LIN-2458": {
+   "ticket": "LIN-2458",
+   "decisions": [
+    {
+     "cycle": "S2.1",
+     "type": "SC",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Review found the consult side has F1's gap: stubbing production defaults at dispatcher.js:1294/reapers.js:1275 to false leaves npm test green. Approve conditional; ledger item 1 (route F-A consult-side pin) is the one close-out must action."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "RT",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "After #205 merged with close-out planned next, a second implementation leg was dispatched on the same ticket: 'Follow-up PR opened: #207 ... Per #205's review (F-A / ledger item 1)' instead of going straight to close-out."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "SC",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "code-at-head"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Implementer pinned only reapers.js consult seam; flagged dispatcher.js runOnce consult gate as a ready-to-file follow-up rather than doing it. Review confirmed not a ledger item; runner filed it as LIN-2467."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "2 pre-existing macOS osacompile test failures on the host; each session confirmed them byte-identical to the main baseline and unrelated. Close-out flags broken osacompile as an operator matter no CI run can see."
+    },
+    {
+     "cycle": "S2.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "review",
+      "implementation",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "/usr/bin/git is the broken Xcode shim, 'a hard blocker'; review switched to Homebrew git. Later sessions hit the same known condition and used /opt/homebrew/bin/git."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "implementation",
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Linear lane auth flaps: summary comment posted 'after 3 auth-flap retries'; review had 'one 503 auth flap, succeeded on retry'; close-out 'the Linear lane 503'd'. Handled by retry loops."
+    }
+   ],
+   "notes": "The digest does not say which session dispatched the #207 implementation leg; attributed to the Passage Runner (leg 05), whose tier the digest does not show. CI-related signals (red-ci, stall) in cycle headers are not borne out by the text; CI was green throughout."
+  },
+  "LIN-2535": {
+   "ticket": "LIN-2535",
+   "decisions": [
+    {
+     "cycle": "S1.73",
+     "type": "RT",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "tracker-state",
+      "ticket-text"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Engine's pick was plan-review, a demonstrable miss: no Implementation Plan heading or plan-review gate line existed. Aborted cec89ed6 and pinned `plan` instead."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SC",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "code-at-head",
+      "tests-run",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Review gaps F1/F2 reproduced first-hand and found unowned by existing tickets; routed to new LIN-2558 and LIN-2557 rather than folded into the completed move PR."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.73",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Engine recommended plan-review on a ticket with no plan; the dispatched session was cancelled while still SUMMARIZING and replaced by a pinned plan dispatch."
+    },
+    {
+     "cycle": "S4.4",
+     "type": "other",
+     "cause": "flake",
+     "reacted": [
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Local full npm test showed 4 e2e failures; 3 passed on rerun, the live-console geometry failure reproduced on unmodified main, so treated as pre-existing environment variance."
+    },
+    {
+     "cycle": "S4.11",
+     "type": "stuck",
+     "cause": "unknown",
+     "reacted": [
+      "code",
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Work was complete at 16:02 but the session ran until a failsafe-reconfirm and silence-refire at 16:53; autopilot noted 72m43s for a single-route move."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "close-out"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Completion summary posted with a wrong link label (item 1 read LIN-2557 while pointing at LIN-2558); corrected in place."
+    }
+   ],
+   "notes": "The decision to keep group C separate from group A was made in the breakdown before this ticket's sessions and is visible only in the description, so it is not coded."
+  },
+  "LIN-2543": {
+   "ticket": "LIN-2543",
+   "decisions": [
+    {
+     "cycle": "comment 09-04T22:14",
+     "type": "RT",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "ticket-text",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Coordinator activates the ticket now: gap 'fired on three consecutive stages' (D, E, F); land before H/I/Stage 7; 'Dispatched in parallel with group F, not after it' since no file contention."
+    },
+    {
+     "cycle": "S2.0",
+     "type": "CE",
+     "role": "research",
+     "tier": "frontier",
+     "basis": [
+      "code-at-head",
+      "ticket-text"
+     ],
+     "effect": "none-in-the-end",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Research found the cited ledger commit '131ca98d does not exist in this repo'; autopilot posted a correction (it was the PR branch head) and the plan revision replaced it with 63d78df7."
+    },
+    {
+     "cycle": "S3.0",
+     "type": "SC",
+     "role": "plan",
+     "tier": "mid",
+     "basis": [
+      "ticket-text",
+      "code-at-head"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Plan narrows scope: Half B gets 5 representative probes (5 of 28 silent deps); Half C and remaining probes deferred to follow-ups; flagged 'plan-review due: yes' because of the scope-narrowing call."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes: probe paths mis-grounded (D targets group-A route, E nonexistent prefix), BASE_DEPS does not reach 200 for A/C, two deferrals lack ticket ids, citation errors. Handed back with five fixes."
+    },
+    {
+     "cycle": "S7.0",
+     "type": "CE",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "tests-run",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Plan said export BASE_DEPS/buildApp/call from the .test.js file; implementer measured that importing it double-executes its 69 tests and relocated the harness to new module tests/unit/lib/proxy-fake-deps.js."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.0",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "research",
+      "autopilot",
+      "plan"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Coordinator's board comment cited 131ca98d as Stage 1's landed head; it was the PR branch head, absent from main. Research flagged it, autopilot corrected, plan revision fixed the description."
+    },
+    {
+     "cycle": "S2.3",
+     "type": "stuck",
+     "cause": "infra",
+     "reacted": [
+      "code",
+      "research"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Stall-failsafe RESUMING, failsafe-reconfirm and silence-refire on a 54-minute research run; autopilot: 'the sweep was genuinely long, not wedged. Good that I held off on the probe.'"
+    },
+    {
+     "cycle": "S4.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "plan-review",
+      "autopilot",
+      "plan"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Plan's Half B probe table mis-grounded against source and description ended with a leaked PLANEOF heredoc and wc -l line; plan-review sent back, plan revision corrected both."
+    },
+    {
+     "cycle": "S7.0",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "no",
+     "classOfReaction": "c",
+     "evidence": "Approved plan's harness export would double-execute 69 tests when imported; caught empirically by the implementer and fixed by relocating the harness. Review confirmed 'file alone reports exactly 12'."
+    }
+   ],
+   "notes": "Supervision was by LIN-679's autopilot session (other-ticket session), coded as autopilot. Plan-review #2's wrong line numbers for probe A were passed to the implementer as a non-blocking correction and are not coded separately."
+  },
+  "LIN-2702": {
+   "ticket": "LIN-2702",
+   "decisions": [
+    {
+     "cycle": "S3.3",
+     "type": "CE",
+     "role": "plan",
+     "tier": "frontier",
+     "basis": [
+      "code-at-head",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Beat 2 found postScan is IIFE-private, so the Phase 2 consumer cannot reach it; raised decision lin2702-postscan-reachability with widen-export vs defer options, recommending widen-export."
+    },
+    {
+     "cycle": "S2.5",
+     "type": "RU",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "code-at-head",
+      "worker-report",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Independently confirmed the gap, ruled widen-export named as a routed-around contract gap forcing plan-review due: yes; surfaced upward for veto but proceeded on that default."
+    },
+    {
+     "cycle": "S4.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Approve with a condition: before LIN-2701 is planned, the requirement to add /scan.js to render-observation.js:218 must be recorded on LIN-2701; stepper posted that inbound requirement."
+    },
+    {
+     "cycle": "S7.1",
+     "type": "SB",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "code-at-head",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Close-out held the merge on ledger item L6 (pre-existing Settings $0.00 bug) as a route to nowhere; asked a human: accept, or file first then merge."
+    },
+    {
+     "cycle": "S2.23",
+     "type": "RU",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Stepper answered close-out's L6 gate with file first, filed LIN-2703 to own it, then authorized the merge; surfaced to the human for veto."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.3",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "stepper",
+      "plan",
+      "plan-review"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Transient LINEAR_AUTH 401s marked retryable recurred across stepper, plan beat 4 and plan-review (credential-health degraded); each layer retried and the calls succeeded."
+    },
+    {
+     "cycle": "S7.4",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "close-out"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "The first Done PATCH returned 502 three times without applying; close-out re-read state before retrying, and no write landed twice."
+    }
+   ],
+   "notes": "The stepper's upward veto requests (decision JSON with if_unanswered defaults) got no visible answer, so they are folded into the stepper's rulings rather than coded as separate escalations."
+  },
+  "LIN-2716": {
+   "ticket": "LIN-2716",
+   "decisions": [
+    {
+     "cycle": "comment 09-11T10:36",
+     "type": "RT",
+     "role": "Runner",
+     "tier": "frontier",
+     "basis": [
+      "ticket-text",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Lane A mandate: 'legs start at implementation' — no research/plan step unless design notes do not hold at HEAD; stage sequence implementation → detached review → close-out; wind-down conditions set."
+    },
+    {
+     "cycle": "S1.5",
+     "type": "CE",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "runtime-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Beat 2 recap 'asserts red-first evidence without giving me any of it'; branch not checkable. Stepper held beat 3 and dispatched a corrective beat 2 demanding the evidence itself."
+    },
+    {
+     "cycle": "S1.7",
+     "type": "RS",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "runtime-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Second identical claim showed the channel was at fault: dispatch feedback carries only the sentinel line. Stepper made the worker post evidence as a ticket comment; standing rule: evidence must be a durable artifact."
+    },
+    {
+     "cycle": "S2.5",
+     "type": "SC",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "ticket-text",
+      "code-at-head"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Wake-cadence state (delayMs/stopped) deliberately excluded from persistence, a named divergence from the ticket's Expected ('cadence resuming'); delayMs is step length not elapsed time. Later filed as LIN-2771."
+    },
+    {
+     "cycle": "S2.9",
+     "type": "SC",
+     "role": "implementation",
+     "tier": "mid",
+     "basis": [
+      "code-at-head",
+      "ticket-text"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Beat 4 admitted the proposals read-only re-render boundary is not implemented: a live proposal vanishes on reload. Left out of this PR as additional scope; later filed as LIN-2772."
+    },
+    {
+     "cycle": "S1.11",
+     "type": "ES",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "ticket-text"
+     ],
+     "effect": "none-in-the-end",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Stepper 'ruled against widening scope in-session and raised the question to John in parallel' — whether the two gaps land as follow-ups or come back into this ticket; non-blocking, review met both gaps."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run",
+      "running-app"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes: reorient clears sessionStorage but not in-memory chatHistory, so the next turn re-persists the cleared thread. Filed LIN-2770 blocking LIN-2716; 8-item ledger, items 1-2 closure-blocking."
+    },
+    {
+     "cycle": "S1.15",
+     "type": "ES",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "code-at-head"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Parked LIN-2716 for a product decision: LIN-2622's reorient is not a fresh start while LIN-2716 gave it a clear-storage job; 'any fix picks a side, which is why this is a product call'."
+    },
+    {
+     "cycle": "S1.16",
+     "type": "SC",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "While parked, filed and linked follow-up tickets LIN-2771/LIN-2772 for the two accepted deviations the reviewer required recorded before close-out."
+    },
+    {
+     "cycle": "comment 09-11T12:23",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "worker-report",
+      "human-message"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "John: reorient is 'not a fresh start'; leave it. Runner reading: reorient keeps LIN-2622 behaviour, the clear-storage job comes out, acceptance bullet withdrawn; fresh-session affordance is a later ticket."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SC",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Close-out discharged the 10-item ledger by routing items 1-4 (test-reach gaps) to new ticket LIN-2776, amending the withdrawn Acceptance bullet and canceling LIN-2770."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.5",
+     "type": "lost-wake",
+     "cause": "infra",
+     "reacted": [
+      "stepper",
+      "implementation",
+      "stepper",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "unclear",
+     "classOfReaction": "c",
+     "evidence": "Beat 2 reported its red-first evidence twice and neither reached the stepper: 'dispatch feedback carries only the worker's one-line sentinel'. Fixed by moving evidence into a ticket comment."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "stepper",
+      "John",
+      "implementation"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "yes",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Beat 5 summary claimed reorient clears storage; review found the next turn re-persists the cleared thread, 'a real defect my verification missed'. Needed John's product ruling before the fix."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "close-out"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Snapshot verification failed: generation-disabled brief read returned status stale with an empty body; close-out recorded it and performed no pruning."
+    }
+   ],
+   "notes": "The runner that wrote the Lane A mandate and relayed John's ruling has no session row in the digest, so its tier is assumed. Many cycle-header signals (failed-child, stall, red-ci) are not borne out by the text."
+  },
+  "LIN-2995": {
+   "ticket": "LIN-2995",
+   "decisions": [
+    {
+     "cycle": "S4.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Request Changes F1-F4: stop sweep selector must match abort route's flipToCancelled set, fold resume-hold into launchHoldReason, define stop for unpolled tokens, correct dependency arrows; would ship a stop that fails to stop."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Second Request Changes R1-R4: post-selection branch only recognises four reasons, so a lone held item launches under pause and a stopped parent resumes; nothing says stop holds fresh launches."
+    },
+    {
+     "cycle": "S1.11",
+     "type": "ES",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Second Request Changes is the loop bound; autopilot parked and asked John: third plan revision (recommended), straight to implementation with R1-R4 binding, or take the plan himself."
+    },
+    {
+     "cycle": "S1.13",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "human-message",
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Con relays John's standing rule: third plan revision then plan-review; plan loops beyond two allowed; straight-to-implementation not taken; also state whether clearing a stop re-wakes stopped parents."
+    },
+    {
+     "cycle": "S1.23",
+     "type": "RS",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "a",
+     "confidence": "low",
+     "evidence": "LIN-3041's run re-dispatched step 1 of 4 with a new worker (dd057b60, replacing 4c80abac); autopilot: one retry inside the run is normal."
+    },
+    {
+     "cycle": "S1.37",
+     "type": "SB",
+     "role": "plan-review",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "LIN-3041's plan review came back Request Changes on three findings plus a CI point; the child run started one plan revision, which added a null-check note to LIN-3043."
+    },
+    {
+     "cycle": "S1.105",
+     "type": "RT",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "plan-text",
+      "ticket-text"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "LIN-3043's run skipped research and planning and went straight to coding, since the ticket already carries the approved parent plan for this part."
+    },
+    {
+     "cycle": "S1.111",
+     "type": "CE",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "worker-report",
+      "diff"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "LIN-3043's run caught two problems checking step 3: stop sweep choosing the wrong sessions to cancel, and halt logging writing the Bearer token into logs; sent a correction on the same worker."
+    },
+    {
+     "cycle": "S1.117",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Review approved PR #249 on condition close-out works through test gaps L1-L3; close-out added tests (d5a4c9f) and a second review followed before merge."
+    },
+    {
+     "cycle": "S1.123",
+     "type": "RT",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "human-message",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "John: finish LIN-3043, then hold; do not start LIN-3044-3046 until LIN-3049 lands so subtasks under an approved plan start at implementation."
+    },
+    {
+     "cycle": "comment 09-25T14:24",
+     "type": "RT",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "a",
+     "confidence": "medium",
+     "evidence": "Engine returned blocked on LIN-3043 because of LIN-3041, which was already Done; the child overrode the verb and recorded why (c8e876f4)."
+    },
+    {
+     "cycle": "comment 09-25T21:00",
+     "type": "RT",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "human-message",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Resume order: rewrite LIN-3044-3046 descriptions to the breakdown template citing the approving plan-review, run them one at a time, monitor first /recommend; research/implementation/close-out move to DeepSeek Flash."
+    },
+    {
+     "cycle": "comment 09-25T21:06",
+     "type": "CE",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "human-message",
+      "runtime-state",
+      "tracker-state"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Con aborted three child autopilots: they started all at once, went straight into plan, descriptions not rewritten; plan beats failed on repo override. Redo: rewrite first, then LIN-3044 alone."
+    },
+    {
+     "cycle": "S10.20",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "LIN-3044 conditional Approve (64c06ae7): 9 of 11 mutants fail; conditions for merging L1 (injected inputs combine test) and L2 tests, L3 live check."
+    },
+    {
+     "cycle": "S10.22",
+     "type": "SB",
+     "role": "close-out",
+     "tier": "cheap",
+     "basis": [
+      "prior-verdict",
+      "diff"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Close-out held PR #250 back: review items L1 and L2 weren't done; a second implementation step started to add the two missing tests."
+    },
+    {
+     "cycle": "S10.32",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "LIN-3045 conditional Approve (eb2852e9): L1 must fix before merge, unit tests not isolated from host's real state/halt (20 fail with a stop file); plus L2-L3 test items."
+    },
+    {
+     "cycle": "S10.34",
+     "type": "SB",
+     "role": "close-out",
+     "tier": "cheap",
+     "basis": [
+      "prior-verdict",
+      "tests-run"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Close-out held PR #251 back for three test fixes after reproducing 20 unit failures with a halt file present; second implementation step started."
+    },
+    {
+     "cycle": "S10.46",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "plan-text"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "LIN-3046 review Needs Discussion: as approved, auto-pause can never hold a fresh launch when workspaces <= threshold; reviewer filed LIN-3055 with exhaustive witness and options (a) and (b)."
+    },
+    {
+     "cycle": "S10.46",
+     "type": "ES",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "worker-report"
+     ],
+     "effect": "sequence",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Either choice changes the approved plan or its definition of done, so it is John's decision; PR #252 stays unmerged; decision posted recommending option (b)."
+    },
+    {
+     "cycle": "S10.49",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "human-message",
+      "prior-verdict"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "John picked option (a) on LIN-3055: auto-pause stays as logging, launches held only with at least threshold + 1 workspaces; PR #252 merges without redesign, acceptance criteria amended."
+    },
+    {
+     "cycle": "S10.51",
+     "type": "RS",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "none-in-the-end",
+     "class": "a",
+     "confidence": "high",
+     "evidence": "Worker failed with opencode exit 1, PR #252 unchanged; first failure on this step, so retried with fresh dispatch f842cd62."
+    },
+    {
+     "cycle": "S10.53",
+     "type": "ES",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Other items' opencode sessions failing too, so the whole lane is at fault; stopped retrying and posted a decision (top up credits recommended, or switch harness)."
+    },
+    {
+     "cycle": "S10.55",
+     "type": "RU",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "human-message",
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Con: every opencode session failed four of four on both models; host or harness fault. Don't dispatch another opencode step or switch harness; post status and wait."
+    },
+    {
+     "cycle": "S10.57",
+     "type": "RS",
+     "role": "John",
+     "tier": "human",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "b",
+     "confidence": "low",
+     "evidence": "Credits are topped up, so the 402 was the cause after all; resuming LIN-3046's implementation step."
+    },
+    {
+     "cycle": "S10.57",
+     "type": "RT",
+     "role": "autopilot",
+     "tier": "frontier",
+     "basis": [
+      "tracker-state",
+      "human-message"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Engine picked blocked because it was reading autopilot's own earlier lane-failure comment; autopilot aborted that dispatch and started the implementation step instead."
+    },
+    {
+     "cycle": "S10.63",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "LIN-3046 re-review conditional Approve (d68be451) with L7 still to add: tests at W = threshold + 1 and W = threshold; engine started an implementation step."
+    },
+    {
+     "cycle": "S11.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "code-at-head",
+      "tests-run",
+      "ci",
+      "runtime-state"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Parent review Approve conditional on close-out: L1 README lacks auto-pause and option-(a) limit; L7 Harbour 'pending LIN-2995' copy now false with no owning ticket, close-out should file one."
+    },
+    {
+     "cycle": "S10.77",
+     "type": "SB",
+     "role": "close-out",
+     "tier": "cheap",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Close-out: L1 README auto-pause docs not dischargeable within authoring gate; did not mark Done, returned L1 to implementation."
+    },
+    {
+     "cycle": "S10.77",
+     "type": "SC",
+     "role": "close-out",
+     "tier": "cheap",
+     "basis": [
+      "prior-verdict",
+      "code-at-head"
+     ],
+     "effect": "scope",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Filed LIN-3074 for stale Harbour halt copy, pinned test and runbook local-halt path, priority High, type Bug, related to LIN-2995; outside this ticket's scope."
+    },
+    {
+     "cycle": "S12.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run",
+      "ci"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "PR #255 conditional Approve: two clauses factually wrong against code and tests; exact replacement text R1 and R2 given for close-out to apply before merge."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S1.23",
+     "type": "failed-session",
+     "cause": "unknown",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "LIN-3041's step 1 re-dispatched with new worker dd057b60 replacing 4c80abac; handled inside the child run."
+    },
+    {
+     "cycle": "S1.39",
+     "type": "other",
+     "cause": "unknown",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "My first fetch of this wake came back unreadable; a plain retry worked."
+    },
+    {
+     "cycle": "S1.111",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "stepper",
+      "implementation",
+      "autopilot"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "unclear",
+     "classOfReaction": "c",
+     "evidence": "Step 3 of LIN-3043 shipped a stop sweep choosing wrong sessions and logged the Bearer token; run sent a correction; autopilot later checked the PR diff for the fix."
+    },
+    {
+     "cycle": "S7.0",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "plan"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Writes against the issue's UUID path returned a LINEAR_AUTH error; using the LIN-2995 identifier worked."
+    },
+    {
+     "cycle": "S9.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "plan"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Breakdown: Linear returned temporary auth error (503, retryable) several times; retried only after checking nothing landed, no duplicates created."
+    },
+    {
+     "cycle": "S10.9",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "John",
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "yes",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Autopilot missed John's order and started LIN-3044-3046 at once into plan; plan beats failed on repo override; con aborted all three and autopilot redid it in order."
+    },
+    {
+     "cycle": "S10.18",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Evidence check failed with a Linear auth error marked retryable; same error came and went earlier; retried."
+    },
+    {
+     "cycle": "S10.32",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "close-out",
+      "implementation"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "LIN-3045 unit tests not isolated from host's real state/halt; with a stop in that file 20 tests fail; close-out reproduced, implementation fixed in 7103590."
+    },
+    {
+     "cycle": "S10.46",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "autopilot",
+      "John",
+      "implementation"
+     ],
+     "modelLayers": 3,
+     "multiLayerNeeded": "yes",
+     "freshSession": "unclear",
+     "classOfReaction": "c",
+     "evidence": "Approved rev-3 design: auto-pause can never hold a fresh launch when workspaces <= threshold; reviewer filed LIN-3055, John ruled option (a), wording and tests added."
+    },
+    {
+     "cycle": "S10.51",
+     "type": "failed-session",
+     "cause": "infra",
+     "reacted": [
+      "autopilot",
+      "John"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "yes",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "LIN-3046 implementation failed twice with opencode exit 1 (25af90ba, f842cd62), lane-wide; autopilot retried once then escalated; OpenRouter credits topped up, 402 was the cause."
+    },
+    {
+     "cycle": "S10.57",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Engine picked blocked from autopilot's stale lane-failure comment; autopilot cancelled it but the stray blocked session ran 12.5 minutes anyway; it only read and posted a check comment."
+    },
+    {
+     "cycle": "S10.57",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "autopilot"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "The override note failed on the usual temporary Linear auth error. Retrying the comment."
+    },
+    {
+     "cycle": "S12.1",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review",
+      "close-out"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Docs implementation reported README matches landed behaviour; review found two clauses factually wrong against code and tests; close-out applied R1/R2 in 959890a."
+    }
+   ],
+   "notes": "Child-ticket gate verdicts (LIN-3041-3046) are coded as they appear through the parent's supervisor; the digest does not show the tier of child workers in S1-era runs (coded frontier) and the breakdown session has no codebook role (coded plan). John's off-digest credit top-up is inferred only from autopilot's S10.57 note."
+  },
+  "LIN-3008": {
+   "ticket": "LIN-3008",
+   "decisions": [
+    {
+     "cycle": "S2.1",
+     "type": "RS",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "Repo lookup failed (REPO_INVENTORY_UNAVAILABLE); stepper didn't name a repo on the dispatch and told the worker to find the LinearViewer repo from its own working directory."
+    },
+    {
+     "cycle": "S4.5",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "code-at-head",
+      "ci"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Approve conditional on ledger L1-L8: eight surviving mutants are unpinned behaviours inside scope, one needing a code guard; merge and Done stay gated on them."
+    },
+    {
+     "cycle": "S2.15",
+     "type": "RT",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "high",
+     "evidence": "Verb override: engine recommended close-out, but L1-L8 need test changes and L1/L8 code changes, so stepper ran an implementation pass on PR #1555 instead."
+    },
+    {
+     "cycle": "S6.1",
+     "type": "SB",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "tests-run",
+      "code-at-head"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Re-review: Approve conditional on N1-N3, three new inside-scope gaps (one code fix, two missing pins); merge and Done gated; routes to a short implementation pass."
+    },
+    {
+     "cycle": "S2.23",
+     "type": "RT",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict"
+     ],
+     "effect": "sequence",
+     "class": "b",
+     "confidence": "low",
+     "evidence": "After N1-N3 fixes, stepper dispatched with kind close-out forced (re-review said don't re-run review on unchanged code), where the engine had earlier chosen a second review after new commits."
+    },
+    {
+     "cycle": "S8.1",
+     "type": "SC",
+     "role": "close-out",
+     "tier": "frontier",
+     "basis": [
+      "prior-verdict",
+      "tracker-state"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Outside-scope review items filed as LIN-3016 and LIN-3017; the /kpis sub-second bug not re-filed because LIN-1612 exists, linked to LIN-3008 and LIN-3012 instead."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.1",
+     "type": "other",
+     "cause": "infra",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Lookup of the workspace's known repos failed with REPO_INVENTORY_UNAVAILABLE; stepper dispatched without a repo and had the worker locate it."
+    },
+    {
+     "cycle": "S2.3",
+     "type": "other",
+     "cause": "real-fault",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Beat 1 reported done instead of pausing as asked (again for fix-up step 1 at S2.17); stepper checked the branch and resumed the same session with the next beat."
+    },
+    {
+     "cycle": "S3.5",
+     "type": "stuck",
+     "cause": "real-fault",
+     "reacted": [
+      "code",
+      "implementation",
+      "stepper"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Worker sat on a mislabelled PENDING-INTERNAL wait from 07:16 until failsafe-reconfirm and silence-refire at 07:46; stepper later told workers to wait on CI in the foreground."
+    },
+    {
+     "cycle": "S5.2",
+     "type": "stuck",
+     "cause": "real-fault",
+     "reacted": [
+      "code",
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Fix-up beat 1 finished at 08:33 with PENDING-INTERNAL, then idled until failsafe-reconfirm and silence-refire at 09:04, where it reported DONE."
+    },
+    {
+     "cycle": "S3.11",
+     "type": "other",
+     "cause": "flake",
+     "reacted": [
+      "implementation"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Full local E2E run hit one unrelated pre-existing flake, diagnosed against origin/main, not a regression; CI was green."
+    },
+    {
+     "cycle": "S4.5",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "review"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "a",
+     "evidence": "Review beat 2 reported 36 mutations with 28 killed; beat 3 corrected it from the execution log to 34 ran, 26 killed, 8 survived."
+    }
+   ],
+   "notes": "The engine's actual recommendation at S2.21/S2.23 is not shown, so the forced close-out routing is low confidence; review beats were split by the stepper, which the digest treats as its normal stepping."
+  },
+  "LIN-3129": {
+   "ticket": "LIN-3129",
+   "decisions": [
+    {
+     "cycle": "S2.1",
+     "type": "RS",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "runtime-state"
+     ],
+     "effect": "timing-only",
+     "class": "b",
+     "confidence": "medium",
+     "evidence": "The server refused the `repo` field (`knownRepos` is empty), so I'm resending without it; the worker lands in the workspace's default folder."
+    },
+    {
+     "cycle": "S2.7",
+     "type": "CE",
+     "role": "stepper",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "plan-text",
+      "worker-report"
+     ],
+     "effect": "what-shipped",
+     "class": "c",
+     "confidence": "high",
+     "evidence": "Didn't accept beat 3: lineage revoke and the race re-read were applied to grant-less tokens, contrary to P3c and S1's no-behaviour-change invariant; corrective beat scoped them to grant-bearing documents (c943ab11)."
+    },
+    {
+     "cycle": "S3.1",
+     "type": "SC",
+     "role": "review",
+     "tier": "frontier",
+     "basis": [
+      "diff",
+      "code-at-head",
+      "tests-run",
+      "plan-text"
+     ],
+     "effect": "scope",
+     "class": "c",
+     "confidence": "medium",
+     "evidence": "Approve conditional on ledger: L2 (absent-workspaceId fail-closed on unwired owner seam, finding R1) to be discharged by a carry-forward note on LIN-3131 (S2b) rather than a code change here."
+    }
+   ],
+   "wrongTurns": [
+    {
+     "cycle": "S2.1",
+     "type": "failed-session",
+     "cause": "infra",
+     "reacted": [
+      "stepper"
+     ],
+     "modelLayers": 1,
+     "multiLayerNeeded": "no",
+     "freshSession": "yes",
+     "classOfReaction": "b",
+     "evidence": "Beat 1 dispatch refused because the `repo` field was unknown (`knownRepos` empty); stepper deleted the field and resent the dispatch."
+    },
+    {
+     "cycle": "S2.7",
+     "type": "bad-report",
+     "cause": "real-fault",
+     "reacted": [
+      "stepper",
+      "implementation"
+     ],
+     "modelLayers": 2,
+     "multiLayerNeeded": "yes",
+     "freshSession": "yes",
+     "classOfReaction": "c",
+     "evidence": "Beat 3 reported complete (061d19ca) but applied lineage revoke and race re-read to grant-less tokens; stepper challenged it against plan text and a corrective beat fixed it."
+    }
+   ],
+   "notes": "Implementation beat reports are only visible through the stepper's summaries; signal tags (red-ci, conflict, escalation) on S2.1/S2.5/S2.7 had no corresponding events visible in the digest text, so none were coded."
+  }
+ }
+}
