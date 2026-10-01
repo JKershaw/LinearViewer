@@ -480,6 +480,29 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         effort,
         dispatchTokenStore,
         proxyTokenStore,
+        // LIN-3200 P5: plan block for the file-pointer pilot on the session/UI
+        // dispatch path. Closes over this route's own provider resolution (the
+        // same getProviderForWorkspace + getWorkspaceCallScope pair the
+        // dangling-referent guard above uses) and the injected fetchIssueContext;
+        // a provider without the capability, an ambiguous call scope, or a test
+        // sentinel degrades to "no plan paths".
+        readPlanBlock: async () => {
+          if (!issueIdentifier || typeof fetchIssueContext !== 'function') return null;
+          const planProvider = injectedProvider || getProviderForWorkspace(workspace);
+          if (!planProvider?.fetchIssueContext) return null;
+          let planToken = null;
+          if (typeof getWorkspaceAccessToken === 'function') {
+            try { planToken = await getWorkspaceAccessToken(workspace.urlKey, req.session); } catch { planToken = null; }
+          }
+          if (!planToken) {
+            const planScope = getWorkspaceCallScope(workspace);
+            planToken = planScope === AMBIGUOUS_CALL_SCOPE ? null : planScope;
+          }
+          if (!planToken) return null;
+          const ctx = await fetchIssueContext(planToken, issueIdentifier);
+          const issue = ctx?.issue || ctx || {};
+          return issue.description || null;
+        },
         // LIN-2775 Area 8: threaded straight through, unvalidated here — the
         // marker's own validation and the terminal-anchor guard it gates
         // both live inside createDispatchItem (the one reusable, testable

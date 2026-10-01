@@ -489,6 +489,19 @@ export function createDispatchRoutes({
         harness,
         terminal,
         effort,
+        // LIN-3200 P5: plan block for the file-pointer pilot. The named issue's
+        // description is resolved through the SAME provider access the
+        // dangling-referent guard already obtained above (no second provider
+        // resolution); a provider without `fetchIssueContext`, or the hermetic
+        // test sentinel, degrades to "no plan paths".
+        readPlanBlock: async () => {
+          const referentProvider = providerAccess?.provider;
+          const referentToken = providerAccess?.token;
+          if (!issueIdentifier || !referentProvider?.fetchIssueContext || !referentToken) return null;
+          const ctx = await referentProvider.fetchIssueContext(referentToken, issueIdentifier);
+          const issue = ctx?.issue || ctx || {};
+          return issue.description || null;
+        },
         finalizePrompt: async (resolvedHarness) => {
           const baseUrl = `${req.protocol}://${req.get('host')}`;
           // LIN-3134 T2-ii (Decisions 1, 7): a follow-up's credential comes from
@@ -953,6 +966,9 @@ export function createDispatchRoutes({
             model,
             harness,
             effort,
+            // LIN-3200 P5: the override branch already holds `issue` from
+            // resolvePromptIssueContext — return its description with no refetch.
+            readPlanBlock: async () => issue?.description || null,
             finalizePrompt: async (resolvedHarness) => {
               // LIN-3134 T2-ii (Decisions 1, 7): a follow-up resumes through the one
               // resume helper, from the persisted parent record — see POST /dispatch.
@@ -1241,6 +1257,19 @@ export function createDispatchRoutes({
           model,
           harness,
           effort,
+          // LIN-3200 P5: plan block for the file-pointer pilot on the
+          // recommendation-derived arm. The terminal issue's context was
+          // consumed inside computeRecommendation and is not carried on `rec`,
+          // so this reads the description through the same provider access this
+          // route already resolved (bounded by PLAN_READ_TIMEOUT_MS at the
+          // factory); a provider without `fetchIssueContext` or the hermetic
+          // test sentinel degrades to "no plan paths".
+          readPlanBlock: async () => {
+            if (!provider?.fetchIssueContext || !accessToken) return null;
+            const ctx = await provider.fetchIssueContext(accessToken, terminalIdentifier);
+            const issue = ctx?.issue || ctx || {};
+            return issue.description || null;
+          },
           finalizePrompt: async (resolvedHarness) => {
             // LIN-3134 T2-ii (Decisions 1, 7): a follow-up resumes through the one
             // resume helper, from the persisted parent record — see POST /dispatch.
