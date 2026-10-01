@@ -278,7 +278,7 @@ describe('P2 — adoption writes back and logs [credential-adopted]', () => {
     ];
   }
 
-  const deps = ({ sessions, persistSession }) => ({
+  const deps = ({ sessions, persistSession, adoptConnectionCredential, ownerHasConnection, refreshConnection }) => ({
     fingerprint: fingerprintCredential(dead),
     urlKey: URL_KEY,
     ownerAccountId: ACCOUNT,
@@ -290,6 +290,9 @@ describe('P2 — adoption writes back and logs [credential-adopted]', () => {
     refreshAccessToken: async () => { throw new Error('no exchange'); },
     persistSession,
     resolveProvider: () => ({}),
+    ...(adoptConnectionCredential ? { adoptConnectionCredential } : {}),
+    ...(ownerHasConnection ? { ownerHasConnection } : {}),
+    ...(refreshConnection ? { refreshConnection } : {}),
   });
 
   test('writes the adopted token into every NON-connection owner row and leaves the connection-backed row untouched', async () => {
@@ -317,6 +320,54 @@ describe('P2 — adoption writes back and logs [credential-adopted]', () => {
     assert.equal(adopted.length, 1);
     const payload = JSON.parse(adopted[0][1]);
     assert.equal(payload.writeBack.ok, false, 'the failed write-back is reported');
+  });
+
+  test('connection-adopt arm writes NOTHING into legacy owner rows and reports rows:null', async () => {
+    const sessions = [{ _id: 'sid-legacy', session: { accountId: ACCOUNT, workspaces: [
+      { urlKey: URL_KEY, provider: 'linear', accessToken: dead, tokenExpiresAt: now + 7200_000 },
+    ] } }];
+    const persisted = [];
+    const connToken = 'conn-new-3186';
+    const { logs } = await withCapturedConsole(async () => {
+      const result = await attemptSuspectCredentialRefresh(deps({
+        sessions,
+        persistSession: async (sid, session) => persisted.push({ sid, token: session.workspaces[0].accessToken }),
+        adoptConnectionCredential: async () => ({ token: connToken, provider: 'linear', expiresAt: now + 3600_000, credentialFingerprint: fingerprintCredential(connToken) }),
+        ownerHasConnection: async () => true,
+      }));
+      assert.equal(result.token, connToken);
+      assert.equal(result.adoptSource, 'connection-adopt');
+    });
+    assert.deepEqual(persisted, [], 'the Connection credential must NOT be mirrored into legacy session rows (plan rev 2 P2)');
+    assert.equal(sessions[0].session.workspaces[0].accessToken, dead, 'the legacy row keeps its original credential');
+    const adopted = logs.filter(args => args[0] === '[credential-adopted]');
+    assert.equal(adopted.length, 1);
+    const payload = JSON.parse(adopted[0][1]);
+    assert.equal(payload.source, 'connection-adopt');
+    assert.equal(payload.writeBack.rows, null, 'connection-adopt reports rows:null — write-back is not applicable');
+  });
+
+  test('exchange arm reports adoptSource:exchange and logs source:exchange (rows:null)', async () => {
+    const sessions = [{ _id: 'sid-1', session: { accountId: ACCOUNT, workspaces: [
+      { urlKey: URL_KEY, provider: 'linear', accessToken: dead, tokenExpiresAt: now + 7200_000 },
+    ] } }];
+    const exchangeToken = 'good-exchange-3186';
+    const { logs } = await withCapturedConsole(async () => {
+      const result = await attemptSuspectCredentialRefresh(deps({
+        sessions,
+        persistSession: async () => {},
+        adoptConnectionCredential: async () => null,
+        ownerHasConnection: async () => true,
+        refreshConnection: async () => ({ token: exchangeToken, provider: 'linear', expiresAt: now + 3600_000, scope: exchangeToken }),
+      }));
+      assert.equal(result.token, exchangeToken);
+      assert.equal(result.adoptSource, 'exchange');
+    });
+    const adopted = logs.filter(args => args[0] === '[credential-adopted]');
+    assert.equal(adopted.length, 1);
+    const payload = JSON.parse(adopted[0][1]);
+    assert.equal(payload.source, 'exchange');
+    assert.equal(payload.writeBack.rows, null, 'the exchange arm does not mirror again — it writes back inside its own refresh');
   });
 
   test('[credential-adopted] carries the source and both fingerprints and no token bytes', async () => {
