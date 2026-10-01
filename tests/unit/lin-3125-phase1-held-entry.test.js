@@ -197,6 +197,51 @@ describe('LIN-3125 Phase 1 — held-entry helper', () => {
   });
 
   // -------------------------------------------------------------------------
+  // C1 reader — L1: put-born rows are never offered
+  // -------------------------------------------------------------------------
+  describe('listAuthorizedAccountConnections (L1)', () => {
+    test('offers a connection-managed row but never a put-born row (no referents)', async () => {
+      const dbDir = mkdtempSync(join(tmpdir(), 'lin3125-heldreader-'));
+      const client = new MangoClient(dbDir);
+      await client.connect();
+      try {
+        const store = new ConnectionStore({ collection: client.db('held_reader').collection('connections') });
+        await store.link('acct-1', 'github', 'managed', { token: 'ghs', installationId: 'managed' }, { urlKey: 'acme', provider: 'github', scope: 'o/r' });
+        await store.put('acct-1', 'github', 'legacy', { token: 'ghs_old', installationId: 'legacy' });
+
+        const rows = await listAuthorizedAccountConnections({ connectionStore: store, accountId: 'acct-1', provider: 'github' });
+        assert.deepEqual(rows.map(r => r._id), ['acct-1::github::managed'], 'the put-born row is excluded, matching the sweep loader');
+      } finally {
+        if (client?.close) await client.close();
+        rmSync(dbDir, { recursive: true, force: true });
+      }
+    });
+
+    test('L3: a connection whose account canonicalizes to another account is not offered (depends on authorizeConnection)', async () => {
+      const dbDir = mkdtempSync(join(tmpdir(), 'lin3125-heldreader-l3-'));
+      const client = new MangoClient(dbDir);
+      await client.connect();
+      try {
+        const store = new ConnectionStore({ collection: client.db('held_reader_l3').collection('connections') });
+        // Connection-managed (referents present) and under the caller's own id
+        // prefix, so ONLY authorizeConnection's canonicalization can exclude it.
+        await store.link('acct-B', 'github', '9', { token: 't', installationId: '9' }, { urlKey: 'x', provider: 'github', scope: 'a/b' });
+
+        const rows = await listAuthorizedAccountConnections({
+          connectionStore: store,
+          accountId: 'acct-B',
+          provider: 'github',
+          resolveCanonicalAccountId: (id) => (id === 'acct-B' ? 'acct-A' : id),
+        });
+        assert.deepEqual(rows, [], 'the row canonicalizes to acct-A, so acct-B is not its owner');
+      } finally {
+        if (client?.close) await client.close();
+        rmSync(dbDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // C1 static check
   // -------------------------------------------------------------------------
   describe('C1: no store/credential import', () => {
