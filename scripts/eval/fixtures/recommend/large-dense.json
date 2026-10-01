@@ -6,10 +6,11 @@
       "id": "LIN-2149",
       "role": "node (defer → LIN-3125)",
       "expect": [
+        "implement",
         "implementation"
       ],
       "descentExpect": "LIN-3125",
-      "note": "Healthy container with open children (LIN-3125 in progress, LIN-3126 todo, LIN-2819 backlog). Beat 2 deferred to LIN-3124; LIN-3124 is now Done, so the actionable frontier child is LIN-3125.",
+      "note": "Healthy container with open children (LIN-3125 in progress, LIN-3126 todo, LIN-2819 backlog). Beat 2 deferred to LIN-3124; LIN-3124 is now Done, so the actionable frontier child is LIN-3125. Beat-3 re-score: accept-set widened to the existing fixture convention [\"implement\",\"implementation\"].",
       "labelSource": "live",
       "changed": true
     },
@@ -17,10 +18,12 @@
       "id": "LIN-1892",
       "role": "dense leaf",
       "expect": [
-        "implementation"
+        "implement",
+        "implementation",
+        "blocked"
       ],
       "descentExpect": "LIN-1892",
-      "note": "Beat 2 said close-out (S1-S3 merged). Live: S3 merged AND deployed, ticket stays In Progress; the latest rulings (29 Sep 19:26-19:28) settle owner backfill and point at a concrete next build.",
+      "note": "Beat 2 said close-out (S1-S3 merged). Live: S3 merged AND deployed, ticket stays In Progress; the latest rulings (29 Sep 19:26-19:28) settle owner backfill and point at a concrete next build. Beat-3 adjudication: the ticket's own review ledger (L5/L6) gates its Done on POST-DEPLOY OPERATOR steps (production owner-population check, owner-index exists in prod, Resend key/sending-domain/EMAIL_FROM), so `blocked` is defensible alongside the remaining S3 implement round: accept-set = implement|implementation|blocked.",
       "labelSource": "live",
       "changed": true
     },
@@ -28,10 +31,11 @@
       "id": "LIN-2944",
       "role": "dense leaf",
       "expect": [
+        "implement",
         "implementation"
       ],
       "descentExpect": "LIN-2944",
-      "note": "Beat 2 said breakdown. Live: P0 merged; the trail records \"next action implementation for P1\" and a ruling \"Dispatch implement for N4+T1\".",
+      "note": "Beat 2 said breakdown. Live: P0 merged; the trail records \"next action implementation for P1\" and a ruling \"Dispatch implement for N4+T1\". Beat-3 re-score: accept-set widened to the existing fixture convention.",
       "labelSource": "live",
       "changed": true
     },
@@ -50,10 +54,11 @@
       "id": "LIN-3098",
       "role": "dense leaf",
       "expect": [
+        "implement",
         "implementation"
       ],
       "descentExpect": "LIN-3098",
-      "note": "S4 merged; S5 (hosted-witness runbook) is the next implementation slice; S6 waits on LIN-3136.",
+      "note": "S4 merged; S5 (hosted-witness runbook) is the next implementation slice; S6 waits on LIN-3136. Beat-3 re-score: accept-set widened to the existing fixture convention.",
       "labelSource": "hand",
       "changed": false
     },
@@ -83,10 +88,12 @@
       "id": "LIN-3135",
       "role": "dense leaf",
       "expect": [
-        "implementation"
+        "implement",
+        "implementation",
+        "blocked"
       ],
       "descentExpect": "LIN-3135",
-      "note": "PR #1616 (R2) merged; ticket stays open for the Simple Dispatcher item (L2).",
+      "note": "PR #1616 (R2, LinearViewer S1/S2/S4) merged after John's ruling; ticket stays In Progress only for the Simple Dispatcher item (L2/S3), which the leg constraint says is an explicit open item and blocks Done. Beat-3 adjudication: `close-out` is NOT defensible here — close-out owns merge+Done, the merge already happened and Done is explicitly withheld, so a close-out prompt is a no-op; the remaining scope is an implement (S3). `blocked` IS defensible — the ticket text names S3 as \"an explicit open item for the SD owner\", an external hand-off that gates Done — so accept-set = implement|implementation|blocked.",
       "labelSource": "hand",
       "changed": false
     },

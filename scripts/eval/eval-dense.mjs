@@ -54,7 +54,8 @@ import { resolveRecommendation } from '../../lib/recommend-recurse.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STUB = !!process.env.STUB;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-if (!STUB && !OPENROUTER_API_KEY) { console.error('Set OPENROUTER_API_KEY (env or .env), or STUB=1 for a dry run'); process.exit(1); }
+const RESCORE = !!process.env.RESCORE;
+if (!STUB && !RESCORE && !OPENROUTER_API_KEY) { console.error('Set OPENROUTER_API_KEY (env or .env), or STUB=1 for a dry run'); process.exit(1); }
 
 const DEFAULT_MODELS = [
   'openai/gpt-5.6-sol',          // incumbent (price fingerprint, 12b8569a)
@@ -68,6 +69,7 @@ const MODELS = (process.env.MODELS ? process.env.MODELS.split(',') : DEFAULT_MOD
 const K = Number(process.env.K) || 1;
 const MAX_USD = process.env.MAX_USD != null ? Number(process.env.MAX_USD) : 10;
 const ONLY = process.env.ONLY;
+const DENSE_ONLY = !!process.env.DENSE_ONLY;
 const DATE = process.env.DATE || '2026-10-01';
 const FIXTURES_DIR = process.env.FIXTURES_DIR || join(HERE, 'fixtures', 'recommend');
 const OUT_DIR = process.env.OUT_DIR || join(HERE, 'recommend-baseline', `${DATE}-dense`);
@@ -272,6 +274,14 @@ mkdirSync(OUT_DIR, { recursive: true });
 const fixtures = loadWorkspaces(FIXTURES_DIR);
 if (STUB) installStub(fixtures);
 
+// Current accept-set / descentExpect per target, from the committed fixtures. Used
+// both when running and when re-scoring offline (RESCORE=1), so a label fix in the
+// fixtures is reflected without editing the raw result rows.
+const targetMeta = {};
+for (const ws of fixtures) for (const t of ws.targets) {
+  targetMeta[t.id] = { expect: t.expect, descentExpect: t.descentExpect || t.id };
+}
+
 setLlmCallRecorder((rec) => { pendingCalls.push(rec); });
 
 const done = new Set(readJsonl(RUNS_PATH).map(r => `${r.model}|${r.target}|${r.run}`));
@@ -281,6 +291,8 @@ const startedAt = Date.now();
 
 outer:
 for (const ws of fixtures) {
+  if (RESCORE) break;
+  if (DENSE_ONLY && ws.name !== 'LargeDense') continue;
   for (const target of ws.targets) {
     if (ONLY && !target.id.includes(ONLY)) continue;
     for (let run = 1; run <= K; run++) {
@@ -306,78 +318,119 @@ const runs = readJsonl(RUNS_PATH);
 const calls = readJsonl(CALLS_PATH);
 const sum = (a) => a.reduce((x, y) => x + (Number(y) || 0), 0);
 const isDense = (r) => r.workspace === 'LargeDense';
-const order = () => ({ runs: 0, ok: 0, errors: 0, calls: 0, actionHit: 0, actionN: 0, descentHit: 0, descentN: 0, denseRuns: 0, denseOk: 0, denseActionHit: 0, denseDescentHit: 0, smallRuns: 0, smallOk: 0, smallActionHit: 0, costUsd: 0, denseCostUsd: 0, smallCostUsd: 0, promptOk: 0, promptN: 0, latencyAll: [], latencyDense: [], confusion: {} });
+const order = () => ({ runs: 0, ok: 0, errors: 0, calls: 0,
+  // lab view: errors EXCLUDED from the denominator
+  actionHit: 0, actionN: 0, descentHit: 0, descentN: 0,
+  denseOk: 0, smallOk: 0, denseActionHit: 0, smallActionHit: 0, denseDescentHit: 0,
+  // production view: an error (unparseable response) is a FAILURE; denominator = runs
+  prodHit: 0, prodN: 0, denseProdHit: 0, denseProdN: 0, smallProdHit: 0, smallProdN: 0,
+  costUsd: 0, denseCostUsd: 0, smallCostUsd: 0,
+  promptOk: 0, promptN: 0, latencyAll: [], latencyDense: [], confusion: {}, lin2149Descent: { hit: 0, n: 0 } });
 const byModel = {};
+// Recompute correctness from the CURRENT fixture accept-sets (targetMeta), not the
+// stored beat-2 flags — this is what makes RESCORE reflect a label fix.
+const scoreOf = (r) => {
+  const meta = targetMeta[r.target] || { expect: r.expected, descentExpect: r.descentExpect };
+  const accept = new Set((meta.expect || []).map(norm));
+  const actionCorrect = !r.error && (accept.size ? accept.has(norm(r.action)) : false);
+  const descentCorrect = !r.error && norm(r.terminal) === norm(meta.descentExpect);
+  return { meta, actionCorrect, descentCorrect };
+};
 for (const r of runs) {
   const m = byModel[r.model] = byModel[r.model] || order();
-  m.runs++;
+  const { meta, actionCorrect, descentCorrect } = scoreOf(r);
   const dense = isDense(r);
-  if (r.error) { m.errors++; continue; } // errors are counted separately, never as misses
-  m.ok++;
+  m.runs++;
+  // production denominator counts every attempted run; an error is a production failure
+  m.prodN++; if (actionCorrect) m.prodHit++;
+  if (dense) { m.denseProdN++; if (actionCorrect) m.denseProdHit++; } else { m.smallProdN++; if (actionCorrect) m.smallProdHit++; }
   m.costUsd += Number(r.runCostUsd) || 0;
-  if (dense) m.denseRuns++; else m.smallRuns++;
   if (dense) m.denseCostUsd += Number(r.runCostUsd) || 0; else m.smallCostUsd += Number(r.runCostUsd) || 0;
-  m.actionN++; if (r.actionCorrect) m.actionHit++;
-  m.descentN++; if (r.descentCorrect) m.descentHit++;
-  if (dense) { m.denseOk++; if (r.actionCorrect) m.denseActionHit++; if (r.descentCorrect) m.denseDescentHit++; }
-  else { m.smallOk++; if (r.actionCorrect) m.smallActionHit++; }
+  if (r.target === 'LIN-2149') { m.lin2149Descent.n++; if (descentCorrect) m.lin2149Descent.hit++; }
+  if (r.error) { m.errors++; continue; } // lab view excludes errors
+  m.ok++;
+  m.actionN++; if (actionCorrect) m.actionHit++;
+  m.descentN++; if (descentCorrect) m.descentHit++;
+  if (dense) { m.denseOk++; if (actionCorrect) m.denseActionHit++; if (descentCorrect) m.denseDescentHit++; }
+  else { m.smallOk++; if (actionCorrect) m.smallActionHit++; }
   if (typeof r.promptOk === 'boolean') { m.promptN++; if (r.promptOk) m.promptOk++; }
   for (const c of r.calls || []) { m.latencyAll.push(c.latencyMs); if (dense) m.latencyDense.push(c.latencyMs); }
-  const key = (r.expected || []).map(norm).sort().join('|') || '—';
+  const key = (meta.expect || []).map(norm).sort().join('|') || '—';
   const c = m.confusion[key] = m.confusion[key] || {};
   const got = norm(r.action) || '—';
   c[got] = (c[got] || 0) + 1;
 }
 for (const c of calls) { const m = byModel[c.model] = byModel[c.model] || order(); m.calls++; }
 const pctl = (arr, p) => { if (!arr.length) return null; const s = [...arr].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
+// Wilson 95% interval for a binomial proportion (continuity not applied).
+function wilson(k, n) {
+  if (!n) return null;
+  const z = 1.959963984540054, p = k / n;
+  const d = 1 + z * z / n;
+  const c = p + z * z / (2 * n);
+  const h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n));
+  return { lo: Math.max(0, (c - h) / d), hi: Math.min(1, (c + h) / d) };
+}
 for (const m of Object.values(byModel)) {
   m.p50LatencyMs = pctl(m.latencyAll, 0.5);
   m.p90LatencyMs = pctl(m.latencyAll, 0.9);
   m.p50LatencyDenseMs = pctl(m.latencyDense, 0.5);
   m.meanCostPerCall = m.calls ? m.costUsd / m.calls : 0;
-  m.meanCostPerDenseCall = m.denseRuns ? m.denseCostUsd / m.denseRuns : 0;
+  m.meanCostPerDenseCall = (m.denseOk + (m.denseProdN - m.denseOk)) ? m.denseCostUsd / (m.denseProdN || 1) : 0;
+  m.prodAccuracy = m.prodN ? m.prodHit / m.prodN : 0;
+  m.labAccuracy = m.actionN ? m.actionHit / m.actionN : 0;
+  m.wilsonProdAll = wilson(m.prodHit, m.prodN);
+  m.wilsonProdSmall = wilson(m.smallProdHit, m.smallProdN);
+  m.wilsonProdDense = wilson(m.denseProdHit, m.denseProdN);
   delete m.latencyAll; delete m.latencyDense;
 }
 const perAction = {};
 for (const r of runs) {
   if (r.error) continue;
-  const k = (r.expected || []).map(norm).sort().join('|') || '—';
-  const a = perAction[k] = perAction[k] || { hit: 0, n: 0, descentExpect: r.descentExpect, dense: isDense(r) };
-  a.n++; if (r.actionCorrect) a.hit++;
+  const { meta, actionCorrect } = scoreOf(r);
+  const k = (meta.expect || []).map(norm).sort().join('|') || '—';
+  const a = perAction[k] = perAction[k] || { hit: 0, n: 0, descentExpect: meta.descentExpect, dense: isDense(r) };
+  a.n++; if (actionCorrect) a.hit++;
 }
 const promptQuality = { ok: runs.filter(r => r.promptOk).length, total: runs.filter(r => typeof r.promptOk === 'boolean').length, bad: runs.filter(r => r.promptProblems && r.promptProblems.length && !(r.promptProblems.length === 1 && r.promptProblems[0] === 'defer')).map(r => ({ model: r.model, target: r.target, problems: r.promptProblems })) };
 const summary = {
   generatedBy: 'scripts/eval/eval-dense.mjs',
+  rescore: RESCORE,
+  generatedFrom: 'saved raw outputs (runs.jsonl); correctness recomputed against current fixtures',
   date: DATE, stub: STUB, models: MODELS, repeats: K,
   completedThisRun: completed, skippedResumed: skipped, totalRuns: runs.length,
   spentThisRunUsd: Number(state.spentUsd.toFixed(6)),
   totalCostUsd: Number(sum(runs.map(r => r.runCostUsd)).toFixed(6)),
   maxUsd: MAX_USD, halted: state.halted, wallSeconds: Math.round((Date.now() - startedAt) / 1000),
   byModel, perAction, promptQuality,
-  overall: { ok: runs.filter(r => !r.error).length, actionHit: runs.filter(r => r.actionCorrect).length, descentHit: runs.filter(r => r.descentCorrect).length, errors: runs.filter(r => r.error).length }
+  // production view: errors (unparseable response) are failures — what the user actually gets
+  production: { hit: runs.filter(r => scoreOf(r).actionCorrect).length, n: runs.length, errors: runs.filter(r => r.error).length },
+  // lab view: errors excluded
+  lab: { hit: runs.filter(r => !r.error && scoreOf(r).actionCorrect).length, n: runs.filter(r => !r.error).length }
 };
 writeFileSync(join(OUT_DIR, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
 
 const pct = (x, n) => n ? Math.round((x / n) * 100) + '%' : '-';
 const lines = [
-  `# LIN-1693 dense recommendation sweep — ${DATE}${STUB ? ' (STUB dry run)' : ''}`, '',
+  `# LIN-1693 dense recommendation sweep — ${DATE}${STUB ? ' (STUB dry run)' : ''}${RESCORE ? ' (RESCORED offline)' : ''}`, '',
   `harness: \`scripts/eval/eval-dense.mjs\` · models: ${MODELS.join(', ')} · K=${K} · cap $${MAX_USD}`,
-  `runs: ${runs.length} (ok ${summary.overall.ok}, errors ${summary.overall.errors}) · spend: $${summary.totalCostUsd.toFixed(4)}${state.halted ? ` · HALTED: ${state.halted.reason}` : ''}`, '',
-  '| model | ok | err | action-acc | small-acc | dense-acc | descent-acc (LIN-2149) | prompt-ok | mean $/call | dense $/call | p50 lat | p90 lat |',
-  '|---|---|---|---|---|---|---|---|---|---|---|---|'
+  `runs: ${summary.production.n} · spend: $${summary.totalCostUsd.toFixed(4)}${state.halted ? ` · HALTED: ${state.halted.reason}` : ''}`, '',
+  `**Production-fitness (errors count as failures): ${summary.production.hit}/${summary.production.n} (${pct(summary.production.hit, summary.production.n)}); lab view (errors excluded): ${summary.lab.hit}/${summary.lab.n} (${pct(summary.lab.hit, summary.lab.n)}) on ${summary.production.errors} errors.**`, '',
+  '| model | runs | errors | prod-acc (all) | prod small | prod dense | lab-acc (ok only) | LIN-2149 descent | prompt-ok | mean $/call | dense $/call | p50 lat | p90 lat |',
+  '|---|---|---|---|---|---|---|---|---|---|---|---|---|'
 ];
 for (const [m, v] of Object.entries(byModel)) {
-  lines.push(`| ${m} | ${v.ok} | ${v.errors} | ${v.actionHit}/${v.actionN} (${pct(v.actionHit, v.actionN)}) | ${v.smallActionHit}/${v.smallOk} (${pct(v.smallActionHit, v.smallOk)}) | ${v.denseActionHit}/${v.denseOk} (${pct(v.denseActionHit, v.denseOk)}) | ${v.denseDescentHit}/${v.denseOk} (${pct(v.denseDescentHit, v.denseOk)}) | ${v.promptOk}/${v.promptN} | $${v.meanCostPerCall.toFixed(4)} | $${v.meanCostPerDenseCall.toFixed(4)} | ${v.p50LatencyMs != null ? v.p50LatencyMs + 'ms' : '—'} | ${v.p90LatencyMs != null ? v.p90LatencyMs + 'ms' : '—'} |`);
+  lines.push(`| ${m} | ${v.prodN} | ${v.errors} | ${v.prodHit}/${v.prodN} (${pct(v.prodHit, v.prodN)}) | ${v.smallProdHit}/${v.smallProdN} (${pct(v.smallProdHit, v.smallProdN)}) | ${v.denseProdHit}/${v.denseProdN} (${pct(v.denseProdHit, v.denseProdN)}) | ${v.actionHit}/${v.actionN} (${pct(v.actionHit, v.actionN)}) | ${v.lin2149Descent.hit}/${v.lin2149Descent.n} | ${v.promptOk}/${v.promptN} | $${v.meanCostPerCall.toFixed(4)} | $${v.meanCostPerDenseCall.toFixed(4)} | ${v.p50LatencyMs != null ? v.p50LatencyMs + 'ms' : '—'} | ${v.p90LatencyMs != null ? v.p90LatencyMs + 'ms' : '—'} |`);
 }
-lines.push('', '### Confusion by expected action (ok runs)', '', '| model | expect | got | n |', '|---|---|---|---|');
+lines.push('', '### Confusion by expected action (lab runs, current labels)', '', '| model | expect | got | n |', '|---|---|---|---|');
 for (const [m, v] of Object.entries(byModel)) {
   for (const [exp, got] of Object.entries(v.confusion || {})) for (const [g, n] of Object.entries(got)) lines.push(`| ${m} | ${exp} | ${g} | ${n} |`);
 }
-lines.push('', '### Per expected-action (all models pooled)', '', '| expect | dense | descentExpect | accuracy |', '|---|---|---|---|');
+lines.push('', '### Per expected-action (all models pooled, lab)', '', '| expect | dense | descentExpect | accuracy |', '|---|---|---|---|');
 for (const [k, v] of Object.entries(perAction)) lines.push(`| ${k} | ${v.dense ? 'dense' : ''} | ${v.descentExpect} | ${v.hit}/${v.n} (${pct(v.hit, v.n)}) |`);
 writeFileSync(join(OUT_DIR, 'summary.md'), lines.join('\n') + '\n');
 
 
-console.log(`\n[${STUB ? 'STUB' : 'sweep'}] runs=${runs.length} completed=${completed} skipped=${skipped} spend=$${summary.totalCostUsd.toFixed(4)}${state.halted ? ` HALTED=${state.halted.reason}` : ''}`);
+console.log(`\n[${STUB ? 'STUB' : RESCORE ? 'RESCORE' : 'sweep'}] runs=${runs.length} completed=${completed} skipped=${skipped} spend=$${summary.totalCostUsd.toFixed(4)} prod=${summary.production.hit}/${summary.production.n}${state.halted ? ` HALTED=${state.halted.reason}` : ''}`);
 console.log(`  ${join(OUT_DIR, 'summary.md')}`);
 if (state.halted && state.halted.reason === 'credits') process.exitCode = 2;
