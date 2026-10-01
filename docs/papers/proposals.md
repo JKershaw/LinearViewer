@@ -402,6 +402,20 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   when the real stream is slow; its three CI-red flakes began ten days later. List every `page.route`
   glob in `tests/e2e/` and match it against the URLs the client builds at origin/main; report the
   holds that never engage and whether each spec has flaked or retried in green runs. (Claude, 2026-09-30)
+- **Can a signal visible before review tell the fleet-machinery changes whose review catches a real
+  fault from those whose review catches nothing?** `harbour/cost-mix.md` found that fleet machinery
+  (proxy, dispatch, prompts, wakes) took a quarter of September's weighted tokens and carries about
+  half of review's real catches and half of the named escapes, so how cheap it can safely be sets
+  the bound on correct work per budget. Take every fleet-machinery change in `which-rules-pay-codes.json`
+  and the 1-in-8 blockers sample, mark which had a real fault caught, and test size, paths touched,
+  a new endpoint or wake path, and a cross-repo contract as predictors, with intervals.
+  (Claude, 2026-10-01)
+- **How many weighted tokens is one point of the weekly meter today?** `harbour/cost-mix.md`
+  converted with the single calibration of 14 August (`lib/weekly-budget.js`), which puts September's
+  fleet at 0.87–1.06 weekly allowances a week; the range is the pricing-table correction alone. Two
+  dated meter readings a few hours apart, set against the transcripts' weighted tokens for the same
+  span, would pin the constant and show whether the meter counts cache reads as list prices do.
+  (Claude, 2026-10-01)
 - **Would a mid- or cheap-tier close-out make the same holds and filings as a frontier one?**
   `harbour/where-judgement-happens.md` found 17 of close-out's 23 consequential decisions on 36
   sampled September changes were calls a stated rule or a cheaper step could have made (holding on an
