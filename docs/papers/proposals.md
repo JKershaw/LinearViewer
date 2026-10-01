@@ -12,8 +12,9 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   lifetime (LIN-3157), and say for each which credential was selected and why it was rejected. (Claude, 2026-10-01)
 - **If a shared-error and wait-graph detector ran live for four weeks, outside the dispatcher, how many of its
   alarms would a person or Flight Companion act on, and would the median time from onset to discovery fall from
-  about 15 hours?** The same paper ran both rules over September after the fact: 9 of 19 incidents on record
-  caught a median 5 hours early, about 60 alarms on no ticket, 18 false. A shadow run that only logs alarms,
+  about 15 hours?** The same paper ran both rules over September after the fact: 7 of 19 incidents on record
+  caught a median 5 hours early, 63 alarms on no ticket, of which a hand-checked sample found about half real
+  (`survey-check-10.md`). A shadow run that only logs alarms,
   read weekly against the tracker, measures agreement and lead without changing any session.
   (Claude, 2026-10-01)
 - **What found the faults that both the full process and a lean replay shipped, and could any check before
@@ -22,14 +23,15 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   dereference), the replay's review approved the same fault the full process had shipped. For each, trace
   the escape or fix back to what found it (a test, a sweep, a reviewer prompt, use) and say whether any
   check that runs before merge would have caught it, and at what cost. (Claude, 2026-10-01)
-- **Does pricing at list rates instead of weighted tokens change the relay's verdict?** `harbour/held-or-fresh.md`
-  priced held and fresh supervisors in weighted tokens, which charge a frontier cache read at a tenth of an input token;
-  the frontier tier's list rate is a twentieth. `harbour/prototype-concepts.md` found a multi-session paper costs 1.7
-  times as much per weighted token as a one-session one, probably because fresh sessions write more cache. Re-price that paper's model
-  at list rates and say whether the relay's 0% (−17% to +9%) and its 21k break-even handoff move. (Claude, 2026-10-01)
+- **Does the scorecard's weighted unit hide September's change of frontier price row?** `harbour/survey-check-10.md`
+  found that the weighted unit charges both frontier price rows at 1, while per weighted token the newer row costs about
+  0.55 of the older one at list rates, and the fleet moved to it in the week of 22 September; the gap
+  `harbour/prototype-concepts.md` v1 read as fresh sessions costing more per weighted token was this change. Re-price
+  September's cost per correct change by week at each session's own row, and say how much of any fall after 22 September
+  the weighted series credits to the process when it was the price. (Claude, 2026-10-01)
 - **Does a check run before a Harbour paper merges find what the post-merge checks found?** `harbour/prototype-concepts.md`
-  found that 23 of 24 checked documents had a load-bearing claim corrected after merge, while Lighthouse checks before
-  release. Run the next wave's checks on the paper's branch and compare what they find, and how long a wrong figure
+  found that 23 of 24 checked documents had a claim corrected after merge (about 20 a load-bearing one, by the checks'
+  own word; `survey-check-10.md`), while Lighthouse checks before release. Run the next wave's checks on the paper's branch and compare what they find, and how long a wrong figure
   stood in the anchor, with the post-merge record. (Claude, 2026-10-01)
 - **Why do two censuses of the same runner logs give 47.1 and 33.6 dispatches per correct change for
   code changes merged 14–28 September, by the child named?** `harbour/survey-check-9.md` found that
