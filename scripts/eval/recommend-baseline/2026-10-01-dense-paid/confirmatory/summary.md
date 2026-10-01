@@ -37,3 +37,11 @@ runs: 40 · spend: $0.6051
 | blocked|implement|implementation | dense | LIN-1892 | 2/8 (25%) |
 | blocked | dense | LIN-3059 | 3/4 (75%) |
 | retrospective-audit | dense | LIN-3107 | 16/16 (100%) |
+
+---
+
+**Cost correction (1 Oct).** Recorded spend **$0.6051** is unchanged: this run had **0
+error runs**, so the pre-fix harness's dropped failed-attempt cost does not apply here.
+Hidden success-after-retry runs are not identifiable from the committed rows (each
+successful attempt records one call per hop), so the figure is exact for successful runs
+and otherwise unquantified; the main sweep's bound covers the known gemini loss.

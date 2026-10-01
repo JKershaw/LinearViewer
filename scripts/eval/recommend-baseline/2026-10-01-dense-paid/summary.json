@@ -283,7 +283,7 @@
           "plan-review": 1
         },
         "blocked|implement|implementation": {
-          "→": 1,
+          "\u2192": 1,
           "close-out": 1
         },
         "blocked": {
@@ -678,5 +678,26 @@
   "lab": {
     "hit": 133,
     "n": 189
+  },
+  "costCorrection": {
+    "correctedAt": "2026-10-01",
+    "reason": "Pre-fix harness dropped the spend of failed/retried attempts.",
+    "lostAttempts": {
+      "model": "google/gemini-2.5-flash-lite",
+      "errorRuns": 11,
+      "attemptsPerErrorRun": 2,
+      "unrecordedAttempts": 22
+    },
+    "recovery": "not possible (no generation ids recorded; per-model daily activity needs a provisioning key on a completed UTC day and the key is shared with production, so it is contaminated)",
+    "bound": {
+      "method": "unrecordedAttempts x maxObservedPerCall",
+      "maxObservedPerCallUsd": 0.0180539,
+      "lostSpendUsdBound": 0.397186
+    },
+    "recordedTotalCostUsd": 6.667505,
+    "correctedTotalCostUsdBound": 7.064691,
+    "geminiMeanCostPerCallRecordedUsd": 0.004576672,
+    "geminiMeanCostPerCallCorrectedBoundUsd": 0.01039,
+    "note": "success-after-retry runs are not identifiable from the committed rows; any such loss is inside the bound. runs.jsonl is unchanged."
   }
 }

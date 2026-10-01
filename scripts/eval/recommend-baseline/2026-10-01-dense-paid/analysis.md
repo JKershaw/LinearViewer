@@ -7,6 +7,19 @@ paid calls except the small confirmatory run in §4). Raw outputs are unchanged;
 `RESCORE=1 node scripts/eval/eval-dense.mjs` (adds a re-score mode; recomputes
 correctness from the current fixture accept-sets; never edits `runs.jsonl`).
 
+> **Cost correction (1 Oct).** The sweep was produced by the pre-fix harness, which
+> dropped the spend of failed/retried attempts. The 11 `google/gemini-2.5-flash-lite`
+> error runs each made a first (paid) attempt plus one retry, and all 22 attempts were
+> never written to `runs.jsonl`/`calls.jsonl` (`runCostUsd: 0`, `calls: []`). They cannot
+> be recovered from the committed data: no generation ids were recorded; OpenRouter's
+> per-model activity for the day needs a provisioning key on a completed UTC day, and this
+> key is shared with production traffic, so any account-level figure is contaminated. They
+> are therefore **bounded**: 22 lost attempts × gemini's max observed per-call cost
+> ($0.0181) ≤ **$0.40**. Success-after-retry runs are **not identifiable** from the
+> committed rows (each successful attempt still records exactly one call per hop), so any
+> such loss is included in that bound, not separately quantified. The figures below keep
+> the original recorded number and add the bound; the recommendation is unchanged.
+
 ## 1. Label corrections
 
 The dense fixtures were built in beat 1 with `expected: ["implementation"]` for five
@@ -57,12 +70,20 @@ Lab view (errors excluded) is shown for reference.
 | openai/gpt-5.6-sol (incumbent) | 40 | 0 | 27/40 (68%) | 17/30 (57%) | 10/10 (100%) | 27/40 (68%) | 1/1 | 40/40 | $0.0896 | $0.1985 | 1.00 / 1.00 | 18.5s | 28.2s |
 | openai/gpt-5.4-mini | 40 | 0 | 29/40 (73%) | 23/30 (77%) | 6/10 (60%) | 29/40 (73%) | 1/1 | 40/40 | $0.0257 | $0.0580 | 0.29 / 0.29 | 3.4s | 6.5s |
 | openai/gpt-5-mini | 40 | 0 | 30/40 (75%) | 23/30 (77%) | 7/10 (70%) | 30/40 (75%) | 1/1 | 38/40 | $0.0139 | $0.0259 | 0.16 / 0.13 | 24.2s | 32.2s |
-| google/gemini-2.5-flash-lite | 40 | **11** | 13/40 (33%) | 10/30 (33%) | 3/10 (30%) | 13/29 (45%) | 0/1 | 29/29 | $0.0046 | $0.0079 | 0.05 / 0.04 | 3.4s | 5.7s |
+| google/gemini-2.5-flash-lite | 40 | **11** | 13/40 (33%) | 10/30 (33%) | 3/10 (30%) | 13/29 (45%) | 0/1 | 29/29 | $0.0046 → ≤$0.0104 | $0.0079 → ≤$0.0115 | 0.05→0.12 / 0.04→0.06 | 3.4s | 5.7s |
 | **qwen/qwen3.6-flash** | 40 | **0** | **34/40 (85%)** | **26/30 (87%)** | **8/10 (80%)** | 34/40 (85%) | 1/1 | 39/40 | $0.0098 | $0.0187 | **0.11 / 0.09** | 14.9s | 22.7s |
 
 Pooled production-fitness across all five models: 133/200 (67%). All 11 errors are
 `google/gemini-2.5-flash-lite` response-format failures (8× missing `## Reasoning`/
 `## Prompt`, 3× missing `DeferTo`); it is **not production-viable**.
+
+Cost columns are **recorded** spend. For gemini the mean `$/call` excludes its 11 error
+runs; including the bounded unrecorded attempts its all-in cost is ≤$0.0104/call (dense
+≤$0.0115), i.e. at the conservative bound it is no longer below qwen's $0.0098/call. It
+is disqualified for correctness regardless, so this does not change the recommendation.
+The other four models had zero error runs; their recorded cost is exact for successful
+runs (hidden retried successes are not identifiable from the rows — see the correction
+block above).
 
 Prompt-quality failures (deterministic `promptOk`): 5-mini 2/40 (`no-header` on
 LIN-596@implement, PR-1603-clean-small), qwen 1/40 (`no-header` on FIX-830-neg), gemini
@@ -84,13 +105,18 @@ K=1, n=10 dense and n=30 small, so every cell is small. Wilson 95% intervals:
 dense gap (80% vs 100%) has overlapping intervals (`[0.49,0.94]` vs `[0.72,1.00]`), as
 does the qwen-vs-incumbent overall gap. The small-target direction (qwen 87% vs
 incumbent 57%) is the closest to separation but still touches. Treat all rankings as
-point estimates with wide uncertainty; the *cost* differences, by contrast, are exact.
+point estimates with wide uncertainty. The *cost* differences are exact for successful
+runs; the 11 failed gemini runs (and any retried attempts) were not written to disk by the
+old harness, so their spend is unrecovered and **bounded at ≤$0.40** (22 gemini attempts ×
+its max observed per-call $0.0181). The bound does not change any ranking.
 
 ## 4. Confirmatory run (cheap finalists only)
 
 The best cheap candidate (qwen) and the cheap runner-up (gpt-5-mini) were tied on dense
 at K=1 (7/10 each), so both were re-run on the **10 dense targets only, K=2**, with
-`MAX_USD=1.50` (`DENSE_ONLY=1`; see `confirmatory/`). **Spend: $0.6051.** No errors, no
+`MAX_USD=1.50` (`DENSE_ONLY=1`; see `confirmatory/`). **Spend: $0.6051** (recorded; no
+error runs, so no unrecorded failed attempts are expected here — hidden retried successes
+are not identifiable from the rows). No errors, no
 402. A confirmatory repeat of the *incumbent* was **not run and is not affordable**:
 sol's dense mean is $0.1985/call, so a K=2 dense repeat alone would cost ≈$4.4, far over
 the $1.50 cap. The incumbent-vs-cheap dense comparison therefore stays at n=10.
@@ -233,5 +259,15 @@ type it, not pick it from the list. For a **free-tier** workspace the value is c
 
 ## 9. Spend
 
-- Prior: $4.74 (beats 1–2). Paid sweep: $6.6675. Confirmatory: $0.6051.
-- **Total ticket eval spend: $12.01** against the $15 ceiling.
+- Prior: $4.74 (beats 1–2). Paid sweep: **$6.6675 recorded**. Confirmatory: **$0.6051 recorded**.
+- The main sweep's recorded figure excludes the 22 unrecorded gemini attempts, bounded at
+  ≤$0.3972 → corrected main sweep **≤$7.0647**.
+- **Total ticket eval spend: $12.01 recorded → ≤$12.41** against the $15 ceiling.
+  Cross-check: OpenRouter's `/api/v1/key` reports this key's `usage_daily` for 2026-10-01 as
+  $7.3289 against $7.2726 recorded for sweep+confirmatory — i.e. the *entire* day's
+  unrecorded spend (eval plus any other traffic on the shared key) is only $0.0564. That
+  figure is contaminated by production traffic, but it shows the true gemini loss is well
+  under the conservative ≤$0.40 bound. Either way the ceiling is not breached.
+
+*Corrected 1 Oct — the old harness dropped failed/retried attempt cost; recorded numbers
+kept above alongside the bound.*
