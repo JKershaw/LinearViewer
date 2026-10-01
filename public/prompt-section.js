@@ -888,7 +888,14 @@
       try {
         // Proxy-context appending is now handled internally by dispatchPrompt()
         // (LIN-1137). Exec controls (LIN-1096) still live in the dispatch options panel.
-        const { model, harness } = window.readDispatchExecControls(btn.closest('.swipe-prompt-options'));
+        const isRunStep = btn.dataset.action === 'run-step';
+        // LIN-3211: the run-step rung sits in the ladder, outside the panel, so
+        // `closest` finds nothing there. It reads its own card's panel instead,
+        // and a blank harness falls back to claude-code, so the item carries the
+        // structured bootstrapToken rather than a token in prompt prose.
+        const panel = isRunStep ? container.querySelector('.swipe-prompt-options') : btn.closest('.swipe-prompt-options');
+        const { model, harness: panelHarness } = window.readDispatchExecControls(panel);
+        const harness = isRunStep ? (panelHarness || 'claude-code') : panelHarness;
         // `issue` is the full card object (id/identifier/title/url) — passing it
         // through is what ties Swipe-dispatched sessions back to their task.
         await window.dispatchPrompt({

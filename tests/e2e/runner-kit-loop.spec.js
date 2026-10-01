@@ -238,3 +238,87 @@ test.describe('runner kit local loop (LIN-3098 S2)', () => {
     }
   });
 });
+
+/**
+ * LIN-3211 — the runtime witness for a runner-taken item with a token in prose.
+ *
+ * On HEAD the run-step rung enqueued through the SESSION route with
+ * `attachProxy:true` and no harness. That route keeps the LIN-1111 null
+ * passthrough (`applyDefaultHarness:false`), so `attachProxyContext` took the
+ * prose branch: a live bootstrap in the prompt text and `bootstrapToken` null.
+ * The runner then took it with `apiAccess:false` and would have handed the
+ * token to a subagent verbatim. The fix: `poll` leaves it, reason
+ * `credential-in-prose`, and it stays queued (B1).
+ *
+ * The workspace is pinned to NO `dispatchDefaults` harness, or the factory
+ * fills `claude-code`, the item takes the MCP branch, and the witness passes on
+ * HEAD for the wrong reason. The stored harness is asserted null first.
+ */
+const EXCHANGE_LINE_RE = /curl -X POST -H "Authorization: Bearer ([A-Za-z0-9_-]{43})" \S+\/api\/proxy\/token/;
+
+async function enqueueViaSession(page, data) {
+  const res = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    headers: { 'Content-Type': 'application/json' },
+    data: { promptName: 'Implementation', target: 'cli', attachProxy: true, ...data }
+  });
+  expect(res.status(), await res.text()).toBe(201);
+  return (await res.json()).item;
+}
+
+async function storedPrompt(request, id) {
+  const res = await request.get(`/api/proxy/dispatch/${id}/prompt`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  expect(res.status()).toBe(200);
+  return (await res.json()).prompt;
+}
+
+test.describe('LIN-3211: a runner never takes an item whose prompt carries a credential in prose', () => {
+  test.beforeEach(async ({ request }) => {
+    // Pin: this workspace has no dispatchDefaults, so a blank harness stays null.
+    expect((await request.get(`/test/set-workspace-model?urlKey=${urlKey}`)).ok()).toBe(true);
+  });
+
+  test('the rung\'s harness-less session-route item is left with credential-in-prose, never taken, still queued', async ({ page, request }) => {
+    // What the run-step rung sent on HEAD: attachProxy, no harness.
+    const queued = await enqueueViaSession(page, { prompt: 'rung step' });
+
+    // Precondition: the stored harness is null, so attachProxyContext took the
+    // prose branch and the token is in the prompt text.
+    const before = await watch(request, queued.id);
+    expect(before.harness).toBeNull();
+    const prompt = await storedPrompt(request, queued.id);
+    const m = prompt.match(EXCHANGE_LINE_RE);
+    expect(m, 'precondition: the stored prompt carries the prose exchange line').toBeTruthy();
+    const token = m[1];
+
+    const polled = await runner(['poll']);
+    const d = polled.decisions.find((x) => x.id === queued.id);
+    expect(d, 'poll decided the item').toBeTruthy();
+    // HEAD: { decision: 'take', reason: 'confirmed', apiAccess: false }.
+    expect(d).toMatchObject({ decision: 'leave', reason: 'credential-in-prose', harness: null, apiAccess: false });
+    const raw = JSON.stringify(polled);
+    expect(raw).not.toContain(token);
+    expect(raw).not.toMatch(/api\/proxy\/token/);
+
+    await expect(runner(['take', queued.id])).rejects.toThrow(/was not approved by the last poll/);
+    const after = await watch(request, queued.id);
+    expect(after.status).toBe('queued');
+    expect(after.feedback).toEqual([]);
+  });
+
+  test('control: the same enqueue with harness claude-code is taken with a broker and no token in the prompt', async ({ page, request }) => {
+    const queued = await enqueueViaSession(page, { prompt: 'rung step (claude-code)', harness: 'claude-code' });
+    expect((await watch(request, queued.id)).harness).toBe('claude-code');
+
+    const polled = await runner(['poll']);
+    const d = polled.decisions.find((x) => x.id === queued.id);
+    expect(d).toMatchObject({ decision: 'take', apiAccess: true });
+
+    const taken = await runner(['take', queued.id]);
+    expect(taken.broker?.socket).toBeTruthy();
+    expect(taken.environment).toContain(`--unix-socket ${taken.broker.socket}`);
+    expect(taken.environment).toContain('You never hold a token.');
+    expect(taken.prompt).toContain('rung step (claude-code)');
+    expect(taken.prompt).not.toMatch(EXCHANGE_LINE_RE);
+    expect(taken.prompt).not.toMatch(/api\/proxy\/token/);
+  });
+});

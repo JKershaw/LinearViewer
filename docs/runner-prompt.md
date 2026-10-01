@@ -132,6 +132,13 @@ or a token. Decisions are made **before** any take, in this order:
 6. **Confirmation.** The item must match `GET /api/proxy/dispatch/:id/prompt` byte for byte; a
    mismatch is refused.
 
+**Credential in the prompt.** After the owner check and before halt, poll also leaves any item
+whose prompt carries a credential in prose (the "Workspace API access" exchange line,
+`curl -X POST -H "Authorization: Bearer …" …/api/proxy/token`), with reason
+`credential-in-prose`. This item's prompt carries a credential in prose; a runner subagent never
+holds one. It stays queued: delete it or re-run it from the app with the `claude-code` harness,
+which hands the credential to the broker instead of the prompt.
+
 A refused item is **left queued**: never taken and then failed. It stays for its owner to
 delete or for a runner it suits, and otherwise expires. You do nothing with it but mention it in
 your end summary.
