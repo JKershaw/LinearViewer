@@ -635,6 +635,40 @@ describe('sumTranscriptUsage on the LIN-3098 witness subagent (LIN-3212)', () =>
   });
 });
 
+describe('sumTranscriptUsage folds repeated snapshots per message.id (LIN-3212)', () => {
+  // Redacted copy of a real subagent transcript (agent-a71d290649df73567.jsonl,
+  // Claude Code 2.1.286, this host). Shape A: the report message is written across
+  // several lines sharing one message.id while the streamed usage grows
+  // (`output_tokens` 4 → 4 → 535). Keeping the FIRST snapshot under-counts it.
+  const lines = readFileSync(join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent-streamed.jsonl'), 'utf8').split('\n');
+  const assistant = lines.filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant');
+
+  test('keeps the largest snapshot per repeated message.id, not the first', () => {
+    assert.deepEqual(sumTranscriptUsage(lines), {
+      harness: 'claude-code',
+      model: 'claude-sonnet-5-5',
+      inputTokens: 6,
+      outputTokens: 1108,
+      cacheCreationInputTokens: 11490,
+      cacheCreation1hInputTokens: 0,
+      cacheReadInputTokens: 66045
+    });
+  });
+
+  test('the fixture really is shape A: a repeated id whose later snapshot is larger', () => {
+    const byId = new Map();
+    for (const e of assistant) {
+      if (!e.message.id) continue;
+      if (!byId.has(e.message.id)) byId.set(e.message.id, []);
+      byId.get(e.message.id).push(e.message.usage.output_tokens);
+    }
+    const growing = [...byId.values()].find((outs) => new Set(outs).size > 1);
+    assert.ok(growing, 'expected at least one message.id with differing snapshots');
+    assert.equal(growing[0], 4); // first-wins would record this
+    assert.equal(Math.max(...growing), 535); // max-per-id records this
+  });
+});
+
 describe('subagentModelFor (NB5: map model onto the subagent, ignore effort)', () => {
   const rows = [
     [null, null],
