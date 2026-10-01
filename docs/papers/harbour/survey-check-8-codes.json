@@ -1,0 +1,1923 @@
+{
+ "ticket": "LIN-3184",
+ "codedAt": "2026-10-01",
+ "method": "Fresh blind sample for survey-check-8: the four-step census tickets step-overlap did not code, every 3rd by number from the second (scripts/survey-overlap-digests.mjs --offset 1; 12 digests, 488 units). Two readers, A (digests in order, two sessions of six) and B (in reverse, two sessions of six), each an in-session subagent of the frontier tier, coded against step-overlap's rubric unchanged (the rubric field of step-overlap-codes.json), shown neither the paper, its codes nor each other's. Not adjudicated. Tallies by scripts/survey-check-8-overlap.mjs.",
+ "digests": [
+  {
+   "digest": "O01",
+   "issue": "LIN-1938",
+   "units": {
+    "R": 11,
+    "P": 7,
+    "V": 12,
+    "I": 7
+   }
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2435",
+   "units": {
+    "R": 12,
+    "P": 12,
+    "V": 12,
+    "I": 11
+   }
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2446",
+   "units": {
+    "R": 12,
+    "P": 12,
+    "V": 9,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2511",
+   "units": {
+    "R": 12,
+    "P": 8,
+    "V": 11,
+    "I": 7
+   }
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2543",
+   "units": {
+    "R": 12,
+    "P": 11,
+    "V": 11,
+    "I": 9
+   }
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2641",
+   "units": {
+    "R": 11,
+    "P": 12,
+    "V": 12,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2719",
+   "units": {
+    "R": 12,
+    "P": 7,
+    "V": 10,
+    "I": 9
+   }
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2889",
+   "units": {
+    "R": 12,
+    "P": 7,
+    "V": 9,
+    "I": 7
+   }
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2933",
+   "units": {
+    "R": 10,
+    "P": 8,
+    "V": 11,
+    "I": 11
+   }
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2975",
+   "units": {
+    "R": 11,
+    "P": 2,
+    "V": 8,
+    "I": 8
+   }
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2994",
+   "units": {
+    "R": 11,
+    "P": 10,
+    "V": 12,
+    "I": 11
+   }
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3026",
+   "units": {
+    "R": 11,
+    "P": 12,
+    "V": 10,
+    "I": 12
+   }
+  }
+ ],
+ "readers": [
+  {
+   "reader": "A1",
+   "digests": [
+    {
+     "digest": "O01",
+     "codes": {
+      "P1": "EXTEND",
+      "P2": "EXTEND",
+      "P3": "NEW",
+      "P4": "EXTEND",
+      "P5": "EXTEND",
+      "P6": "REVERIFY",
+      "P7": "NEW",
+      "V1": "CHECK",
+      "V2": "NEW",
+      "V3": "NEW",
+      "V4": "NEW",
+      "V5": "REVERIFY",
+      "V6": "NEW",
+      "V7": "CHECK",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "NEW",
+      "V11": "CHECK",
+      "V12": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "NEW",
+      "I4": "RESTATE",
+      "I5": "RESTATE",
+      "I6": "REVERIFY",
+      "I7": "NEW"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "CITED",
+      "R3": "FOLLOWED",
+      "R4": "BACKGROUND",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "IGNORED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "P5": "Mostly restates research constraints, but adds new decisions (extend broker block, keep retryable:false), so EXTEND.",
+      "P7": "Process self-assessment; no PROCESS code for P units, coded NEW.",
+      "V1": "Verdict line that also states the new transition-window risk; CHECK taken by rubric order.",
+      "V5": "Re-verifies research's 65-row pin (REVERIFY by order) but its main point is a new unnamed DI-witness pin.",
+      "V9": "Plan claimed non-pollution; review re-establishes it with fresh evidence and strengthens it.",
+      "R9": "Only the close-out description preamble (not a step) mentions the OAuth 24h clock.",
+      "R10": "Plan covers both Class A (S3) and Class B (S6) rather than assuming A; weak trace.",
+      "I1": "Comment predates research; content matches research's Class-B retry recommendation.",
+      "I2": "Sequencing comment predates research; research quotes it."
+     }
+    },
+    {
+     "digest": "O02",
+     "codes": {
+      "P1": "NEW",
+      "P2": "NEW",
+      "P3": "REVERIFY",
+      "P4": "EXTEND",
+      "P5": "EXTEND",
+      "P6": "NEW",
+      "P7": "NEW",
+      "P8": "RESTATE",
+      "P9": "NEW",
+      "P10": "RESTATE",
+      "P11": "EXTEND",
+      "P12": "NEW",
+      "V1": "REVERIFY",
+      "V2": "CHECK",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "CHECK",
+      "V6": "REVERIFY",
+      "V7": "REVERIFY",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "CHECK",
+      "V11": "CHECK",
+      "V12": "PROCESS",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "RESTATE",
+      "I5": "EXTEND",
+      "I6": "EXTEND",
+      "I7": "EXTEND",
+      "I8": "RESTATE",
+      "I9": "NEW",
+      "I10": "NEW",
+      "I11": "REVERIFY"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "CONTRADICTED",
+      "R9": "FOLLOWED",
+      "R10": "FOLLOWED",
+      "R11": "IGNORED",
+      "R12": "FOLLOWED"
+     },
+     "notes": {
+      "P1": "Close-out pruning note; process, coded NEW for lack of a PROCESS code.",
+      "P3": "Claims a re-ground at HEAD with no drift; thin evidence shown.",
+      "P12": "Process next-action line; coded NEW.",
+      "V2": "Research section 7 already flagged the stale on-page prose, so not NEW; judges plan's omission.",
+      "V6": "Fact rests on research's 'gate block is auto-wake only'; re-established for Commit 1.",
+      "V7": "Header line asserting confirmation; borderline PROCESS.",
+      "R8": "Option 1 was effectively rejected by the operator ruling (reinterpret_by_shape rejected); an option rather than a claim.",
+      "R9": "Spec gap only partly acted on (review notes user turns are outside the gate; impl single-flight covers composer).",
+      "R10": "Witness form followed; the 120s number was replaced by the ruled 180s cap.",
+      "I1": "Comment predates research; research covers it.",
+      "I4": "Operator ruling predates the plan; plan carries it.",
+      "I5": "Narrowed freeze departs from plan rev1 but follows review F3."
+     }
+    },
+    {
+     "digest": "O03",
+     "codes": {
+      "P1": "NEW",
+      "P2": "CONTRA",
+      "P3": "EXTEND",
+      "P4": "RESTATE",
+      "P5": "EXTEND",
+      "P6": "RESTATE",
+      "P7": "NEW",
+      "P8": "EXTEND",
+      "P9": "EXTEND",
+      "P10": "EXTEND",
+      "P11": "EXTEND",
+      "P12": "EXTEND",
+      "V1": "CHECK",
+      "V2": "NEW",
+      "V3": "NEW",
+      "V4": "NEW",
+      "V5": "CHECK",
+      "V6": "REVERIFY",
+      "V7": "REVERIFY",
+      "V8": "CHECK",
+      "V9": "CHECK",
+      "I1": "CONTRA",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "RESTATE",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "RESTATE",
+      "I8": "NEW",
+      "I9": "NEW",
+      "I10": "EXTEND",
+      "I11": "RESTATE",
+      "I12": "NEW"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "CITED",
+      "R3": "CITED",
+      "R4": "CITED",
+      "R5": "BACKGROUND",
+      "R6": "FOLLOWED",
+      "R7": "CITED",
+      "R8": "CITED",
+      "R9": "FOLLOWED",
+      "R10": "BACKGROUND",
+      "R11": "FOLLOWED",
+      "R12": "CITED"
+     },
+     "notes": {
+      "P1": "Revision changelog; process, coded NEW.",
+      "V5": "Asks for a change; also re-verifies the refiredAt mechanism.",
+      "I1": "Operator comment predating research; its narrowing of finding 1 was overturned by research. CONTRA used for contradicts research, not a plan departure.",
+      "I3": "Datum predates research update 2, which absorbed it (selection effect).",
+      "I5": "Disclosure boilerplate; coded NEW (no PROCESS code for I).",
+      "I8": "Signature boilerplate; coded NEW.",
+      "I10": "Finds research's autoUpdates claim inert on native install, but implements as planned, so not a plan departure.",
+      "R9": "probeHealth half followed; oplog half ignored.",
+      "R12": "Plan quotes and corrects it (reapers.js import claim): CITED by order, also CONTRADICTED."
+     }
+    },
+    {
+     "digest": "O04",
+     "codes": {
+      "P1": "NEW",
+      "P2": "RESTATE",
+      "P3": "RESTATE",
+      "P4": "NEW",
+      "P5": "RESTATE",
+      "P6": "RESTATE",
+      "P7": "EXTEND",
+      "P8": "NEW",
+      "V1": "PROCESS",
+      "V2": "REVERIFY",
+      "V3": "REVERIFY",
+      "V4": "REVERIFY",
+      "V5": "REVERIFY",
+      "V6": "NEW",
+      "V7": "NEW",
+      "V8": "NEW",
+      "V9": "CHECK",
+      "V10": "NEW",
+      "V11": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "RESTATE",
+      "I5": "RESTATE",
+      "I6": "EXTEND",
+      "I7": "NEW"
+     },
+     "use": {
+      "R1": "FOLLOWED",
+      "R2": "BACKGROUND",
+      "R3": "BACKGROUND",
+      "R4": "CITED",
+      "R5": "BACKGROUND",
+      "R6": "CITED",
+      "R7": "BACKGROUND",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "BACKGROUND",
+      "R11": "FOLLOWED",
+      "R12": "FOLLOWED"
+     },
+     "notes": {
+      "P1": "Pruning note; coded NEW.",
+      "V5": "Fresh test run confirms plan's 'stay green'; also corrects 192 to 197.",
+      "I3": "Descoping departs from first-round plan Change 3 but the latest plan description already carries the ruling.",
+      "I6": "Ships fewer pins than the plan's six; adds red-first evidence.",
+      "R5": "Refuted hypothesis; nothing to act on, no later trace.",
+      "R11": "Plan adopted it as Change 3; later descoped to LIN-2517."
+     }
+    },
+    {
+     "digest": "O05",
+     "codes": {
+      "P1": "NEW",
+      "P2": "EXTEND",
+      "P3": "NEW",
+      "P4": "NEW",
+      "P5": "REVERIFY",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "EXTEND",
+      "P9": "NEW",
+      "P10": "RESTATE",
+      "P11": "NEW",
+      "V1": "PROCESS",
+      "V2": "REVERIFY",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "REVERIFY",
+      "V6": "REVERIFY",
+      "V7": "NEW",
+      "V8": "NEW",
+      "V9": "CHECK",
+      "V10": "CHECK",
+      "V11": "PROCESS",
+      "I1": "RESTATE",
+      "I2": "NEW",
+      "I3": "NEW",
+      "I4": "RESTATE",
+      "I5": "EXTEND",
+      "I6": "EXTEND",
+      "I7": "CONTRA",
+      "I8": "RESTATE",
+      "I9": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "BACKGROUND",
+      "R3": "BACKGROUND",
+      "R4": "BACKGROUND",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "BACKGROUND",
+      "R11": "FOLLOWED",
+      "R12": "FOLLOWED"
+     },
+     "notes": {
+      "P4": "Process line pointing to research; coded NEW.",
+      "P8": "Deferring Half C is a scope decision on research's recommended shape, not a factual contradiction.",
+      "V11": "Housekeeping about stray shell output in the description; no claim about the work.",
+      "I9": "Process line; coded NEW.",
+      "R12": "Plan followed the export lift; implementation later relocated the harness instead (also CONTRADICTED)."
+     }
+    },
+    {
+     "digest": "O06",
+     "codes": {
+      "P1": "NEW",
+      "P2": "REVERIFY",
+      "P3": "EXTEND",
+      "P4": "NEW",
+      "P5": "NEW",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "RESTATE",
+      "P9": "EXTEND",
+      "P10": "NEW",
+      "P11": "NEW",
+      "P12": "EXTEND",
+      "V1": "CHECK",
+      "V2": "NEW",
+      "V3": "CHECK",
+      "V4": "NEW",
+      "V5": "CHECK",
+      "V6": "CHECK",
+      "V7": "CHECK",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "REVERIFY",
+      "V11": "REVERIFY",
+      "V12": "CHECK",
+      "I1": "NEW",
+      "I2": "NEW",
+      "I3": "NEW",
+      "I4": "NEW",
+      "I5": "EXTEND",
+      "I6": "NEW",
+      "I7": "NEW",
+      "I8": "EXTEND",
+      "I9": "NEW",
+      "I10": "NEW",
+      "I11": "NEW",
+      "I12": "NEW"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "BACKGROUND",
+      "R3": "FOLLOWED",
+      "R4": "IGNORED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "CITED",
+      "R8": "CITED",
+      "R9": "FOLLOWED",
+      "R10": "CITED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "P12": "Stronger than research's internal-flow claim; new sweep evidence, so EXTEND not REVERIFY.",
+      "V3": "Framing sentence of the F1 defect; the new facts are in V2/V4.",
+      "I5": "Coordinator ruling; adapter corrects the plan's row handling (borderline CONTRA).",
+      "I6": "Lists later-round settled items not in the first-round plan.",
+      "I7": "Process recommendation to bypass further plan revision.",
+      "R7": "Plan names the research's consumer list and disproves routes/proxy.js:33 (also partly CONTRADICTED)."
+     }
+    }
+   ]
+  },
+  {
+   "reader": "A2",
+   "digests": [
+    {
+     "digest": "O07",
+     "codes": {
+      "P1": "NEW",
+      "P2": "RESTATE",
+      "P3": "EXTEND",
+      "P4": "EXTEND",
+      "P5": "EXTEND",
+      "P6": "EXTEND",
+      "P7": "NEW",
+      "V1": "CHECK",
+      "V2": "REVERIFY",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "NEW",
+      "V6": "NEW",
+      "V7": "NEW",
+      "V8": "CHECK",
+      "V9": "CHECK",
+      "V10": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "EXTEND",
+      "I5": "EXTEND",
+      "I6": "RESTATE",
+      "I7": "EXTEND",
+      "I8": "NEW",
+      "I9": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "IGNORED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED",
+      "R12": "CITED"
+     },
+     "notes": {
+      "P1": "post-hoc status stub; no PROCESS code for P, so NEW",
+      "P4": "research left the effort question open; plan picks a third option (read-only reflection), not CONTRA",
+      "R7": "bystander tax only traced via later e2e migration of those surfaces; could be BACKGROUND",
+      "V1": "verdict line that also names the missed file; CHECK taken first"
+     }
+    },
+    {
+     "digest": "O08",
+     "codes": {
+      "P1": "NEW",
+      "P2": "EXTEND",
+      "P3": "EXTEND",
+      "P4": "EXTEND",
+      "P5": "EXTEND",
+      "P6": "RESTATE",
+      "P7": "EXTEND",
+      "V1": "REVERIFY",
+      "V2": "NEW",
+      "V3": "REVERIFY",
+      "V4": "NEW",
+      "V5": "CHECK",
+      "V6": "REVERIFY",
+      "V7": "CHECK",
+      "V8": "CHECK",
+      "V9": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "NEW",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "BACKGROUND",
+      "R3": "FOLLOWED",
+      "R4": "BACKGROUND",
+      "R5": "FOLLOWED",
+      "R6": "IGNORED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED",
+      "R12": "CITED"
+     },
+     "notes": {
+      "P1": "post-merge status line",
+      "P4": "session-fit text coded EXTEND because it builds on the research's refactor split",
+      "R12": "its 'existing fakes still pass' cost claim was overturned by review F2, but the plan cites the refactor first, so CITED",
+      "V6": "history check confirmed with fresh git log, not CHECK"
+     }
+    },
+    {
+     "digest": "O09",
+     "codes": {
+      "P1": "NEW",
+      "P2": "EXTEND",
+      "P3": "REVERIFY",
+      "P4": "RESTATE",
+      "P5": "EXTEND",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "NEW",
+      "V1": "CHECK",
+      "V2": "CHECK",
+      "V3": "CHECK",
+      "V4": "CHECK",
+      "V5": "NEW",
+      "V6": "CHECK",
+      "V7": "CHECK",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "CHECK",
+      "V11": "REVERIFY",
+      "I1": "RESTATE",
+      "I2": "EXTEND",
+      "I3": "NEW",
+      "I4": "REVERIFY",
+      "I5": "RESTATE",
+      "I6": "REVERIFY",
+      "I7": "NEW",
+      "I8": "REVERIFY",
+      "I9": "NEW",
+      "I10": "EXTEND",
+      "I11": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "CITED",
+      "R3": "CITED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "CITED"
+     },
+     "notes": {
+      "P4": "same decision the research recommended, but 'closes the actual gap' overclaims against research evidence (review B1); RESTATE taken first",
+      "P7": "plan moves :3328 out of C1, which research had in scope; coded EXTEND as a scope decision rather than CONTRA",
+      "V10": "judgement plus new facts (pins not broken, injection point); CHECK taken first",
+      "I1": "comment predates the research; restates the LIN-3005 facts the research already holds",
+      "R9": "plan briefly claimed to close the LIN-2484/2485 gap, but review restored it"
+     }
+    },
+    {
+     "digest": "O10",
+     "codes": {
+      "P1": "EXTEND",
+      "P2": "RESTATE",
+      "V1": "REVERIFY",
+      "V2": "PROCESS",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "NEW",
+      "V6": "NEW",
+      "V7": "CHECK",
+      "V8": "NEW",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "NEW",
+      "I4": "EXTEND",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "NEW",
+      "I8": "NEW"
+     },
+     "use": {
+      "R1": "FOLLOWED",
+      "R2": "BACKGROUND",
+      "R3": "BACKGROUND",
+      "R4": "BACKGROUND",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "BACKGROUND",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "V1": "the 'plan review' section is really the plan-finalisation comment; coded as V anyway",
+      "V8": "mostly gate bookkeeping, but it flags a new risk (inverted 'voyage reconstruction leak' pin), so NEW",
+      "R4": "'no defect' finding; nothing to act on"
+     }
+    },
+    {
+     "digest": "O11",
+     "codes": {
+      "P1": "EXTEND",
+      "P2": "EXTEND",
+      "P3": "EXTEND",
+      "P4": "EXTEND",
+      "P5": "RESTATE",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "RESTATE",
+      "P9": "EXTEND",
+      "P10": "NEW",
+      "V1": "CHECK",
+      "V2": "NEW",
+      "V3": "CHECK",
+      "V4": "NEW",
+      "V5": "NEW",
+      "V6": "NEW",
+      "V7": "NEW",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "CHECK",
+      "V11": "CHECK",
+      "V12": "PROCESS",
+      "I1": "NEW",
+      "I2": "NEW",
+      "I3": "NEW",
+      "I4": "NEW",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "NEW",
+      "I8": "NEW",
+      "I9": "NEW",
+      "I10": "NEW",
+      "I11": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "CONTRADICTED",
+      "R7": "FOLLOWED",
+      "R8": "IGNORED",
+      "R9": "FOLLOWED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "R4": "plan picked the research's named alternative (dedicated collection), not an overturn",
+      "R6": "review F3 found a second runner-repo poll consumer (chrome-extension)",
+      "P7": "same as the research's recommendation plus a concrete ~1.5s bound",
+      "I1": "the only implementer comment is a later L2 test-hang fix that neither plan nor research covers, so all I units are NEW"
+     }
+    },
+    {
+     "digest": "O12",
+     "codes": {
+      "P1": "NEW",
+      "P2": "NEW",
+      "P3": "RESTATE",
+      "P4": "EXTEND",
+      "P5": "NEW",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "NEW",
+      "P9": "NEW",
+      "P10": "RESTATE",
+      "P11": "RESTATE",
+      "P12": "NEW",
+      "V1": "CHECK",
+      "V2": "REVERIFY",
+      "V3": "NEW",
+      "V4": "CHECK",
+      "V5": "CHECK",
+      "V6": "CHECK",
+      "V7": "REVERIFY",
+      "V8": "CHECK",
+      "V9": "CHECK",
+      "V10": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "NEW",
+      "I4": "REVERIFY",
+      "I5": "RESTATE",
+      "I6": "REVERIFY",
+      "I7": "REVERIFY",
+      "I8": "NEW",
+      "I9": "REVERIFY",
+      "I10": "NEW",
+      "I11": "NEW",
+      "I12": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "IGNORED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "P6": "the 503 is research's choice; the noted divergence from the proxy's 500 is new",
+      "V3": "missing strategy-framing record, shown by grep, so NEW; V8 (mislabelled criteria) is plan-text judgement, so CHECK",
+      "I12": "verdict summary; I has no PROCESS code"
+     }
+    }
+   ]
+  },
+  {
+   "reader": "B1",
+   "digests": [
+    {
+     "digest": "O12",
+     "codes": {
+      "P1": "NEW",
+      "P2": "NEW",
+      "P3": "RESTATE",
+      "P4": "EXTEND",
+      "P5": "NEW",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "NEW",
+      "P9": "NEW",
+      "P10": "RESTATE",
+      "P11": "RESTATE",
+      "P12": "EXTEND",
+      "V1": "CHECK",
+      "V2": "REVERIFY",
+      "V3": "NEW",
+      "V4": "CHECK",
+      "V5": "CHECK",
+      "V6": "CHECK",
+      "V7": "REVERIFY",
+      "V8": "CHECK",
+      "V9": "CHECK",
+      "V10": "CHECK",
+      "I1": "RESTATE",
+      "I2": "EXTEND",
+      "I3": "NEW",
+      "I4": "REVERIFY",
+      "I5": "REVERIFY",
+      "I6": "REVERIFY",
+      "I7": "REVERIFY",
+      "I8": "NEW",
+      "I9": "REVERIFY",
+      "I10": "EXTEND",
+      "I11": "EXTEND",
+      "I12": "NEW"
+     },
+     "use": {
+      "R1": "FOLLOWED",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "CITED",
+      "R9": "FOLLOWED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "P1": "Post-ship summary stub; process content coded NEW for want of a fitting code.",
+      "P7": "Research gave the proxy swap to LIN-3025; folding it into this PR is a scope decision, so EXTEND, not CONTRA.",
+      "V1": "Verdict line, but it makes claims about the plan, so CHECK, not PROCESS.",
+      "V3": "Missing strategy-framing record is a defect neither step stated, not a judgement of a stated claim.",
+      "I12": "Verdict rationale; no PROCESS code is available for I units.",
+      "R2": "Only the anchor reappears (V7); the 404-HTML quirk shows no trace."
+     }
+    },
+    {
+     "digest": "O11",
+     "codes": {
+      "P1": "NEW",
+      "P2": "EXTEND",
+      "P3": "EXTEND",
+      "P4": "NEW",
+      "P5": "RESTATE",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "RESTATE",
+      "P9": "NEW",
+      "P10": "NEW",
+      "V1": "CHECK",
+      "V2": "NEW",
+      "V3": "NEW",
+      "V4": "NEW",
+      "V5": "NEW",
+      "V6": "NEW",
+      "V7": "NEW",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "CHECK",
+      "V11": "CHECK",
+      "V12": "PROCESS",
+      "I1": "NEW",
+      "I2": "NEW",
+      "I3": "NEW",
+      "I4": "NEW",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "NEW",
+      "I8": "NEW",
+      "I9": "NEW",
+      "I10": "NEW",
+      "I11": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "CONTRADICTED",
+      "R7": "FOLLOWED",
+      "R8": "IGNORED",
+      "R9": "FOLLOWED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "P4": "Best-effort dashboard (D4) came from the plan review's F1, not from the research; the 'requested' wording part is a restatement.",
+      "R4": "Plan took the dedicated-collection alternative that research had left open; the 'don't use get/save' guidance was kept.",
+      "R10": "Sibling-field recommendation not taken, but research explicitly allowed a dedicated collection; the rest was followed.",
+      "R6": "Plan review found a second runner poll consumer (chrome-extension service worker).",
+      "I1": "The I units are a later L2 test-hang fix, unrelated to the plan text, so nearly all are NEW."
+     }
+    },
+    {
+     "digest": "O10",
+     "codes": {
+      "P1": "EXTEND",
+      "P2": "RESTATE",
+      "V1": "REVERIFY",
+      "V2": "PROCESS",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "NEW",
+      "V6": "NEW",
+      "V7": "CHECK",
+      "V8": "CHECK",
+      "I1": "RESTATE",
+      "I2": "REVERIFY",
+      "I3": "NEW",
+      "I4": "EXTEND",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "NEW",
+      "I8": "NEW"
+     },
+     "use": {
+      "R1": "FOLLOWED",
+      "R2": "BACKGROUND",
+      "R3": "BACKGROUND",
+      "R4": "BACKGROUND",
+      "R5": "BACKGROUND",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "CITED",
+      "R9": "CITED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "V1": "The 'plan review' section is really the plan author's finalization comment; coded with V codes anyway.",
+      "V8": "Mostly gate bookkeeping, but it judges the relaxation criterion and flags the pin inversion, so CHECK.",
+      "I2": "The planned placement was re-confirmed by reading the guard order at HEAD.",
+      "R5": "Verified context; a later step only covers it via the 'unchanged from research' class record."
+     }
+    },
+    {
+     "digest": "O09",
+     "codes": {
+      "P1": "NEW",
+      "P2": "EXTEND",
+      "P3": "REVERIFY",
+      "P4": "RESTATE",
+      "P5": "EXTEND",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "NEW",
+      "V1": "CHECK",
+      "V2": "CHECK",
+      "V3": "CHECK",
+      "V4": "CHECK",
+      "V5": "NEW",
+      "V6": "CHECK",
+      "V7": "CHECK",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "NEW",
+      "V11": "NEW",
+      "I1": "RESTATE",
+      "I2": "EXTEND",
+      "I3": "NEW",
+      "I4": "REVERIFY",
+      "I5": "RESTATE",
+      "I6": "REVERIFY",
+      "I7": "NEW",
+      "I8": "REVERIFY",
+      "I9": "NEW",
+      "I10": "EXTEND",
+      "I11": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "CITED",
+      "R3": "CITED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "CITED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "CITED"
+     },
+     "notes": {
+      "P4": "The decision restates research section 7.2, but the 'closes the actual gap' claim conflicts with research R1; RESTATE taken by the order rule.",
+      "V10": "Judges the refactor, but also adds new facts (pins don't cover adopt-arm text; injection point), so NEW.",
+      "I1": "Posted before the research and repeats the LIN-3005 incident facts that research also covers.",
+      "R9": "The first plan said it closed the gap rather than deferring it; after review, the deferral to LIN-3018 was followed.",
+      "R6": "The plan uses research's C2 label, so CITED."
+     }
+    },
+    {
+     "digest": "O08",
+     "codes": {
+      "P1": "NEW",
+      "P2": "RESTATE",
+      "P3": "EXTEND",
+      "P4": "EXTEND",
+      "P5": "EXTEND",
+      "P6": "RESTATE",
+      "P7": "EXTEND",
+      "V1": "REVERIFY",
+      "V2": "NEW",
+      "V3": "REVERIFY",
+      "V4": "NEW",
+      "V5": "CHECK",
+      "V6": "REVERIFY",
+      "V7": "CHECK",
+      "V8": "CHECK",
+      "V9": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "NEW",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "BACKGROUND",
+      "R3": "FOLLOWED",
+      "R4": "BACKGROUND",
+      "R5": "FOLLOWED",
+      "R6": "BACKGROUND",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED",
+      "R12": "CITED"
+     },
+     "notes": {
+      "P6": "The plan presents this as a newly resolved question, but research step 2 already prescribed the same fall-through.",
+      "P4": "Session fit is not in the research; coded EXTEND as a scope decision built on research's buildRulingRef refactor.",
+      "R8": "Weak trace: the final success rule accepts outcome alongside firstStampWins."
+     }
+    },
+    {
+     "digest": "O07",
+     "codes": {
+      "P1": "NEW",
+      "P2": "RESTATE",
+      "P3": "EXTEND",
+      "P4": "EXTEND",
+      "P5": "EXTEND",
+      "P6": "NEW",
+      "P7": "NEW",
+      "V1": "NEW",
+      "V2": "REVERIFY",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "NEW",
+      "V6": "NEW",
+      "V7": "NEW",
+      "V8": "CHECK",
+      "V9": "NEW",
+      "V10": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "EXTEND",
+      "I5": "RESTATE",
+      "I6": "RESTATE",
+      "I7": "EXTEND",
+      "I8": "NEW",
+      "I9": "NEW"
+     },
+     "use": {
+      "R1": "CITED",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "IGNORED",
+      "R10": "FOLLOWED",
+      "R11": "FOLLOWED",
+      "R12": "CITED"
+     },
+     "notes": {
+      "V1": "Verdict line that carries a new defect (the unnamed 7th spec file), so NEW, not PROCESS or CHECK.",
+      "V7": "Overturns research's x9 count with fresh evidence; coded NEW because V has no CONTRA code.",
+      "R7": "Bystander surfaces were handled; the benefit tickets show no trace."
+     }
+    }
+   ]
+  },
+  {
+   "reader": "B2",
+   "digests": [
+    {
+     "digest": "O06",
+     "codes": {
+      "P1": "NEW",
+      "P2": "REVERIFY",
+      "P3": "EXTEND",
+      "P4": "NEW",
+      "P5": "NEW",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "REVERIFY",
+      "P9": "EXTEND",
+      "P10": "NEW",
+      "P11": "NEW",
+      "P12": "EXTEND",
+      "V1": "PROCESS",
+      "V2": "NEW",
+      "V3": "CHECK",
+      "V4": "NEW",
+      "V5": "CHECK",
+      "V6": "CHECK",
+      "V7": "CHECK",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "REVERIFY",
+      "V11": "REVERIFY",
+      "V12": "CHECK",
+      "I1": "NEW",
+      "I2": "NEW",
+      "I3": "NEW",
+      "I4": "NEW",
+      "I5": "EXTEND",
+      "I6": "RESTATE",
+      "I7": "NEW",
+      "I8": "EXTEND",
+      "I9": "NEW",
+      "I10": "NEW",
+      "I11": "NEW",
+      "I12": "NEW"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "BACKGROUND",
+      "R3": "FOLLOWED",
+      "R4": "IGNORED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "CITED",
+      "R8": "CITED",
+      "R9": "FOLLOWED",
+      "R10": "CITED",
+      "R11": "CITED"
+     },
+     "notes": {
+      "P1": "Close-out pruning note, no claim about the work; coded NEW for want of a process code.",
+      "P5": "Echoes the description's 'dial with no gauge' but the no-workaround-tax claim is new.",
+      "P8": "Same docstring fix as research R7; quotes the current text with a shifted line range, so REVERIFY over RESTATE.",
+      "V3": "Sets up the F1 defect; treated as judging the plan's steps (CHECK), with the new fact carried by V2/V4.",
+      "V12": "Next-action line, but it asks for changes and judges what survives, so CHECK over PROCESS.",
+      "I6": "Coordinator instruction listing settled decisions, mostly from later revisions not shown.",
+      "R7": "Plan cites the Surface Assessment for the fix but corrects its consumer list (routes/proxy.js:33).",
+      "R11": "Plan uses the research's H1 label for the denominator hazard and resolves it in D1."
+     }
+    },
+    {
+     "digest": "O05",
+     "codes": {
+      "P1": "EXTEND",
+      "P2": "EXTEND",
+      "P3": "NEW",
+      "P4": "NEW",
+      "P5": "REVERIFY",
+      "P6": "EXTEND",
+      "P7": "EXTEND",
+      "P8": "EXTEND",
+      "P9": "EXTEND",
+      "P10": "RESTATE",
+      "P11": "NEW",
+      "V1": "PROCESS",
+      "V2": "REVERIFY",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "REVERIFY",
+      "V6": "REVERIFY",
+      "V7": "NEW",
+      "V8": "NEW",
+      "V9": "CHECK",
+      "V10": "CHECK",
+      "V11": "PROCESS",
+      "I1": "RESTATE",
+      "I2": "NEW",
+      "I3": "NEW",
+      "I4": "RESTATE",
+      "I5": "REVERIFY",
+      "I6": "REVERIFY",
+      "I7": "CONTRA",
+      "I8": "RESTATE",
+      "I9": "NEW"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "BACKGROUND",
+      "R3": "BACKGROUND",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "BACKGROUND",
+      "R11": "FOLLOWED",
+      "R12": "FOLLOWED"
+     },
+     "notes": {
+      "P3": "Close-out pruning note; NEW for want of a process code.",
+      "P4": "Bare process line ('turned the research into a plan'); NEW for want of a process code.",
+      "P8": "Deferring Half C departs from the research's recommendation; coded EXTEND (a scope decision on a research point) because it comes before CONTRA.",
+      "V11": "Housekeeping about stray shell text in the description, not about the work.",
+      "I9": "Process line; NEW for want of a process code.",
+      "R3": "Growth figures (155 deps) are sizing context; no later step uses them."
+     }
+    },
+    {
+     "digest": "O04",
+     "codes": {
+      "P1": "NEW",
+      "P2": "RESTATE",
+      "P3": "RESTATE",
+      "P4": "NEW",
+      "P5": "RESTATE",
+      "P6": "RESTATE",
+      "P7": "EXTEND",
+      "P8": "NEW",
+      "V1": "PROCESS",
+      "V2": "REVERIFY",
+      "V3": "REVERIFY",
+      "V4": "REVERIFY",
+      "V5": "REVERIFY",
+      "V6": "NEW",
+      "V7": "NEW",
+      "V8": "NEW",
+      "V9": "CHECK",
+      "V10": "NEW",
+      "V11": "CHECK",
+      "I1": "NEW",
+      "I2": "RESTATE",
+      "I3": "CONTRA",
+      "I4": "RESTATE",
+      "I5": "RESTATE",
+      "I6": "EXTEND",
+      "I7": "NEW"
+     },
+     "use": {
+      "R1": "FOLLOWED",
+      "R2": "BACKGROUND",
+      "R3": "BACKGROUND",
+      "R4": "CITED",
+      "R5": "FOLLOWED",
+      "R6": "CITED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "FOLLOWED",
+      "R10": "BACKGROUND",
+      "R11": "FOLLOWED",
+      "R12": "FOLLOWED"
+     },
+     "notes": {
+      "P1": "Pruning note; NEW for want of a process code.",
+      "V10": "Refutes the plan's test premise with fresh evidence (197, not 192), so NEW rather than REVERIFY.",
+      "I3": "Descoping Change 3 departs from the first-round plan; the current description already carries the ruling, written after the fact.",
+      "I6": "Ships fewer pins than the plan's 6 but adds red-before-green evidence.",
+      "R5": "The plan-review repeats the dispatcher ordering and 'not a race' in another context; the trace is weak.",
+      "R7": "Same as R5."
+     }
+    },
+    {
+     "digest": "O03",
+     "codes": {
+      "P1": "NEW",
+      "P2": "CONTRA",
+      "P3": "EXTEND",
+      "P4": "RESTATE",
+      "P5": "EXTEND",
+      "P6": "RESTATE",
+      "P7": "NEW",
+      "P8": "EXTEND",
+      "P9": "EXTEND",
+      "P10": "EXTEND",
+      "P11": "EXTEND",
+      "P12": "NEW",
+      "V1": "PROCESS",
+      "V2": "NEW",
+      "V3": "NEW",
+      "V4": "NEW",
+      "V5": "CHECK",
+      "V6": "REVERIFY",
+      "V7": "REVERIFY",
+      "V8": "CHECK",
+      "V9": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "RESTATE",
+      "I5": "NEW",
+      "I6": "NEW",
+      "I7": "RESTATE",
+      "I8": "NEW",
+      "I9": "NEW",
+      "I10": "EXTEND",
+      "I11": "RESTATE",
+      "I12": "NEW"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "CITED",
+      "R3": "CITED",
+      "R4": "CITED",
+      "R5": "BACKGROUND",
+      "R6": "FOLLOWED",
+      "R7": "CITED",
+      "R8": "CITED",
+      "R9": "FOLLOWED",
+      "R10": "BACKGROUND",
+      "R11": "FOLLOWED",
+      "R12": "CONTRADICTED"
+     },
+     "notes": {
+      "P1": "Revision changelog answering the plan-review; NEW for want of a process code.",
+      "I1": "Operator comment that predates the research; its facts are in the research, but the research rejects its narrowing of the breaker.",
+      "I3": "Operator evidence that predates the research; covered by research update 2.",
+      "I5": "Disclosure/process line; NEW for want of a process code.",
+      "I8": "Signature line; NEW for want of a process code.",
+      "I10": "Overturns the research's claim that the native CLI honours autoUpdates, but the plan had flagged it for checking, so EXTEND.",
+      "I12": "New evidence (a spinning kitty process) that cuts against the research's socket/TCC framing; NEW comes before CONTRA.",
+      "R12": "The plan names this and overturns its 'already imported into reapers.js' claim; coded CONTRADICTED rather than CITED.",
+      "R10": "Diagnostic context; I12 later weakens the socket framing."
+     }
+    },
+    {
+     "digest": "O02",
+     "codes": {
+      "P1": "NEW",
+      "P2": "NEW",
+      "P3": "REVERIFY",
+      "P4": "EXTEND",
+      "P5": "EXTEND",
+      "P6": "NEW",
+      "P7": "NEW",
+      "P8": "RESTATE",
+      "P9": "NEW",
+      "P10": "RESTATE",
+      "P11": "EXTEND",
+      "P12": "NEW",
+      "V1": "REVERIFY",
+      "V2": "CHECK",
+      "V3": "CHECK",
+      "V4": "REVERIFY",
+      "V5": "CHECK",
+      "V6": "REVERIFY",
+      "V7": "PROCESS",
+      "V8": "REVERIFY",
+      "V9": "REVERIFY",
+      "V10": "CHECK",
+      "V11": "CHECK",
+      "V12": "PROCESS",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "RESTATE",
+      "I4": "EXTEND",
+      "I5": "RESTATE",
+      "I6": "NEW",
+      "I7": "NEW",
+      "I8": "RESTATE",
+      "I9": "NEW",
+      "I10": "NEW",
+      "I11": "REVERIFY"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "FOLLOWED",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "CONTRADICTED",
+      "R9": "IGNORED",
+      "R10": "FOLLOWED",
+      "R11": "IGNORED",
+      "R12": "FOLLOWED"
+     },
+     "notes": {
+      "P1": "Close-out pruning note; NEW for want of a process code.",
+      "P12": "Next-action line; NEW for want of a process code.",
+      "V1": "Verdict header, but it re-runs git log to confirm no drift, so REVERIFY over PROCESS.",
+      "V2": "The research had already flagged the stale on-page prose (section 7), so this is CHECK, not NEW.",
+      "V7": "Lead-in line with no content of its own.",
+      "I1": "LIN-2432 carry-over comment that predates the research; the research covers it in full.",
+      "I4": "Operator ruling: takes the research's options and settles them (180s cap plus emitting surface).",
+      "R5": "Dismiss is zero-fetch as advised; whether the Approve guard discipline was copied is not visible because the plan was pruned.",
+      "R8": "The operator ruling rejects 'reinterpret_by_shape', which is this option.",
+      "R9": "The plan's detail was pruned; nothing visible addresses user-turn floors."
+     }
+    },
+    {
+     "digest": "O01",
+     "codes": {
+      "P1": "EXTEND",
+      "P2": "EXTEND",
+      "P3": "NEW",
+      "P4": "EXTEND",
+      "P5": "RESTATE",
+      "P6": "REVERIFY",
+      "P7": "NEW",
+      "V1": "CHECK",
+      "V2": "NEW",
+      "V3": "NEW",
+      "V4": "NEW",
+      "V5": "NEW",
+      "V6": "NEW",
+      "V7": "CHECK",
+      "V8": "REVERIFY",
+      "V9": "NEW",
+      "V10": "NEW",
+      "V11": "CHECK",
+      "V12": "CHECK",
+      "I1": "RESTATE",
+      "I2": "RESTATE",
+      "I3": "NEW",
+      "I4": "RESTATE",
+      "I5": "RESTATE",
+      "I6": "REVERIFY",
+      "I7": "NEW"
+     },
+     "use": {
+      "R1": "BACKGROUND",
+      "R2": "FOLLOWED",
+      "R3": "FOLLOWED",
+      "R4": "BACKGROUND",
+      "R5": "FOLLOWED",
+      "R6": "FOLLOWED",
+      "R7": "FOLLOWED",
+      "R8": "FOLLOWED",
+      "R9": "CITED",
+      "R10": "CITED",
+      "R11": "FOLLOWED"
+     },
+     "notes": {
+      "V1": "The verdict line carries the substantive leak claim, so CHECK over PROCESS; the new evidence for it sits in V2/V3.",
+      "V4": "Refutes the plan's 'eleven groups' claim with fresh evidence, so NEW rather than REVERIFY.",
+      "V9": "Neither research nor the first-round plan had the non-pollution property; the current plan text adopted it afterwards.",
+      "I1": "Class-B addendum that predates the research; the research's section 7.5 covers it.",
+      "I2": "Sequencing comment that predates the research.",
+      "R9": "Only the close-out edit of the description cites it (research fa0d588d); no plan, review or implementation comment does.",
+      "R10": "Same as R9; S6's Class-B guidance does act on it."
+     }
+    }
+   ]
+  }
+ ],
+ "summary": {
+  "freshSample": {
+   "tickets": 12,
+   "units": 488,
+   "kappa": {
+    "P": {
+     "n": 108,
+     "agree": 0.898,
+     "kappa": 0.849
+    },
+    "V": {
+     "n": 127,
+     "agree": 0.913,
+     "kappa": 0.875
+    },
+    "I": {
+     "n": 116,
+     "agree": 0.862,
+     "kappa": 0.794
+    },
+    "R": {
+     "n": 137,
+     "agree": 0.869,
+     "kappa": 0.775
+    }
+   },
+   "shares": {
+    "planRestates": {
+     "mean": 0.206,
+     "ci95": [
+      0.135,
+      0.292
+     ],
+     "tickets": 12
+    },
+    "planReverifies": {
+     "mean": 0.047,
+     "ci95": [
+      0.018,
+      0.081
+     ],
+     "tickets": 12
+    },
+    "planExtendsOrNew": {
+     "mean": 0.74,
+     "ci95": [
+      0.672,
+      0.798
+     ],
+     "tickets": 12
+    },
+    "planContra": {
+     "mean": 0.007,
+     "ci95": [
+      0,
+      0.021
+     ],
+     "tickets": 12
+    },
+    "reviewChecks": {
+     "mean": 0.399,
+     "ci95": [
+      0.327,
+      0.481
+     ],
+     "tickets": 12
+    },
+    "reviewReverifies": {
+     "mean": 0.274,
+     "ci95": [
+      0.227,
+      0.326
+     ],
+     "tickets": 12
+    },
+    "reviewNew": {
+     "mean": 0.268,
+     "ci95": [
+      0.184,
+      0.353
+     ],
+     "tickets": 12
+    },
+    "reviewProcess": {
+     "mean": 0.059,
+     "ci95": [
+      0.026,
+      0.094
+     ],
+     "tickets": 12
+    },
+    "implRestatesOrReverifies": {
+     "mean": 0.413,
+     "ci95": [
+      0.288,
+      0.519
+     ],
+     "tickets": 12
+    },
+    "implExtendsOrNew": {
+     "mean": 0.569,
+     "ci95": [
+      0.461,
+      0.694
+     ],
+     "tickets": 12
+    },
+    "researchUsed": {
+     "mean": 0.777,
+     "ci95": [
+      0.713,
+      0.847
+     ],
+     "tickets": 12
+    },
+    "researchCited": {
+     "mean": 0.181,
+     "ci95": [
+      0.11,
+      0.27
+     ],
+     "tickets": 12
+    },
+    "researchFollowed": {
+     "mean": 0.596,
+     "ci95": [
+      0.506,
+      0.681
+     ],
+     "tickets": 12
+    },
+    "researchBackground": {
+     "mean": 0.161,
+     "ci95": [
+      0.082,
+      0.236
+     ],
+     "tickets": 12
+    }
+   },
+   "citedOfUsed": 0.231,
+   "digests": 12,
+   "issues": [
+    "LIN-1938",
+    "LIN-2435",
+    "LIN-2446",
+    "LIN-2511",
+    "LIN-2543",
+    "LIN-2641",
+    "LIN-2719",
+    "LIN-2889",
+    "LIN-2933",
+    "LIN-2975",
+    "LIN-2994",
+    "LIN-3026"
+   ]
+  },
+  "paperSampleBootstrap": {
+   "tickets": 13,
+   "units": 535,
+   "kappa": {
+    "P": {
+     "n": 127,
+     "agree": 0.866,
+     "kappa": 0.814
+    },
+    "V": {
+     "n": 133,
+     "agree": 0.917,
+     "kappa": 0.883
+    },
+    "I": {
+     "n": 145,
+     "agree": 0.766,
+     "kappa": 0.674
+    },
+    "R": {
+     "n": 130,
+     "agree": 0.862,
+     "kappa": 0.728
+    }
+   },
+   "shares": {
+    "planRestates": {
+     "mean": 0.254,
+     "ci95": [
+      0.158,
+      0.367
+     ],
+     "tickets": 13
+    },
+    "planReverifies": {
+     "mean": 0.07,
+     "ci95": [
+      0.043,
+      0.099
+     ],
+     "tickets": 13
+    },
+    "planExtendsOrNew": {
+     "mean": 0.65,
+     "ci95": [
+      0.542,
+      0.75
+     ],
+     "tickets": 13
+    },
+    "planContra": {
+     "mean": 0.025,
+     "ci95": [
+      0,
+      0.054
+     ],
+     "tickets": 13
+    },
+    "reviewChecks": {
+     "mean": 0.32,
+     "ci95": [
+      0.224,
+      0.423
+     ],
+     "tickets": 13
+    },
+    "reviewReverifies": {
+     "mean": 0.349,
+     "ci95": [
+      0.264,
+      0.449
+     ],
+     "tickets": 13
+    },
+    "reviewNew": {
+     "mean": 0.209,
+     "ci95": [
+      0.145,
+      0.274
+     ],
+     "tickets": 13
+    },
+    "reviewProcess": {
+     "mean": 0.123,
+     "ci95": [
+      0.045,
+      0.231
+     ],
+     "tickets": 13
+    },
+    "implRestatesOrReverifies": {
+     "mean": 0.411,
+     "ci95": [
+      0.31,
+      0.519
+     ],
+     "tickets": 13
+    },
+    "implExtendsOrNew": {
+     "mean": 0.579,
+     "ci95": [
+      0.476,
+      0.682
+     ],
+     "tickets": 13
+    },
+    "researchUsed": {
+     "mean": 0.751,
+     "ci95": [
+      0.653,
+      0.844
+     ],
+     "tickets": 12
+    },
+    "researchCited": {
+     "mean": 0.082,
+     "ci95": [
+      0.039,
+      0.132
+     ],
+     "tickets": 12
+    },
+    "researchFollowed": {
+     "mean": 0.669,
+     "ci95": [
+      0.583,
+      0.749
+     ],
+     "tickets": 12
+    },
+    "researchBackground": {
+     "mean": 0.184,
+     "ci95": [
+      0.113,
+      0.263
+     ],
+     "tickets": 12
+    }
+   },
+   "citedOfUsed": 0.112
+  },
+  "pooled": {
+   "tickets": 25,
+   "units": 1023,
+   "kappa": {
+    "P": {
+     "n": 235,
+     "agree": 0.881,
+     "kappa": 0.831
+    },
+    "V": {
+     "n": 260,
+     "agree": 0.915,
+     "kappa": 0.879
+    },
+    "I": {
+     "n": 261,
+     "agree": 0.808,
+     "kappa": 0.726
+    },
+    "R": {
+     "n": 267,
+     "agree": 0.865,
+     "kappa": 0.756
+    }
+   },
+   "shares": {
+    "planRestates": {
+     "mean": 0.231,
+     "ci95": [
+      0.168,
+      0.3
+     ],
+     "tickets": 25
+    },
+    "planReverifies": {
+     "mean": 0.059,
+     "ci95": [
+      0.038,
+      0.081
+     ],
+     "tickets": 25
+    },
+    "planExtendsOrNew": {
+     "mean": 0.693,
+     "ci95": [
+      0.619,
+      0.758
+     ],
+     "tickets": 25
+    },
+    "planContra": {
+     "mean": 0.016,
+     "ci95": [
+      0.003,
+      0.034
+     ],
+     "tickets": 25
+    },
+    "reviewChecks": {
+     "mean": 0.358,
+     "ci95": [
+      0.292,
+      0.423
+     ],
+     "tickets": 25
+    },
+    "reviewReverifies": {
+     "mean": 0.313,
+     "ci95": [
+      0.259,
+      0.373
+     ],
+     "tickets": 25
+    },
+    "reviewNew": {
+     "mean": 0.237,
+     "ci95": [
+      0.185,
+      0.289
+     ],
+     "tickets": 25
+    },
+    "reviewProcess": {
+     "mean": 0.092,
+     "ci95": [
+      0.048,
+      0.155
+     ],
+     "tickets": 25
+    },
+    "implRestatesOrReverifies": {
+     "mean": 0.412,
+     "ci95": [
+      0.333,
+      0.491
+     ],
+     "tickets": 25
+    },
+    "implExtendsOrNew": {
+     "mean": 0.574,
+     "ci95": [
+      0.495,
+      0.655
+     ],
+     "tickets": 25
+    },
+    "researchUsed": {
+     "mean": 0.764,
+     "ci95": [
+      0.701,
+      0.821
+     ],
+     "tickets": 24
+    },
+    "researchCited": {
+     "mean": 0.132,
+     "ci95": [
+      0.083,
+      0.188
+     ],
+     "tickets": 24
+    },
+    "researchFollowed": {
+     "mean": 0.632,
+     "ci95": [
+      0.567,
+      0.693
+     ],
+     "tickets": 24
+    },
+    "researchBackground": {
+     "mean": 0.173,
+     "ci95": [
+      0.119,
+      0.228
+     ],
+     "tickets": 24
+    }
+   },
+   "citedOfUsed": 0.174
+  }
+ }
+}

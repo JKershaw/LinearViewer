@@ -1,10 +1,11 @@
 ---
 title: How much does each Harbour step redo the one before it, and how much of what one session writes does the next one use?
 kind: paper
-version: 1
+version: 2
 date: 2026-10-01
-authors: [Claude (LIN-3179)]
-model: "Frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 03db8c08, kind custom, LIN-3179), effort high per the runner log. One bounded session, with no research, plan, review or close-out legs, by the brief's design. Fourteen in-session subagents of the same tier coded the samples blind: overlap readers A and B (three sessions each) and value readers A and B (four sessions each). That session wrote the scripts, the rubric and the paper; it did not adjudicate the readers."
+authors: [Claude (version 1, LIN-3179), Claude (version 2 corrections, LIN-3184)]
+model: "Frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 03db8c08, kind custom, LIN-3179), effort high per the runner log. One bounded session, with no research, plan, review or close-out legs, by the brief's design. Fourteen in-session subagents of the same tier coded the samples blind: overlap readers A and B (three sessions each) and value readers A and B (four sessions each). That session wrote the scripts, the rubric and the paper; it did not adjudicate the readers. Version 2: frontier tier, Claude Code CLI (dispatch 3a6a1e76, kind custom, LIN-3184), the independent check's session, effort not recorded in the dispatch item; its four subagents coded a second blind sample of 12 census tickets."
+revision: "Version 2 corrects figures per docs/papers/harbour/survey-check-8.md (LIN-3184): the coded shares with a second blind sample of 12 tickets beside the first, so the citation rate is one in four to nine and plan review's re-verification a quarter to a third; the 30 plan-review finds scoped to repeat rounds; ticket reads 1.3% (1.6% with briefs); Option A's ceiling without research sessions; output's share in weighted units; Option C's size fleet-wide. The census, its figures and the answer are unchanged."
 grounded_at: 26014544 (LinearViewer, origin/main); 3366748 (simple-dispatcher, origin/main); local transcripts of sessions begun 29 Aug 19:15Z to 1 Oct 06:00Z; runner logs read 1 Oct 06:50Z; tickets fetched over the proxy 1 Oct 06:52–07:24Z
 cites:
   - "docs/steady-base.md@26014544 (the anchor) and docs/papers/harbour/steady-base.md@26014544:195-237 (ticket reads are 1.6% of what legs carried, 24–29 Sep)"
@@ -20,6 +21,7 @@ cites:
   - "scripts/steady-base-carry.mjs@26014544 (the carried-token rule)"
   - "docs/papers/harbour/writing-length.md@26014544 and measuring-throughput.md@26014544 (the scorecard)"
   - "docs/papers/harbour/step-overlap-codes.json (this paper's rubric, both readers' codes, unadjudicated)"
+  - "docs/papers/harbour/survey-check-8.md and survey-check-8-codes.json (LIN-3184: the independent check, and the second blind sample's codes)"
 ---
 
 # How much does each Harbour step redo the one before it, and how much of what one session writes does the next one use?
@@ -27,22 +29,26 @@ cites:
 Less than John suspects in what the steps write. More in what they read. And not where the value
 is. This paper takes the 37 tickets in the transcripts (29 August to 30 September, both repos) that
 ran research, plan, plan review and implementation. Two blind readers coded 535 units from 13 of
-them. About a quarter of a plan restates the research and 7% re-verifies it; two-thirds extends it
-or is new (κ 0.81). About a third of a plan review re-establishes facts the plan or research already
-stated, and the prompt asks it to. A third checks a claim without re-deriving it, and a fifth is new
-(κ 0.88). Later steps act on three-quarters of what research writes, but cite it one time in nine.
+them, and two more coded 488 units from 12 others for the independent check. A fifth to a quarter of
+a plan restates the research and 5–7% re-verifies it; two-thirds to three-quarters extends it or is
+new (κ 0.81–0.85). A quarter to a third of a plan review re-establishes facts the plan or research
+already stated, and the prompt asks it to. A third or more checks a claim without re-deriving it,
+and a fifth to a quarter is new (κ 0.88). Later steps act on three-quarters of what research writes,
+but cite it one time in four to nine (about one in six over both samples).
 The steps paraphrase rather than copy, and they talk about the same code: 63–85% of a later step's
 code references were already named before it. Their sessions mostly re-read files an earlier session
 on the ticket read: 56–71% of their file-read bytes, or 5% of their carried context. The written
-text is cheap to carry. Ticket reads were 1.6% of all the context September's sessions carried, and
+text is cheap to carry. Ticket reads were 1.3% of all the context September's sessions carried (1.6%
+with briefs, at 4 bytes a token), and
 a word of ticket text reached 1.4 later sessions on average, against 5.4 that could have loaded it,
 because sessions read tickets in part. Since late June the words written per ticket have roughly
 doubled to tripled, while the later sessions that could read each word held at two to five. So the
 read load grew with the writing, not with the readers. The overlap is not where the gates earn
 their keep. Of 44 real faults that code review caught, the research or plan had named 3. None of
-plan review's 30 real finds was in the research. Splitting does duplicate process: half the
-implemented children of a planned parent ran their own plan and a third their own plan review.
-Those children's planning took 4.5% of all tokens on disk. Siblings share about a fifth of their
+the 30 real finds of repeat plan-review rounds was in the research. Splitting does duplicate
+process: half the implemented children of a planned parent ran their own plan and a third their own
+plan review. Those children's research and planning took 4.5% of all tokens on disk, their plan and
+plan review alone 3.9%. Siblings share about a fifth of their
 code references, so the duplication is of process more than of content.
 
 ![How much of each step is already in an earlier step: the code references its text names, and the files its session reads](figures/step-overlap/overlap-matrix.svg)
@@ -61,12 +67,20 @@ other's codes. Per ticket, averaged over both readers:
 
 So John's first suspicion, that research does most of the plan, does not hold: about a third of a
 plan restates or re-verifies the research, and two-thirds is design, steps, tests and scope the
-research did not have. His second does: about a third of a plan review re-establishes facts the plan
+research did not have. His second does: a quarter to a third of a plan review re-establishes facts the plan
 or research already stated, and that is by design. The prompt tells plan-review to "independently
 re-run the plan's grounding claims" (`lib/prompt-template-defs.js:840-844`, `:868-874`). A fifth of
 it is new. Of the research's own units, later steps acted on 75% (followed 67%, cited 8%). 3% were
 contradicted, 3% ignored, and 18% were background with nothing to act on (κ 0.73). The research is
 used, but it is rarely named: a later step that takes up a research finding says so one time in nine.
+A second blind sample of the census's other tickets, every third from the second (12 tickets, 488
+units, κ 0.78–0.88; `survey-check-8.md`), gives the plan 21% restated, 5% re-verified and 74%
+extended or new; plan review 40% checks, 27% re-verifies and 27% new; and research 78% used and 18%
+cited, one time in four. Over both samples (25 tickets) the shares are 23%, 6% and 69%; 36%, 31% and
+24%; and 76% used, 13% cited, about one in six. The plan's shape and research's use hold across the
+samples; the citation rate does not settle, and 13 tickets cannot tell a quarter from a third of
+plan review. The rubric has no PROCESS code for plan and implementation units, so their status and
+next-action lines are coded NEW, which lifts "extends or new" a little in both samples.
 The plan step is told to work from research's classes (`:282`, `:589`), and it does.
 
 **In text, the steps paraphrase rather than copy, and they talk about the same code.** On all 37
@@ -108,7 +122,8 @@ which step re-reads which.
 **The overlap is not where the value is: what review and plan review find is new.** The value
 readers took every real fault that code review led a fix for in `which-rules-pay.md` (44 in 18
 tickets) and every real, new plan-review find in `why-legs-repeat.md`'s two samples (30 in 28
-tickets). For each, they read the research and plan written before it and asked whether either had
+tickets). Those samples are of repeat legs, so every one of the 30 is from a second or later
+plan-review round, and was counted only if it was new against the earlier rounds. For each, they read the research and plan written before it and asked whether either had
 named that failure.
 
 | Finding | Findings | Named before, both readers | in the research | Tickets with no research or plan text before it | Agreement |
@@ -118,7 +133,7 @@ named that failure.
 
 Of the 29 review faults on tickets that had a plan or research before them, the plan or research
 had named 3. One example is LIN-2974's repo guard: its plan said it "fails open" on an 8-second
-timeout, and review found that it usually did. None of plan review's 30 real finds was in the research. One
+timeout, and review found that it usually did. None of the 30 repeat-round plan-review finds was in the research. One
 reader called one of them in both research and plan, and the other reader did not. So the gates are
 not re-finding what research already knew. They find things that no earlier step wrote down. That is
 consistent with `why-legs-repeat.md`: repeat plan reviews earn their keep.
@@ -148,8 +163,9 @@ mostly a supervisor reading its child. Most sessions take the ticket through a f
 `head -c`, or take the brief. The ticket as filed is the exception: most later sessions get it. Over
 all 2,022 sessions on disk, ticket reads were **1.3% of carried context** and brief reads 0.3%. That
 matches `steady-base.md`'s 1.6% for 24–29 September. Writing the text is small too. On the census
-tickets, the words posted are about 4% of the sessions' output tokens, and output tokens are under
-1% of all tokens. September's measured multiplier did not move by week (1.2–1.9; the figure's
+tickets, the words posted are about 4% of the sessions' output tokens. Output is 0.4% of raw tokens
+but, at list-price weights, up to 14% of weighted units, so the words posted are about 0.5% of
+weighted units. September's measured multiplier did not move by week (1.2–1.9; the figure's
 orange squares).
 
 **Since June the words grew and the readers did not.** In the trend sample, ten Done tickets a
@@ -186,7 +202,9 @@ disk did about the same: 15 of 26 planned and 8 plan-reviewed. So a parent's pla
 its children's planning. The breakdown step is meant to copy an approved plan's slice, with a
 "plan-review due: no" line, into each child (`lib/prompt-template-defs.js:439`, `:485`). None of
 the 24 children in the split sample carried that line. The research, plan and plan-review sessions
-of planned parents' children took 1.26 billion tokens, 4.5% of all 28.0 billion on disk. In the
+of planned parents' children took 1.26 billion tokens, 4.5% of all 28.0 billion on disk (5.2% of
+weighted units). Their plan and plan-review sessions alone, the ones a child need not run, took 3.9%
+(4.3% weighted). In the
 sample's text, a median 42% of a child's research and plan code references were already named by the
 parent (quartiles 29–48%), and 21% by earlier siblings (17–30%). Of a later sibling's research and
 plan file reads, a median 14% fell on files an earlier sibling's research or plan had read (11
@@ -305,6 +323,10 @@ node scripts/survey-overlap-analyse.mjs && node scripts/survey-overlap-figures.m
 - **File reads miss queries and subagents.** `grep`, `rg` and `git log` re-runs are not counted as
   re-reads, and neither are files read inside a subagent, whose transcript is separate. Both bias
   the work overlap down, most for plan review, which re-runs queries by design.
+- **Carried tokens are bytes over 4.** `starting-context.md` measured 2.6 bytes a token on the
+  whole window, and prose tokenizes nearer 4, so every carried share here (ticket reads, file
+  re-reads) may be low by up to a third: ticket reads 1.3–2.0%, re-reads of earlier sessions' files
+  5.1–7.8%.
 - **Paths lose their repo.** A relative path does not say which repo it is in, so files with the same
   path in both repos (`README.md`, `package.json`, `docs/…`) can match across repos. This biases
   the work overlap up, a little, on the 4 tickets in both repos.
@@ -339,11 +361,11 @@ step-level change can save on a four-step ticket.
 
 | Option | Estimated effect | Evidence | Risk to correctness | How the scorecard would see it |
 |---|---|---|---|---|
-| **A. A child of an approved plan does not plan again.** The breakdown already copies the approved slice and a "plan-review due: no" line into each child (`lib/prompt-template-defs.js:439`, `:485`); the child's own plan and plan-review sessions would run only when the slice has drifted | Up to 4.5% of all tokens on disk, the planning sessions of planned parents' children. The real figure is lower, because some children need their own plan; perhaps 1–3% | Half the implemented children of a planned parent ran their own plan, a third their own plan review; none of 24 sampled children carried the breakdown's inherited-plan line; siblings share about a fifth of their code references | Medium. A child whose slice has drifted needs its own plan, and none of plan review's 30 real finds was in the research, so a skipped plan review may skip a find. The sample has no measure of what the children's own plans changed (see Next) | Planning dispatches and tokens per child; the correct rate of children with and without their own plan |
-| **B. The plan states what it adds to the research and cites the rest.** It would not restate it | A quarter of a plan's units restate the research. At the median plan of 1,763 words, about 440 words. Under 1% of a four-step ticket's tokens, because plans are 10% of them and ticket text is 1.6% of what sessions carry | Coded sample: plan restates 25%, re-verifies 7%; research is cited one time in nine when it is used | Low. A cited finding stays checkable, and plan review still re-runs the claims | Plan words per ticket; plan-review rounds; correct rate |
-| **C. Plan review re-runs a bound the plan made reproducible, and re-derives only what it left unbounded.** That is the prompt's own instruction (`:874`); how often it is followed is unmeasured | Re-verification is 35% of plan-review units, and plan review is 8% of these tickets' tokens, so at most about 3%. Likely much less, since much of it is already a re-run query | Coded sample; plan review re-reads few of the research's or plan's files in its first round (median 3% of its bytes) | High. Plan review's finds are new: none of its 30 real finds was in the research, and checking by re-deriving may be how it finds them | Plan-review NEW findings per round; escapes on plan-reviewed tickets |
+| **A. A child of an approved plan does not plan again.** The breakdown already copies the approved slice and a "plan-review due: no" line into each child (`lib/prompt-template-defs.js:439`, `:485`); the child's own plan and plan-review sessions would run only when the slice has drifted | Up to 3.9% of all tokens on disk (4.3% of weighted units), the plan and plan-review sessions of planned parents' children; their research sessions, which this option keeps, bring the 4.5% above. The real figure is lower, because some children need their own plan; perhaps 1–3% | Half the implemented children of a planned parent ran their own plan, a third their own plan review; none of 24 sampled children carried the breakdown's inherited-plan line; siblings share about a fifth of their code references | Medium. A child whose slice has drifted needs its own plan, and none of the 30 repeat-round plan-review finds was in the research, so a skipped plan review may skip a find. The sample has no measure of what the children's own plans changed (see Next) | Planning dispatches and tokens per child; the correct rate of children with and without their own plan |
+| **B. The plan states what it adds to the research and cites the rest.** It would not restate it | A quarter of a plan's units restate the research. At the median plan of 1,763 words, about 440 words. Under 1% of a four-step ticket's tokens, because plans are 10% of them and ticket text is 1.6% of what sessions carry | Coded samples: plan restates 21–25%, re-verifies 5–7%; research is cited one time in four to nine when it is used | Low. A cited finding stays checkable, and plan review still re-runs the claims | Plan words per ticket; plan-review rounds; correct rate |
+| **C. Plan review re-runs a bound the plan made reproducible, and re-derives only what it left unbounded.** That is the prompt's own instruction (`:874`); how often it is followed is unmeasured | Re-verification is 27–35% of plan-review units, and plan review is 8% of these tickets' tokens, so at most about 3% of a four-step ticket's; fleet-wide, where plan review is 6.1% of weighted tokens (`starting-context.md`), about 2%. Likely much less, since much of it is already a re-run query | Coded sample; plan review re-reads few of the research's or plan's files in its first round (median 3% of its bytes) | High. Plan review's finds are new: none of the 30 repeat-round finds was in the research (first rounds were not sampled), and checking by re-deriving may be how it finds them | Plan-review NEW findings per round; escapes on plan-reviewed tickets |
 | **D. Each step leaves a file map for the next** (paths read, at which sha, and why), so a later session reads only what changed | Re-reads of files an earlier session read are 5.1% of later sessions' carried context, 4.2% across steps (implementation 6.5%). A map would save a fraction of that: perhaps 1–3% of later steps' tokens | Transcripts of 296 later sessions on the census; `starting-context.md` sizes the same re-finding fleet-wide and tests a path-list finder | Low to medium. A stale map misleads; an implementer still reads what it edits | Carried tokens per change; correct rate |
-| **E. Writing less, for tokens' sake.** Listed so that it can be ruled out | Small. Ticket text is 1.6% of carried context, and a word reaches about 1.4 later sessions | Read multiplier and token share, September | Unknown; the text is how steps hand over | Not worth measuring on token grounds; the case for shorter writing is the human reader's (`writing-length.md`) |
+| **E. Writing less, for tokens' sake.** Listed so that it can be ruled out | Small. Ticket text is 1.3% of carried context (1.6% with briefs; about 2.4% at 2.6 bytes a token), and a word reaches about 1.4 later sessions | Read multiplier and token share, September | Unknown; the text is how steps hand over | Not worth measuring on token grounds; the case for shorter writing is the human reader's (`writing-length.md`) |
 
 ## Next
 
@@ -353,6 +375,6 @@ step-level change can save on a four-step ticket.
   set the child's plan against the parent's plan for that surface. Say whether the child's plan changed substance, and whether its plan review found something
   real. That measures option A's risk. (Claude, 2026-10-01)
 - **What does plan review's re-verification find that a re-run of the plan's own query would not?**
-  A third of plan-review units re-establish a fact already stated, and its real finds are new. For the
+  A quarter to a third of plan-review units re-establish a fact already stated, and its real finds are new. For the
   re-verified units, say how often the re-derivation turned up the finding and how often it confirmed
   the claim and found nothing. That separates option C's saving from its risk. (Claude, 2026-10-01)

@@ -1,10 +1,11 @@
 ---
 title: How much of a Harbour session goes on finding its starting context, and how much of that is re-finding what an earlier session on the same ticket already found?
 kind: paper
-version: 1
+version: 2
 date: 2026-10-01
-authors: [Claude (LIN-3178)]
-model: "Frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 2ad02f2d, kind custom, LIN-3178), effort high per the dispatch item. One bounded session with no research, plan, review or close-out legs, by the brief's design. No subagents. Unchecked: a paper is checked by a second document."
+authors: [Claude (version 1, LIN-3178), Claude (version 2 corrections, LIN-3184)]
+model: "Frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 2ad02f2d, kind custom, LIN-3178), effort high per the dispatch item. One bounded session with no research, plan, review or close-out legs, by the brief's design. No subagents. Version 2: frontier tier, Claude Code CLI (dispatch 3a6a1e76, kind custom, LIN-3184), the independent check's session; effort not recorded in the dispatch item."
+revision: "Version 2 corrects figures per docs/papers/harbour/survey-check-8.md (LIN-3184): what the 82–85% re-read rate counts (the ticket and the proxy's instructions as well as files); which text the finder's named paths come from, and first rounds' recall and precision; the bootstrap's cost carried after it; Options A, C and D's sizes; the comparisons with where-the-effort-goes.md and steady-base-carry.mjs's 17.9%. The census, its figures and the answer are unchanged."
 grounded_at: "26014544 (LinearViewer, origin/main when this session began); 3366748 (simple-dispatcher, origin/main); local Claude Code transcripts on the runner machine read 1 Oct 2026 about 07:00Z, sessions started 31 Aug–30 Sep"
 cites:
   - "docs/steady-base.md@26014544 (the anchor; its point 2 and the effort-to-savings map)"
@@ -18,6 +19,7 @@ cites:
   - "docs/papers/harbour/held-or-fresh.md@628fed50:17-20 (sibling, LIN-3176: a fresh supervisor's orientation and bootstrap)"
   - "LinearViewer c0ad85bd (LIN-2896, 18 Sep): CLAUDE.md cut from 153,845 to about 9,000 bytes"
   - "simple-dispatcher README.md@3366748:9-10 (LIN-2116: broker-armed implementation, research and plan launches skip the bootstrap summarise)"
+  - "docs/papers/harbour/survey-check-8.md (LIN-3184: the independent check; scripts/survey-check-8-context.mjs)"
 ---
 
 # How much of a Harbour session goes on finding its starting context, and how much of that is re-finding?
@@ -34,10 +36,14 @@ of orientation. The low figure
 counts only repo files that nobody had changed in between; the high one counts every repeated
 file, ticket and feedback read. It sits where the ticket's later sessions start: 82–85% of what
 plan-review, code review and close-out sessions read while orienting was already read,
-62% for implementation, and 18% for research legs, which come first. Implementation spends
+62% for implementation, and 18% for research legs, which come first. Those counts include
+re-reading the ticket, which has new comments by then, and the proxy's instructions. For repo
+files alone, 67–71% of the files the later roles open while orienting were already read, 55%
+for implementation and 4% for research. Implementation spends
 the least on orientation (1–18% of its tokens), and plans and plan-reviews the most (up to 45%).
-A simple deterministic finder, the file paths the plan names, would have handed the implementer
-about half the existing files it went on to edit, and 55% of what it named was used. Adding
+A simple deterministic finder, the file paths named in the prompt and the ticket (which holds the
+plan), would have handed the implementer about half the existing files it went on to edit, and 55%
+of what it named was used; on a ticket's first implementation round, 53% at 61%. Adding
 symbol grep and import neighbours finds more, but most of what they add is never used. So the
 opportunity John named is real and bounded. Removing the re-found half would save about 5–12%
 of tokens directly. LIN-2115's pointer experiment shows the larger prize lies in the turns a
@@ -74,8 +80,9 @@ that end in a written report rather than a file or ticket write. The upper bound
 reading as orientation and its report as the output, so it overstates orientation for the
 reading roles. Implementation, where the first edit is an unambiguous line, is the clean case:
 1–18% of its tokens, 24 calls and about 2½ active minutes to the first edit at the median.
-`where-the-effort-goes.md`'s 3.5–5.6% re-orientation is this paper's lower bound: its
-bootstrap plus cold-resume handshakes, against 5.8% here.
+`where-the-effort-goes.md`'s 3.5% is its bootstrap, which matches the 3.0% here role by role
+(13%, 9% and 8% of close-out, review and plan-review there). Its 5.6% adds the handshake turn of
+each cold resume, which is not what this paper's 5.8% lower bound adds.
 
 **The bootstrap summarise is 3.0% of all tokens, and it weighs most on the short sessions.**
 Broker-armed research, plan and implementation launches already skip it (LIN-2116). Every other
@@ -83,7 +90,9 @@ role still runs it: 1,313 of 1,998 sessions with a task. A median bootstrap is 6
 77k weighted units. It reads the same four files nearly every time: LinearViewer's CLAUDE.md
 (987 reads) and README (985), simple-dispatcher's README (967) and CLAUDE.md (695). That is 13.9%
 of a close-out's tokens, 8.9% of a code review's and 8.0% of a plan-review's. These are the
-short sessions, where a fixed cost weighs most.
+short sessions, where a fixed cost weighs most. The 3.0% is the bootstrap's own turns. What it
+read stays in the window for every later turn, and carrying it costs up to 2.4% more of the fleet's
+tokens as cache reads (a ceiling: priced at the frontier tier's weight).
 
 **Later beats re-orient, and much of what they read the same session already had.** The turns at
 the start of each later beat, before its first productive call, are 10.9% of all tokens: 29% of a
@@ -146,8 +155,11 @@ makes before its first productive call:
 | research | 2,537 | 18% |
 | supervisors (stepper, autopilot, leg) | 7,036 | 15–19% |
 
-Supervisors read prompts and dispatch feedback, which are new each time. Research legs open a
-ticket, so there is little before them to repeat. Every later role re-reads the ground the
+The ticket is 40–42% of what close-out and code review re-read here, and the proxy's instructions
+17–22%; counting distinct repo files only, close-out repeats 69%, code review 67%, plan-review
+71%, plan 53%, implementation 55% and research 4% (`survey-check-8.md`). Supervisors read prompts
+and dispatch feedback, which are new each time. Research legs open a ticket, so there is little
+before them to repeat. Every later role re-reads the ground the
 research and plan already covered. Some of that is the point of the role: a code review that
 took the implementer's word for which files matter would not be independent. The table cannot
 separate re-reading for independence from re-reading for want of a pointer.
@@ -169,7 +181,10 @@ finder can name.
 | all four | 100 | 84% | 5.5% |
 
 Named paths alone found every edited file in 92 of 263 sessions; all four together found them in
-202, at the price of naming a hundred files. By repo, named paths reach 50% recall at 54%
+202, at the price of naming a hundred files. On a later implementation round the ticket also holds
+the earlier implementer's report and the code review, so the input is not only the plan. Split,
+the 186 first-round sessions get 53% recall at 61% precision from named paths, and the 100 later
+rounds 39% at 41% (`survey-check-8.md`). By repo, named paths reach 50% recall at 54%
 precision in LinearViewer and 45% at 64% in simple-dispatcher. The plan already names most of
 what can usefully be named. The methods that find more do so in a pile twenty times larger, and
 nothing here says a session handed a hundred paths would read fewer.
@@ -206,10 +221,10 @@ none is a change: John decides. Effects are shares of the fleet's weighted token
 
 | # | Option | Estimated effect | Evidence | Risk to correctness | How the scorecard would measure it |
 |---|---|---|---|---|---|
-| A | **Stop the bootstrap summarise for the roles that still run it** (review, plan-review, close-out, supervisors, other), as LIN-2116 already does for research, plan and implementation | Up to 3.0% (2.3% in 19–30 Sep); 8–14% of a close-out's, review's or plan-review's tokens | Bootstrap finding; it reads the same four files; LIN-2115 found CLAUDE.md not load-bearing for a localized change | Low: the task prompt arrives either way. A session that needs the README can still read it | Tokens per correct change by role; the correct rate per role before and after |
+| A | **Stop the bootstrap summarise for the roles that still run it** (review, plan-review, close-out, supervisors, other), as LIN-2116 already does for research, plan and implementation | Up to about 5%: its own turns are 3.0% (2.3% in 19–30 Sep), and carrying what it read through later turns up to 2.4% more; 8–14% of a close-out's, review's or plan-review's tokens in its own turns | Bootstrap finding; it reads the same four files; LIN-2115 found CLAUDE.md not load-bearing for a localized change | Low: the task prompt arrives either way. A session that needs the README can still read it | Tokens per correct change by role; the correct rate per role before and after |
 | B | **Hand each later session the earlier sessions' file list for its ticket**: which files and tickets they read and edited, as pointers, not conclusions | Bounded by re-finding: 4.9–12.1% (strict–broad); most of it in plan-review, close-out, code review and implementation | Re-reads and re-finding findings; LIN-2115's 93-token pointer: 18 turns against 51, about half the cost, one task, same verifier | Medium for reviews: a reviewer steered to the implementer's files may not look elsewhere, and that independence is what catches faults (`which-rules-pay.md`). Low for implementation and close-out. 15% of repeats were of changed files, so a list must carry the commit it was read at | Tokens to first productive call and per correct change, by role; review findings per round and escaped defects, held to the baseline |
-| C | **Put the plan's named paths, resolved to files that exist, at the top of the implementation prompt** | Implementation orients for 1–18% of its tokens, which is 0.2–4.1% of the fleet's. Named paths point at half its edited files, so the direct saving is perhaps a third to a half of that, about 1–2%. LIN-2115 suggests the saving in turns can be larger on a localized task | Finder finding; LIN-2115's pointer probe; implementation is 22.6% of fleet tokens and orients for 1–18% of them | Low if it is a pointer: 45% of named paths go unused, and a wrong pointer can anchor a session on the wrong file; paths must be resolved at the session's base commit, and stated as where to start, not as the scope | The implementer's tokens and calls to first edit, and per correct change |
-| D | **Carry a beat's file list into the next beat's prompt** in stepped and held sessions | Up to 10.9% (later-beat re-orientation), of which the 42% re-read share is the reachable part, so about 4–5% | Later-beat finding; `held-or-fresh.md` on whether to hold at all | Low: stale only if the file changed, which the beat's own diff says | Re-orientation tokens per later beat |
+| C | **Put the plan's named paths, resolved to files that exist, at the top of the implementation prompt** | Implementation orients for 1–18% of its tokens, which is 0.2–4.1% of the fleet's. Named paths point at half its edited files (53% on a first round, at 61% precision), so the direct saving is perhaps a third to a half of that, 0.1–2%. LIN-2115 suggests the saving in turns can be larger on a localized task | Finder finding; LIN-2115's pointer probe; implementation is 22.6% of fleet tokens and orients for 1–18% of them | Low if it is a pointer: 45% of named paths go unused, and a wrong pointer can anchor a session on the wrong file; paths must be resolved at the session's base commit, and stated as where to start, not as the scope | The implementer's tokens and calls to first edit, and per correct change |
+| D | **Carry a beat's file list into the next beat's prompt** in stepped and held sessions | About 1.4%. Later-beat re-orientation is 10.9%, but 85% of a supervisor's later-beat re-reads are of the ticket, which has new comments by then, and a file list cannot stand in for them. The repo-file re-reads reach 0.3% in supervisors and 1.1% elsewhere (`survey-check-8.md`) | Later-beat finding; `held-or-fresh.md` on whether to hold at all | Low: stale only if the file changed, which the beat's own diff says | Re-orientation tokens per later beat |
 | E | **Answer the deterministic research questions with a tool**: callers and readers of a symbol at a commit, a ticket's or path's commits, PRs and dispatches | Small fleet-wide: research legs are 5.3% of tokens and their searching and history calls about 40% of their calls; perhaps 1–2% | Research-session finding; John's research-tool projects (`what-should-an-agent-leave-behind.md`) show conditional gains and are not evaluated here | Low: the answers are facts at a commit; misuse is reading a stale index | Research legs' calls and tokens per leg; the plan-review send-back rate on research-fed plans |
 
 LIN-2115 and LIN-2961 bear on option C more than on B. LIN-2115's probe gave a localized
@@ -310,6 +325,9 @@ node scripts/survey-context-figures.mjs                       # → docs/papers/
 
 ## Limits
 
+- **A write through a shell variable reads as a repo edit.** A scratch path written as `$S/…` is
+  keyed as a repo file. In 25 of 242 close-outs that write is the first productive call, which ends
+  orientation early and understates close-out's.
 - **The productive call is a definition, not an observation.** For plan, plan-review and
   research, reading is the work, so the upper bound counts a plan's analysis as orientation and
   overstates orientation for those roles. The lower bound, the turns before the first file read,
@@ -337,10 +355,11 @@ node scripts/survey-context-figures.mjs                       # → docs/papers/
   scaled to 100%, and their prompt share is still a little high.
 - **The model's own output is counted as carried.** Thinking blocks may be dropped from later
   turns, so the 20% share may be high. If so, every other share is slightly low.
-- **`scripts/steady-base-carry.mjs` converts at 4 bytes a token.** The measured ratio is 2.6,
-  so its absolute block sizes are low by about a third. Its 17.9% file-read share is a share of
-  the measured window, so it is low by a similar factor. This paper's categories differ from
-  its, and the two are not directly comparable.
+- **`scripts/steady-base-carry.mjs` converts at 4 bytes a token, and its "file reads" are broad.**
+  It counts any command containing `cat`, `sed -n`, `head` or `tail` as a file read. Its 17.9% is
+  11.1% of direct file reads and 6.8% of piped command output. At 2.6 bytes a token the 11.1% is
+  about 17%, against this paper's file categories at 14–18%. The two agree only after both
+  corrections (`survey-check-8.md`).
 - **The finder's ground truth is shaped by the plan.** A session reads what its plan names because
   the plan names it, so "used" favours named paths. This biases their precision up and the other
   methods' down. Edits made through scripts or `git apply` are missed, which biases recall either way.

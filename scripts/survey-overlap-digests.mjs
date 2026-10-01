@@ -1,5 +1,5 @@
 // LIN-3179: write the blind coders' reading digests: per sub-sampled census ticket, each step's first-round text cut into numbered units; per coded real review fault or real plan-review find, the finding beside the research and plan written before it.
-// Usage: node scripts/survey-overlap-digests.mjs [--every 3] [--cap 12] [--out data/survey-overlap/digests]
+// Usage: node scripts/survey-overlap-digests.mjs [--every 3] [--offset 0] [--cap 12] [--out data/survey-overlap/digests]
 // The sub-sample is every 3rd census ticket by number, from the first, fixed before any digest was read. Units are survey-overlap-lib.mjs's
 // (paragraphs and list items of 8+ content words); an artefact with more than --cap units shows every k-th, from the first, so each reader codes
 // the same units. A step's first round is the comments of its first session on the ticket (by transcript), else its first comment by heading.
@@ -8,7 +8,7 @@ import { join } from 'path';
 import { attribute, units, splitDescription } from './survey-overlap-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
-const every = +arg('--every', 3); const cap = +arg('--cap', 12);
+const every = +arg('--every', 3); const offset = +arg('--offset', 0); const cap = +arg('--cap', 12); // --offset 1 gave survey-check-8's fresh sample (LIN-3184)
 const outDir = arg('--out', 'data/survey-overlap/digests');
 const J = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const sessions = J('data/survey-overlap/transcripts.json').sessions;
@@ -31,7 +31,7 @@ const block = (tag, cs, descPart) => {
 };
 
 // ---- Overlap and use digests.
-const sub = [...sel.census].sort((a, b) => num(a) - num(b)).filter((_, i) => i % every === 0).filter((id) => D[id]);
+const sub = [...sel.census].sort((a, b) => num(a) - num(b)).filter((_, i) => i % every === offset).filter((id) => D[id]);
 const index = [];
 sub.forEach((id, n) => {
   const cs = labelled(id); const d = D[id];
@@ -72,5 +72,5 @@ for (const [id, rs] of Object.entries(legs.reduce((m, r) => ((m[r.issue] ||= [])
   for (const r of rs) { const c = cs.find((x) => x.step === 'plan-review' && x.createdAt > r.at); fs.push({ id: `${id}@${r.at.slice(0, 16)}`, text: c ? `The plan-review round launched ${r.at} (${r.src}, digest ${r.digest}) raised something real and new. Its comment [${c.createdAt}]:\n\n${c.body.slice(0, 6000)}` : `The plan-review round launched ${r.at} (comment not found)`, at: c?.createdAt || r.at }); }
   valueDigest(id, fs, fs.map((f) => f.at).sort()[0]);
 }
-writeFileSync(join(outDir, 'index.json'), JSON.stringify({ every, cap, index }, null, 1));
+writeFileSync(join(outDir, 'index.json'), JSON.stringify({ every, offset, cap, index }, null, 1));
 console.log(`overlap digests ${sub.length} (units ${index.filter((x) => x.units).reduce((a, x) => a + x.units.R + x.units.P + x.units.V + x.units.I, 0)}); value digests ${v}`);
