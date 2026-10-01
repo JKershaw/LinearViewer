@@ -591,8 +591,10 @@ const accountWorkspaceStore = new AccountWorkspaceStore({ collection: accountWor
 // is injected here rather than at construction; while it stays unwired the
 // grant mint fails closed with OWNER_CHECK_UNAVAILABLE. Keys on `workspaceId`
 // (the account↔workspace edge, LIN-1892 S1), reusing #1601's
-// `getWorkspaceOwnerAccountId` — no parallel owner model.
-proxyTokenStore.setOwnerCheck(createWorkspaceOwnerCheck({ accountWorkspaceStore, accountStore }))
+// `getWorkspaceOwnerAccountId` — no parallel owner model. LIN-3137 J5 hoists it
+// into a named const so the legacy dispatch-token mint consumes the SAME seam.
+const workspaceOwnerCheck = createWorkspaceOwnerCheck({ accountWorkspaceStore, accountStore })
+proxyTokenStore.setOwnerCheck(workspaceOwnerCheck)
 
 // Email magic-link sign-in (LIN-1892 S2). The transport exists exactly when
 // email sign-in is available (lib/email-availability.js — the one predicate;
@@ -2171,7 +2173,7 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache }))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions

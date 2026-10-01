@@ -42,7 +42,14 @@ Tokens are created by authenticated users in the Linear Viewer settings page:
 3. In the "Dispatch Tokens" section, create a new token with a descriptive label
 4. **Save the token immediately** - it's only shown once
 
-Alternatively, tokens can be created via API (requires session authentication):
+Minting is **owner-only** as of LIN-3137 (LIN-2884 J5): a never-expiring dispatch token is a
+take path, so only the workspace's owner can create one. A non-owner member is refused `403
+GRANT_OWNER_ONLY`; an ownerless workspace is refused `409 WORKSPACE_OWNER_UNSET` until an owner
+is assigned; a session with no account is refused `503 GRANT_OWNERLESS`; and an unavailable owner
+check (unwired/throwing/corrupt edge) is `503 OWNER_CHECK_UNAVAILABLE`. This is a **mint gate
+only** — existing tokens keep working and listing/revoking are unchanged.
+
+Alternatively, tokens can be created via API (requires session authentication as the owner):
 
 ```bash
 POST /workspace/:urlKey/api/dispatch/tokens
@@ -279,7 +286,9 @@ a standard working token, so a consumer holding one is never stranded mid-flight
 ```
 
 The fix on the consumer side is the same either way: **re-create the dispatch token** while
-signed in (which stamps an owner) and point the consumer at the new value. `GET
+signed in (which stamps an owner) and point the consumer at the new value. As of LIN-3137 that
+re-creation must be done **as the workspace owner** — a non-owner gets `403 GRANT_OWNER_ONLY`, and
+a workspace with no owner edge gets `409 WORKSPACE_OWNER_UNSET` until an owner is assigned. `GET
 /workspace/:urlKey/api/dispatch/tokens` reports `hasOwner` per token so you can tell which of
 your tokens still need re-issuing — an ownerless one is also flagged on the Dispatch page.
 

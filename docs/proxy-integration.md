@@ -43,7 +43,9 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
 > credential is a single-use **bootstrap** — exchange it first (see
 > [Bootstrap Tokens](#bootstrap-tokens-single-use-exchange-only)). A **runner** copy
 > (`{ "runner": true }`) is an owner-only bootstrap too; see
-> [Runner credentials](#runner-credentials-lin-3131).
+> [Runner credentials](#runner-credentials-lin-3131). The **legacy dispatch token**
+> (`POST /workspace/:urlKey/api/dispatch/tokens`) is also owner-only as of LIN-3137: a
+> non-owner is refused `403 GRANT_OWNER_ONLY`, and it is a mint gate, not revocation.
 
 ## Authentication
 

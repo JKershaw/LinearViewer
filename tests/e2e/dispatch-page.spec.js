@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3). The
 // dispatch queue/tokens/history stores stay store-backed (urlKey-scoped), NOT
@@ -884,6 +885,8 @@ test.describe('Dispatch Page', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(`/test/clear-dispatch-tokens?urlKey=${WS}`);
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+      // LIN-3137 J5: the mint is owner-only — seed the owner edge explicitly.
+      await seedWorkspaceOwnership(page, WS);
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -956,6 +959,22 @@ test.describe('Dispatch Page', () => {
 
       // Token should be removed
       await expect(page.locator('.token-list-empty')).toContainText('No tokens yet');
+    });
+
+    test('LIN-3137: a non-owner mint surfaces the owner-only refusal, no modal, no token row', async ({ page }) => {
+      // The client has no owner signal, so the create form still renders; the
+      // submit is the path to the SERVER's refusal, which must be loud.
+      await seedWorkspaceOwnership(page, WS, 'foreign');
+
+      await page.locator('.token-label-input').fill('should-refuse');
+      await page.locator('#create-token-form button[type="submit"]').click();
+
+      const toast = page.locator('.toast.toast-error');
+      await expect(toast).toBeVisible({ timeout: 5000 });
+      await expect(toast).toContainText("Only this workspace's owner can mint a dispatch token");
+
+      await expect(page.locator('.token-modal')).toHaveCount(0);
+      await expect(page.locator('.token-item')).toHaveCount(0);
     });
   });
 
