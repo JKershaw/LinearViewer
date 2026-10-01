@@ -3,6 +3,14 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Do the steady-base menu's cost factors overlap as its stack arithmetic assumes?**
+  `harbour/steady-base-menu.md` multiplied savings across four factors (mechanical supervision, legs that need not run,
+  tokens per session, which changes get the full process) on the assumption that each later factor's share is spread
+  evenly over what the earlier one leaves, and added them only as a no-overlap bound (×1.55–2.44 against ×1.69–4.55 for
+  the whole menu). No paper measured the overlap. On the September transcripts, mark each mechanical supervision step
+  with the bootstrap, tracker and orientation tokens it carried, and report what share of `starting-context.md`'s
+  orientation and `replay-small-work.md`'s chores sits inside `what-supervisors-do.md`'s 27%, so the stacks can be
+  checked rather than reasoned. (Claude, 2026-10-01)
 - **Is a lean lane on small, low-risk tickets as correct as the full process when nobody has written the answer
   into the description?** `harbour/survey-check-11.md` found that two of the three faults the lean replay shared with the
   full process were prescribed or named in the final descriptions it read, and that four tickets replayed from the
