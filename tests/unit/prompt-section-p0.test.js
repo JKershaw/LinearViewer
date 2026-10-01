@@ -881,3 +881,69 @@ describe('P0 re-review N4: a set-up press updates only the notice slot', () => {
     await flush();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIN-3211: the run-step rung sends a harness. The rung sits OUTSIDE the
+// options panel (its ladder and the panel are siblings in the card), so a
+// `btn.closest('.swipe-prompt-options')` lookup finds nothing and HEAD sends
+// `harness: null`. The rung must read its own card's panel and use a non-blank
+// harness from it, otherwise `claude-code`. The opencode case pins the accepted
+// LIN-1094 behaviour change: the panel choice is honoured, not overridden.
+// ---------------------------------------------------------------------------
+
+describe('LIN-3211: the run-step rung sends the card panel\'s harness, else claude-code', () => {
+  // `panelHarness`: what the card's panel selector holds ('' = the blank "—"
+  // option). `panel: false`: no panel rendered in the card at all.
+  async function pressRung({ panelHarness = 'claude-code', panel = true } = {}) {
+    const { PromptSection, window, calls } = loadPromptSection();
+    if (!panel) window.renderDispatchDisclosure = () => '';
+    // The card's panel, as the container's scoped lookup returns it. A real
+    // readDispatchExecControls reads the harness select inside the element it is
+    // given and returns null for anything else (public/common.js:1263).
+    window.readDispatchExecControls = (scopeEl) => (scopeEl && scopeEl.isCardPanel
+      ? { model: null, harness: panelHarness || null }
+      : { model: null, harness: null });
+    const container = makeContainer();
+    const qs = container.querySelector;
+    container.querySelector = (selector) => {
+      const el = qs(selector);
+      if (el && selector.includes('swipe-prompt-options')) el.isCardPanel = true;
+      return el;
+    };
+    PromptSection.init(container, baseOpts(
+      { id: 'issue-3211', identifier: 'LIN-3211', url: 'https://x/3211' },
+      { dispatchEnabled: true }
+    ));
+    await container.click({ prompt: 'implementation' });
+    await flush();
+    if (panel) assert.ok(container.querySelector('.swipe-prompt-options'), 'precondition: the card renders its panel');
+    // The rung is in the ladder, not inside the panel: closest() on the panel
+    // class finds nothing, as in the real DOM.
+    const btn = {
+      dataset: { action: 'run-step', target: 'cli' },
+      disabled: false,
+      textContent: '',
+      closest: (selector) => (selector.includes('swipe-prompt-options') ? null : btn),
+    };
+    await container._clickHandler({ target: btn });
+    await flush();
+    assert.equal(calls.dispatch.length, 1, 'the rung dispatched once');
+    return calls.dispatch[0];
+  }
+
+  test('default panel (claude-code preselected) → claude-code', async () => {
+    assert.equal((await pressRung({ panelHarness: 'claude-code' })).harness, 'claude-code');
+  });
+
+  test('panel set to opencode → opencode (LIN-1094: the panel choice is honoured)', async () => {
+    assert.equal((await pressRung({ panelHarness: 'opencode' })).harness, 'opencode');
+  });
+
+  test('panel blank ("—") → claude-code', async () => {
+    assert.equal((await pressRung({ panelHarness: '' })).harness, 'claude-code');
+  });
+
+  test('no panel in the card → claude-code', async () => {
+    assert.equal((await pressRung({ panel: false })).harness, 'claude-code');
+  });
+});

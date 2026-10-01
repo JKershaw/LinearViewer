@@ -59,6 +59,8 @@ describe('what the served prompt must do (each bullet has an anchor)', () => {
     ['Claude Code only (opencode has no subagents)', /Claude Code only/, /opencode has no subagents/i],
     ['N2: items for another harness are left', /items asked for another harness are left for a runner of that harness/i],
     ['Q3: items without a bootstrap run with no API access', /no workspace API access/i],
+    ['S6: an enqueue 403 DISPATCH_GRANT_REQUIRED is reported [failed] and stops the item',
+      /403 DISPATCH_GRANT_REQUIRED/, /\[failed\] enqueue blocked: DISPATCH_GRANT_REQUIRED/, /stop (?:that item|it)/i],
     ['the end summary', /## (?:\d+\. )?End summary/]
   ];
   for (const [name, ...res] of anchors) {
@@ -69,11 +71,12 @@ describe('what the served prompt must do (each bullet has an anchor)', () => {
 });
 
 describe('the honesty copy', () => {
-  test('what happens when the laptop sleeps or closes, with the B4 orphan truth', () => {
+  test('what happens when the laptop sleeps or closes, with the B4 orphan truth (LIN-3163: no 30-day claim)', () => {
     assert.match(prompt, /laptop sleeps/i);
     assert.match(prompt, /laptop closes/i);
     assert.match(prompt, /stay `taken`/);
-    assert.match(prompt, /30 days/);
+    assert.doesNotMatch(prompt, /30 days/i, 'history is lifetime-retained (LIN-3163); no 30-day expiry claim');
+    assert.match(prompt, /project's lifetime/i);
     assert.match(prompt, /Autopilot[^.\n]*hangs/i);
     assert.match(prompt, /re-dispatch/i);
   });
@@ -83,14 +86,17 @@ describe('the honesty copy', () => {
     assert.match(prompt, /longer than about 24h/i);
   });
 
-  test('only items the owner enqueued run, unconditionally (Q4; lin3098-owner-check-after-t3 = keep)', () => {
+  test('only items the owner enqueued run, permanently (Q4; lin3098-owner-check-after-t3 = keep)', () => {
     assert.match(prompt, /only items the workspace owner enqueued/i);
-    // N3: the rule is not scoped to "before T3"; the pre-T3 exposure is the why.
+    // S6 (post-T3): the rule is permanent. It is neither scoped to "before T3"
+    // nor retired/"lifted" at T3, so no line may frame the owner rule against
+    // T3 at all. The pre-T3 framing is retired copy, not the rule.
     for (const line of prompt.split('\n').filter((l) => /owner/i.test(l))) {
-      assert.doesNotMatch(line, /before T3/i, `the owner rule must not read as lifting at T3: ${line}`);
+      assert.doesNotMatch(line, /(before|until|after|once) T3/i, `the owner rule must not be framed against T3: ${line}`);
     }
-    assert.match(prompt, /after T3 \(LIN-3136\) too/);
-    assert.match(prompt, /until T3 \(LIN-3136\)[^.]*enqueue/i);
+    assert.doesNotMatch(prompt, /until T3/i);
+    assert.doesNotMatch(prompt, /after T3/i);
+    assert.match(prompt, /owner-only rule is permanent/i);
   });
 
   test('the same-user boundary, stated plainly', () => {

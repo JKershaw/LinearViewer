@@ -32,6 +32,16 @@ when you're in the workspace.
   and **Dispatch queue** (they may already
   be on):
   https://harbour.cat/workspace/URLKEY/settings
+- **No token in a prompt.** **run this
+  step** sends the `claude-code` harness
+  (or the one picked in the card's
+  dispatch options), so its item reaches
+  the runner with API access and no token
+  in the text. A runner prompt must never
+  hold the prose "Workspace API access"
+  block with its `curl … /api/proxy/token`
+  line. The runner leaves any item that
+  does, with `credential-in-prose`.
 - **One tiny task.** On the workspace page,
   tap **+ Add task**. Title: `Say hello`.
   Description: `Reply with one sentence.
@@ -82,15 +92,17 @@ Also check and note:
    expiresAt is about 24h from now;
 3. running login again with the same block
    now fails with HTTP 401;
-4. while the first item runs: curl through
-   its socket to /api/proxy/instructions
+4. while the step-3 item runs (it has
+   API access): curl through its socket to /api/proxy/instructions
    gives 200; to /api/proxy/runner/poll
    gives 403; a bare curl (no socket) to
    http://harbour-runner.invalid/api/proxy/instructions
    fails (note the exit code, and whether
    http_proxy or HTTPS_PROXY is set);
 5. each time wait exits: its reason, and
-   that you re-armed it.
+   that you re-armed it;
+6. any item poll leaves with
+   credential-in-prose: a finding.
 ```
 
 ## 3. Run one step
@@ -103,6 +115,8 @@ Also check and note:
    **look into**. (Or tap **✦**: either
    gives a prompt.)
 5. Scroll down. Tap **run this step**.
+   That tap is the dispatch: it queues
+   the item for the runner.
 6. Watch the runner. It takes the item and
    runs it in a subagent. Wait until it
    says the item is done.
@@ -110,12 +124,38 @@ Also check and note:
 ## 4. Run one tiny task
 
 1. On the same card, tap **run the whole
-   task**.
+   task**. That only loads the Autopilot
+   prompt: tap **run this step** to send it.
 2. Leave the runner working. Autopilot
    sends follow-ups, and the runner
    continues the same subagent for each.
    Wait until it says the task is done
    (or blocked).
+
+## 4b. Post-T3: re-witness the Autopilot
+
+T3 (1 Oct, 17:13Z) put the dispatch
+grant in front of every enqueue. An
+Autopilot launched after it holds the
+grant, so its worker dispatches should
+enqueue and run. Confirm that: the run
+in step 4 shows new worker dispatches,
+not a `403 DISPATCH_GRANT_REQUIRED`.
+
+If you do see `403 DISPATCH_GRANT_REQUIRED`,
+the task's credential has no grant: it
+was launched before T3. Note it as a
+finding to post, not a pass, and
+re-launch the task from the app.
+
+First check the runner's take line for
+this item. If it says `apiAccess: false`,
+that is not the T3 grant: the task was
+launched with no harness (LIN-3211), and
+re-launching from the same button repeats
+it. Answer "stop, do not pass it", set
+Settings → Dispatch defaults → Harness to
+`claude-code`, and re-launch.
 
 ## 5. Done: paste this back
 

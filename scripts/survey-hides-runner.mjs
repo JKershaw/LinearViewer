@@ -7,6 +7,7 @@
 // Snapshot goes to the git-ignored data/survey-hides/runner.json.
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { classifyDonePosts } from './survey-hides-d5x-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const state = arg('--state', '/Users/work/development/simple-dispatcher/state');
@@ -59,6 +60,18 @@ const failures = posts.filter((p) => !p.ok).map((p) => {
 });
 const failByMonth = {};
 for (const f of failures) { const k = month(f.ts); failByMonth[k] ??= { total: 0, byStatus: {}, byKind: {}, terminal: 0, terminalLost: 0, healed: 0 }; const m = failByMonth[k]; m.total++; inc(m.byStatus, String(f.status ?? f.cause ?? f.error)); inc(m.byKind, f.kind); if (f.terminal) { m.terminal++; if (!f.healed) m.terminalLost++; } if (f.healed) m.healed++; }
+// LIN-3210: align the failed-post summary with the D5x semantics. `terminalLost` already excludes a healed
+// retry (a post that later succeeded is not a loss). Alongside it, count the honest post-change companions
+// from the oplog: `doneLoggedAnyway` (a FALSE `done_posted` — no ok `[done]` feedback.post for the item,
+// i.e. what the old unconditional marker lied about), `donePostFailed` (retries exhausted) and `unresolved`
+// (a `done_post_started` with no posted/failed outcome). These are the M22 after-read's companions.
+const opsByMonth = new Map();
+for (const o of ops) { const k = month(o.ts); if (!opsByMonth.has(k)) opsByMonth.set(k, []); opsByMonth.get(k).push(o); }
+for (const [k, monthOps] of opsByMonth) {
+  const c = classifyDonePosts(monthOps, failures.filter((f) => month(f.ts) === k));
+  failByMonth[k] ??= { total: 0, byStatus: {}, byKind: {}, terminal: 0, terminalLost: 0, healed: 0 };
+  Object.assign(failByMonth[k], { doneLoggedAnyway: c.doneLoggedAnyway, donePostFailed: c.donePostFailed, unresolved: c.unresolved });
+}
 const postsByMonth = {}; for (const p of posts) inc(postsByMonth, month(p.ts));
 // Episodes: failures from >=3 distinct items (sessions where known) inside 60 minutes; overlapping windows merge.
 const episodes = [];

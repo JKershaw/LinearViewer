@@ -123,13 +123,21 @@ or a token. Decisions are made **before** any take, in this order:
    tell the person, then end (§8).
 2. **Harness.** Claude Code only.
 3. **Owner.** This runner runs only items the workspace owner enqueued, and wakes of the
-   owner's own dispatches. Anything else is left queued. This holds after T3 (LIN-3136) too; see
-   §7 for why.
+   owner's own dispatches. Anything else is left queued. The owner-only rule is permanent — it
+   is this runner's own boundary, independent of how dispatch grants are enforced server-side;
+   see §7.
 4. **Halt** (§6).
 5. **Credential life.** With less than {{FRESH_TAKE_MIN_TOKEN_LIFE_HOURS}}h left on the runner
    credential, fresh items are left queued; follow-ups, wakes and aborts still flow.
 6. **Confirmation.** The item must match `GET /api/proxy/dispatch/:id/prompt` byte for byte; a
    mismatch is refused.
+
+**Credential in the prompt.** After the owner check and before halt, poll also leaves any item
+whose prompt carries a credential in prose (the "Workspace API access" exchange line,
+`curl -X POST -H "Authorization: Bearer …" …/api/proxy/token`), with reason
+`credential-in-prose`. This item's prompt carries a credential in prose; a runner subagent never
+holds one. It stays queued: delete it or re-run it from the app with the `claude-code` harness,
+which hands the credential to the broker instead of the prompt.
 
 A refused item is **left queued**: never taken and then failed. It stays for its owner to
 delete or for a runner it suits, and otherwise expires. You do nothing with it but mention it in
@@ -190,6 +198,14 @@ with the same line on the abort row; a finished target gets only the ack, so a r
 never overwritten; an unknown target gets `[failed] No session to abort (<id>).`. When it prints
 `abort.stopAgent`, stop that subagent (TaskStop).
 
+**If an enqueue is refused (403).** A subagent's enqueues go through its broker on the item's own
+credential. An Autopilot item's credential carries the `dispatch` grant, so its
+enqueues are expected to succeed. A `403 DISPATCH_GRANT_REQUIRED` means this item's credential has
+no grant — a legacy or grant-less item. Report
+`[failed] enqueue blocked: DISPATCH_GRANT_REQUIRED` on that item, stop it, and tell the person to
+relaunch that task from the app. Leave the `[failed]` line exactly as written; it is the marker
+Harbour reads.
+
 ## 5. Your own watchdog
 
 There is no Simple Dispatcher reaper, so the kit watches for you. A running item silent for
@@ -215,8 +231,9 @@ this runner, so don't follow it.
 
 - **The laptop sleeps.** Everything pauses. The brokers don't count the sleep against their
   heartbeat, and `wait` re-arms when you wake. A subagent mid-call may need its step retried.
-- **The laptop closes, or this session ends.** The runner is gone. Rows it took stay `taken`
-  until Harbour's history expires them (30 days); nothing can close them from outside. A parent
+- **The laptop closes, or this session ends.** The runner is gone. Rows it took stay `taken` —
+  Harbour keeps that history for the project's lifetime, so nothing expires them and nothing can
+  close them from outside. A parent
   Autopilot waiting on one hangs: the owner should re-dispatch the task. Each item's broker exits
   on its own about {{BROKER_STALE_MIN}} minutes after the heartbeat stops (at most
   {{BROKER_MAX_LIFETIME_HOURS}}h). The next session's `recover` posts
@@ -232,9 +249,9 @@ this runner, so don't follow it.
   a same-user socket. Any process running as the same OS user, subagents included, could read that
   file or use a live broker. The kernel keeps other users out; nothing keeps your own user's
   processes out. Run only work you'd run yourself.
-- **Owner-only, always.** Until T3 (LIN-3136) enforces the dispatch grant, anyone with a
-  read-write token for this workspace can enqueue work, and this runner executes on your machine.
-  That is why it runs only the owner's items (§3), and it keeps that rule after T3 as well.
+- **Owner-only, always.** This runner executes only items the workspace owner enqueued, and
+  wakes of the owner's own dispatches (§3). That rule is permanent: it is this runner's own
+  boundary, independent of how dispatch grants are enforced server-side.
 
 ## 8. End summary
 
@@ -254,6 +271,7 @@ let running subagents finish or stop them, and report:
 [usage] {"schema":1,"harness":"claude-code","model":"claude-opus-5-5","inputTokens":130,"outputTokens":1050,"cacheCreationInputTokens":1500,"cacheCreation1hInputTokens":200,"cacheReadInputTokens":12300}
 [done] Added the runner prompt route; tests green.
 [failed] The migration needs a database this machine can't reach.
+[failed] enqueue blocked: DISPATCH_GRANT_REQUIRED
 [blocked] Waiting on a decision: which of the two schemas to keep.
 [blocked] stalled: subagent a1b2c3d4 silent for 21 min
 [failed] stalled: subagent a1b2c3d4 silent for 61 min
