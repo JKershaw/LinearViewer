@@ -32,6 +32,9 @@ function buildApp({ dispatchQueueStore, recordedEvents = null }) {
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
+      // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+      // /fixture:LIN-3136
       createToken: async () => ({ token: 'bootstrap-xyz', kind: 'bootstrap', scope: 'readWrite' })
     },
     proxyEventStore: { recordEvent: async (evt) => { if (recordedEvents) recordedEvents.push(evt); } },

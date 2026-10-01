@@ -27,6 +27,9 @@ installHermeticLinearTransport();
 
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+// fixture:LIN-3136
+import { mintDispatchWriter } from './lib/dispatch-writer.js';
+// /fixture:LIN-3136
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { buildWakeCredentialProvisioner } from '../../lib/wake-credential.js';
 // Namespace import so this file still loads (and reports per-cell red) before
@@ -215,6 +218,9 @@ async function callApp(app, method, path, body, bearer) {
 /** A later follow-up to `followUpTo` through the real POST /api/proxy/dispatch. */
 async function laterFollowUp(world, followUpTo) {
   const poster = await world.tokenStore.createToken(URL_KEY, { kind: 'standard', scope: 'readWrite', label: 'poster', createdBy: POSTER });
+  // fixture:LIN-3136: the poster holds the dispatch grant (the enqueue mounts require it)
+  poster.token = (await mintDispatchWriter(world.tokenStore, { urlKey: URL_KEY, ownerAccountId: POSTER, label: 'poster' })).token;
+  // /fixture:LIN-3136
   resetSpy(world);
   const app = express();
   app.use(express.json());

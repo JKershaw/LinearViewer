@@ -102,6 +102,9 @@ function buildDataRouteApp({ resolveWorkspaceAccess, issueDetail, rejectedCreden
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: async () => ({ tokenId: 'tok-1', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner' }),
+      // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+      validateToken: async () => ({ tokenId: 'tok-1', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+      // /fixture:LIN-3136
     },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: resolveWorkspaceAccess ?? (async () => ({
@@ -349,6 +352,9 @@ function buildKickoffApp({ resolveWorkspaceAccess, fetchIssueContext } = {}) {
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: async () => ({ tokenId: 'tok-1', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner' }),
+      // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+      validateToken: async () => ({ tokenId: 'tok-1', urlKey: 'acme', label: 'autopilot', scope: 'readWrite', createdBy: 'acct-owner', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+      // /fixture:LIN-3136
       createToken: async () => ({ token: 'bootstrap-xyz', kind: 'bootstrap', scope: 'readWrite' }),
     },
     proxyEventStore: { recordEvent: async () => {} },

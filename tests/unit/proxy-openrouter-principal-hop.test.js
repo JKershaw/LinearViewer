@@ -34,6 +34,9 @@ installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+// fixture:LIN-3136
+import { armDispatchWriterOnce } from './lib/dispatch-writer.js';
+// /fixture:LIN-3136
 import { UserPreferencesStore } from '../../lib/user-preferences.js';
 import { getWorkspaceOpenRouterKey } from '../../lib/openrouter-key-resolver.js';
 
@@ -276,6 +279,9 @@ describe('req.proxyCreatedBy -> getWorkspaceOpenRouterKey principal hop (LIN-192
   test('6: POST /api/proxy/recommend-and-dispatch', async () => {
     const { spy, app, proxyTokenStore } = await setup();
     // requireWriteScope gates this route — readWrite, unlike the other five.
+    // fixture:LIN-3136: the writer below holds the dispatch grant (the enqueue mounts require it)
+    armDispatchWriterOnce(proxyTokenStore, { ownerAccountId: ACCOUNT_A });
+    // /fixture:LIN-3136
     const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope: 'readWrite', createdBy: ACCOUNT_A });
 
     const { status, body } = await requestJson(app, '/api/proxy/recommend-and-dispatch', {

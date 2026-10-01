@@ -57,8 +57,15 @@ function makeFakeProvider(overrides = {}) {
 // triage path can assert the proxy block is appended (LIN-733).
 function fakeProxyTokenStore(token = 'minted-rw-token') {
   const calls = [];
+  // fixture:LIN-3136
+  const grantCalls = [];
+  // /fixture:LIN-3136
   return {
     calls,
+    // fixture:LIN-3136: the declared (M4) mint, recorded like createToken
+    grantCalls,
+    async mintGrantBootstrap(args) { grantCalls.push(args); return { token, scope: 'readWrite', grants: args.grants }; },
+    // /fixture:LIN-3136
     async createToken(urlKey, options) { calls.push({ urlKey, options }); return { token, scope: options?.scope }; }
   };
 }
@@ -73,6 +80,10 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features =
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: token };
       req.session = { linearUserId: 'user-1', features };
+      // fixture:LIN-3136: the owner session and workspace id a declared mint needs
+      req.workspace.id = 'ws-acme';
+      req.session.accountId = 'acct-owner';
+      // /fixture:LIN-3136
       next();
     },
     dispatchQueueStore,

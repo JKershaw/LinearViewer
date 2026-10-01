@@ -28,8 +28,14 @@ function buildApp(captured) {
     proxyTokenStore: {
       // LIN-1175: claude-code (default harness) dispatch now fails closed without a
       // mintable token; give the stub a minting createToken like production.
+      // fixture:LIN-3136: the declared (M1) mint, mirroring createToken
+      mintGrantBootstrap: async () => ({ token: "test-bootstrap", kind: "bootstrap", scope: "readWrite" }),
+      // /fixture:LIN-3136
       createToken: async () => ({ token: "test-bootstrap", kind: "bootstrap", scope: "readWrite" }),
       validateToken: async () => ({
+        // fixture:LIN-3136
+        grants: ['dispatch'], workspaceId: 'ws-acme',
+        // /fixture:LIN-3136
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
       })
     },

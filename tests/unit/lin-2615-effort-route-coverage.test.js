@@ -34,6 +34,13 @@ function buildProxyApp(captured) {
       createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' })
     },
+    // fixture:LIN-3136: the writer holds the dispatch grant (overrides the store above)
+    proxyTokenStore: {
+      mintGrantBootstrap: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
+      createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' })
+    },
+    // /fixture:LIN-3136
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
     getWorkspaceAccessToken: async () => 'test-token',

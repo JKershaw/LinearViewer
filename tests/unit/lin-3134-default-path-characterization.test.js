@@ -356,6 +356,9 @@ function buildRouteApp({ itemForWatch = null, itemsForList = null } = {}) {
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
+      // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+      // /fixture:LIN-3136
       createToken: async () => ({ token: MINTED, kind: 'bootstrap', scope: 'readWrite' })
     },
     proxyEventStore: { recordEvent: async () => {} },
@@ -431,6 +434,9 @@ describe('S0 — POST /api/proxy/dispatch createToken arguments', () => {
     app.use(createProxyRoutes({
       proxyTokenStore: {
         validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
+        // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+        validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+        // /fixture:LIN-3136
         createToken: async (urlKey, opts) => { calls.push({ urlKey, opts }); return { token: MINTED, kind: 'bootstrap', scope: 'readWrite' }; }
       },
       proxyEventStore: { recordEvent: async () => {} },
@@ -600,6 +606,9 @@ function proxyApp() {
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
+      // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+      // /fixture:LIN-3136
       createToken: async (urlKey, opts) => { captured.mintCalls.push({ urlKey, opts }); return { token: MINTED, kind: 'bootstrap', scope: 'readWrite' }; }
     },
     proxyEventStore: { recordEvent: async () => {} },

@@ -60,6 +60,9 @@ installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+// fixture:LIN-3136
+import { armDispatchWriterOnce } from './lib/dispatch-writer.js';
+// /fixture:LIN-3136
 
 const PAID_NOTE = 'openrouter_key_fallback_paid_env';
 const FREE_NOTE = 'openrouter_key_fallback_free_tier';
@@ -212,6 +215,9 @@ async function request(app, path, { method = 'GET', token, body } = {}) {
  */
 async function mintAndRequest({ getWorkspaceOpenRouterKey, events, accessToken, dispatchQueueStore, scope = 'read' }, path, opts = {}) {
   const { app, proxyTokenStore } = buildApp({ getWorkspaceOpenRouterKey, events, accessToken, dispatchQueueStore });
+  // fixture:LIN-3136: a readWrite writer holds the dispatch grant (the enqueue mounts require it)
+  if (scope === 'readWrite') armDispatchWriterOnce(proxyTokenStore, { ownerAccountId: ACCOUNT_A });
+  // /fixture:LIN-3136
   const { token } = await proxyTokenStore.createToken(WORKSPACE_URL_KEY, { scope, createdBy: ACCOUNT_A });
   return request(app, path, { ...opts, token });
 }

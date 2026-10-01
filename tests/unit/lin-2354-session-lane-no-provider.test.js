@@ -152,10 +152,17 @@ describe('LIN-2354 F1 — feedback-triage/autopilot lane (routes/workspace-api.j
       workspaceFromUrl: (req, res, next) => {
         req.workspace = workspace;
         req.session = { linearUserId: 'user-1', features: { feedbackTriage: true } };
+        // fixture:LIN-3136: the owner session and workspace id a declared mint needs
+        req.workspace = { ...workspace, id: 'ws-acme' };
+        req.session.accountId = 'acct-owner';
+        // /fixture:LIN-3136
         next();
       },
       dispatchQueueStore: { addItem: async (urlKey, item) => { dispatch.items.push({ urlKey, item }); return { _id: 'd1', ...item }; } },
       proxyTokenStore: fakeProxyTokenStore(),
+      // fixture:LIN-3136: the declared (M4) mint, mirroring createToken (overrides the store above)
+      proxyTokenStore: { ...fakeProxyTokenStore(), async mintGrantBootstrap() { return { token: 'minted-rw-token', kind: 'bootstrap', scope: 'readWrite' }; } },
+      // /fixture:LIN-3136
       freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
       workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
       customPromptsStore: {}, recapCacheStore: {},

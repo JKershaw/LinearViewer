@@ -587,6 +587,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // LIN-3129: the token's grant set, additively. Nothing reads it until a
       // mount uses requireGrant (LIN-2884) — S1 adds no mount.
       req.proxyTokenGrants = result.grants || [];
+      // LIN-3136: the token's own stored workspace id (null when it has none).
+      // The kickoff's declared mint (M1) reads it; it is never client-supplied.
+      req.proxyWorkspaceId = result.workspaceId || null;
       next();
     } catch (err) {
       console.error('Proxy token validation error:', err.message);

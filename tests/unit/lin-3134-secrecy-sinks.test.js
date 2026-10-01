@@ -33,6 +33,9 @@ installHermeticLinearTransport();
 
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+// fixture:LIN-3136
+import { mintDispatchWriter } from './lib/dispatch-writer.js';
+// /fixture:LIN-3136
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -183,6 +186,9 @@ before(async () => {
   world.dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
   world.consumerToken = (await world.dispatchTokenStore.createToken(URL_KEY, 'consumer', POSTER)).token;
   world.posterToken = (await world.tokenStore.createToken(URL_KEY, { kind: 'standard', scope: 'readWrite', label: 'poster', createdBy: POSTER })).token;
+  // fixture:LIN-3136: the poster holds the dispatch grant (the enqueue mounts require it)
+  world.posterToken = (await mintDispatchWriter(world.tokenStore, { urlKey: URL_KEY, ownerAccountId: POSTER, label: 'poster' })).token;
+  // /fixture:LIN-3136
 
   // The declared parent (finished, in history).
   const parent = await world.store.addItem(URL_KEY, {
