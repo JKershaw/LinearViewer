@@ -1,12 +1,13 @@
 ---
 title: What does a Harbour supervisor cost held open and woken, against started fresh for each step, and what would John's relay have cost on September's work?
 kind: paper
-version: 1
+version: 2
 date: 2026-10-01
-authors: [Claude (LIN-3176), for John Kershaw]
-model: "frontier tier, claude-code, dispatched by simple-dispatcher (dispatch 309243c5, kind custom); effort not recorded in the dispatch item. One bounded research session with no plan, review or close-out legs, by the brief's design. Six in-session subagents of the same tier coded blind: two for the handoff sample (each coder split across two agents) and two for the failure tickets."
+authors: [Claude (LIN-3176), for John Kershaw; Claude (version 2 corrections, LIN-3183)]
+model: "frontier tier, claude-code, dispatched by simple-dispatcher (dispatch 309243c5, kind custom); effort not recorded in the dispatch item. One bounded research session with no plan, review or close-out legs, by the brief's design. Six in-session subagents of the same tier coded blind: two for the handoff sample (each coder split across two agents) and two for the failure tickets. Version 2: frontier tier, claude-code, the independent check's session (LIN-3183, kind custom), which re-ran every script."
+revision: "Version 2 corrects the relay model per docs/papers/harbour/survey-check-7.md (LIN-3183). A fresh step's orientation now stops before its first decision, because the wake's own steps already charge that step; version 1 counted it twice. The cheap cases apply each role's mechanical share to that role, not the pooled 32%, because the roles were sampled equally. The quiet-wakes-to-code shape is also sized as code would route it, by delivery class. Figures that moved: the relay as proposed, +2% to 0%; the cheap ends of every range; the break-even handoff, 11k to 21k; the cold-resume comparison; the per-merged-change ratios as proposed; option A's size."
 grounded_at: 26014544 (LinearViewer, origin/main); 3366748 (simple-dispatcher, origin/main)
-cites: [docs/steady-base.md@26014544:27-29, docs/steady-base.md@26014544:78, docs/steady-base.md@26014544:93-95, docs/steady-base.md@26014544:121-123, docs/steady-base.md@26014544:142-144, docs/papers/harbour/wake-inventory.md@26014544:25-33, docs/papers/harbour/what-supervisors-do.md@26014544:60-61, docs/papers/harbour/what-doubled-the-dispatches.md@26014544:23, docs/papers/harbour/fleet-complexity-read.md@26014544:38, docs/papers/harbour/measuring-throughput.md@26014544:120-121, docs/papers/harbour/wake-inventory-failures.json@26014544, simple-dispatcher/hook.js@3366748:1062, simple-dispatcher/dispatcher.js@3366748:50, LIN-353, LIN-2078, LIN-3176 (2026-10-01)]
+cites: [docs/steady-base.md@26014544:27-29, docs/steady-base.md@26014544:78, docs/steady-base.md@26014544:93-95, docs/steady-base.md@26014544:121-123, docs/steady-base.md@26014544:142-144, docs/papers/harbour/wake-inventory.md@26014544:25-33, docs/papers/harbour/what-supervisors-do.md@26014544:60-61, docs/papers/harbour/what-doubled-the-dispatches.md@26014544:23, docs/papers/harbour/fleet-complexity-read.md@26014544:38, docs/papers/harbour/measuring-throughput.md@26014544:120-121, docs/papers/harbour/wake-inventory-failures.json@26014544, docs/papers/harbour/survey-check-7.md (LIN-3183), scripts/survey-check-7-held.mjs, simple-dispatcher/hook.js@3366748:1062, simple-dispatcher/dispatcher.js@3366748:50, LIN-353, LIN-2078, LIN-3176 (2026-10-01)]
 ---
 
 # What does a Harbour supervisor cost held open and woken, against started fresh for each step, and what would John's relay have cost on September's work?
@@ -16,19 +17,20 @@ weighted tokens plus 0.11 of everything the session has accumulated, because the
 is read back from cache. Cost per wake therefore rises in a straight line with history: it is
 not flat, and it is no worse than linear. A session's total grows a little faster than its
 number of wakes (exponent 1.1–1.2). Starting fresh is not cheap either. A fresh supervisor
-spends 116–238k tokens and one to two minutes orienting before its first decision, plus a 60–80k
+spends 116–238k tokens and 0.7 to 2.1 minutes reaching its first decision, plus a 62–82k
 bootstrap. Its first prompt to a decision is 76–96k tokens, mostly docs and code it reads.
 
 Modelled on September's 6,209 wakes into held supervisors, the relay as proposed would have cost
-about the same as today: **+2% of the fleet's weighted tokens (range −18% to +11%), about 13.6M
-per correct change against 13.3M**. The two halves of the relay pull opposite ways. Sending the
+about the same as today: **0% of the fleet's weighted tokens (range −17% to +9%), 13.3M per
+correct change against 13.3M**. The two halves of the relay pull opposite ways. Sending the
 3,233 wakes that changed nothing to code removes 16% of the fleet's tokens. Turning each of the
-2,976 wakes that acted into a fresh session costs twice what holding them did, because orientation
-is 62% of a fresh step's price. The relay saves money only when the fresh step reads a small
+2,976 wakes that acted into a fresh session costs 1.9 times what holding them did, because
+orientation is 60% of a fresh step's price. The relay saves money only when the fresh step reads a small
 handoff instead of orienting as today's fresh starts do. That *lean relay* comes to −19%
-(range −25% to −9%, 10.8M per correct change). Most of that saving does not need fresh sessions
+(range −24% to −9%, 10.8M per correct change). Most of that saving does not need fresh sessions
 at all: keeping acted wakes held and sending only the quiet ones to code comes to −14%
-(−21% to −13%).
+(−19% to −13%). That figure assumes code knows in advance which wakes will change nothing. Code
+that routes by what it can see, the delivery's class, reaches about −10%.
 
 Little is lost by forgetting. In a blind-coded sample of 48 wakes that acted, no decision rested
 on a fact only the session's memory held. About a third of the facts the decisions used came from
@@ -42,7 +44,9 @@ of the failures, mostly lost wakes into held sessions, would not exist under a r
 
 **Cost per wake rises linearly with the context the session carries, because every step re-reads
 it.** For September's held supervisors (all transcripts, both repos' tickets), one model step costs
-a fixed few thousand weighted tokens plus about 0.11 times its whole prompt:
+a fixed few thousand weighted tokens plus about 0.11 times its whole prompt. The slope is mostly
+the cache-read price itself; the fit explains little of the step-to-step spread (R² 0.09–0.20),
+which output and cache writes drive:
 
 | Role | Wakes (sessions) | Context at wake, median (p10–p90) | Tokens per wake, median | One step ≈ | Cache read share of wake cost | Context added per wake | Session total ∝ wakes^ |
 |---|--:|--:|--:|---|--:|--:|--:|
@@ -64,8 +68,9 @@ because a few thousand tokens of context are added per wake against a starting c
 100k. This extends `what-supervisors-do.md`'s finding that the same gate reply costs three times
 as much late in a session as early.
 
-**A fresh start costs one to two minutes and 116–238k tokens to orient, plus a 60–80k bootstrap,
-by role.** From the moment a session's task arrived to its first write, push, edit or dispatch:
+**A fresh supervisor takes 0.7 to 2.1 minutes and 116–238k tokens to reach its first decision,
+plus a 62–82k bootstrap, by role.** From the moment a session's task arrived to its first write,
+push, edit or dispatch, that step included:
 
 | Role (fresh sessions in September) | Tokens to first decision, median (p25–p75) | Bootstrap before the task | Context at first decision | Minutes | What it read, by characters |
 |---|--:|--:|--:|--:|---|
@@ -89,38 +94,49 @@ September 130 of 155 resume handshakes into held supervisors were cold, and 48 o
 re-confirms. A cold first step cost 1.81 weighted tokens per context token, against 0.11 warm.
 The 183 cold resumes into held supervisors held a median 152–349k tokens by role, and their first
 steps alone cost 106M weighted tokens, 3.1% of the fleet's September tokens. Starting the same
-roles fresh at those moments would have cost about 45M. A cold resume costs more than a fresh
-start once the session holds more than about 110k tokens (autopilot) to 170k (stepper), and most
-of them did.
+roles fresh at those moments, up to their first decision, would have cost about 41M. A cold resume
+costs more than a fresh start once the session holds more than about 100k tokens (autopilot) to
+155k (stepper), and most of them did. 95 of the 183 changed nothing.
 
-**The relay as proposed would have cost about what September did: +2% of the fleet's tokens
-(−18% to +11%).** In the model, every wake into a held supervisor that changed nothing goes to code
+**The relay as proposed would have cost about what September did: 0% of the fleet's tokens
+(−17% to +9%).** In the model, every wake into a held supervisor that changed nothing goes to code
 at no model cost. Every wake that acted becomes a fresh session of its role. That session pays
-its role's measured orientation and bootstrap, reads a handoff, and then does the wake's own steps
-at its smaller fresh context. The central case takes the median orientation, a 20k handoff and the
-bootstrap. The dear case takes the 75th percentile, a 50k handoff and the bootstrap. The cheap case
-takes the 25th percentile and a 5k handoff, drops the bootstrap, and also sends to code the 32% of
-acted wakes the coders marked mechanical.
+its role's measured orientation (the steps before a fresh start's first decision) and bootstrap,
+reads a handoff, and then does the wake's own steps at its smaller fresh context. The central case
+takes the median orientation, a 20k handoff and the bootstrap. The dear case takes the 75th
+percentile, a 50k handoff and the bootstrap. The cheap case takes the 25th percentile and a 5k
+handoff, and drops the bootstrap. It also sends to code each role's acted wakes in the share the
+coders marked mechanical: Runner 58%, autopilot 50%, stepper 13% and leg 8%, 24% of all acted
+wakes.
 
 | Shape | Fleet tokens, central (range) | Per correct change (range) | Runner (175M today) | Leg (247M) | Stepper (335M) | Autopilot (440M) |
 |---|--:|--:|--:|--:|--:|--:|
 | Today | 0 | 13.3M | | | | |
-| Relay as proposed | +2.1% (−18.2 to +11.3) | 13.6M (10.9–14.8) | −84% | +22% | +88% | −30% |
-| Lean relay (fresh step reads only a 10–60k handoff) | −18.6% (−25.4 to −9.3) | 10.8M (9.9–12.1) | −93% | −47% | −24% | −63% |
-| Quiet wakes to code, acted wakes stay held | −13.9% (−20.7 to −13.4) | 11.5M (10.5–11.5) | −81% | −26% | −16% | −50% |
-| Relay for Runner and autopilot only | −11.5% | 11.8M | −84% | −26% | −16% | −30% |
+| Relay as proposed | −0.1% (−17.1 to +9.4) | 13.3M (11.0–14.6) | −85% | +14% | +76% | −33% |
+| Lean relay (fresh step reads only a 10–60k handoff) | −18.6% (−24.2 to −9.3) | 10.8M (10.1–12.1) | −93% | −47% | −24% | −63% |
+| Quiet wakes to code, acted wakes stay held | −13.9% (−19.2 to −13.4) | 11.5M (10.7–11.5) | −81% | −26% | −16% | −50% |
+| Relay for Runner and autopilot only | −11.9% | 11.7M | −85% | −26% | −16% | −33% |
 
 The relay wins where wakes are mostly quiet and loses where they mostly act. The Runner's wakes
-change nothing 93% of the time, and the relay removes 84% of its cost. A stepper's wakes act 79%
-of the time, and each fresh start (238k plus a 72k bootstrap) costs more than the held wake it
-replaces (median 173k), so the relay nearly doubles its cost. Held-supervisor wakes are 35% of the
-fleet's September tokens: 16.3% in wakes that changed nothing and 18.7% in wakes that acted. As
-proposed, the relay saves the first and roughly doubles the second.
+change nothing 93% of the time, and the relay removes 85% of its cost. A stepper's wakes act 79%
+of the time, and each fresh start (208k to orient plus a 72k bootstrap) costs more than the held
+wake it replaces (median 173k), so the relay raises its cost by three-quarters. Held-supervisor
+wakes are 35% of the fleet's September tokens: 16.3% in wakes that changed nothing and 18.7% in
+wakes that acted. As proposed, the relay saves the first and nearly doubles the second.
+
+**Code can see a wake's class, not its outcome.** The table's shapes send to code exactly the
+wakes that turned out to change nothing. Code has to decide before a model reads the wake. By
+delivery class it can take pause wakes, failsafe re-confirms, silence re-fires and every delivery
+into the Runner. Those are 2,514 wakes: 2,295 quiet, 11.7% of the fleet's tokens, and 219 that
+acted, which code would have to pass on. The other 938 quiet wakes, 4.5% of the fleet's tokens,
+are terminal and unlabelled deliveries that only a reader can tell from the ones that act. Routed
+by class, with acted wakes held, the saving is −9.9% (−9.2% at a five-minute cache): −5.7% from
+the supervisors' pause and re-ask wakes and −4.1% from the Runner (`survey-check-7.md`).
 
 ![Modelled weighted tokens per correct change, today against the relay and its variants](figures/held-or-fresh/cost-per-change.svg)
 
 **The result turns on the handoff.** If the fresh step also orients as fresh supervisors do today,
-the relay breaks even with a handoff of just 11k tokens. If it reads only its handoff, it breaks
+the relay breaks even with a handoff of 21k tokens. If it reads only its handoff, it breaks
 even at 100k, and every 10k of handoff costs about 2.3 points of the fleet's tokens. The lean relay
 beats keeping acted wakes held only while the handoff stays under about 40k. The hybrid's figure
 already pays for about 105 acted wakes whose cache would have expired once the quiet wakes no longer
@@ -129,7 +145,7 @@ lived five minutes instead of an hour.
 
 ![The fleet's change in tokens against the handoff each fresh judgement step reads](figures/held-or-fresh/handoff-sensitivity.svg)
 
-**Per merged change, under both charging rules, the relay costs 9–13% more as proposed, and the
+**Per merged change, under both charging rules, the relay costs 7–11% more as proposed, and the
 lean relay 9–13% less.** The cohort is the 298 tickets whose work merged in September and whose
 first session is in the transcripts: 258 LinearViewer and 50 simple-dispatcher, a change in both
 counted in both. Charged by the child each wake names, a merged change cost a mean 9.4M weighted
@@ -138,7 +154,7 @@ cost 9.1M (9.4M and 8.9M).
 
 | Shape | By the child named (LV / SD) | By the session entered (LV / SD) |
 |---|--:|--:|
-| Relay as proposed | ×1.09 (1.09 / 1.15) | ×1.13 (1.13 / 1.12) |
+| Relay as proposed | ×1.07 (1.06 / 1.13) | ×1.11 (1.10 / 1.10) |
 | Lean relay | ×0.87 (0.87 / 0.95) | ×0.91 (0.90 / 0.93) |
 | Quiet wakes to code, acted held | ×0.91 (0.91 / 0.95) | ×0.94 (0.94 / 0.94) |
 
@@ -169,8 +185,9 @@ session's transcript up to that moment.
 held. The coders put the smallest note that would carry every remembered fact at a median of 300
 characters (p90 600, largest 850). On those cards, the handoff would be a few hundred tokens. What
 makes a fresh step dear is the orientation it does around the handoff, not the handoff itself.
-The coders marked 32% of the acted decisions mechanical (agreement 85%, κ 0.67): 7 of 12 at the
-Runner, 6 at the autopilot, 1.5 at the stepper and 1 at the leg.
+The coders marked 32% of the sampled acted decisions mechanical (agreement 85%, κ 0.67): 7 of 12
+at the Runner, 6 at the autopilot, 1.5 at the stepper and 1 at the leg. Roles were sampled
+equally, so weighted by each role's acted wakes the share is 24%.
 
 **Recoveries worked from the record. One clear failure depended on held memory, and eleven would
 not exist under a relay.** Two blind coders read each of the 25 supervisor failures on record with
@@ -229,7 +246,8 @@ codebooks and all four codings are committed in `held-or-fresh-codes.json`;
 - **Cold.** A first step is cold when cache reads are under half its context.
 - **The relay.**
   - *Relay as proposed:* each acted wake costs its role's orientation (a quantile of the fresh
-    starts) and bootstrap, plus a handoff written once to the 1-hour cache. Its own steps are
+    starts' steps before their first decision) and bootstrap, plus a handoff written once to the
+    1-hour cache. The decision step itself is one of the wake's own steps. Its own steps are
     re-priced with each prompt moved from the held context to the role's median context at first
     decision plus the handoff.
   - *Lean relay:* it starts from the bare 33k first prompt plus the handoff and does no other
@@ -237,6 +255,11 @@ codebooks and all four codings are committed in `held-or-fresh-codes.json`;
   - *Hybrid:* acted wakes stay held. A wake pays a full cold re-write when the last acted wake was
     more than an hour before but some wake (now gone) came within the hour.
   - *Fleet change:* measured against all September steps in all sessions (3,424M weighted tokens).
+  - *Mechanical share:* in the cheap cases, each role's acted wakes go to code in the share both
+    coders marked mechanical for that role.
+  - *By class* (`scripts/survey-check-7-held.mjs`): code takes pause wakes, failsafe re-confirms,
+    silence re-fires and the Runner's deliveries whatever they led to; those that acted are passed
+    on at their held cost.
   - *Per correct change:* applies that change to the mean of `measuring-throughput.md`'s four
     September weeks, 13.3M (11.4–16.0M). That figure is fleet tokens divided by correct, complete
     changes, so it moves one for one with the fleet if the correct rate holds.
@@ -263,7 +286,11 @@ codebooks and all four codings are committed in `held-or-fresh-codes.json`;
 - **Code is priced at zero.** Quiet wakes sent to code cost no tokens in the model, and code that
   mishandles a progress wake is not counted. `what-supervisors-do.md` found 39% of progress wakes
   led to an action, and here those are counted as acted wakes, not quiet ones. This biases every
-  shape's saving up.
+  shape's saving up. The table's shapes also route by outcome, which code cannot see; routed by
+  class, the hybrid's −14% becomes −10%. The by-class figure passes the 219 class-routed wakes that
+  acted on at their held cost, which biases it towards saving.
+- **The central relay carries the bootstrap.** Broker-armed launches already skip it for some
+  kinds. Without it, the relay as proposed comes to −6%. The cheap case drops it.
 - **The lean relay assumes a fresh step reads nothing beyond its handoff.** Today's fresh
   supervisors read 40–60k tokens of docs and code by choice or by prompt. If a relay step did the
   same, it would move to the "as proposed" line. The lean figure is a bound on what a deliberately
@@ -300,10 +327,10 @@ Each option is sized from this paper. None is a change; John decides.
 
 | Option | Estimated effect | Evidence | Risk to correctness | How the scorecard measures it |
 |---|---|---|---|---|
-| **A. Code delivers or absorbs the wakes that change nothing; acted wakes stay held** (the anchor's map rows 1–3, sized) | −13% to −21% of weighted tokens; 11.5M per correct change (10.5–11.5) | 3,233 quiet wakes are 16.3% of fleet tokens; the cache-expiry cost is about 2 points | Lost wakes are the most common failure (15 of 25); the plumbing moves rather than disappears. Code must still pass on the 39% of progress wakes that lead somewhere | Tokens and wakes per correct change; correct rate; lost-wake incidents |
+| **A. Code delivers or absorbs the wakes that change nothing; acted wakes stay held** (the anchor's map rows 1–2, and the gate replies that follow those wakes) | About −10% of weighted tokens routed by delivery class (−5.7% supervisors' pause and re-ask wakes, −4.1% the Runner); −14% (−19% to −13%) if code could tell which wakes will change nothing; 11.5–12.0M per correct change | 3,233 quiet wakes are 16.3% of fleet tokens, 11.7% in classes code can see; the cache-expiry cost is about 2 points | Lost wakes are the most common failure (15 of 25); the plumbing moves rather than disappears. Code must still pass on the 39% of progress wakes that lead somewhere | Tokens and wakes per correct change; correct rate; lost-wake incidents |
 | **B. On top of A, a lean fresh session for each judgement step** | A further −5 points at a 20k handoff (−9 at none), falling to 0 at about 40k; worse than A above it | 0 of 48 decisions needed memory alone; handoff notes 300–850 characters; role prompts about 6–18k tokens | Behavioural fixes that live only in a run's memory (LIN-2078) are lost; judgement quality without history is unmeasured; about 0.5–1.5 minutes more per step | Review send-backs and escapes per correct change; tokens per judgement step |
-| **C. Start fresh instead of resuming cold once a session holds more than about 110–170k tokens** | About −1.8% of fleet tokens (106M of cold first steps against about 45M fresh) | 183 cold resumes; 1.81 against 0.11 tokens per context token | As B, for those sessions only | Tokens per correct change; cold-resume count |
-| **D. The relay as proposed, with today's orientation** | +2% (−18% to +11%): no reliable saving | Orientation is 62% of a fresh step's cost; a stepper's cost nearly doubles | As B | Not recommended without B's small handoff |
+| **C. Start fresh instead of resuming cold once a session holds more than about 100–155k tokens** | About −1.9% of fleet tokens alone (106M of cold first steps against about 41M fresh); about −0.8% on top of A, which already sends the 95 cold resumes that changed nothing to code; inside B and D | 183 cold resumes; 1.81 against 0.11 tokens per context token | As B, for those sessions only | Tokens per correct change; cold-resume count |
+| **D. The relay as proposed, with today's orientation** | 0% (−17% to +9%): no reliable saving | Orientation is 60% of a fresh step's cost; a stepper's cost rises by three-quarters | As B | Not recommended without B's small handoff |
 
 ## Next
 

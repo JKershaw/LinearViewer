@@ -19,6 +19,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { SCOPES, RUNNER_GRANTS } from '../lib/proxy-scopes.js';
+import { ownerMintRefusal } from '../lib/owner-mint-refusals.js';
 
 // LIN-525 #5: the +proxy toggle auto-mints a 'prompt-proxy' readWrite token on
 // every page-load session that dispatches. To stop these standing credentials
@@ -28,29 +29,15 @@ import { SCOPES, RUNNER_GRANTS } from '../lib/proxy-scopes.js';
 const PROMPT_PROXY_LABEL = 'prompt-proxy';
 const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
 
-// LIN-3131 S2b.2 — the P5 refusal map for the owner-checked runner copy mint.
-// `mintGrantBootstrap` throws a tagged error (`code`/`status`/`retryable`); the
-// route surfaces exactly the P5 code/status, with a short human `error`. There
-// is deliberately NO compatibility lane: every one fails closed. An unknown
-// code is rethrown (→ the route's generic 500) rather than silently allowed.
-const RUNNER_MINT_REFUSALS = Object.freeze({
-  GRANT_OWNERLESS: Object.freeze({
-    status: 503, category: 'auth', retryable: false,
-    error: 'This session has no account owner'
-  }),
-  WORKSPACE_OWNER_UNSET: Object.freeze({
-    status: 409, category: 'config', retryable: false,
-    error: 'This workspace has no recorded owner'
-  }),
-  GRANT_OWNER_ONLY: Object.freeze({
-    status: 403, category: 'auth', retryable: false,
-    error: "Only this workspace's owner can mint a runner credential"
-  }),
-  OWNER_CHECK_UNAVAILABLE: Object.freeze({
-    status: 503, category: 'upstream', retryable: true,
-    error: 'Owner verification is temporarily unavailable'
-  })
-});
+// LIN-3131 S2b.2 / LIN-3137 — the P5 refusal vocabulary for the owner-checked
+// runner copy mint now lives in the shared lib/owner-mint-refusals.js, so this
+// mint and the legacy dispatch-token mint (routes/dispatch.js) cannot drift.
+// This route keeps its OWN outcome→code mapping: `mintGrantBootstrap` throws a
+// tagged error (`code`/`status`/`retryable`) and the route maps it through the
+// shared vocabulary, with a short human `error`. There is deliberately NO
+// compatibility lane: every one fails closed. An unknown code is rethrown
+// (→ the route's generic 500) rather than silently allowed.
+const RUNNER_CREDENTIAL_SUBJECT = 'a runner credential';
 
 /**
  * @param {Object} deps
@@ -98,15 +85,16 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
       // Branched BEFORE the label/scope validation on purpose: client `scope`
       // and `label` are IGNORED on this path. The lifetime profile is the named
       // `runner` profile (LIN-3132). No compatibility lane — every refusal fails
-      // closed and maps through RUNNER_MINT_REFUSALS (P5).
+      // closed and maps through the shared owner-mint refusal vocabulary (P5).
       if (wantRunner) {
         if (!req.session?.accountId) {
           console.warn(
             `Runner copy refused: session has no account owner (urlKey=${workspace.urlKey}) — ` +
             `GRANT_OWNERLESS (LIN-3131)`
           );
-          return jsonError(res, 503, RUNNER_MINT_REFUSALS.GRANT_OWNERLESS.error, {
-            code: 'GRANT_OWNERLESS', category: 'auth', retryable: false
+          const refusal = ownerMintRefusal('GRANT_OWNERLESS', RUNNER_CREDENTIAL_SUBJECT);
+          return jsonError(res, refusal.status, refusal.error, {
+            code: refusal.code, category: refusal.category, retryable: refusal.retryable
           });
         }
 
@@ -120,10 +108,10 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
             profile: 'runner'
           });
         } catch (err) {
-          const refusal = RUNNER_MINT_REFUSALS[err?.code];
+          const refusal = ownerMintRefusal(err?.code, RUNNER_CREDENTIAL_SUBJECT);
           if (!refusal) throw err;
           return jsonError(res, refusal.status, refusal.error, {
-            code: err.code, category: refusal.category, retryable: refusal.retryable
+            code: refusal.code, category: refusal.category, retryable: refusal.retryable
           });
         }
 

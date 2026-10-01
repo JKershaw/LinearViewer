@@ -43,6 +43,7 @@ import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
+import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -138,9 +139,13 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   requests it (`attachProxy:true`), so a claude-code dispatch carries the token as the
  *   structured `bootstrapToken` field instead of injectable prose (LIN-1162). Absent → the
  *   attach degrades to a no-op (attachProxyContext returns the prompt unchanged).
+ * @param {Function|null} [options.workspaceOwnerCheck] - The workspace-owner seam
+ *   (`createWorkspaceOwnerCheck`), used to gate the legacy dispatch-token mint
+ *   (LIN-3137 J5) so only a workspace's owner can mint. `null` (unwired) fails
+ *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null }) {
   const router = Router();
 
   // =========================================================================
@@ -1138,11 +1143,37 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
   /**
    * POST /workspace/:urlKey/api/dispatch/tokens
-   * Create a new dispatch token for this workspace.
+   * Create a new dispatch token for this workspace. Owner-only (LIN-3137 J5):
+   * a non-owner member is refused 403 GRANT_OWNER_ONLY and nothing is minted.
    * Rate limited to 5 requests per 15 minutes per IP.
    */
   router.post('/workspace/:urlKey/api/dispatch/tokens', tokenCreationLimiter, workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
+
+    // LIN-3137 J5 — the owner-only mint gate. A legacy dispatch token is a take
+    // path (any holder can run a runner), so only the workspace's owner may mint
+    // one. Runs after auth (`workspaceFromUrl`), before label validation and
+    // before `createToken` — a refused caller mints nothing. The seam is keyed
+    // on the route workspace id + the session account, never the request body.
+    // Fails closed on a missing accountId (pre-check, so it maps to
+    // GRANT_OWNERLESS rather than the seam's not-owner), an unwired/absent seam,
+    // a throwing seam, or any unexpected verdict.
+    const ownerRefusal = await resolveOwnerMintRefusal({
+      ownerCheck: workspaceOwnerCheck,
+      workspaceId: workspace.id,
+      accountId: req.session?.accountId,
+      subject: 'a dispatch token'
+    });
+    if (ownerRefusal) {
+      console.warn(
+        `Dispatch token mint refused: ${ownerRefusal.code} (urlKey=${workspace.urlKey}) — LIN-3137`
+      );
+      return jsonError(res, ownerRefusal.status, ownerRefusal.error, {
+        code: ownerRefusal.code,
+        category: ownerRefusal.category,
+        retryable: ownerRefusal.retryable
+      });
+    }
 
     try {
       const { label } = req.body || {};
@@ -1461,7 +1492,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * host runner's own consumer token is ownerless, so deleting it unconditionally
    * would trade a silent failure for a loud one on the very next deploy. The fix
    * is two-part and ordered — (1) re-issue the runner's dispatch token as OWNED
-   * (an on-host operator action: create a new token while signed in, which stamps
+   * (an on-host operator action: create a new token while signed in AS THE
+   * WORKSPACE OWNER — the mint is owner-only as of LIN-3137 — which stamps
    * req.session.accountId, and point the runner at it; `GET .../api/dispatch/tokens`
    * now reports `hasOwner` so "are any ownerless tokens still live?" is answerable),
    * then (2) set DISPATCH_OWNERLESS_BROKER_COMPAT=off to restore strict minting.

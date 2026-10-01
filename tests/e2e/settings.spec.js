@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js'
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js'
 import { nav, settings } from '../helpers.js'
 
 // Proof-of-pattern spec for LIN-215: brittle `:has-text()` / class / href
@@ -165,6 +166,8 @@ test.describe('Token Management', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await page.goto(`/test/clear-dispatch-tokens?urlKey=${localWorkerUrlKey}`)
     await seedLocal(undefined, { features: { dispatch: true } })
+    // LIN-3137 J5: the mint is owner-only — seed the owner edge explicitly.
+    await seedWorkspaceOwnership(page, localWorkerUrlKey)
     await page.goto(`/workspace/${localWorkerUrlKey}/dispatch`)
     await page.waitForLoadState('networkidle')
   })
