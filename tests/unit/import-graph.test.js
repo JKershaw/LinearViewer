@@ -14,12 +14,19 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
 
 import {
   buildImportGraph,
   resolveSpecifier,
   parseModule,
 } from './lib/import-graph.js';
+
+// Absolute URL of the helper, so the bounded child process below imports the
+// same file this test imports.
+const HELPER_URL = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), 'lib', 'import-graph.js')).href;
 
 /** Object of { path: source } -> the iterable form buildImportGraph accepts. */
 function mk(sources) {
@@ -211,10 +218,27 @@ describe('cycles terminate', () => {
     'y.js': "export * from './x.js';\nexport const only = 1;\n",
   });
 
-  test('a two-module import cycle resolves reach without looping', () => {
-    assert.equal(graph.reaches('c1.js', 'b'), true);
-    assert.equal(graph.reaches('c2.js', 'a'), true);
-    assert.equal(graph.reaches('c1.js', 'missing'), false);
+  test('reaches terminates on a two-module import cycle and returns the right answer', () => {
+    // `reaches` is synchronous, so a lost visited-set guard would spin the
+    // event loop and Node's per-test timeout could not preempt it. Run the
+    // cycle in a bounded child process instead: a lost guard makes this test
+    // FAIL (ETIMEDOUT) rather than hang the suite.
+    const script = `
+      import { buildImportGraph } from ${JSON.stringify(HELPER_URL)};
+      const g = buildImportGraph(new Map([
+        ['c1.js', "import { b } from './c2.js';\\nexport function a() {}\\n"],
+        ['c2.js', "import { a } from './c1.js';\\nexport function b() {}\\n"],
+      ]));
+      if (g.reaches('c1.js', 'b') !== true) throw new Error('c1 -> b should be true');
+      if (g.reaches('c2.js', 'a') !== true) throw new Error('c2 -> a should be true');
+      if (g.reaches('c1.js', 'missing') !== false) throw new Error('missing should be false');
+      console.log('terminated');
+    `;
+    const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+      encoding: 'utf8',
+      timeout: 2000,
+    });
+    assert.match(out, /terminated/);
   });
 
   test('a star re-export cycle expands exported names without looping', () => {
