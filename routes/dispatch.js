@@ -26,14 +26,14 @@ import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, DISPATCH_KINDS, DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
-import { getPeriodicals } from '../lib/periodicals.js';
+import { getPeriodicals, PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE } from '../lib/workspace.js';
-import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
+import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
@@ -308,6 +308,18 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return badRequest.json(res, 'periodicalId must be one of the known periodical template ids');
       }
 
+      // LIN-3136 M2 / M2b: which launches declare the dispatch grant. An
+      // autopilot, or a periodical "+ Autopilot" variant: kind 'periodical', a
+      // periodicalId validated just above, and the SERVER-OWNED handoff tail in
+      // the prompt (lib/periodicals.js). A plain Mint, or a prompt edited to drop
+      // the tail, launches a grant-less leaf as before. The client sends no
+      // grant intent at all; the owner check at the mint is the authority.
+      const isPeriodicalAutopilot = kind === 'periodical'
+        && periodicalId !== undefined
+        && typeof prompt === 'string'
+        && prompt.includes(PERIODICAL_AUTOPILOT_TAIL);
+      const launchesOrchestrator = kind === 'autopilot' || isPeriodicalAutopilot;
+
       // Opt-in completion hold (LIN-797): boolean, default false. Stored +
       // forwarded blindly — the runner owns the behaviour (see LIN-795).
       if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
@@ -540,25 +552,45 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           : wantProxyContext
           ? {
               finalizePrompt: async (resolvedHarness) => {
-                const attached = await attachProxyContext({
-                  proxyTokenStore,
-                  urlKey: workspace.urlKey,
-                  baseUrl,
-                  issueIdentifier: issueIdentifier || null,
-                  prompt,
-                  label: 'dispatch-bootstrap',
-                  harness: resolvedHarness,
-                  // LIN-2354: declared provider identity, fallback-free —
-                  // getProvider (unlike getProviderForWorkspace, used above for
-                  // capability shaping) never guesses Linear for an undeclared
-                  // workspace.
-                  providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
-                  // LIN-2804: capability summary, same source as the displayName above.
-                  providerUi: getProvider(workspace.provider)?.ui ?? null,
-                  // LIN-1376: stamp the launching account so the dispatched
-                  // session's token resolves under LIN-1366 owner-scoping.
-                  createdBy: req.session?.accountId || null
-                });
+                let attached;
+                try {
+                  attached = await attachProxyContext({
+                    proxyTokenStore,
+                    urlKey: workspace.urlKey,
+                    baseUrl,
+                    issueIdentifier: issueIdentifier || null,
+                    prompt,
+                    label: 'dispatch-bootstrap',
+                    harness: resolvedHarness,
+                    // LIN-2354: declared provider identity, fallback-free —
+                    // getProvider (unlike getProviderForWorkspace, used above for
+                    // capability shaping) never guesses Linear for an undeclared
+                    // workspace.
+                    providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
+                    // LIN-2804: capability summary, same source as the displayName above.
+                    providerUi: getProvider(workspace.provider)?.ui ?? null,
+                    // LIN-1376: stamp the launching account so the dispatched
+                    // session's token resolves under LIN-1366 owner-scoping.
+                    createdBy: req.session?.accountId || null,
+                    // LIN-3136 M2: an orchestrator launch holds the dispatch
+                    // grant, minted for this session's own account, which the
+                    // mint checks is the workspace owner. A non-owner is refused
+                    // (LIN-3085 owns delegation), never given a grant-less run.
+                    ...(launchesOrchestrator
+                      ? {
+                          declaredGrants: ['dispatch'],
+                          declaredSite: 'M2',
+                          grantOwnerAccountId: req.session?.accountId || null,
+                          workspaceId: workspace.id
+                        }
+                      : {})
+                  });
+                } catch (err) {
+                  // Mark a launch-arm refusal so the catch below answers it with
+                  // human text; a follow-up resume's refusal keeps its own relay.
+                  if (isCodedGrantRefusal(err)) err.launchRefusal = true;
+                  throw err;
+                }
                 // "Surface, don't silently drop" (LIN-525): the client dropped its
                 // own mint+append and trusted the server to attach the block. If the
                 // block did not get appended (mint failed / rate-limited, or no store/
@@ -703,6 +735,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // could not mint/append its block. Surface it (503, transient — mirrors the
       // client's old token-rate-limit message) rather than the generic 500, and
       // NEVER as a success: no item was enqueued (the throw fired before addItem).
+      // LIN-3136 M2: a declared launch the owner check refused (or could not
+      // run). Ahead of the attach-failure branch, because a transient
+      // OWNER_CHECK_UNAVAILABLE also carries `proxyAttachFailed` and would
+      // otherwise read as a token rate limit. Human text from the shared
+      // vocabulary; nothing was enqueued.
+      if (err && err.launchRefusal) {
+        const refusal = codedGrantRefusalResponse(err, 'an autopilot launch credential');
+        return jsonError(res, refusal.status, refusal.error, { code: refusal.code, retryable: refusal.retryable });
+      }
       if (err && err.proxyAttachFailed) {
         return serviceUnavailable.json(res, 'Proxy context was requested but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
       }

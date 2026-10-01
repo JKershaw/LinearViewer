@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedJiraWorkspace } from '../fixtures/jira-harness.js';
+// fixture:LIN-3136
+import { mintDriverWriter } from '../fixtures/driver-writer.js';
+// /fixture:LIN-3136
 
 // Bound per-test from the per-worker key (LIN-628) so the session, the proxy
 // page / API URLs, and every /test/* seam query param all address this worker's
@@ -2319,6 +2322,10 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
 
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=autopilot-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
+    // fixture:LIN-3136: the kickoff declares the dispatch grant for its child (M1), owner-checked in the caller token's workspace, so the writer is the owner's driver copy
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    writeToken = (await mintDriverWriter(page, URL_KEY)).token;
+    // /fixture:LIN-3136
   });
 
   test('read-only token cannot launch (403)', async ({ request }) => {

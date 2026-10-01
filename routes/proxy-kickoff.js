@@ -11,7 +11,7 @@ import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS 
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
-import { attachProxyContext } from '../lib/proxy-preamble.js';
+import { attachProxyContext, isStructuralGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
@@ -372,6 +372,15 @@ export function createKickoffRoutes({
               label: 'kickoff-bootstrap',
               harness: resolvedHarness,
               createdBy: req.proxyCreatedBy || null,
+              // LIN-3136 M1: the child orchestrator is launched holding the
+              // dispatch grant, minted for the caller token's own owner in the
+              // workspace that token was owner-checked in (both read from the
+              // token, never from the request). The owner check runs again here;
+              // a caller token with no stored workspace fails closed.
+              declaredGrants: ['dispatch'],
+              declaredSite: 'M1',
+              grantOwnerAccountId: req.proxyCreatedBy,
+              workspaceId: req.proxyWorkspaceId,
               // LIN-2354: only resolved when this was a SCOPED kickoff (the
               // `if (issueIdentifier)` block above called resolveProviderAccess,
               // stamping req.resolvedProvider); a goal-only kickoff resolves no
@@ -464,6 +473,15 @@ export function createKickoffRoutes({
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 503);
         return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+      }
+      // LIN-3136 M1: the child's launch credential could not be declared (the
+      // ownership changed, the workspace has no owner, the caller token carries
+      // no workspace, ...). Relay the refusal's status and code with the shared
+      // human text; a retry cannot help. Nothing was enqueued or minted.
+      if (isStructuralGrantRefusal(err)) {
+        const refusal = codedGrantRefusalResponse(err, 'a child autopilot launch credential');
+        logEvent(req, '/api/proxy/autopilot/kickoff', refusal.status);
+        return jsonError(res, refusal.status, refusal.error, { code: refusal.code, retryable: false });
       }
       // LIN-2216: an upstream provider-auth failure (Linear 401/403) —
       // resolvePromptIssueContext's own try/catch above only catches a

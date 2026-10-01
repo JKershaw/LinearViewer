@@ -18,7 +18,7 @@ import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } 
 import { renderDetailsContent, PRIORITY_OPTION_LABELS } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { attachProxyContext } from '../lib/proxy-preamble.js';
+import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
 import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
@@ -3677,8 +3677,14 @@ ${goal}`
   // +proxy block)", so the `attachProxyContext` mint+append (LIN-1157) is how
   // the run gets its API access — the same append the triage path makes. (The store
   // then appends the "Your autopilot session id" block for `kind: 'autopilot'`.)
+  //
+  // LIN-3136 M4: the run is launched holding the dispatch grant, owner-checked
+  // for the submitting session. Returns `{ launched: true }`, or — only when
+  // that owner-checked mint is refused — `{ launched: false, code, retryable,
+  // message }` for the route to report (no grant-less fallback). Every other
+  // failure, and the early return, stay swallowed and return null.
   async function enqueueFeedbackAutopilot(workspace, issue, session, baseUrl, overrides = {}) {
-    if (!dispatchQueueStore || !issue?.identifier || !baseUrl) return;
+    if (!dispatchQueueStore || !issue?.identifier || !baseUrl) return null;
     try {
       const kickoff = buildAutopilotKickoff({
         baseUrl,
@@ -3729,7 +3735,12 @@ ${goal}`
           providerUi: getProvider(workspace.provider)?.ui ?? null,
           // LIN-1376: stamp the launching account so the dispatched session's
           // token resolves under LIN-1366 owner-scoping.
-          createdBy: session?.accountId || null
+          createdBy: session?.accountId || null,
+          // LIN-3136 M4: an orchestrator launch, owner-checked for this session.
+          declaredGrants: ['dispatch'],
+          declaredSite: 'M4',
+          grantOwnerAccountId: session?.accountId || null,
+          workspaceId: workspace.id
         }),
         fields: {
           promptName: `Autopilot — ${issue.identifier}`,
@@ -3741,8 +3752,15 @@ ${goal}`
           target: 'cli'
         }
       });
+      return { launched: true };
     } catch (err) {
+      if (isCodedGrantRefusal(err)) {
+        const refusal = codedGrantRefusalResponse(err, 'an autopilot launch credential');
+        console.warn(`Feedback autopilot not launched: ${refusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
+        return { launched: false, code: refusal.code, retryable: refusal.retryable, message: refusal.error };
+      }
       console.error('Feedback autopilot enqueue failed:', err.message);
+      return null;
     }
   }
 
@@ -3931,15 +3949,23 @@ ${goal}`
       // With no explicit action (the legacy plain send) we preserve the old
       // behaviour: triage only when the per-user `feedbackTriage` flag is on.
       const baseUrl = `${req.protocol}://${req.get('host')}`;
+      let autopilot = null;
       if (action === 'triage') {
         await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness });
       } else if (action === 'autopilot') {
-        await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness });
+        autopilot = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness });
       } else if (!action && getFeatureFlags(req.session).feedbackTriage) {
         await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness });
       }
 
-      return res.status(201).json({ success: true, issue: result.issue });
+      // LIN-3136 M4: the ticket is filed either way; a refused autopilot launch
+      // is reported so the widget can say why. Every other outcome keeps the
+      // response exactly as it was.
+      return res.status(201).json({
+        success: true,
+        issue: result.issue,
+        ...(autopilot && autopilot.launched === false ? { autopilot } : {})
+      });
     } catch (error) {
       console.error('Feedback submit error:', error);
       return jsonError(res, 500, 'Failed to submit feedback');

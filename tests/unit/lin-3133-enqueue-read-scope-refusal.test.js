@@ -96,10 +96,25 @@ for (const route of ENQUEUE_ROUTES) {
     });
   }
 
-  test(`${route.name}: a readWrite token with no grants still enqueues (no grant gate yet)`, async () => {
-    const { app, added } = buildEnqueueApp({ scope: 'readWrite' });
-    const { status, body } = await call(app, 'post', route.path, { body: route.body });
-    assert.equal(status, 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
-    assert.equal(added.length, 1, 'the readWrite token still reaches the enqueue in T1');
-  });
+  if (route.path === '/api/proxy/autopilot/kickoff') {
+    // LIN-3136 (ledger A2, kickoff row, advanced to G3): the kickoff now declares
+    // the dispatch grant for its child (M1), owner-checked in the workspace the
+    // CALLER token was minted for. A grant-less readWrite token carries no such
+    // workspace, so the launch fails closed before the enqueue; no grant-less
+    // fallback. (G5's gate then refuses it earlier, with DISPATCH_GRANT_REQUIRED.)
+    test(`${route.name}: a readWrite token with no grants is refused before the enqueue (M1 fails closed)`, async () => {
+      const { app, added } = buildEnqueueApp({ scope: 'readWrite' });
+      const { status, body } = await call(app, 'post', route.path, { body: route.body });
+      assert.equal(status, 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+      assert.equal(body.code, 'INVALID_GRANTS');
+      assert.equal(added.length, 0, 'a grant-less caller never reaches the enqueue');
+    });
+  } else {
+    test(`${route.name}: a readWrite token with no grants still enqueues (no grant gate yet)`, async () => {
+      const { app, added } = buildEnqueueApp({ scope: 'readWrite' });
+      const { status, body } = await call(app, 'post', route.path, { body: route.body });
+      assert.equal(status, 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
+      assert.equal(added.length, 1, 'the readWrite token still reaches the enqueue in T1');
+    });
+  }
 }

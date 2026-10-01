@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
+// fixture:LIN-3136
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
+// /fixture:LIN-3136
 
 // Periodicals feature (LIN-341): a synthetic, workspace-flag-gated group on the
 // main workspace view containing the periodical template rows. The LIN-354 set
@@ -173,6 +176,9 @@ test.describe('Periodicals group', () => {
 
   test('proxy flag ON: dispatching Mint + Autopilot queues the variant prompt with proxy attached', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+    // fixture:LIN-3136: "+ Autopilot" declares the dispatch grant for the session's owner (M2b)
+    await seedWorkspaceOwnership(page, localWorkerUrlKey);
+    // /fixture:LIN-3136
     await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
@@ -206,5 +212,34 @@ test.describe('Periodicals group', () => {
     // SAME template, and the id must not drift with the "+ Autopilot" title
     // suffix (that promptName drift is exactly what this id replaces).
     expect(item.periodicalId).toBe('documentation-review');
+  });
+
+  // LIN-3136 (M2b): the "+ Autopilot" dispatch launches an orchestrator holding
+  // the dispatch grant, so only the workspace owner may send it. A non-owner is
+  // refused with the reason shown (not a bare "failed"), and nothing is queued.
+  test('a non-owner Mint + Autopilot dispatch is refused with the reason, nothing queued (LIN-3136)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+    await setPeriodicalsFlag(page, localWorkerUrlKey, true);
+    await seedWorkspaceOwnership(page, localWorkerUrlKey, 'foreign');
+    try {
+      await page.goto(`/workspace/${localWorkerUrlKey}/`);
+      await page.waitForLoadState('networkidle');
+
+      const group = page.locator('[data-project-type="periodicals"]');
+      const docNode = group.locator('.node', { has: page.locator('.line:has-text("Documentation Review")') });
+      await docNode.locator('.line:has-text("Documentation Review")').click();
+      const variant = docNode.locator('[data-proxy-force="true"]');
+      await variant.locator('.dispatch-disclosure').click();
+      const dispatchBtn = variant.locator('.prompt-dispatch[data-target="cli"]');
+      await dispatchBtn.click();
+
+      await expect(dispatchBtn).toHaveText('failed');
+      await expect(page.locator('.toast-error')).toContainText("Only this workspace's owner can mint an autopilot launch credential");
+      const { items } = await (await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`)).json();
+      expect(items.filter(i => i.kind === 'periodical')).toHaveLength(0);
+    } finally {
+      await seedWorkspaceOwnership(page, localWorkerUrlKey, 'owner');
+    }
   });
 });
