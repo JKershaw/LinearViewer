@@ -20,6 +20,7 @@ import session from 'express-session'
 import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { ensureIndexes } from './lib/db-indexes.js'
+import { runOwnerBackfill } from './lib/owner-backfill.js'
 import { Scheduler } from './lib/scheduler.js'
 import { MongoSessionStore } from './lib/session-store.js'
 import { createSessionOptions, SESSION_TTL_SECONDS } from './lib/session-options.js'
@@ -246,6 +247,13 @@ const db = dbClient.db('linear-viewer')
 // deploy mechanism (no migration framework). Best-effort per index, so a failed
 // build can never wedge startup. Must run after connect and before app.listen.
 await ensureIndexes(db)
+
+// One-shot owner backfill (LIN-3142): every ownerless workspace bound before
+// the ruling cutoff gets John's account as owner. Idempotent and non-fatal (it
+// never throws; a failed gate writes nothing and boot continues), and gated on
+// the owner index above actually existing. Logs one `[owner-backfill]` summary
+// line per boot. It owns its own stores, and nothing writes edges before it.
+await runOwnerBackfill({ db })
 
 // Leader-safe scheduler substrate (LIN-2128). `scheduler-locks` is a pure
 // composite-`_id`-lookup collection (see lib/db-indexes.js's excluded-
