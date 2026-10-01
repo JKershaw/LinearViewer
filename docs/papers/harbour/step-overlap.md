@@ -150,7 +150,7 @@ half-month by first session:
 
 ![Words written per ticket by step, and the later sessions each word could reach, by half-month since June](figures/step-overlap/read-multiplier.svg)
 
-| First session | Tickets | Words per ticket | Later fresh sessions per word | Word-reads per ticket | Later dispatches per word, by the log's line | by the session entered |
+| First session | Tickets | Words per ticket (mean) | Later fresh sessions per word | Word-reads per ticket | Later dispatches per word, by the log's line | by the session entered |
 |---|--:|--:|--:|--:|--:|--:|
 | 20–30 June | 3 | 3,771 | 3.4 | 12,857 | 3.4 | 3.4 |
 | 1–15 July | 10 | 3,221 | 2.1 | 6,683 | 10.3 | 10.3 |
@@ -163,13 +163,13 @@ half-month by first session:
 
 Words per ticket roughly doubled to tripled from early July, which is `growth-atlas.md`'s finding
 again. The later fresh sessions that could read each word stayed between two and five. So the word
-reads a ticket could cause rose three- to fivefold, carried by the writing. Counting every later
+reads a ticket could cause rose from 7,000–13,000 in late June and early July to 14,000–38,000 after,
+carried by the writing. Counting every later
 dispatch instead of fresh sessions gives a much noisier series. The two charging rules agree on this
 sample except in late September, because few sampled tickets are parents that receive their children's
 wakes. On the census they differ by a dispatch per word. If September's ratio of received to possible
 loads (about a quarter) held earlier, a June word reached about one later session and a September word about one and a
 half.
-
 
 **Splitting duplicates the process more than the content.** Among the transcripts, 27 parents
 had two or more children with sessions on disk, and 22 of those parents had run their own plan or
