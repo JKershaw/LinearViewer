@@ -480,6 +480,13 @@
           reflectDraftIndicator();
           const ident = data.issue && (data.issue.identifier || data.issue.id);
           const filed = ident ? `Filed ${ident}` : 'Your feedback was filed';
+          // LIN-3136 (M4): the ticket was filed but its autopilot launch was
+          // refused (e.g. a non-owner). Say why, and stay open so it is read —
+          // the draft is still cleared, since resubmitting would file a duplicate.
+          if (data.autopilot && data.autopilot.launched === false) {
+            setStatus(`${filed}. Autopilot was not started: ${data.autopilot.message}`, 'error');
+            return;
+          }
           setStatus(`Thanks! ${filed}${DONE_SUFFIX[action] || '.'}`, 'success');
           setTimeout(minimize, 2500);
           return;

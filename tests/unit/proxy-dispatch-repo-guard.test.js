@@ -60,6 +60,9 @@ function buildApp(captured, { provider, token = REPO_GUARD_TEST_SCOPE } = {}) {
     proxyTokenStore: {
       createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
       validateToken: async () => ({
+        // fixture:LIN-3136
+        grants: ['dispatch'], workspaceId: 'ws-acme',
+        // /fixture:LIN-3136
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
       })
     },

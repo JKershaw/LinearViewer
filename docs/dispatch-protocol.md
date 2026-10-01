@@ -243,7 +243,7 @@ Orientation only; not part of the contract.
   *marker-type × subscription-level* (§3, §5), so PENDING-internal stops waking.
 - **Harbour wake seam** (`lib/dispatch-wake.js`, `lib/dispatch-store.js addFeedback`): the
   `subscribe===true` boolean gate becomes the `subscription` enum (§6).
-- **Harbour long-poll** (`routes/proxy.js`, `GET /api/proxy/dispatch/:id?wait=N`) is the warm
+- **Harbour long-poll** (`routes/proxy-dispatch.js`, `GET /api/proxy/dispatch/:id?wait=N`) is the warm
   path of §8; resume is the durable path.
 - **Simple Dispatcher sentinel** (`hook.js parseCompletionSentinel`, `outstandingAsyncWait`)
   is §2/§4; `shouldHoldForFollowUp` is the PENDING-external hold; `followup.js

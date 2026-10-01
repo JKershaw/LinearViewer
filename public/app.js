@@ -1088,6 +1088,8 @@ function initPrompts() {
       }, 1500)
     } catch (error) {
       console.error('Failed to copy:', error)
+      // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+      if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
       copyBtn.textContent = 'failed'
       setTimeout(() => {
         copyBtn.textContent = 'copy'
@@ -1133,6 +1135,8 @@ function initPrompts() {
       }, 1500)
     } catch (error) {
       console.error('Failed to download:', error)
+      // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+      if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
       downloadBtn.textContent = 'failed'
       setTimeout(() => {
         downloadBtn.textContent = 'download'
@@ -1245,6 +1249,8 @@ function initPrompts() {
       }, 1500)
     } catch (error) {
       console.error('Failed to dispatch:', error)
+      // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+      if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
       dispatchBtn.textContent = 'failed'
       setTimeout(() => {
         dispatchBtn.textContent = originalLabel

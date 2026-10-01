@@ -1307,6 +1307,9 @@ test.describe('Dispatch Page', () => {
   test.describe('Autopilot Goal', () => {
     test.beforeEach(async ({ page }) => {
       await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: true }, urlKey: WS });
+      // fixture:LIN-3136: an autopilot launch declares the dispatch grant for the session's owner (M2)
+      await seedWorkspaceOwnership(page, WS);
+      // /fixture:LIN-3136
       await page.goto(DISPATCH_URL);
       await page.waitForLoadState('networkidle');
     });

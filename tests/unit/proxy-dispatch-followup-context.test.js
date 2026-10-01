@@ -32,6 +32,9 @@ function buildApp(captured, { createToken, getItemStatus } = {}) {
   app.use(createProxyRoutes({
     proxyTokenStore: {
       validateToken: async () => ({
+        // fixture:LIN-3136
+        grants: ['dispatch'], workspaceId: 'ws-acme',
+        // /fixture:LIN-3136
         tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1'
       }),
       // LIN-376: the dispatch path mints a single-use bootstrap to embed in the

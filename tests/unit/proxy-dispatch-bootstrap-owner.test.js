@@ -28,6 +28,9 @@ import express from 'express';
 import { attachProxyContext } from '../../lib/proxy-preamble.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+// fixture:LIN-3136
+import { mintDispatchWriter } from './lib/dispatch-writer.js';
+// /fixture:LIN-3136
 
 function createMockCollection() {
   let docs = [];
@@ -174,6 +177,9 @@ describe('LIN-1429 — the real mint -> exchange -> validate chain across a chai
     });
     const seedWorking = await store.exchangeBootstrapToken(seedBootstrap.token);
     assert.ok(seedWorking?.token, 'the seed bootstrap exchanges for a working token');
+    // fixture:LIN-3136: the seed credential holds the dispatch grant (the enqueue mounts require it)
+    seedWorking.token = (await mintDispatchWriter(store, { urlKey: 'acme', ownerAccountId: 'account-A', label: 'seed' })).token;
+    // /fixture:LIN-3136
 
     // 2. POST /api/proxy/dispatch authenticated with THAT working token, so
     //    authenticateProxyToken validates for real (not a fixture) and sets

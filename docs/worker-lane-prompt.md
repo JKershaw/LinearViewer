@@ -63,8 +63,10 @@ around it.
   than one coherent multi-ticket lane, and it never materializes into the durable
   cross-workspace session store `lib/observation-sessions-materializer.js` builds (its
   discovery predicate is `kind === 'autopilot' || sessionId`) — so it is missing from any
-  cross-workspace merged feed. Stamping fixes both. If this lane dispatches workers of its own,
-  stamp the same id (or your own dispatch id, the existing convention) on each.
+  cross-workspace merged feed. Stamping fixes both. A lane is a leaf: it does its tickets
+  in-session and dispatches no workers of its own. Its credential holds no `dispatch` grant, so
+  an enqueue from it gets `403 DISPATCH_GRANT_REQUIRED`. (Letting lanes coordinate would need the
+  deferred declared launch verb, M3, which belongs to LIN-3099.)
 - **Declare your file carve.** Name, in that same first comment, which files/directories you
   own outright and which belong to sibling lanes running concurrently (if any were named in
   your kickoff). The carve — especially its forbidden half — is what let six concurrent lanes

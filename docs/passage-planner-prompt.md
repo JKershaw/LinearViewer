@@ -187,7 +187,10 @@ launch. Only John's explicit launch say-so does. **Never launch the runner witho
 
 On that yes, launch exactly **one** Runner for the whole passage — the Runner's own Step 3
 fans a child out per leg itself, so this is not a per-leg dispatch and carries no per-leg yes.
-Make exactly **one** call, `POST /api/proxy/autopilot/kickoff`, with:
+Make exactly **one** call, `POST /api/proxy/autopilot/kickoff`, with the token pasted with this
+prompt: it holds the `dispatch` grant (the owner's copy), and the kickoff passes the grant down to
+the Runner so it can fan out its legs. If the call returns `403 DISPATCH_GRANT_REQUIRED`, the token
+was not an owner's copy: stop and ask John to copy this prompt again from the app. The call takes:
 
 - `issueIdentifier` — the passage task's own identifier,
 - `variant: 'standard'` and `mode: 'write'` — today's route defaults, named explicitly anyway

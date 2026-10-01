@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedJiraWorkspace } from '../fixtures/jira-harness.js';
+// fixture:LIN-3136
+import { mintDriverWriter } from '../fixtures/driver-writer.js';
+// /fixture:LIN-3136
 
 // Bound per-test from the per-worker key (LIN-628) so the session, the proxy
 // page / API URLs, and every /test/* seam query param all address this worker's
@@ -876,6 +879,10 @@ test.describe('Proxy API - Dispatch', () => {
 
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=dispatch-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
+    // fixture:LIN-3136: enqueue requires the dispatch grant, so the writer is the owner's driver copy
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    writeToken = (await mintDriverWriter(page, URL_KEY)).token;
+    // /fixture:LIN-3136
 
     // A consumer dispatch token lets the test play the runner (take + feedback).
     const consumerResp = await page.goto(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
@@ -888,6 +895,17 @@ test.describe('Proxy API - Dispatch', () => {
       data: { prompt: 'do the thing' }
     });
     expect(resp.status()).toBe(403);
+  });
+
+  // LIN-3136: the enqueue routes require the dispatch grant, not just readWrite.
+  test('a readWrite token without the dispatch grant is refused 403 DISPATCH_GRANT_REQUIRED (LIN-3136)', async ({ page, request }) => {
+    const plain = await (await page.goto(`/test/create-proxy-token?scope=readWrite&label=plain-rw&urlKey=${URL_KEY}`)).json();
+    const resp = await request.post('/api/proxy/dispatch', {
+      headers: { Authorization: `Bearer ${plain.token}`, 'Content-Type': 'application/json' },
+      data: { prompt: 'do the thing' }
+    });
+    expect(resp.status()).toBe(403);
+    expect((await resp.json()).code).toBe('DISPATCH_GRANT_REQUIRED');
   });
 
   test('enqueue requires a prompt (400)', async ({ request }) => {
@@ -1810,6 +1828,10 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
 
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=fused-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
+    // fixture:LIN-3136: enqueue requires the dispatch grant, so the writer is the owner's driver copy
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    writeToken = (await mintDriverWriter(page, URL_KEY)).token;
+    // /fixture:LIN-3136
   });
 
   test('read-only token cannot trigger (403)', async ({ request }) => {
@@ -1818,6 +1840,17 @@ test.describe('Proxy API - Recommend-and-Dispatch (fused verb, LIN-321)', () => 
       data: { issueIdentifier: 'TEST-14' }
     });
     expect(resp.status()).toBe(403);
+  });
+
+  // LIN-3136: the enqueue routes require the dispatch grant, not just readWrite.
+  test('a readWrite token without the dispatch grant is refused 403 DISPATCH_GRANT_REQUIRED (LIN-3136)', async ({ page, request }) => {
+    const plain = await (await page.goto(`/test/create-proxy-token?scope=readWrite&label=plain-rw&urlKey=${URL_KEY}`)).json();
+    const resp = await request.post('/api/proxy/recommend-and-dispatch', {
+      headers: { Authorization: `Bearer ${plain.token}`, 'Content-Type': 'application/json' },
+      data: { issueIdentifier: 'TEST-14' }
+    });
+    expect(resp.status()).toBe(403);
+    expect((await resp.json()).code).toBe('DISPATCH_GRANT_REQUIRED');
   });
 
   test('missing issueIdentifier gets 400', async ({ request }) => {
@@ -2319,6 +2352,10 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
 
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=autopilot-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
+    // fixture:LIN-3136: the kickoff declares the dispatch grant for its child (M1), owner-checked in the caller token's workspace, so the writer is the owner's driver copy
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    writeToken = (await mintDriverWriter(page, URL_KEY)).token;
+    // /fixture:LIN-3136
   });
 
   test('read-only token cannot launch (403)', async ({ request }) => {
@@ -2327,6 +2364,17 @@ test.describe('Proxy API - Autopilot kickoff (fused launch verb, LIN-569)', () =
       data: { goal: 'ship the thing' }
     });
     expect(resp.status()).toBe(403);
+  });
+
+  // LIN-3136: the enqueue routes require the dispatch grant, not just readWrite.
+  test('a readWrite token without the dispatch grant is refused 403 DISPATCH_GRANT_REQUIRED (LIN-3136)', async ({ page, request }) => {
+    const plain = await (await page.goto(`/test/create-proxy-token?scope=readWrite&label=plain-rw&urlKey=${URL_KEY}`)).json();
+    const resp = await request.post('/api/proxy/autopilot/kickoff', {
+      headers: { Authorization: `Bearer ${plain.token}`, 'Content-Type': 'application/json' },
+      data: { goal: 'ship the thing' }
+    });
+    expect(resp.status()).toBe(403);
+    expect((await resp.json()).code).toBe('DISPATCH_GRANT_REQUIRED');
   });
 
   test('invalid mode gets 400', async ({ request }) => {
@@ -2963,6 +3011,10 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
 
     const writeResp = await page.goto(`/test/create-proxy-token?scope=readWrite&label=periodicals-write&urlKey=${URL_KEY}`);
     writeToken = (await writeResp.json()).token;
+    // fixture:LIN-3136: enqueue requires the dispatch grant, so the writer is the owner's driver copy
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${URL_KEY}`);
+    writeToken = (await mintDriverWriter(page, URL_KEY)).token;
+    // /fixture:LIN-3136
 
     // A consumer dispatch token lets the test play the runner (take), the
     // same substrate that archives a queue row into history as 'taken'.
@@ -3081,6 +3133,10 @@ test.describe('Proxy API - Periodicals (real-server wiring, LIN-1829)', () => {
     const otherWrite = await (await page.goto(`/test/create-proxy-token?scope=readWrite&label=periodicals-write-b&urlKey=${secondWorkerUrlKey}`)).json();
     const otherConsumer = await (await page.goto(`/test/create-dispatch-token?label=periodicals-runner-b&urlKey=${secondWorkerUrlKey}`)).json();
     const otherRead = await (await page.goto(`/test/create-proxy-token?scope=read&label=periodicals-read-b&urlKey=${secondWorkerUrlKey}`)).json();
+    // fixture:LIN-3136: workspace B's writer is B's owner's driver copy (enqueue requires the dispatch grant)
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: true }))}&urlKey=${secondWorkerUrlKey}`);
+    otherWrite.token = (await mintDriverWriter(page, secondWorkerUrlKey)).token;
+    // /fixture:LIN-3136
 
     // Mint + take a real periodical dispatch in workspace B ONLY.
     const enqueue = await request.post('/api/proxy/dispatch', {

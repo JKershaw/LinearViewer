@@ -1,5 +1,8 @@
 import { test, expect } from '../fixtures/test-base.js';
 import fs from 'node:fs/promises';
+// fixture:LIN-3136
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
+// /fixture:LIN-3136
 
 // LIN-3079: a task-level Autopilot prompt promises a `readWrite` proxy token in
 // its body, so it MUST carry one on copy/download/dispatch regardless of the
@@ -34,6 +37,9 @@ test.beforeEach(({ workerUrlKey }) => {
 /** Fresh session, toggle guaranteed OFF (a new context has no localStorage state). */
 async function setSession(page) {
   await page.goto(`/test/set-session?features=${FEATS}&urlKey=${URL_KEY}`);
+  // fixture:LIN-3136: forced copies mint the owner-only driver copy (M5), and the dispatches declare for the owner (M2)
+  await seedWorkspaceOwnership(page, URL_KEY);
+  // /fixture:LIN-3136
 }
 
 /** Open the home task's Autopilot container and wait for its kickoff to load. */
@@ -447,5 +453,58 @@ test.describe('LIN-3079 Autopilot surfaces — the inert +proxy toggle stays rem
     await section.locator('.swipe-prompt-buttons .swipe-prompt-btn:not(.ai-btn):not(.autopilot-btn):not(.swipe-prompt-btn-more)').first().click();
     await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
     await expect(section.locator('.prompt-proxy-toggle')).toHaveCount(1);
+  });
+});
+
+// LIN-3136 (M5): a forced copy mints the owner's DRIVER copy — the client sends
+// only `{ purpose: 'driver' }`, the block states the dispatch grant, and a
+// non-owner's copy is refused with the reason shown and nothing copied (no
+// grant-less fallback).
+test.describe('LIN-3136 forced Autopilot copy — the owner-only driver copy', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  });
+
+  /** Capture every POST /api/proxy/tokens body while letting each through. */
+  function captureMintBodies(page) {
+    const bodies = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && new URL(req.url()).pathname.endsWith('/api/proxy/tokens')) {
+        try { bodies.push(req.postDataJSON()); } catch { bodies.push(null); }
+      }
+    });
+    return bodies;
+  }
+
+  test('the copy mints with { purpose: "driver" } and the block states the dispatch grant', async ({ page }) => {
+    await setSession(page);
+    const bodies = captureMintBodies(page);
+
+    const container = await revealHomeAutopilot(page);
+    await container.locator('.prompt-copy').click();
+    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+
+    expect(bodies).toEqual([{ purpose: 'driver' }]);
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip).toContain(PROXY_MARKER);
+    expect(clip).toContain('It also holds the dispatch grant');
+  });
+
+  test('a non-owner copy is refused with the reason shown, and nothing is copied', async ({ page }) => {
+    await setSession(page);
+    await seedWorkspaceOwnership(page, URL_KEY, 'foreign');
+    try {
+      const container = await revealHomeAutopilot(page);
+      await page.evaluate(() => navigator.clipboard.writeText('__SENTINEL__'));
+
+      await container.locator('.prompt-copy').click();
+      await expect(container.locator('.prompt-copy')).toHaveText('failed');
+      await expect(page.locator('.toast-error')).toContainText(
+        "Only this workspace's owner can copy a prompt that can queue work on their machine."
+      );
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('__SENTINEL__');
+    } finally {
+      await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    }
   });
 });

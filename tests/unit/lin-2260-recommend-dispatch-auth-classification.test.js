@@ -45,6 +45,9 @@ function buildApp({ resolveWorkspaceAccess = LIVE_CREDENTIAL, addItem } = {}) {
     proxyTokenStore: {
       createToken: async () => ({ token: 'test-bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
+      // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+      // /fixture:LIN-3136
     },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess,

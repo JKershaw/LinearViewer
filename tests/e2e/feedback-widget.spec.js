@@ -129,6 +129,41 @@ test.describe('Feedback widget', () => {
     expect(postedAction).toBe('triage')
   })
 
+  // LIN-3136 (M4): a filed ticket whose autopilot launch was refused comes back
+  // 201 with `autopilot: { launched: false, code, retryable, message }`. The
+  // widget says why in the error status and stays open (no auto-minimize),
+  // while still clearing the draft (the ticket exists; a resubmit would dupe it).
+  test('a refused autopilot launch shows why, as an error, and stays open (LIN-3136)', async ({ page, seedLocal }) => {
+    const { urlKey } = await seedLocal()
+    await enableWidget(page, urlKey)
+
+    const refusal = "Only this workspace's owner can mint an autopilot launch credential"
+    await page.route(`**/workspace/${urlKey}/api/feedback`, async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          issue: { identifier: 'LIN-778' },
+          autopilot: { launched: false, code: 'GRANT_OWNER_ONLY', retryable: false, message: refusal }
+        })
+      })
+    })
+
+    await page.getByTestId('nav-feedback-trigger').click()
+    await page.getByTestId('feedback-message').fill('ship this with autopilot')
+    await page.getByTestId('feedback-submit-autopilot').click()
+
+    const status = page.getByTestId('feedback-status')
+    await expect(status).toHaveText(`Filed LIN-778. Autopilot was not started: ${refusal}`)
+    await expect(status).toHaveClass(/feedback-status-error/)
+    await expect(page.getByTestId('feedback-message')).toHaveValue('')
+    // The success path minimizes after 2.5s; a refusal must still be readable after that.
+    await page.waitForTimeout(3000)
+    await expect(page.getByTestId('feedback-popup')).toBeVisible()
+    await expect(status).toContainText('Autopilot was not started')
+  })
+
   // LIN-1132: the popup carries the shared model/harness exec-controls (the same
   // window.renderDispatchExecControls block the Dispatch page uses), and a
   // dispatching action forwards the entered override in its payload.

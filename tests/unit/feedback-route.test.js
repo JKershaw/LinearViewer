@@ -57,8 +57,15 @@ function makeFakeProvider(overrides = {}) {
 // triage path can assert the proxy block is appended (LIN-733).
 function fakeProxyTokenStore(token = 'minted-rw-token') {
   const calls = [];
+  // fixture:LIN-3136
+  const grantCalls = [];
+  // /fixture:LIN-3136
   return {
     calls,
+    // fixture:LIN-3136: the declared (M4) mint, recorded like createToken
+    grantCalls,
+    async mintGrantBootstrap(args) { grantCalls.push(args); return { token, scope: 'readWrite', grants: args.grants }; },
+    // /fixture:LIN-3136
     async createToken(urlKey, options) { calls.push({ urlKey, options }); return { token, scope: options?.scope }; }
   };
 }
@@ -73,6 +80,10 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features =
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: token };
       req.session = { linearUserId: 'user-1', features };
+      // fixture:LIN-3136: the owner session and workspace id a declared mint needs
+      req.workspace.id = 'ws-acme';
+      req.session.accountId = 'acct-owner';
+      // /fixture:LIN-3136
       next();
     },
     dispatchQueueStore,
@@ -278,10 +289,15 @@ describe('feedback submit (LIN-635)', () => {
     assert.match(item.prompt, /run on autopilot until \*\*LIN-900\*\*/);
     // ...carrying the load-bearing feedback-origin brief...
     assert.match(item.prompt, /filed directly from the in-app feedback widget/);
-    // ...and the minted readWrite token / proxy access block for the run.
-    assert.strictEqual(proxyTokenStore.calls.length, 1);
-    assert.strictEqual(proxyTokenStore.calls[0].options.scope, 'readWrite');
-    assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-autopilot');
+    // ...and the declared launch credential (LIN-3136 M4: the owner-checked
+    // `['dispatch']` mint, never a plain createToken) / proxy access block.
+    assert.strictEqual(proxyTokenStore.grantCalls.length, 1);
+    assert.deepStrictEqual(proxyTokenStore.grantCalls[0].grants, ['dispatch']);
+    assert.strictEqual(proxyTokenStore.grantCalls[0].workspaceId, 'ws-acme');
+    assert.strictEqual(proxyTokenStore.grantCalls[0].ownerAccountId, 'acct-owner');
+    assert.strictEqual(proxyTokenStore.grantCalls[0].profile, 'worker');
+    assert.strictEqual(proxyTokenStore.grantCalls[0].label, 'feedback-autopilot');
+    assert.strictEqual(proxyTokenStore.calls.length, 0, 'no grant-less mint for the autopilot run');
     assert.match(item.prompt, /Workspace API access/);
     // LIN-1164: no workspace harness default → factory interposes claude-code, so
     // the bootstrap arrives via the bootstrapToken field, not Bearer/curl prose.
@@ -337,7 +353,7 @@ describe('feedback submit (LIN-635)', () => {
     assert.doesNotMatch(item.prompt, /Authorization: Bearer rw-tok-cc-auto/);
     assert.doesNotMatch(item.prompt, /curl -X POST/);
     assert.match(item.prompt, /Workspace API access/);
-    assert.strictEqual(proxyTokenStore.calls[0].options.label, 'feedback-autopilot');
+    assert.strictEqual(proxyTokenStore.grantCalls[0].label, 'feedback-autopilot');
   });
 
   // === LIN-1164 regression: an explicit NON-claude-code workspace harness is ===
@@ -385,6 +401,66 @@ describe('feedback submit (LIN-635)', () => {
     const { status, body } = await submit(app, 'acme', { message: 'hi', action: 'autopilot' });
     assert.strictEqual(status, 201);
     assert.strictEqual(body.success, true);
+    assert.strictEqual('autopilot' in body, false, 'a non-refusal failure keeps the response unchanged (LIN-3136)');
+  });
+
+  // === LIN-3136 M4: a refused declared launch is reported, never degraded ===
+  // The ticket is filed (201); the autopilot launch is not, and the response
+  // says why. No grant-less fallback, nothing enqueued.
+  function refusingProxyTokenStore(code, status, retryable) {
+    const store = fakeProxyTokenStore();
+    store.mintGrantBootstrap = async () => {
+      throw Object.assign(new Error(`Grant bootstrap mint refused: ${code}`), { code, status, retryable });
+    };
+    return store;
+  }
+
+  const M4_REFUSALS = [
+    ['GRANT_OWNER_ONLY', 403, false, "Only this workspace's owner can mint an autopilot launch credential"],
+    ['WORKSPACE_OWNER_UNSET', 409, false, 'This workspace has no recorded owner'],
+    ['GRANT_OWNERLESS', 503, false, 'This session has no account owner'],
+    ['OWNER_CHECK_UNAVAILABLE', 503, true, 'Owner verification is temporarily unavailable'],
+    ['INVALID_GRANTS', 400, false, 'An autopilot launch credential could not be declared (INVALID_GRANTS).']
+  ];
+  for (const [prefsName, prefs] of [['claude-code', claudeCodePrefs], ['opencode', opencodePrefs]]) {
+    for (const [code, status, retryable, message] of M4_REFUSALS) {
+      test(`LIN-3136 M4 (${prefsName}): a ${code} refusal → 201 + autopilot.launched:false, nothing enqueued, no token`, async () => {
+        const { provider } = makeFakeProvider();
+        const dispatch = capturingDispatchStore();
+        const proxyTokenStore = refusingProxyTokenStore(code, status, retryable);
+        const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore, workspacePreferencesStore: prefs });
+
+        const res = await submit(app, 'acme', { message: 'autopilot please', action: 'autopilot' });
+
+        assert.strictEqual(res.status, 201);
+        assert.strictEqual(res.body.success, true);
+        assert.strictEqual(res.body.issue.identifier, 'LIN-900', 'the ticket is still filed');
+        assert.deepStrictEqual(res.body.autopilot, { launched: false, code, retryable, message });
+        assert.strictEqual(dispatch.items.length, 0, 'nothing enqueued');
+        assert.strictEqual(proxyTokenStore.calls.length, 0, 'never degrades to a grant-less mint');
+      });
+    }
+  }
+
+  test('LIN-3136 M4: a launched autopilot keeps the response byte-identical (no autopilot field)', async () => {
+    const { provider } = makeFakeProvider();
+    const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore(), proxyTokenStore: fakeProxyTokenStore() });
+    const { status, body } = await submit(app, 'acme', { message: 'go', action: 'autopilot' });
+    assert.strictEqual(status, 201);
+    assert.deepStrictEqual(Object.keys(body).sort(), ['issue', 'success']);
+  });
+
+  test('LIN-3136 M4: triage is unchanged — a grant-less createToken mint, no autopilot field', async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const proxyTokenStore = fakeProxyTokenStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore });
+    const { status, body } = await submit(app, 'acme', { message: 'triage it', action: 'triage' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual('autopilot' in body, false);
+    assert.strictEqual(proxyTokenStore.grantCalls.length, 0);
+    assert.strictEqual(proxyTokenStore.calls.length, 1);
+    assert.strictEqual(dispatch.items[0].item.grantDeclaration ?? null, null);
   });
 
   test('clamps an out-of-range priority to 0, which is omitted like any unset priority (LIN-1557)', async () => {

@@ -1,8 +1,9 @@
 /**
  * LIN-3138 (LIN-3134 T2-i) — F3 inertness + C4 secrecy censuses.
  *
- * F3: no file outside the five mechanism modules passes a non-empty
- *     `declaredGrants` or sets `grantDeclaration`.
+ * F3: outside the five mechanism modules, the only files that pass a
+ *     non-empty `declaredGrants` (or set `grantDeclaration`) are the three
+ *     declared launch literals LIN-3136 (T3) adds: M1, M2 and M4.
  * C4: `grantDeclaration` / `grantRefusal` appear only inside the five mechanism
  *     modules (plus lib/proxy-tokens.js for the private `grantRefusal` FUNCTION
  *     name); none in any route file or projection body; `_formatItem` /
@@ -73,21 +74,64 @@ function extractMethod(src, name) {
 
 const PRODUCTION = loadProductionSources();
 
-// ── F3 inertness ─────────────────────────────────────────────────────────────
+// ── F3 — the declared-mint writer set ────────────────────────────────────────
+// LIN-3136 (T3) adds the first production writers: exactly the M1 (kickoff),
+// M2 (session dispatch, incl. M2b) and M4 (feedback autopilot) launch literals.
+// The three proxy-dispatch launch arms stay undeclared (M3, deferred to
+// LIN-3099). The mutations below check against this allowed set, so a planted
+// writer cannot pass just because the set is no longer empty.
 
-describe('F3 — declared-mint writer set is empty outside the mechanism modules', () => {
-  test('no production file/line passes declaredGrants or sets grantDeclaration', () => {
-    assert.deepEqual(scanF3(PRODUCTION), []);
+const F3_WRITERS = [
+  { site: 'M1', file: 'routes/proxy-kickoff.js', text: "declaredGrants: ['dispatch']," },
+  { site: 'M2', file: 'routes/dispatch.js', text: "declaredGrants: ['dispatch']," },
+  { site: 'M4', file: 'routes/workspace-api.js', text: "declaredGrants: ['dispatch']," }
+];
+
+/** F3 against the allowed writer set: each listed writer exactly once, nothing unlisted. */
+function checkF3(files, allowed = F3_WRITERS) {
+  const v = [];
+  const hits = scanF3(files);
+  for (const w of allowed) {
+    const found = hits.filter(h => h.file === w.file && h.text === w.text).length;
+    if (found !== 1) v.push(`${w.site} (${w.file}): expected exactly one writer, found ${found}`);
+  }
+  for (const h of hits) {
+    if (!allowed.some(w => w.file === h.file && w.text === h.text)) v.push(`unlisted writer: ${h.file}:${h.line} ${h.text}`);
+  }
+  return v;
+}
+
+describe('F3 — the declared-mint writer set is exactly M1, M2 and M4', () => {
+  test('the production writers are exactly the three declared launch literals', () => {
+    assert.deepEqual(F3_WRITERS.map(w => w.site), ['M1', 'M2', 'M4']);
+    assert.deepEqual(checkF3(PRODUCTION), []);
   });
 
   test('mutation 4 (F3 half): a planted declaredGrants literal in a route fails F3', () => {
     const mutated = [...PRODUCTION, { file: 'routes/proxy-dispatch.js', src: "const x = { declaredGrants: ['dispatch'] };" }];
-    assert.notDeepEqual(scanF3(mutated), []);
+    assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer: routes/proxy-dispatch.js')));
   });
 
   test('mutation 4 (F3 half): a planted grantDeclaration writer in a route fails F3', () => {
     const mutated = [...PRODUCTION, { file: 'routes/dispatch.js', src: 'item.grantDeclaration = record;' }];
-    assert.notDeepEqual(scanF3(mutated), []);
+    assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer: routes/dispatch.js')));
+  });
+
+  test('mutation: a fourth declaring site (a leaf lane) fails F3', () => {
+    const mutated = [...PRODUCTION, { file: 'routes/collective.js', src: "          declaredGrants: ['dispatch'],\n" }];
+    assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer: routes/collective.js')));
+  });
+
+  test('mutation: a second literal at a listed site fails F3', () => {
+    const mutated = PRODUCTION.map(f => (f.file === 'routes/workspace-api.js'
+      ? { ...f, src: `${f.src}\n          declaredGrants: ['dispatch'],\n` } : f));
+    assert.ok(checkF3(mutated).some(m => m.startsWith('M4 (routes/workspace-api.js): expected exactly one writer, found 2')));
+  });
+
+  test('mutation: a listed writer removed fails F3 (the set never shrinks silently)', () => {
+    const mutated = PRODUCTION.map(f => (f.file === 'routes/proxy-kickoff.js'
+      ? { ...f, src: f.src.replace("declaredGrants: ['dispatch'],", '') } : f));
+    assert.ok(checkF3(mutated).some(m => m.startsWith('M1 (routes/proxy-kickoff.js): expected exactly one writer, found 0')));
   });
 });
 
@@ -405,12 +449,12 @@ const MINT_SITE_TABLE = [
   { key: 'lib/chat-tools.js | tool send_follow_up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'send_follow_up: a follow-up by construction' },
   { key: 'lib/wake-credential.js | function buildWakeCredentialProvisioner | - | provisionResumeCredential', count: 1, cls: 'wake-helper', reason: 'the wake (Class F eleventh member)' },
   { key: 'routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential', count: 1, cls: 'refire-helper', reason: 'declared refire re-mint, R2 (LIN-3135)' },
-  { key: `${KICKOFF} [kind: 'autopilot'] | launch | attachProxyContext`, count: 1, cls: 'launch-M1', reason: 'kickoff launch: T3/T2c, out of T2' },
-  { key: `${SESSION} | launch | attachProxyContext`, count: 1, cls: 'launch-M2', reason: 'session route launch attach, after the gate' },
-  { key: `${PD_DISPATCH} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'POST /dispatch launch attach, after the gate' },
-  { key: `${PD_OVERRIDE} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'override arm launch attach, after the gate' },
-  { key: `${PD_LLM} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'LLM arm launch attach, after the gate' },
-  { key: "routes/workspace-api.js | function enqueueFeedbackAutopilot [kind: 'autopilot'] | launch | attachProxyContext", count: 1, cls: 'launch-M4', reason: 'feedback autopilot launch: T3/T2c, out of T2' },
+  { key: `${KICKOFF} [kind: 'autopilot'] | launch | attachProxyContext`, count: 1, cls: 'launch-M1', reason: 'kickoff launch: declared M1 (LIN-3136)' },
+  { key: `${SESSION} | launch | attachProxyContext`, count: 1, cls: 'launch-M2', reason: 'session route launch attach, after the gate: declared M2/M2b (LIN-3136)' },
+  { key: `${PD_DISPATCH} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'POST /dispatch launch attach, after the gate: undeclared, M3 deferred to LIN-3099' },
+  { key: `${PD_OVERRIDE} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'override arm launch attach, after the gate: undeclared, M3 deferred to LIN-3099' },
+  { key: `${PD_LLM} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'LLM arm launch attach, after the gate: undeclared, M3 deferred to LIN-3099' },
+  { key: "routes/workspace-api.js | function enqueueFeedbackAutopilot [kind: 'autopilot'] | launch | attachProxyContext", count: 1, cls: 'launch-M4', reason: 'feedback autopilot launch: declared M4 (LIN-3136)' },
   { key: "routes/collective.js | POST /workspace/:urlKey/collective/start [kind: 'custom'] | launch | attachProxyContext", count: 1, cls: 'leaf', reason: 'collective participant: never holds dispatch' },
   { key: "routes/collective.js | POST /workspace/:urlKey/collective/start [kind: 'custom'] | launch | provisionBootstrapToken", count: 1, cls: 'leaf', reason: 'collective participant prose branch' },
   { key: "routes/workspace-api.js | function enqueueFeedbackTriage [kind: 'triage'] | launch | attachProxyContext", count: 1, cls: 'leaf', reason: 'feedback triage worker: never holds dispatch' },

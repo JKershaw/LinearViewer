@@ -76,8 +76,14 @@ function buildApp({ providerName, displayName, live = true, throwOn = 'context' 
   app.use(express.json());
   app.use(createProxyRoutes({
     proxyTokenStore: {
+      // fixture:LIN-3136: the declared (M1) mint, mirroring createToken
+      mintGrantBootstrap: async () => ({ token: 'bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
+      // /fixture:LIN-3136
       createToken: async () => ({ token: 'bootstrap', kind: 'bootstrap', scope: 'readWrite' }),
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }),
+      // fixture:LIN-3136: the writer holds the dispatch grant (overrides the stub above)
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' }),
+      // /fixture:LIN-3136
     },
     proxyEventStore: { recordEvent: async () => {} },
     resolveWorkspaceAccess: credential(providerName, { live }),

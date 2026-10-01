@@ -100,15 +100,58 @@ describe('buildInstructions — per-path token lifetime table (LIN-1938 S1)', ()
 });
 
 describe('buildInstructions — grants table + take-gated runner section (LIN-3131 S2b.4)', () => {
-  test('the grants table is shown to every bearer, and names dispatch as not yet enforced', () => {
+  test('the grants table is shown to every bearer, and names dispatch as enforced (LIN-3136)', () => {
     for (const scope of ['read', 'readWrite']) {
       const text = buildInstructions({ baseUrl: BASE_URL, scope });
       assert.match(text, /## Grants/);
       assert.match(text, /`take`/);
       assert.match(text, /`dispatch`/);
-      assert.match(text, /RECORDED BUT NOT YET\n\s*ENFORCED/);
+      assert.match(text, /\*\*ENFORCED\*\*/);
+      assert.doesNotMatch(text, /NOT YET\s+ENFORCED/);
+      assert.match(text, /`403 DISPATCH_GRANT_REQUIRED`/);
       assert.match(text, /Your token's grants: \(none\)\./);
     }
+  });
+
+  test('LIN-3136: the scope x grant table states which routes each opens', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /What each opens:/);
+    assert.match(text, /`read` {21}yes {5}no {31}no {8}no/);
+    assert.match(text, /`readWrite` {16}yes {5}yes {30}no {8}no/);
+    assert.match(text, /`readWrite` \+ `dispatch` {3}yes {5}yes {30}yes {7}no/);
+    assert.match(text, /`readWrite` \+ `take` {7}yes {5}yes {30}no {8}yes/);
+    assert.match(text, /Who carries `dispatch`: the owner's runner copy/);
+  });
+
+  test('LIN-3136: each enqueue route states the grant requirement and its 403', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    for (const route of ['/api/proxy/dispatch\n', '/api/proxy/recommend-and-dispatch\n', '/api/proxy/autopilot/kickoff\n']) {
+      const start = text.indexOf(`POST ${BASE_URL}${route}`);
+      assert.ok(start > -1, `${route.trim()} documented`);
+      const next = text.indexOf('\nPOST ', start + 1);
+      const section = text.slice(start, next > -1 ? next : undefined);
+      assert.match(section, /DISPATCH GRANT \(LIN-3136\)/, `${route.trim()} states the grant`);
+      assert.match(section, /"code": "DISPATCH_GRANT_REQUIRED"/);
+      assert.match(section, /after the scope and before any body validation/);
+    }
+    assert.match(text, /DISPATCH_GRANT_REQUIRED - an enqueue route/, 'the error list names the 403');
+  });
+
+  test('LIN-3136: POST /dispatch documents queueIfBusy, subscription and waitForFollowUps', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    const start = text.indexOf(`POST ${BASE_URL}/api/proxy/dispatch\n`);
+    const section = text.slice(start, text.indexOf(`POST ${BASE_URL}/api/proxy/recommend-and-dispatch`));
+    for (const field of ['"queueIfBusy"', '"subscription"', '"waitForFollowUps"']) {
+      assert.ok(section.includes(field), `the POST /dispatch body names ${field}`);
+      assert.match(section, new RegExp(`→ ${field} \\(optional`), `${field} is explained`);
+    }
+  });
+
+  test('LIN-3136: the lifetime table names the driver copy on the worker profile', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, /48h {2}- a `dispatch`-grant holder on the `worker` profile/);
+    assert.match(text, /label `prompt-driver`, `\{ "purpose": "driver" \}`/);
+    assert.match(text, /the `\+proxy` toggle-path copy, grant-less/);
   });
 
   test('a take-grant bearer sees the runner endpoints and the refusal codes', () => {

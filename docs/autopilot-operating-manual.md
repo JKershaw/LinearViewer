@@ -315,7 +315,8 @@ found it.
 
 The mechanism is the same push substrate as a subscribed orchestrator above, pointed one level up:
 
-- **Dispatch the child** with `POST /api/proxy/autopilot/kickoff`, passing the task as
+- **Dispatch the child** with `POST /api/proxy/autopilot/kickoff` (the kickoff mints the child its own
+  `dispatch` grant, so it can queue its own workers), passing the task as
   `issueIdentifier`, **your own session id** as `sessionId`, `subscription: 'everything'`, and a `variant` chosen
   by what the child *holds*, not by what you were launched as — the same question at every altitude, so
   it recurses cleanly down the tree:
@@ -389,7 +390,9 @@ bullet below because it isn't a child *autopilot* at all:
   reachability**, never by raw ticket count: a long ticket list whose tail never gets touched before the
   session runs out is worse than a shorter list that actually finishes. Unlike the two shapes above, a
   lane child is **not** dispatched via `POST /autopilot/kickoff` — it's a plain `kind: 'implementation'`
-  dispatch whose `prompt` is [`buildWorkerLaneKickoff()`](../lib/prompts/worker-lane-kickoff.js)'s body
+  dispatch, so it is a leaf: it holds no `dispatch` grant and a dispatch of its own gets `403
+  DISPATCH_GRANT_REQUIRED` (any child launched other than via the kickoff is grant-less the same way). Its
+  `prompt` is [`buildWorkerLaneKickoff()`](../lib/prompts/worker-lane-kickoff.js)'s body
   plus the ordered ticket list, so it carries no `variant` and drives its own research → implement →
   review → close-out loop per ticket **inside one session**, never pausing between tickets to hand back
   a plan. Stamp a readable `sessionId` on it exactly as you would any other child (your own session id,

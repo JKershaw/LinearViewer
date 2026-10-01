@@ -1,4 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
+// fixture:LIN-3136
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
+// /fixture:LIN-3136
 
 // LIN-1849: Passage Planner's one-click kickoff copy, Flight Companion parity
 // (LIN-922 + LIN-1764). Mirrors tests/e2e/flight-companion-proxy-copy.spec.js's
@@ -47,6 +50,9 @@ test.describe('Passage Planner proxy copy', () => {
   test('copy force-appends the proxy block and excludes the preamble when proxy is enabled', async ({ page }) => {
     const feats = encodeURIComponent(JSON.stringify({ passagePlanner: true, proxy: true }));
     await page.goto(`/test/set-session?features=${feats}&urlKey=${URL_KEY}`);
+    // fixture:LIN-3136: the forced copy mints the owner-only driver copy (M5)
+    await seedWorkspaceOwnership(page, URL_KEY);
+    // /fixture:LIN-3136
     await page.goto(`/workspace/${URL_KEY}/passage-planner`);
     await page.waitForLoadState('networkidle');
 
@@ -87,6 +93,9 @@ test.describe('Passage Planner proxy copy', () => {
   test('copy surfaces failure (does not silently drop) when the forced mint fails', async ({ page }) => {
     const feats = encodeURIComponent(JSON.stringify({ passagePlanner: true, proxy: true }));
     await page.goto(`/test/set-session?features=${feats}&urlKey=${URL_KEY}`);
+    // fixture:LIN-3136: the forced copy mints the owner-only driver copy (M5)
+    await seedWorkspaceOwnership(page, URL_KEY);
+    // /fixture:LIN-3136
     await page.goto(`/workspace/${URL_KEY}/passage-planner`);
     await page.waitForLoadState('networkidle');
     await failTokenMint(page);

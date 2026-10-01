@@ -49,6 +49,11 @@ function buildApp({ providerName, dispatchQueueStore, injectProvider = null } = 
     proxyTokenStore: {
       validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' })
     },
+    // fixture:LIN-3136: the writer holds the dispatch grant (overrides the store above)
+    proxyTokenStore: {
+      validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1', grants: ['dispatch'], workspaceId: 'ws-acme' })
+    },
+    // /fixture:LIN-3136
     proxyEventStore: { recordEvent: async () => {} },
     // token === 'test-token' drives isTestMode → the mock issue context
     // (TEST-1, with TEST-2 as its child). `provider` here is a NAME string,

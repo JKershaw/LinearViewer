@@ -39,6 +39,43 @@ const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
 // (→ the route's generic 500) rather than silently allowed.
 const RUNNER_CREDENTIAL_SUBJECT = 'a runner credential';
 
+// LIN-3136 S5 (LIN-2884 M5) — the closed, server-side copy-purpose table. The
+// client sends only a row NAME (`purpose`, or the older `runner: true` alias
+// for `runner`); the grants, lifetime profile and label come from here, behind
+// the owner check in `mintGrantBootstrap`. `driver` is the owner's copy-prompt
+// credential (Autopilot, Flight Companion, Passage Planner copies): exactly
+// `['dispatch']`, never `take`, on the 48h `worker` profile — never
+// RUNNER_GRANTS, which would over-grant `take` and shorten its lifetime.
+// `label` is fixed server-side so the audit log tells a driver copy from the
+// toggle path's `prompt-proxy`; the runner row passes none, as before.
+// `providerIdentity` marks the rows whose response carries
+// `providerDisplayName` (the driver block names the declared backend); the
+// runner response stays as it was.
+export const COPY_PURPOSES = Object.freeze({
+  runner: Object.freeze({
+    grants: Object.freeze([...RUNNER_GRANTS]),
+    profile: 'runner',
+    subject: RUNNER_CREDENTIAL_SUBJECT,
+    label: null,
+    providerIdentity: false,
+    logName: 'Runner copy'
+  }),
+  driver: Object.freeze({
+    grants: Object.freeze(['dispatch']),
+    profile: 'worker',
+    subject: 'a driver credential',
+    label: 'prompt-driver',
+    providerIdentity: true,
+    logName: 'Driver copy'
+  })
+});
+
+function invalidPurpose(res) {
+  return jsonError(res, 400, 'Unknown copy purpose', {
+    code: 'INVALID_PURPOSE', category: 'auth', retryable: false
+  });
+}
+
 /**
  * @param {Object} deps
  * @param {Object} deps.proxyTokenStore - Proxy token storage instance
@@ -65,7 +102,7 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
     }
 
     try {
-      const { label, scope, singleUse, bootstrap, runner, grants } = req.body || {};
+      const { label, scope, singleUse, bootstrap, runner, grants, purpose } = req.body || {};
 
       // F4 (LIN-3129/LIN-3059): the server resolves grants, never the client.
       // Any body carrying the field is refused outright, on every path — before
@@ -77,22 +114,37 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
         });
       }
 
+      // LIN-3136: resolve the copy purpose. `runner: true` stays an alias of
+      // `purpose: 'runner'`; an unknown, non-string or conflicting purpose is
+      // refused rather than falling through to the grant-less default path.
+      // No purpose and no runner is the default path below, unchanged.
       const wantRunner = runner === true || runner === 'true';
-
-      // LIN-3131 S2b.2 — the owner-checked runner copy mint (LIN-3059 P4).
-      // `runner: true` asks for the runner credential; the SERVER resolves the
-      // grant list (J2: RUNNER_GRANTS) and the owner (J4), never the client.
-      // Branched BEFORE the label/scope validation on purpose: client `scope`
-      // and `label` are IGNORED on this path. The lifetime profile is the named
-      // `runner` profile (LIN-3132). No compatibility lane — every refusal fails
-      // closed and maps through the shared owner-mint refusal vocabulary (P5).
+      let purposeName = null;
+      if (purpose !== undefined) {
+        if (typeof purpose !== 'string' || !Object.prototype.hasOwnProperty.call(COPY_PURPOSES, purpose)) {
+          return invalidPurpose(res);
+        }
+        purposeName = purpose;
+      }
       if (wantRunner) {
+        if (purposeName !== null && purposeName !== 'runner') return invalidPurpose(res);
+        purposeName = 'runner';
+      }
+
+      // LIN-3131 S2b.2 / LIN-3136 S5 — the owner-checked copy mint (LIN-3059 P4).
+      // The SERVER resolves the grant list and profile from the purpose row and
+      // the owner from the session (J4), never the client. Branched BEFORE the
+      // label/scope validation on purpose: client `scope` and `label` are
+      // IGNORED on this path. No compatibility lane — every refusal fails closed
+      // and maps through the shared owner-mint refusal vocabulary (P5).
+      if (purposeName !== null) {
+        const row = COPY_PURPOSES[purposeName];
         if (!req.session?.accountId) {
           console.warn(
-            `Runner copy refused: session has no account owner (urlKey=${workspace.urlKey}) — ` +
-            `GRANT_OWNERLESS (LIN-3131)`
+            `${row.logName} refused: session has no account owner (urlKey=${workspace.urlKey}) — ` +
+            `GRANT_OWNERLESS (${purposeName === 'runner' ? 'LIN-3131' : 'LIN-3136'})`
           );
-          const refusal = ownerMintRefusal('GRANT_OWNERLESS', RUNNER_CREDENTIAL_SUBJECT);
+          const refusal = ownerMintRefusal('GRANT_OWNERLESS', row.subject);
           return jsonError(res, refusal.status, refusal.error, {
             code: refusal.code, category: refusal.category, retryable: refusal.retryable
           });
@@ -104,17 +156,37 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
             urlKey: workspace.urlKey,
             workspaceId: workspace.id,
             ownerAccountId: req.session.accountId,
-            grants: RUNNER_GRANTS,
-            profile: 'runner'
+            grants: [...row.grants],
+            profile: row.profile,
+            ...(row.label ? { label: row.label } : {})
           });
         } catch (err) {
-          const refusal = ownerMintRefusal(err?.code, RUNNER_CREDENTIAL_SUBJECT);
+          const refusal = ownerMintRefusal(err?.code, row.subject);
           if (!refusal) throw err;
           return jsonError(res, refusal.status, refusal.error, {
             code: refusal.code, category: refusal.category, retryable: refusal.retryable
           });
         }
 
+        if (!row.providerIdentity) {
+          return res.status(201).json({
+            success: true,
+            tokenId: minted.tokenId,
+            token: minted.token,
+            label: minted.label,
+            scope: minted.scope,
+            kind: minted.kind,
+            singleUse: minted.singleUse,
+            grants: minted.grants,
+            expiresAt: minted.expiresAt,
+            lifetimeProfile: minted.lifetimeProfile,
+            message: 'Runner bootstrap created. Save this token now - it cannot be retrieved later.'
+          });
+        }
+
+        // The driver block (public/common.js buildBlock) names the declared
+        // provider and states the grant, so this response carries both. Same
+        // identity derivation as the default path below (see LIN-2370 there).
         return res.status(201).json({
           success: true,
           tokenId: minted.tokenId,
@@ -126,7 +198,8 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
           grants: minted.grants,
           expiresAt: minted.expiresAt,
           lifetimeProfile: minted.lifetimeProfile,
-          message: 'Runner bootstrap created. Save this token now - it cannot be retrieved later.'
+          providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
+          message: 'Driver bootstrap created. Save this token now - it cannot be retrieved later.'
         });
       }
 
