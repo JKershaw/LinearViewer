@@ -78,6 +78,28 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
     expect(clip).toContain('/api/proxy/instructions');
   });
 
+  // LIN-3136: the toggle path is the grant-less prompt-proxy mint, byte for
+  // byte — only a FORCED copy asks for the owner's driver copy.
+  test('the toggle copy still mints with exactly the prompt-proxy body (LIN-3136)', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    const bodies = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && new URL(req.url()).pathname.endsWith('/api/proxy/tokens')) bodies.push(req.postDataJSON());
+    });
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+
+    const container = await selectDashboardPrompt(page);
+    await container.locator('.prompt-proxy-toggle').click();
+    await container.locator('.prompt-copy').click();
+    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+
+    expect(bodies).toEqual([{ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }]);
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip).toContain(PROXY_MARKER);
+    expect(clip).not.toContain('It also holds the dispatch grant');
+  });
+
   test('copy does NOT append when +proxy is disabled', async ({ page }) => {
     await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
     await page.goto(`/workspace/${URL_KEY}/`);

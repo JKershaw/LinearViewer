@@ -1572,10 +1572,21 @@ window.ProxyToggle = (function () {
    * null-on-failure exactly as before, so every existing caller's failure branch
    * is unchanged.
    *
+   * LIN-3136 (M5): `{ purpose: 'driver' }` asks for the owner's driver copy
+   * instead — the server resolves its grant (`['dispatch']`), label and scope, so
+   * the body is exactly `{ purpose: 'driver' }`. That path also returns `grants`
+   * and, on failure, a structured `error: { code, message }` (from
+   * `DRIVER_COPY_ERROR_COPY`) rather than swallowing it. With no purpose the
+   * toggle path below is byte for byte what it was.
+   *
    * @param {string} urlKey
-   * @returns {Promise<{token: string|null, providerDisplayName: string|null}>}
+   * @param {{ purpose?: 'driver' }} [opts]
+   * @returns {Promise<{token: string|null, providerDisplayName: string|null,
+   *   grants?: string[], error?: {code: string, message: string}}>}
    */
-  async function getOrCreateToken(urlKey) {
+  async function getOrCreateToken(urlKey, opts) {
+    const purpose = opts && opts.purpose;
+    if (purpose === 'driver') return getDriverCopyToken(urlKey);
     if (!urlKey) return { token: null, providerDisplayName: null };
     try {
       const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
@@ -1593,6 +1604,63 @@ window.ProxyToggle = (function () {
     } catch {
       return { token: null, providerDisplayName: null };
     }
+  }
+
+  /**
+   * The driver-copy error-copy map (LIN-3136 M5). Keyed by the server's refusal
+   * `code` (INVALID_PURPOSE included), plus client-only cases: `RATE_LIMITED`
+   * (a 429 from the per-IP creation limiter), `NETWORK` (no HTTP status) and
+   * `UNKNOWN` (anything else, including a bare 5xx — "couldn't verify
+   * ownership" would be the wrong claim for a generic server error). Every
+   * value is user-facing and never names an account.
+   */
+  const DRIVER_COPY_ERROR_COPY = {
+    GRANT_OWNER_ONLY: "Only this workspace's owner can copy a prompt that can queue work on their machine. Ask the owner, or sign in as the owner.",
+    WORKSPACE_OWNER_UNSET: "This workspace has no recorded owner yet, so a prompt that can queue work can't be created. Workspaces made before ownership tracking need an operator to assign an owner; a workspace created now gets its owner automatically.",
+    GRANT_OWNERLESS: "This session isn't linked to an account. Sign in again, then copy.",
+    OWNER_CHECK_UNAVAILABLE: "Couldn't verify ownership right now. Try again in a minute.",
+    GRANTS_NOT_CLIENT_SETTABLE: 'The copy request was malformed. Reload the page and try again.',
+    INVALID_PURPOSE: 'The copy request was malformed. Reload the page and try again.',
+    RATE_LIMITED: 'Too many prompt copies in a short time. Wait a minute and try again.',
+    NETWORK: "Couldn't reach Harbour to create this prompt's access token. Check your connection and try again.",
+    UNKNOWN: "Couldn't create this prompt's access token. Try again in a minute."
+  };
+
+  function driverCopyError(code) {
+    return { token: null, providerDisplayName: null, error: { code, message: DRIVER_COPY_ERROR_COPY[code] } };
+  }
+
+  /**
+   * The `purpose: 'driver'` mint behind `getOrCreateToken` (LIN-3136 M5).
+   * Never swallows a failure; never caches (each copy mints its own bootstrap).
+   */
+  async function getDriverCopyToken(urlKey) {
+    if (!urlKey) return driverCopyError('UNKNOWN');
+    let data;
+    try {
+      data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // The server resolves the grant, owner, label and lifetime; the client
+        // sends only the purpose name and never a grant.
+        body: JSON.stringify({ purpose: 'driver' }),
+        on401: false
+      });
+    } catch (err) {
+      const serverCode = (err && err.body && err.body.code) || null;
+      if (serverCode && Object.prototype.hasOwnProperty.call(DRIVER_COPY_ERROR_COPY, serverCode)) {
+        return driverCopyError(serverCode);
+      }
+      const status = err && typeof err.status === 'number' ? err.status : null;
+      if (status === null) return driverCopyError('NETWORK');
+      return driverCopyError(status === 429 ? 'RATE_LIMITED' : 'UNKNOWN');
+    }
+    if (!data || !data.token) return driverCopyError('UNKNOWN');
+    return {
+      token: data.token,
+      providerDisplayName: data.providerDisplayName || null,
+      grants: Array.isArray(data.grants) ? data.grants.slice() : []
+    };
   }
 
   /**
@@ -1671,13 +1739,20 @@ window.ProxyToggle = (function () {
    * unconditional Linear claim was the first thing a worker read about its own
    * tooling, and it was false.
    *
+   * LIN-3136: when the minted token holds the dispatch grant (a driver copy),
+   * the closing line says so, and which routes it opens.
+   *
    * @param {string} token - single-use bootstrap
    * @param {string|null} [providerDisplayName] - declared provider display name, or null
+   * @param {string[]} [grants] - the minted token's grants, when the mint returned them
    */
-  function buildBlock(token, providerDisplayName) {
+  function buildBlock(token, providerDisplayName, grants) {
     const baseUrl = window.location.origin;
     const backing = providerDisplayName ? `; currently backed by ${providerDisplayName}` : '';
-    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral${backing}). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nFirst, exchange your single-use bootstrap token for a working token:\n\n  curl -X POST -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/token\n\nThat returns { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> from here on. Then fetch the full API documentation:\n\n  curl -H "Authorization: Bearer <WORKING_TOKEN>" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.`;
+    const grantNote = Array.isArray(grants) && grants.includes('dispatch')
+      ? ' It also holds the dispatch grant, so it can enqueue work (`POST /dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`) that runs on the operator\'s machine.'
+      : '';
+    return `\n\n## Workspace API access\n\nYou have access to a workspace API proxy (source-neutral${backing}). Use it to read and modify workspace issues, projects, and more.\n\nThis proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace attached this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.\n\nFirst, exchange your single-use bootstrap token for a working token:\n\n  curl -X POST -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/token\n\nThat returns { "token": "<WORKING_TOKEN>", "scope": "readWrite", "expiresAt": "...", "notes": "…" }. The bootstrap is single-use — this exchange spends it — so use <WORKING_TOKEN> from here on. Then fetch the full API documentation:\n\n  curl -H "Authorization: Bearer <WORKING_TOKEN>" ${baseUrl}/api/proxy/instructions\n\nThis will return all available endpoints with examples. Your token scope is: readWrite.${grantNote}`;
   }
 
   /**
@@ -1694,6 +1769,11 @@ window.ProxyToggle = (function () {
    * promises a `readWrite` token in its body but exposes no +proxy toggle. The
    * urlKey + token requirements (and their throw-on-failure) still hold, so a
    * forced append never silently dispatches a tokenless prompt.
+   *
+   * LIN-3136 (M5): a forced append mints the owner's DRIVER copy
+   * (`purpose: 'driver'`, which holds the dispatch grant) and, if that is
+   * refused, throws the mapped `DRIVER_COPY_ERROR_COPY` text — there is no
+   * grant-less fallback. The unforced (toggle) path is unchanged.
    * @param {string} text
    * @param {string} urlKey
    * @param {{ force?: boolean }} [opts]
@@ -1707,9 +1787,10 @@ window.ProxyToggle = (function () {
       if (!isFeatureEnabled()) return text;
     }
     if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
-    const { token, providerDisplayName } = await getOrCreateToken(urlKey);
+    const { token, providerDisplayName, grants, error } = await getOrCreateToken(urlKey, force ? { purpose: 'driver' } : undefined);
+    if (force && error) throw new Error(error.message);
     if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
-    return text + buildBlock(token, providerDisplayName);
+    return text + buildBlock(token, providerDisplayName, grants);
   }
 
   /**
@@ -1744,7 +1825,7 @@ window.ProxyToggle = (function () {
     });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive };
+  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

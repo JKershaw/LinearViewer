@@ -843,7 +843,9 @@
           btn.textContent = 'copy';
           btn.classList.remove('copied');
         }, 2000);
-      } catch {
+      } catch (error) {
+        // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+        if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' });
         btn.textContent = 'failed';
         setTimeout(() => { if (!destroyed) btn.textContent = 'copy'; }, 2000);
       }
@@ -868,7 +870,9 @@
           btn.textContent = 'download';
           btn.classList.remove('copied');
         }, 2000);
-      } catch {
+      } catch (error) {
+        // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+        if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' });
         btn.textContent = 'failed';
         setTimeout(() => { if (!destroyed) btn.textContent = 'download'; }, 2000);
       }
@@ -902,7 +906,9 @@
           proxyForce: !!(state.result && state.result.proxyForce) || btn.dataset.proxyForce === 'runner'
         });
         btn.textContent = '\u2713';
-      } catch {
+      } catch (error) {
+        // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+        if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' });
         btn.textContent = 'err';
       } finally {
         setTimeout(() => {

@@ -192,9 +192,9 @@ This will return all available endpoints with examples. Your token scope is: ${s
       tokensCount.textContent = '';
       return;
     }
-    // LIN-3131 S2b.3: runner credentials (grant-bearing) live in their own
+    // LIN-3131 S2b.3: runner credentials (`take` holders) live in their own
     // "Runner credentials" group, so this count covers the ordinary tokens only.
-    const generic = tokens.filter(t => !isRunnerToken(t));
+    const generic = tokens.filter(isOrdinaryListed);
     tokensCount.textContent = generic.length ? `(${generic.length})` : '(0)';
   }
 
@@ -206,7 +206,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
       tokenList.innerHTML = '<div class="token-list-empty">Failed to load tokens</div>';
       return;
     }
-    const generic = tokens.filter(t => !isRunnerToken(t));
+    const generic = tokens.filter(isOrdinaryListed);
     if (tokensCount) {
       tokensCount.textContent = generic.length ? `(${generic.length})` : '(0)';
     }
@@ -263,6 +263,9 @@ This will return all available endpoints with examples. Your token scope is: ${s
 
   function renderTokenItem(t) {
     const scopeBadge = t.scope === 'readWrite' ? ' [rw]' : ' [r]';
+    // LIN-3136: marks the ordinary tokens that can enqueue work (declared
+    // launches, driver copies) — the dispatch grant without `take`.
+    const grantBadge = hasDispatchGrant(t) ? ' [+dispatch]' : '';
     const consumedBadge = t.consumed ? ' (consumed)' : '';
     const expiryBadge = renderExpiryBadge(t.expiresAt);
     const meta = [
@@ -278,7 +281,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
 
     return `<div class="surface token-item">
       <div class="token-info">
-        <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${consumedBadge}${expiryBadge}</div>
+        <div class="token-label-text">${escapeHtml(t.label)}${scopeBadge}${grantBadge}${consumedBadge}${expiryBadge}</div>
         <div class="token-meta">${escapeHtml(meta)}${ownerless}</div>
       </div>
       <button class="action-btn token-revoke" data-token-id="${escapeHtml(t.tokenId)}">revoke</button>
@@ -323,8 +326,26 @@ This will return all available endpoints with examples. Your token scope is: ${s
   // structurally (lib/proxy-tokens.js `revokeToken`), so no new route is needed.
   // =========================================================================
 
+  // LIN-3136 (the LIN-3131 O-d carry): a runner row is a `take` holder. Any
+  // grant is no longer enough — declared launches and driver copies mint
+  // `['dispatch']` tokens, which are ordinary rows with ordinary revoke copy.
   function isRunnerToken(t) {
-    return Array.isArray(t.grants) && t.grants.length > 0;
+    return Array.isArray(t.grants) && t.grants.includes('take');
+  }
+
+  function hasDispatchGrant(t) {
+    return Array.isArray(t.grants) && t.grants.includes('dispatch');
+  }
+
+  // The ordinary list: everything but runner rows, and minus a CONSUMED
+  // grant-bearing bootstrap. Revoking one revokes its whole lineage
+  // (lib/proxy-tokens.js `revokeToken`), including a running autopilot's live
+  // working token — the runner group hides its spent bootstraps for the same
+  // reason. Display-only: the revoke route and who may call it are unchanged.
+  function isOrdinaryListed(t) {
+    if (isRunnerToken(t)) return false;
+    const grantBearing = Array.isArray(t.grants) && t.grants.length > 0;
+    return !(t.kind === 'bootstrap' && t.consumed && grantBearing);
   }
 
   async function loadRunnerCredentials() {
