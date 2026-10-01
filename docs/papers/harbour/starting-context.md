@@ -15,6 +15,7 @@ cites:
   - "docs/papers/harbour/what-should-an-agent-leave-behind.md@26014544:26 and its -evidence.md (LIN-2961: John's context and handoff projects; the pointer result's limits)"
   - "docs/papers/harbour/what-supervisors-do.md@26014544 and wake-inventory.md@26014544 (supervision and wakes, not re-measured here)"
   - "docs/papers/harbour/why-legs-repeat.md@26014544 (repeat legs: the sessions that re-find most)"
+  - "docs/papers/harbour/held-or-fresh.md@628fed50:17-20 (sibling, LIN-3176: a fresh supervisor's orientation and bootstrap)"
   - "LinearViewer c0ad85bd (LIN-2896, 18 Sep): CLAUDE.md cut from 153,845 to about 9,000 bytes"
   - "simple-dispatcher README.md@3366748:9-10 (LIN-2116: broker-armed implementation, research and plan launches skip the bootstrap summarise)"
 ---
@@ -88,8 +89,10 @@ short sessions, where a fixed cost weighs most.
 the start of each later beat, before its first productive call, are 10.9% of all tokens: 29% of a
 stepper's and 22% of a passage leg's. 42% of later-beat reads are files or tickets the same
 session read in an earlier beat. Some of this is legitimate: the file changed, or the context
-was compacted. `held-or-fresh.md` asks whether a held session is cheaper than a fresh one; this
-is one of its inputs.
+was compacted. `held-or-fresh.md`, which landed alongside this paper, measures the other side:
+a fresh supervisor spends 116–238k tokens orienting to its first decision, plus a 60–80k
+bootstrap, and orientation is 62% of a fresh step's price. That agrees in size with the medians
+in the table above.
 
 **What sessions read is a small part of what they carry.** Context shares are each block's tokens
 times the turns that carry it, over the summed per-turn window (Method). Between 19 and 30 September,
@@ -353,5 +356,6 @@ node scripts/survey-context-figures.mjs                       # → docs/papers/
 - Separate re-reading for independence from re-reading for want of a pointer in code review: code
   a sample of review orientation spans for whether the reviewer looked beyond the implementer's
   files, and whether that found anything.
-- `held-or-fresh.md` (sibling) on the 10.9% of later-beat re-orientation, and `cost-mix.md` on
-  how the shares above price out.
+- Price the 10.9% of later-beat re-orientation against `held-or-fresh.md`'s fresh-start costs. A
+  beat that re-reads 42% of what its own session already read is the held case's version of the
+  same cost. `cost-mix.md` (sibling) covers how the shares above price out.
