@@ -320,7 +320,7 @@ describe(
     let obCounter = 0;
 
     async function withOwnerBackfillDb(fn) {
-      const { runOwnerBackfill } = await import('../../lib/owner-backfill.js');
+      const { runOwnerBackfill, planOwnerBackfill, executeOwnerBackfill } = await import('../../lib/owner-backfill.js');
       const caseDb = client.db(`${db.databaseName}_ownerbackfill_${obCounter++}`);
       try {
         await ensureIndexes(caseDb, { logger: { warn() {} } });
@@ -328,7 +328,7 @@ describe(
           _id: OB_PIN_ACCOUNT,
           identities: [{ provider: 'linear', scope: OB_PIN_LINEAR_SCOPE }]
         });
-        await fn({ caseDb, edges: caseDb.collection('account-workspaces'), runOwnerBackfill });
+        await fn({ caseDb, edges: caseDb.collection('account-workspaces'), runOwnerBackfill, planOwnerBackfill, executeOwnerBackfill });
       } finally {
         await caseDb.dropDatabase();
       }
@@ -381,7 +381,11 @@ describe(
       });
     });
 
-    test('owner backfill: 12 concurrent runs on one insert-path workspace leave one John edge and one owner; a pair-index E11000 is raced, never failed (LIN-3142 G11b)', async () => {
+    // Its `raced` counts come from the upsert-found-John's-edge and
+    // modifiedCount-0 paths, not from a pair-index E11000: MongoDB 8 retries a
+    // same-key upsert collision on the server, so that branch is not reliably
+    // reachable here. G11c is the case that drives E11000 → raced.
+    test('owner backfill: 12 concurrent runs on one insert-path workspace leave one John edge and one owner, with no failed write (LIN-3142 G11b)', async () => {
       await withOwnerBackfillDb(async ({ caseDb, edges, runOwnerBackfill }) => {
         const workspaceId = 'ob-ws-single';
         await edges.insertOne(obEdge(randomUUID(), workspaceId));
@@ -397,10 +401,19 @@ describe(
       });
     });
 
-    test('owner backfill vs a rival promote on 20 workspaces: one owner each, and no stray John edge where the rival won (LIN-3142 G11c)', async () => {
-      await withOwnerBackfillDb(async ({ caseDb, edges, runOwnerBackfill }) => {
+    // The acceptance instrument for flag F2. The plan is computed BEFORE any
+    // rival moves, then the writer races 20 rival promotes, so the writer's
+    // insert-as-owner genuinely contends with a rival's owner mark. (Racing
+    // `runOwnerBackfill` itself is vacuous: its gate reads let every rival
+    // finish before the edge read, so it plans `targets=0`.) A lost
+    // insert-as-owner must be E11000 → `raced` and leave no John edge at all.
+    test('owner backfill: a precomputed plan raced against rival owner promotes on 20 workspaces gives one owner each, at least one raced, and no stray John edge where the rival won (LIN-3142 G11c)', async () => {
+      await withOwnerBackfillDb(async ({ edges, planOwnerBackfill, executeOwnerBackfill }) => {
         const rivals = Array.from({ length: 20 }, (_, i) => obEdge(randomUUID(), `ob-ws-rival-${String(i).padStart(2, '0')}`));
         await edges.insertMany(rivals);
+        const plan = planOwnerBackfill({ edges: await edges.find({}).toArray(), mergedInto: new Map(), johnAccountId: OB_PIN_ACCOUNT });
+        assert.strictEqual(plan.targets.length, 20, 'every workspace is a target');
+        assert.ok(plan.targets.every((t) => t.promoteEdgeId === null), 'all on the insert path: John has no edge');
 
         const promoteRival = async (rival) => {
           try {
@@ -410,24 +423,26 @@ describe(
           }
         };
         const settled = await Promise.allSettled([
-          runOwnerBackfill({ db: caseDb, write: true, logger: obSilent }),
-          ...rivals.map(promoteRival),
-          runOwnerBackfill({ db: caseDb, write: true, logger: obSilent })
+          executeOwnerBackfill({ edgesCollection: edges, plan, johnAccountId: OB_PIN_ACCOUNT, logger: obSilent }),
+          ...rivals.map(promoteRival)
         ]);
 
         assert.deepStrictEqual(settled.filter((r) => r.status === 'rejected'), [], 'no rejection from either side');
-        assertRunsClean([settled[0], settled[settled.length - 1]], 'G11c');
+        const result = settled[0].value;
+        assert.strictEqual(result.failed, 0, 'a lost insert-as-owner is raced, never failed');
+        assert.strictEqual(result.assigned + result.raced, 20, 'every target is assigned or raced');
+        assert.ok(result.raced >= 1, `the race must actually contend: at least one target raced, got raced=${result.raced}`);
         for (const rival of rivals) {
           const { workspaceId } = rival;
           const owners = await edges.find({ workspaceId, role: 'owner' }).toArray();
           assert.strictEqual(owners.length, 1, `${workspaceId}: exactly one owner`);
-          if (owners[0].accountId !== OB_PIN_ACCOUNT) {
-            assert.strictEqual(
-              await edges.countDocuments({ workspaceId, accountId: OB_PIN_ACCOUNT }),
-              0,
-              `${workspaceId}: the rival won, so no stray plain John edge`
-            );
-          }
+          assert.strictEqual(
+            await edges.countDocuments({ workspaceId, accountId: OB_PIN_ACCOUNT }),
+            owners[0].accountId === OB_PIN_ACCOUNT ? 1 : 0,
+            owners[0].accountId === OB_PIN_ACCOUNT
+              ? `${workspaceId}: John won, with exactly one John edge`
+              : `${workspaceId}: the rival won, so no stray plain John edge`
+          );
         }
       });
     });
