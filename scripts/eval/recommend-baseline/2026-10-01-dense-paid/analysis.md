@@ -107,6 +107,54 @@ the incumbent gap within noise. qwen's two remaining dense misses are concentrat
 `LIN-1892` (predicts `close-out`; not defensible) — every other dense target is now
 correct at K=3 or via an accepted synonym/alternative.
 
+### 4b. Strict-label sensitivity (the two `blocked` widenings removed)
+
+The `blocked` widenings on LIN-1892 and LIN-3135 were each adopted from ticket evidence,
+but they are the only labels decided by judgement rather than the vocabulary convention,
+and they cut in opposite directions (LIN-1892's benefits the incumbent; LIN-3135's
+benefits qwen). Re-scored under **strict labels** — the `implement|implementation`
+convention fix only, no `blocked`:
+
+| model | dense, widened | dense, strict |
+|---|---|---|
+| openai/gpt-5.6-sol | 10/10 (100%) | **9/10 (90%)** |
+| openai/gpt-5.4-mini | 6/10 (60%) | 6/10 (60%) |
+| openai/gpt-5-mini | 7/10 (70%) | 7/10 (70%) |
+| google/gemini-2.5-flash-lite | 3/10 (30%) | 3/10 (30%) |
+| qwen/qwen3.6-flash | 8/10 (80%) | **7/10 (70%)** |
+
+Finalists, combined dense K=3 (main + confirmatory):
+
+| model | dense, widened | dense, strict |
+|---|---|---|
+| qwen/qwen3.6-flash | 24/30 (80%) | **21/30 (70%)** |
+| openai/gpt-5-mini | 20/30 (67%) | 20/30 (67%) |
+
+Strict labels do not change any ordering and do not change the recommendation, but they
+widen the incumbent's dense lead from 20 to 30 points on the K=3 finalist view (90% vs
+70%) — still within Wilson noise.
+
+**qwen dense misses per target, all 3 runs, strict labels:**
+
+| target | strict label | qwen (3 runs) |
+|---|---|---|
+| LIN-1892 | implement\|implementation | `context`, `close-out`, `close-out` — **0/3** |
+| LIN-3135 | implement\|implementation | `blocked`, `blocked`, `blocked` — **0/3** |
+| LIN-2149 | implement\|implementation | `breakdown`, `breakdown`, `implement` — 1/3 |
+| LIN-3059 | blocked | `blocked`, `context`, `blocked` — 2/3 |
+| all other 6 dense | — | 3/3 |
+
+**Residual risk, stated plainly.** `LIN-1892` is the largest assembled context in the
+set (~148.5k prompt tokens) and **qwen missed it 3/3** (it always routed to `close-out`
+where the honest answer is continue/blocked). That is exactly the "denser context
+degrades cheaper models" failure the ticket describes, at the extreme end. The
+incumbent's dense point estimate is higher (within noise), and this is the one dense
+case where the gap is consistent rather than random. `LIN-3135` is qwen's other 0/3, but
+there the miss (`blocked`) *was* defensible and we declined only to widen the label; it
+is not a denser-context failure. If LIN-1892-class tickets are common in production, the
+cost saving carries a real accuracy tail; the incumbent remains the safe fallback.
+
+
 ## 5. Context and latency checks
 
 - **Largest assembled context** (actual OpenRouter `prompt_tokens` in the paid run):
