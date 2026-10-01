@@ -133,6 +133,15 @@ was launched before T3. Note it as a
 finding to post, not a pass, and
 re-launch the task from the app.
 
+First check the runner's take line for
+this item. If it says `apiAccess: false`,
+that is not the T3 grant: the task was
+launched with no harness (LIN-3211), and
+re-launching from the same button repeats
+it. Answer "stop, do not pass it", set
+Settings → Dispatch defaults → Harness to
+`claude-code`, and re-launch.
+
 ## 5. Done: paste this back
 
 1. Send this line to the runner:
