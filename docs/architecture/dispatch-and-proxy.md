@@ -24,7 +24,7 @@ best-effort under degradation; the degraded-mode path is the proxy verb (below).
 - `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
 
 Items expire after 24 hours. Tokens are workspace-scoped and never expire (but can be revoked).
-Feedback is append-only, inherits 30-day history TTL, and requires strict token ownership.
+Feedback is append-only, **retained for the life of the project**, and requires strict token ownership.
 
 A dispatch item may carry an optional `followUpTo` field (the `id` of an earlier dispatch) to resume that
 session as a follow-up instead of starting fresh (cli/web only, same workspace; LIN-415). Harbour
@@ -44,7 +44,7 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 - Read/write scope separation (`read` for queries, `readWrite` for mutations)
 - Single-use token support (consumed after first request)
 - Single-use **bootstrap** tokens for handoffs (LIN-376): every token embedded in a dispatched prompt, page copy, +proxy block, or Collective message is a single-use, exchange-only bootstrap (`kind: 'bootstrap'` in `lib/proxy-tokens.js`). It authenticates ONLY `POST /api/proxy/token`, which atomically consumes it and returns a multi-use working token; `validateToken` rejects a bootstrap on every data endpoint. The durable prompt (queue/history/log/clipboard, readable via `GET /api/proxy/dispatch/:id/prompt`) therefore carries a credential that is inert the instant the agent exchanges it, and the dispatch endpoints no longer replay the caller's own standing token. The one seam is the exchange endpoint; every handoff generator (`buildProxyContextPreamble`, `buildLinearAccessBlock`, `buildAgentPrompt`, `buildBlock`, `/instructions`) leads with the exchange step. **Token lifetime varies by mint path (LIN-1938)** — every agent-facing mint is 48h (`WORKING_TOKEN_TTL_SECONDS`/`BOOTSTRAP_TOKEN_TTL_SECONDS`/`PROMPT_PROXY_TOKEN_TTL_SECONDS`), an operator standard mint under any other label is 90 days (the store default); see the per-path table in `GET /api/proxy/instructions` and `docs/proxy-integration.md`'s Token lifetimes section for the full breakdown, and LIN-2602/LIN-2603 for the tracked mint-duration-control and human-approved-extension work — there is no self-service refresh today.
-- Event audit logging (30-day TTL)
+- Event audit logging (audit events are **retained for the life of the project**)
 - Rate limiting (60 requests/minute per IP)
 - Workspace isolation (tokens are scoped to a single workspace)
 

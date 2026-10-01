@@ -330,8 +330,9 @@ test('Shape B (/stack) threads owner_signed_out through to auth envelope (LIN-15
 // Everything above pins the reason reaching the *response envelope* — which is
 // ephemeral. LIN-1538's diagnostic had the same weakness one layer down: its
 // only sink was a console.warn, so the discriminating field could never be
-// counted. `workspaceUnavailable` already wrote a durable, 30-day-TTL audit row
-// on this exact path, but dropped the in-scope `reason`, so every 503 landed as
+// counted. `workspaceUnavailable` already wrote a durable audit row
+// on this exact path (proxy-events; lifetime-retained since LIN-3163), but
+// dropped the in-scope `reason`, so every 503 landed as
 // an indistinguishable `note: null`. Passing it through as the existing `note`
 // breadcrumb (the LIN-961 field) makes 503s countable BY REASON with no schema
 // change. These tests pin the write side; the read side already returned `note`.
@@ -364,13 +365,42 @@ test('LIN-1540: a 503 records the failure reason as the note on the audit row', 
 // route rather than by inspecting the store directly.
 function inMemoryEventCollection() {
   const docs = [];
+  // Honor the urlKey + read-horizon filter listEvents actually issues, so the
+  // 30-day horizon semantics stay real rather than being stubbed away.
+  // LIN-3162 (A2) moved the read from `expiresAt` to a `timestamp` bound and
+  // into a database-side sort/skip/limit + countDocuments; this double follows
+  // that shape instead of pinning the pre-A2 query.
+  const matches = (doc, { urlKey, timestamp }) =>
+    doc.urlKey === urlKey && (!timestamp?.$gte || doc.timestamp >= timestamp.$gte);
+  function cursor(query) {
+    let sortSpec = null;
+    let skipN = 0;
+    let limitN = Infinity;
+    const api = {
+      sort(spec) { sortSpec = spec; return api; },
+      skip(n) { skipN = n; return api; },
+      limit(n) { limitN = n; return api; },
+      async toArray() {
+        let rows = docs.filter(d => matches(d, query));
+        if (sortSpec) {
+          const keys = Object.entries(sortSpec);
+          rows = rows.slice().sort((a, b) => {
+            for (const [key, dir] of keys) {
+              if (a[key] === b[key]) continue;
+              return (a[key] < b[key] ? -1 : 1) * dir;
+            }
+            return 0;
+          });
+        }
+        return rows.slice(skipN, limitN === Infinity ? undefined : skipN + limitN);
+      }
+    };
+    return api;
+  }
   return {
     insertOne: async doc => { docs.push(doc); return { insertedId: doc._id }; },
-    // Honours the urlKey + non-expired filter listEvents actually issues, so
-    // the 30-day TTL semantics stay real rather than being stubbed away.
-    find: ({ urlKey, expiresAt }) => ({
-      toArray: async () => docs.filter(d => d.urlKey === urlKey && d.expiresAt > expiresAt.$gt)
-    })
+    find: query => cursor(query),
+    countDocuments: async query => docs.filter(d => matches(d, query)).length
   };
 }
 

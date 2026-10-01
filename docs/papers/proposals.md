@@ -3,6 +3,103 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Which leg kinds share a name length, and which published counts did the length decode misread?**
+  `harbour/survey-check-6.md` found that the bootstrap-length decode reads breakdown (and look-into)
+  sessions as close-outs and custom, design and triage sessions as reviews: in September's transcript
+  headers, 16 of 81 decoded close-outs and 17 of 146 decoded reviews were other kinds. List every kind
+  the dispatcher has sent since June with its length, set each decoded leg in the censuses of
+  `what-doubled-the-dispatches.md`, `survey-check-4.md` and `why-legs-repeat.md` against the kinds that
+  share it, and report which published counts move and by how much. (Claude, 2026-09-30)
+- **Does a second plan-review round find what the first missed, or what the revision introduced?**
+  `harbour/why-legs-repeat.md` found that 37 of 41 sampled plan-review repeats raised a finding no
+  earlier round had, and 30 of those were real (version 2). For each, read revision 1 against the finding and say
+  whether it was already there to be seen or came in with the change the first round asked for, by
+  ticket size, so a missed finding can be told from one the loop itself created. (Claude, 2026-09-30)
+- **With size and area held fixed, do mid-tier changes fail more often than frontier ones?**
+  `harbour/why-throughput-halved.md` found that, from 13 July, changes written mainly at the mid tier
+  were 67% correct and complete against 78% for the frontier tier, with 14 of 365 against none of 171
+  escaping once rows naming the finder are set aside (version 2), at the same dispatches and working
+  hours per change. `harbour/model-choice.md` held size and area fixed and the gap stayed. Match
+  later-block changes on ticket kind as well, and report whether the gap survives or belongs to the tickets each tier was
+  given. (Claude, 2026-09-30)
+- **Does per-change cost keep its sensitivity out of sample?** `harbour/measuring-throughput.md` found the
+  weekly count of correct, complete changes needs about eight weeks each side to see a doubling (four-week
+  detectable ratio ×2.4). `harbour/survey-check-2.md` found cost per change is not the ×1.4 the paper
+  printed, because changes in one week are not independent: on the observed spread of weekly means it
+  sees ×2.8 in dispatches and ×2.0 in hours over four weeks. Re-run `scripts/survey-scorecard.mjs` weekly
+  for eight weeks and report whether those detectable ratios hold on new weeks, and whether the weekly
+  count and per-change cost ever move in opposite directions. (Claude, 2026-09-30, corrected 2026-09-30)
+- **When were the faults that later reviews find actually written?** `harbour/reliability-baseline.md`
+  counted 49 escaped Bugs filed as `kind:review-residue`, a later review finding a fault in older
+  code, and `harbour/survey-check.md` found at least 21 more with no residue label. In
+  LinearViewer they are all of its August–September rise. For each, `git blame` the lines its fix
+  changed and date the introducing commit: before the fleet started on 4 June, in its first
+  months, or recent. That separates faults the fleet is finding from faults it is making.
+  (Claude, 2026-09-30, widened 2026-09-30)
+- **What does a follow-up beat buy?** `harbour/growth-atlas.md` found fresh fleet sessions flat at
+  about 450–530 a week since mid-July, while follow-up beats into held sessions doubled after
+  31 August, from about 800 a week to about 1,600. Sample beats from simple-dispatcher's run logs and
+  oplog, and trace each to what it changed: a commit, a ticket state, a comment, or nothing.
+  (Claude, 2026-09-30)
+- **Why does Harbour's unit suite slow faster than it grows?** `harbour/growth-atlas.md` found one
+  CI pass of the unit suite took 8–10× longer from late June to late September while test lines
+  grew 4.2×. Time every test file under `node --test` at each month-end commit and report whether a
+  few files or the whole suite carry the time. (Claude, 2026-09-30)
+- **What does the added supervision buy?** `harbour/where-the-effort-goes.md` found the supervision
+  layers rose from 28% to 45% of weighted tokens across September, and `harbour/survey-check.md`
+  found the whole rise is the passage Runner and its legs, while dispatches per same-sized ticket
+  rose 1.2–1.8×, almost all of it warm beats, and working time held flat. Compare tickets flown
+  under a Runner and its legs with tickets run by a lone autopilot, at a fixed size and risk
+  class: first-pass review approval, review rounds and later-found defects. (Claude, 2026-09-30)
+- **Does effort follow risk at all?** The same paper found no detectable difference between a
+  credential or auth change and any other change of its size, on intervals wide enough to hide a
+  difference of half either way. Is a risk class ever an input when a ticket's process is chosen,
+  and do high-risk tickets' reviews find more? (Claude, 2026-09-30)
+- **Can a ticket's effort be compared month on month in one unit?** `harbour/survey-check.md`
+  found that a dispatch changed meaning over the summer (mostly fresh sessions in July, mostly
+  warm beats into held sessions in September), that the two working-time instruments disagree
+  2.5× on the same tickets, and that transcripts and dispatch history age out after 30 days, so
+  tokens exist only from 31 August. From simple-dispatcher's oplog and run logs, which reach back
+  to 12 July, find a measure that means the same in July as in September, such as executing time
+  outside CI and Monitor polls, and redo the size-held-fixed table in it. (Claude, 2026-09-30)
+
+- **Can the lead rule of a review finding be coded reliably?** `harbour/survey-check-3.md` found that
+  two blind readers named `harbour/which-rules-pay.md`'s lead rule for 59–66% of its production changes
+  and each other's for 78%, while agreeing on the counts. The class check and reviewer judgement trade
+  places most. Write decision rules that separate "a rule pointed the reviewer here" from "the reviewer
+  saw it", for example that the review text uses the rule's own words. Recode the paper's 28 production
+  tickets under them with two blind readers and report κ. (Claude, 2026-09-30)
+- **Do the tests the mutation check forces ever catch anything?** `harbour/which-rules-pay.md` found
+  the mutation check led 107 of 483 review findings in the last 100 reviewed Done tickets, 97 of which
+  changed only tests, and about 36 of the 88 extra legs those tickets ran. Follow every test file those
+  97 changes touched forward through CI on main and later PRs, and count how often one goes red on a
+  real regression before a reviewer or a Bug finds it. (Claude, 2026-09-30)
+- **What does reviewer judgement catch that no rule names?** The same paper found that the largest
+  single source of production changes from review, 29 changes and 16 real faults, was a reviewer
+  reading the code with no specific rule behind the finding. Read those findings for a common kind
+  of reading, and ask whether the named rules describe how faults are actually found. (Claude, 2026-09-30)
+- **What do the orchestrator's stepper beats keep of the rules?** `harbour/steady-base-check.md`
+  found that 41 of 112 sampled worker prompts were beats the frontier-tier orchestrator wrote
+  itself, and at least 18 of them wrap an engine brief. For every beat since the stepper shipped,
+  diff the beat's text against the engine brief it wraps, if any, and against the rules in
+  `harbour/steady-base-rules.json`. Record which rules reach the worker, which are dropped, and
+  which the orchestrator adds that no template holds. That says whether the meta-prompt or the
+  kickoff is where a rule actually lives. (Claude, 2026-09-30)
+- **Does a prompt budget move the growth next door?** `harbour/paid-where-written.md` argues that a
+  budget cuts what it caps and moves cost to what it does not count, as the `CLAUDE.md` cap did
+  (its text moved into `docs/architecture/`, which grew 21 KB, about a third of it in changes
+  that also edited `CLAUDE.md`). The NAO found only that Britain's regulatory target did not see
+  what it did not count (`harbour/paid-where-written-check.md`). If `steady-base.md`'s step 1,
+  a byte budget on every template and the meta-prompt, is adopted, measure for eight weeks either side the size of every document an agent
+  is told to read and the comment lines added to production code. Faster growth after the freeze
+  means the budget moved the cost without cutting it. (Claude, 2026-09-30)
+- **When Harbour removed a rule, did the incident it was written for come back?**
+  `harbour/paid-where-written-check.md` found the essay mentions Chesterton's fence but does not
+  answer it: a rule obeyed silently leaves no signature, so a firing record cannot tell an idle
+  rule from one that is why an incident stopped. `harbour/steady-base.md` lists eight removals,
+  three deliberate cuts and one retirement on firing evidence. For each, find the ticket that
+  introduced the removed text and the incident class it named, then search the tracker for that
+  class in the eight weeks either side of the removal. (Claude, 2026-09-30)
 - **Does calibration transfer between domains?** `harbour/learning-while-the-tools-change.md`
   argues in section 7 that the scarce capability is calibrated distrust, learned from
   consequence and bound to a domain, and its Next names this as what would refute it. Harbour's operators review agent work in more than one
@@ -227,3 +324,75 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   same method to the first invited runs of a finished-run page: record which sections a real
   person opens, how long they stay, and whether they reach the ledger before clicking merge, and
   report the share nothing reads. (Claude, 2026-09-19)
+- **Which of a supervisor's gate replies and quiet wakes could the runner already have answered?**
+  `harbour/what-supervisors-do.md` found 24% of September's supervision tokens go to answering the
+  completion gate (20% to PENDING-EXTERNAL replies), and 31% of wakes change nothing — while the runner
+  holds each parent's live subscribed children (`reapers.js:1009`) only to exempt it from reaping. Replay the September gate replies
+  and quiet wake cycles against the runner's own state at that moment, and count how many a reader of
+  that state would have written identically. (Claude, 2026-09-30)
+- **Which of Harbour's pin-class tests have never failed, for any reason, since they were written?**
+  `harbour/test-estate.md` found the 851 text pins, census pins and source scans failed a PR's CI
+  twice in four months, while inside sessions census and text pins demanded a bump at least as often
+  as they caught a fault, on one or two catches a class (`harbour/survey-check-2.md`). Join each pin's age to every CI and session failure record to separate
+  the pins that bump often from the ones that never fire, and say how much of the pin family each
+  group is. (Claude, 2026-09-30)
+- **What does an escaped defect cost the operator, by implementer tier?** `harbour/model-choice.md`
+  found that mid-tier changes escape more often than frontier ones (11 of 187 against none of 85),
+  but that the rework adds only 0.2–0.3 working hours to a correct change's whole-life cost of 3.25–3.5 hours for either
+  tier. Hours leave out the person who finds, triages and re-dispatches each escape. Join
+  `reliability-baseline-defects.json`'s finder to the tracker's comment and state history, and
+  say how much operator attention each escape took, by the tier that wrote the change.
+  (Claude, 2026-09-30)
+- **Once the 25 September switch to cheap implementers has had 30 days, what does a correct change
+  cost over its whole life?** `harbour/model-choice.md` could not price the cheap tier, because its
+  changes are younger than the 30-day window. Re-run `scripts/survey-model-analyse.mjs` in late
+  October and report the cheap tier's whole-life hours, escapes and afterlife curve beside the two
+  tiers measured here. (Claude, 2026-09-30)
+- **Which of the scorecard's named fixes are fixes, and which follow-ups are the change's own?**
+  `harbour/survey-check-2.md` found `scripts/survey-scorecard.mjs`'s correct and complete tests rest on text
+  matches: 69 of its 78 named fixes are a mention of the change anywhere in a later ticket's description,
+  35 of 66 escapes name the ticket whose review found the fault, and 116 mature changes are named as origin
+  in filings the scorecard ignores. Read the 78 fixes and the 116 filings blind, against a written rubric,
+  and report the correct and complete rates as estimates with intervals rather than bounds.
+  (Claude, 2026-09-30)
+- **Is the reduced-motion livebar test's first-attempt failure the product or the harness?**
+  `harbour/browser-flakes.md` found `observation.spec.js:401` failing its first attempt in 71% of
+  sampled green runs and passing on the traced retry, a rate that fell from about 90% in July to 44%
+  in late September. `harbour/survey-check-5.md` found every failure read an empty `animationName`,
+  which is what a detached element reports, so the feed poll may be replacing the node before the
+  read. Run it alone at origin/main, repeated, with and without tracing and with and without the feed
+  poll, and report which condition makes the first attempt fail. It is the one test
+  where retries could be hiding a real reduced-motion fault. (Claude, 2026-09-30)
+- **How many of the wakes a worker event sends up the stack change what any supervisor does?**
+  `harbour/what-doubled-the-dispatches.md` found wakes are most of the rise in dispatches per correct
+  change since July, that each worker session or beat sent 0.8–0.9 wakes up in July and August and
+  1.4 after the passage layer went live (`harbour/survey-check-4.md`: 2.2 counted by the child each wake names),
+  and that PENDING-EXTERNAL pauses track wakes one for one.
+  For September's wakes, trace each one to the layer it woke (stepper, ticket autopilot, leg, Runner)
+  and say, per layer, how often the woken session's next action differs from what it would have done
+  had the wake gone only to the lowest layer. (Claude, 2026-09-30)
+- **After the same reading, how many of the heavy group's scorecard failures survive?**
+  `harbour/proportional-process-backtest.md` read every scorecard failure in its light groups: 11 of M3's
+  became 5, and 24 of M4's became 12. It could not read the heavy group's 89 to 100. Read them against the
+  same finder-row and blames/unclear/mention rubric, so a light group's failure rate can be set against the
+  heavy group's on the same footing, with intervals. (Claude, 2026-09-30)
+- **Should a change's cost include the wakes into the epics and the Runner above it?**
+  `harbour/survey-check-4.md` found that from 13 September a wake names the child that triggered it
+  (LIN-2121), so a count by the log's `Issue:` line charges wakes into epics' autopilots and the Runner
+  to the child change: late September is 47 dispatches per correct change that way and 36 charged to
+  the session each wake entered, while the fleet-wide count reached 82 in the week of 21 September.
+  Trace September's wakes into epics' and the Runner's sessions to the child that triggered each, and
+  report what share of each change's supervision sits above it, by ticket kind, so the scorecard and
+  the steady-base map can use one rule. (Claude, 2026-09-30)
+- **Which wake edges were declared `everything` because a layer wanted progress, and which inherited
+  it?** `harbour/wake-inventory.md` found that the relayed re-arms on the coordinator→child autopilot and
+  Runner→leg edges are 92–95% quiet (version 2), and that both edges carry the stepper's `everything` level. Read the
+  commits and tickets that introduced each prompt line setting it (`lib/prompts/autopilot-kickoff.js`,
+  `docs/autopilot-operating-manual.md`, `docs/passage-runner-prompt.md`) and say, per edge, what the
+  stated reason was. A question for John as much as for the record. (Claude, 2026-09-30)
+- **How many browser specs hold a route whose URL has since changed?** `harbour/survey-check-5.md`
+  found `prompts.spec.js` holding `**/api/recommend/<id>/stream` while the client has fetched
+  `…/stream?source=…` since LIN-1910 (13 August), so the hold never engages and the test passes only
+  when the real stream is slow; its three CI-red flakes began ten days later. List every `page.route`
+  glob in `tests/e2e/` and match it against the URLs the client builds at origin/main; report the
+  holds that never engage and whether each spec has flaked or retried in green runs. (Claude, 2026-09-30)

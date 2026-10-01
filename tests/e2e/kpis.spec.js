@@ -190,9 +190,9 @@ test.describe('KPIs page', () => {
     expect(data.proxyCategories.days.length).toBe(30);
     expect(data.proxyCategoriesHourly.hours.length).toBe(24);
     // Dispatched work by kind is now a genuine 30-day daily window (LIN-1846),
-    // not the old 5×7-day = 35-day span that exceeded the 30-day history TTL.
+    // not the old 5×7-day = 35-day span that exceeded the 30-day reporting window.
     expect(data.dispatchByDay.days.length).toBe(30);
-    // The outcome trend uses 4 weekly buckets: the history TTL is 30 days, so
+    // The outcome trend uses 4 weekly buckets: the reporting window is 30 days, so
     // a full 30-day span split into whole weeks would under-fill its oldest.
     expect(data.dispatchOutcomes.weeks.length).toBe(4);
     expect(data.dispatchOutcomes.weeklyRate.length).toBe(4);

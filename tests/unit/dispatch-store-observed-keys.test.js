@@ -137,3 +137,54 @@ describe('DispatchQueueStore.listObservedWorkspaceKeys (LIN-2146, mock-collectio
     assert.deepStrictEqual(await store.listObservedWorkspaceKeys(), ['ws-solo']);
   });
 });
+
+describe('DispatchQueueStore.listObservedWorkspaceKeys — 30-day read horizon (LIN-3161 / LIN-3157 A1)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const NOW = new Date('2026-06-10T12:00:00.000Z');
+  const HORIZON_START = new Date(NOW.getTime() - 30 * DAY_MS);
+
+  function historyWith(rows) {
+    const collection = createMockCollection();
+    for (const row of rows) collection._docs.push(row);
+    return collection;
+  }
+
+  test('a workspace whose newest history row is recent is included; one whose newest row is 31 days old is excluded', async () => {
+    const historyCollection = historyWith([
+      { urlKey: 'recent-ws', dispatchedAt: new Date(NOW.getTime() - 1 * DAY_MS) },
+      { urlKey: 'dormant-ws', dispatchedAt: new Date(NOW.getTime() - 31 * DAY_MS) }
+    ]);
+    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection });
+    const keys = await store.listObservedWorkspaceKeys({ now: NOW });
+    assert.deepStrictEqual(keys, ['recent-ws']);
+  });
+
+  test('the recorded distinct filter carries the dispatchedAt bound on both collections', async () => {
+    const calls = [];
+    const distinctCollection = { distinct(field, filter) { calls.push({ field, filter }); return Promise.resolve([]); } };
+    const store = new DispatchQueueStore({ collection: distinctCollection, historyCollection: distinctCollection });
+    await store.listObservedWorkspaceKeys({ now: NOW });
+
+    assert.strictEqual(calls.length, 2, 'both the queue and history reads must be bound');
+    for (const call of calls) {
+      assert.strictEqual(call.field, 'urlKey');
+      assert.deepStrictEqual(call.filter, { dispatchedAt: { $gte: HORIZON_START } });
+    }
+  });
+
+  test('BOUNDARY BAND (m1): a history row dispatched 30.5d ago but resolved 29.5d ago is now excluded', async () => {
+    // The bound keys on dispatchedAt, while the old archive-time expiry keyed
+    // on resolvedAt — so a ≤~25h band near the cutoff flips from included to
+    // excluded. This pins the plan's one qualified behaviour change.
+    const historyCollection = historyWith([
+      {
+        urlKey: 'band-ws',
+        dispatchedAt: new Date(NOW.getTime() - 30.5 * DAY_MS),
+        resolvedAt: new Date(NOW.getTime() - 29.5 * DAY_MS)
+      }
+    ]);
+    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection });
+    const keys = await store.listObservedWorkspaceKeys({ now: NOW });
+    assert.deepStrictEqual(keys, [], 'dispatchedAt is 30d+ old, so the roster read excludes it despite a recent resolvedAt');
+  });
+});

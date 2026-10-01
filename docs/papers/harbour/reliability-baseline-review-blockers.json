@@ -1,0 +1,378 @@
+{
+ "ticket": "LIN-3149",
+ "classifiedAt": "2026-09-30",
+ "population": "Tickets in the systematic 1-in-8 shipped-ticket sample (scripts/survey-reliability-tracker.mjs shippedSample) first merged June–September 2026, whose comments show a code review and contain a review-headed comment matching a send-back pattern (request changes, blocker, ❌). The pattern over-selects; comments that were not send-backs carry no blockers.",
+ "method": "Every send-back review comment, truncated at 6,000 characters, read by three in-session subagents, one batch each, against this rubric fixed before reading; a finding repeated in a later round counted once. Not second-read.",
+ "rubric": {
+  "bug": "a correctness fault in the change under review that would have shipped wrong product behaviour had it merged: wrong output, crash/hang, broken UI, security or credential flaw, data loss, or the change not taking effect.",
+  "coverage": "missing or wrong test, witness or mutation proof, behaviour not shown wrong.",
+  "record": "a false or unsupported claim in the PR, ticket, close-out or docs.",
+  "scope-design": "scope, design preference, naming, structure, style.",
+  "process": "ledger, CI evidence, template compliance, rebase."
+ },
+ "tickets": [
+  {
+   "identifier": "LIN-516",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-533",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-572",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-583",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-628",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-1137",
+   "rounds": 1,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "next-run disclosure omits toggleClass; toggle loses next-run-dispatch-toggle class, 6 E2E fail"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-1412",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-1461",
+   "rounds": 3,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "sessionGroupId merge absorbs sibling workers' feedback; running worker falsely reported done"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-1684",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "coverage",
+     "summary": "Defensive chronological sort unpinned; deleting sort survived tests, need newest-first fixture"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-1728",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-1744",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-1801",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "Seed title span lands in grid label column; fix with grid-column: 2"
+    },
+    {
+     "class": "coverage",
+     "summary": "Add layout test that would catch title misplacement (unit tests blind)"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2068",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "Waypoint focus outline scales ~13x inside zoomed SVG, covering the map"
+    },
+    {
+     "class": "bug",
+     "summary": "Stale lastBlurredWaypointIdx steals focus from scrub slider, breaks keyboard scrubbing"
+    },
+    {
+     "class": "coverage",
+     "summary": "Label layer keyed reconcile unwitnessed by any test"
+    },
+    {
+     "class": "coverage",
+     "summary": "Label cull loop unwitnessed; orphan labels would ship unnoticed"
+    },
+    {
+     "class": "coverage",
+     "summary": "Visible label text unwitnessed by tests"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2081",
+   "rounds": 7,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "Newline-stripped PEM accepted, still fails with ERR_OSSL_UNSUPPORTED at sign"
+    },
+    {
+     "class": "bug",
+     "summary": "Four working key formats (CRLF, blank lines, whitespace) now hard-rejected"
+    },
+    {
+     "class": "bug",
+     "summary": "Unguarded beginInstall throw in async handler hangs request"
+    },
+    {
+     "class": "bug",
+     "summary": "isGitHubConfigured() drifts from shape validation; reports configured wrongly"
+    },
+    {
+     "class": "coverage",
+     "summary": "buildInstallUrl behaviour change not pinned by tests"
+    },
+    {
+     "class": "bug",
+     "summary": "Space/CR-collapsed PEM still accepted via normalizer re-adding newline"
+    },
+    {
+     "class": "coverage",
+     "summary": "Empty-body guard untested"
+    },
+    {
+     "class": "bug",
+     "summary": "Trailing per-line whitespace PEM rejected; regression takes working deployment down"
+    },
+    {
+     "class": "bug",
+     "summary": "Bad-alphabet error message echoes 64 chars of private key material"
+    },
+    {
+     "class": "bug",
+     "summary": "Stray-trailing error leaks complete second private key into logs"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2137",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-2179",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "Mobile more toggle shrinks to 7px wide, failing WCAG target size"
+    },
+    {
+     "class": "bug",
+     "summary": "Keyboard-focused tab can stay clipped in non-wrapping scrolling strip"
+    },
+    {
+     "class": "coverage",
+     "summary": "Single-row e2e guard excludes toggle, passes vacuously on reported bug"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2187",
+   "rounds": 1,
+   "blockers": [
+    {
+     "class": "scope-design",
+     "summary": "Instruction must forbid bare sentinel lines inside DECISION block; require strict JSON"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2253",
+   "rounds": 6,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "In-flight anchor lineage misclassified as noLineage (DONE-only map checked)"
+    },
+    {
+     "class": "bug",
+     "summary": "ticketMarkers parsed unsorted by dispatchedAt; latest state resolved wrong"
+    },
+    {
+     "class": "bug",
+     "summary": "noLineage seeding dilutes ignorance-disclosure shares on public /kpis"
+    },
+    {
+     "class": "scope-design",
+     "summary": "Redundant guard clause with comment misclaiming two independent guards"
+    },
+    {
+     "class": "bug",
+     "summary": "Headline numerator and denominator computed over different populations; overstates rate"
+    },
+    {
+     "class": "coverage",
+     "summary": "Issue-less overhead-lineage invariant unpinned; mutation survived"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2351",
+   "rounds": 1,
+   "blockers": [
+    {
+     "class": "scope-design",
+     "summary": "Plan misses auth-log line and timeout raisers still saying Linear"
+    },
+    {
+     "class": "bug",
+     "summary": "Planned resolvedProvider stamp placement would TDZ-error or gate on token"
+    },
+    {
+     "class": "bug",
+     "summary": "TEST_LOCAL_URL_KEY early-return branch left unstamped; stale provider on reused req"
+    },
+    {
+     "class": "record",
+     "summary": "LIN-1746 no-risk claim asserted without verification evidence"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2556",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-2575",
+   "rounds": 1,
+   "blockers": [
+    {
+     "class": "coverage",
+     "summary": "Live-branch periodicalId derivation (proxy.js:1514) unpinned; mutation survives full suite"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2632",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "Non-stream/network failure leaves stuck 'thinking…' row with in-progress pill"
+    },
+    {
+     "class": "bug",
+     "summary": "Sticky chat section overlays page; copy-prompt controls unclickable on phone"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2716",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "bug",
+     "summary": "Reorient clears storage not memory; next turn re-persists cleared conversation"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2773",
+   "rounds": 6,
+   "blockers": [
+    {
+     "class": "record",
+     "summary": "Published contract falsely says effect is null for read-only dispositions"
+    },
+    {
+     "class": "record",
+     "summary": "Corrected contract falsely guarantees declaredEffect null on read-only rows"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-2882",
+   "rounds": 1,
+   "blockers": []
+  },
+  {
+   "identifier": "LIN-2930",
+   "rounds": 3,
+   "blockers": [
+    {
+     "class": "record",
+     "summary": "Sept 2026 frontier table row malformed, drops required gate cell"
+    },
+    {
+     "class": "record",
+     "summary": "Stack Overflow survey citation URL 404s; sole source for opening date"
+    },
+    {
+     "class": "record",
+     "summary": "'Two years' elapsed claim is actually 18 months, three occurrences"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-3078",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "record",
+     "summary": "Execution hypothesis still settles runner question, contradicting LIN-2938"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-3103",
+   "rounds": 1,
+   "blockers": [
+    {
+     "class": "record",
+     "summary": "runStallFailsafe wrongly dispositioned observation-only; must be graded HIGH"
+    },
+    {
+     "class": "record",
+     "summary": "Dispatch-request validation duplication left undispositioned in report"
+    },
+    {
+     "class": "record",
+     "summary": "Largest handlers named but carry no disposition"
+    },
+    {
+     "class": "record",
+     "summary": "F-gate defect mechanism described wrongly (unanchored predicates, not regex quote)"
+    },
+    {
+     "class": "process",
+     "summary": "Adversarial Second-Read appendix must be filled in"
+    }
+   ]
+  },
+  {
+   "identifier": "LIN-3130",
+   "rounds": 2,
+   "blockers": [
+    {
+     "class": "coverage",
+     "summary": "L2 proxyTokenStore source pin vacuous; must match depth-1 keys only"
+    }
+   ]
+  }
+ ]
+}

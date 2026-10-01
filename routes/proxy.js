@@ -29,6 +29,7 @@ import { createKickoffRoutes } from './proxy-kickoff.js';
 import { createDispatchRoutes } from './proxy-dispatch.js';
 import { createProxyFlightCompanionRoutes } from './proxy-flight-companion.js';
 import { createProxyRunnerRoutes } from './proxy-runner.js';
+import { createProxyRunnerPromptRoutes } from './proxy-runner-prompt.js';
 import { BYTE_IDENTICAL_ESCALATION_THRESHOLD } from '../lib/rejected-credentials.js';
 import { STAGE_PROVIDER_LANE, STAGE_PROXY_TOKEN } from '../lib/proxy-events.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
@@ -308,7 +309,7 @@ const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
 // LIN-1470: defensive cap on the list endpoint's lineage batch query
 // (`rootItemId: {$in: anchors}`). Unlike the 200-row PAGE bound, nothing
 // structurally limits how many rows one $in query can match: it spans the
-// full 30-day history TTL, not just the current page, and — unlike the
+// full 30-day read window, not just the current page, and — unlike the
 // existing single-anchor equivalent at `_collectGroupFeedback` (the `:id`
 // watch endpoint, one anchor per request) — this one fans the same query
 // shape out across every anchor on the CURRENT PAGE (up to 200) in one call.
@@ -369,17 +370,22 @@ const RECOMMEND_DESCENT_BUDGET_MS = LLM_TIMEOUT_MS;
  * Race a promise against a timeout. Throws a TimeoutError if the promise
  * doesn't settle within `ms` milliseconds, giving the same error shape as
  * AbortSignal.timeout() so graphqlErrorStatus() maps it to 504.
+ *
+ * Clears its timer once the race settles (LIN-3158), mirroring fetchWithTimeout
+ * and the sibling helpers: an uncleared timer keeps the event loop alive for the
+ * full `ms` even after the real call already won the race, which idled the
+ * live-path unit files ~25 s each. Promise.race already swallows the timeout's
+ * later settle, so clearing changes no response semantics.
  */
 function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => {
-        const err = new DOMException('Upstream API request timed out', 'TimeoutError');
-        reject(err);
-      }, ms);
-    })
-  ]);
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new DOMException('Upstream API request timed out', 'TimeoutError');
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -1588,6 +1594,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // through untouched. `haltReadTimeoutMs` is deliberately NOT passed — it is
   // not bound in this composer, and the factory's own default applies. The
   // routes land dormant: no production path mints a `take` grant until S2b.
+  // LIN-3098 S3: the served runner prompt (routes/proxy-runner-prompt.js),
+  // GET /api/proxy/runner/prompt. Mounted BEFORE createProxyRunnerRoutes: it
+  // runs its own limiter → auth → take-grant chain and answers, so the runner
+  // sub-router's path-scoped gate never runs a second pass over it (R8).
+  router.use(createProxyRunnerPromptRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent }));
+
   router.use(createProxyRunnerRoutes({ proxyLimiter, authenticateProxyToken, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore, sessionsFeedCache }));
 
   // LIN-2620: the Flight Companion turn, over the proxy — a LIN-679 sub-router

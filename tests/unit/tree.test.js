@@ -864,9 +864,10 @@ describe('buildRecentActivityForest', () => {
   });
 
   test('surfaces a recently completed issue as a "completed" row', () => {
+    const completedAt = ago(2 * HOUR);
     const issues = [createIssue({
       id: 'done', state: { name: 'Done', type: 'completed' }, project: { id: 'proj-1' },
-      createdAt: ago(10 * DAY), completedAt: ago(2 * HOUR), updatedAt: ago(2 * HOUR)
+      createdAt: ago(10 * DAY), completedAt, updatedAt: completedAt
     })];
     const roots = rootsOf(buildRecentActivityForest(issues, projects));
     assert.strictEqual(roots.length, 1);
@@ -911,9 +912,10 @@ describe('buildRecentActivityForest', () => {
   });
 
   test('emits at most one row per issue: created-then-completed reads as "completed"', () => {
+    const completedAt = ago(1 * HOUR);
     const issues = [createIssue({
       id: 'both', state: { name: 'Done', type: 'completed' },
-      createdAt: ago(6 * HOUR), updatedAt: ago(1 * HOUR), completedAt: ago(1 * HOUR)
+      createdAt: ago(6 * HOUR), completedAt, updatedAt: completedAt
     })];
     const roots = rootsOf(buildRecentActivityForest(issues, projects));
     assert.strictEqual(roots.length, 1, 'one issue → one row (dedupe)');
@@ -921,9 +923,10 @@ describe('buildRecentActivityForest', () => {
   });
 
   test('sorts all activity kinds together, newest activity first', () => {
+    const bCompletedAt = ago(1 * HOUR);
     const issues = [
       createIssue({ id: 'a-old-created', state: { name: 'Backlog', type: 'backlog' }, createdAt: ago(5 * DAY), updatedAt: ago(5 * DAY) }),
-      createIssue({ id: 'b-recent-completed', state: { name: 'Done', type: 'completed' }, createdAt: ago(10 * DAY), completedAt: ago(1 * HOUR), updatedAt: ago(1 * HOUR) }),
+      createIssue({ id: 'b-recent-completed', state: { name: 'Done', type: 'completed' }, createdAt: ago(10 * DAY), completedAt: bCompletedAt, updatedAt: bCompletedAt }),
       createIssue({ id: 'c-recent-edited', state: { name: 'In Progress', type: 'started' }, createdAt: ago(10 * DAY), updatedAt: ago(2 * HOUR) })
     ];
     const roots = rootsOf(buildRecentActivityForest(issues, projects));
@@ -931,8 +934,9 @@ describe('buildRecentActivityForest', () => {
   });
 
   test('kinds option restricts the feed (pipeline keeps completion-only)', () => {
+    const doneCompletedAt = ago(1 * HOUR);
     const issues = [
-      createIssue({ id: 'done', state: { name: 'Done', type: 'completed' }, createdAt: ago(10 * DAY), completedAt: ago(1 * HOUR), updatedAt: ago(1 * HOUR) }),
+      createIssue({ id: 'done', state: { name: 'Done', type: 'completed' }, createdAt: ago(10 * DAY), completedAt: doneCompletedAt, updatedAt: doneCompletedAt }),
       createIssue({ id: 'new', state: { name: 'Backlog', type: 'backlog' }, createdAt: ago(2 * HOUR), updatedAt: ago(2 * HOUR) }),
       createIssue({ id: 'edited', state: { name: 'In Progress', type: 'started' }, createdAt: ago(10 * DAY), updatedAt: ago(3 * HOUR) })
     ];

@@ -97,7 +97,6 @@ export const BASE_DEPS = () => ({
     listItems: async () => [],
     listHistory: async () => ({ items: [], total: 0 }),
     getItemStatus: async () => null,
-    historyTtl: 30 * 24 * 60 * 60, // seconds
     pollAvailable: async () => [],
     takeItem: async () => null,
     addFeedback: async () => null,

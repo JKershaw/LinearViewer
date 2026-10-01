@@ -231,17 +231,12 @@ describe('GET /api/proxy/issues/:identifier/cost — store wiring', () => {
 
 describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
   test('end-to-end: worker + app costs joined, fully priced', async () => {
-    // Value pin: a real LlmCallLogStore built at its real default (no injected
-    // ttl) must actually carry .ttl === 30 days — not a hand-rolled object that
-    // hardcodes the very number this test asserts. summarizeByIssue is stubbed
-    // because a bare construction leaves this.collection undefined.
+    // LIN-3163 (LIN-3157 B): the call log is lifetime-retained and no longer
+    // exposes a `ttl`. The published /cost window is derived from the shared
+    // 30-day READ_HORIZON_DAYS (LIN-3161), never from a store retention value.
+    // summarizeByIssue is stubbed because a bare construction leaves
+    // this.collection undefined.
     const llmCallLogStore = new LlmCallLogStore();
-    // Falsy-default guard: routes/proxy.js falls back to `|| 30 * 24 * 60 *
-    // 60` when store.ttl is falsy (e.g. 0), which would silently restore
-    // days: 30 and keep the value pin below green even if the real default
-    // were changed to a falsy value. Pin the real default's ttl directly so
-    // that drift goes red too.
-    assert.equal(llmCallLogStore.ttl, 30 * 24 * 60 * 60);
     llmCallLogStore.summarizeByIssue = async (urlKey, identifier) => {
       assert.equal(urlKey, 'acme');
       assert.equal(identifier, 'LIN-42');
@@ -264,15 +259,8 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     assert.equal(body.window.days, 30);
     assert.ok(body.window.appCallsSince);
 
-    // Wiring pin: window.days must come from store.ttl, not a hardcoded 30 —
-    // a real default store alone can't prove this (its .ttl IS 30, same as the
-    // route's own fallback literal), so this uses a SECOND store built with a
-    // deliberately non-default ttl.
-    const wiringStore = new LlmCallLogStore({ ttl: 90 * 24 * 60 * 60 });
-    wiringStore.summarizeByIssue = async () => ({ calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] });
-    const { app: wiringApp } = buildApp({ history: [row()], llmCallLogStore: wiringStore });
-    const { body: wiringBody } = await get(wiringApp, '/api/proxy/issues/LIN-42/cost');
-    assert.equal(wiringBody.window.days, 90);
+    // The `window.days` wiring is now the shared read horizon, not store.ttl —
+    // see the dedicated '30-day read horizon' suite below (LIN-3161).
   });
 
   test('LIN-2615: effort and durationMs reach the wire through the route spread', async () => {
@@ -317,5 +305,50 @@ describe('GET /api/proxy/issues/:identifier/cost — response shape', () => {
     assert.equal(body.totalUsd, null);
     assert.equal(body.noLineage, true);
     assert.deepEqual(body.workerSessions, []);
+  });
+});
+
+describe('GET /api/proxy/issues/:identifier/cost — 30-day read horizon (LIN-3161 / LIN-3157 A1)', () => {
+  const HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
+
+  test('window.days is the shared 30-day horizon, not the store ttl', async () => {
+    // A store configured with lifetime-ish retention (365 d) must not widen the
+    // published window — the route derives it from READ_HORIZON_DAYS. Before
+    // A1 this read `window.days === 365`.
+    const lifetimeStore = new LlmCallLogStore({ ttl: 365 * 24 * 60 * 60 });
+    lifetimeStore.summarizeByIssue = async () => ({ calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] });
+    const { app } = buildApp({ history: [row()], llmCallLogStore: lifetimeStore });
+    const { status, body } = await get(app, '/api/proxy/issues/LIN-42/cost');
+
+    assert.equal(status, 200);
+    assert.equal(body.window.days, 30);
+    const ageMs = Date.now() - new Date(body.window.appCallsSince).getTime();
+    assert.ok(Math.abs(ageMs - HORIZON_MS) < 5000, `expected appCallsSince ~30d ago, got ${Math.round(ageMs / 86400000)} days`);
+  });
+
+  test('the horizon `since` reaches both listHistory calls and summarizeByIssue', async () => {
+    let summarizeOpts = null;
+    const store = new LlmCallLogStore();
+    store.summarizeByIssue = async (urlKey, identifier, opts = {}) => {
+      summarizeOpts = opts;
+      return { calls: 0, costUsd: 0, unpricedCalls: 0, byFeature: [] };
+    };
+    const { app, historyCalls } = buildApp({ history: [row()], llmCallLogStore: store });
+    await get(app, '/api/proxy/issues/LIN-42/cost');
+
+    const pageCall = pageCallOf(historyCalls);
+    const lineageCall = lineageCallOf(historyCalls);
+    assert.ok(pageCall, 'expected the issue-scoped page call');
+    assert.ok(lineageCall, 'expected the lineage batch call');
+
+    const lo = Date.now() - HORIZON_MS - 5000;
+    const hi = Date.now() - HORIZON_MS + 5000;
+    for (const [label, call] of [['page', pageCall], ['lineage', lineageCall]]) {
+      assert.ok(call.since instanceof Date, `${label} call must carry a Date since`);
+      assert.ok(call.since.getTime() >= lo && call.since.getTime() <= hi, `${label} since must be ~30d ago`);
+    }
+    assert.ok(summarizeOpts, 'summarizeByIssue must be called');
+    assert.ok(summarizeOpts.since instanceof Date, 'summarizeByIssue must receive a Date since');
+    assert.ok(summarizeOpts.since.getTime() >= lo && summarizeOpts.since.getTime() <= hi, 'summarizeByIssue since must be ~30d ago');
   });
 });

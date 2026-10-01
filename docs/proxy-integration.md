@@ -13,7 +13,7 @@ The API is **source-neutral**: it exposes one provider-backed contract (flat sha
 - Read/write scope separation (`read` for queries, `readWrite` for mutations)
 - Single-use token support (consumed after first request)
 - Full CRUD: issues, comments, relations, labels, cycles
-- Event audit logging (all API calls tracked with 30-day retention)
+- Event audit logging (audit events are **retained for the life of the project**)
 - Rate limiting (60 requests/minute per IP)
 - Workspace isolation (tokens are scoped to a single workspace)
 
@@ -213,6 +213,21 @@ body itself is the runner-prompt ticket's (LIN-3098); this is only the credentia
 | another account owns the workspace | 403 | `GRANT_OWNER_ONLY` |
 | owner check unwired, erroring, or a corrupt merge chain | 503 (retryable) | `OWNER_CHECK_UNAVAILABLE` |
 | body carries `grants` | 400 | `GRANTS_NOT_CLIENT_SETTABLE` |
+
+### The runner prompt (LIN-3098)
+
+- **`GET /api/proxy/runner/prompt`** (requires `take`; any other token gets `403
+  TAKE_GRANT_REQUIRED`) returns the runner prompt as `text/plain`: the pasteable instructions that
+  make a Claude Code session this workspace's runner. It is `docs/runner-prompt.md` at HEAD, with
+  the runner lifetimes, halt modes, feedback kinds, the kit's thresholds and this request's base
+  URL filled in (`lib/prompts/runner-kickoff.js`). It is mounted before the other runner routes
+  and runs its own limiter → auth → grant chain.
+- **`GET /runner-kit/{broker.mjs|runner.mjs}`** (public, no token) serves the runner kit
+  (`lib/runner-kit/`) byte-for-byte. The prompt pins each file's sha256, and the session verifies
+  the kit before it runs anything; a mismatch means the prompt predates a deploy and must be
+  copied again.
+- The session never hands a subagent a token: each taken item gets its own local broker on a
+  same-user Unix socket (`broker.mjs`), and subagents call it with `curl --unix-socket`.
 
 
 ### Using the Token
@@ -1070,10 +1085,11 @@ matching zero rows and returning an authoritative-looking `$0.00`.
   chain is counted **once per lineage**, never once per dispatch row — summing rows
   directly would multiply-count that lineage by its dispatch count. `workerSessions`
   reports one entry per lineage (keyed by `rootItemId`), not per dispatch row.
-- **Retention window**: `window.days` (default 30) is how far back app-call figures
-  reach — both the llm-call-log's TTL and the dispatch history's retention default to
-  30 days, so `appCalls`/`workerSessions` are silently blind to anything older, which
-  this field makes machine-readable instead of doc-only.
+- **Retention vs read window**: `window.days` (fixed 30) is how far back app-call
+  figures reach — a **read window**, not retention. The app-call log and dispatch
+  history are **retained for the life of the project**, so older rows still exist;
+  this field reports the fixed window the figures are drawn from, not a pruning
+  boundary. `appCalls`/`workerSessions` are scoped to that window.
 - **Known limitation**: a lineage spanning two issues (a follow-up filed under a
   different issue than its parent — already an accepted, documented behavior for the
   `/dispatch` list route's status/completedAt join) is reported under **both** issues'
@@ -1270,14 +1286,12 @@ decide for itself whether a periodical is due.
   both `status: "taken"` **and** carries a terminal `done`/`complete` feedback marker
   (LIN-2385) — a claim that was taken and then failed, or never reported, does not count and
   does not reset the cadence clock; `"due"` — the cadence has elapsed since the last run; `"never"` — **no evidence in the
-  full retained history window**, which is a *bounded* claim, not "ever ran" — a workspace
-  that only recently started dispatching periodicals, or whose history retention is shorter
-  than the read horizon, reads `"never"` the same as one that has genuinely never run this
-  template; `"unknown"` — the read horizon is narrower than the store's retention window, so
-  absence isn't conclusive. `"unknown"` is **not produced by any deployment today** (both the
-  read horizon and the store's retention default to 30 days, so they're always equal) — it
-  becomes reachable only if a future caller narrows the horizon below the store's retention,
-  or an operator configures a longer retention than the fixed 30-day horizon this route uses.
+  30-day read window**, which is a *bounded* claim, not "ever ran" — the window is this
+  route's fixed 30-day READ horizon and evidence is **retained for the life of the
+  project**, so the bound is a read horizon, not a retention period; `"unknown"` —
+  the read horizon is narrower than the reporting window, so absence isn't conclusive.
+  `"unknown"` is **not produced by any deployment today** (the read horizon is the only
+  window and it is 30 days) — it is reserved for a future caller that narrows the horizon.
 - **`lastDispatchedAt`** (top-level) is the most recent matched **history** run's timestamp
   (ISO-8601), `null` when there is none in the window. A live queued run does not update it —
   it only drives `state: "recent"`.
@@ -1610,7 +1624,7 @@ Content-Type: application/json
 
 > **Canonical path:** `POST /api/proxy/agent/status`. The older `POST /api/proxy/foreman/status` remains a forgiving, deprecated alias (identical handler and payload) so existing consumers keep working — prefer `agent/status` going forward.
 
-**Requires `readWrite`.** Append-only progress log (30-day TTL). Each entry is attributed to the posting token so the UI can group entries into sessions.
+**Requires `readWrite`.** Append-only progress log, **retained for the life of the project**. Each entry is attributed to the posting token so the UI can group entries into sessions.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -1630,7 +1644,7 @@ GET /api/proxy/agent/status?limit={n}&offset={n}&tokenId={id}&taskIdentifier={id
 
 > **Canonical path:** `GET /api/proxy/agent/status`. The older `GET /api/proxy/foreman/status` remains a forgiving, deprecated alias going forward.
 
-Lists recent status entries, newest first. `limit` is 1-100 (default 20). Optional `tokenId` (filter to one session; use `__unattributed__` for entries with no token) and `taskIdentifier` (filter to one task thread).
+Lists status entries, newest first, paging over the workspace's **full retained history** (status is retained for the life of the project). `limit` is 1-100 (default 20). Optional `tokenId` (filter to one session; use `__unattributed__` for entries with no token) and `taskIdentifier` (filter to one task thread).
 
 ```json
 {
@@ -2610,7 +2624,7 @@ curl -s -X POST -H "$AUTH" -H "Content-Type: application/json" \
 - Tokens can be revoked at any time from the proxy page
 - Each token is scoped to a single workspace
 - Single-use tokens are consumed after first successful request
-- All API calls are logged in the event audit trail (30-day retention)
+- All API calls are logged in the event audit trail (**retained for the life of the project**)
 
 ## Rate Limits
 

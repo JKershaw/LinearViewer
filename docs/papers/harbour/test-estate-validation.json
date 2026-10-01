@@ -1,0 +1,852 @@
+[
+  {
+    "id": 1,
+    "repo": "lv",
+    "file": "tests/e2e/swipe.spec.js",
+    "line": 439,
+    "name": "shows the empty state for an issue with no sessions",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "Playwright spec: opens swipe page, asserts empty-state UI"
+  },
+  {
+    "id": 2,
+    "repo": "lv",
+    "file": "tests/unit/flight-companion-client.test.js",
+    "line": 3825,
+    "name": "a failed turn rolls back both the rendered proposal and the unanswered user message",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Drives sandboxed client submit with failing SSE; asserts chat history rolled back"
+  },
+  {
+    "id": 3,
+    "repo": "lv",
+    "file": "tests/unit/dispatch-wake.test.js",
+    "line": 77,
+    "name": "terminals + [blocked] ALWAYS bubble on a terminal-only edge",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls buildWakeFollowUp per marker; asserts a wake descriptor returned"
+  },
+  {
+    "id": 4,
+    "repo": "lv",
+    "file": "tests/unit/credential-state.test.js",
+    "line": 35,
+    "name": "a null token id stays `unknown` even when the index has verdicts",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls resolveCredentialState; asserts returned state value"
+  },
+  {
+    "id": 5,
+    "repo": "sd",
+    "file": "test/feedback-metadata.test.js",
+    "line": 361,
+    "name": "postStatusFeedback falls back to itemId when rootItemId is undefined",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls postStatusFeedback with mocked fetch; asserts posted body rootItemId"
+  },
+  {
+    "id": 6,
+    "repo": "lv",
+    "file": "tests/unit/lin-2550-assignee-label-tracks-applied-filter.test.js",
+    "line": 201,
+    "name": "${label}: no filter requested at all is unchanged",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Runs dashboard route with stubs; asserts render options selectedAssignee"
+  },
+  {
+    "id": 7,
+    "repo": "sd",
+    "file": "test/terminal-selection.test.js",
+    "line": 75,
+    "name": "the default kick-off prompt (summaryPrompt omitted) is a bare summarise with no Stop-hook pre-authorisation (LIN-1360)",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Asserts composed kickoff prompt wording present/absent via regex"
+  },
+  {
+    "id": 8,
+    "repo": "lv",
+    "file": "tests/unit/autopilot-kickoff.test.js",
+    "line": 296,
+    "name": "the \"pause for the human\" bullet cites the handbook section by name, matching the runtime kickoff",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Reads docs/autopilot-kickoff.md; asserts bullet wording present/absent"
+  },
+  {
+    "id": 9,
+    "repo": "lv",
+    "file": "tests/unit/brief-cache.test.js",
+    "line": 31,
+    "name": "is stable for equal inputs and changes with the description",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls hashContext; asserts stable/changing hash values"
+  },
+  {
+    "id": 10,
+    "repo": "lv",
+    "file": "tests/unit/lin-1524-legacy-no-accountid-accepted-behaviour.test.js",
+    "line": 114,
+    "name": "handleUnauthorizedError\\'s 401 gate does not read workspace.refreshToken — accepted, per the option-A decision (do not reintroduce this as a \"fix\" without revisiting LIN-1524)",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Slices server.js source text; asserts pattern absent"
+  },
+  {
+    "id": 11,
+    "repo": "sd",
+    "file": "test/system/launch-pacing.test.js",
+    "line": 32,
+    "name": "window-saturation: a fresh launch is HELD (not claimed, not failed) when iTerm is over the window cap, then launches once windows free up",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "simple-dispatcher test/system full-system harness launch-pacing scenario"
+  },
+  {
+    "id": 12,
+    "repo": "lv",
+    "file": "tests/unit/workspace-token-eviction-census.test.js",
+    "line": 170,
+    "name": "ensureValidToken evicts before its remaining>0 branch, so BOTH arms are covered",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Reads server.js source; asserts ordering of call substrings"
+  },
+  {
+    "id": 13,
+    "repo": "sd",
+    "file": "test/feedback.test.js",
+    "line": 113,
+    "name": "does not throw on 404 response",
+    "handClass": "behavioural",
+    "confidence": "low",
+    "reason": "Calls sendFeedback on 404; only implicit no-throw assertion"
+  },
+  {
+    "id": 14,
+    "repo": "lv",
+    "file": "tests/unit/lin-2533-agent-status-extraction.test.js",
+    "line": 58,
+    "name": "routes/proxy-agent-status.js carries both array-path registrations",
+    "handClass": "census",
+    "confidence": "low",
+    "reason": "Counts occurrences of registration pattern in route source files; exact count"
+  },
+  {
+    "id": 15,
+    "repo": "sd",
+    "file": "test/hook-decision.test.js",
+    "line": 684,
+    "name": "FAILED → failed (FAILED phase, terminal), carrying the [failed] wake marker + detail",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls decideHookAction; asserts action type, phase, detail, status"
+  },
+  {
+    "id": 16,
+    "repo": "lv",
+    "file": "tests/unit/proxy-preamble.test.js",
+    "line": 308,
+    "name": "real registered provider parity: every endpoint the rendered hint names is supports()-true for that provider (discharges review \"What CI Did Not Prove\" item 1)",
+    "handClass": "behavioural",
+    "confidence": "low",
+    "reason": "Builds preamble with real providers; asserts provider supports() for named endpoints"
+  },
+  {
+    "id": 17,
+    "repo": "sd",
+    "file": "test/dispatch-source.test.js",
+    "line": 224,
+    "name": "the LATCHING credential-dead poll -> { status, ok:false, body } (finding A: not {credentialDead:true} yet — that\\'s only the short-circuit)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Polls http dispatch source with stub fetch; asserts lastPollOutcome shape"
+  },
+  {
+    "id": 18,
+    "repo": "lv",
+    "file": "tests/unit/ship-layout-parity.test.js",
+    "line": 226,
+    "name": "degenerate: all-backlog workspace with the filter on",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Compares lib vs client buildSegments output for parity"
+  },
+  {
+    "id": 19,
+    "repo": "lv",
+    "file": "tests/unit/workspace.test.js",
+    "line": 1266,
+    "name": "returns null for undefined workspaces",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls getActiveWorkspace; asserts null returned"
+  },
+  {
+    "id": 20,
+    "repo": "lv",
+    "file": "tests/unit/proxy-token-grants.test.js",
+    "line": 305,
+    "name": "a seam returning a non-function is treated as unwired (fails closed)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls store.mintGrantBootstrap with bad seam; asserts refusal code/status"
+  },
+  {
+    "id": 21,
+    "repo": "sd",
+    "file": "test/system/boot.test.js",
+    "line": 28,
+    "name": "a dispatch queued via the real route is polled back by the real dispatcher transport",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "simple-dispatcher test/system: real route dispatch polled by real transport"
+  },
+  {
+    "id": 22,
+    "repo": "sd",
+    "file": "test/hook-decision.test.js",
+    "line": 702,
+    "name": "BLOCKED → blocked (BLOCKED phase)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls decideHookAction; asserts blocked type and phase"
+  },
+  {
+    "id": 23,
+    "repo": "lv",
+    "file": "tests/unit/proxy-route-internal-read-backstop.test.js",
+    "line": 179,
+    "name": "site 5 — POST …/labels with issueLabels missing",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls proxy route on app with stub provider; asserts declined response"
+  },
+  {
+    "id": 24,
+    "repo": "sd",
+    "file": "test/pacing.test.js",
+    "line": 150,
+    "name": "window saturation takes PRECEDENCE over a concurrent cold-start (the harder ceiling)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls freshLaunchDeferReason; asserts returned reason"
+  },
+  {
+    "id": 25,
+    "repo": "sd",
+    "file": "test/e2e-smoke.test.js",
+    "line": 185,
+    "name": "ignores sidechain (sub-agent) turns",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls latestAssistantText on sidechain lines; asserts null"
+  },
+  {
+    "id": 26,
+    "repo": "lv",
+    "file": "tests/unit/proxy-halt.test.js",
+    "line": 137,
+    "name": "GET succeeds with a read-scope token (read scope is enough, as with the agent-status GET)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "HTTP GET on built app; asserts 200 status and JSON body"
+  },
+  {
+    "id": 27,
+    "repo": "lv",
+    "file": "tests/unit/lin-2803-settings-flash-census.test.js",
+    "line": 73,
+    "name": "providerNoticeFromQuery never attaches `activate` for a provider whose add creates a separate workspace",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Extracts providerNoticeFromQuery source text; asserts regex present"
+  },
+  {
+    "id": 28,
+    "repo": "lv",
+    "file": "tests/unit/trashed-signal.test.js",
+    "line": 135,
+    "name": "/issues/:id handler applies the trashed signal",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Regex-matches routes/proxy-reads.js source text"
+  },
+  {
+    "id": 29,
+    "repo": "lv",
+    "file": "tests/unit/tree.test.js",
+    "line": 785,
+    "name": "without subtree blocked-ness the harness/provider is blind → identifier order (the red baseline)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls selectFocusSubtask; asserts chosen identifier"
+  },
+  {
+    "id": 30,
+    "repo": "lv",
+    "file": "tests/unit/periodicals.test.js",
+    "line": 986,
+    "name": "first-party remit is FLOW / Core-happy-path / Configuration / the portfolio scorecard",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Asserts periodical generated prompt contains remit wording regexes"
+  },
+  {
+    "id": 31,
+    "repo": "sd",
+    "file": "test/harbour-token-mcp-server.test.js",
+    "line": 72,
+    "name": "initialize falls back to a default version when the client sends none",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls buildInitializeResult; asserts protocolVersion default present"
+  },
+  {
+    "id": 32,
+    "repo": "lv",
+    "file": "tests/unit/north-star-resolver.test.js",
+    "line": 178,
+    "name": "strips trailing spaces/tabs on interior lines without touching their text",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls normalizeNorthStarText; asserts normalized output"
+  },
+  {
+    "id": 33,
+    "repo": "sd",
+    "file": "test/process-item.test.js",
+    "line": 698,
+    "name": "an unlisted kind (e.g. 'wake') keeps the historical bootstrap — the fail-safe default arm",
+    "handClass": "behavioural",
+    "confidence": "low",
+    "reason": "Runs processPolledItem; asserts session phase, launch prompt and feedback wording"
+  },
+  {
+    "id": 34,
+    "repo": "sd",
+    "file": "test/links.test.js",
+    "line": 364,
+    "name": "no top-level production module other than links.js contains an https?-style URL regex pattern",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Greps root .js files for URL-regex pattern; only links.js allowed"
+  },
+  {
+    "id": 35,
+    "repo": "lv",
+    "file": "tests/e2e/proxy.spec.js",
+    "line": 2765,
+    "name": "the panel is not visible when the proxy flag is off (the page redirects)",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "Playwright spec: page redirects and panel absent"
+  },
+  {
+    "id": 36,
+    "repo": "lv",
+    "file": "tests/unit/passage-planner-kickoff.test.js",
+    "line": 30,
+    "name": "does not start with the doc H1 title",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Builds passage planner kickoff; asserts text does not start with title"
+  },
+  {
+    "id": 37,
+    "repo": "sd",
+    "file": "test/system/local-halt.test.js",
+    "line": 133,
+    "name": "pause: an abort is still claimed and cancels its target",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "simple-dispatcher test/system full harness: abort under local pause"
+  },
+  {
+    "id": 38,
+    "repo": "lv",
+    "file": "tests/unit/bash-tool.test.js",
+    "line": 24,
+    "name": "setup temp dir",
+    "handClass": "other",
+    "confidence": "high",
+    "reason": "Setup step creating temp dir; no assertions"
+  },
+  {
+    "id": 39,
+    "repo": "sd",
+    "file": "test/claude-md-anchor-resolver.test.js",
+    "line": 185,
+    "name": "EXPECTED_HEADINGS covers exactly the area docs that exist, both ways",
+    "handClass": "census",
+    "confidence": "high",
+    "reason": "Asserts EXPECTED_HEADINGS map equals set of existing area docs"
+  },
+  {
+    "id": 40,
+    "repo": "sd",
+    "file": "test/zero-tool-done-guard-runtime.test.js",
+    "line": 705,
+    "name": "unarmed: marker matches the real dispatchedPrompt end-to-end",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Runs stall failsafe and Stop hook; asserts phases and injected content"
+  },
+  {
+    "id": 41,
+    "repo": "sd",
+    "file": "test/claude-md-anchor-resolver.test.js",
+    "line": 198,
+    "name": "CLAUDE.md\\'s \"Where the detail lives\" lists exactly the area docs that exist, both ways",
+    "handClass": "census",
+    "confidence": "high",
+    "reason": "CLAUDE.md doc map must list exactly the existing area docs"
+  },
+  {
+    "id": 42,
+    "repo": "sd",
+    "file": "test/hook-decision.test.js",
+    "line": 902,
+    "name": "PENDING-EXTERNAL → defer, HOLDABLE (arms — a coordination pause a follow-up can signal into)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls decideHookAction; asserts holdable defer outcome"
+  },
+  {
+    "id": 43,
+    "repo": "sd",
+    "file": "test/feedback.test.js",
+    "line": 120,
+    "name": "does not throw on 429 response",
+    "handClass": "behavioural",
+    "confidence": "low",
+    "reason": "Calls sendFeedback on 429; only implicit no-throw assertion"
+  },
+  {
+    "id": 44,
+    "repo": "sd",
+    "file": "test/verify-defer.test.js",
+    "line": 366,
+    "name": "resolves a registered Agent via a task-id + status notification with no tool-use-id",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls outstandingAsyncWait on transcript lines; asserts null"
+  },
+  {
+    "id": 45,
+    "repo": "sd",
+    "file": "test/system/wake-invariants.test.js",
+    "line": 112,
+    "name": "a beat stamped with a PARENT sessionId wakes the parent, and the producing beat is never its own wake target",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "simple-dispatcher test/system full harness wake invariants"
+  },
+  {
+    "id": 46,
+    "repo": "lv",
+    "file": "tests/unit/reply-delivery-contract.test.js",
+    "line": 611,
+    "name": "the helper block is DOM-free — no document.* or window.ChatUI reference, by contract (LIN-2200/LIN-1728: every caller supplies its own UI)",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Slices common.js source; asserts no document./ChatUI references"
+  },
+  {
+    "id": 47,
+    "repo": "sd",
+    "file": "test/zero-tool-done-guard-runtime.test.js",
+    "line": 722,
+    "name": "broker-armed, re-arm succeeds: marker matches the content-free nudge end-to-end",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Runs stall failsafe and Stop hook; asserts phases and injected nudge"
+  },
+  {
+    "id": 48,
+    "repo": "lv",
+    "file": "tests/unit/collective-roster.test.js",
+    "line": 92,
+    "name": "a nick with no matching roster entry produces no self marker",
+    "handClass": "text pin",
+    "confidence": "low",
+    "reason": "Builds participant prompt; asserts self-marker text absent"
+  },
+  {
+    "id": 49,
+    "repo": "lv",
+    "file": "tests/unit/prompt-templates.test.js",
+    "line": 4341,
+    "name": "does not restate the manual rubric prose (one-source-of-truth)",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Generates prompts; asserts rubric prose strings absent"
+  },
+  {
+    "id": 50,
+    "repo": "sd",
+    "file": "test/feedback.test.js",
+    "line": 105,
+    "name": "does not throw on network error",
+    "handClass": "behavioural",
+    "confidence": "low",
+    "reason": "Calls sendFeedback on network error; only implicit no-throw assertion"
+  },
+  {
+    "id": 51,
+    "repo": "lv",
+    "file": "tests/unit/credential-lifecycle-observability.test.js",
+    "line": 449,
+    "name": "an owner_mismatch classification durably records an owner_mismatch_503 event carrying the same diagnostic the console.warn line already computes",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Slices server.js source near console.warn; regex matches"
+  },
+  {
+    "id": 52,
+    "repo": "lv",
+    "file": "tests/unit/github-auth.test.js",
+    "line": 612,
+    "name": "GET callback (install path) surfaces the truncation note when the provider read was capped (LIN-2820)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Invokes GitHub callback handler; asserts rendered HTML has truncation note"
+  },
+  {
+    "id": 53,
+    "repo": "sd",
+    "file": "test/followup.test.js",
+    "line": 160,
+    "name": "resumes (not signals) a session whose hold already expired to COMPLETED — correctness ≠ the hold",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls resolveFollowUpTarget; asserts resume decision"
+  },
+  {
+    "id": 54,
+    "repo": "sd",
+    "file": "test/halt.test.js",
+    "line": 294,
+    "name": "tie-break source naming local > auto when harbour asserts nothing",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls resolveEffectiveHalt; asserts mode and source"
+  },
+  {
+    "id": 55,
+    "repo": "lv",
+    "file": "tests/unit/lin-3134-declared-mint-census.test.js",
+    "line": 111,
+    "name": "_formatItem / _formatHistoryItem bodies contain no spread and neither token",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Reads dispatch-store.js; asserts method bodies lack spread/tokens"
+  },
+  {
+    "id": 56,
+    "repo": "sd",
+    "file": "test/terminal-override-process.test.js",
+    "line": 52,
+    "name": "a payload terminal rides into launchCli opts AND the session record",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Runs processPolledItem; asserts launch opts and session record carry terminal"
+  },
+  {
+    "id": 57,
+    "repo": "lv",
+    "file": "tests/e2e/next-run.spec.js",
+    "line": 704,
+    "name": "a failed proxy-token mint surfaces as failure, not a bare dispatch (LIN-645/LIN-1162)",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "Playwright spec: mocked 503 dispatch surfaces failure in UI"
+  },
+  {
+    "id": 58,
+    "repo": "lv",
+    "file": "tests/unit/render-empty-state.test.js",
+    "line": 16,
+    "name": "tag selects the wrapper element (roadmap/pipeline use p)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls renderEmptyState; asserts exact HTML output"
+  },
+  {
+    "id": 59,
+    "repo": "lv",
+    "file": "tests/e2e/settings.spec.js",
+    "line": 77,
+    "name": "model pricing hint updates with the selected model (LIN-993)",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "Playwright spec: selecting model updates pricing hint"
+  },
+  {
+    "id": 60,
+    "repo": "sd",
+    "file": "test/pacing.test.js",
+    "line": 83,
+    "name": "defaults to the transcriptPath-only check when isSettled is not supplied (back-compat)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls coldStartingHookSessions; asserts count"
+  },
+  {
+    "id": 61,
+    "repo": "lv",
+    "file": "tests/e2e/proxy-bootstrap.spec.js",
+    "line": 55,
+    "name": "a bootstrap token is rejected on a data endpoint (containment), without being consumed",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "Playwright spec: bootstrap token rejected 401 then still exchanges"
+  },
+  {
+    "id": 62,
+    "repo": "lv",
+    "file": "tests/unit/lin-2216-transient-vs-terminal-auth.test.js",
+    "line": 404,
+    "name": "an issue-scoped kickoff whose context fetch hits a credential our own records already believe is dead returns a terminal 401 with the same code",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "POSTs kickoff route; asserts 401 status and JSON code"
+  },
+  {
+    "id": 63,
+    "repo": "sd",
+    "file": "test/build-window-title.test.js",
+    "line": 31,
+    "name": "keeps whitelist punctuation that shows up in real ids/labels (._-:/#)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls buildWindowTitle; asserts exact title"
+  },
+  {
+    "id": 64,
+    "repo": "lv",
+    "file": "tests/unit/swim-lanes.test.js",
+    "line": 158,
+    "name": "filters out terminal-state issues by default (completed/canceled/duplicate)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls assignLanes; asserts terminal-state issues filtered"
+  },
+  {
+    "id": 65,
+    "repo": "sd",
+    "file": "test/system/launch-pacing.test.js",
+    "line": 179,
+    "name": "launch-breaker-open also holds a RESUME follow-up",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "simple-dispatcher test/system full harness: breaker holds resume"
+  },
+  {
+    "id": 66,
+    "repo": "sd",
+    "file": "test/tool-activity-relay.test.js",
+    "line": 162,
+    "name": "is a no-op (no post, no commit) when there is nothing new since the cursor",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls postToolActivityDelta; asserts no fetch and no commit"
+  },
+  {
+    "id": 67,
+    "repo": "sd",
+    "file": "test/stall-failsafe.test.js",
+    "line": 44,
+    "name": "contains DECISION_EMIT_INSTRUCTION",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Asserts REFIRE_PROMPT includes decision emit instruction text"
+  },
+  {
+    "id": 68,
+    "repo": "lv",
+    "file": "tests/unit/recommendation-context-fetch.test.js",
+    "line": 75,
+    "name": "fetchRecommendationContext uses the lean focused-child fetch, not a second full fetch",
+    "handClass": "source scan",
+    "confidence": "high",
+    "reason": "Regex-matches Linear provider source for fetch call shape"
+  },
+  {
+    "id": 69,
+    "repo": "lv",
+    "file": "tests/unit/swipe-sort.test.js",
+    "line": 252,
+    "name": "handles chain: A blocks B blocks C",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls applyBlockingOrder; asserts resulting order"
+  },
+  {
+    "id": 70,
+    "repo": "sd",
+    "file": "test/process-followup.test.js",
+    "line": 614,
+    "name": "throttles the waiting log: an item that stays queued across many polls logs the wait ONCE",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Runs processPolledItem repeatedly; asserts status and single log line"
+  },
+  {
+    "id": 71,
+    "repo": "sd",
+    "file": "test/verify-defer.test.js",
+    "line": 667,
+    "name": "defers while the Monitor is still registered and unstopped",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls decideHookAction with Monitor lines; asserts defer"
+  },
+  {
+    "id": 72,
+    "repo": "lv",
+    "file": "tests/unit/scheduler.test.js",
+    "line": 421,
+    "name": "(i) F-D: register() called twice against the same collection (a second boot) seeds ",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Registers scheduler twice on collection; asserts one lock doc"
+  },
+  {
+    "id": 73,
+    "repo": "lv",
+    "file": "tests/unit/observation-scan-due.test.js",
+    "line": 437,
+    "name": "survives loadMoreDueChecks — an in-progress selection is not dropped by pagination",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Drives sandboxed client pagination; asserts selection preserved"
+  },
+  {
+    "id": 74,
+    "repo": "lv",
+    "file": "tests/unit/workspace-accesstoken-linear-egress-census.test.js",
+    "line": 94,
+    "name": "exactly 2 statically Linear-bound GraphQL clients are constructed outside tests",
+    "handClass": "census",
+    "confidence": "high",
+    "reason": "Counts GraphQLClient constructions across files; asserts exact total"
+  },
+  {
+    "id": 75,
+    "repo": "sd",
+    "file": "test/pacing.test.js",
+    "line": 27,
+    "name": "is true for the hook-substrate targets (cli / web)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls isFreshHookLaunch; asserts true for cli/web"
+  },
+  {
+    "id": 76,
+    "repo": "lv",
+    "file": "tests/unit/email-auth-csrf.test.js",
+    "line": 248,
+    "name": "a cookie but no nonce, or the wrong one: 403, no token issued, no Set-Cookie",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Posts form via harness; asserts 403, no cookie, no link"
+  },
+  {
+    "id": 77,
+    "repo": "sd",
+    "file": "test/system/auto-pause.test.js",
+    "line": 81,
+    "name": "engages after sustained real poll failures (logged source: auto), and the first successful poll after Harbour restarts clears it and launches the item",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "simple-dispatcher test/system full harness: auto-pause across Harbour restart"
+  },
+  {
+    "id": 78,
+    "repo": "lv",
+    "file": "tests/unit/lin-3134-followup-sites.test.js",
+    "line": 728,
+    "name": "A4 attach selector false (attachProxy:false) and pbt guard false (prose) -> spy 0, record carried",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Runs follow-up site against seeded world; asserts no mint, record carried"
+  },
+  {
+    "id": 79,
+    "repo": "lv",
+    "file": "tests/unit/openrouter.test.js",
+    "line": 697,
+    "name": "a terminal task WITH open children is told to descend, not close (Scenario J)",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Builds meta prompt; asserts open-children branch wording present"
+  },
+  {
+    "id": 80,
+    "repo": "sd",
+    "file": "test/stall-failsafe.test.js",
+    "line": 76,
+    "name": "the bare REFIRE_PROMPT never carries WITHDRAW_EMIT_INSTRUCTION (F1 regression pin)",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Asserts REFIRE_PROMPT does not include withdraw instruction text"
+  },
+  {
+    "id": 81,
+    "repo": "lv",
+    "file": "tests/unit/digest-feedback-freshness.test.js",
+    "line": 33,
+    "name": "seeded-empty: feedbackVersion:0, feedbackDigest:null -> not fresh",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Calls isFreshDigest; asserts false"
+  },
+  {
+    "id": 82,
+    "repo": "lv",
+    "file": "tests/unit/dashboard-routes.test.js",
+    "line": 4626,
+    "name": "buildSessionPayload back-compat: an errored session with NO done touched task stays \"error\" (default-false path unchanged)",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Polls dashboard router; asserts read count and session status"
+  },
+  {
+    "id": 83,
+    "repo": "sd",
+    "file": "test/tmux-driver-process.test.js",
+    "line": 173,
+    "name": "closeWindow kills the session AND reaps the pane process",
+    "handClass": "behavioural",
+    "confidence": "high",
+    "reason": "Launches real tmux session and closes; asserts session and process gone"
+  },
+  {
+    "id": 84,
+    "repo": "lv",
+    "file": "tests/unit/prompt-templates.test.js",
+    "line": 3035,
+    "name": "(g8) close-out still emits no literal \"Linear\" with the archive+prune section included (LIN-177 parity)",
+    "handClass": "text pin",
+    "confidence": "high",
+    "reason": "Generates close-out prompt; asserts section present and no \"Linear\""
+  },
+  {
+    "id": 85,
+    "repo": "lv",
+    "file": "tests/e2e/proxy.spec.js",
+    "line": 188,
+    "name": "tokens list is sorted newest-first",
+    "handClass": "e2e",
+    "confidence": "high",
+    "reason": "Playwright spec: creates tokens via API, asserts newest-first order"
+  }
+]

@@ -217,19 +217,19 @@ describe('foldPeriodicalRuns — all four states', () => {
     assert.equal(result.state, 'recent');
   });
 
-  test('never: no matched row at all, and the horizon is not narrower than the store\'s retention', () => {
+  test('never: no matched row at all, and the horizon is not narrower than the reference read window', () => {
     const t = template();
     const [result] = foldPeriodicalRuns([t], {}, { now: NOW, horizonMs: DEFAULT_HORIZON_MS, historyTtlMs: HISTORY_TTL_MS });
     assert.equal(result.state, 'never');
   });
 
-  test('unknown (synthetic): no matched row, horizon narrower than the store\'s retention', () => {
+  test('unknown (synthetic): no matched row, horizon narrower than the reference read window', () => {
     // Unreachable by any production caller at HEAD — both `horizonMs` and the
-    // store's `historyTtlMs` default to 30 days, so `effectiveHorizonMs`
-    // always equals `historyTtlMs` in production. This fixture forces
-    // `horizonMs < historyTtlMs` to exercise the defensive branch directly,
-    // per research beat 3 §2 — kept so a future reader does not delete it as
-    // dead code.
+    // reference `historyTtlMs` read-window input default to 30 days, so
+    // `effectiveHorizonMs` always equals `historyTtlMs` in production. This
+    // fixture forces `horizonMs < historyTtlMs` to exercise the defensive
+    // branch directly, per research beat 3 §2 — kept so a future reader does
+    // not delete it as dead code.
     const t = template();
     const [result] = foldPeriodicalRuns([t], {}, { now: NOW, horizonMs: 7 * DAY_MS, historyTtlMs: HISTORY_TTL_MS });
     assert.equal(result.state, 'unknown');
@@ -738,7 +738,7 @@ describe('foldPeriodicalRuns — effective horizon filters history rows, not jus
     assert.equal(result.state, 'never');
   });
 
-  test('a taken row older than the store\'s own retention (40d, 30d TTL) is excluded, not read as due', () => {
+  test('a taken row older than the 30-day read window (40d) is excluded, not read as due', () => {
     const t = template();
     const rows = { historyRows: [historyRow({ periodicalId: t.id, dispatchedAt: new Date(NOW - 40 * DAY_MS).toISOString() })] };
     const [result] = foldPeriodicalRuns([t], rows, { now: NOW, horizonMs: HISTORY_TTL_MS, historyTtlMs: HISTORY_TTL_MS });
@@ -832,6 +832,18 @@ describe('foldPeriodicalRuns — historyTtlMs is required', () => {
   test('a non-finite historyTtlMs (NaN) throws', () => {
     const t = template();
     assert.throws(() => foldPeriodicalRuns([t], {}, { now: NOW, historyTtlMs: NaN }), TypeError);
+  });
+
+  test('the required-input TypeError names the read-horizon input, not a store TTL (LIN-3163)', () => {
+    const t = template();
+    assert.throws(
+      () => foldPeriodicalRuns([t], {}, { now: NOW }),
+      err => err instanceof TypeError
+        && /historyTtlMs/.test(err.message)
+        && /read-horizon input/.test(err.message)
+        && !/store/.test(err.message),
+      'the message must describe the read-horizon input; evidence is lifetime-retained'
+    );
   });
 });
 
@@ -1236,7 +1248,10 @@ describe('periodical-runs round-trip (real MangoDB tmpdir)', () => {
 
     const [result] = foldPeriodicalRuns([t], { historyRows }, {
       now: newer.dispatchedAt.getTime() + 1000,
-      historyTtlMs: store.historyTtl * 1000
+      // LIN-3163 (LIN-3157 B): dispatch-history is lifetime-retained, so the
+      // fold is fed the fixed 30-day READ horizon (DEFAULT_HORIZON_MS) — the
+      // store no longer carries a `historyTtl`. The route passes READ_HORIZON_MS.
+      historyTtlMs: DEFAULT_HORIZON_MS
     });
     assert.equal(result.lastDispatchedAt, newer.dispatchedAt.getTime());
     assert.equal(result.runs, 2);

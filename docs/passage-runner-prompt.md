@@ -179,7 +179,7 @@ this and later steps describe don't apply. Say so plainly in the landing report.
 
 There is **no voyage-level cost roll-up**: `GET /cost/{identifier}` is per-issue-identifier
 only. When you write the landing report (Step 7), sum per-anchor `/cost` reads and state the
-coverage gaps verbatim — the 30-day app-call retention window, and any unpriced models or
+coverage gaps verbatim — the 30-day app-call read window, and any unpriced models or
 sessions — rather than presenting a total as if it were complete. `GET /dispatch` (list) now
 carries `sessionId`/`maxTasks` on every row (LIN-2975), so you CAN group the newest-200-row
 window client-side by `sessionId` — but it still cannot be *filtered* by `sessionId` server-side,

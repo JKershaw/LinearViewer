@@ -1,0 +1,31 @@
+{
+ "about": "LIN-3150: supervisor failures on record, hand-classed by the author from the 82 candidate tickets that scripts/survey-supervise-failures.mjs finds (a supervisor layer in the title or description, a failure word in the title). Kept: a ticket whose filing describes a supervisor doing the wrong thing, or the machinery around a supervisor failing it. Dropped: plans, features, UI, drift reviews and measurements. type: missed-wake, looping, wrong-routing, lost-input, leaving-altitude. locus: 'model' if the supervisor session's own choice went wrong, 'code' if deterministic plumbing did. action: 'M' if the step that failed is one the census codes mechanical, 'J' if it needed judgement. Read from the ticket title and the first 1,500 characters of its description.",
+ "failures": [
+  { "id": "LIN-366", "type": "looping", "locus": "code", "action": "J", "why": "the recommend engine kept choosing investigate after an investigation completed; the supervisor followed it" },
+  { "id": "LIN-384", "type": "wrong-routing", "locus": "code", "action": "M", "why": "descent did not defer an epic to its ready child, so an epic-scoped implementation was dispatched" },
+  { "id": "LIN-881", "type": "missed-wake", "locus": "code", "action": "M", "why": "stepper beats carried the hold but not the wake, so PENDING never woke the head" },
+  { "id": "LIN-1059", "type": "missed-wake", "locus": "code", "action": "M", "why": "a follow-up itemId repoint severed the up-chain wake edge" },
+  { "id": "LIN-1165", "type": "looping", "locus": "code", "action": "M", "why": "an up-chain wake self-looped into the producing session" },
+  { "id": "LIN-1323", "type": "looping", "locus": "model", "action": "M", "why": "an autopilot's own background poll loop competed with the PENDING-EXTERNAL push wake" },
+  { "id": "LIN-1355", "type": "missed-wake", "locus": "code", "action": "M", "why": "a one-shot guard suppressed every beat-2..N terminal wake on a stepper drip" },
+  { "id": "LIN-1357", "type": "missed-wake", "locus": "code", "action": "M", "why": "a held stepper child was not re-invoked by its worker's terminal result; 31-minute stall" },
+  { "id": "LIN-1591", "type": "looping", "locus": "model", "action": "M", "why": "orchestrator poll loops re-read their whole context per beat, measured at 15% of token spend" },
+  { "id": "LIN-1656", "type": "wrong-routing", "locus": "model", "action": "M", "why": "two orchestrators dispatched the same issue and kind minutes apart; one implementation was always discarded" },
+  { "id": "LIN-1697", "type": "missed-wake", "locus": "code", "action": "M", "why": "the stall failsafe killed a correctly standing-by subscribed parent" },
+  { "id": "LIN-1698", "type": "missed-wake", "locus": "code", "action": "M", "why": "a wake lost on the launch path was never re-delivered" },
+  { "id": "LIN-1816", "type": "missed-wake", "locus": "code", "action": "M", "why": "an orchestrator died mid-pipeline when its child-completion wake never arrived" },
+  { "id": "LIN-1884", "type": "wrong-routing", "locus": "model", "action": "M", "why": "concurrent sessions shared a /tmp comment payload and cross-posted comments onto the wrong issue" },
+  { "id": "LIN-2078", "type": "looping", "locus": "code", "action": "M", "why": "abort items stamped with a sessionId produced duplicate terminal wakes" },
+  { "id": "LIN-2145", "type": "lost-input", "locus": "code", "action": "J", "why": "the runner's DONE/PENDING turn overwrote the worker's report, so the stepper judged a beat without it" },
+  { "id": "LIN-2229", "type": "looping", "locus": "code", "action": "M", "why": "a parent-child mutual wait was unbounded on both sides" },
+  { "id": "LIN-2468", "type": "missed-wake", "locus": "code", "action": "M", "why": "a follow-up signalled into a dead-hook hold was silently lost" },
+  { "id": "LIN-2511", "type": "missed-wake", "locus": "code", "action": "M", "why": "the stall reaper force-failed a healthy session 27 ms after delivering its wake" },
+  { "id": "LIN-2517", "type": "missed-wake", "locus": "code", "action": "M", "why": "a wake delivered into a dead-consumer session was destroyed by the stall reaper" },
+  { "id": "LIN-2720", "type": "missed-wake", "locus": "code", "action": "M", "why": "an opencode hold lapsed when the runner died, so every OpenCode autopilot stalled at its first wait" },
+  { "id": "LIN-2754", "type": "lost-input", "locus": "code", "action": "M", "why": "a ruling relayed by an agent never stamped the decision it answered" },
+  { "id": "LIN-2899", "type": "wrong-routing", "locus": "model", "action": "M", "why": "two concurrent breakdowns minted duplicate subtasks for the same parent" },
+  { "id": "LIN-2932", "type": "missed-wake", "locus": "code", "action": "M", "why": "a finished worker stayed taken behind its own CI monitor; the autopilot waited 30+ minutes, reported as verifying" },
+  { "id": "LIN-2974", "type": "wrong-routing", "locus": "code", "action": "M", "why": "a dispatch passed repo validation the runner then refused, and the failed row burned the duplicate guard" },
+  { "id": "LIN-2975", "type": "wrong-routing", "locus": "code", "action": "M", "why": "proxy POST /dispatch dropped maxTasks, so a passage Runner's ratified pool was never declared" }
+ ]
+}

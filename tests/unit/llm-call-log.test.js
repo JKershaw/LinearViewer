@@ -7,9 +7,10 @@
  * captured metadata, non-numeric fields are coerced to null, listing is
  * workspace-scoped and newest-first, and recording never throws (fire-and-forget).
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
+import { createMangoTmpdir, recordingCollection } from '../fixtures/mango-tmpdir.js';
 
 // Minimal in-memory mock of the MongoDB/MangoDB collection surface.
 function createMockCollection() {
@@ -26,6 +27,11 @@ function createMockCollection() {
         if (query.issueIdentifier && doc.issueIdentifier !== query.issueIdentifier) return false;
         if (query.feature && doc.feature !== query.feature) return false;
         if (query.expiresAt?.$gt && !(doc.expiresAt > query.expiresAt.$gt)) return false;
+        // LIN-3161: honour the `timestamp` bound (A1's additive read horizon).
+        // Without this the double silently ignores the operator and
+        // summarizeByIssue's `since` test would pass vacuously.
+        if (query.timestamp?.$gte && !(doc.timestamp >= query.timestamp.$gte)) return false;
+        if (query.timestamp?.$lt && !(doc.timestamp < query.timestamp.$lt)) return false;
         return true;
       });
       return { async toArray() { return results; } };
@@ -70,8 +76,8 @@ describe('LlmCallLogStore.record', () => {
     assert.strictEqual(doc.completionTokens, 300);
     assert.strictEqual(doc.durationMs, 1834);
     assert.ok(doc.timestamp instanceof Date);
-    assert.ok(doc.expiresAt instanceof Date);
-    assert.ok(doc.expiresAt > doc.timestamp);
+    // LIN-3163 (B): the call log is retained for the project's lifetime — no expiry stamp.
+    assert.ok(!('expiresAt' in doc), 'a lifetime-retained call row carries no expiresAt stamp');
     assert.ok(typeof doc._id === 'string' && doc._id.length > 0);
   });
 
@@ -111,32 +117,105 @@ describe('LlmCallLogStore.record', () => {
   });
 });
 
-describe('LlmCallLogStore.listCalls', () => {
-  let store;
+// LIN-3162 (LIN-3157 A2): listCalls became a database-side paged read
+// (`find({urlKey, timestamp:{$gte:horizon}}).sort({timestamp:-1,_id:-1}).skip().limit()`
+// + `countDocuments`). The old inline double had a `toArray()`-only cursor with
+// no `countDocuments`, so it can no longer serve these reads; they run on a real
+// MangoDB tmpdir instead (the plan's "do not extend the doubles" rule).
+describe('LlmCallLogStore.listCalls (real MangoDB tmpdir, LIN-3162 A2)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  let harness;
+  let raw;
   let collection;
+  let store;
+
+  before(async () => {
+    harness = createMangoTmpdir('lin-3162-llm-calls-');
+    await harness.connect();
+  });
+
+  after(async () => {
+    await harness.close();
+  });
 
   beforeEach(() => {
-    collection = createMockCollection();
+    raw = harness.freshDb().collection('llm-call-log');
+    collection = recordingCollection(raw);
     store = new LlmCallLogStore({ collection });
   });
 
+  async function seed({ expiresAt, ...doc }) {
+    const timestamp = doc.timestamp || new Date();
+    const out = { urlKey: 'acme', feature: 'recommend', model: 'm1', ...doc, timestamp };
+    out.expiresAt = expiresAt !== undefined ? expiresAt : new Date(timestamp.getTime() + 30 * DAY_MS);
+    await raw.insertOne(out);
+  }
+
   test('is workspace-scoped and newest-first', async () => {
-    await store.record({ urlKey: 'acme', feature: 'recommend', model: 'm1' });
-    await new Promise(r => setTimeout(r, 2));
-    await store.record({ urlKey: 'acme', feature: 'brief', model: 'm2' });
-    await store.record({ urlKey: 'other', feature: 'recap', model: 'm3' });
+    const now = Date.now();
+    await seed({ _id: 'OLD', feature: 'recommend', timestamp: new Date(now - 2000) });
+    await seed({ _id: 'NEW', feature: 'brief', timestamp: new Date(now) });
+    await seed({ _id: 'OTHER', urlKey: 'other', feature: 'recap', timestamp: new Date(now) });
 
     const { items, total } = await store.listCalls('acme');
     assert.strictEqual(total, 2);
-    assert.strictEqual(items[0].feature, 'brief'); // newest first
-    assert.strictEqual(items[1].feature, 'recommend');
+    assert.deepStrictEqual(items.map(i => i.feature), ['brief', 'recommend']);
     assert.ok(items.every(i => i.model && typeof i.timestamp === 'string'));
   });
 
+  test('honours limit and offset', async () => {
+    for (let i = 0; i < 5; i++) {
+      await seed({ _id: `x${i}`, timestamp: new Date(Date.now() - i * 1000) });
+    }
+    const { items, total } = await store.listCalls('acme', { limit: 2, offset: 1 });
+    assert.strictEqual(total, 5);
+    assert.deepStrictEqual(items.map(i => i.id), ['x1', 'x2']);
+  });
+
   test('returns empty for unknown workspace or missing urlKey', async () => {
-    await store.record({ urlKey: 'acme', feature: 'recommend' });
+    await seed({ _id: 'x' });
     assert.deepStrictEqual(await store.listCalls('nope'), { items: [], total: 0 });
     assert.deepStrictEqual(await store.listCalls(), { items: [], total: 0 });
+  });
+
+  test('pages in the database: sort().skip().limit() plus countDocuments, no full materialisation (A2)', async () => {
+    for (let i = 0; i < 25; i++) await seed({ _id: `x${i}`, timestamp: new Date(Date.now() - i * 1000) });
+
+    const { items, total } = await store.listCalls('acme', { limit: 5, offset: 10 });
+    const cursor = collection.__record.cursors.at(-1);
+    assert.deepStrictEqual(cursor.sorts, [{ timestamp: -1, _id: -1 }]);
+    assert.deepStrictEqual(cursor.skips, [10]);
+    assert.deepStrictEqual(cursor.limits, [5]);
+    assert.strictEqual(cursor.materialized, 5, 'only the page may be materialised');
+    assert.strictEqual(collection.__record.countDocuments.length, 1, 'total must come from countDocuments');
+    assert.strictEqual(total, 25);
+    assert.strictEqual(items.length, 5);
+  });
+
+  test('has no default horizon bound and pages over full retained history (LIN-3163 B)', async () => {
+    const now = Date.now();
+    await seed({ _id: 'no-stamp', timestamp: new Date(now - 5 * DAY_MS), expiresAt: undefined });
+    await seed({ _id: 'old-live-stamp', timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
+
+    const { items, total } = await store.listCalls('acme');
+    const q = collection.__record.finds.at(-1).query;
+    assert.strictEqual(q.timestamp, undefined, 'the default 30-day `since` bound is gone from the paged list');
+    assert.strictEqual(q.expiresAt, undefined, 'the expiry predicate is gone');
+    assert.strictEqual(total, 2, 'the >30d row is listed over the full retained history');
+    assert.deepStrictEqual(items.map(i => i.id), ['no-stamp', 'old-live-stamp']);
+  });
+
+  test('orders same-millisecond rows by _id descending and pages without duplicates (A2)', async () => {
+    const now = Date.now();
+    const ts = new Date(now - 1000);
+    for (const id of ['c', 'a', 'b']) {
+      await seed({ _id: id, timestamp: ts, expiresAt: new Date(now + DAY_MS) });
+    }
+    const p0 = await store.listCalls('acme', { limit: 1, offset: 0 });
+    const p1 = await store.listCalls('acme', { limit: 1, offset: 1 });
+    const p2 = await store.listCalls('acme', { limit: 1, offset: 2 });
+    assert.deepStrictEqual([p0.items[0].id, p1.items[0].id, p2.items[0].id], ['c', 'b', 'a']);
+    assert.strictEqual(new Set([p0.items[0].id, p1.items[0].id, p2.items[0].id]).size, 3);
   });
 });
 
@@ -292,6 +371,48 @@ describe('LlmCallLogStore.summarizeByIssue', () => {
     assert.deepStrictEqual(await store.summarizeByIssue(undefined, 'LIN-1'), empty);
     assert.deepStrictEqual(await new LlmCallLogStore({}).summarizeByIssue('acme', 'LIN-1'), empty);
   });
+
+  // LIN-3161 (LIN-3157 A1): the additive `since` timestamp bound.
+  function pushRow(overrides) {
+    collection._docs.push({
+      _id: overrides._id, urlKey: 'acme', issueIdentifier: 'LIN-1', feature: 'recommend',
+      cost: overrides.cost, timestamp: overrides.timestamp, expiresAt: overrides.expiresAt
+    });
+  }
+
+  test('a `since` bound excludes a row older than it even when its expiresAt is still live (LIN-3161)', async () => {
+    const now = Date.now();
+    const future = new Date(now + 365 * 24 * 60 * 60 * 1000);
+    // Outside the 30-day read window, but with a still-live stamped expiry —
+    // the exact shape lifetime retention would produce.
+    pushRow({ _id: 'old', cost: 5, timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: future });
+    // Inside the window.
+    pushRow({ _id: 'new', cost: 0.01, timestamp: new Date(now - 24 * 60 * 60 * 1000), expiresAt: future });
+
+    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const s = await store.summarizeByIssue('acme', 'LIN-1', { since });
+    assert.strictEqual(s.calls, 1);
+    assert.ok(Math.abs(s.costUsd - 0.01) < 1e-9);
+  });
+
+  test('omitting `since` keeps the pre-existing behaviour (every live-expiry row counts) (LIN-3161)', async () => {
+    const now = Date.now();
+    pushRow({ _id: 'old', cost: 5, timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: new Date(now + 365 * 24 * 60 * 60 * 1000) });
+    const s = await store.summarizeByIssue('acme', 'LIN-1');
+    assert.strictEqual(s.calls, 1);
+    assert.ok(Math.abs(s.costUsd - 5) < 1e-9);
+  });
+
+  test('A2 removes the expiresAt predicate: an in-window row with a past stamped expiry is counted (LIN-3162)', async () => {
+    const now = Date.now();
+    // Inside any `since` window, but its stamped expiry has already passed.
+    // A1 kept the `expiresAt` predicate alongside `since`; A2 removes it, so the
+    // read is keyed on `timestamp` alone and this row is now counted.
+    pushRow({ _id: 'expired', cost: 9, timestamp: new Date(now - 24 * 60 * 60 * 1000), expiresAt: new Date(now - 24 * 60 * 60 * 1000) });
+    const since = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const s = await store.summarizeByIssue('acme', 'LIN-1', { since });
+    assert.strictEqual(s.calls, 1);
+  });
 });
 
 describe('LlmCallLogStore.summarizeByFeature (LIN-2702)', () => {
@@ -346,11 +467,14 @@ describe('LlmCallLogStore.summarizeByFeature (LIN-2702)', () => {
     assert.strictEqual(s.unknown, false);
   });
 
-  test('rows whose expiresAt has passed are excluded from the window (aged-out-only -> unknown)', async () => {
+  test('rows older than the read horizon are excluded from the window (aged-out-only -> unknown)', async () => {
     const now = Date.now();
+    // LIN-3162 A2: the window is bounded on `timestamp` (the shared read
+    // horizon), not on the expiry stamp. The guarantee is unchanged — an
+    // aged-out row is excluded and a window with no live rows is `unknown`.
     collection._docs.push({
-      _id: 'expired', urlKey: 'acme', feature: 'scan', cost: 0.05,
-      timestamp: new Date(now - 1000 * 60 * 60), expiresAt: new Date(now - 1000)
+      _id: 'aged-out', urlKey: 'acme', feature: 'scan', cost: 0.05,
+      timestamp: new Date(now - 40 * 24 * 60 * 60 * 1000), expiresAt: new Date(now - 24 * 60 * 60 * 1000)
     });
 
     const s = await store.summarizeByFeature('acme', 'scan');
@@ -426,5 +550,66 @@ describe('summarize()/summarizeByIssue() are unaffected by summarizeByFeature (L
     assert.strictEqual(byIssue.calls, 2);
     assert.strictEqual(byIssue.unpricedCalls, 1);
     assert.ok(Math.abs(byIssue.costUsd - 0.02) < 1e-9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4 #7 (treatment H, permanent): summarize()/summarizeByFeature() read the
+// reporting window keyed on `timestamp`, replacing the expiry-stamp predicate.
+// Real engine, because the witness is that a >30-day row with a live stamped
+// expiry is excluded and a no-expiresAt row inside the window is counted.
+// ---------------------------------------------------------------------------
+
+describe('LlmCallLogStore summaries key on the read horizon (real MangoDB tmpdir, LIN-3162 A2)', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  let harness;
+  let raw;
+  let store;
+
+  before(async () => {
+    harness = createMangoTmpdir('lin-3162-llm-summaries-');
+    await harness.connect();
+  });
+
+  after(async () => {
+    await harness.close();
+  });
+
+  beforeEach(() => {
+    raw = harness.freshDb().collection('llm-call-log');
+    store = new LlmCallLogStore({ collection: raw });
+  });
+
+  test('summarize() counts a no-expiresAt row inside the horizon and hides a >30d row with a live stamp (A2)', async () => {
+    const now = Date.now();
+    await raw.insertOne({ _id: 'no-stamp', urlKey: 'acme', feature: 'recommend', cost: 0.01, totalTokens: 10, timestamp: new Date(now - 5 * DAY_MS) });
+    await raw.insertOne({ _id: 'old-live', urlKey: 'acme', feature: 'recommend', cost: 5, totalTokens: 500, timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
+
+    const s = await store.summarize('acme');
+    assert.strictEqual(s.totalCalls, 1, 'only the in-horizon row counts');
+    assert.ok(Math.abs(s.totalCost - 0.01) < 1e-9, 'the >30d row must not be folded in');
+  });
+
+  test('summarizeByFeature() counts a no-expiresAt row inside the horizon and hides a >30d row with a live stamp (A2)', async () => {
+    const now = Date.now();
+    await raw.insertOne({ _id: 'no-stamp', urlKey: 'acme', feature: 'scan', cost: 0.02, timestamp: new Date(now - 5 * DAY_MS) });
+    await raw.insertOne({ _id: 'old-live', urlKey: 'acme', feature: 'scan', cost: 5, timestamp: new Date(now - 40 * DAY_MS), expiresAt: new Date(now + 365 * DAY_MS) });
+
+    const s = await store.summarizeByFeature('acme', 'scan');
+    assert.strictEqual(s.calls, 1);
+    assert.strictEqual(s.pricedCalls, 1);
+    assert.ok(Math.abs(s.meanUsd - 0.02) < 1e-9);
+    assert.strictEqual(s.unknown, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3163 (B): lifetime retention — the llm-call-log evictor is deleted.
+// ---------------------------------------------------------------------------
+
+describe('LlmCallLogStore.cleanup is removed (LIN-3163 B)', () => {
+  test('the evictor no longer exists — lifetime retention, no cleanup method', () => {
+    assert.strictEqual(typeof LlmCallLogStore.prototype.cleanup, 'undefined', 'cleanup must be deleted from the store');
+    assert.strictEqual(typeof new LlmCallLogStore({}).cleanup, 'undefined');
   });
 });

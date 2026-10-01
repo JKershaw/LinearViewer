@@ -106,6 +106,7 @@ import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLi
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createProxyRoutes } from './routes/proxy.js'
+import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
 import { createWorkspaceApiRoutes, shouldMockAi } from './routes/workspace-api.js'
 import { getModelCatalog, CATALOG_CACHE_TTL_MS } from './lib/openrouter-catalog.js'
@@ -2729,6 +2730,10 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
 
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore }))
 
+// LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
+// runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
+app.use(createRunnerKitRoutes())
+
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args) }))
 
@@ -4225,22 +4230,6 @@ const server = app.listen(PORT, () => {
       }
     } catch (err) {
       console.error('Proxy token cleanup error:', err)
-    }
-    try {
-      const removedCount = await proxyEventStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Proxy event cleanup: removed ${removedCount} expired events`)
-      }
-    } catch (err) {
-      console.error('Proxy event cleanup error:', err)
-    }
-    try {
-      const removedCount = await agentStatusStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Agent status cleanup: removed ${removedCount} expired entries`)
-      }
-    } catch (err) {
-      console.error('Agent status cleanup error:', err)
     }
     try {
       const removedCount = await observationSessionsStore.cleanup()
