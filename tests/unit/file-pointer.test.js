@@ -15,7 +15,7 @@ import {
   HOP_ALLOWANCE_MS,
   SKEW_SLACK_MS,
   RACE_SUSPECT_WINDOW_MS,
-  DEFAULT_MAX_ENTRIES,
+  DEFAULT_MAX_CHARS,
   FILE_POINTER_MARKER,
   buildFilePointer,
   extractPlanSection,
@@ -76,6 +76,42 @@ describe('file-pointer — render bound', () => {
     assert.equal(isRenderableRepo('LinearViewer'), true);
     assert.equal(isRenderableRepo('evil/repo'), false);
     assert.equal(isRenderableRepo(''), false);
+  });
+
+  test('extension allowlist drops dotted identifiers, versions, method refs and hosts (P1 false positives)', () => {
+    const noise = [
+      'Promise.all',
+      '1.5',
+      '1.6',
+      '1.7',
+      '7.5',
+      '7.6',
+      'store.listItems',
+      'store.countPilotEligible',
+      'api.github.com',
+      'github.com.evil.com',
+      'issue.description',
+      'Y.resolvedAt',
+      'req.body.kind',
+      '2b454442..HEAD',
+      'README'
+    ];
+    for (const p of noise) {
+      assert.equal(isRenderablePath(p), false, p);
+      assert.equal(extractPlanPaths(`## Implementation Plan\n${p}`).includes(p), false, p);
+    }
+    // Real repo-relative files (root-level included) still pass.
+    for (const p of ['lib/foo.js', 'package.json', 'scripts/file-pointer-read.mjs', 'src/a.tsx']) {
+      assert.equal(isRenderablePath(p), true, p);
+    }
+  });
+
+  test('rejects `..` ANYWHERE in a token, not only as a whole segment', () => {
+    for (const p of ['lib/a..b/c.js', 'foo..js', 'lib/foo/..bar.js', 'a..b', 'dot..js']) {
+      assert.equal(isRenderablePath(p), false, p);
+    }
+    const paths = extractPlanPaths('## Implementation Plan\nlib/ok.js and 2b454442..HEAD');
+    assert.deepEqual(paths, ['lib/ok.js']);
   });
 });
 
@@ -150,27 +186,31 @@ describe('file-pointer — PR files and builder', () => {
     assert.match(built.text, /^- lib\/a\.js$/m);
   });
 
-  test('caps entries and dedupes across plan + PR sources', () => {
+  test('caps entries by character budget and dedupes across plan + PR sources', () => {
     const built = buildFilePointer({
       planBlock: '## Implementation Plan\nlib/shared.js\nlib/plan1.js\nlib/plan2.js',
       prFiles: [
         { repo: 'LinearViewer', path: 'lib/shared.js' },
         { repo: 'LinearViewer', path: 'lib/pr.js' }
       ],
-      maxEntries: 3
+      // Costs: 13+3 + 12+3 + 12+3 = 46 — exactly the three plan paths.
+      maxChars: 46
     });
-    // shared appears once (plan), then plan1, plan2 => cap 3.
-    assert.deepEqual(built.planPaths.slice(0, 3), ['lib/shared.js', 'lib/plan1.js', 'lib/plan2.js']);
+    assert.deepEqual(built.planPaths, ['lib/shared.js', 'lib/plan1.js', 'lib/plan2.js']);
     const lines = built.text.split('\n').filter(l => l.startsWith('- '));
     assert.deepEqual(lines, ['- lib/shared.js', '- lib/plan1.js', '- lib/plan2.js']);
   });
 
-  test('default cap is applied and the text carries the marker and no tracker name', () => {
+  test('default character cap keeps the pointer near the plan ~100-token figure', () => {
     const built = buildFilePointer({
-      planBlock: '## Implementation Plan\n' + Array.from({ length: DEFAULT_MAX_ENTRIES + 5 }, (_, i) => `lib/f${i}.js`).join('\n')
+      planBlock: '## Implementation Plan\n' + Array.from({ length: 80 }, (_, i) => `lib/f${i}.js`).join('\n')
     });
     const lines = built.text.split('\n').filter(l => l.startsWith('- '));
-    assert.equal(lines.length, DEFAULT_MAX_ENTRIES);
+    const renderedChars = lines.reduce((n, l) => n + l.length + 1, 0);
+    assert.ok(lines.length < 40, `expected far fewer than the old 40-entry cap, got ${lines.length}`);
+    assert.ok(renderedChars <= DEFAULT_MAX_CHARS, `entry chars ${renderedChars} must fit ${DEFAULT_MAX_CHARS}`);
+    // A rough token estimate (~4 chars/token) stays near the probe's 93.
+    assert.ok(built.text.length / 4 < 200, 'whole pointer must stay well under 200 tokens');
     assert.ok(built.text.startsWith(FILE_POINTER_MARKER));
     assert.doesNotMatch(built.text, /\bLinear\b/);
   });

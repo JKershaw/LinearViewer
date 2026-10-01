@@ -14,17 +14,27 @@
  * and excluded counts by reason, plus totals and any stated concerns (over 10%
  * excluded, or exclusions lopsided between arms).
  *
+ * HISTORY READ (the P7 fix). History is read with an EXCLUSION projection
+ * (`{ feedback: 0 }`), never an inclusion like `{ prompt: 1 }`: Mongo's
+ * inclusion form returns only `_id` + the included keys, so `_formatHistoryItem`
+ * then invents `kind: 'custom'` and drops `issueIdentifier`/`dispatchedAt`, and
+ * every archived row fails `isPilotEligible` — the read would see only the live
+ * queue. Queue and history are then de-duped by `_id` exactly as P4's
+ * `countPilotEligible` does, so a row visible in both during the take/cancel hop
+ * is counted once and does not flag itself race-suspect.
+ *
  * OPERATOR STEP before trusting a run: search the deploy logs for BOTH
  * `Error archiving dispatch item:` and `Error archiving expired items:` over
  * the window; any hit restarts the comparison window after it (R3). Rows after
  * a retention change or a flag toggle invalidate the recompute — see LIN-3200.
  */
+import { pathToFileURL } from 'node:url';
 import { MongoClient } from 'mongodb';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from '../lib/dispatch-store.js';
 import { FILE_POINTER_MARKER, RACE_SUSPECT_WINDOW_MS, classifyPilotRows } from '../lib/file-pointer.js';
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const out = { urlKey: process.env.LIN3200_URL_KEY || null, json: false, windowMs: RACE_SUSPECT_WINDOW_MS };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--url-key') out.urlKey = argv[++i];
@@ -34,10 +44,10 @@ function parseArgs(argv) {
   return out;
 }
 
-function toRow(item) {
+export function toRow(item) {
   const prompt = typeof item?.prompt === 'string' ? item.prompt : '';
   return {
-    id: item?.id,
+    id: item?.id ?? item?._id,
     kind: item?.kind,
     followUpTo: item?.followUpTo ?? null,
     abort: item?.abort === true,
@@ -46,6 +56,56 @@ function toRow(item) {
     resolvedAt: item?.resolvedAt ?? null,
     delivered: prompt.includes(FILE_POINTER_MARKER)
   };
+}
+
+/**
+ * Merge the live queue and the history list into one row array, de-duped by
+ * `_id` (as P4's `countPilotEligible` does). A row may be in one collection, the
+ * other, or — for one awaited round trip during a take/cancel hop — both; the
+ * de-dupe keeps the recomputed ordinal aligned with the factory's count. Rows
+ * without an id are kept (never collapsed) since they cannot be the same row.
+ *
+ * @param {{liveItems?: Array, historyItems?: Array}} params
+ * @returns {Array<Object>} rows, queue first then history
+ */
+export function mergePilotRows({ liveItems = [], historyItems = [] } = {}) {
+  const byId = new Map();
+  const noId = [];
+  let anonymous = 0;
+  for (const item of [...liveItems, ...historyItems]) {
+    const row = toRow(item);
+    if (row.id == null) {
+      row.id = `__noid__${anonymous++}`;
+      noId.push(row);
+      continue;
+    }
+    const key = String(row.id);
+    if (byId.has(key)) continue;
+    byId.set(key, row);
+  }
+  return [...byId.values(), ...noId];
+}
+
+/**
+ * Load the eligible-row candidates through the store (queue ∪ history). The
+ * history projection is the EXCLUSION `{ feedback: 0 }` — see the file header
+ * for why an inclusion projection silently hides every archived row. Fails open
+ * to whatever the store could return.
+ *
+ * @param {DispatchQueueStore} store
+ * @param {string} urlKey
+ * @returns {Promise<Array<Object>>}
+ */
+export async function loadPilotRows(store, urlKey) {
+  const [history, live] = await Promise.all([
+    store.listHistory(urlKey, { projection: { feedback: 0 } }),
+    store.listItems(urlKey)
+  ]);
+  const liveItems = Array.isArray(live) ? live : [];
+  const historyItems = Array.isArray(history?.items)
+    ? history.items
+    : (Array.isArray(history) ? history : []);
+  return mergePilotRows({ liveItems, historyItems });
 }
 
 function printHuman(urlKey, result) {
@@ -62,8 +122,8 @@ function printHuman(urlKey, result) {
   }
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+export async function main(argv = process.argv.slice(2)) {
+  const args = parseArgs(argv);
   if (!args.urlKey) {
     console.error('Missing --url-key (or LIN3200_URL_KEY).');
     process.exit(2);
@@ -81,15 +141,7 @@ async function main() {
       historyCollection: db.collection('dispatch-history')
     });
 
-    const [history, live] = await Promise.all([
-      store.listHistory(args.urlKey, { projection: { prompt: 1 } }),
-      store.listItems(args.urlKey)
-    ]);
-
-    const rows = [
-      ...(Array.isArray(live) ? live : []).map(toRow),
-      ...((history?.items || []).map(toRow))
-    ];
+    const rows = await loadPilotRows(store, args.urlKey);
     const result = classifyPilotRows(rows, { windowMs: args.windowMs });
 
     if (args.json) {
@@ -102,7 +154,10 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isDirectRun) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

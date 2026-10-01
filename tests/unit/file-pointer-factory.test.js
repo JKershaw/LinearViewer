@@ -225,6 +225,29 @@ describe('file-pointer seam — hard caps and fail-open', () => {
     }
   });
 
+  test('recount never resolves ⇒ fail-open c1-unavailable at the count cap, prompt untouched', async () => {
+    // c0 even ⇒ pointer arm; the RECOUNT then never resolves. The bound
+    // G ≤ COUNT_TIMEOUT_MS on the pointer arm rests on the recount's cap, so
+    // this test goes red (hangs) if that cap is replaced with a bare await.
+    const { store, state } = pilotStore({ counts: (n) => (n === 1 ? 0 : new Promise(() => {})) });
+    const logs = captureLogs();
+    try {
+      await createDispatchItem(baseArgs(store, {
+        filePointerEnabled: true,
+        filePointerTimeouts: timeouts,
+        readPlanBlock: async () => '## Implementation Plan\nlib/x.js'
+      }));
+      assert.equal(state.addItemArg.prompt, 'BODY', 'prompt must be untouched on recount fail-open');
+      assert.equal(state.addItemCalls, 1);
+      assert.equal(state.countCalls, 2);
+      const entry = logs.parsed().at(-1);
+      assert.equal(entry.failOpen, true);
+      assert.equal(entry.reason, 'c1-unavailable');
+    } finally {
+      logs.restore();
+    }
+  });
+
   test('gap: addItem is reached with only synchronous work after the deciding count', async () => {
     const { store, state } = pilotStore({ counts: [0, 0] });
     let lastCountAt = 0;
