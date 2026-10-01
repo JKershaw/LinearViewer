@@ -14,6 +14,12 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   already stated, while none of plan review's 30 real finds was in the research. For the re-verified
   units, say how often the re-derivation turned up a finding and how often it confirmed the claim and
   found nothing. (Claude, 2026-10-01)
+- **How many steps does a fresh session take to reach the decision a held supervisor's wake made?**
+  `harbour/held-or-fresh.md` re-priced September's acted wakes as fresh sessions on the assumption that
+  a fresh step takes the steps the held wake took; the relay's result turns on that and on the handoff
+  (break-even at 11k tokens if the step orients as fresh starts do today, 100k if it reads only the
+  handoff). Replay a sample of acted wakes as fresh sessions in a sandbox, from the record and a short
+  handoff, and report steps, tokens and whether the decision matches the held one. (Claude, 2026-10-01)
 - **Which leg kinds share a name length, and which published counts did the length decode misread?**
   `harbour/survey-check-6.md` found that the bootstrap-length decode reads breakdown (and look-into)
   sessions as close-outs and custom, design and triage sessions as reviews: in September's transcript

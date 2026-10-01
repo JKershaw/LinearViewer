@@ -23,11 +23,11 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { renderRunnerSetupPage, RUNNER_SETUP_STATES } from '../../lib/render-runner-setup.js';
+import { renderRunnerSetupPage, RUNNER_SETUP_STATES, RUNNER_WITNESS_RUNBOOK_URL } from '../../lib/render-runner-setup.js';
 import { renderDispatchPage } from '../../lib/render-dispatch.js';
 import { createRunnerSetupRoutes } from '../../routes/runner-setup.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
@@ -261,4 +261,18 @@ describe('the Dispatch page links to the setup page (B2 entry point)', () => {
     const tokens = html.slice(html.indexOf('>Tokens<'));
     assert.match(tokens, /Run on your own machine instead: <a [^>]*href="\/workspace\/acme\/runner"[^>]*data-testid="dispatch-runner-setup-link"[^>]*>set up a runner \u203A<\/a>/);
   });
+});
+
+describe('the witness runbook link (LIN-3098 S5)', () => {
+  test('points at the runbook file on GitHub main, and that file exists', () => {
+    assert.equal(RUNNER_WITNESS_RUNBOOK_URL, 'https://github.com/JKershaw/LinearViewer/blob/main/docs/runbooks/runner-hosted-witness.md');
+    assert.ok(existsSync(join(ROOT, 'docs', 'runbooks', 'runner-hosted-witness.md')));
+  });
+
+  for (const state of ['owner', 'owner-dispatch-off']) {
+    test(`${state}: the page links to it`, () => {
+      const html = render(state);
+      assert.match(html, /<a href="https:\/\/github\.com\/JKershaw\/LinearViewer\/blob\/main\/docs\/runbooks\/runner-hosted-witness\.md"[^>]*data-testid="runner-setup-runbook-link"[^>]*>witness runbook<\/a>/);
+    });
+  }
 });
