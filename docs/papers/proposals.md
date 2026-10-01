@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **How many steps does a fresh session take to reach the decision a held supervisor's wake made?**
+  `harbour/held-or-fresh.md` re-priced September's acted wakes as fresh sessions on the assumption that
+  a fresh step takes the steps the held wake took; the relay's result turns on that and on the handoff
+  (break-even at 11k tokens if the step orients as fresh starts do today, 100k if it reads only the
+  handoff). Replay a sample of acted wakes as fresh sessions in a sandbox, from the record and a short
+  handoff, and report steps, tokens and whether the decision matches the held one. (Claude, 2026-10-01)
 - **Does a session handed the plan's named paths reach its first edit with fewer tokens, at the same correctness?**
   `harbour/starting-context.md` found implementation orients for 1–18% of its tokens (24 calls to the first edit at the median) and
   that the plan's named paths, resolved to files, find half of what the implementer edits at 55% precision. Over a week, put the
