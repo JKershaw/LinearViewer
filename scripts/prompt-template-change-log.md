@@ -74,6 +74,8 @@ Newest last.
 | 2026-09-25 | PR #1579 | LIN-3049 | handwritten + meta | Breakdown-created subtasks of an approved plan now carry their own copied plan slice, a committed session-fit answer, and `Plan-review due: no` citing the parent's approving verdict (both prompt paths), gated on the decomposed ticket's OWN comment trail — not its rendered Parent Task section — actually carrying a recorded `### Plan Review Verdict: Approve` for the plan being decomposed (F4); a breakdown child whose decomposed ticket carries no such Approve still gets a plain acceptance-criteria description on both paths (no false session-fit or plan-review-due claim). The meta-prompt's Step 1 over-fire guard, completed-prep rule, and gate now recognize a qualifying copied slice as completed prep via three new, narrowly-scoped sentences outside the (a)-(d) criteria text (though the gate addition narrows when criterion (d) re-fires for this population — see the gate record in the LIN-3049 description). All three guards withhold that recognition when the copied slice visibly diverges from what the cited approving verdict approved, so a stale/diverged slice re-derives instead of routing to `implementation` (R1). A new `Breakdown prompts` quality rule mandates the same precondition and copy on the AI path. Expected direction: **down** on plan/plan-review sessions per breakdown-created subtask (the primary signal this ticket exists to move). Note `follow-on-ratio`'s `PLAN_MARKER` diagnostic (description-only "fits one session" match) may tick up harmlessly on these subtasks — a diagnostic-only field, not the ratio's numerator/denominator. Note also that `meta-prompt.baseline.txt`'s regen diff includes ~22+/10− lines of pre-existing drift unrelated to this change (present at HEAD before any LIN-3049 edit; last regenerated at LIN-1455) — do not attribute the full diff to this ticket. Timing: the LIN-1871 plan-gate re-read that the plan's timing section protected already RAN on 2026-09-25 (LIN-2924 `a814fadd`, window closed 09-25 07:00Z), one day early and before LIN-3049 was filed, so no exempted child can enter that sample; no tag-or-exclude instruction is owed. Commit `380fbf391cdce7d68ad6cbbb3e13184df0c6b29a` (squash-merge on `main`). | **down** |
 | 2026-09-26 | PR #1584 | LIN-3056 | handwritten + meta (`lib/prompt-template-defs.js`, `lib/prompts/meta-prompt-template.js`) | Review's conditional-Approve wording is now reserved for a ledger close-out can actually discharge within LIN-3033's trivial review-named-edit bound; a ledger holding an **inside** item whose discharge requires authoring beyond that bound (a new or changed test, or a code change) now gets **Request Changes** back to `implementation` directly, instead of a conditional Approve that close-out would only hold and bounce back anyway. No change to LIN-3033's close-out authoring bound or to the ledger's content rules (inside/outside, lanes) — only the verdict-selection wording moves. Expected direction: **down** on close-out sessions that discharge nothing and immediately bounce a ticket back to `implementation` for this population (the LIN-3043/3044/3045/3037/3039/LIN-2891 pattern); no expected change to total implementation+review round trips, since Request Changes now fires one step earlier for the same eventual outcome. | **down** |
 | 2026-10-01 | PR #1695 | LIN-3202 | handwritten + meta (plus `scripts/eval/meta-prompt.baseline.txt`) | Plan prompts must now state what the plan adds beyond the research and cite the findings it relies on (comment author/heading or id, file:line, or sha) instead of restating them; a no-research plan stands alone with no manufactured citations, restating a finding to look self-contained is forbidden, and a disagreement with a finding or a finding found stale is named with evidence as an addition. The in/out-of-scope verdict stays the plan's own decision, so the LIN-1871 class-not-member mapping and the plan-review gate line are unchanged. Regenerated `meta-prompt.baseline.txt` to keep the byte-identity drift guard green. Expected direction: **down** on plan words per ticket; **unknown** on plan-review rounds per ticket. | **down / unknown** |
+| 2026-10-01 | PR #LIN-3200 | LIN-3200 | handwritten | The implementation prompt's HANDWRITTEN path (`lib/prompt-templates.js` → `generatePrompt()`) gains the file-pointer prepend at the shared dispatch seam (`lib/dispatch-factory.js` step 7.6): a short pointer to the plan's named paths and earlier-PR files, on every second eligible implementation dispatch, implementation-only. No template text changes; the seam is downstream of both paths. The arm rule is recomputable from existing row fields (no stamp); reviewer/plan/research/close-out output is byte-identical. Expected direction: **down** on tokens and tool calls to first edit; **unknown** on review findings per round. | **down / unknown** |
+| 2026-10-01 | PR #LIN-3200 | LIN-3200 | meta | The implementation prompt's AI-GENERATED path (`lib/openrouter.js` → `lib/prompts/meta-prompt-template.js`) gains the SAME file-pointer prepend at the same shared dispatch seam: the meta-prompt template text is untouched and the pointer is built from the record and prepended only to `effectiveKind:'implementation'` dispatches. Both prompt paths move together by construction (one seam), reviewer independence preserved by the effective-kind gate. Expected direction: **down** on tokens and tool calls to first edit; **unknown** on review findings per round. | **down / unknown** |
 
 ### On the LIN-3202 row's direction, recorded before the read
 
@@ -278,3 +280,31 @@ measurement — LIN-1602 adds the plan-review template and LIN-1603 adds the gat
 that routes to it, which is precisely the effect LIN-1661's read exists to
 detect. Both landed on the window's opening day and are recorded here so a
 reader does not have to wonder whether they were missed.
+
+### On the LIN-3200 rows, and the R3 operator step
+
+**Direction recorded before the read.** Both rows expect **down** on tokens and
+tool calls to the first edit: the pointer's whole purpose is to stop a session
+re-finding files earlier sessions on the same ticket already read (4.9–12.1% of
+tokens at the median; 85% of repeated reads are of unchanged files). Review
+findings per round is **unknown** — the pointer could help a reviewer or could
+mask a fault by steering the implementer to a narrow file set, which is exactly
+why reviewers are excluded from the prepend and why the read reports findings
+per round separately per arm.
+
+**R3 operator step before the read, with BOTH archive-loss log strings.** A row
+removed from the queue with no history insert makes every eligible row
+dispatched while it was missing off by one in the recompute, with nothing in
+the rows to show it. There are two reachable paths, so the operator search
+before the read must match **both** strings:
+
+```
+rg -n "Error archiving dispatch item:|Error archiving expired items:" <deploy logs>
+```
+
+`Error archiving dispatch item:` is `_archiveItem`'s swallowed `insertOne`
+failure (take / cancel / expiry). `Error archiving expired items:` is
+`cleanup()`'s skipped archive loop when its `find({expiresAt<now})` throws while
+the subsequent `deleteMany` still runs — eligible implementation rows expire
+after 24 h when no runner takes them, so this path is reachable. Any hit
+restarts the comparison window after it (recorded as a comment on LIN-3200).
