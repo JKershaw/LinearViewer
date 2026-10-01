@@ -1,4 +1,4 @@
-// LIN-3194: the steady-base menu. Holds every option's checked size (paper and section cited in `src`), merges overlapping
+// LIN-3194: the steady-base menu; version 2 corrections from survey-check-12 (LIN-3195). Holds every option's checked size (paper and section cited in `src`), merges overlapping
 // savings once per cost factor, multiplies factors into stacks, and counts the expedition's own archive from git. No proxy calls.
 // Usage: node scripts/survey-menu-analyse.mjs [--out data/survey-menu/menu.json] [--print]
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
@@ -22,33 +22,35 @@ const OPTIONS = [
   { id: 'M3', row: 'map 3', label: 'Deterministic conductor for the supervision cycle (contains M1, M2, M5)', factor: 'F1', repo: 'both', lo: 10, hi: 27, risk: 3, effort: 'L',
     src: 'what-supervisors-do v2 §Findings (77% of supervision tokens mechanical, about 27% of fleet tokens); held-or-fresh v2 §Options A (−10% by class, −14% if code could tell which wakes change nothing)' },
   { id: 'M4', row: 'map 16', label: 'Lean relay: judgement steps start fresh from a small handoff', factor: 'F1', repo: 'both', lo: 9, hi: 19, risk: 3, effort: 'L',
-    src: 'held-or-fresh v2 §Options B (A plus a further 0–9 points at a 20k handoff; −19% as a bound); prototype-concepts v2 §Options C (the handoff needs a done-and-answered list)' },
-  { id: 'M5', row: 'judgement 2', label: 'Rule-class calls in code (loop bound, retry once, proceed when a blocker is Done)', factor: 'F1', repo: 'both', lo: 0.3, hi: 1, risk: 1, effort: 'S',
-    src: 'where-judgement-happens v2 §Options 2 (under 1% of ticket cost; removes the engine\'s 9 misroutes)' },
+    src: 'held-or-fresh v2 §Options B (A plus a further −5 points at a 20k handoff, −9 at none, 0 at about 40k); prototype-concepts v2 §Options C (the handoff needs a done-and-answered list)' },
+  { id: 'M15', row: 'held C', label: 'Start fresh instead of resuming cold above about 100–155k tokens (inside M3 and M4)', factor: 'F1', repo: 'SD', lo: 0.8, hi: 1.9, risk: 3, effort: 'S',
+    src: 'held-or-fresh v2 §Options C (−1.9% alone; about −0.8% on top of A; inside B and D); omitted from version 1, added by survey-check-12' },
+  { id: 'M5', row: 'judgement 2', label: 'Rule-class calls in code (loop bound, retry once, proceed when a blocker is Done)', factor: 'F1', repo: 'both', lo: 0, hi: 1, risk: 1, effort: 'S',
+    src: 'where-judgement-happens v2 §Options 2 (under 1% of ticket cost, 0.6% in these cycles; removes the engine\'s 9 misroutes); a share of ticket cost, inside M3' },
   { id: 'M6', row: 'cost-mix 2', label: 'Lighter orchestration of split families (parents at half their spend)', factor: 'F1', repo: 'LV', lo: 0, hi: 6.5, risk: 2, effort: 'M',
     src: 'cost-mix v2 §Options 2 (1.1× alone; parent-only spend 13% of the budget); its mechanical part is inside M3, so 0 marks full overlap', derived: true },
   { id: 'M7', row: 'map 15', label: 'A child of an approved plan does not plan again', factor: 'F2', repo: 'LV', lo: 1, hi: 3, risk: 3, effort: 'S',
     src: 'step-overlap v2 §Options A (perhaps 1–3%; ceiling 3.9% of tokens, 4.3% weighted)' },
-  { id: 'M8', row: 'map 8', label: 'Stop review and close-out rounds that change nothing', factor: 'F2', repo: 'LV', lo: 1, hi: 3, risk: 1, effort: 'S',
-    src: 'why-legs-repeat v2 §Findings (repeats 10% of tokens; 44 of 430 repeat dispatches are close-outs; 20 of 20 close-out repeats changed nothing); which-rules-pay v2 §Findings (mutation check led ~36 of 88 extra legs, 97 test-or-wording changes). 44/430 × 10% ≈ 1% is this paper\'s arithmetic; the mutation rounds are unsized', derived: true },
+  { id: 'M8', row: 'map 8', label: 'Stop review and close-out rounds that change nothing', factor: 'F2', repo: 'LV', lo: 1, hi: 1, risk: 1, effort: 'S',
+    src: 'why-legs-repeat v2 §Findings (repeats 10% of tokens; 44 of 430 repeat dispatches are close-outs; 20 of 20 close-out repeats changed nothing); which-rules-pay v2 §Findings (mutation check led ~36 of 88 extra legs, 97 test-or-wording changes). 44/430 × 10% ≈ 1% is this paper\'s arithmetic; the mutation rounds are unsized, so the upper end is unsized too (survey-check-12)', derived: true },
   { id: 'M34', row: 'hides C', label: 'Give the periodicals the alarm log instead of a search for runtime faults', factor: 'F2', repo: 'LV', lo: 0, hi: 3.1, risk: 1, effort: 'S',
     src: 'what-hides-between-sessions v2 §Options C (up to 3.1% of September\'s tokens per batch spent where no cross-session instance was found first)' },
   { id: 'M9', row: 'map 13', label: 'Stop the bootstrap summary for the roles that still run it', factor: 'F3', repo: 'SD', lo: 3, hi: 5, risk: 1, effort: 'S',
     src: 'starting-context v2 §Options A (3.0% own turns plus up to 2.4% carried; survey-check-8 raised it from 3% to about 5%)' },
-  { id: 'M10', row: 'map 14', label: 'A short file pointer between sessions on one ticket (not a map or wiki)', factor: 'F3', repo: 'LV', lo: 1.5, hi: 2, risk: 2, effort: 'S–M',
-    src: 'starting-context v2 §Options B–D (bounded by re-finding 4.9–12.1%; C 0.1–2%; D about 1.4%); prototype-concepts v2 §Options A (~1.5–2%)' },
-  { id: 'M11', row: 'context E', label: 'Answer deterministic research questions with a tool', factor: 'F3', repo: 'LV', lo: 1, hi: 2, risk: 1, effort: 'M',
-    src: 'starting-context v2 §Options E (research legs 5.3% of tokens; perhaps 1–2%)' },
-  { id: 'M12', row: 'map 17', label: 'Lighter legs everywhere: fewer tracker reads and writes, brief passed inline', factor: 'F3', repo: 'both', lo: 10, hi: 15, risk: 2, effort: 'M',
-    src: 'replay-small-work v2 §Options 2 (tracker calls 25% and remote work 4% of tokens; halving saves about 15%); survey-check-11 (about 15 points truly avoidable). The low end nets out the 35% of tokens in supervision sessions M3 already removes, assuming an even spread', derived: true },
-  { id: 'M13', row: 'judgement 3', label: 'Close-out at a cheaper tier, with a frontier step for the open questions', factor: 'F3', repo: 'LV', lo: 1, hi: 3, risk: 3, effort: 'S',
-    src: 'where-judgement-happens v2 §Options 3 (2–5% of ticket cost); starting-context v2 §Findings (close-out is 5.2% of fleet tokens); prototype-concepts v2 §Options F (a fixture eval first)', derived: true },
-  { id: 'M14', row: 'overlap B', label: 'The plan states what it adds to the research and cites the rest', factor: 'F3', repo: 'LV', lo: 0.2, hi: 1, risk: 1, effort: 'S',
+  { id: 'M10', row: 'map 14', label: 'A short file pointer between sessions on one ticket (not a map or wiki)', factor: 'F3', repo: 'LV', lo: 1.5, hi: 2, risk: 2, effort: 'S–M', unsized: true,
+    src: 'starting-context v2 §Options B–D (bounded by re-finding 4.9–12.1%; C 0.1–2%; D about 1.4%); prototype-concepts v2 §Options A and the anchor row 14 cite 1.5–2% from each other, and no paper derives it (survey-check-12); step-overlap v2 §Options D is the same lever' },
+  { id: 'M11', row: 'context E', label: 'Answer deterministic research questions with a tool', factor: 'F3', repo: 'LV', lo: 1, hi: 1.7, risk: 1, effort: 'M',
+    src: 'starting-context v2 §Options E (research legs 5.3% of tokens; perhaps 1–2%); survey-check-8 (a ceiling: search and history are 32% of research legs\' result tokens, so about 1.7% at most)' },
+  { id: 'M12', row: 'map 17', label: 'Lighter legs everywhere: fewer tracker reads and writes, brief passed inline', factor: 'F3', repo: 'both', lo: 12.3, hi: 14.6, risk: 2, effort: 'M',
+    src: 'replay-small-work v2 §Options 2 and survey-check-11 (tracker calls 24.7% and remote work 4.4% of tokens; halving saves 14.6%). survey-check-12: 58% of tracker tokens sit in supervisor sessions, so after F1 the option is 13.9% of what is left with F1 at 10% and 12.3% with F1 at 27%', derived: true },
+  { id: 'M13', row: 'judgement 3', label: 'Close-out at a cheaper tier, with a frontier step for the open questions', factor: 'F3', repo: 'LV', lo: 2.1, hi: 4.2, risk: 3, effort: 'S',
+    src: 'where-judgement-happens v2 §Options 3 (2–5% of ticket cost: close-out 6% × 0.4–0.8); starting-context v2 §Findings (close-out is 5.2% of fleet tokens), so 5.2% × 0.4–0.8, before the uncosted frontier step (survey-check-7: leans high); model-choice v2 (close-out has run at the cheap tier since 25 September, ungated); prototype-concepts v2 §Options F (a fixture eval first)', derived: true },
+  { id: 'M14', row: 'overlap B', label: 'The plan states what it adds to the research and cites the rest', factor: 'F3', repo: 'LV', lo: 0, hi: 1, risk: 1, effort: 'S',
     src: 'step-overlap v2 §Options B (under 1% of a four-step ticket\'s tokens)' },
   { id: 'M16', row: 'map 7', label: 'A light lane for small, non-credential changes, classified by the paths touched', factor: 'F4', repo: 'both', lo: 8, hi: 12, risk: 3, effort: 'M',
     src: 'cost-mix v2 §Options 1 (1.08–1.14×); replay-small-work v2 §Options 1 (saves 8–12% of tokens); proportional-process-backtest v2 (13–18% of hours, 21–30% of dispatches at most)' },
-  { id: 'M17', row: 'cost-mix 4', label: 'Size the gates to the change: hold credentials and 300+ lines, halve the rest (contains M16)', factor: 'F4', repo: 'both', lo: 8, hi: 17, risk: 3, effort: 'M',
-    src: 'cost-mix v2 §Options 4 (1.2× on the 0–299-line changes it touches, which is a 17% cut); the 50–299 band holds 11 of 43 catches' },
+  { id: 'M17', row: 'cost-mix 4', label: 'Size the gates to the change: hold credentials and 300+ lines, halve the rest (contains M16)', factor: 'F4', repo: 'both', lo: 8, hi: 18.7, risk: 3, effort: 'M',
+    src: 'cost-mix v2 §Options 4 (1.2× on the 0–299-line changes it touches); survey-check-9 (1.23×, an 18.7% cut of the whole budget); the 50–299 band holds 11 of 43 catches' },
   // Hours, not tokens.
   { id: 'M18', row: 'map 5', label: 'Make the flaky browser specs robust', factor: 'F5', repo: 'LV', lo: 0, hi: 0, risk: 0, effort: 'S–M', hours: '38 red PR runs, 54 re-runs, about 3 runner-hours of re-runs; none before two workers',
     src: 'browser-flakes v2 §Findings; test-estate v2 §Findings (flakes are the biggest cause of red CI)' },
@@ -56,12 +58,14 @@ const OPTIONS = [
     src: 'test-estate v2 §Findings; survey-check-2' },
   { id: 'M20', row: 'map 9', label: 'Loosen text pins on prompt prose; keep the branch pins', factor: 'F5', repo: 'LV', lo: 0, hi: 0, risk: 1, effort: 'M', hours: 'friction on every prompt change; prose pins caught 3 of 19 deleted lines',
     src: 'test-estate v2 §Findings' },
-  { id: 'M21', row: 'hides A', label: 'Run the cross-session detectors live, outside the processes they watch', factor: 'F5', repo: 'both', lo: 0, hi: 1, risk: 1, effort: 'M', hours: '42 hours of supervisors waiting on lost wakes and 165 hours of stalls in September; discovery a median 16 h after onset, detectors 5 h earlier on 7 of 19',
+  { id: 'M21', row: 'hides A', label: 'Run the cross-session detectors live, outside the processes they watch', factor: 'F5', repo: 'both', lo: 0, hi: 1, risk: 1, effort: 'M', hours: '42 hours of supervisors waiting on lost wakes in September, and the overnight freezes (the 165 hours of stalls are already caught in code); discovery a median 16 h after onset, detectors 0–9.3 h earlier on 7 of 19',
     src: 'what-hides-between-sessions v2 §Options A; survey-check-10 (7 of 19, not 9; about 40 real unrecorded faults)' },
   { id: 'M22', row: 'hides B', label: "Make the runner's completion post tell the truth", factor: 'F5', repo: 'SD', lo: 0, hi: 0, risk: 0, effort: 'S', hours: '23 failed terminal posts logged as posted since July, 8 in September',
     src: 'what-hides-between-sessions v2 §Options B' },
   { id: 'M23', row: 'hides E', label: 'An alarm for duplicate launches', factor: 'F5', repo: 'SD', lo: 0.15, hi: 0.15, risk: 1, effort: 'S', hours: '5 duplicate pairs a month',
     src: 'what-hides-between-sessions v2 §Options E' },
+  { id: 'M36', row: 'judgement 4', label: 'Retry service faults inside the tools sessions use, with the duplicate guard in the tool', factor: 'F5', repo: 'both', lo: 0, hi: 0, risk: 1, effort: 'S', hours: 'not sized: 47 auth flaps, outages and host faults on 20 of 36 tickets, each costing a step that re-reads its context',
+    src: 'where-judgement-happens v2 §Options 4; omitted from version 1, added by survey-check-12' },
   // Enablers and landing: no saving of their own.
   { id: 'M24', row: 'map 10', label: 'Keep the evidence for the project\'s lifetime (phase C remaining)', factor: 'F6', repo: 'LV', status: 'in progress, LIN-3157', src: 'steady-base.md map row 10' },
   { id: 'M25', row: 'map 11', label: 'Freeze prompt sizes; new lessons land as code first', factor: 'F6', repo: 'both', src: 'steady-base.md map row 11; how-process-changes-land v2 §Findings 3 (adds outnumber removals about six to one)' },
@@ -82,12 +86,13 @@ const DONE = [
   { row: 'map 5 (unit part)', label: 'Unit flakes: a fixture clock race', ticket: 'LIN-3159', effect: 'done', src: 'steady-base.md map row 5' },
 ];
 
+// Version 2: prototype-concepts v2 E (a reader-and-inference pass on every check) is a correctness option at a cost, which the source
+// does not advise against, so it is not listed here (survey-check-12).
 const NOT_RECOMMENDED = [
   { label: 'The relay as proposed, with today\'s orientation', why: '0% (−17% to +9%): no reliable saving', src: 'held-or-fresh v2 §Options D' },
   { label: 'Plan review re-derives less', why: 'at most ~2%, and plan review\'s finds are new; high risk', src: 'step-overlap v2 §Options C' },
   { label: 'Writing less, for tokens\' sake', why: 'ticket text is 1.3–2.4% of carried context', src: 'step-overlap v2 §Options E' },
   { label: 'A graph-structured investigation for research legs', why: 'a median 1.44× the tokens for more coverage', src: 'prototype-concepts v2 §Options G' },
-  { label: 'A reader-and-inference pass on every check', why: 'a cost, not a saving', src: 'prototype-concepts v2 §Options E' },
   { label: 'Switching model tiers as the cost lever', why: 'whole-life cost per correct change is about the same at frontier and mid tier (ratio 0.91, 0.70–1.21)', src: 'model-choice v2 §Findings' },
   { label: 'A lighter plan review or review on the strength of the judgement paper', why: 'gates and makers make 158 of 260 consequential decisions', src: 'where-judgement-happens v2 §Options 5' },
 ];
@@ -99,14 +104,17 @@ const mult = (share) => 1 / (1 - share / 100);
 const FACTORS = {
   F1: { name: 'Supervision plumbing (map rows 1–3, 16; judgement 2; cost-mix 2)', union: { lo: 10, hi: 27 },
     note: 'M1 + M2 by class is 10; 14 if code could tell which wakes change nothing; 27 is every mechanical supervision token. M4, M5 and M6 sit inside that range.' },
-  F2: { name: 'Legs that need not run (map rows 8, 15; hides C)', union: { lo: 2, hi: 6 },
-    note: 'M7 (1–3) and M8 (1–3) are disjoint pools and add; M34\'s 0–3.1 is an upper bound the union does not add.' },
-  F3: { name: 'Tokens per session (map rows 13, 14, 17; context E; judgement 3; overlap B)', union: { lo: 16.7, hi: 28 },
-    note: 'M9 3–5, M10 1.5–2, M11 1–2, M12 10–15, M13 1–3, M14 0.2–1, added as disjoint pools. Without M12 it is 6.7–13.' },
-  F4: { name: 'Which changes get the full process (map row 7; cost-mix 1, 4)', union: { lo: 8, hi: 17 },
+  F2: { name: 'Legs that need not run (map rows 8, 15; hides C)', union: { lo: 2, hi: 4 },
+    note: 'M7 (1–3) and M8 (about 1, its upper end unsized) are disjoint pools and add; M34\'s 0–3.1 is an upper bound the union does not add.' },
+  F3: { name: 'Tokens per session (map rows 13, 14, 17; context E; judgement 3; overlap B)', union: { lo: 21.5, hi: 26.2 },
+    note: 'M9 3–5, M10 1.5–2 (unsized), M11 1–1.7, M12 13.9 with F1 at 10% and 12.3 with F1 at 27% (survey-check-12), M13 2.1–4.2, M14 0–1, added as pools; M12 also overlaps M9 by an unmeasured amount (survey-check-11), so the sum is an upper end. Without M12 it is 7.6–13.9.' },
+  F4: { name: 'Which changes get the full process (map row 7; cost-mix 1, 4)', union: { lo: 8, hi: 18.7 },
     note: 'M17 contains M16: the same small-change spend, cut further.' },
 };
-const F3_NO_M12 = { lo: 6.7, hi: 13 };
+// Version 2 (survey-check-12): F1 by class is 10% (M1 5.7 + M2 4.1); 14% needs code to know in advance which wakes change nothing,
+// which it cannot (survey-check-7), so no stack's low end and no "code can see" stack uses it.
+const F1_CLASS = { lo: 10, hi: 10 }, F1_CONDUCTOR = { lo: 10, hi: 27 };
+const F3_QUICK = { lo: 4.5, hi: 8 }; // M9, M10, M14
 
 const stack = (name, parts, members) => {
   const lo = parts.reduce((p, q) => p * mult(q.lo), 1), hi = parts.reduce((p, q) => p * mult(q.hi), 1);
@@ -119,12 +127,12 @@ const CRED = 9.7; // cost-mix v2 §Findings: credentials and auth, child-named s
 const heldCredit = (m) => 1 / (CRED / 100 + (1 - CRED / 100) / m); // the stack applied to everything but credential work
 
 const STACKS = [
-  stack('S0 Quick and reliability-neutral', [{ f: 'F3', ...F3_NO_M12, lo: 4.7, hi: 8 }], ['M9', 'M10', 'M14', 'M18', 'M19', 'M20', 'M22', 'M23']),
-  stack('S1 Plumbing code can see', [{ f: 'F1', lo: 10, hi: 14 }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', lo: 4.7, hi: 8 }], ['S0', 'M1', 'M2', 'M5', 'M7', 'M8']),
-  stack('S1+ Plumbing code can see, plus proportionality', [{ f: 'F1', lo: 10, hi: 14 }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', lo: 4.7, hi: 8 }, { f: 'F4', ...FACTORS.F4.union }], ['S1', 'M16', 'M17']),
-  stack('S2 The conductor', [{ f: 'F1', lo: 14, hi: 27 }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', lo: 4.7, hi: 8 }], ['S0', 'M3', 'M21', 'M7', 'M8']),
-  stack('S3 The conductor, plus proportionality', [{ f: 'F1', lo: 14, hi: 27 }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', lo: 4.7, hi: 8 }, { f: 'F4', ...FACTORS.F4.union }], ['S2', 'M16', 'M17']),
-  stack('S4 The whole menu', [{ f: 'F1', lo: 14, hi: 27 }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', ...FACTORS.F3.union }, { f: 'F4', ...FACTORS.F4.union }], ['S3', 'M12', 'M13', 'M11', 'M4']),
+  stack('S0 Quick and reliability-neutral', [{ f: 'F3', ...F3_QUICK }], ['M9', 'M10', 'M14', 'M18', 'M19', 'M20', 'M22', 'M23']),
+  stack('S1 Plumbing code can see', [{ f: 'F1', ...F1_CLASS }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', ...F3_QUICK }], ['S0', 'M1', 'M2', 'M5', 'M7', 'M8']),
+  stack('S1+ Plumbing code can see, plus proportionality', [{ f: 'F1', ...F1_CLASS }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', ...F3_QUICK }, { f: 'F4', ...FACTORS.F4.union }], ['S1', 'M16', 'M17']),
+  stack('S2 The conductor', [{ f: 'F1', ...F1_CONDUCTOR }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', ...F3_QUICK }], ['S0', 'M3', 'M21', 'M7', 'M8']),
+  stack('S3 The conductor, plus proportionality', [{ f: 'F1', ...F1_CONDUCTOR }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', ...F3_QUICK }, { f: 'F4', ...FACTORS.F4.union }], ['S2', 'M16', 'M17']),
+  stack('S4 The whole menu', [{ f: 'F1', ...F1_CONDUCTOR }, { f: 'F2', ...FACTORS.F2.union }, { f: 'F3', ...FACTORS.F3.union }, { f: 'F4', ...FACTORS.F4.union }], ['S3', 'M12', 'M13', 'M11', 'M4']),
 ];
 // The sum of every token option's high end, counted as if none overlapped.
 const naiveSum = r1(OPTIONS.filter((o) => o.hi > 0 && o.factor !== 'F5').reduce((p, o) => p + o.hi, 0));
