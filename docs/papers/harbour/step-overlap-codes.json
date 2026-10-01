@@ -1,0 +1,6075 @@
+{
+ "ticket": "LIN-3179",
+ "codedAt": "2026-10-01",
+ "method": "Overlap: every 3rd ticket of the four-step census by number (13 digests), units cut by survey-overlap-lib.mjs and capped by survey-overlap-digests.mjs. Value: every ticket with a real review fault in which-rules-pay-codes.json, and every real plan-review find in why-legs-repeat-codes.json and survey-check-6-codes.json. Two readers, A (digests in order) and B (in reverse), each an in-session subagent of the frontier tier split across sessions, blind to each other and to this analysis. Not adjudicated.",
+ "rubric": "# Step-overlap coding rubric (LIN-3179) — fixed before any digest was read\n\n## Overlap digests (O01, O02, …)\n\nEach digest is one ticket that went through research, plan, plan review and implementation. It shows\nthe ticket description, then each step's first-round text (research, plan, plan review) and the\nimplementer's comments, then a list of numbered units cut mechanically from that text: R (research),\nP (plan), V (plan review), I (implementation). Read the whole digest before coding. Code every listed\nunit, exactly one code per unit. When a unit fits two codes, take the first that applies in the order\nlisted. Add a short note only where the call was hard.\n\n1. **P units (the plan), against the research and the ticket description.**\n   - `RESTATE`: the same fact, decision or reference is already in the research or the description, and the plan adds no new evidence for it.\n   - `REVERIFY`: the same fact is already in the research, and the plan re-establishes it with fresh evidence of its own (re-read lines, new line numbers or counts for the same claim, a re-run command).\n   - `EXTEND`: builds on a point the research made and adds substance it did not have (a design detail, a step, a test, a scope decision).\n   - `NEW`: a point that neither the research nor the description makes.\n   - `CONTRA`: contradicts or overturns something the research said.\n2. **V units (the plan review), against the research and the plan.**\n   - `CHECK`: judges a claim or decision of the plan or research (agrees, disagrees, asks for a change) without re-establishing it from fresh evidence.\n   - `REVERIFY`: re-establishes from fresh evidence a fact the plan or research already stated (line numbers, a grep, a test run) and confirms it.\n   - `NEW`: raises a fact, risk or defect that neither the plan nor the research stated, whether or not it turns out right.\n   - `PROCESS`: a verdict line, ledger bookkeeping, boilerplate, or a process note with no claim about the work.\n3. **I units (the implementer's comments), against the plan and the research.** `RESTATE`, `REVERIFY`, `EXTEND`, `NEW` or `CONTRA` as for P, where `CONTRA` means the implementation departed from the plan.\n4. **Use of each R unit by the later steps (plan, plan review, implementation).**\n   - `CITED`: a later step names it or points to the research for it.\n   - `FOLLOWED`: a later step acts on it or repeats it without pointing to the research.\n   - `CONTRADICTED`: a later step overturns it.\n   - `IGNORED`: it is actionable (a fact, risk, recommendation or decision) and no later step shows any trace of it.\n   - `BACKGROUND`: context with nothing to act on.\n\nOutput for each digest: `{\"digest\": \"O01\", \"codes\": {\"P1\": \"RESTATE\", …, \"V1\": …, \"I1\": …}, \"use\": {\"R1\": \"FOLLOWED\", …}, \"notes\": {\"P3\": \"…\"}}`.\n\n## Value digests (V01, V02, …)\n\nEach digest is one ticket and one or more findings, each a real fault that code review found\n(`which-rules-pay.md`) or a real, new point that a repeat plan-review round raised\n(`why-legs-repeat.md`). It shows the description as filed, the description's research and plan sections as they stand now,\nand the research and plan comments written before the first finding. For each finding:\n\n- For a plan-review finding, first name the real, new point in one line (`point`); the round's whole comment is shown, so pick the point that is most clearly new and substantive.\n- `flaggedIn`: where, if anywhere, the same risk or defect was named before the finding was raised: `RESEARCH`, `PLAN`, `BOTH`, `DESCRIPTION` or `NONE`. Named means that a reader of that text would have known to look for this specific failure. A generic \"add tests\" or \"be careful with X\" does not count; naming the mechanism does.\n- `priorText`: `true` if the digest shows any research or plan text before the finding, else `false`.\n- `quote`: where `flaggedIn` is not `NONE`, the shortest quote that names it, and `quoteSource`: `comment` (a research or plan comment dated before the finding) or `description-now` (the description's research or plan section as it stands now, which may postdate the finding).\n\nOutput for each digest: `{\"digest\": \"V01\", \"findings\": {\"<finding id>\": {\"point\": \"…\", \"flaggedIn\": \"NONE\", \"priorText\": true, \"quote\": null, \"quoteSource\": null}}}`.\n",
+ "digests": [
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "units": {
+    "R": 11,
+    "P": 11,
+    "V": 3,
+    "I": 9
+   }
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "units": {
+    "R": 12,
+    "P": 11,
+    "V": 12,
+    "I": 10
+   }
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "units": {
+    "R": 11,
+    "P": 10,
+    "V": 11,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "units": {
+    "R": 11,
+    "P": 10,
+    "V": 9,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "units": {
+    "R": 0,
+    "P": 7,
+    "V": 11,
+    "I": 11
+   }
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "units": {
+    "R": 12,
+    "P": 12,
+    "V": 12,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "units": {
+    "R": 11,
+    "P": 11,
+    "V": 10,
+    "I": 11
+   }
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "units": {
+    "R": 12,
+    "P": 10,
+    "V": 11,
+    "I": 11
+   }
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "units": {
+    "R": 10,
+    "P": 10,
+    "V": 11,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "units": {
+    "R": 11,
+    "P": 11,
+    "V": 10,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "units": {
+    "R": 5,
+    "P": 9,
+    "V": 11,
+    "I": 11
+   }
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "units": {
+    "R": 12,
+    "P": 6,
+    "V": 12,
+    "I": 12
+   }
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "units": {
+    "R": 12,
+    "P": 9,
+    "V": 10,
+    "I": 10
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "findings": [
+    "LIN-3124#f4",
+    "LIN-3124#f5",
+    "LIN-3124#f12",
+    "LIN-3124#f13",
+    "LIN-3124#f14",
+    "LIN-3124#f15",
+    "LIN-3124#f16",
+    "LIN-3124#f20"
+   ],
+   "research": 0,
+   "plan": 4
+  },
+  {
+   "digest": "V02",
+   "issue": "LIN-2837",
+   "findings": [
+    "LIN-2837#f0",
+    "LIN-2837#f1",
+    "LIN-2837#f2",
+    "LIN-2837#f3",
+    "LIN-2837#f11",
+    "LIN-2837#f12"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V03",
+   "issue": "LIN-3035",
+   "findings": [
+    "LIN-3035#f0"
+   ],
+   "research": 0,
+   "plan": 1
+  },
+  {
+   "digest": "V04",
+   "issue": "LIN-3049",
+   "findings": [
+    "LIN-3049#f0",
+    "LIN-3049#f3"
+   ],
+   "research": 1,
+   "plan": 4
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "findings": [
+    "LIN-2934#f0",
+    "LIN-2934#f4",
+    "LIN-2934#f11",
+    "LIN-2934#f14",
+    "LIN-2934#f15",
+    "LIN-2934#f16",
+    "LIN-2934#f17",
+    "LIN-2934#f18",
+    "LIN-2934#f19",
+    "LIN-2934#f23"
+   ],
+   "research": 1,
+   "plan": 4
+  },
+  {
+   "digest": "V06",
+   "issue": "LIN-3011",
+   "findings": [
+    "LIN-3011#f0"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V07",
+   "issue": "LIN-2974",
+   "findings": [
+    "LIN-2974#f5"
+   ],
+   "research": 1,
+   "plan": 5
+  },
+  {
+   "digest": "V08",
+   "issue": "LIN-2812",
+   "findings": [
+    "LIN-2812#f0"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V09",
+   "issue": "LIN-2959",
+   "findings": [
+    "LIN-2959#f0",
+    "LIN-2959#f1"
+   ],
+   "research": 1,
+   "plan": 1
+  },
+  {
+   "digest": "V10",
+   "issue": "LIN-2872",
+   "findings": [
+    "LIN-2872#f0",
+    "LIN-2872#f1"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V11",
+   "issue": "LIN-2771",
+   "findings": [
+    "LIN-2771#f1"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V12",
+   "issue": "LIN-2760",
+   "findings": [
+    "LIN-2760#f0"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V13",
+   "issue": "LIN-2830",
+   "findings": [
+    "LIN-2830#f0"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V14",
+   "issue": "LIN-2820",
+   "findings": [
+    "LIN-2820#f0",
+    "LIN-2820#f1"
+   ],
+   "research": 1,
+   "plan": 1
+  },
+  {
+   "digest": "V15",
+   "issue": "LIN-2804",
+   "findings": [
+    "LIN-2804#f0"
+   ],
+   "research": 0,
+   "plan": 1
+  },
+  {
+   "digest": "V16",
+   "issue": "LIN-2758",
+   "findings": [
+    "LIN-2758#f0"
+   ],
+   "research": 0,
+   "plan": 2
+  },
+  {
+   "digest": "V17",
+   "issue": "LIN-2623",
+   "findings": [
+    "LIN-2623#f0"
+   ],
+   "research": 0,
+   "plan": 1
+  },
+  {
+   "digest": "V18",
+   "issue": "LIN-2756",
+   "findings": [
+    "LIN-2756#f0",
+    "LIN-2756#f3"
+   ],
+   "research": 0,
+   "plan": 0
+  },
+  {
+   "digest": "V19",
+   "issue": "LIN-275",
+   "findings": [
+    "LIN-275@2026-08-06T09:29"
+   ],
+   "research": 2,
+   "plan": 1
+  },
+  {
+   "digest": "V20",
+   "issue": "LIN-2025",
+   "findings": [
+    "LIN-2025@2026-08-10T18:39"
+   ],
+   "research": 0,
+   "plan": 3
+  },
+  {
+   "digest": "V21",
+   "issue": "LIN-2077",
+   "findings": [
+    "LIN-2077@2026-08-14T10:26"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V22",
+   "issue": "LIN-2116",
+   "findings": [
+    "LIN-2116@2026-08-16T07:33"
+   ],
+   "research": 1,
+   "plan": 0
+  },
+  {
+   "digest": "V23",
+   "issue": "LIN-2327",
+   "findings": [
+    "LIN-2327@2026-08-27T07:27"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V24",
+   "issue": "LIN-2333",
+   "findings": [
+    "LIN-2333@2026-08-29T14:57"
+   ],
+   "research": 1,
+   "plan": 0
+  },
+  {
+   "digest": "V25",
+   "issue": "LIN-2385",
+   "findings": [
+    "LIN-2385@2026-08-30T14:32"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V26",
+   "issue": "LIN-2431",
+   "findings": [
+    "LIN-2431@2026-08-31T11:49"
+   ],
+   "research": 8,
+   "plan": 5
+  },
+  {
+   "digest": "V27",
+   "issue": "LIN-2701",
+   "findings": [
+    "LIN-2701@2026-09-06T06:39"
+   ],
+   "research": 0,
+   "plan": 2
+  },
+  {
+   "digest": "V28",
+   "issue": "LIN-2720",
+   "findings": [
+    "LIN-2720@2026-09-11T06:42"
+   ],
+   "research": 1,
+   "plan": 3
+  },
+  {
+   "digest": "V29",
+   "issue": "LIN-2754",
+   "findings": [
+    "LIN-2754@2026-09-11T19:08",
+    "LIN-2754@2026-09-11T19:31"
+   ],
+   "research": 1,
+   "plan": 9
+  },
+  {
+   "digest": "V30",
+   "issue": "LIN-2887",
+   "findings": [
+    "LIN-2887@2026-09-17T19:38"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V31",
+   "issue": "LIN-2991",
+   "findings": [
+    "LIN-2991@2026-09-24T21:25",
+    "LIN-2991@2026-09-24T17:59"
+   ],
+   "research": 2,
+   "plan": 3
+  },
+  {
+   "digest": "V32",
+   "issue": "LIN-3027",
+   "findings": [
+    "LIN-3027@2026-09-25T06:24"
+   ],
+   "research": 2,
+   "plan": 2
+  },
+  {
+   "digest": "V33",
+   "issue": "LIN-2995",
+   "findings": [
+    "LIN-2995@2026-09-25T08:24"
+   ],
+   "research": 1,
+   "plan": 3
+  },
+  {
+   "digest": "V34",
+   "issue": "LIN-3107",
+   "findings": [
+    "LIN-3107@2026-09-26T20:19"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V35",
+   "issue": "LIN-1948",
+   "findings": [
+    "LIN-1948@2026-08-09T16:18"
+   ],
+   "research": 1,
+   "plan": 3
+  },
+  {
+   "digest": "V36",
+   "issue": "LIN-1557",
+   "findings": [
+    "LIN-1557@2026-08-10T09:06"
+   ],
+   "research": 1,
+   "plan": 6
+  },
+  {
+   "digest": "V37",
+   "issue": "LIN-2154",
+   "findings": [
+    "LIN-2154@2026-08-20T07:35"
+   ],
+   "research": 1,
+   "plan": 1
+  },
+  {
+   "digest": "V38",
+   "issue": "LIN-2281",
+   "findings": [
+    "LIN-2281@2026-08-27T13:54"
+   ],
+   "research": 0,
+   "plan": 2
+  },
+  {
+   "digest": "V39",
+   "issue": "LIN-2361",
+   "findings": [
+    "LIN-2361@2026-08-29T19:42"
+   ],
+   "research": 0,
+   "plan": 1
+  },
+  {
+   "digest": "V40",
+   "issue": "LIN-2396",
+   "findings": [
+    "LIN-2396@2026-08-30T16:31"
+   ],
+   "research": 1,
+   "plan": 1
+  },
+  {
+   "digest": "V41",
+   "issue": "LIN-2435",
+   "findings": [
+    "LIN-2435@2026-08-31T18:42"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V42",
+   "issue": "LIN-2437",
+   "findings": [
+    "LIN-2437@2026-09-02T07:31"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V43",
+   "issue": "LIN-2719",
+   "findings": [
+    "LIN-2719@2026-09-11T04:43"
+   ],
+   "research": 1,
+   "plan": 2
+  },
+  {
+   "digest": "V44",
+   "issue": "LIN-2891",
+   "findings": [
+    "LIN-2891@2026-09-25T00:21"
+   ],
+   "research": 0,
+   "plan": 3
+  },
+  {
+   "digest": "V45",
+   "issue": "LIN-3026",
+   "findings": [
+    "LIN-3026@2026-09-25T01:33"
+   ],
+   "research": 1,
+   "plan": 3
+  },
+  {
+   "digest": "V46",
+   "issue": "LIN-3033",
+   "findings": [
+    "LIN-3033@2026-09-25T07:38"
+   ],
+   "research": 1,
+   "plan": 2
+  }
+ ],
+ "summary": {
+  "overlap": {
+   "P": {
+    "units": 127,
+    "agreement": {
+     "n": 127,
+     "agree": 0.866,
+     "kappa": 0.814
+    },
+    "readerA": {
+     "EXTEND": 44,
+     "RESTATE": 34,
+     "CONTRA": 2,
+     "NEW": 37,
+     "REVERIFY": 10
+    },
+    "readerB": {
+     "CONTRA": 5,
+     "RESTATE": 33,
+     "EXTEND": 41,
+     "NEW": 40,
+     "REVERIFY": 8
+    },
+    "bothAgree": {
+     "RESTATE": 30,
+     "EXTEND": 35,
+     "CONTRA": 2,
+     "NEW": 35,
+     "REVERIFY": 8
+    }
+   },
+   "V": {
+    "units": 133,
+    "agreement": {
+     "n": 133,
+     "agree": 0.917,
+     "kappa": 0.883
+    },
+    "readerA": {
+     "REVERIFY": 46,
+     "PROCESS": 13,
+     "NEW": 28,
+     "CHECK": 46
+    },
+    "readerB": {
+     "REVERIFY": 49,
+     "PROCESS": 11,
+     "NEW": 30,
+     "CHECK": 43
+    },
+    "bothAgree": {
+     "REVERIFY": 45,
+     "PROCESS": 11,
+     "NEW": 26,
+     "CHECK": 40
+    }
+   },
+   "I": {
+    "units": 145,
+    "agreement": {
+     "n": 145,
+     "agree": 0.766,
+     "kappa": 0.674
+    },
+    "readerA": {
+     "NEW": 48,
+     "RESTATE": 42,
+     "EXTEND": 34,
+     "REVERIFY": 20,
+     "CONTRA": 1
+    },
+    "readerB": {
+     "NEW": 65,
+     "RESTATE": 43,
+     "EXTEND": 19,
+     "REVERIFY": 16,
+     "CONTRA": 2
+    },
+    "bothAgree": {
+     "NEW": 45,
+     "RESTATE": 38,
+     "EXTEND": 15,
+     "REVERIFY": 12,
+     "CONTRA": 1
+    }
+   },
+   "R": {
+    "units": 130,
+    "agreement": {
+     "n": 130,
+     "agree": 0.862,
+     "kappa": 0.728
+    },
+    "readerA": {
+     "FOLLOWED": 92,
+     "CITED": 9,
+     "BACKGROUND": 21,
+     "CONTRADICTED": 4,
+     "IGNORED": 4
+    },
+    "readerB": {
+     "FOLLOWED": 83,
+     "CITED": 13,
+     "BACKGROUND": 24,
+     "CONTRADICTED": 5,
+     "IGNORED": 5
+    },
+    "bothAgree": {
+     "FOLLOWED": 81,
+     "CITED": 6,
+     "BACKGROUND": 18,
+     "CONTRADICTED": 4,
+     "IGNORED": 3
+    }
+   },
+   "shares": {
+    "planRestatesOrReverifies": {
+     "tickets": 13,
+     "mean": 0.324,
+     "median": 0.3
+    },
+    "planRestates": {
+     "tickets": 13,
+     "mean": 0.254,
+     "median": 0.25
+    },
+    "planReverifies": {
+     "tickets": 13,
+     "mean": 0.07,
+     "median": 0.091
+    },
+    "planExtendsOrNew": {
+     "tickets": 13,
+     "mean": 0.65,
+     "median": 0.7
+    },
+    "planContra": {
+     "tickets": 13,
+     "mean": 0.025,
+     "median": 0
+    },
+    "reviewChecks": {
+     "tickets": 13,
+     "mean": 0.32,
+     "median": 0.292
+    },
+    "reviewReverifies": {
+     "tickets": 13,
+     "mean": 0.349,
+     "median": 0.333
+    },
+    "reviewNew": {
+     "tickets": 13,
+     "mean": 0.209,
+     "median": 0.182
+    },
+    "reviewProcess": {
+     "tickets": 13,
+     "mean": 0.123,
+     "median": 0.091
+    },
+    "implRestatesOrReverifies": {
+     "tickets": 13,
+     "mean": 0.411,
+     "median": 0.417
+    },
+    "implExtendsOrNew": {
+     "tickets": 13,
+     "mean": 0.579,
+     "median": 0.583
+    },
+    "implContra": {
+     "tickets": 13,
+     "mean": 0.01,
+     "median": 0
+    },
+    "researchUsed": {
+     "tickets": 12,
+     "mean": 0.751,
+     "median": 0.833
+    },
+    "researchCited": {
+     "tickets": 12,
+     "mean": 0.082,
+     "median": 0.083
+    },
+    "researchFollowed": {
+     "tickets": 12,
+     "mean": 0.669,
+     "median": 0.708
+    },
+    "researchContradicted": {
+     "tickets": 12,
+     "mean": 0.032,
+     "median": 0
+    },
+    "researchIgnored": {
+     "tickets": 12,
+     "mean": 0.034,
+     "median": 0
+    },
+    "researchBackground": {
+     "tickets": 12,
+     "mean": 0.184,
+     "median": 0.167
+    }
+   }
+  },
+  "value": {
+   "review-fault": {
+    "findings": 44,
+    "tickets": 18,
+    "agreementFlagged": {
+     "n": 44,
+     "agree": 1,
+     "kappa": 1
+    },
+    "agreementWhere": {
+     "n": 44,
+     "agree": 1,
+     "kappa": 1
+    },
+    "readerA": {
+     "NONE": 41,
+     "PLAN": 2,
+     "BOTH": 1
+    },
+    "readerB": {
+     "NONE": 41,
+     "PLAN": 2,
+     "BOTH": 1
+    },
+    "flaggedBoth": 3,
+    "flaggedEither": 3,
+    "flaggedBothFromComment": 3,
+    "inResearchBoth": 1,
+    "noPriorText": 15
+   },
+   "plan-review-find": {
+    "findings": 30,
+    "tickets": 28,
+    "agreementFlagged": {
+     "n": 30,
+     "agree": 0.967,
+     "kappa": 0
+    },
+    "agreementWhere": {
+     "n": 30,
+     "agree": 0.967,
+     "kappa": 0
+    },
+    "readerA": {
+     "NONE": 29,
+     "BOTH": 1
+    },
+    "readerB": {
+     "NONE": 30
+    },
+    "flaggedBoth": 0,
+    "flaggedEither": 1,
+    "flaggedBothFromComment": 0,
+    "inResearchBoth": 0,
+    "noPriorText": 0
+   }
+  }
+ },
+ "units": [
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P1",
+   "A": "EXTEND",
+   "B": "CONTRA"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P2",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P7",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P8",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P9",
+   "A": "EXTEND",
+   "B": "CONTRA"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P10",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "P11",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "V1",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "V2",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "V3",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I6",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I7",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I8",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "I9",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R1",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R2",
+   "A": "CITED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R8",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R10",
+   "A": "CITED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O01",
+   "issue": "LIN-679",
+   "unit": "R11",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P1",
+   "A": "EXTEND",
+   "B": "CONTRA"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P2",
+   "A": "CONTRA",
+   "B": "CONTRA"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P5",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P7",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P8",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P9",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "P11",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V1",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V2",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V5",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V6",
+   "A": "REVERIFY",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V7",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V8",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V9",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V10",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V11",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "V12",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I1",
+   "A": "RESTATE",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I2",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I8",
+   "A": "RESTATE",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "I10",
+   "A": "EXTEND",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R1",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R2",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R3",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R5",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R6",
+   "A": "CONTRADICTED",
+   "B": "CONTRADICTED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R8",
+   "A": "CONTRADICTED",
+   "B": "CONTRADICTED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R11",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O02",
+   "issue": "LIN-2423",
+   "unit": "R12",
+   "A": "CONTRADICTED",
+   "B": "CONTRADICTED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P2",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P5",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P6",
+   "A": "CONTRA",
+   "B": "CONTRA"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P8",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P9",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "P10",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V1",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V2",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V4",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V5",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V6",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V8",
+   "A": "CHECK",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V9",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V10",
+   "A": "CHECK",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "V11",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I1",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I2",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I4",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I6",
+   "A": "REVERIFY",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I8",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I9",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I10",
+   "A": "EXTEND",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I11",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "I12",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R1",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R2",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R6",
+   "A": "IGNORED",
+   "B": "IGNORED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R8",
+   "A": "CONTRADICTED",
+   "B": "CONTRADICTED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R10",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O03",
+   "issue": "LIN-2444",
+   "unit": "R11",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P4",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P5",
+   "A": "RESTATE",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P7",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P8",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P9",
+   "A": "EXTEND",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "P10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V1",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V5",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V6",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V7",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V8",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "V9",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I1",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I2",
+   "A": "NEW",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I5",
+   "A": "EXTEND",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I8",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I9",
+   "A": "EXTEND",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I11",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "I12",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R1",
+   "A": "FOLLOWED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R2",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R8",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R9",
+   "A": "CITED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O04",
+   "issue": "LIN-2510",
+   "unit": "R11",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "P2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "P3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "P4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "P5",
+   "A": "REVERIFY",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "P6",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "P7",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V1",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V5",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V6",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V8",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V9",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V10",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "V11",
+   "A": "NEW",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I1",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I2",
+   "A": "EXTEND",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I5",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I6",
+   "A": "REVERIFY",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I7",
+   "A": "EXTEND",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I8",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I9",
+   "A": "REVERIFY",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I10",
+   "A": "REVERIFY",
+   "B": "NEW"
+  },
+  {
+   "digest": "O05",
+   "issue": "LIN-2534",
+   "unit": "I11",
+   "A": "RESTATE",
+   "B": "NEW"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P1",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P2",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P5",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P7",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P8",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P9",
+   "A": "EXTEND",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P10",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P11",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "P12",
+   "A": "RESTATE",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V1",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V2",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V5",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V6",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V7",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V8",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V9",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V10",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V11",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "V12",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I1",
+   "A": "NEW",
+   "B": "CONTRA"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I2",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I5",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I6",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I7",
+   "A": "REVERIFY",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I8",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I10",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I11",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "I12",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R1",
+   "A": "CITED",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R2",
+   "A": "CITED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R8",
+   "A": "FOLLOWED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R11",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O06",
+   "issue": "LIN-2634",
+   "unit": "R12",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P4",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P6",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P7",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P8",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P9",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "P11",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V1",
+   "A": "PROCESS",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V2",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V3",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V5",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V6",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V7",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V8",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "V10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I2",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I3",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I5",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I6",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I7",
+   "A": "CONTRA",
+   "B": "CONTRA"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I8",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "I11",
+   "A": "REVERIFY",
+   "B": "NEW"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R1",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R2",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R8",
+   "A": "FOLLOWED",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O07",
+   "issue": "LIN-2717",
+   "unit": "R11",
+   "A": "CITED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P2",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P4",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P6",
+   "A": "RESTATE",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P7",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P8",
+   "A": "RESTATE",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "P10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V1",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V2",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V5",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V6",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V7",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V8",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V9",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "V11",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I1",
+   "A": "REVERIFY",
+   "B": "NEW"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I2",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I5",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I6",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I7",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I8",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I9",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "I11",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R1",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R2",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R8",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R9",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R11",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O08",
+   "issue": "LIN-2803",
+   "unit": "R12",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P1",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P2",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P4",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P6",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P7",
+   "A": "NEW",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P8",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P9",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "P10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V1",
+   "A": "PROCESS",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V5",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V6",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V7",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V8",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V9",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V10",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "V11",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I1",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I5",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I6",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I7",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I8",
+   "A": "REVERIFY",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I9",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I11",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "I12",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R1",
+   "A": "CITED",
+   "B": "CITED"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R2",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R3",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R4",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R5",
+   "A": "IGNORED",
+   "B": "IGNORED"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R7",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R8",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O09",
+   "issue": "LIN-2932",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P2",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P3",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P7",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P8",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "P11",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V1",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V2",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V5",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V6",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V8",
+   "A": "NEW",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V9",
+   "A": "CHECK",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "V10",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I1",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I2",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I3",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I4",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I5",
+   "A": "EXTEND",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I6",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I8",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I9",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I10",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I11",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "I12",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R1",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R2",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R3",
+   "A": "CITED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R8",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R9",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R10",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O10",
+   "issue": "LIN-2974",
+   "unit": "R11",
+   "A": "IGNORED",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P4",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P5",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P6",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P8",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "P9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V1",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V3",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V4",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V5",
+   "A": "CHECK",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V6",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V7",
+   "A": "CHECK",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V8",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V10",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "V11",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I1",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I2",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I3",
+   "A": "NEW",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I4",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I5",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I6",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I8",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I10",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "I11",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "R1",
+   "A": "BACKGROUND",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "R2",
+   "A": "FOLLOWED",
+   "B": "BACKGROUND"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O11",
+   "issue": "LIN-2991",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "P1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "P2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "P3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "P4",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "P5",
+   "A": "REVERIFY",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "P6",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V1",
+   "A": "PROCESS",
+   "B": "PROCESS"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V4",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V5",
+   "A": "CHECK",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V6",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V8",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V9",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V10",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V11",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "V12",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I2",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I3",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I5",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I6",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I8",
+   "A": "EXTEND",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I10",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I11",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "I12",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R1",
+   "A": "BACKGROUND",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R2",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R4",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R7",
+   "A": "IGNORED",
+   "B": "IGNORED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R8",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R11",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O12",
+   "issue": "LIN-3025",
+   "unit": "R12",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P1",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P2",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P3",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P5",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P6",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P7",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P8",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "P9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V1",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V2",
+   "A": "REVERIFY",
+   "B": "REVERIFY"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V3",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V4",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V5",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V6",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V7",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V8",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V9",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "V10",
+   "A": "CHECK",
+   "B": "CHECK"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I1",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I2",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I3",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I4",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I5",
+   "A": "RESTATE",
+   "B": "RESTATE"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I6",
+   "A": "RESTATE",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I7",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I8",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I9",
+   "A": "NEW",
+   "B": "NEW"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "I10",
+   "A": "EXTEND",
+   "B": "EXTEND"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R1",
+   "A": "BACKGROUND",
+   "B": "CITED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R2",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R3",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R4",
+   "A": "BACKGROUND",
+   "B": "IGNORED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R5",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R6",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R7",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R8",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R9",
+   "A": "FOLLOWED",
+   "B": "IGNORED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R10",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R11",
+   "A": "CITED",
+   "B": "CONTRADICTED"
+  },
+  {
+   "digest": "O13",
+   "issue": "LIN-3033",
+   "unit": "R12",
+   "A": "FOLLOWED",
+   "B": "FOLLOWED"
+  }
+ ],
+ "findings": [
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f4",
+   "source": "review-fault",
+   "A": {
+    "point": "Unlink census release runs after unlinkProvider, so it never releases the connection-backed binding",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Unlink census release runs after unlinkProvider, so it never releases the connection-backed binding",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f5",
+   "source": "review-fault",
+   "A": {
+    "point": "Legacy deleteAll(accountId,urlKey) deletes the connection-keyed shared owner record because urlKey is persisted on it",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Legacy deleteAll(accountId, urlKey) deletes the connection-keyed shared owner record because urlKey is persisted on it",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f12",
+   "source": "review-fault",
+   "A": {
+    "point": "Mirror/expiry accessors return undefined for connection-backed workspaces: no proactive refresh, Bearer undefined",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Mirror/expiry accessors return undefined for connection-backed workspaces: no proactive refresh and Bearer undefined",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f13",
+   "source": "review-fault",
+   "A": {
+    "point": "Post-401 retry renders with a stale side-table credential after the connection refresh",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Post-401 retry renders with a stale side-table credential after the connection refresh",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f14",
+   "source": "review-fault",
+   "A": {
+    "point": "Revokes keyed on provider reach a sibling Connection in mixed containers; must be scoped to the active binding",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Revokes keyed on provider reach a sibling Connection in mixed containers; must be scoped to the active binding",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f15",
+   "source": "review-fault",
+   "A": {
+    "point": "refreshConnectionForWorkspace swallows TokenRefreshError, so the D4 revoke is unreachable (double gate)",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "refreshConnectionForWorkspace swallows TokenRefreshError, so the D4 revoke is unreachable (double gate)",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f16",
+   "source": "review-fault",
+   "A": {
+    "point": "upsertWorkspace keeps a stale connection-backed marker; the predicate is not provider-checked",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "upsertWorkspace keeps a stale connection-backed marker; the predicate is not provider-checked",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V01",
+   "issue": "LIN-3124",
+   "finding": "LIN-3124#f20",
+   "source": "review-fault",
+   "A": {
+    "point": "Suspect lane falls back to the legacy record and spends its refresh token even when a Connection matched",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Suspect lane falls back to the legacy record and spends its refresh token even when a Connection matched",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V02",
+   "issue": "LIN-2837",
+   "finding": "LIN-2837#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Catch block overwrites the terminal phase and destroys pendingFollowUp (LIN-2556 regression)",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Catch block overwrites the terminal phase and destroys pendingFollowUp (LIN-2556 regression)",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V02",
+   "issue": "LIN-2837",
+   "finding": "LIN-2837#f1",
+   "source": "review-fault",
+   "A": {
+    "point": "Follow-up beat refusal is still silent; no [failed] posted to the beat",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Follow-up beat refusal is still silent; no [failed] is posted to the beat",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V02",
+   "issue": "LIN-2837",
+   "finding": "LIN-2837#f2",
+   "source": "review-fault",
+   "A": {
+    "point": "Follow-up beat wait is unbounded; needs the OPENCODE_MESSAGE_TIMEOUT_MS bound",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Follow-up beat wait is unbounded; needs an OPENCODE_MESSAGE_TIMEOUT_MS bound",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V02",
+   "issue": "LIN-2837",
+   "finding": "LIN-2837#f3",
+   "source": "review-fault",
+   "A": {
+    "point": "Sibling non-clean-finish arm still writes FAILED unguarded, so a CANCELLED record is reported FAILED",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Sibling non-clean-finish arm still writes FAILED unguarded, so a CANCELLED record is reported FAILED",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V02",
+   "issue": "LIN-2837",
+   "finding": "LIN-2837#f11",
+   "source": "review-fault",
+   "A": {
+    "point": "Live bad-key 401: extractor misses info.error.data.message, so provider words are not relayed",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Live bad-key 401: the extractor misses info.error.data.message, so the provider's words are not relayed",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V02",
+   "issue": "LIN-2837",
+   "finding": "LIN-2837#f12",
+   "source": "review-fault",
+   "A": {
+    "point": "Server error= line absent from stderr without --print-logs; bogus-model reason never captured",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Server error= line is absent from stderr without --print-logs, so the bogus-model reason is never captured",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V03",
+   "issue": "LIN-3035",
+   "finding": "LIN-3035#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Feedback route clears the sessions cache on every feedback write, not just decision-withdrawn, defeating the cache",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Feedback route clears the sessions cache on every feedback write, not only decision-withdrawn, defeating the cache",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V04",
+   "issue": "LIN-3049",
+   "finding": "LIN-3049#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Live A/B: new meta guards route diverged/stale slices to implementation (3/12 vs 0/6 on main)",
+    "flaggedIn": "PLAN",
+    "priorText": true,
+    "quote": "Divergence fixture's `expect` is now an explicit acceptable set `['plan','plan-review']` (never `implementation`)",
+    "quoteSource": "comment"
+   },
+   "B": {
+    "point": "Live A/B: the new meta guards route diverged (stale) slices to implementation (3/12 vs 0/6 on main)",
+    "flaggedIn": "PLAN",
+    "priorText": true,
+    "quote": "Divergence fixture's `expect` is now an explicit acceptable set `['plan','plan-review']` (never `implementation`)",
+    "quoteSource": "comment"
+   }
+  },
+  {
+   "digest": "V04",
+   "issue": "LIN-3049",
+   "finding": "LIN-3049#f3",
+   "source": "review-fault",
+   "A": {
+    "point": "Fallback points at the deleted per-surface acceptance-criteria wording; bullet had to be restored and pinned",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Fallback points at per-surface acceptance-criteria wording that was deleted; bullet must be restored and pinned",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Feed shows no n-of-N on general (goal-only) budgeted runs because there is no anchor loop",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Feed shows no n-of-N on general (goal-only) budgeted runs because there is no anchor loop; acceptance missed",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f4",
+   "source": "review-fault",
+   "A": {
+    "point": "sessionPosition reports the last first-seen task, not the most recently dispatched (A-B-A reads B)",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "sessionPosition reports the last first-seen task rather than the most recently dispatched one (A-B-A reads B)",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f11",
+   "source": "review-fault",
+   "A": {
+    "point": "Branch conflicts with main: BUILDER_VERSION 12->13 collision makes the cache bump inert",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Branch conflicts with main: BUILDER_VERSION 12->13 collides with a bump already on main, making the cache bump inert",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f14",
+   "source": "review-fault",
+   "A": {
+    "point": "R1 fix makes null-anchored rulings match any live general run, forcing the effect record",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "R1 fix makes null-anchored rulings match any live general run, forcing effect record",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f15",
+   "source": "review-fault",
+   "A": {
+    "point": "General anchors share one null bucket, breaking iteration numbering and materializer parity",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "General anchors share one null bucket, breaking iteration numbering and materializer parity",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f16",
+   "source": "review-fault",
+   "A": {
+    "point": "pointReadSession builds general sessions without the anchor, so the session page diverges from the feed",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "pointReadSession builds general sessions without the anchor, so the session page diverges from the feed",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f17",
+   "source": "review-fault",
+   "A": {
+    "point": "General-run card title regresses to a placeholder; terminality change unstated",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "General-run card title regresses to a placeholder; the terminality change is unstated",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f18",
+   "source": "review-fault",
+   "A": {
+    "point": "Null-anchored record-effect ruling reply posts to /api/comments/null",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Null-anchored record-effect ruling reply posts to /api/comments/null",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f19",
+   "source": "review-fault",
+   "A": {
+    "point": "Identifier-less anchor never matches its own agent-status rows and lingers as running",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "An identifier-less anchor never matches its own agent-status rows and lingers as running",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V05",
+   "issue": "LIN-2934",
+   "finding": "LIN-2934#f23",
+   "source": "review-fault",
+   "A": {
+    "point": "T2 fix misses issue-scoped builds; materialized/point-read docs diverge from the full build",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "T2 fix misses issue-scoped builds, so materialized/point-read docs diverge from the full build",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V06",
+   "issue": "LIN-3011",
+   "finding": "LIN-3011#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Queued live items now serve runtime.dispatchedAt as null instead of ISO in the lean JSON",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Queued live items now serve runtime.dispatchedAt as null instead of an ISO string in lean JSON",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V07",
+   "issue": "LIN-2974",
+   "finding": "LIN-2974#f5",
+   "source": "review-fault",
+   "A": {
+    "point": "Live check inconclusive: inventory is empty and the fetch hits the 8s timeout, so the repo guard usually fails open",
+    "flaggedIn": "BOTH",
+    "priorText": true,
+    "quote": "**Fails open** when there is no provider, no `fetchProjects`, a throw, an 8s timeout, or test mode",
+    "quoteSource": "comment"
+   },
+   "B": {
+    "point": "Live check is inconclusive: the inventory is empty and the fetch hits the 8s timeout, so the repo guard usually fails open",
+    "flaggedIn": "BOTH",
+    "priorText": true,
+    "quote": "Fails open when there is no provider, no `fetchProjects`, a throw, an 8s timeout, or test mode",
+    "quoteSource": "comment"
+   }
+  },
+  {
+   "digest": "V08",
+   "issue": "LIN-2812",
+   "finding": "LIN-2812#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "isPinnedToBottom sampled after DOM mutation; single-frame answers strand a pinned reader and the stream stops following",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "isPinnedToBottom is sampled after the DOM mutation, so single-frame answers strand a pinned reader and the stream stops following",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V09",
+   "issue": "LIN-2959",
+   "finding": "LIN-2959#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Focus drops to <body> when the window floor advances past the focused dot on mobile",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "On mobile, focus drops to <body> when the window floor advances past the focused dot and culls it",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V09",
+   "issue": "LIN-2959",
+   "finding": "LIN-2959#f1",
+   "source": "review-fault",
+   "A": {
+    "point": "Star markers are not windowed; an off-window junction star paints inside the map",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Star markers are not windowed, so an off-window junction star paints inside the map",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V10",
+   "issue": "LIN-2872",
+   "finding": "LIN-2872#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "isLaunchTimeFailure never fires on the three cited incidents; the 'Session launched' beat is counted as work",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "isLaunchTimeFailure never fires on the three cited incidents because the 'Session launched' beat is counted as work",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V10",
+   "issue": "LIN-2872",
+   "finding": "LIN-2872#f1",
+   "source": "review-fault",
+   "A": {
+    "point": "WORKING regex misses the categorized [working · cat] heartbeat, so it would wrongly exempt once F1 is fixed",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "WORKING regex misses the categorized [working · cat] heartbeat, so it would wrongly exempt once F1 is fixed",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V11",
+   "issue": "LIN-2771",
+   "finding": "LIN-2771#f1",
+   "source": "review-fault",
+   "A": {
+    "point": "Reload while the tab is hidden ignores the resume anchor; first wake fires at the full step",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Reload while the tab is hidden ignores the resume anchor, so the first wake fires at the full step",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V12",
+   "issue": "LIN-2760",
+   "finding": "LIN-2760#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "On an all-skipped page select-all cannot clear a hand-picked selection; the control is inert and snaps back",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "On a page where every row is skipped, select-all cannot clear a hand-picked selection; the control is inert and snaps back",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V13",
+   "issue": "LIN-2830",
+   "finding": "LIN-2830#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Seven fixed grid tracks clip rows in 263px cards; effort/cost/duration columns invisible",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Seven fixed grid tracks clip rows in 263px cards, hiding the effort/cost/duration columns",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V14",
+   "issue": "LIN-2820",
+   "finding": "LIN-2820#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Client filter inert: author display:flex beats [hidden], acceptance item 3 unmet",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Client-side filter is inert because author display:flex overrides [hidden]; acceptance item 3 unmet",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V14",
+   "issue": "LIN-2820",
+   "finding": "LIN-2820#f1",
+   "source": "review-fault",
+   "A": {
+    "point": ".truncated never set at the default cap of 500 (a page multiple), so the silent cutoff remains",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": ".truncated is never set when the default cap of 500 is an exact page multiple, so the silent cutoff remains",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V15",
+   "issue": "LIN-2804",
+   "finding": "LIN-2804#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Replacement hint advertises /search, which itself 422s on Jira and GitHub Projects",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Replacement hint advertises /search, which itself 422s on Jira and GitHub Projects",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V16",
+   "issue": "LIN-2758",
+   "finding": "LIN-2758#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Completion summary prints total not ok; two untallied paths over-report applied",
+    "flaggedIn": "PLAN",
+    "priorText": true,
+    "quote": "Any progress-text design needs to account for \"skipped\" outcomes (2 kinds) as well as success/failure",
+    "quoteSource": "comment"
+   },
+   "B": {
+    "point": "Completion summary prints total rather than ok; two untallied outcome paths over-report rows as applied",
+    "flaggedIn": "PLAN",
+    "priorText": true,
+    "quote": "Any progress-text design needs to account for \"skipped\" outcomes (2 kinds) as well as success/failure",
+    "quoteSource": "comment"
+   }
+  },
+  {
+   "digest": "V17",
+   "issue": "LIN-2623",
+   "finding": "LIN-2623#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "GET page resolves the workspace model while the turn resolves the per-op override: wrong strip, no tools-off warning",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "GET page resolves the workspace model while the turn resolves the per-op override, so the strip is wrong and the tools-off warning is missing",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V18",
+   "issue": "LIN-2756",
+   "finding": "LIN-2756#f0",
+   "source": "review-fault",
+   "A": {
+    "point": "Keep is inert on legacy decisionId-only suggestions: withdraw() lacks the two-tier fallback, violating the byte-identical criterion",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Keep is inert on legacy decisionId-only suggestions because withdraw() lacks the two-tier fallback, breaking byte-identical single-loop behaviour",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V18",
+   "issue": "LIN-2756",
+   "finding": "LIN-2756#f3",
+   "source": "review-fault",
+   "A": {
+    "point": "A withdrawn scoped doc shadows the standing legacy one; a second Keep reports success but withdraws nothing",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "A withdrawn scoped document shadows a standing legacy one, so a second Keep reports success but withdraws nothing",
+    "flaggedIn": "NONE",
+    "priorText": false,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V19",
+   "issue": "LIN-275",
+   "finding": "LIN-275@2026-08-06T09:29",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The plan's routes/jira-auth.js + getAuthRouter() adds a fourth lib->routes import edge, routing around LIN-675 (hoist auth-router factories) without naming that identifier.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "The plan's routes/jira-auth.js + getAuthRouter() adds a fourth lib/ -> routes/ import edge, a routed-around contract gap that has an identifier (LIN-675, which names Jira) and is not recorded.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V20",
+   "issue": "LIN-2025",
+   "finding": "LIN-2025@2026-08-10T18:39",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Round 2's R2 was dropped: an unconditional provider.fetchTeams() placed ahead of the isTestMode/testMockData arm at server.js:2375 (and workspace-api.js:3426) makes test-token sessions hit real Linear, which breaks the roadmap.spec LIN-1034 regression guard.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "The plan puts an unconditional provider.fetchTeams() ahead of the test-mode arm in the roadmap handlers (server.js:2375, workspace-api.js:3426), so test-token sessions hit real Linear, failing the LIN-1034 roadmap e2e guard; round 2's R2/R3 were dropped, not resolved.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V21",
+   "issue": "LIN-2077",
+   "finding": "LIN-2077@2026-08-14T10:26",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Binding mechanical item: the exact failing-pin inventory, i.e. which of the twelve holdable:true assertions in hook-decision.test.js flip (:375 and :752/:753). The comment's other new items are truncated.",
+    "flaggedIn": "BOTH",
+    "priorText": true,
+    "quote": "Two pins assert today's behaviour and must be updated deliberately, not deleted",
+    "quoteSource": "comment"
+   },
+   "B": {
+    "point": "LIN-1821's fast-fail watchdog, added after the original surface sweep, had to be checked against the enlarged EXECUTING+awaitingVerify population; it is scoped to coldStartingHookSessions, so the population never enters it.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V22",
+   "issue": "LIN-2116",
+   "finding": "LIN-2116@2026-08-16T07:33",
+   "source": "plan-review-find",
+   "A": {
+    "point": "npm run test:hooks and e2e-smoke.js never reach processPolledItem or the SUMMARIZING->EXECUTING launch shape, so no automated tier exercises this change. Only a real dispatch does.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "npm run test:hooks and e2e-smoke.js do not exercise the production first-message/SUMMARIZING-to-EXECUTING launch path at all, so they cannot be the real-model check the plan names; only a real dispatch is.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V23",
+   "issue": "LIN-2327",
+   "finding": "LIN-2327@2026-08-27T07:27",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Surface 6's real-route TTL-boundary test cannot show the claimed property: the counter's write site is not reached by driving rejections through the HTTP route, so the test fails in two silent ways.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Surface 6's real-route test cannot demonstrate escalation across the suspect-TTL boundary as specified; built and run, it fails silently in two independent ways (the counter's write site is not exercised by the route test).",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V24",
+   "issue": "LIN-2333",
+   "finding": "LIN-2333@2026-08-29T14:57",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The widened :798 tagging of a parked anchor (blocked->failed) is self-correcting rather than sticky: findTerminalFeedback returns the last terminal marker, so a later honest terminal from a successful resume supersedes it. session.phase at :798 is also the pre-attempt phase.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Tagging a [failed] on a parked anchor at :798 (non-forced) is self-correcting, because findTerminalFeedback returns the last terminal marker, so a later successful resume's terminal supersedes it.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V25",
+   "issue": "LIN-2385",
+   "finding": "LIN-2385@2026-08-30T14:32",
+   "source": "plan-review-find",
+   "A": {
+    "point": "B6: /recommend-and-dispatch has two createDispatchItem fields blocks. The plan stamps periodicalId only on the rare verb-override branch (:6739) and misses the everyday LLM-recommended branch (:6929) that autopilot actually takes.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "/recommend-and-dispatch has two createDispatchItem fields blocks; step 2 names only the rare verb-override branch, so periodicalId would be dropped on the everyday LLM-recommended branch autopilot actually takes.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V26",
+   "issue": "LIN-2431",
+   "finding": "LIN-2431@2026-08-31T11:49",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The surface list misses CLAUDE.md:153, which pins the observer-state instance-key roster at exactly two families; companion:v1: makes it false and it needs a row or a named owner (LIN-2436).",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Section 4's precedence order has no branch for companionDoc === null, which readCurrent returns on a transient backend fault, so the gate's behaviour on a store fault is unspecified.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V27",
+   "issue": "LIN-2701",
+   "finding": "LIN-2701@2026-09-06T06:39",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The cancellation witness that cross-cutting section 4 cites does not exist in B.12. onResult fires after onTeardown on every Stop with rows in flight, and nothing tests idempotent late-row painting or that the control stays torn down.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Cross-cutting section 4 claims B.12 has a cancellation witness, but none exists; onResult fires after onTeardown on every Stop with rows in flight, and the idempotent late-arrival render and no flip back to 'running' are unwitnessed.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V28",
+   "issue": "LIN-2720",
+   "finding": "LIN-2720@2026-09-11T06:42",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The section 5 selector walk is incomplete: six reapers.js find* selectors go unwalked. The reviewer checks reachability for opencode (the transcript-hook filter, and the findStalledExecuting deferredAt read gated off); the binding corrections are truncated.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Plan section 5's selector walk is incomplete: six reapers.js find* selectors (findFastFailCandidates, findSilentStartCandidates, findStalledExecuting, ...) were not walked and had to be checked for opencode reachability.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V29",
+   "issue": "LIN-2754",
+   "finding": "LIN-2754@2026-09-11T19:08",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Step 4b's corrected 409 predicate compares toRecord's ISO-string outcomeAt to a Date, which always evaluates false, so the 409 can never fire and a repeat Agree reports false success",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Step 4b's corrected 409 predicate compares record.outcomeAt (always an ISO string after toRecord) with a Date, which coerces to NaN and is always false, so the 409 can never fire",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V29",
+   "issue": "LIN-2754",
+   "finding": "LIN-2754@2026-09-11T19:31",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Reusing deliverRulingReply from agreeRulingRow/bulkAgreeRow collides with their caller contracts: the rulingsPending re-entrancy guard makes Agree-as-answer return silently, deliverRulingReply returns undefined so bulk runs concurrently, and its per-row restore/poll reverses bulk's settled discipline",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Step 7 reuses deliverRulingReply from agreeRulingRow/bulkAgreeRow without reconciling caller contracts: the rulingsPending re-entrancy guard makes Agree-as-answer return silently, deliverRulingReply returns undefined so bulk runs concurrently, and its per-row restore/poll reverses bulkAgreeRow's settled discipline",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V30",
+   "issue": "LIN-2887",
+   "finding": "LIN-2887@2026-09-17T19:38",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The periodical-report-gate.js:173 refusal string is re-pointed at ci.md, but the convention it cites (CLAUDE.md:249-256) sits in the Architecture source tree that moves to source-map.md, so the live gate message would point at a doc without the content",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "G1: lib/periodical-report-gate.js:173's merge-blocking refusal string is re-pointed at docs/architecture/ci.md, but the periodical report-location convention (CLAUDE.md:249-256) is inside ## Architecture and moves to source-map.md, so the string would cite a doc that does not hold it",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V31",
+   "issue": "LIN-2991",
+   "finding": "LIN-2991@2026-09-24T21:25",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Bumping BUILDER_VERSION invalidates only the materialized session docs, not the per-row feedbackDigest (isFreshDigest checks feedbackVersion), so pre-change digests lack answeredDecisions and already-answered decisions reappear on lean reads",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Bumping BUILDER_VERSION does not invalidate the per-row feedbackDigest that lean rulings reads use (isFreshDigest keys on feedbackVersion, not schema), so pre-change digests lack answeredDecisions and every previously answered decision reappears",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V31",
+   "issue": "LIN-2991",
+   "finding": "LIN-2991@2026-09-24T17:59",
+   "source": "plan-review-find",
+   "A": {
+    "point": "answeredDecisionId keeps only the last stamp on a loop, so a content loop stamped for x that later raises and answers y erases x's answer and the older duplicate carriers of x come back as resumable: the collision is not structurally eliminated",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "D1: a stamped content loop that later raises and answers another decision overwrites answeredDecisionId (last stamp only), so the earlier decision's duplicate copies reappear unanswered; the collision is not structurally eliminated over time",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V32",
+   "issue": "LIN-3027",
+   "finding": "LIN-3027@2026-09-25T06:24",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Approve, with a precision note (N1) on how Revision 1's Surface 1 poll halt shape states the nullable setBy; the note's detail is truncated in the digest",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Approve verdict with two precision notes (N1, N2); N1 concerns how Surface 1 states the poll halt shape's nullable setBy. The note text itself is cut off in the digest",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V33",
+   "issue": "LIN-2995",
+   "finding": "LIN-2995@2026-09-25T08:24",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Approve; the only new fact visible is that Harbour HEAD has moved one commit (ff91480c, LIN-2994, test-only) past the plan's 5fdb3ae0 grounding, with the halt poll contract unchanged (the breakdown notes are truncated)",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Approve verdict; the visible new fact is that Harbour has moved past the plan's grounding SHA 5fdb3ae0 by ff91480c (LIN-2994, test-only), with the halt poll contract confirmed unchanged; the comment is cut off before its carry-forward notes",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V34",
+   "issue": "LIN-3107",
+   "finding": "LIN-3107@2026-09-26T20:19",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Reused historical fixtures (LIN-571-replan-trap, SYN-12) have breakdown gold for a 'needs multiple sessions' plan with no verdict, which contradicts today's plan-review gate (criterion (a), LIN-1603), so their gold must be re-graded or excluded",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "The 'check historical gold against today's routing contract' rule was applied only to fresh candidates; reused fixtures (LIN-571-replan-trap, SYN-12) have gold of breakdown for a multi-session plan with no verdict, which today's plan-review gate criterion (a) (LIN-1603) routes to plan-review",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V35",
+   "issue": "LIN-1948",
+   "finding": "LIN-1948@2026-08-09T16:18",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Executing the routes shows POST /api/proxy/autopilot/kickoff already refuses a dangling issueIdentifier (404, addItem never called), so surface 2b has no hole to fix",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Finding G: POST /api/proxy/autopilot/kickoff already refuses a dangling issueIdentifier (404, addItem never called) when executed, so surface 2b has no hole and should be dropped; research and plan both assumed it was accepted",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V36",
+   "issue": "LIN-1557",
+   "finding": "LIN-1557@2026-08-10T09:06",
+   "source": "plan-review-find",
+   "A": {
+    "point": "GET /api/proxy/instructions (routes/proxy.js:1752-1755) is a second live copy of the create contract that will still advertise stateId/assigneeId/priority/cycleId/parentId after the gate starts refusing them, and the plan does not update it",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "GET /api/proxy/instructions (routes/proxy.js:1752-1755) is a second live copy of the create contract that still advertises the fields the new gate will 400, and the same false 'self-verifying' claim also sits on the PATCH door (docs :1232 / proxy.js :1762); the plan fixes only docs/proxy-integration.md:1182",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V37",
+   "issue": "LIN-2154",
+   "finding": "LIN-2154@2026-08-20T07:35",
+   "source": "plan-review-find",
+   "A": {
+    "point": "loop.source is the 'live'|'history' dispatch-collection tag, not a provider name, so threading it as ?source= to resolveIssueBinding matches nothing and falls back to the active binding; the claimed tenancy fix is not wired.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "loop.source is the dispatch collection ('live'|'history'), not a provider name, so ?source= from it matches no binding and falls back to the active binding; the claimed tenancy fix is wired to the wrong field.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V38",
+   "issue": "LIN-2281",
+   "finding": "LIN-2281@2026-08-27T13:54",
+   "source": "plan-review-find",
+   "A": {
+    "point": "observer-efficacy-signal reads the anchor loop's own-row (not lineage-merged) feedback, so the plan's claimed 'resolved' flip (surface 14) cannot happen; also the mergeLineageFeedback call-site enumeration misnames sites and misclassifies dispatch-store.js:571.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "observer-efficacy-signal reads the loop's own (not lineage-merged) feedback, so the warm-resume post on the follow-up row cannot flip 'resolved'; surface 14 must be OUT, not a named acceptance consequence.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V39",
+   "issue": "LIN-2361",
+   "finding": "LIN-2361@2026-08-29T19:42",
+   "source": "plan-review-find",
+   "A": {
+    "point": "resolvePromptUi has a fifth consumer (lib/prompt-trace-store.js) that JSON.stringify-compares its output, so adding fixedStates changes an observability contract the plan's four-site enumeration misses.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "resolvePromptUi has a fifth consumer (lib/prompt-trace-store.js providerContextVerdict) that whole-object JSON.stringify-compares its output, so adding fixedStates changes a prompt-trace observability contract the plan's four-site enumeration misses.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V40",
+   "issue": "LIN-2396",
+   "finding": "LIN-2396@2026-08-30T16:31",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The new shared sentence contains 'left open', so the existing assertion /do not leave it open|left open/i at periodicals.test.js:139 would be satisfied by the shared bullet alone and stop guarding conclude()/concludeAdvisory().",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "The new shared sentence contains 'left open', so the existing periodicals.test.js:139 assertion /do not leave it open|left open/i becomes satisfied by the shared bullet alone and stops witnessing conclude()/concludeAdvisory(); tighten it.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V41",
+   "issue": "LIN-2435",
+   "finding": "LIN-2435@2026-08-31T18:42",
+   "source": "plan-review-find",
+   "A": {
+    "point": "F6: the client response matrix covers only statuses the turn handler emits; statuses produced outside the handler (e.g. middleware) are left unhandled (residue of F4).",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "F6: the client response matrix covers only statuses the turn handler itself emits, leaving a residue of responses produced outside the handler unhandled (comment truncated before F6 detail).",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V42",
+   "issue": "LIN-2437",
+   "finding": "LIN-2437@2026-09-02T07:31",
+   "source": "plan-review-find",
+   "A": {
+    "point": "public/llms.txt's Flight Companion DOM map is a missed documentation sibling: it must gain the new save control alongside #flight-companion-send.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "public/llms.txt's Flight Companion DOM map is a missed documentation sibling; it needs the new #flight-companion-save control.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V43",
+   "issue": "LIN-2719",
+   "finding": "LIN-2719@2026-09-11T04:43",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Swapping to a <select> needs an escape-hatch read branch in readDispatchExecControls (read the custom 'other…' text, not the select value), and the six e2e calls that would expose this are unassigned in the migration table.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "The <select> swap needs an escape-hatch read branch in readDispatchExecControls (exec-controls reader), which the plan never asks for, and the six e2e calls that would expose it are left unassigned in the migration table.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V44",
+   "issue": "LIN-2891",
+   "finding": "LIN-2891@2026-09-25T00:21",
+   "source": "plan-review-find",
+   "A": {
+    "point": "LIN-3022 landed after the plan's grounding and rewrote isDecisionAnswered into lineage-grouped set membership (and bumped BUILDER_VERSION to 13), so the plan's 'mirror exactly' withdrawal design, insertion points and version bump are stale and discharge must be re-bounded across three lineage-map sites.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "LIN-3022 merged under the plan: isDecisionAnswered is now lineage-grouped set membership computed in three places (collectUnansweredDecisions group discharge, observer-sweep, chat-tools, fossil script) and BUILDER_VERSION is already 13, so the withdrawal discharge design and insertion points are stale and the discharge-consumer class must be re-bounded.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V45",
+   "issue": "LIN-3026",
+   "finding": "LIN-3026@2026-09-25T01:33",
+   "source": "plan-review-find",
+   "A": {
+    "point": "Not identifiable: the round's comment is not present in the digest ('comment not found').",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "Round comment not found in digest; the new point cannot be identified.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  },
+  {
+   "digest": "V46",
+   "issue": "LIN-3033",
+   "finding": "LIN-3033@2026-09-25T07:38",
+   "source": "plan-review-find",
+   "A": {
+    "point": "The authoring limit is still scoped to ledger discharge (plus 'do it here'); close-out also authors via non-gating review findings/nits with no ledger item and via self-found same-class siblings with no ruling, which stay unbounded; the limit must cover any change close-out authors.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   },
+   "B": {
+    "point": "The close-out authoring limit is still scoped to ledger discharge; non-gating review nits (dea5bc5e) and self-found same-class siblings with no ruling (c3d062e6) remain unbounded, so the limit must apply to any change close-out authors.",
+    "flaggedIn": "NONE",
+    "priorText": true,
+    "quote": null,
+    "quoteSource": null
+   }
+  }
+ ]
+}
