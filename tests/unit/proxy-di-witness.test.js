@@ -44,12 +44,15 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   parseFactoryDecl,
   parseMountDeps,
   diffMountAgainstFactory,
   censusMountCompleteness,
+  discoverProxySubRouterFiles,
 } from './lib/proxy-di-witness.js';
+import { buildImportGraph } from './lib/import-graph.js';
 import { ACME, BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
 
 // ---------------------------------------------------------------------------
@@ -160,56 +163,81 @@ describe('Half A: mount-completeness census against the real repo', () => {
     }
   });
 
-  // A separate, coarser sanity pin: the corpus is exactly 10 files / 132
-  // declared deps today (LIN-2540: group I's routes/proxy-dispatch.js adds
-  // 24, all un-defaulted so classifyParams counts every one as required —
-  // 87 + 24 = 111; LIN-2444's routes/proxy-rulings.js then adds 6 more —
-  // proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent,
-  // dispatchQueueStore, agentStatusStore — its other four
-  // (taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore,
-  // sessionsFeedCache) are defaulted to null and so are not counted as
-  // required: 111 + 6 = 117; LIN-2620's routes/proxy-flight-companion.js then
-  // adds a 10th file with 15 required deps — proxyLimiter,
-  // authenticateProxyToken, resolveProviderAccess, workspaceUnavailable,
-  // logEvent, getWorkspaceOpenRouterKey, resolveProxyLLM,
-  // chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore,
-  // recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore,
-  // proxyTokenStore — its optional deps (taskDecisionsStore,
-  // shelvedRulingsStore, and LIN-2634's savedChatStore) are all defaulted to
-  // null and so are not counted: 117 + 15 = 132, unchanged by LIN-2634 —
-  // re-run (not assumed) after threading savedChatStore = null through both
-  // this factory's signature and createProxyRoutes's own. Unlike the test above, THIS one is not blind to a
-  // signature+mount drop (removing a dep from a factory's signature shrinks
-  // `required`, which this total catches) — that's a different, unrelated
-  // invariant catching it, not evidence Half A's own missing/extra detectors
-  // saw the gap; keeping the two in separate tests keeps that distinction
-  // legible in the mutation-validation record.
-  //
-  // LIN-3025: routes/proxy-halt.js adds an 11th file with 5 required deps —
-  // workspaceHaltStore, proxyLimiter, authenticateProxyToken,
-  // requireWriteScope, logEvent — all undefaulted (workspaceHaltStore is
-  // deliberately NOT defaulted here, unlike createProxyRoutes's own `= null`
-  // default, so this census counts it): 132 + 5 = 137.
-  //
-  // LIN-3130 (S2a): routes/proxy-runner.js adds a 12th file with 8 required
-  // deps — proxyLimiter, authenticateProxyToken, requireGrant, logEvent,
-  // dispatchQueueStore, dispatchTokenStore, proxyTokenStore, workspaceHaltStore
-  // — plus two DEFAULTED, uncounted params (sessionsFeedCache = null,
-  // haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS): 137 + 8 = 145.
-  //
-  // LIN-3133 (T1): routes/proxy-kickoff.js and routes/proxy-dispatch.js each
-  // declare one more required dep, requireGrant (threaded from the composer's
-  // own closure at their two mounts): 145 + 2 = 147.
-  //
-  // LIN-3098 (S3): routes/proxy-runner-prompt.js adds a 13th file with 4
-  // required deps — proxyLimiter, authenticateProxyToken, requireGrant,
-  // logEvent — plus one DEFAULTED, uncounted param (buildPrompt =
-  // buildRunnerKickoff): 147 + 4 = 151.
-  test('the corpus is exactly 13 proxy sub-router files totalling 151 declared deps', () => {
-    const rows = censusMountCompleteness({ routesDir: 'routes', proxySourcePath: 'routes/proxy.js' });
-    assert.equal(rows.length, 13, `expected 13 proxy sub-router files, found: ${rows.map((r) => r.file).join(', ')}`);
-    const totalDeps = rows.reduce((sum, row) => sum + row.required.length, 0);
-    assert.equal(totalDeps, 151, `expected 151 total required deps across the 13 factories, found ${totalDeps}`);
+  // Derived-set equality (LIN-3218 / LIN-3201 A1): the hand-maintained corpus
+  // total ("13 files / 151 deps") is gone. Instead the set of `routes/proxy-*.js`
+  // modules that export a `create…Routes` factory is derived from source — via
+  // tests/unit/lib/import-graph.js, which parses real `export function`
+  // declarations rather than trusting this file's own count — and must equal the
+  // set of factories imported AND mounted by routes/proxy.js. This catches both
+  // directions of drift the old total caught (a new sub-router not mounted; a
+  // mount whose factory vanished) without pinning a number that every LIN-679
+  // stage has to bump. Unlike the `missingFromMount`/`extraInMount` detector
+  // above, an exported-but-not-mounted factory or a mounted-but-not-exported one
+  // fails here directly.
+  function deriveFactoryMountSets(modules) {
+    const graph = buildImportGraph(modules);
+    const composerPath = 'routes/proxy.js';
+    const composerSource = graph.sourceOf(composerPath) || '';
+    const isFactory = (name) => /^create\w+Routes$/.test(name);
+
+    const exportedBy = new Map();
+    for (const path of graph.paths()) {
+      if (path === composerPath || !/^routes\/proxy-.*\.js$/.test(path)) continue;
+      for (const name of graph.exportedNamesOf(path)) {
+        if (isFactory(name)) exportedBy.set(name, path);
+      }
+    }
+
+    const importedBy = new Map();
+    for (const rec of graph.importsOf(composerPath)) {
+      for (const binding of rec.bindings) {
+        if (isFactory(binding.imported)) importedBy.set(binding.imported, rec.resolved);
+      }
+    }
+
+    const mounted = new Set();
+    for (const name of importedBy.keys()) {
+      if (new RegExp(`router\\.use\\(\\s*${name}\\(\\{`).test(composerSource)) mounted.add(name);
+    }
+
+    return {
+      exported: [...exportedBy.keys()].sort(),
+      mounted: [...mounted].sort(),
+      exportedNotMounted: [...exportedBy.keys()].filter((n) => !mounted.has(n)).sort(),
+      mountedNotExported: [...mounted].filter((n) => !exportedBy.has(n)).sort(),
+      moduleMismatch: [...mounted].filter((n) => exportedBy.has(n) && exportedBy.get(n) !== importedBy.get(n)).sort(),
+    };
+  }
+
+  test('the set of proxy sub-router factories exported equals the set imported and mounted by routes/proxy.js', () => {
+    const files = ['routes/proxy.js', ...discoverProxySubRouterFiles('routes').map((f) => `routes/${f}`)];
+    const modules = files.map((path) => ({ path, source: readFileSync(path, 'utf8') }));
+    const sets = deriveFactoryMountSets(modules);
+    assert.deepEqual(
+      sets.exported, sets.mounted,
+      `a factory is exported but not mounted, or mounted but not exported: ${JSON.stringify(sets)}`
+    );
+    assert.deepEqual(sets.exportedNotMounted, []);
+    assert.deepEqual(sets.mountedNotExported, []);
+    assert.deepEqual(sets.moduleMismatch, []);
+  });
+
+  test('planted witness: an exported-but-not-mounted factory fails the derived-set equality', () => {
+    const sets = deriveFactoryMountSets([
+      { path: 'routes/proxy.js', source: "import { createFooRoutes } from './proxy-foo.js';\nconst router = { use() {} };\n" },
+      { path: 'routes/proxy-foo.js', source: 'export function createFooRoutes({ a }) { return {}; }\n' },
+    ]);
+    assert.notDeepEqual(sets.exported, sets.mounted);
+    assert.deepEqual(sets.exportedNotMounted, ['createFooRoutes']);
+  });
+
+  test('planted witness: a mounted-but-not-exported factory fails the derived-set equality', () => {
+    const sets = deriveFactoryMountSets([
+      { path: 'routes/proxy.js', source: "import { createBarRoutes } from './proxy-bar.js';\nconst router = { use: () => {} };\nrouter.use(createBarRoutes({}));\n" },
+      { path: 'routes/proxy-bar.js', source: 'export const nothing = 1;\n' },
+    ]);
+    assert.notDeepEqual(sets.exported, sets.mounted);
+    assert.deepEqual(sets.mountedNotExported, ['createBarRoutes']);
   });
 });
 

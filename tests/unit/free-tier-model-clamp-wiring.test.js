@@ -59,21 +59,14 @@ test('every billed resolveWorkspaceModel / resolveAiOperationModel call threads 
       );
     });
   }
-  // 17 billed sites: workspace-api has 7 (recommend×2 + recap + brief + scan
-  // [LIN-2197 Phase 4] + scan retire [LIN-2650 WS4] + feedback-title),
-  // workspace-api-roadmap has 2 (roadmap-generate + roadmap-chat, moved out
-  // of workspace-api.js by LIN-2246), proxy-compute has 4 (recap×2 + brief×2)
-  // + proxy.js has 1 (LIN-679 Stage 4: /recommend's site is inside
-  // computeRecommendation, a closure-local helper that stayed in
-  // routes/proxy.js and is shared with group I's /recommend-and-dispatch —
-  // not proxy-compute.js), next-run has 1 (resolveAiOperationModel), dashboard
-  // has 2 (run-summary + session-summary, both resolveAiOperationModel).
-  // LIN-2966: task-chat's billed call moved OUT of the route layer — it no
-  // longer calls a resolver directly, the shared turn core
-  // (lib/agent-turn.js) does, on its own `opKind`-parameterised call, exactly
-  // as Flight Companion's route already worked before this test existed
-  // (lib/agent-turn.js was never in FILES above; the core's own clamp is
-  // pinned by tests/unit/workspace-model-clamp.test.js and
-  // tests/unit/agent-turn-core.test.js instead).
-  assert.equal(billedClampCount, 17, `expected 17 clamped billed sites, found ${billedClampCount}`);
+  // LIN-3218 (LIN-3201 A1): the numeric total ("17 billed sites") is gone. The
+  // boundary rule IS the assertion: every `resolveWorkspaceModel(` /
+  // `resolveAiOperationModel(` call in FILES is either clamped
+  // (`forceDefault: isFreeTier`) or exactly one of the DISPLAY_ONLY lines above.
+  // A new billed caller — or a lost clamp on an existing one — fails at the
+  // exact line above, with no total to bump. (The former per-file breakdown
+  // lives in git history.) Non-vacuity is proven by a planted-offender witness,
+  // not a pinned count: dropping the clamp from one real billed site in a
+  // scanned file must fail this test (recorded in the PR).
+  assert.ok(billedClampCount > 0, 'expected at least one clamped billed site — a zero scan would be vacuous');
 });

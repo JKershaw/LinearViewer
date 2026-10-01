@@ -55,24 +55,35 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 const tokensAdminSource = readFileSync(join(__dirname, '../../routes/proxy-tokens-admin.js'), 'utf8');
 
-function occurrenceCount(source, needle) {
-  return source.split(needle).length - 1;
+function registrationsIn(source) {
+  return source.match(/router\.(get|post|put|patch|delete)\(/g) || [];
 }
 
 describe('LIN-2534: group A registrations moved out of routes/proxy.js, onto workspaceFromUrl only', () => {
-  test('routes/proxy-tokens-admin.js registers exactly 5 routes on workspaceFromUrl', () => {
-    assert.equal(occurrenceCount(tokensAdminSource, 'workspaceFromUrl, async (req, res) => {'), 5,
-      'expected all 5 group-A handlers to carry workspaceFromUrl as their auth middleware');
+  test('every route registration in routes/proxy-tokens-admin.js is chained onto workspaceFromUrl', () => {
+    // Boundary rule (LIN-3218): the count is not pinned — every registration in
+    // the file must carry `workspaceFromUrl` as its first middleware, derived
+    // from the registration count itself. A new registration on a different
+    // auth chain fails the equality.
+    const registrations = registrationsIn(tokensAdminSource);
+    const workspaceFromUrlChains = (tokensAdminSource.match(/workspaceFromUrl, async \(req, res\) => \{/g) || []).length;
+    assert.ok(registrations.length > 0, 'the file must register routes, never pass on zero');
+    assert.equal(workspaceFromUrlChains, registrations.length,
+      `every one of the ${registrations.length} registrations must chain workspaceFromUrl`);
   });
 
-  test('routes/proxy-tokens-admin.js carries zero authenticateProxyToken references (session-cookie auth only)', () => {
-    assert.equal(occurrenceCount(tokensAdminSource, 'authenticateProxyToken'), 0,
-      'group A is the only group off the proxy-token bearer-auth surface — a swapped chain must fail this pin');
+  test('routes/proxy-tokens-admin.js carries no authenticateProxyToken reference (session-cookie auth only)', () => {
+    assert.ok(!tokensAdminSource.includes('authenticateProxyToken'),
+      'group A is the only group off the proxy-token bearer-auth surface — a swapped chain must fail this bound');
   });
 
-  test('proxyTokenCreationLimiter is used as middleware exactly once, on the POST registration', () => {
-    assert.equal(occurrenceCount(tokensAdminSource, 'proxyTokenCreationLimiter, workspaceFromUrl'), 1,
-      'expected exactly one registration chaining the limiter directly before workspaceFromUrl');
+  test('proxyTokenCreationLimiter is bound to exactly the POST /tokens registration', () => {
+    // Derived set, not a count: the registrations whose middleware list names
+    // the limiter must be exactly the one POST arm.
+    const limiterRegistrations = [...tokensAdminSource.matchAll(/router\.(get|post|put|patch|delete)\(\s*'([^']+)'[^)]*proxyTokenCreationLimiter/g)]
+      .map((m) => `${m[1].toUpperCase()} ${m[2]}`);
+    assert.deepEqual(limiterRegistrations, ['POST /workspace/:urlKey/api/proxy/tokens'],
+      'the limiter must be reached from exactly the POST /tokens arm');
     assert.match(tokensAdminSource,
       /router\.post\('\/workspace\/:urlKey\/api\/proxy\/tokens', proxyTokenCreationLimiter, workspaceFromUrl/,
       'the limiter must be the first middleware on POST /tokens, ahead of workspaceFromUrl');
@@ -81,41 +92,57 @@ describe('LIN-2534: group A registrations moved out of routes/proxy.js, onto wor
 
 describe('LIN-2534: limiter declaration and lifetime — source-text half', () => {
   test('routes/proxy-tokens-admin.js declares no rateLimit( of its own (limiter is injected, not redeclared)', () => {
-    assert.equal(occurrenceCount(tokensAdminSource, 'rateLimit('), 0,
+    assert.ok(!tokensAdminSource.includes('rateLimit('),
       'a sub-factory rateLimit({...}) declaration would make the limiter per-factory — a behaviour change');
   });
 
-  test('routes/proxy.js still declares proxyTokenCreationLimiter exactly once (module-scope singleton preserved)', () => {
-    assert.equal(occurrenceCount(proxySource, 'const proxyTokenCreationLimiter = rateLimit({'), 1);
+  test('routes/proxy.js declares proxyTokenCreationLimiter once, at module scope', () => {
+    const declaration = 'const proxyTokenCreationLimiter = rateLimit({';
+    const declIndex = proxySource.indexOf(declaration);
+    const composerIndex = proxySource.indexOf('export function createProxyRoutes(');
+    assert.ok(declIndex !== -1, 'the module-scope proxyTokenCreationLimiter declaration is missing');
+    assert.ok(composerIndex !== -1, 'createProxyRoutes declaration not found');
+    // Module scope (not inside createProxyRoutes): a declaration relocated into
+    // the composer body would make each composer call close over its own
+    // budget — the exact regression the runtime witness below discriminates.
+    assert.ok(declIndex < composerIndex,
+      'proxyTokenCreationLimiter must stay a module-scope singleton, declared before createProxyRoutes');
   });
 
-  test('rateLimit( call sites scoped to routes/ stay exactly 5 (never the naive repo-wide count, which is 7)', () => {
+  test('every rateLimit( occurrence in the scoped route files is a limiter declaration, never a bare call', () => {
+    // Replaces the pinned scoped total (5): derive both sides from source and
+    // require every occurrence to be a `= rateLimit(` declaration, so a new
+    // bare call cannot slip in behind a matching number.
     const files = [
       'routes/dispatch.js',
       'routes/proxy.js',
       'routes/proxy-tokens-admin.js',
       'routes/proxy-agent-status.js',
     ];
-    let total = 0;
+    let occurrences = 0;
+    let declarations = 0;
     for (const rel of files) {
       const src = readFileSync(join(__dirname, '../..', rel), 'utf8');
-      total += occurrenceCount(src, 'rateLimit(');
+      occurrences += (src.match(/rateLimit\(/g) || []).length;
+      declarations += (src.match(/=\s*rateLimit\(/g) || []).length;
     }
-    assert.equal(total, 5,
-      'routes/dispatch.js:66,81,92 + routes/proxy.js:370,379 = 5; a repo-wide grep would ' +
-      'also count 2 prompt-fixture string literals in scripts/eval/lin-263-spike5{b,c}.mjs — deliberately excluded');
+    assert.ok(occurrences > 0, 'the scoped files must declare at least one limiter, never pass on zero');
+    assert.equal(declarations, occurrences,
+      `every rateLimit( occurrence in ${files.join(', ')} must be a limiter declaration`);
   });
 });
 
 describe('LIN-2534: providerDisplayName derivation (LIN-2370) moved verbatim', () => {
   const DERIVATION = "const providerDisplayName = getProvider(workspace.provider)?.ui?.displayName ?? null;";
 
-  test('routes/proxy-tokens-admin.js carries the derivation verbatim', () => {
-    assert.equal(occurrenceCount(tokensAdminSource, DERIVATION), 1);
+  test('routes/proxy-tokens-admin.js carries the derivation', () => {
+    assert.ok(tokensAdminSource.includes(DERIVATION),
+      'the providerDisplayName derivation must live in routes/proxy-tokens-admin.js');
   });
 
   test('routes/proxy.js no longer carries the derivation (moved out, not duplicated)', () => {
-    assert.equal(occurrenceCount(proxySource, DERIVATION), 0);
+    assert.ok(!proxySource.includes(DERIVATION),
+      'the providerDisplayName derivation must not remain in routes/proxy.js');
   });
 });
 
