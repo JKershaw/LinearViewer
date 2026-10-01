@@ -1,12 +1,13 @@
 ---
 title: Where in a ticket's life does a model's judgement change the outcome, and where could a program make the call?
 kind: paper
-version: 1
+version: 2
 date: 2026-10-01
-authors: [Claude (LIN-3177)]
-model: "Frontier tier, claude-code, effort high; one bounded research session (dispatch df74b692, kind custom), with no plan, review or close-out legs, by the brief's design. Ten in-session subagents of the same tier coded the sample: eight split reader A's 36 digests between them, and two were reader B on a blind sub-sample of ten, coded in reverse order."
+authors: [Claude (LIN-3177); Claude (version 2 corrections, LIN-3183)]
+model: "Frontier tier, claude-code, effort high; one bounded research session (dispatch df74b692, kind custom), with no plan, review or close-out legs, by the brief's design. Ten in-session subagents of the same tier coded the sample: eight split reader A's 36 digests between them, and two were reader B on a blind sub-sample of ten, coded in reverse order. Version 2: frontier tier, claude-code, the independent check's session (LIN-3183, kind custom), which re-ran every script; six in-session subagents of the same tier were two fresh readers, C and D, each split across three, on nine more tickets."
+revision: "Version 2 adds docs/papers/harbour/survey-check-7.md's fresh blind double-coding of nine tickets (LIN-3183). Every other reader put more decisions in class c than reader A, and the rule class did not reproduce, so the class mix and the cost shares are now given as ranges whose direction is known. Option 1's size is split into what wake filtering reaches and what needs the gate in code. The loop-bound escalation is dropped as an example of a rule-class call. Every figure in version 1 re-ran unchanged."
 grounded_at: 26014544 (LinearViewer, origin/main); 3366748 (simple-dispatcher, origin/main); runner logs, oplog and local transcripts read 1 Oct 2026 about 06:50Z
-cites: [docs/steady-base.md@26014544, docs/papers/harbour/held-or-fresh.md@cce25f13, docs/papers/harbour/what-supervisors-do.md@26014544 (v2), docs/papers/harbour/wake-inventory.md@26014544 (v2), docs/papers/harbour/where-the-effort-goes.md@26014544 (v2), docs/papers/harbour/why-legs-repeat.md@26014544 (v2), docs/papers/harbour/close-out-claims.md@26014544, docs/papers/harbour/where-judgement-happens-codes.json, scripts/survey-judgement-codebook.md, simple-dispatcher PR #255 (CI run 36228946934, 26 Sep), LIN-2944 (In Progress, replaced in the sample), LIN-3177 (2026-10-01)]
+cites: [docs/steady-base.md@26014544, docs/papers/harbour/held-or-fresh.md (v2), docs/papers/harbour/survey-check-7.md (LIN-3183), docs/papers/harbour/survey-check-7-codes.json, scripts/survey-check-7-judgement.mjs, docs/papers/harbour/what-supervisors-do.md@26014544 (v2), docs/papers/harbour/wake-inventory.md@26014544 (v2), docs/papers/harbour/where-the-effort-goes.md@26014544 (v2), docs/papers/harbour/why-legs-repeat.md@26014544 (v2), docs/papers/harbour/close-out-claims.md@26014544, docs/papers/harbour/where-judgement-happens-codes.json, scripts/survey-judgement-codebook.md, simple-dispatcher PR #255 (CI run 36228946934, 26 Sep), LIN-2944 (In Progress, replaced in the sample), LIN-3177 (2026-10-01)]
 ---
 
 # Where in a ticket's life does a model's judgement change the outcome, and where could a program make the call?
@@ -16,15 +17,20 @@ cheaper step would do. A September change carries about seven consequential deci
 five): a send-back, a caught error, a scope change, a re-route, a ruling and so on. One reader
 coded every such decision on 36 sampled Done changes from both repos, 260 in all, and a second
 coded ten of the tickets blind. 61% needed reasoning over the ticket's context, 31% could have been
-made by a cheaper or shorter step, and 8% by a stated rule over observable state. Where both coded
-a decision they agree on its class 85% of the time (κ 0.67).
+made by a cheaper or shorter step, and 8% by a stated rule over observable state. The second
+reader agrees with the first on a decision's class 85% of the time (κ 0.67), and two fresh readers
+of nine more tickets 78–86% (κ 0.51–0.71). Every other reader put more decisions in the context
+class than the first, and the fresh readers fewer in the rule class. So 61% is the low end of the
+context share and 8% the high end of the rule share: on their nine tickets the fresh readers coded
+67–73% context and 2–4% rule, against the first reader's 58% and 12%.
 Plan-review, review and close-out make the most decisions (82), then the makers (research, plan,
-implementation, 76), the supervisors (73) and John (26). Per unit of cost the difference is
+implementation and other workers, 76), the supervisors (73) and John (26). Per unit of cost the difference is
 large. Plan-review spends 59% of its cost in cycles that held such a decision, review 48% and
 close-out 45%. The ticket's own autopilot spends 7–10% that way and half its cost on bookkeeping;
 steppers and legs about 16%. Taken over the whole ticket, a third of the cost sits in cycles that
 held a consequential decision. A quarter sits in ones that needed context, and under 1% in ones a
-rule could have made. When things go wrong, one layer handles it 83% of the time, and the readers
+rule could have made. These are low ends too: the fresh readers put more of the cost in decision
+cycles than the first reader did on the same tickets. When things go wrong, one layer handles it 83% of the time, and the readers
 judged that a fresh session holding only the record could have made the same call 82% of the time.
 What needs more than one layer is a wrong premise in a plan or ticket, or a worker's report that
 turns out false, and John is in half of those.
@@ -58,7 +64,6 @@ and 70 the sequence. Twenty only changed timing and eleven came to nothing in th
 follows what a decision rested on. Code read at HEAD sits behind 95 of the context decisions, the
 plan's text behind 44, a test run behind 44 and an earlier verdict behind 43. The rule-class
 decisions rest on tracker state, a prior verdict or runtime state. Examples:
-- an autopilot escalating at the plan loop's bound ("a second send-back counts as looping");
 - a retry after `opencode exited with code 1`;
 - a stepper dispatching research once the blocker was Done, though the engine still called it open;
 - a session merging on green CI because its brief said so.
@@ -163,15 +168,37 @@ which one reader coded as a send-back and the other did not. Of the wrong turns,
 B 45). The fresh-session test agrees on 85% (κ 0.50) and the more-than-one-layer call on 88%
 (κ 0.61).
 
+**Two fresh readers confirm the context class and the fresh-session result, and not the rule
+class.** `survey-check-7.md` drew every third of the 26 tickets reader B had not coded, nine
+tickets holding 60 of A's decisions. Readers C and D coded them blind to A and to each other
+(D in reverse order), from the same codebook and digests rebuilt from the transcripts.
+
+| Pair | Decisions (each) | Matched on cycle | Class agreement | Context against the rest | Class mix a / b / c |
+|---|--:|--:|--:|--:|---|
+| C and D | 63 / 73 | 50 | 90% (κ 0.76) | 90% (κ 0.75) | 1/20/42 and 3/17/53 |
+| A and C | 60 / 63 | 50 | 86% (κ 0.71) | 92% (κ 0.82) | 7/18/35 and 1/20/42 |
+| A and D | 60 / 73 | 50 | 78% (κ 0.51) | 86% (κ 0.67) | 7/18/35 and 3/17/53 |
+
+The fresh readers agree with each other more than either agrees with A, and both lean the same
+way from A: towards context, away from the rule class. Of A's seven class-a decisions on these
+tickets, both fresh readers agreed on one, a retry after a harness failure. Both coded the
+escalation at the plan loop's bound as context, because it frames a decision for John. On these
+tickets the fresh readers put 27–31% of the cost in decision cycles against A's 25%, and 14–20% of
+the supervisors' cost against A's 12%. On wrong turns, every reader judged a fresh session could
+have made the call in 88–91% of events on these tickets (fresh-session κ 0.48–0.65 against A), and
+more than one layer was needed in 9–12%.
+
 ## Options
 
 Each option's size is a share of the sampled tickets' cost, both repos, without the Runner. The
-shares overlap the steady-base map's rows and each other; they do not add.
+shares overlap the steady-base map's rows and each other; they do not add. Option 1 and
+`held-or-fresh.md`'s option A are one lever measured twice, per ticket here and over the fleet
+there.
 
 | # | Option | Estimated effect | Evidence | Risk to correctness | How the scorecard would see it |
 |---|---|---|---|---|---|
-| 1 | **Wake a supervising model only on events that carry a decision**: terminal reports, failures, human messages. Code takes the rest | Up to the supervisors' bookkeeping: 33–38% of their cost, 8–10% of ticket cost (inside map rows 1–3) | Supervisors make 2 decisions per ticket (73 of 260), in cycles that are 12–14% of their cost. 9–10% of wakes held a decision and 36–38% changed nothing. `held-or-fresh.md` models sending only the quiet wakes to code at −14% of fleet tokens (−21% to −13%) | 22 of the supervisors' 37 context decisions rested on a worker's report, which arrives on a terminal wake. A filter that drops or delays a terminal report loses them | Supervisor decisions per ticket held; correct rate held; hours per change |
-| 2 | **Put the rule-class calls in code**: escalate at the loop bound, retry once after a harness failure, proceed when a blocker is Done, merge on green where the brief says so | Under 1% of ticket cost directly (0.6% sits in these cycles); removes the engine's misroutes (9 on 6 tickets) | 21 decisions are class a; every engine misroute was corrected by one layer, 4 by a rule | Low. A coded rule acts when its state is stale (the engine's misroutes came from stale hold comments), so it must read current state | Overrides of the engine per ticket; misroutes |
+| 1 | **Wake a supervising model only on events that carry a decision**: terminal reports, failures, human messages. Code takes the rest | Up to the supervisors' bookkeeping: 33–38% of their cost, 8–10% of ticket cost (inside map rows 1–3). Of that, the quiet wakes and the gate replies after them are about 3–4%; the rest is the completion gate after working turns (about 4%), launches and handshakes, which only a gate held in code (map row 3) removes | Supervisors make 2 decisions per ticket (73 of 260), in cycles that are 12–14% of their cost. 9–10% of wakes held a decision and 36–38% changed nothing. The same lever as `held-or-fresh.md`'s option A, measured over the fleet: −10% of fleet tokens routed by delivery class, −14% if code could tell which wakes will change nothing | 22 of the supervisors' 37 context decisions rested on a worker's report, which arrives on a terminal wake. A filter that drops or delays a terminal report loses them | Supervisor decisions per ticket held; correct rate held; hours per change |
+| 2 | **Put the rule-class calls in code**: escalate at the loop bound, retry once after a harness failure, proceed when a blocker is Done, merge on green where the brief says so | Under 1% of ticket cost directly (0.6% sits in these cycles); removes the engine's misroutes (9 on 6 tickets) | 21 decisions are class a, the least reproducible class: two fresh readers confirmed 1 of A's 7 on nine tickets; every engine misroute was corrected by one layer, 4 by a rule | Low. A coded rule acts when its state is stale (the engine's misroutes came from stale hold comments), so it must read current state | Overrides of the engine per ticket; misroutes |
 | 3 | **Run close-out at a cheaper tier, keeping a frontier step for the open questions** | 2–5% of ticket cost (close-out is 6%; a mid tier costs 0.6 of frontier, cheap 0.2) | 17 of close-out's 23 decisions are class a or b; cheap-tier close-outs already made 5 of them, holds and a filing, on LIN-2891, LIN-2995 and LIN-3163 | Six close-out decisions needed context. A cheaper close-out that misreads a ledger lets an undischarged item through; `close-out-claims.md` | Close-out holds overturned; escapes on items the ledger named |
 | 4 | **Retry service faults inside the tools sessions use**, with the duplicate guard in the tool | Not sized: each fault costs a step that re-reads its context, here on 20 of 36 tickets | 47 auth flaps, outages and host faults; none needed a second layer; 37 class a; one duplicate verdict post (LIN-3106) | Low, if the duplicate guard holds | Proxy error retries per ticket; duplicate writes |
 | 5 | **Keep the gates and the makers' judgement whole**: no lighter plan-review or review on the strength of this paper | None: this is the limit on 1–4 | Gates and makers make 158 of 260 decisions, 66% class c; review and plan-review catch 31 of 50 false reports first; the faults that needed more than one layer are wrong premises and false reports (24 of 28) | n/a | The correct rate under any proportionality change (map row 7) |
@@ -218,6 +245,10 @@ every 8 seconds, for ticket records only; 10 calls answered 503 and were repeate
   values outside the codebook (design legs) were mapped to other workers. Decisions match across
   readers on the same cycle and type, then on the same cycle. The census and every cost figure use
   reader A.
+- **Fresh readers (version 2).** `survey-check-7.md` drew every third of the 26 tickets B had not
+  coded. Readers C and D coded them blind to A and to each other, from the same codebook and the
+  digests rebuilt on 1 October; `scripts/survey-check-7-judgement.mjs` scores every pair by the
+  rule above. Their codes are in `survey-check-7-codes.json`. No census or cost figure uses them.
 - **Cost.** A cycle is charged to the session entered when its session is the ticket's, and to the
   child the log names when its fetched item or wake names the ticket. The Runner's wakes name only
   "a child task" and its rows carry the passage's own issue, so neither rule puts them on a sampled
@@ -234,8 +265,10 @@ every 8 seconds, for ticket records only; 10 calls answered 503 and were repeate
   This biases the decision and wrong-turn counts down.
 - **The readers are models of the tier under study, judging counterfactuals.** "A rule could have
   made it" is judged with hindsight of how it turned out, which pushes class a and b up. The tie
-  rule pushes class c up. The net direction is unknown; the two readers' class mixes on the same
-  tickets differ by three decisions in 58.
+  rule pushes class c up. Net, reader A's census leans towards a and b: reader B put three more of
+  58 matched decisions in class c, and the fresh readers of `survey-check-7.md` 42 and 53 of their
+  63 and 73 against A's 35 of 60 on the same nine tickets. The class mix, and the cost in context
+  cycles, are low ends; the rule share is a high end.
 - **"Holding a decision" counts the whole cycle.** A review leg that sent work back is counted
   entire. The decision shares of cost are upper bounds on what judgement itself cost, most for the
   gates.

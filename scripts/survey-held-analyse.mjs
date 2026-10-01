@@ -1,5 +1,5 @@
 // LIN-3176: what a held supervisor costs per wake against the context it has accumulated, what a fresh start costs to orient by role, and what John's relay (code for mechanical wakes, a fresh judgement session for the rest) would have cost on September's work, under both wake-charging rules.
-// Usage: node scripts/survey-held-analyse.mjs [--in data/survey-held/held.jsonl] [--sd ../simple-dispatcher] [--out data/survey-held/analysis.json] [--codes data/survey-held/codes]
+// Usage: node scripts/survey-held-analyse.mjs [--in data/survey-held/held.jsonl] [--sd ../simple-dispatcher] [--out data/survey-held/analysis.json] [--codes data/survey-held/codes] [--codes-file docs/papers/harbour/held-or-fresh-codes.json]
 // Run survey-held-extract.mjs first. No proxy calls.
 // *Episode*: a delivery into a held supervisor (Runner, leg, stepper, ticket autopilot) after its own task arrived, dated 1–30 September,
 // that is not the runner's completion gate or resume handshake, merged with the handshake just before it and the gates, compactions and
@@ -23,6 +23,7 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? proce
 const out = arg('--out', 'data/survey-held/analysis.json');
 const sdDir = resolve(arg('--sd', '../simple-dispatcher'));
 const codesDir = arg('--codes', 'data/survey-held/codes');
+const codesFile = arg('--codes-file', 'docs/papers/harbour/held-or-fresh-codes.json');
 const sessions = readFileSync(arg('--in', 'data/survey-held/held.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 const FROM = '2026-09-01'; const TO = '2026-10-01';
 const SUP = ['Runner', 'leg', 'stepper', 'autopilot'];
@@ -89,10 +90,10 @@ for (const s of sessions) {
   if (!s.taskAt || s.taskAt < FROM || s.taskAt >= TO || !s.decisionStep) continue;
   const role = s.layer === 'worker' ? s.kind : s.layer;
   const boot = sum(s.d.filter((x) => x.n < s.taskN).flatMap((x) => x.st.map((y) => y[UN])));
-  let u = 0; let ctx = null; let n = 0; let done = false;
-  for (const x of s.d) { if (x.n < s.taskN) continue; for (let i = 0; i < x.st.length; i++) { u += x.st[i][UN]; n++; if (x.n === s.decisionStep.n && i === s.decisionStep.idx) { ctx = x.st[i][C]; done = true; break; } } if (done) break; }
+  let u = 0; let ctx = null; let n = 0; let last = 0; let done = false;
+  for (const x of s.d) { if (x.n < s.taskN) continue; for (let i = 0; i < x.st.length; i++) { u += x.st[i][UN]; n++; if (x.n === s.decisionStep.n && i === s.decisionStep.idx) { ctx = x.st[i][C]; last = x.st[i][UN]; done = true; break; } } if (done) break; }
   if (!done) continue;
-  (fresh[role] ||= []).push({ units: u, boot, ctx, steps: n, minutes: (Date.parse(s.decisionAt) - Date.parse(s.taskAt)) / 60e3, reads: s.orientReads, calls: s.orientCalls, bootstrapped: s.taskN > 0 });
+  (fresh[role] ||= []).push({ units: u, last, boot, ctx, steps: n, minutes: (Date.parse(s.decisionAt) - Date.parse(s.taskAt)) / 60e3, reads: s.orientReads, calls: s.orientCalls, bootstrapped: s.taskN > 0 });
 }
 const part2 = {};
 for (const [role, v] of Object.entries(fresh)) {
@@ -109,14 +110,27 @@ for (const f of Object.values(firstStep)) { f.coldUnitsPerCtx = f.coldUnitsPerCt
 const heldLatency = {}; for (const L of SUP) { const xs = live.filter((e) => e.layer === L && e.acted).map((e) => e.st.find((x) => ACTED.has(x[8]))?.[9]).filter((x) => x != null); heldLatency[L] = { p50: r2(med(xs) / 60e3), p75: r2(q(xs, 0.75) / 60e3) }; }
 
 // Part 3: the relay.
-let mShare = null; // share of acted episodes the blind coders both marked M (a mechanical action that code could take)
-if (existsSync(codesDir)) {
-  const files = readdirSync(codesDir).filter((f) => /^coder[A-Z]-\d+\.json$/.test(f));
-  const by = {}; for (const f of files) { const coder = f.match(/coder([A-Z])/)?.[1]; for (const c of JSON.parse(readFileSync(join(codesDir, f), 'utf8'))) (by[c.card] ||= {})[coder] = c; }
+let mShare = null; // share of acted episodes the blind coders marked M (a mechanical action that code could take), pooled over the sample
+const mRole = {}; // the same share per role, applied to that role's acted episodes (version 2, survey-check-7.md)
+// The two coders' cards: from the coder files if present, else from the committed held-or-fresh-codes.json, so this re-runs from git.
+{
+  let by = {}; let layerOf = {};
+  const files = existsSync(codesDir) ? readdirSync(codesDir).filter((f) => /^coder[A-Z]-\d+\.json$/.test(f)) : [];
+  if (files.length) {
+    for (const f of files) { const coder = f.match(/coder([A-Z])/)?.[1]; for (const c of JSON.parse(readFileSync(join(codesDir, f), 'utf8'))) (by[c.card] ||= {})[coder] = c; }
+    layerOf = Object.fromEntries(JSON.parse(readFileSync(join(codesDir, '..', 'cards', 'index.json'), 'utf8')).cards.map((c) => [c.id, c.layer]));
+  } else if (existsSync(codesFile)) {
+    const k = JSON.parse(readFileSync(codesFile, 'utf8'));
+    for (const coder of ['A', 'B']) for (const c of k.cards[coder]) (by[c.card] ||= {})[coder] = c;
+    layerOf = Object.fromEntries(k.sample.cards.map((c) => [c.id, c.layer]));
+  }
   const both = Object.values(by).filter((x) => x.A && x.B); if (both.length) mShare = sum(both.map((x) => (x.A.mj === 'M') + (x.B.mj === 'M'))) / (2 * both.length);
+  for (const L of SUP) { const xs = Object.entries(by).filter(([k, x]) => x.A && x.B && layerOf[k] === L).map(([, x]) => x); if (xs.length) mRole[L] = sum(xs.map((x) => (x.A.mj === 'M') + (x.B.mj === 'M'))) / (2 * xs.length); }
 }
 const ROLE_OF = { Runner: 'leg', leg: 'leg', stepper: 'stepper', autopilot: 'autopilot' }; // no fresh Runner start in September; a leg is the nearest supervisor role
-const orient = (L, p) => { const v = fresh[ROLE_OF[L]].map((x) => x.units); return q(v, p); };
+// Version 2 (survey-check-7.md): orientation is the steps before the first decision. The decision step itself is one of the episode's own
+// steps, which reprice() already charges, so version 1 counted it twice.
+const orient = (L, p) => { const v = fresh[ROLE_OF[L]].map((x) => x.units - x.last); return q(v, p); };
 const ctxFresh = (L) => med(fresh[ROLE_OF[L]].map((x) => x.ctx));
 const bootU = (L) => med(fresh[ROLE_OF[L]].filter((x) => x.bootstrapped).map((x) => x.boot)) || 0;
 // A session's first prompt before it reads anything: system prompt, tools and standing files.
@@ -156,9 +170,9 @@ const SCEN = {
 };
 const fleetUnits = sum(sessions.flatMap((s) => s.d.filter((x) => x.at >= FROM && x.at < TO).flatMap((x) => x.st.map((y) => y[UN]))));
 const heldUnits = sum(eps.map((e) => e.units));
-const part3 = { fleetUnitsM: r2(fleetUnits / 1e6), heldEpisodeUnitsM: r2(heldUnits / 1e6), heldShareOfFleet: pct(heldUnits, fleetUnits), baseCtx: BASE, mShareOfActed: mShare == null ? null : r2(mShare), scenarios: {} };
-// Mechanical acted episodes go to code in the *Cheap scenarios: their cost is scaled by the coders' J share.
-const relayOf = (e, sc) => { const c = relayCost(e, sc); return sc.mToCode && mShare != null && e.acted ? c * (1 - mShare) : c; };
+const part3 = { fleetUnitsM: r2(fleetUnits / 1e6), heldEpisodeUnitsM: r2(heldUnits / 1e6), heldShareOfFleet: pct(heldUnits, fleetUnits), baseCtx: BASE, mShareOfActed: mShare == null ? null : r2(mShare), mShareByRole: Object.fromEntries(Object.entries(mRole).map(([k, v]) => [k, r2(v)])), mShareOfActedPopulation: Object.keys(mRole).length ? r2(sum(eps.filter((e) => e.acted).map((e) => mRole[e.layer] || 0)) / eps.filter((e) => e.acted).length) : null, scenarios: {} };
+// Mechanical acted episodes go to code in the *Cheap scenarios: their cost is scaled by the coders' J share for their role.
+const relayOf = (e, sc) => { const c = relayCost(e, sc); return sc.mToCode && mRole[e.layer] != null && e.acted ? c * (1 - mRole[e.layer]) : c; };
 for (const [k, sc] of Object.entries(SCEN)) {
   const byL = {}; for (const L of SUP) { const xs = eps.filter((e) => e.layer === L); const t = sum(xs.map((e) => e.units)); const r = sum(xs.map((e) => relayOf(e, sc))); byL[L] = { todayM: r2(t / 1e6), relayM: r2(r / 1e6), change: pct(r - t, t) }; }
   const t = heldUnits; const r = sum(eps.map((e) => relayOf(e, sc)));
