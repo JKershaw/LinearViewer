@@ -348,6 +348,8 @@ const METHOD_CLASSES = {
   readConnectionsByAccountPrefix: 'READ',
   updateCredentials: 'WRITE',
   removeReferent: 'WRITE',
+  // LIN-3125 Phase 1 (C1): the held-mode referent-only write.
+  addReferent: 'WRITE',
   deleteIfUnreferenced: 'WRITE',
   deleteConnection: 'WRITE',
   deleteEmptyByAccountPrefix: 'WRITE',

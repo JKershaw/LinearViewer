@@ -24,6 +24,8 @@ import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.j
 import { GitHubProjectsProvider } from '../../lib/providers/github-projects/index.js';
 import { createFakeGitHubProjectsClient } from '../../lib/providers/github-projects/fake-client.js';
 import { JiraProvider } from '../../lib/providers/jira/index.js';
+import { LinearProvider } from '../../lib/providers/linear/index.js';
+import { localProvider } from '../../lib/providers/local/index.js';
 import { fetchJiraAccessibleResources } from '../../lib/providers/jira/oauth.js';
 
 describe('LIN-2010 Phase 2 — ProviderInterface base defaults', () => {
@@ -124,5 +126,38 @@ describe('LIN-2010 Phase 2 — Jira', () => {
       { cloudId: 'cid-1', url: 'https://a.atlassian.net', name: 'A' },
       { cloudId: 'cid-2', url: 'https://b.atlassian.net', name: 'https://b.atlassian.net' },
     ]);
+  });
+});
+
+describe('LIN-3125 Phase 1 — listConnectionScopes declaration + explicit decline (F6)', () => {
+  test("lin-2010 (LIN-3125): base listConnectionScopes throws NotImplementedError (method 'listConnectionScopes', provider 'base'); supports() true only for github and github-projects", () => {
+    const base = new ProviderInterface();
+    assert.equal(base.supports('listConnectionScopes'), false);
+    assert.throws(
+      () => base.listConnectionScopes({ token: 'x' }),
+      (err) => {
+        assert.ok(err instanceof NotImplementedError, 'must throw NotImplementedError');
+        assert.strictEqual(err.code, 'NOT_IMPLEMENTED');
+        assert.strictEqual(err.method, 'listConnectionScopes');
+        assert.strictEqual(err.provider, 'base');
+        return true;
+      },
+      'the base class must decline by throwing'
+    );
+
+    // Implemented for the two held-capable providers.
+    assert.equal(new GitHubProvider().supports('listConnectionScopes'), true);
+    assert.equal(new GitHubProjectsProvider().supports('listConnectionScopes'), true);
+
+    // Declines: Jira (connection unit == scope unit), Linear and Local do not
+    // override it, so `supports()` is false and the inherited stub declines.
+    for (const [name, provider] of [
+      ['jira', new JiraProvider()],
+      ['linear', new LinearProvider()],
+      ['local', localProvider],
+    ]) {
+      assert.equal(provider.supports('listConnectionScopes'), false, `${name} must decline`);
+      assert.throws(() => provider.listConnectionScopes({ token: 'x' }), NotImplementedError, `${name} must decline by throwing`);
+    }
   });
 });
