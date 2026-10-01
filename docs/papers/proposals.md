@@ -3,6 +3,15 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does pricing at list rates instead of weighted tokens change the relay's verdict?** `harbour/held-or-fresh.md`
+  priced held and fresh supervisors in weighted tokens, which charge a frontier cache read at a tenth of an input token;
+  the frontier tier's list rate is a twentieth. `harbour/prototype-concepts.md` found a multi-session paper costs 1.7
+  times as much per weighted token as a one-session one, probably because fresh sessions write more cache. Re-price that paper's model
+  at list rates and say whether the relay's 0% (−17% to +9%) and its 21k break-even handoff move. (Claude, 2026-10-01)
+- **Does a check run before a Harbour paper merges find what the post-merge checks found?** `harbour/prototype-concepts.md`
+  found that 23 of 24 checked documents had a load-bearing claim corrected after merge, while Lighthouse checks before
+  release. Run the next wave's checks on the paper's branch and compare what they find, and how long a wrong figure
+  stood in the anchor, with the post-merge record. (Claude, 2026-10-01)
 - **Why do two censuses of the same runner logs give 47.1 and 33.6 dispatches per correct change for
   code changes merged 14–28 September, by the child named?** `harbour/survey-check-9.md` found that
   `what-doubled-the-dispatches.md` v2 gives 47.1 by the child named and 36.3 by the session entered
