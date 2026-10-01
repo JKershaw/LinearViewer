@@ -46,6 +46,24 @@ test('setting a new entry prunes expired ones', () => {
   assert.equal(cache.size, 1);
 });
 
+test('clear() drops every entry, returning the cache to cold (LIN-3198)', () => {
+  let clock = 0;
+  const cache = createDedupeCache({ ttlMs: 10000, now: () => clock });
+  const key = dedupeKey('ws', 'LIN-1', 'Approve');
+  cache.set(key, { comment: { id: 'c1' } });
+  assert.deepEqual(cache.get(key), { comment: { id: 'c1' } });
+  assert.equal(cache.size, 1);
+
+  cache.clear();
+
+  // The entry is gone at the SAME clock (a TTL prune would not have helped),
+  // and a fresh set afterward repopulates normally.
+  assert.equal(cache.get(key), undefined);
+  assert.equal(cache.size, 0);
+  cache.set(key, { comment: { id: 'c2' } });
+  assert.deepEqual(cache.get(key), { comment: { id: 'c2' } });
+});
+
 // ---- createGenerationTracker (LIN-1160 / LIN-2005) -------------------------
 
 test('generation tracker: current() on a cold key is stable and falsy', () => {

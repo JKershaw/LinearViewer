@@ -237,7 +237,7 @@ export function buildMockRecommendationHop(ctx) {
 // succeeds within 5 minutes simply falls out of both caches together, at
 // which point a resubmission mints a fresh (unrelated) comment+stamp attempt
 // rather than being treated as a retry forever.
-const decisionStampDedupe = createDedupeCache();
+export const decisionStampDedupe = createDedupeCache();
 
 /**
  * Best-effort decision-answer stamp(s) for a human comment write (LIN-1728

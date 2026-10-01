@@ -51,9 +51,11 @@ import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection
  * @param {Object} options.proxyEventsCollection - Raw proxy-events collection (LIN-3002: /kpis aggregation-failure fault injection)
  * @param {Function} options.resetKpiCache - Resets server.js's kpiCache to cold (LIN-3002)
  * @param {Object|null} [options.emailTransport] - The capture email transport (LIN-1892), or null when email sign-in isn't in capture mode
+ * @param {Object|null} [options.commentDedupe] - In-process comment dedupe cache (LIN-3198 reset seam), or null when not wired
+ * @param {Object|null} [options.decisionStampDedupe] - In-process decision-stamp dedupe cache (LIN-3198), or null
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -745,6 +747,29 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   router.get('/test/clear-sessions-feed-cache', (req, res) => {
     try {
       if (sessionsFeedCache) sessionsFeedCache.clear(req.query.urlKey || 'test-workspace')
+      res.send('ok')
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to drop the in-process comment-dedupe caches (LIN-3198). Two
+  // process-global caches collapse an identical (workspace, issue, body)
+  // comment re-post to a 200 instead of a fresh 201: `commentDedupe` (the
+  // written-comment reply cache) and `decisionStampDedupe` (LIN-2208's
+  // "already stamped" marker, keyed identically). No existing /test/clear-*
+  // route reset either, so a spec that re-posts the same ruling body against
+  // one server could never pass twice — and a CI retry deterministically hit
+  // the dedupe instead of recovering. Cleared TOGETHER (never one alone: the
+  // pair must return to "never seen" or a retry either mints a fresh comment
+  // and skips stamping, or re-stamps a deduped one). The clear is global, not
+  // urlKey-scoped: `dedupeKey` hashes its parts, so entries cannot be filtered
+  // by workspace; no e2e test asserts a deduped comment 200, so a clear from
+  // one worker cannot change another worker's assertion. No-op if not wired.
+  router.get('/test/clear-comment-dedupe', (req, res) => {
+    try {
+      if (commentDedupe) commentDedupe.clear()
+      if (decisionStampDedupe) decisionStampDedupe.clear()
       res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })

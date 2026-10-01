@@ -354,13 +354,36 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
 
     // Feed: the session is terminal, so the waiting flag is gated off — the card
     // reports done with no waiting flag/message even though a worker is [blocked].
-    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
-    const body = await feed.json();
-    const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
-    expect(s.terminal).toBe(true);
-    expect(s.status).not.toBe('waiting');
-    expect(s.waiting).toBe(false);
-    expect(s.waitingMessage).toBe(null);
+    //
+    // LIN-3198: the feed is intentionally eventually consistent — a 5s
+    // stale-while-revalidate cache plus an async per-workspace materializer whose
+    // background backfill can race the seed and persist a mid-seed snapshot
+    // (worker already [blocked], anchor not yet [done]). A single read then
+    // asserts against that transient "waiting" doc (observed ~2-3/20, only under
+    // parallel repeats; clean HEAD flakes identically, so it is pre-existing and
+    // not one of the four fix surfaces). Poll the read until the terminal gate is
+    // reflected — the assertion is unchanged (it must become terminal and
+    // not-waiting), only the read outlasts the refresh window.
+    await expect.poll(async () => {
+      const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
+      const body = await feed.json();
+      const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
+      if (!s) return null;
+      return {
+        terminal: s.terminal,
+        statusIsWaiting: s.status === 'waiting',
+        waiting: s.waiting,
+        waitingMessage: s.waitingMessage,
+      };
+    }, {
+      timeout: 15000,
+      message: 'session feed reflects the terminal gate once the async materializer settles',
+    }).toMatchObject({
+      terminal: true,
+      statusIsWaiting: false,
+      waiting: false,
+      waitingMessage: null,
+    });
 
     // Session page: no "waiting on you" banner on a finished session.
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);

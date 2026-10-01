@@ -37,6 +37,12 @@ test.beforeEach(async ({ page, workerUrlKey, localWorkerUrlKey }) => {
   // (the loop-decision path, not the local-provider scan path), so
   // `workerUrlKey` IS the key actually written here.
   await page.goto(`/test/clear-shelved-rulings?urlKey=${URL_KEY}`);
+  // LIN-3198: drop the in-process comment-dedupe caches. The F1 cross-workspace
+  // ruling re-posts the same "Approve" body to the same (workspace, issue) every
+  // run; the 5-min server-side dedupe window would otherwise collapse the second
+  // run's fresh 201 into a deduped 200, making the exact-201 assertion retry-fatal.
+  // Global clear (the dedupe key is hashed, so it can't be urlKey-scoped).
+  await page.request.get('/test/clear-comment-dedupe');
 });
 
 async function clearRuns(page) {

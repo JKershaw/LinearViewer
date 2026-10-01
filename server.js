@@ -108,10 +108,10 @@ import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
 import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning, isEmailSignInAvailable, resolvePromptStepMode } from './lib/email-availability.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
-import { createProxyRoutes } from './routes/proxy.js'
+import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
-import { createWorkspaceApiRoutes, shouldMockAi } from './routes/workspace-api.js'
+import { createWorkspaceApiRoutes, shouldMockAi, decisionStampDedupe } from './routes/workspace-api.js'
 import { getModelCatalog, CATALOG_CACHE_TTL_MS } from './lib/openrouter-catalog.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
@@ -900,7 +900,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe }))
 }
 
 // =============================================================================
