@@ -598,12 +598,17 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
   // Source pins: the 10 seams
   // -------------------------------------------------------------------------
 
-  describe('source pins — the 10 writeConnection seams', () => {
+  describe('source pins — the writeConnection seams', () => {
+    // LIN-3125 Phase 2: the three GitHub convert+fallback pairs collapsed into
+    // the one shared seam `lib/persist-binding.js`. The GitHub legacy write now
+    // lives there (one guarded call serving all three sites) instead of three
+    // inline calls in `lib/github-install-flow.js`; the other seven seams are
+    // unchanged. The guarantees are preserved below, relocated to the new seam.
     const SEAMS = {
       'routes/auth.js': 2,
-      'lib/github-install-flow.js': 3,
       'routes/jira-auth.js': 4,
       'routes/account-merge.js': 1,
+      'lib/persist-binding.js': 1,
     };
     const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 
@@ -618,11 +623,30 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
         const blockGuards = (src.match(/if \(!conversion\.connectionBacked\) \{/g) || []).length;
         assert.ok(guarded + blockGuards >= n, `${rel}: every legacy write sits behind the conversion result`);
       }
-      assert.equal(total, 10);
+      assert.equal(total, 8);
+      // LIN-3125 Phase 2: the flow drives all three GitHub sites through the
+      // shared seam and keeps no inline legacy write of its own.
+      const flow = read('lib/github-install-flow.js');
+      assert.equal((flow.match(/await persistBinding\(/g) || []).length, 3, 'the three GitHub sites call the shared seam');
+      assert.equal((flow.match(/await writeConnection\(/g) || []).length, 0, 'the GitHub legacy writes moved into the shared seam');
     });
 
-    test('in every seam function the conversion runs after the establishAccount refusal return', () => {
-      for (const rel of Object.keys(SEAMS)) {
+    test('in every seam the conversion runs after the establishAccount refusal return', () => {
+      // LIN-3125 Phase 2: the GitHub ordering guarantee is now asserted on the
+      // flow's `persistBinding(` calls (each sits after its establishAccount /
+      // `!established.ok` return) rather than a per-file convert scan.
+      const flow = read('lib/github-install-flow.js');
+      let idx = flow.indexOf('await persistBinding({');
+      let seen = 0;
+      while (idx >= 0) {
+        seen++;
+        const head = flow.slice(0, idx);
+        const refusal = Math.max(head.lastIndexOf('if (!established.ok)'), head.lastIndexOf('const established = await establishAccount('));
+        assert.ok(refusal >= 0, 'a persistBinding with no establishAccount/refusal before it');
+        idx = flow.indexOf('await persistBinding({', idx + 1);
+      }
+      assert.equal(seen, 3, 'the three GitHub sites');
+      for (const rel of ['routes/auth.js', 'routes/jira-auth.js', 'routes/account-merge.js']) {
         const src = read(rel);
         let idx = src.indexOf('convertToConnectionBacked({');
         let seen = 0;
