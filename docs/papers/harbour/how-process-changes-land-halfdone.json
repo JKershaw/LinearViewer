@@ -1,0 +1,1109 @@
+{
+  "method": "LIN-3182 Part 2. Half-finished items in the process code at origin/main on 2026-10-01 (LinearViewer cce25f13, simple-dispatcher 3366748). Process code is LinearViewer's growth-atlas 'prompt text' and 'dispatch + fleet' areas plus the scorecard's reading paths and lib/runner-kit/, and every root production .js file of simple-dispatcher plus its CLAUDE.md, README.md, docs/, experiments/ and scripts/. scripts/survey-landing-halfdone.mjs scans for candidates and every candidate is either coded below or excluded with a reason. (a) A flag is a setting whose documented purpose is to switch a behaviour on or off or back to the path before a named change: boolean env switches, and numeric knobs whose comment says 0 disables the new behaviour or restores the pre-LIN-n path. Numeric knobs with no such meaning are tuning, counted but not coded; selectors among several supported paths (terminal, harness, clone strategy), credentials, file paths and safety overrides are excluded. Subtypes: dark (the new path is off by default and not switched on in the runner's environment), kept-after-rollout (the new path is live and the switch back is kept), rollback-knob (numeric 0 restores the old path). The runner's environment was read for flag names only (~/development/simple-dispatcher/.env and the live process): it sets SD_TERMINAL and SD_WORKER_USAGE_RELAY and no other switch. (b) A dual path is code that keeps an older path, interface or data shape alongside its replacement. Subtypes: old-path (old behaviour still reachable), old-interface (an alias or wrapper for an older name or shape), data-shape (a reader branch for rows written before a change), partial-rollout (a new path applied to some cases only), test-only (an old form kept only so existing tests run). A defensive guard against malformed records, a `?? 0` default or prose that merely mentions compatibility is not a dual path. (c) A parked experiment is a proposal, epic design, prototype or research document in the process area whose own status says proposed or undecided, or that is not referenced by anything live, with no recorded conclusion. Research that shipped or was concluded is excluded with the evidence. UI and product prototypes and plans are excluded as not process. (d) Open follow-ups are computed by the script, not coded: open (Backlog, Todo, In Progress) tickets labelled kind:follow-up, with kind:review-residue as a second row, on a process front (dispatcher-substrate, prompt-engine, operating-model, rulings); origin is the parent or the first other ticket the description names; repo is simple-dispatcher when the text names it or its files, else LinearViewer; age is createdAt where the snapshot has it, else interpolated from ticket number over the snapshot's 95 dated tickets. Ages of coded items are days from the first first-parent commit on main that added the item's token (the env name anywhere in the repo for flags; the comment or code text in the file for the rest) to 2026-10-01.",
+  "items": [
+    {
+      "id": "F-SD1",
+      "class": "flag",
+      "subtype": "dark",
+      "repo": "simple-dispatcher",
+      "flag": "SD_ASSISTANT_TEXT_RELAY",
+      "path": "config.js",
+      "token": "SD_ASSISTANT_TEXT_RELAY",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1290"
+      ],
+      "what": "Full assistant-text relay into dispatch feedback. Default off ('flag-off output must stay byte-identical'); not set in the runner's environment.",
+      "evidence": "config.js comment block; LIN-1290 Done; runner .env sets no such flag",
+      "line": 1148,
+      "introducedSha": "2411d63",
+      "introducedDate": "2026-07-12",
+      "introducedSubject": "Merge pull request #94 from JKershaw/lin-1290-assistant-text-relay",
+      "ageDays": 81
+    },
+    {
+      "id": "F-SD2",
+      "class": "flag",
+      "subtype": "dark",
+      "repo": "simple-dispatcher",
+      "flag": "SD_TOOL_ACTIVITY_RELAY",
+      "path": "config.js",
+      "token": "SD_TOOL_ACTIVITY_RELAY",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1293"
+      ],
+      "what": "Tool-activity line relay. Default off; not set in the runner.",
+      "evidence": "config.js comment block; LIN-1293 Done",
+      "line": 1159,
+      "introducedSha": "fc04fcc",
+      "introducedDate": "2026-07-13",
+      "introducedSubject": "LIN-1293: E2 — tool-activity relay behind an independent flag (#97)",
+      "ageDays": 80
+    },
+    {
+      "id": "F-SD3",
+      "class": "flag",
+      "subtype": "dark",
+      "repo": "simple-dispatcher",
+      "flag": "SD_OPENCODE_TELEMETRY_RELAY",
+      "path": "config.js",
+      "token": "SD_OPENCODE_TELEMETRY_RELAY",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1417",
+        "LIN-1404",
+        "LIN-1405"
+      ],
+      "what": "OpenCode tool-part and evidence relays share this flag. Default off; not set in the runner.",
+      "evidence": "config.js comment block; LIN-1417, LIN-1404, LIN-1405 Done",
+      "line": 1167,
+      "introducedSha": "ebe93ab",
+      "introducedDate": "2026-07-19",
+      "introducedSubject": "LIN-1417: SD_OPENCODE_TELEMETRY_RELAY flag (#114)",
+      "ageDays": 74
+    },
+    {
+      "id": "F-SD4",
+      "class": "flag",
+      "subtype": "dark",
+      "repo": "simple-dispatcher",
+      "flag": "SD_RESOURCE_RELAY",
+      "path": "config.js",
+      "token": "SD_RESOURCE_RELAY",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1790",
+        "LIN-1805"
+      ],
+      "what": "Resource-sample relay to Harbour. 'MUST stay off until' Harbour's vocabulary is live; the flip is a separate act, LIN-1805, still in Backlog.",
+      "evidence": "config.js comment block; LIN-1789 and LIN-1790 Done, LIN-1805 Backlog",
+      "line": 1190,
+      "introducedSha": "f107c1f",
+      "introducedDate": "2026-08-02",
+      "introducedSubject": "Merge pull request #158 from JKershaw/lin-1790-phase-b",
+      "ageDays": 60
+    },
+    {
+      "id": "F-SD5",
+      "class": "flag",
+      "subtype": "kept-after-rollout",
+      "repo": "simple-dispatcher",
+      "flag": "SD_WORKER_USAGE_RELAY",
+      "path": "config.js",
+      "token": "SD_WORKER_USAGE_RELAY",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1425"
+      ],
+      "what": "Per-session usage relay ([usage] lines). Default off in code, switched on in the runner's .env, so the shipped default and the live behaviour differ.",
+      "evidence": "config.js comment block; runner .env sets SD_WORKER_USAGE_RELAY=1",
+      "line": 1177,
+      "introducedSha": "80183b0",
+      "introducedDate": "2026-07-23",
+      "introducedSubject": "Merge pull request #131 from JKershaw/lin-1425-worker-usage-capture",
+      "ageDays": 70
+    },
+    {
+      "id": "F-SD6",
+      "class": "flag",
+      "subtype": "kept-after-rollout",
+      "repo": "simple-dispatcher",
+      "flag": "SD_CLOSE_WINDOW_ON_DONE",
+      "path": "config.js",
+      "token": "SD_CLOSE_WINDOW_ON_DONE",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1100"
+      ],
+      "what": "Close a session's window on DONE; '0/false is the instant-rollback switch that leaves every window open exactly as before'.",
+      "evidence": "config.js comment block",
+      "line": 1114,
+      "introducedSha": "dc5b148",
+      "introducedDate": "2026-07-10",
+      "introducedSubject": "LIN-1100: auto-close a session's window when its DONE sentinel finalizes it (#81)",
+      "ageDays": 83
+    },
+    {
+      "id": "F-SD7",
+      "class": "flag",
+      "subtype": "kept-after-rollout",
+      "repo": "simple-dispatcher",
+      "flag": "SD_ZERO_TOOL_DONE_GUARD",
+      "path": "config.js",
+      "token": "SD_ZERO_TOOL_DONE_GUARD",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1700"
+      ],
+      "what": "Zero-tool DONE guard's instant-rollback switch; default on.",
+      "evidence": "config.js comment block",
+      "line": 1137,
+      "introducedSha": "a31cf16",
+      "introducedDate": "2026-07-30",
+      "introducedSubject": "Merge pull request #149 from JKershaw/lin-1700-zero-tool-done-guard",
+      "ageDays": 63
+    },
+    {
+      "id": "F-SD8",
+      "class": "flag",
+      "subtype": "kept-after-rollout",
+      "repo": "simple-dispatcher",
+      "flag": "SD_TICKET_MARKER_RELAY",
+      "path": "config.js",
+      "token": "SD_TICKET_MARKER_RELAY",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-2423"
+      ],
+      "what": "Worker-lane [ticket] marker relay; default on, an explicit falsy value is the rollback switch.",
+      "evidence": "config.js comment block",
+      "line": 1202,
+      "introducedSha": "ee81d0a",
+      "introducedDate": "2026-09-02",
+      "introducedSubject": "LIN-2423: relay [ticket] lane markers into dispatch feedback (#200)",
+      "ageDays": 29
+    },
+    {
+      "id": "F-SD9",
+      "class": "flag",
+      "subtype": "kept-after-rollout",
+      "repo": "simple-dispatcher",
+      "flag": "SD_LAUNCH_BREAKER_ENABLED",
+      "path": "config.js",
+      "token": "SD_LAUNCH_BREAKER_ENABLED",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-2446"
+      ],
+      "what": "Launch-failure breaker's own instant-rollback switch; default on.",
+      "evidence": "config.js comment block",
+      "line": 710,
+      "introducedSha": "2a68022",
+      "introducedDate": "2026-09-02",
+      "introducedSubject": "LIN-2446: kitty launch circuit breaker, reason-first stderr, wedge-hold coverage (#201)",
+      "ageDays": 29
+    },
+    {
+      "id": "F-SD10",
+      "class": "flag",
+      "subtype": "kept-after-rollout",
+      "repo": "simple-dispatcher",
+      "flag": "SD_AUTO_PAUSE_ENABLED",
+      "path": "config.js",
+      "token": "SD_AUTO_PAUSE_ENABLED",
+      "tokenAnywhere": true,
+      "alsoFlags": [
+        "AUTO_PAUSE_WINDOW_MS"
+      ],
+      "tickets": [],
+      "what": "Auto-pause's instant-rollback switch; default on (halt.js reads it as 'always reports not-engaged' when off).",
+      "evidence": "config.js comment block; halt.js comment",
+      "line": 761,
+      "introducedSha": "484cfe0",
+      "introducedDate": "2026-09-26",
+      "introducedSubject": "Merge pull request #252 from JKershaw/feat/lin-3046-auto-pause",
+      "ageDays": 5
+    },
+    {
+      "id": "F-SD11",
+      "class": "flag",
+      "subtype": "kept-after-rollout",
+      "repo": "simple-dispatcher",
+      "flag": "SD_OPLOG",
+      "path": "oplog.js",
+      "token": "SD_OPLOG",
+      "tokenAnywhere": true,
+      "tickets": [],
+      "what": "Operations log; 'on by default; SD_OPLOG=0 is the instant off-switch'.",
+      "evidence": "oplog.js comment",
+      "line": 24,
+      "introducedSha": "7334732",
+      "introducedDate": "2026-07-12",
+      "introducedSubject": "Merge pull request #90 from JKershaw/lin-1291-completion-propagation-oplog",
+      "ageDays": 81
+    },
+    {
+      "id": "F-SD12",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "CLAUDE_CODE_STOP_HOOK_BLOCK_CAP",
+      "path": "config.js",
+      "token": "CLAUDE_CODE_STOP_HOOK_BLOCK_CAP",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1266"
+      ],
+      "what": "Stop-hook block cap raised 9 to 1000; 0 omits it and falls back to Claude Code's default, 'the instant-rollback switch'.",
+      "evidence": "config.js comment block",
+      "line": 1122,
+      "introducedSha": "d0d003d",
+      "introducedDate": "2026-07-12",
+      "introducedSubject": "Merge pull request #85 from JKershaw/lin-1266-raise-stop-hook-cap",
+      "ageDays": 81
+    },
+    {
+      "id": "F-SD13",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "FOLLOWUP_HOLD_MS",
+      "path": "config.js",
+      "token": "FOLLOWUP_HOLD_MS",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-789",
+        "LIN-827"
+      ],
+      "what": "Completion-grace hold of a DONE session for follow-ups; '0 DISABLES the hold (exact pre-LIN-789 behavior)'.",
+      "evidence": "config.js comment block",
+      "line": 48,
+      "introducedSha": "901b95c",
+      "introducedDate": "2026-06-28",
+      "introducedSubject": "Merge pull request #34 from JKershaw/feat/lin-789-followup-hold",
+      "ageDays": 95
+    },
+    {
+      "id": "F-SD14",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "ASYNC_WAIT_MAX_AGE_MS",
+      "path": "config.js",
+      "token": "ASYNC_WAIT_MAX_AGE_MS",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-1113"
+      ],
+      "what": "Bound on a stale async wait; 0 is 'the instant-rollback switch back to pre-LIN-1113 behaviour'.",
+      "evidence": "config.js comment block",
+      "line": 65,
+      "introducedSha": "cb02c3b",
+      "introducedDate": "2026-07-25",
+      "introducedSubject": "Merge pull request #144 from JKershaw/lin-1113-stale-async-wait",
+      "ageDays": 68
+    },
+    {
+      "id": "F-SD15",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "MAX_PENDING_EXTERNAL_REFIRES",
+      "path": "config.js",
+      "token": "MAX_PENDING_EXTERNAL_REFIRES",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-2229"
+      ],
+      "what": "Cap on PENDING-EXTERNAL re-fires; 0 restores 'the pre-LIN-2229 unbounded loop'.",
+      "evidence": "config.js comment block",
+      "line": 112,
+      "introducedSha": "64760ad",
+      "introducedDate": "2026-08-23",
+      "introducedSubject": "LIN-2229: bound the PENDING-EXTERNAL re-fire loop on a default (terminal-only) edge (#183)",
+      "ageDays": 39
+    },
+    {
+      "id": "F-SD16",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "BOOTSTRAP_STALL_MS",
+      "path": "config.js",
+      "token": "BOOTSTRAP_STALL_MS",
+      "tokenAnywhere": true,
+      "tickets": [],
+      "what": "Short stall ceiling for bootstrap phases; 0 reverts 'to byte-identical single-ceiling behavior (the instant-rollback switch)'.",
+      "evidence": "config.js comment block",
+      "line": 147,
+      "introducedSha": "c6d5d3b",
+      "introducedDate": "2026-09-04",
+      "introducedSubject": "LIN-2510: bounded bootstrap retry-before-kill for post-refire SUMMARIZING/RESUMING stalls (#214)",
+      "ageDays": 27
+    },
+    {
+      "id": "F-SD17",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "MAX_BOOTSTRAP_REFIRES",
+      "path": "config.js",
+      "token": "MAX_BOOTSTRAP_REFIRES",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-2510"
+      ],
+      "what": "Bootstrap retry population; 0 reproduces 'today's exact pre-LIN-2510 behavior'.",
+      "evidence": "config.js comment block",
+      "line": 156,
+      "introducedSha": "c6d5d3b",
+      "introducedDate": "2026-09-04",
+      "introducedSubject": "LIN-2510: bounded bootstrap retry-before-kill for post-refire SUMMARIZING/RESUMING stalls (#214)",
+      "ageDays": 27
+    },
+    {
+      "id": "F-SD18",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "FAST_FAIL_BOUND_MS",
+      "path": "config.js",
+      "token": "FAST_FAIL_BOUND_MS",
+      "tokenAnywhere": true,
+      "alsoFlags": [
+        "FAST_FAIL_CAPTURE_BACKOFF_BASE_MS",
+        "FAST_FAIL_CAPTURE_BACKOFF_CAP_MS"
+      ],
+      "tickets": [],
+      "what": "Fast-fail watchdog bound; '0 genuinely disables the whole pass'.",
+      "evidence": "config.js comment block",
+      "line": 144,
+      "introducedSha": "02bdbaf",
+      "introducedDate": "2026-08-09",
+      "introducedSubject": "Merge pull request #169 from JKershaw/feat/lin-1821-fast-fail-watchdog",
+      "ageDays": 53
+    },
+    {
+      "id": "F-SD19",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "SILENT_START_CAPTURE_MS",
+      "path": "config.js",
+      "token": "SILENT_START_CAPTURE_MS",
+      "tokenAnywhere": true,
+      "tickets": [],
+      "what": "Settled-silent start pass; 'independent rollback switch (the plan's explicit requirement)', 0 disables the pass.",
+      "evidence": "config.js comment block",
+      "line": 287,
+      "introducedSha": "37bc15f",
+      "introducedDate": "2026-09-05",
+      "introducedSubject": "LIN-2515: login-expired detection + settled-silent fast-fail watchdog (#219)",
+      "ageDays": 26
+    },
+    {
+      "id": "F-SD20",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "HEARTBEAT_TRANSCRIPT_SCAN_BACKOFF_BASE_MS",
+      "path": "config.js",
+      "token": "HEARTBEAT_TRANSCRIPT_SCAN_BACKOFF_BASE_MS",
+      "tokenAnywhere": true,
+      "alsoFlags": [
+        "HEARTBEAT_TRANSCRIPT_SCAN_BACKOFF_CAP_MS"
+      ],
+      "tickets": [],
+      "what": "Heartbeat transcript-scan backoff; '0 is the documented never back off rollback switch'.",
+      "evidence": "config.js comment block",
+      "line": 320,
+      "introducedSha": "53bf2a8",
+      "introducedDate": "2026-08-23",
+      "introducedSubject": "LIN-2136: bound the heartbeat-cycle transcript heal's per-tick disk scan, pin its ordering (#185)",
+      "ageDays": 39
+    },
+    {
+      "id": "F-SD21",
+      "class": "flag",
+      "subtype": "rollback-knob",
+      "repo": "simple-dispatcher",
+      "flag": "OPENCODE_MESSAGE_TIMEOUT_MS",
+      "path": "config.js",
+      "token": "OPENCODE_MESSAGE_TIMEOUT_MS",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-2837"
+      ],
+      "what": "Bound on an OpenCode message wait; '0 disables (the pre-LIN-2837 unbounded wait)'.",
+      "evidence": "config.js comment block",
+      "line": 833,
+      "introducedSha": "3b1e734",
+      "introducedDate": "2026-09-26",
+      "introducedSubject": "Merge pull request #235 from JKershaw/feat/lin-2837-provider-refusal-surfacing",
+      "ageDays": 5
+    },
+    {
+      "id": "D-LV1",
+      "class": "dual-path",
+      "subtype": "data-shape",
+      "repo": "LinearViewer",
+      "path": "lib/dispatch-store.js",
+      "token": "pre-LIN-1341 legacy row",
+      "alsoPaths": [
+        "lib/observation-sessions-materializer.js"
+      ],
+      "tickets": [
+        "LIN-1341"
+      ],
+      "what": "Rows written before sessionGroupId still read through the old followUpTo chain walk (the materializer keeps 'the legacy walk').",
+      "evidence": "dispatch-store.js comments; observation-sessions-materializer.js comment",
+      "line": 703,
+      "introducedSha": "c5272d41",
+      "introducedDate": "2026-07-20",
+      "introducedSubject": "LIN-1461: scope feedback-group merge to the queried item's rootItemId lineage",
+      "ageDays": 73
+    },
+    {
+      "id": "D-LV2",
+      "class": "dual-path",
+      "subtype": "data-shape",
+      "repo": "LinearViewer",
+      "path": "lib/dispatch-store.js",
+      "token": "legacy label + explicit-null branch",
+      "tickets": [],
+      "what": "Feedback ownership has a runner-ownership branch and the legacy token-label + explicit-null branch for dispatch-token and Harbour OS takes. The runner-ownership branch arrived on 29 Sep (LIN-3130), which is when the label branch became the legacy one.",
+      "evidence": "dispatch-store.js comment",
+      "line": 2153,
+      "introducedSha": "fd528742",
+      "introducedDate": "2026-09-29",
+      "introducedSubject": "Merge pull request #1606 from JKershaw/lin-3130-s2a-runner-proxy-routes",
+      "ageDays": 2
+    },
+    {
+      "id": "D-LV3",
+      "class": "dual-path",
+      "subtype": "data-shape",
+      "repo": "LinearViewer",
+      "path": "lib/dismissal-suggestions-store.js",
+      "token": "function pickStandingDoc",
+      "tickets": [
+        "LIN-2756",
+        "LIN-2757"
+      ],
+      "what": "Dismissal proposals keep the legacy workspace-wide shape beside the loop-scoped one; readers pick between them (also in unanswered-decisions.js and the agent instructions).",
+      "evidence": "dismissal-suggestions-store.js module docstring 'back-compat decision made explicit'",
+      "line": 127,
+      "introducedSha": "5feeefd0",
+      "introducedDate": "2026-09-11",
+      "introducedSubject": "LIN-2756: per-loop ruling identity — fix duplicate decision_id collision (#1437)",
+      "ageDays": 20
+    },
+    {
+      "id": "D-LV4",
+      "class": "dual-path",
+      "subtype": "data-shape",
+      "repo": "LinearViewer",
+      "path": "lib/pipeline-loops.js",
+      "token": "(LIN-3022) legacy fallback",
+      "alsoPaths": [
+        "lib/unanswered-decisions.js",
+        "lib/observation-sessions-store.js"
+      ],
+      "tickets": [
+        "LIN-3022"
+      ],
+      "what": "A digest written before the answered-decision set is read through a legacy scalar fallback.",
+      "evidence": "pipeline-loops.js and unanswered-decisions.js comments",
+      "line": 89,
+      "introducedSha": "0c472125",
+      "introducedDate": "2026-09-25",
+      "introducedSubject": "Merge pull request #1570 from JKershaw/feat/lin-3022-answered-decision-set",
+      "ageDays": 6
+    },
+    {
+      "id": "D-LV5",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "LinearViewer",
+      "path": "lib/proxy-instructions.js",
+      "token": "(alias: /api/proxy/foreman/status — deprecated)",
+      "tickets": [],
+      "what": "Agents are still told the deprecated /foreman/status alias resolves beside /agent/status.",
+      "evidence": "proxy-instructions.js",
+      "line": 626,
+      "introducedSha": "41c6cd88",
+      "introducedDate": "2026-06-16",
+      "introducedSubject": "LIN-533: decouple agent-status substrate from Foreman naming (agent/status canonical + alias) (#499)",
+      "ageDays": 107,
+      "tokenAnywhere": true
+    },
+    {
+      "id": "D-LV6",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "LinearViewer",
+      "path": "lib/proxy-instructions.js",
+      "token": "Legacy flat forms",
+      "tickets": [],
+      "what": "Legacy flat proxy routes (/relations/{id}, /recap/{id}, /comments/{id}) still resolve beside the nested /issues/{id}/ forms.",
+      "evidence": "proxy-instructions.js",
+      "line": 210,
+      "introducedSha": "cbbf971e",
+      "introducedDate": "2026-06-16",
+      "introducedSubject": "LIN-528: align proxy surface with canonical nested routes + forgiving aliases (#496)",
+      "ageDays": 107,
+      "tokenAnywhere": true
+    },
+    {
+      "id": "D-LV7",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "LinearViewer",
+      "path": "lib/terminal-marked-task-cost.js",
+      "token": "Deprecated alias for `laneLandedCount`, kept for one cycle",
+      "tickets": [
+        "LIN-2423"
+      ],
+      "what": "noLineageCount published as a deprecated alias of laneLandedCount, 'kept for one cycle — remove once every consumer has migrated'. The only item found with a written retirement condition.",
+      "evidence": "terminal-marked-task-cost.js comment",
+      "line": 599,
+      "introducedSha": "dff239c5",
+      "introducedDate": "2026-08-30",
+      "introducedSubject": "LIN-2253: publish pricedTicketCount headline denominator + ticketsPerPricedLane (#1306)",
+      "ageDays": 32
+    },
+    {
+      "id": "D-LV8",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "LinearViewer",
+      "path": "lib/prompt-templates.js",
+      "token": "export const isInReadyQueue = isEligibleForPlan",
+      "tickets": [],
+      "what": "Legacy alias isInReadyQueue for isEligibleForPlan.",
+      "evidence": "prompt-templates.js 'Legacy alias for backwards compatibility'",
+      "line": 349,
+      "introducedSha": "731335e7",
+      "introducedDate": "2026-01-12",
+      "introducedSubject": "Merge pull request #18 from JKershaw/claude/review-tags-handling-6Pydq",
+      "ageDays": 262
+    },
+    {
+      "id": "D-LV9",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "LinearViewer",
+      "path": "lib/prompt-formatters.js",
+      "token": "Support legacy useMcp parameter",
+      "tickets": [],
+      "what": "formatWorkflow still accepts the legacy useMcp parameter beside useLinear.",
+      "evidence": "prompt-formatters.js comment",
+      "line": 322,
+      "introducedSha": "b94bcd14",
+      "introducedDate": "2026-03-08",
+      "introducedSubject": "Merge pull request #174 from JKershaw/claude/combine-linear-prompts-ri22H",
+      "ageDays": 207
+    },
+    {
+      "id": "D-LV10",
+      "class": "dual-path",
+      "subtype": "old-path",
+      "repo": "LinearViewer",
+      "path": "lib/harbour-spawn.js",
+      "token": "Kept only for tests/legacy callers",
+      "tickets": [],
+      "what": "Inline-prompt spawn mode kept beside the staging-file mode; routes/dispatch.js never uses it.",
+      "evidence": "harbour-spawn.js docstring",
+      "line": 136,
+      "introducedSha": "d3083458",
+      "introducedDate": "2026-04-19",
+      "introducedSubject": "Merge pull request #258 from JKershaw/claude/implement-harbour-dispatch-KpLGF",
+      "ageDays": 165
+    },
+    {
+      "id": "D-LV11",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "LinearViewer",
+      "path": "lib/live-console.js",
+      "token": "Either a bare status-item array (back-compat; no loops)",
+      "tickets": [],
+      "what": "The live-console tempo builder accepts the older bare array beside { statusItems, loops }.",
+      "evidence": "live-console.js docstring",
+      "line": 788,
+      "introducedSha": "5ec586fa",
+      "introducedDate": "2026-07-19",
+      "introducedSubject": "Merge pull request #958 from JKershaw/claude/project-summary-experimental-features-y428ue",
+      "ageDays": 74
+    },
+    {
+      "id": "D-LV12",
+      "class": "dual-path",
+      "subtype": "data-shape",
+      "repo": "LinearViewer",
+      "path": "lib/agent-status-store.js",
+      "token": "(legacy bucket)",
+      "tickets": [],
+      "what": "Agent-status entries with no tokenId are read as a separate legacy bucket.",
+      "evidence": "agent-status-store.js docstring",
+      "line": 134,
+      "introducedSha": "41c6cd88",
+      "introducedDate": "2026-06-16",
+      "introducedSubject": "LIN-533: decouple agent-status substrate from Foreman naming (agent/status canonical + alias) (#499)",
+      "ageDays": 107
+    },
+    {
+      "id": "D-LV13",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "LinearViewer",
+      "path": "lib/next-run.js",
+      "token": "Back-compat thin wrapper returning only the options array",
+      "tickets": [],
+      "what": "Next-run keeps the original options-array contract as a wrapper over parseNextRunResponse.",
+      "evidence": "next-run.js docstring",
+      "line": 679,
+      "introducedSha": "8c3b55e6",
+      "introducedDate": "2026-06-25",
+      "introducedSubject": "Merge pull request #609 from JKershaw/feat/lin-642-next-run-generation-shape",
+      "ageDays": 98
+    },
+    {
+      "id": "D-LV14",
+      "class": "dual-path",
+      "subtype": "test-only",
+      "repo": "LinearViewer",
+      "path": "lib/prompts/roadmap-chat-template.js",
+      "token": "Backward-compatible export",
+      "alsoPaths": [
+        "lib/prompts/roadmap-digest-template.js",
+        "lib/prompts/roadmap-gap-template.js",
+        "lib/prompts/roadmap-narrative-template.js",
+        "lib/prompts/roadmap-north-star-template.js",
+        "lib/prompts/roadmap-orientation-template.js",
+        "lib/prompts/roadmap-product-template.js",
+        "lib/prompts/roadmap-trajectory-template.js"
+      ],
+      "tickets": [],
+      "what": "Eight roadmap prompt modules each keep a backward-compatible system/user export 'for testing' beside the messages builder. Counted as one item.",
+      "evidence": "roadmap-*-template.js comments",
+      "line": 68,
+      "introducedSha": "8d7dbf9f",
+      "introducedDate": "2026-03-24",
+      "introducedSubject": "Merge pull request #208 from JKershaw/claude/swim-lane-task-ordering-t3YMm",
+      "ageDays": 191
+    },
+    {
+      "id": "D-SD1",
+      "class": "dual-path",
+      "subtype": "partial-rollout",
+      "repo": "simple-dispatcher",
+      "path": "dispatcher.js",
+      "token": "const NO_BOOTSTRAP_KINDS",
+      "tickets": [
+        "LIN-2116",
+        "LIN-2127"
+      ],
+      "what": "Bootstrap-free launch applies to implementation, research and plan only, and only when broker-armed; every other kind keeps the summarise-then-inject bootstrap, so both launch paths run in production.",
+      "evidence": "dispatcher.js; README 'Not universal'",
+      "line": 41,
+      "introducedSha": "42419a1",
+      "introducedDate": "2026-08-16",
+      "introducedSubject": "LIN-2127: per-kind bootstrap-free launch shape for broker-armed implementation/research/plan (#175)",
+      "ageDays": 46
+    },
+    {
+      "id": "D-SD2",
+      "class": "dual-path",
+      "subtype": "old-interface",
+      "repo": "simple-dispatcher",
+      "path": "hook.js",
+      "token": "stays recognised for backward compatibility",
+      "tickets": [
+        "LIN-905"
+      ],
+      "what": "A bare PENDING: sentinel is still recognised and routed as external beside PENDING-INTERNAL and PENDING-EXTERNAL.",
+      "evidence": "hook.js comment",
+      "line": 484,
+      "introducedSha": "9f8a4b3",
+      "introducedDate": "2026-07-02",
+      "introducedSubject": "Merge pull request #54 from JKershaw/feat/lin-905-five-outcome-sentinel",
+      "ageDays": 91
+    },
+    {
+      "id": "D-SD3",
+      "class": "dual-path",
+      "subtype": "test-only",
+      "repo": "simple-dispatcher",
+      "path": "hook.js",
+      "token": "Backward-compatible single-block view (LIN-3039)",
+      "tickets": [
+        "LIN-3039"
+      ],
+      "what": "scanWithdrawBlock (single block) kept for direct callers and tests; the hook itself uses the multi-block scan.",
+      "evidence": "hook.js comment",
+      "line": 675,
+      "introducedSha": "e26add4",
+      "introducedDate": "2026-09-26",
+      "introducedSubject": "Merge pull request #254 from JKershaw/lin-2891-f2-multi-withdraw",
+      "ageDays": 5
+    },
+    {
+      "id": "D-SD4",
+      "class": "dual-path",
+      "subtype": "test-only",
+      "repo": "simple-dispatcher",
+      "path": "reapers.js",
+      "token": "the legacy port-shaped",
+      "tickets": [
+        "LIN-2737"
+      ],
+      "what": "The OpenCode liveness lookup keeps a legacy port-shaped call form so nine pre-existing unit cells run unedited; production always passes precomputed readings.",
+      "evidence": "reapers.js comments",
+      "line": 2509,
+      "introducedSha": "2a45b11",
+      "introducedDate": "2026-09-11",
+      "introducedSubject": "Merge pull request #229 from JKershaw/lin2737-c2-completion-lane",
+      "ageDays": 20
+    },
+    {
+      "id": "D-SD5",
+      "class": "dual-path",
+      "subtype": "test-only",
+      "repo": "simple-dispatcher",
+      "path": "terminal-driver.js",
+      "token": "re-exported by",
+      "tickets": [
+        "LIN-767"
+      ],
+      "what": "Pure launch helpers moved to the driver port are re-exported by executors.js for back-compat with existing tests.",
+      "evidence": "terminal-driver.js comment",
+      "line": 95,
+      "introducedSha": "5702205",
+      "introducedDate": "2026-06-28",
+      "introducedSubject": "LIN-767: Terminal.app support via verb-performing TerminalDriver",
+      "ageDays": 95
+    },
+    {
+      "id": "E-SD1",
+      "class": "experiment",
+      "subtype": "stale-prototype",
+      "repo": "simple-dispatcher",
+      "path": "experiments",
+      "dir": true,
+      "alsoPaths": [
+        "experiments/01-check-auth.js",
+        "experiments/02-dispatch-server.js",
+        "experiments/chrome-extension"
+      ],
+      "tickets": [],
+      "what": "The project's first experiments (auth check, a prompt server for a Chrome extension, the extension) from the initial commit, still in the tree with no conclusion recorded. Counted as one item.",
+      "evidence": "experiments/ added in 88ba61c (initial commit)",
+      "introducedSha": "88ba61c",
+      "introducedDate": "2026-02-26",
+      "introducedSubject": "Initial commit: task dispatcher for Claude Code",
+      "ageDays": 217
+    },
+    {
+      "id": "E-SD2",
+      "class": "experiment",
+      "subtype": "unconcluded-proposal",
+      "repo": "simple-dispatcher",
+      "path": "docs/cloud-execution-epic.md",
+      "token": "Status:** proposed",
+      "tickets": [
+        "LIN-1301",
+        "LIN-1302",
+        "LIN-1303",
+        "LIN-1304",
+        "LIN-1305"
+      ],
+      "what": "Cloud execution epic: 'Status: proposed'; its five tickets are all Todo.",
+      "evidence": "doc header; tracker snapshot states",
+      "line": 3,
+      "introducedSha": "30198d8",
+      "introducedDate": "2026-07-12",
+      "introducedSubject": "Merge pull request #96 from JKershaw/claude/cloud-deployment-feasibility-wiv7nn",
+      "ageDays": 81
+    },
+    {
+      "id": "E-SD3",
+      "class": "experiment",
+      "subtype": "unconcluded-proposal",
+      "repo": "simple-dispatcher",
+      "path": "docs/remote-execution-epic.md",
+      "token": "Status:** proposed (design)",
+      "tickets": [
+        "LIN-1408",
+        "LIN-1395",
+        "LIN-1410"
+      ],
+      "what": "Remote execution epic: 'proposed (design)', absorbs part of the cloud epic; LIN-1408 Todo, LIN-1395 and LIN-1410 Backlog.",
+      "evidence": "doc header; tracker snapshot states",
+      "line": 3,
+      "introducedSha": "09d5d69",
+      "introducedDate": "2026-07-25",
+      "introducedSubject": "Merge pull request #146 from JKershaw/claude/dispatch-capability-question-tr8le1",
+      "ageDays": 68
+    },
+    {
+      "id": "E-SD4",
+      "class": "experiment",
+      "subtype": "unconcluded-proposal",
+      "repo": "simple-dispatcher",
+      "path": "docs/control-plane-split-research.md",
+      "token": "decides nothing on its own",
+      "tickets": [],
+      "what": "Control-plane split research, 'input to a proposed epic; decides nothing on its own'; the epic it feeds is E-SD3, still proposed.",
+      "evidence": "doc header",
+      "line": 3,
+      "introducedSha": "09d5d69",
+      "introducedDate": "2026-07-25",
+      "introducedSubject": "Merge pull request #146 from JKershaw/claude/dispatch-capability-question-tr8le1",
+      "ageDays": 68
+    },
+    {
+      "id": "E-SD5",
+      "class": "experiment",
+      "subtype": "concluded-not-acted",
+      "repo": "simple-dispatcher",
+      "path": "docs/linux-substrate-findings.md",
+      "token": "Delivering the measured verdict onto `SD_CLONE_STRATEGY` is LIN-1785",
+      "tickets": [
+        "LIN-1785"
+      ],
+      "what": "Linux substrate measured on 1 Aug; delivering the verdict (provisioning, clone strategy) is LIN-1785, still Todo.",
+      "evidence": "doc line; LIN-1785 Todo",
+      "line": 170,
+      "introducedSha": "2c3b783",
+      "introducedDate": "2026-08-01",
+      "introducedSubject": "Merge pull request #156 from JKershaw/feat/lin-1783-linux-reflink-clone",
+      "ageDays": 61
+    },
+    {
+      "id": "E-LV1",
+      "class": "experiment",
+      "subtype": "flag-gated-draft",
+      "repo": "LinearViewer",
+      "path": "docs/architecture/experiments.md",
+      "token": "Collective (experimental, LIN-450)",
+      "tokenAnywhere": true,
+      "tickets": [
+        "LIN-450",
+        "LIN-1048"
+      ],
+      "what": "Collective: a 'rough-draft experiment, gated behind a per-user collective feature flag', dispatching agents; documented under process paths, no conclusion recorded. Product-facing, so borderline.",
+      "evidence": "docs/architecture/experiments.md (moved from CLAUDE.md by LIN-2896)",
+      "line": 3,
+      "introducedSha": "2b7ad939",
+      "introducedDate": "2026-06-13",
+      "introducedSubject": "LIN-450: Collective experiment V1 (rigging + participant prompt) (#454)",
+      "ageDays": 110
+    },
+    {
+      "id": "E-LV2",
+      "class": "experiment",
+      "subtype": "orphan-draft",
+      "repo": "LinearViewer",
+      "path": "docs/autopilot-operating-manual-v2.md",
+      "token": "# The Autopilot Handbook",
+      "tickets": [],
+      "what": "A 'V2 Autopilot handbook' added beside the live operating manual; nothing in lib/, routes/, CLAUDE.md or docs/*.md references it, and agents are served v1.",
+      "evidence": "added cf921e0d (#344); grep finds no reference",
+      "line": 1,
+      "introducedSha": "cf921e0d",
+      "introducedDate": "2026-06-07",
+      "introducedSubject": "Add V2 Autopilot handbook (disposition, not procedure) (#344)",
+      "ageDays": 116
+    }
+  ],
+  "excluded": [
+    {
+      "repo": "simple-dispatcher",
+      "flags": [
+        "SD_ALLOW_ROOT",
+        "SD_SKIP_GIT_PROBE"
+      ],
+      "reason": "operator safety overrides for start-up checks, not a switch between an old and a new process path"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "flags": [
+        "OPENCODE_MESSAGE_HEADERS_TIMEOUT_MS",
+        "OPENCODE_MESSAGE_BODY_TIMEOUT_MS"
+      ],
+      "reason": "tuning: 0 is the default and disables a library (undici) timeout; no earlier process path named"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "flags": [
+        "LAUNCH_SHELL_SETTLE_MS",
+        "ITERM_CAPTURE_TIMEOUT_MS",
+        "LAUNCH_READY_MAX_ATTEMPTS"
+      ],
+      "reason": "tuning; tagged only because 'scrollback' matched an earlier draft of the rollback pattern"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "flags": [
+        "SD_TERMINAL",
+        "DEFAULT_HARNESS",
+        "SD_CLONE_STRATEGY"
+      ],
+      "reason": "selectors among several supported paths by design"
+    },
+    {
+      "repo": "LinearViewer",
+      "flags": [
+        "OBSERVATION_FEED_TIMING"
+      ],
+      "reason": "diagnostic timing log switch; changes no behaviour"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "lib/prompt-template-defs.js",
+        "lib/prompts/meta-prompt-template.js"
+      ],
+      "reason": "user feature flags (linearMcp, featureBranches, codeReview*) are per-user prompt preferences, a product setting, not a half-landed process change"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "lib/digest-feedback.js"
+      ],
+      "reason": "an absent feedbackVersion reads as 0 through a `?? 0` default; no second branch"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "lib/dispatch-tokens.js"
+      ],
+      "reason": "an additive optional parameter; no older path kept"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "lib/proxy-preamble.js"
+      ],
+      "reason": "warns callers not to use a legacy default; not itself a dual path"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "lib/periodicals.js"
+      ],
+      "reason": "prompt prose asking reviewers to judge backwards compatibility; not a path"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "lib/unanswered-decisions.js",
+        "lib/observation-sessions-store.js",
+        "lib/observation-sessions-materializer.js"
+      ],
+      "reason": "counted under D-LV1, D-LV3 and D-LV4"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "paths": [
+        "abort.js",
+        "dispatcher.js"
+      ],
+      "reason": "guards against a malformed or legacy session record: defensive, no older path kept"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "paths": [
+        "config.js"
+      ],
+      "reason": "'shim' refers to Apple's xcselect git shim on the host, not a process path; config.js's flags are coded under (a)"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "paths": [
+        "experiments/chrome-extension/content-script.js"
+      ],
+      "reason": "inside E-SD1"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "paths": [
+        "docs/cloud-deployment-feasibility.md"
+      ],
+      "reason": "concluded: superseded in part by measurement on 2026-08-01 (linux-substrate-findings.md, E-SD5)"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "paths": [
+        "docs/premature-done-research.md"
+      ],
+      "reason": "implemented (PR #1, 2026-06-08), per its own status line"
+    },
+    {
+      "repo": "simple-dispatcher",
+      "paths": [
+        "docs/full-system-test-plan.md"
+      ],
+      "reason": "built: test/system/ and npm run test:system exist; the 'proposed' status line is stale"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/lin-260-prompt-scaling-research.md"
+      ],
+      "reason": "shipped and measured in the same PR (2d2f7f23, #350: eval harness, lower bound shipped, a directive-only fix tried, measured and reverted; formatScaleToTask is live); the 'not yet implemented' status line is stale"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/reviews/cheap-implementer-bakeoff-2026-09-13.md"
+      ],
+      "reason": "concluded (cheap-implementer.md) and acted on (25 Sep routing, model-choice.md row 7)"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/reviews/model-effort-routing-proposal-2026-09-11.md"
+      ],
+      "reason": "acted on through runtime config (model-choice.md rows 6 and 7)"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/reviews/proposal-red-team-2026-09-18.md"
+      ],
+      "reason": "concluded: an outcome table with a verdict per proposal"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/autopilot-experiment.md"
+      ],
+      "reason": "results recorded in the document (one stage inconclusive for a laptop-sleep reason); the autopilot it tested is live"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/autopilot-operating-manual-research.md",
+        "docs/lin-367-research-notes.md",
+        "docs/lin-370-research-notes.md",
+        "docs/lin-418-llm-tracking-research.md",
+        "docs/spike-LIN-192-refactoring-recommendations.md"
+      ],
+      "reason": "research notes behind Done tickets (LIN-325, LIN-367, LIN-370, LIN-418, LIN-192); nothing left pending"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/north-star-v3-proposal.md"
+      ],
+      "reason": "applied 19 September, per its status line"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "docs/direction-layer-proposal.md",
+        "docs/lin-482-ui-simplification-research.md"
+      ],
+      "reason": "product and UI direction, not process"
+    },
+    {
+      "repo": "LinearViewer",
+      "paths": [
+        "plans/01-team-filter.md",
+        "plans/02-multi-workspace.md",
+        "plans/03-multi-account.md",
+        "plans/lin-1258-design-notes.md",
+        "plans/lin-1412-design-notes.md",
+        "plans/pipeline-view.md",
+        "plans/swim-horizontal-ordering.md",
+        "plans/swim-view.md",
+        "prototypes/lin-1412-chat",
+        "prototypes/swim-flow"
+      ],
+      "reason": "UI and product plans and prototypes, not process"
+    }
+  ]
+}

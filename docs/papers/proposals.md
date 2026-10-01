@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Did LIN-2323's adversarial second read of periodical reports ever disagree with a report, and should its
+  own sunset have retired it?** `harbour/how-process-changes-land.md` found it the only added process step since
+  June that was given a retirement condition ("if after ~1 month of operation the disagreement rate is near zero
+  … this step should be retired"), due about 26 September, with no read on record. Count the second reads since
+  26 August, how many disagreed and what each disagreement changed, and say whether the condition was met.
+  (Claude, 2026-10-01)
 - **When a child of an approved plan runs its own plan, what does that plan change?**
   `harbour/step-overlap.md` found that 32 of 65 implemented children of a parent with its own plan or
   breakdown ran their own plan session and 23 their own plan review, 4.5% of all tokens on disk, and that

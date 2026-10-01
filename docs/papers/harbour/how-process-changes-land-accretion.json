@@ -1,0 +1,2862 @@
+{
+ "method": "See scripts/survey-landing-accretion.mjs header. Population: scorecard changes (June-September, both repos) whose first-parent merges touched process code. Sample: seed 3182, stratified by repo side (Harbour only / touches simple-dispatcher, min 15) and merge month, proportional by largest remainder, 80 changes. One reader (Claude, LIN-3182) coded each from the ticket text in the tracker snapshot and the process-code diff. Effect classes: a step is a new leg, beat, gate check, session or required action an agent session performs; a rule is an instruction agents must follow or a code-enforced gate condition; a wake is a new occasion that wakes or resumes a session. A repair that makes an already-designed path work is 'neither'; a change to what the design wakes on is a wake. Code reapers and runner automation are not steps (they are not something a session does). Product LLM prompts (roadmap, newspaper, chat) are 'neither'. retirementCondition quotes a stated condition for removing what the change added, else null. retirementScan: every hit of the retirement-language pattern over population ticket descriptions and their process commits, each with a hand verdict.",
+ "seed": 3182,
+ "population": {
+  "total": 652,
+  "note": "recomputed by the script; by repo side and month it prints the table",
+  "byRepo": {
+   "LinearViewer": 455,
+   "simple-dispatcher": 183,
+   "both": 14
+  }
+ },
+ "sample": [
+  {
+   "id": "LIN-435",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "neither",
+   "kind": "consolidation",
+   "reason": "Moves four grounding rules into one shared post-pass for both prompt paths; the rules themselves are unchanged",
+   "evidence": "9dab8de3 lib/prompt-formatters.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-585",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "adds-rule",
+   "kind": "bug/research prompt",
+   "reason": "Bug prompts gain 'validate the acceptance witness' and 'confirm the cause before building the fix' steps; research gains 'pin the measurement'",
+   "evidence": "f832f0da lib/prompt-template-defs.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-329",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "neither",
+   "kind": "product UI",
+   "reason": "An onHop callback so the human recommend UI can stream the defer descent",
+   "evidence": "4f600b6e lib/recommend-recurse.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-520",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "adds-step",
+   "kind": "periodical",
+   "reason": "A new recurring periodical session (Design & Interface Review) that mints up to three fix tasks",
+   "evidence": "0f2e87bb lib/periodicals.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-300",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "neither",
+   "kind": "product LLM prompt",
+   "reason": "New roadmap-orientation prompt for the Ship view; no agent session or rule",
+   "evidence": "97bb578d lib/prompts/roadmap-orientation-template.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-742",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "neither",
+   "kind": "product LLM prompt",
+   "reason": "Next-run suggestion prompt reframes run size and folds in a fresh roadmap report",
+   "evidence": "4299d38a lib/next-run.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-328",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "adds-step",
+   "kind": "recommender",
+   "reason": "The recommender gains a 'defer' action and a Step 4 decision, resolved by an extra server-side recommend hop",
+   "evidence": "76e38a05 lib/prompts/meta-prompt-template.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-638",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "neither",
+   "kind": "product LLM prompt",
+   "reason": "Next-run context gains relationship and dependency-chain lines",
+   "evidence": "ebc1ed2c lib/next-run.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-416",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "neither",
+   "kind": "product LLM prompt",
+   "reason": "Roadmap digest becomes narrative prose instead of a four-slot form",
+   "evidence": "bea1d86a lib/prompts/roadmap-digest-template.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-215",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "adds-rule",
+   "kind": "CLAUDE.md convention",
+   "reason": "New E2E testing pattern agents must follow: prefer data-testid, parallel-aware urlKey discipline",
+   "evidence": "aafecb58 CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-343",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "adds-rule",
+   "kind": "periodical",
+   "reason": "Documentation periodical must now mint a task carrying a full contract (scope, grounding, bounding, definition of done, hand-off)",
+   "evidence": "866367be lib/periodicals.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-286",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "removes-rule",
+   "kind": "prompt text",
+   "reason": "Removes the 'preparing' label instructions and their completion signals from prompts",
+   "evidence": "e455dd16 lib/prompt-templates.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-349",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "adds-rule",
+   "kind": "periodical",
+   "reason": "Documentation periodical adds a quality dimension (brevity, organisation, discoverability, readability) on top of drift",
+   "evidence": "b86c40c8 lib/periodicals.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-453",
+   "repo": "LinearViewer",
+   "month": "2026-06",
+   "effect": "adds-step",
+   "kind": "periodical",
+   "reason": "A new advisory periodical session (Stability Review)",
+   "evidence": "4983230b lib/periodicals.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1192",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "product LLM prompt",
+   "reason": "Newspaper front-page copy made shorter and plainer",
+   "evidence": "067bf41f lib/prompts/ship-biscuit-editor.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-685",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "Documents the GitHub-login auth surface in CLAUDE.md; describes code, asks nothing of agents",
+   "evidence": "7380dabc CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1155",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Bootstrap token moves from prompt prose to a structured dispatch field",
+   "evidence": "71296984 lib/dispatch-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-701",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "adds-rule",
+   "kind": "periodical",
+   "reason": "Test-coverage periodical widens its remit to read CI reliability signal",
+   "evidence": "85f9d446 lib/periodicals.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1318",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "tuning",
+   "reason": "Replaces one polling instruction with another (one background loop instead of a call per turn); no step added or removed",
+   "evidence": "fee12368 lib/prompts/autopilot-kickoff.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1084",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Stores and forwards a harness field on dispatch items",
+   "evidence": "0c4eb0a4 lib/dispatch-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1337",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "Documents a test-only env var in CLAUDE.md",
+   "evidence": "0c0bc13b CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1492",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "test seam",
+   "reason": "Injectable clock for the loop builder",
+   "evidence": "ffc5843e lib/pipeline-loops.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1067",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "product LLM prompt",
+   "reason": "Task-chat prompt learns to fetch exact comment times",
+   "evidence": "60751cdd lib/prompts/task-chat-template.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1656",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "adds-rule",
+   "kind": "code gate",
+   "reason": "A 409 duplicate-dispatch guard refuses a second dispatch of the same issue and kind within five minutes",
+   "evidence": "08c80c49 lib/dispatch-factory.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-922",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "adds-step",
+   "kind": "new session role",
+   "reason": "Flight Companion kickoff prompt: a new watching session that talks the work through with the human (prototype)",
+   "evidence": "574871b6 lib/prompts/flight-companion-kickoff.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1511",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "CLAUDE.md notes the paginated proxy read",
+   "evidence": "37246a74 CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1059",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "repair",
+   "reason": "Repairs the designed up-chain wake when a follow-up repoints the item id; no new occasion to wake",
+   "evidence": "1850aa91 lib/dispatch-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-901",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "adds-wake",
+   "kind": "wake matrix",
+   "reason": "Subscription becomes an enum: terminal and blocked events bubble on every edge, pending only on 'everything' edges, which the manual tells autopilots to use",
+   "evidence": "9bb02809 lib/dispatch-wake.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1241",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "measurement",
+   "reason": "Before/after cohort split for a measurement close-out",
+   "evidence": "776b309a lib/transcript-spend.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1206",
+   "repo": "LinearViewer",
+   "month": "2026-07",
+   "effect": "removes-step",
+   "kind": "autopilot manual",
+   "reason": "Autopilot stops closing finished session windows itself (the runner now does it)",
+   "evidence": "3d883c97 docs/autopilot-operating-manual.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2180",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Accepts a 'decision' feedback kind; ships inert",
+   "evidence": "53cf3998 lib/dispatch-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2297",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "adds-wake",
+   "kind": "wake guard",
+   "reason": "The once-only wake guard becomes class-aware, so a blocked wake no longer consumes the slot and a later done also wakes the parent",
+   "evidence": "3e61f2fe lib/dispatch-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2142",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "comment prose",
+   "reason": "Corrects comment claims in the observer state store",
+   "evidence": "78fed694 lib/observer-state-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1853",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "clarification",
+   "reason": "States that the maintenance leg counts against the existing 2-4 leg cap",
+   "evidence": "aea28f0f docs/passage-planner-prompt.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2311",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "removes-rule",
+   "kind": "prompt text",
+   "reason": "Drops the native priority field from the Follow-up Triage instruction",
+   "evidence": "842db225 lib/prompt-template-defs.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2129",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "infrastructure",
+   "reason": "A durable store for the observer harness; adds no step by itself",
+   "evidence": "f5f76cff lib/observer-state-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2023",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "adds-rule",
+   "kind": "CLAUDE.md convention",
+   "reason": "Unit-test servers must bind 127.0.0.1 explicitly",
+   "evidence": "7fc03d38 CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-694",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "adds-rule",
+   "kind": "code gate",
+   "reason": "A periodical review task cannot move to Done without a persisted-report comment",
+   "evidence": "18843e64 lib/periodical-report-gate.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2197",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "adds-step",
+   "kind": "decision producer",
+   "reason": "A human-triggered task scan that writes operator decisions (third producer into the decision queue)",
+   "evidence": "e968cf3a lib/task-decisions-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2182",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Derives decision fields on the loop; ships inert",
+   "evidence": "b52ad4d9 lib/pipeline-loops.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1885",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "CLAUDE.md lists the Jira provider files",
+   "evidence": "ba3bccd8 CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2253",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "measurement",
+   "reason": "Cost metric counts lane-landed tickets",
+   "evidence": "fb8c023f lib/terminal-marked-task-cost.js",
+   "retirementCondition": "keeping `noLineageCount` on the wire for one deprecation cycle (ticket); \"keeping noLineageCount as a deprecated one-cycle alias\" (commit dff2...)"
+  },
+  {
+   "id": "LIN-1685",
+   "repo": "LinearViewer",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "CLAUDE.md lists the Ship Journey view",
+   "evidence": "025aa9b8 CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2408",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "repair",
+   "reason": "A degraded observer report is retried rather than carried forward",
+   "evidence": "08416052 lib/observer-pass.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2404",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "CLAUDE.md records a constant's calibration provenance",
+   "evidence": "97bac32d CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2704",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Proxy contract carries the raw issue id on decision anchors",
+   "evidence": "e4ec02f3 lib/proxy-instructions.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2934",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "adds-rule",
+   "kind": "code gate",
+   "reason": "A per-task bound on worker sessions (409 BUDGET_EXHAUSTED) and an instruction to comment the ledger on the ticket when it fires",
+   "evidence": "2c0122ec lib/dispatch-factory.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2634",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "Proxy instructions document a new read endpoint",
+   "evidence": "a0f5782f lib/proxy-instructions.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2121",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "attribution",
+   "reason": "Wake rows carry the triggering child's issue id; changes counting, not waking",
+   "evidence": "8372d336 lib/dispatch-wake.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-3010",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Digest fields pass through history formatting",
+   "evidence": "e9724589 lib/dispatch-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-3027",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "Architecture doc for the halt endpoints",
+   "evidence": "5fdb3ae0 docs/architecture/dispatch-and-proxy.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2773",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "An optional on_answer effect field on decisions and its published contract; nothing required of agents",
+   "evidence": "de478d84 lib/proxy-instructions.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2618",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "consolidation",
+   "reason": "One shared Flight Companion brief rendered for both kickoff and in-page chat",
+   "evidence": "8f15565e lib/prompts/flight-companion-brief.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2616",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Validates an effort field on presets",
+   "evidence": "df034348 lib/dispatch-presets-store.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1938",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "adds-rule",
+   "kind": "proxy instructions",
+   "reason": "Documents token lifetimes and adds retry guidance agents follow on an expired-token 401",
+   "evidence": "c5cc2b8d lib/proxy-instructions.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2956",
+   "repo": "LinearViewer",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "reference docs",
+   "reason": "Source map line for the Ship Journey",
+   "evidence": "4b28d25c docs/architecture/source-map.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-624",
+   "repo": "simple-dispatcher",
+   "month": "2026-06",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Launch-failure diagnostics and a shell-readiness poll",
+   "evidence": "f9cb7f65 executors.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-827",
+   "repo": "simple-dispatcher",
+   "month": "2026-06",
+   "effect": "adds-wake",
+   "kind": "follow-up delivery",
+   "reason": "Queue-if-busy: a follow-up to a busy session waits and is delivered instead of failing; hold budget 30 -> 60 min",
+   "evidence": "715dd8af dispatcher.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-549",
+   "repo": "simple-dispatcher",
+   "month": "2026-06",
+   "effect": "adds-step",
+   "kind": "completion protocol",
+   "reason": "The Stop hook asks a one-shot completion self-check; only a positive DONE completes the session",
+   "evidence": "61781973 hook.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1434",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "repair",
+   "reason": "Remaps a tool input key in the opencode transcript",
+   "evidence": "ec88d067 opencode-runner.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1315",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "An opt-in kitty terminal driver",
+   "evidence": "9f7826bf terminal-driver.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-906",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "adds-wake",
+   "kind": "completion hold",
+   "reason": "The completion hold becomes arm-by-default: every holdable boundary holds the session open for a warm follow-up",
+   "evidence": "e0ecc0a3 hook.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1280",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "repair",
+   "reason": "The completion self-check is no longer swallowed on re-entry",
+   "evidence": "e67ed456 hook.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1580",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "adds-step",
+   "kind": "CI gate",
+   "reason": "simple-dispatcher gets CI on every PR; CLAUDE.md makes the run the authoritative number a review cites",
+   "evidence": "539834d8 CLAUDE.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1293",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "telemetry",
+   "reason": "Tool-activity relay behind a default-off flag",
+   "evidence": "fc04fccb config.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1420",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "telemetry",
+   "reason": "opencode tool lines at the turn seam, flag-gated",
+   "evidence": "02a1153e opencode-runner.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-907",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "adds-wake",
+   "kind": "stall failsafe",
+   "reason": "Three stall reapers collapse into one 60-min failsafe that re-fires the sentinel over a resume instead of failing the session",
+   "evidence": "c59af104 reapers.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1100",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "runner automation",
+   "reason": "The runner closes a session window on its DONE sentinel; a code reaper, not a session step (the autopilot-side removal is LIN-1206)",
+   "evidence": "dc5b1486 reapers.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1156",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Bootstrap token delivered through a one-tool MCP server",
+   "evidence": "dc0e0341 harbour-token-mcp-server.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1290",
+   "repo": "simple-dispatcher",
+   "month": "2026-07",
+   "effect": "neither",
+   "kind": "telemetry",
+   "reason": "Assistant-text relay behind a default-off flag",
+   "evidence": "2411d638 config.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1767",
+   "repo": "simple-dispatcher",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "telemetry",
+   "reason": "Usage payloads carry a billing lane",
+   "evidence": "aaa3e026 hook.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1455",
+   "repo": "both",
+   "month": "2026-08",
+   "effect": "both",
+   "kind": "CI precondition",
+   "reason": "Removes the unconditional 'confirm CI is green' wait where a repo has no CI, and adds a recorded two-branch substitute run in its place",
+   "evidence": "5a0b7210 lib/prompt-template-defs.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1783",
+   "repo": "simple-dispatcher",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Per-platform clone strategy",
+   "evidence": "2c3b7839 config.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-1821",
+   "repo": "simple-dispatcher",
+   "month": "2026-08",
+   "effect": "neither",
+   "kind": "runner automation",
+   "reason": "A fast-fail launch watchdog (a code reaper) fails a wedged launch sooner",
+   "evidence": "02bdbafb reapers.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2559",
+   "repo": "simple-dispatcher",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "repair",
+   "reason": "Registers the Agent tool as an async wait so the hold stops swallowing its notifications",
+   "evidence": "10c2d1db heartbeat.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2891",
+   "repo": "both",
+   "month": "2026-09",
+   "effect": "adds-rule",
+   "kind": "decision protocol",
+   "reason": "Agents may withdraw a decision they raised, with a required reason; WITHDRAW instruction composed onto the self-check and refire prompts",
+   "evidence": "83d0aec8 hook.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2736",
+   "repo": "simple-dispatcher",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "An inert opencode liveness seam",
+   "evidence": "047dfc5c opencode-liveness.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2720",
+   "repo": "simple-dispatcher",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "repair",
+   "reason": "An opencode follow-up resumes the session rather than failing it, as the hold intended",
+   "evidence": "f337a301 reapers.js",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-3160",
+   "repo": "simple-dispatcher",
+   "month": "2026-09",
+   "effect": "adds-rule",
+   "kind": "testing doc",
+   "reason": "The manual mutation gate 'must be run when changing code a mutant anchors to'",
+   "evidence": "33667480 docs/testing-and-ci.md",
+   "retirementCondition": null
+  },
+  {
+   "id": "LIN-2567",
+   "repo": "simple-dispatcher",
+   "month": "2026-09",
+   "effect": "neither",
+   "kind": "plumbing",
+   "reason": "Effort axis resolved and passed at launch",
+   "evidence": "3f2fc6bc harnesses.js",
+   "retirementCondition": null
+  }
+ ],
+ "retirementScan": [
+  {
+   "key": "LIN-177:desc:retire:6879",
+   "id": "LIN-177",
+   "source": "ticket",
+   "text": ".app/linearviewer/issue/LIN-306/unify-on-our-api-route-the-consumer-api-through-providers-retire-the) (per brief). [LIN-177](https://linear.app/linearviewer/issue/LIN-177/phase-3-source-tracking-and-m",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-177:desc:retire:7610",
+   "id": "LIN-177",
+   "source": "ticket",
+   "text": ".app/linearviewer/issue/LIN-306/unify-on-our-api-route-the-consumer-api-through-providers-retire-the)). ## Cross-cutting concerns 1. **Capability access pattern** consumed by S3/S4/S5 \u2014 settle once",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-312:desc:retire:101",
+   "id": "LIN-312",
+   "source": "ticket",
+   "text": "nified API is on par with the honest proxy, then delete the old path. ## Validation (the retire gate) - [ ] Use the proxy event log + existing E2E proxy specs as the parity oracle \u2014 every endpoint e",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-312:desc:retire:444",
+   "id": "LIN-312",
+   "source": "ticket",
+   "text": "works (a non-Linear provider, even a stub, returns clean errors for unsupported ops). ## Retire - [ ] Remove the raw-Linear code path / dead queries from `routes/proxy.js`. - [ ] Update docs (`docs/",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-312:desc:retire:897",
+   "id": "LIN-312",
+   "source": "ticket",
+   "text": "y is no longer the odd one out. Blocked by Steps 2, 3, 4, 5. --- ## Research results \u2014 retire gate is GREEN (2026-06-21, validated at HEAD 6e73d26) **Validation (the retire gate):** - [X] Parity",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-312:desc:retire:977",
+   "id": "LIN-312",
+   "source": "ticket",
+   "text": "results \u2014 retire gate is GREEN (2026-06-21, validated at HEAD 6e73d26) **Validation (the retire gate):** - [X] Parity oracle \u2014 proven by regression: same unchanged `tests/e2e/proxy.spec.js` (102 tes",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-356:desc:retire:5924",
+   "id": "LIN-356",
+   "source": "ticket",
+   "text": "nt with the epic's use of `blocks` for phase ordering). ## Leads into LIN-306 LIN-306 (\"retire the honest proxy\") re-points the consumer API's writes onto `provider.*` with no special-case path (LIN",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-356:desc:retirement:6054",
+   "id": "LIN-356",
+   "source": "ticket",
+   "text": "consumer API's writes onto `provider.*` with no special-case path (LIN-309) and gates the retirement on a parity proof (LIN-312). Until a *non-Linear writable* provider exists, that unified write path",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-356:desc:retiring:6226",
+   "id": "LIN-356",
+   "source": "ticket",
+   "text": "sts, that unified write path can only ever be validated against Linear-via-the-proxy-it's-retiring. This provider is that backend \u2014 and the provider-agnostic E2E it enables feeds LIN-312's parity gate",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-392:desc:until a status transition / new feedback / cap, then:2270",
+   "id": "LIN-392",
+   "source": "ticket",
+   "text": "` \u2014 add `?wait=Ns` to `GET /api/proxy/dispatch/:id`: arm keepalive, loop a store re-check until a status transition / new feedback / cap, then return. 2. `lib/dispatch-store.js` \u2014 a small \"has this it",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-435:desc:until both epics hit the green bar \u2014 then:1173",
+   "id": "LIN-435",
+   "source": "ticket",
+   "text": "ted on top. The parity-test heads-up from Subtask 2 applies here too. Iterate on the eval until both epics hit the green bar \u2014 then stop; resist gold-plating. --- ## Research findings (2026-06-12) \u2014",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-451:desc:retired:147",
+   "id": "LIN-451",
+   "source": "ticket",
+   "text": "via an agent, and has been superseded by Autopilot. We don't use it anymore, so it can be retired. Some parts of that experiment do live on though. --- ## Research summary (2026-06-13) Foreman = fi",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-496:desc:retirement:134",
+   "id": "LIN-496",
+   "source": "ticket",
+   "text": "r, 2026-06-15):** /ship is a **key view, experimental and in active development** \u2014 NOT a retirement candidate. Its lack of an inbound link is because it is still in-dev, not abandoned. It is a delibe",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-496:desc:retiring:1376",
+   "id": "LIN-496",
+   "source": "ticket",
+   "text": "it is in active development** (do not refactor under the experiment). **Out of scope:** retiring or folding ship (explicitly rejected); a new shared layout/content-frame (Step 2). **Done when:** vi",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-523:desc:retired:200",
+   "id": "LIN-523",
+   "source": "ticket",
+   "text": "istent**, but the **commit \u2192 PR \u2192 CI \u2192 merge \u2192 close tail is a mess**. With Foreman being retired (superseded by Autopilot) and the `In Review` state being retired (not all providers support it), the",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-523:desc:retired:266",
+   "id": "LIN-523",
+   "source": "ticket",
+   "text": "s**. With Foreman being retired (superseded by Autopilot) and the `In Review` state being retired (not all providers support it), the remaining fault line is purely **git/GitHub + CI/CD**. Root cause",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-523:desc:retire:1945",
+   "id": "LIN-523",
+   "source": "ticket",
+   "text": "date** `code-review` **->** `review`: fold the diff-examination content into `review` and retire `code-review` as a template. Mid-flight fresh-context diff reads are already covered by Autopilot's Rev",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-523:desc:retiring:2727",
+   "id": "LIN-523",
+   "source": "ticket",
+   "text": "ttle\" the handbook already describes, made explicit. ## Out of scope (follow-up ticket) Retiring/reworking the feature flags (`featureBranches`, `codeReview*`). They exist because PR/CI were optiona",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-533:desc:retirement:30",
+   "id": "LIN-533",
+   "source": "ticket",
+   "text": "Follow-up to LIN-451 (Foreman retirement). Session 1 \u2014 observer page + playbook deletion + Tier D heading relabel \u2014 shipped in PR #498 (merg",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-533:desc:deprecated:1363",
+   "id": "LIN-533",
+   "source": "ticket",
+   "text": "tegration.md` to document `agent/status` as canonical with `foreman/status` retained as a deprecated alias. ## Keep unchanged * The Mongo collection literal `'foreman-status'` (server.js) \u2014 renaming",
+   "verdict": "deprecated-no-condition",
+   "why": "a deprecated alias kept with no stated removal condition"
+  },
+  {
+   "key": "LIN-540:desc:stopgap:153",
+   "id": "LIN-540",
+   "source": "ticket",
+   "text": "`) was closing iTerm windows that were still in use, aborting work in a live window. As a stopgap it has been **disabled** by commenting out the `runWindowReaper()` call in the dispatcher loop (`dispa",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-540:desc:stopgap:379",
+   "id": "LIN-540",
+   "source": "ticket",
+   "text": "acks finding and fixing the root cause so it can be safely re-enabled. ## Current state (stopgap) * `runWindowReaper()` is commented out in the main loop (`dispatcher.js`). * The function, its selec",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-540:desc:expires on:1647",
+   "id": "LIN-540",
+   "source": "ticket",
+   "text": "rminal well before the user is actually done in the window, so the `WINDOW_REAP_MS` clock expires on a window the user is still reading/using. ## Acceptance criteria * Identify why an in-use window",
+   "verdict": "other",
+   "why": "describes a clock expiring, not a condition"
+  },
+  {
+   "key": "LIN-549:desc:interim:4911",
+   "id": "LIN-549",
+   "source": "ticket",
+   "text": "forces the contract at the Stop boundary. (On-record approach B made primary; deletes the interim \"bake a sentinel into the dispatched prompt\" surface, which depended on a prompt SD doesn't own \u2014 the",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-558:desc:retires:2698",
+   "id": "LIN-558",
+   "source": "ticket",
+   "text": "eps installed, `.env` present, quiescent). This removes the copy-while-mid-write race and retires the whole \"shared workspace left dirty by a prior task\" class of bug (and the CLAUDE.md note about it)",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-580:desc:retire:139",
+   "id": "LIN-580",
+   "source": "ticket",
+   "text": ".app/linearviewer/issue/LIN-306/unify-on-our-api-route-the-consumer-api-through-providers-retire-the). linear-cli.js still uses raw Linear GraphQL ({ GraphQLClient, gql }) and was explicitly held out",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-580:desc:retire:380",
+   "id": "LIN-580",
+   "source": "ticket",
+   "text": ".app/linearviewer/issue/LIN-306/unify-on-our-api-route-the-consumer-api-through-providers-retire-the) consumer-API unification ([LIN-312](https://linear.app/linearviewer/issue/LIN-312/step-6-validate-",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-580:desc:retire:501",
+   "id": "LIN-580",
+   "source": "ticket",
+   "text": "ation ([LIN-312](https://linear.app/linearviewer/issue/LIN-312/step-6-validate-parity-and-retire-the-honest-raw-linear-proxy) brief + research). Decide whether the CLI should also move onto the provid",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-595:desc:retirement:5960",
+   "id": "LIN-595",
+   "source": "ticket",
+   "text": "rlKey/observation` (swim pattern: no flag gate); pass new endpoint deps if needed. * Tier retirement (see decision): remove `dashboard` from `lib/feature-defaults.js` FEATURES/DEFAULTS, from `EXPERIME",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-595:desc:retirement:6285",
+   "id": "LIN-595",
+   "source": "ticket",
+   "text": "shboard` -> `/observation`. * `docs/view-tiers.md` + `CLAUDE.md` \u2014 record the promotion + retirement. **Reused unchanged:** the 5 data endpoints above, `lib/session-telemetry.js`, `lib/run-summary*.j",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-595:desc:retired:7239",
+   "id": "LIN-595",
+   "source": "ticket",
+   "text": "the first-class project-tree root). `/dashboard` -> 302 `/observation`; experimental flag retired. (Flagged for John's confirmation since the brief marked replace-vs-coexist unresolved \u2014 but the plann",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-595:desc:retire:7569",
+   "id": "LIN-595",
+   "source": "ticket",
+   "text": "dation + Level 1/2):** new `/sessions` poll endpoint + first-class wiring (route, footer, retire flag) + `render-observation.js` shell + Level-1 feed + Level-2 session cards (run id, seed title, statu",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-603:desc:until stopped\") grounded in roadmap+north-star+stack, then:2265",
+   "id": "LIN-603",
+   "source": "ticket",
+   "text": "experimental flagged page that LLM-generates 1\u2013N sized goal options (one always \"continue until stopped\") grounded in roadmap+north-star+stack, then on accept hands the chosen paragraph to the existin",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-606:desc:deprecated:1697",
+   "id": "LIN-606",
+   "source": "ticket",
+   "text": "`lib/agent-status-store.js` (canonical proxy path `/agent/status`; `/foreman/status` is a deprecated alias). 2. Provider map (46-48): add `github/index.js` (+ client/fake-client) \u2014 `lib/providers/gith",
+   "verdict": "deprecated-no-condition",
+   "why": "a deprecated alias kept with no stated removal condition"
+  },
+  {
+   "key": "LIN-622:desc:stopgap:2425",
+   "id": "LIN-622",
+   "source": "ticket",
+   "text": "currency (cap or sequential). * Unit test: feed reconstruction carries no `promptText`. * Stopgap only: larger dyno / `--max-old-space-size`. Full detail in the investigation comment. `bug` label ret",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-826:desc:retire:12757",
+   "id": "LIN-826",
+   "source": "ticket",
+   "text": "oncile the stepper long-poll + instruments note. * `docs/autopilot-operating-manual.md` \u2014 retire the poll echo + the free-the-producer-must-poll rule for the subscribed case. ### Ordered changes with",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-826:desc:retires:15410",
+   "id": "LIN-826",
+   "source": "ticket",
+   "text": "minal, then wakes the parent), so no mutual wait \u2014 the held orchestrator is safe. Phase 2 retires the must-poll rule for the subscribed case. ### Testing strategy * **Pure-core unit tests** (mirror",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-843:desc:retires:924",
+   "id": "LIN-843",
+   "source": "ticket",
+   "text": "he orchestrator **stand by** for the push instead of hand-rolling a long-poll watch. This retires the long-poll active-wait that is the common root of this deadlock and the LIN-831 wedge. ## Constrai",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-877:desc:retired:5462",
+   "id": "LIN-877",
+   "source": "ticket",
+   "text": "EP surface, and the sole risk (Observation depending on `pipeline-*`-named libs) is fully retired by the KEEP import evidence above. Verification = `npm test` green: the deleted view tests go away; th",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1030:desc:temporary:3173",
+   "id": "LIN-1030",
+   "source": "ticket",
+   "text": "wins are analytically identified but not yet observed \u2014 mirror the LIN-1021/1022 method (temporary timing span + `heroku logs`) before/after. Heroku CLI access to `linear-viewer` is available (read-o",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1122:desc:until the full 180s elapsed, then:860",
+   "id": "LIN-1122",
+   "source": "ticket",
+   "text": "acing: holding fresh launch ... still cold-starting [<id> (78s)]` messages that persisted until the full 180s elapsed, then repeated on the next opencode dispatch. ## Root cause `coldStartingHookSes",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1125:desc:deprecated:4784",
+   "id": "LIN-1125",
+   "source": "ticket",
+   "text": "vent` \u2014 emits `session.status` (fields: `sessionID`, `status`, optional `parentID`) and a deprecated `session.idle` event, plus `message.part.delta` etc. This is a live, event-driven \"turn finished\" s",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1136:desc:remove it when:45",
+   "id": "LIN-1136",
+   "source": "ticket",
+   "text": "Improve the triage prompt: * We can remove \"remove it when the fix lands\" as it relates to the bug tag as now we keep them, so a bug tag can be added, and",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1194:desc:retiring:3191",
+   "id": "LIN-1194",
+   "source": "ticket",
+   "text": "identity; cli/web only, mirroring the `followUpTo`/Collective constraint. * **Merging or retiring** the existing autopilot feed \u2014 it stays as a sibling view; revisit a merge only after the sessions v",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1206:desc:retires:5521",
+   "id": "LIN-1206",
+   "source": "ticket",
+   "text": "sessions\", c998819). This ticket **reverses the LIN-1071 direction** on the DONE axis and retires the LIN-946 cascade. Constraint those commits protect, still load-bearing here: closing must never be",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1206:desc:retire:6034",
+   "id": "LIN-1206",
+   "source": "ticket",
+   "text": "utopilot closes nothing on the completion axis):** remove the per-session default **and** retire the end-of-run cascade. Cost-of-doing is ~equal (both are prose-only, same files, tiny blast radius).",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1206:desc:retire:7655",
+   "id": "LIN-1206",
+   "source": "ticket",
+   "text": "wire; SD closes it on DONE. Advance/judge stays. * **End-of-run cascade (L244\u2013272)** \u2014 retire the `close --cascade` instruction (Strategy B). Autopilot closes nothing on the completion axis. 2. `li",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1206:desc:retire:8154",
+   "id": "LIN-1206",
+   "source": "ticket",
+   "text": "ion; keep judge-and-advance. * **L430\u2013442** (the end-of-run `close --cascade` block) \u2014 retire per Strategy B. 3. `docs/autopilot-kickoff.md` \u2014 human mirror of #2; update in lockstep (kickoff.js hea",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1206:desc:retiring:10063",
+   "id": "LIN-1206",
+   "source": "ticket",
+   "text": "and damaging close-out. Keep them distinct. * **Orchestrator's own session on run-end.** Retiring the cascade removes the autopilot's only self-reap. Verify the intended model is that SD's `closeOnDo",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1206:desc:retirement:12184",
+   "id": "LIN-1206",
+   "source": "ticket",
+   "text": "s that would lose focus if separated. No subtasks; the one genuine open decision (cascade retirement / orchestrator self-reap) is a design confirmation with @wardrox, not a separable unit of work.",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1219:desc:retired:4051",
+   "id": "LIN-1219",
+   "source": "ticket",
+   "text": "out: *\"claude --resume now works for any session.\"* The hold's founding justification was retired before LIN\u20111100 was even written. It was re\u2011armed by default in LIN\u2011906 on a *different, weaker* ratio",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1219:desc:retired:15235",
+   "id": "LIN-1219",
+   "source": "ticket",
+   "text": "a layer. The founding justification for the DONE hold (unreliable `claude --resume`) was retired by LIN-790; its LIN-906 re-arming rationale (stepper drip-feed latency) is served entirely by the unto",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1270:desc:interim:2296",
+   "id": "LIN-1270",
+   "source": "ticket",
+   "text": "or just before the code-source-reads staleness redo so we don't maintain dead code in the interim. Confirm byte-parity of the staleness post-pass output after removal (the LIN-435/LIN-177 parity tests",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1292:desc:retired:1474",
+   "id": "LIN-1292",
+   "source": "ticket",
+   "text": "e the sessions where truncation was observed (to separate the current close-race from the retired pre-LIN-1219 60-min-hold bug)? ## Files * `dispatcher.js` (`signalFollowUp`, `resumeSession` repoint",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1292:desc:retired:3504",
+   "id": "LIN-1292",
+   "source": "ticket",
+   "text": "Close-race (B1/LIN-1288) is **fixed today** (PR #92, `662998a`); the 60-min-hold bug is **retired** (LIN-1219). If the symptom still reproduces it is purely the render gap. Exact age of the originally",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1298:desc:retire:3795",
+   "id": "LIN-1298",
+   "source": "ticket",
+   "text": "`collective.js`). * **Migrate the Task Chat view itself** onto the shared primitives and retire the duplicated `.chat-*` bubble/composer rules in `task-chat.css`, so the source view and the shared co",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1318:desc:until the status goes terminal (`done`/`failed`/`blocked`), then:1062",
+   "id": "LIN-1318",
+   "source": "ticket",
+   "text": "a single `run_in_background` bash loop that keeps hitting `?wait=50` and stays *silent* until the status goes terminal (`done`/`failed`/`blocked`), then prints only the final feedback tail and exits",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1318:desc:retired:3845",
+   "id": "LIN-1318",
+   "source": "ticket",
+   "text": "oduced due to reliability issues\" memory is inverted** \u2014 history is long-poll (LIN-392) \u2192 retired for push rails (LIN-843/845/901/1127). No reintroduction commit exists. Do not preserve \"long polling",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1324:desc:retired:22220",
+   "id": "LIN-1324",
+   "source": "ticket",
+   "text": "uld be enforced (as `docs/autopilot-operating-manual.md` is, by being read at runtime) or retired \u2014 an unenforced mirror of a high-churn prompt reliably drifts. **Not part of this ticket:** LIN-1323",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1336:desc:retired:7519",
+   "id": "LIN-1336",
+   "source": "ticket",
+   "text": "extra scrutiny (no single module owns it). IDs are stable forever; a removed surface is `retired`, never deleted (\u00a77). 4. `runReview(body)` \u2014 the 12 maturity dimensions and the 0\u20134 + N/A scale (\u00a72.2",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1336:desc:retired:26121",
+   "id": "LIN-1336",
+   "source": "ticket",
+   "text": "r recommendation across runs; renaming breaks the diff. If a surface is removed, mark it `retired`, don't delete it. * **Regressions are first\u2011class.** A score dropping is as important to report as on",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1341:desc:transitional:17170",
+   "id": "LIN-1341",
+   "source": "ticket",
+   "text": "a stamped row and an equivalent un-stamped row group **identically**, so the fallback is transitional, not a second behaviour. * **Materialized \u00d7 live reads.** Both call the same builders; the groupi",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1357:desc:retire:10585",
+   "id": "LIN-1357",
+   "source": "ticket",
+   "text": "on.js` extension; fall back to **(B)** only if we want zero fixture change. Either way, **retire the boolean** \u2014 do not dual-represent. * **Back-compat for stored booleans (open question, answered):**",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-1385:desc:until someone sets `deploy_version`, and then:7557",
+   "id": "LIN-1385",
+   "source": "ticket",
+   "text": "actly what the acceptance asks for (\"footer shows a real commit\"). `version` stays `null` until someone sets `DEPLOY_VERSION`, and then it renders too. | This makes the renderer change load-bearing r",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1393:desc:transitional:1898",
+   "id": "LIN-1393",
+   "source": "ticket",
+   "text": "e fix and add a mixed-chain test\" OR an explicit named acceptance of the bounded <=30-day transitional split as a known issue. The autopilot close-out-disposition comment (19:53:35Z) said it was dispa",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1397:desc:interim:10891",
+   "id": "LIN-1397",
+   "source": "ticket",
+   "text": "ed. Needs a documented backfill/re-mint note (the reaper's Approach-3 fallback covers the interim gracefully). * **(B) Resolve the owner durably by urlKey server-side** (a workspace/account store keye",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1429:desc:deprecation:17035",
+   "id": "LIN-1429",
+   "source": "ticket",
+   "text": "and becomes largely unnecessary once cell #7 provisions on its own. Known consequence, no deprecation proposed. ### Invariants and their mechanisms | Invariant | Mechanism | | -- | -- | | **Fresh di",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1429:desc:temporarily:22381",
+   "id": "LIN-1429",
+   "source": "ticket",
+   "text": "enter \u2014 do not skip.** Verify this test is load-bearing by mutation *before* trusting it: temporarily drop `createdBy` from the new provisioning call. The test must fail at the `validated.createdBy` a",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1448:desc:temporary:47",
+   "id": "LIN-1448",
+   "source": "ticket",
+   "text": "**Cleanup follow-up of LIN-1447** (which adds *temporary* backward-compat so `POST /api/dispatch/broker-token` tolerates legacy pre-LIN-1397 ownerless dispat",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1448:desc:temporary:251",
+   "id": "LIN-1448",
+   "source": "ticket",
+   "text": "okens instead of 503ing). **Do this once no ownerless tokens remain in use:** remove the temporary compat lane added in LIN-1447 from `routes/dispatch.js` (around the broker-token mint), restoring st",
+   "verdict": "retirement-condition",
+   "why": "exit condition for LIN-1447's temporary compat lane"
+  },
+  {
+   "key": "LIN-1448:desc:remove after:718",
+   "id": "LIN-1448",
+   "source": "ticket",
+   "text": "compat branch added in LIN-1447 would make this measurable; add one there if cheap). Only remove after the compat branch has been cold for a safe window. Priority: low \u2014 a debt-cleanup, not urgent. B",
+   "verdict": "retirement-condition",
+   "why": "exit condition for LIN-1447's temporary compat lane"
+  },
+  {
+   "key": "LIN-1448:desc:remove once:1339",
+   "id": "LIN-1448",
+   "source": "ticket",
+   "text": "Y minter of the `refire-broker` label, so the compat lane never goes cold on its own and \"remove once no ownerless tokens remain / after a cold window\" can never be met by waiting. The lane exists bec",
+   "verdict": "retirement-condition",
+   "why": "exit condition for LIN-1447's temporary compat lane (found unsatisfiable)"
+  },
+  {
+   "key": "LIN-1475:desc:retire:1763",
+   "id": "LIN-1475",
+   "source": "ticket",
+   "text": "nly `routes/proxy.js` ships a silent no-op. Follow-on (optional, likely its own ticket): retire the `session-telemetry.js` regex heuristics in favour of the structured field once it is available, kee",
+   "verdict": "retirement-condition",
+   "why": "old regex heuristics to retire once the structured field is available (optional follow-on, out of scope)"
+  },
+  {
+   "key": "LIN-1475:desc:retirement:11235",
+   "id": "LIN-1475",
+   "source": "ticket",
+   "text": "remove; that surface likely needs a disambiguated name. * `session-telemetry.js` **regex retirement** \u2014 OUT, as the original Scope says. Keep the regexes as fallback for legacy untagged entries. ##",
+   "verdict": "retirement-condition",
+   "why": "regex fallback kept for legacy entries; retirement out of scope"
+  },
+  {
+   "key": "LIN-1487:desc:transitional:12462",
+   "id": "LIN-1487",
+   "source": "ticket",
+   "text": "tches `pipeline-loops.js:407` and S2b's `groupLoopsByLineage`, and it is **permanent, not transitional** \u2014 see the second stale population below. **C4 \u2014 the CSS rail.** `observation.css:583-584` trim",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1582:desc:interim:3775",
+   "id": "LIN-1582",
+   "source": "ticket",
+   "text": "ing can be restored without qualification (LIN-1448 softened it to name this issue in the interim: `lib/proxy-preamble.js`, `tests/unit/proxy-preamble.test.js`, PR #1010's body). Related: LIN-1448 (t",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1582:desc:retired:5397",
+   "id": "LIN-1582",
+   "source": "ticket",
+   "text": "2's own premise** stays unresolved in spirit, and the recurrence risk it documents is not retired. * **B. Structural refusal in the store + gates at both uncovered sites** (the existing design comment",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1697:desc:retired:818",
+   "id": "LIN-1697",
+   "source": "ticket",
+   "text": "d state. Consequence: **the coordinator/orchestrator pattern is unusable.** The operator retired it mid-run and hand-drove every step at 30-minute wake granularity, so a ~23-item batch landed seriall",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1700:desc:kill-switch:7679",
+   "id": "LIN-1700",
+   "source": "ticket",
+   "text": "port | **In** | One new pure function, see \u00a74. | | `config.js` | **In** | One new boolean kill-switch constant, mirroring `CLOSE_WINDOW_ON_DONE`'s parsing idiom. | | `phases.js` | **Out (no change)**",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1700:desc:kill-switch:10964",
+   "id": "LIN-1700",
+   "source": "ticket",
+   "text": "it protects:** any new env-derived constant must not silently coerce a bad value. The new kill-switch here is a *boolean* (mirroring `CLOSE_WINDOW_ON_DONE`'s `/^(0|false|no|off)$/i` idiom), which has",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1700:desc:kill-switch:18433",
+   "id": "LIN-1700",
+   "source": "ticket",
+   "text": "ther than silent via the oplog entries in \u00a74.7 rather than hidden. **4.7 Observability + kill-switch.** * `oplog('hook.zeroToolChallenge', { session, item, cursor })` when the challenge is first iss",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1700:desc:kill-switch:23142",
+   "id": "LIN-1700",
+   "source": "ticket",
+   "text": "hallenge`/`failed`, proving the phase anchor (not `toolsBefore`) is what's consulted. * **Kill-switch test**: `SD_ZERO_TOOL_DONE_GUARD=0` \u2192 guard never fires, byte-identical to pre-change behavior (mi",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1700:desc:kill-switch:30589",
+   "id": "LIN-1700",
+   "source": "ticket",
+   "text": "d, wider signature just for one caller (\u00a74.2). | | `config.js` | **In** | One new boolean kill-switch, `CLOSE_WINDOW_ON_DONE`'s literal regex copied verbatim (not factored into a shared helper \u2014 confi",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1700:desc:kill switch:46889",
+   "id": "LIN-1700",
+   "source": "ticket",
+   "text": "ode is out of scope entirely**, now explicitly including `dispatcher.js:164` (\u00a72). **4.7 Kill switch + observability \u2014 unchanged from Revision 1, one addition:** * `oplog('hook.zeroToolChallenge', .",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1700:desc:kill-switch:52628",
+   "id": "LIN-1700",
+   "source": "ticket",
+   "text": "omplete`), proving the phase anchor \u2014 not a session-wide count \u2014 is what's consulted. * **Kill-switch test:** `SD_ZERO_TOOL_DONE_GUARD=0` \u2192 guard never fires, byte-identical to pre-change behavior. *",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1790:desc:until then:1201",
+   "id": "LIN-1790",
+   "source": "ticket",
+   "text": "must stay off**** ****until the Harbour** `kind: 'resources'` **vocabulary is deployed.** Until then `routes/dispatch.js:1358` silently drops the kind to `undefined` and every relayed sample is lost w",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1849:desc:stopgap:959",
+   "id": "LIN-1849",
+   "source": "ticket",
+   "text": "erated template rather than the raw doc), LIN-751 (the eventual in-site chat surface this stopgap bridges toward). Filed by the flight companion on John's instruction, 2026-08-03. --- ## Shipped (c",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1858:desc:retired:924",
+   "id": "LIN-1858",
+   "source": "ticket",
+   "text": "cceptance bar):** remove the cold-read witness ceremony \u2014 it existed solely to police the retired brief-handoff contract and was proven unrunnable-honestly on this substrate (LIN-1844, Canceled by own",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1938:desc:retired:4596",
+   "id": "LIN-1938",
+   "source": "ticket",
+   "text": "01 expiry fields plus the missing audit row (S3), and the Class-B retry guidance (S6). **Retired (ruling 2026-09-05) \u2014 not deferred, not subtasked.** The agent self-exchange half \u2014 `supersededBy` CAS",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1938:desc:retired:10340",
+   "id": "LIN-1938",
+   "source": "ticket",
+   "text": "ns` catalog test. **No file in** `simple-dispatcher` **is touched** \u2014 the cross-repo half retired with S7a/S7b. ## Scope Assessment and session fit **This fits one session.** Revision 1's \"needs mul",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1938:desc:retired:10500",
+   "id": "LIN-1938",
+   "source": "ticket",
+   "text": "s one session.** Revision 1's \"needs multiple sessions\" conclusion rested entirely on the retired surfaces \u2014 the credential-surface security review, the two-repo deploy ordering, and the endpoint-inve",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-1938:desc:retired:11117",
+   "id": "LIN-1938",
+   "source": "ticket",
+   "text": "icated credential-lifecycle endpoint / new atomic-CAS field\". Both were properties of the retired surfaces and no longer hold. Criteria (b) and (c) never fired. `Surface Assessment: lands cleanly`",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2018:desc:transitional:4158",
+   "id": "LIN-2018",
+   "source": "ticket",
+   "text": "vel at epics; dropping the project mapping now would put every issue in \"No Project\". The transitional duplication names LIN-2011 in-code as its removal trigger. * **D2's exact-status-id match landed",
+   "verdict": "retirement-condition",
+   "why": "transitional duplication names LIN-2011 in code as its removal trigger"
+  },
+  {
+   "key": "LIN-2036:desc:retired:3660",
+   "id": "LIN-2036",
+   "source": "ticket",
+   "text": "vel, and `requiredN(0.5) === requiredN(0.5001)` (the `0.5 / 0.5001` non-inversion pair is retired \u2014 it passes on the defective code). ## F3 (minor) \u2014 the numerator condition is still a tautology Wit",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2126:desc:until then:973",
+   "id": "LIN-2126",
+   "source": "ticket",
+   "text": "s first (and possibly only) Stop is the real EXECUTING completion. So for its entire life until then it emits **zero heartbeats**, is treated as still cold-starting for the full 180s cooldown (blockin",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2126:desc:retire:4767",
+   "id": "LIN-2126",
+   "source": "ticket",
+   "text": "haped, and the probe is expected to *pass* rather than expected to block. It does **not** retire the gate: n=1, one claude version, and a **bootstrap-free** launch is still the case that actually matt",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2127:desc:retire:15682",
+   "id": "LIN-2127",
+   "source": "ticket",
+   "text": "subsequent `plan-review` verdict. ### Injection-guard watch (the one risk reading cannot retire) The bootstrap-free first message is structurally closer to the shape LIN-1360 pulled back from than a",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2146:desc:interim:2450",
+   "id": "LIN-2146",
+   "source": "ticket",
+   "text": "se tick) was measured at one-workspace-per-tick. Refs: LIN-2131 (P1-3, the sweep and its interim session-derived roster), LIN-2114 (the observer-harness epic). --- ## Implementation Plan **Shipped",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2175:desc:retires:1479",
+   "id": "LIN-2175",
+   "source": "ticket",
+   "text": "back to polling `GET /dispatch/{id}` \u2014 the up-chain poll the operating manual explicitly retires for subscribed children. Every check-in was manual. **2. No budget guard.** The guard's enforcement k",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2175:desc:stopgap:3073",
+   "id": "LIN-2175",
+   "source": "ticket",
+   "text": "correct, and leaves consequences 2 and 3 unfixed. These are not exclusive \u2014 B is a sound stopgap while A is built, and B is worth doing regardless so the prompt stops stating an unsatisfiable rule.",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2180:desc:retired:2413",
+   "id": "LIN-2180",
+   "source": "ticket",
+   "text": "erge and held exactly \u2014 no drift. The pre-merge \"re-ground before you start\" direction is retired; read the close-out comment for the merged state.*",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retire:3651",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "m the opposite direction. Rescan an unanswered ruling; if the condition no longer holds, retire it. **Clearing is more dangerous than raising, and must be built that way.** A false positive costs on",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retirement:3889",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "decision that mattered silently vanishes and the operator never learns it existed. So: * Retirement must be **visible and reversible** \u2014 record *why* it cleared and against which fingerprint, never a",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retires:6072",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "ated cost before running, is abortable, and bounds concurrency. 4. A self-resolved ruling retires with a distinct outcome value, a recorded reason, and reversibility; an uncertain rescan leaves the ru",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retire:7257",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "s-store.js`, `lib/task-decisions-store.js`, `GET /workspace/:urlKey/api/scan-due` and the retire/un-retire routes in `routes/workspace-api.js`, and the Scan-due tab in `public/observation.js`. Read th",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retire:7267",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "`, `lib/task-decisions-store.js`, `GET /workspace/:urlKey/api/scan-due` and the retire/un-retire routes in `routes/workspace-api.js`, and the Scan-due tab in `public/observation.js`. Read those at `HE",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retire:8453",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "and the follow-ups. Follow-ups: **LIN-2725** (uncovered scan-route error branches, incl. retire's `502` \u2014 pre-existing owner), **LIN-2727** (e2e retire/un-retire round trip), **LIN-2728** (cost-estim",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retire:8509",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "scan-route error branches, incl. retire's `502` \u2014 pre-existing owner), **LIN-2727** (e2e retire/un-retire round trip), **LIN-2728** (cost-estimate calibration + day-one `unknown` split), **LIN-2729**",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2241:desc:retire:8519",
+   "id": "LIN-2241",
+   "source": "ticket",
+   "text": "e error branches, incl. retire's `502` \u2014 pre-existing owner), **LIN-2727** (e2e retire/un-retire round trip), **LIN-2728** (cost-estimate calibration + day-one `unknown` split), **LIN-2729** (older-ru",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2253:desc:retirement:3719",
+   "id": "LIN-2253",
+   "source": "ticket",
+   "text": "he committed narrow scope) Per the operator's `narrow-keep-exclusion` ruling, the larger retirement/propagation plan was collapsed to a headline-only change: * `lib/terminal-marked-task-cost.js` \u2014 p",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2253:desc:deprecation:4089",
+   "id": "LIN-2253",
+   "source": "ticket",
+   "text": "rename `noLineageCount` \u2192 `laneLandedCount`, keeping `noLineageCount` on the wire for one deprecation cycle. * `lib/render-kpis.js` \u2014 the headline divides `pricedTicketCostUsd \u00f7 pricedTicketCount`, ne",
+   "verdict": "retirement-condition",
+   "why": "deprecated alias kept for one deprecation cycle"
+  },
+  {
+   "key": "LIN-2253:desc:retired:4511",
+   "id": "LIN-2253",
+   "source": "ticket",
+   "text": "ped regardless). ## Acceptance boundaries (retained) * `lineageBearingCount` is **not** retired, and stays derived from the same filter as `laneLandedCount` \u2014 LIN-2418's anti-drift coupling is prese",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2294:desc:retire:232",
+   "id": "LIN-2294",
+   "source": "ticket",
+   "text": "ing 3**). Review searched for an existing owner and found none (LIN-1274 is the adjacent \"retire the ~30-min clocks\" ticket, not this). ## The gap The wedged-silence rule appears **four times** in `",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2310:desc:retires:4875",
+   "id": "LIN-2310",
+   "source": "ticket",
+   "text": "first line it actually emitted into that **existing** record; the reaper reads it. That retires PR #191's session-root `refireMarkerFirstLine` (a second derivation of hook state) rather than patch",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-2323:desc:sunset:2538",
+   "id": "LIN-2323",
+   "source": "ticket",
+   "text": "ontext, not a self-review turn \u2014 the 07-01 draft reviewed itself and passed. ## Cost and sunset condition This adds one session per periodical report (~$3\u20135 at 2026-08 observed rates). It buys back",
+   "verdict": "retirement-condition",
+   "why": "sunset condition for the added check session"
+  },
+  {
+   "key": "LIN-2323:desc:sunset:2753",
+   "id": "LIN-2323",
+   "source": "ticket",
+   "text": "d time, and the 07-01 precedent prices the alternative: a wrong report steering a week. **Sunset condition, written in deliberately:** if after ~1 month of operation the disagreement rate is near zero",
+   "verdict": "retirement-condition",
+   "why": "sunset condition for the added check session"
+  },
+  {
+   "key": "LIN-2323:desc:retired:2943",
+   "id": "LIN-2323",
+   "source": "ticket",
+   "text": "near zero, the periodical that reviews periodicals should say so and this step should be retired \u2014 the check must retire attention on net, never add to it. ## Sequencing First of a four-ticket set",
+   "verdict": "retirement-condition",
+   "why": "sunset condition for the added check session"
+  },
+  {
+   "key": "LIN-2323:desc:retire:2968",
+   "id": "LIN-2323",
+   "source": "ticket",
+   "text": "l that reviews periodicals should say so and this step should be retired \u2014 the check must retire attention on net, never add to it. ## Sequencing First of a four-ticket set (this ticket \u2192 experiment",
+   "verdict": "retirement-condition",
+   "why": "sunset condition for the added check session"
+  },
+  {
+   "key": "LIN-2323:desc:sunset:6784",
+   "id": "LIN-2323",
+   "source": "ticket",
+   "text": "the new adversarial-read branch **simultaneously, for the first time in production**. **Sunset condition (still live, from the scope above):** if after ~1 month of operation the disagreement rate is",
+   "verdict": "retirement-condition",
+   "why": "sunset condition for the added check session"
+  },
+  {
+   "key": "LIN-2323:desc:retired:6984",
+   "id": "LIN-2323",
+   "source": "ticket",
+   "text": "near zero, the periodical that reviews periodicals should say so and this step should be retired. --- *Process detail pruned at close-out. Full history is preserved and readable: the research notes",
+   "verdict": "retirement-condition",
+   "why": "sunset condition for the added check session"
+  },
+  {
+   "key": "LIN-2334:desc:retire:2662",
+   "id": "LIN-2334",
+   "source": "ticket",
+   "text": "y, don't poll\" wake-contract overclaim, a different defect shape | | **LIN-1274** | Would retire the whole ~30-min clock class once the runtime silence-timer lands; blocked on LIN-575, structural rath",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2338:desc:retired:28",
+   "id": "LIN-2338",
+   "source": "ticket",
+   "text": "Successor to **LIN-2310**'s retired Track S. LIN-2310 shipped its Harbour half (Track H, merged `97803873`); its simple-dispatcher half wa",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2338:desc:retired:140",
+   "id": "LIN-2338",
+   "source": "ticket",
+   "text": "310 shipped its Harbour half (Track H, merged `97803873`); its simple-dispatcher half was retired by John's ratified ruling on 2026-08-28 (LIN-2310 comment `bc518db6`) after three plan-review rounds.",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2338:desc:retired:3426",
+   "id": "LIN-2338",
+   "source": "ticket",
+   "text": "*not** license reviving the ownership design \u2014 the ownership design is what this re-scope retired, and rediscovering its motivation is not a reason to rebuild it. ## Prior art LIN-2310 keeps all thr",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2338:desc:retired:3748",
+   "id": "LIN-2338",
+   "source": "ticket",
+   "text": "4dfa675`, `c07a6bf6`, `2abbc47f` (R1/R2/R3 are in the last) * Escalation packet with both retired remedies and the evidence for each: `bc1ea848` * Ruling: `bc518db6` ## Out of scope **LIN-2259's nar",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2338:desc:retired:6280",
+   "id": "LIN-2338",
+   "source": "ticket",
+   "text": "N-2259 (`972f95c`) ~4.5 h after this ticket was filed. R1 was a defect in LIN-2310 \u00a74a's *retired plan text*, never in shipped code. What landed instead is the regression pin the item asked for: a tes",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2419:desc:retiring:954",
+   "id": "LIN-2419",
+   "source": "ticket",
+   "text": "untouched; the population was moved out of the way. 3. **LIN-2253 Rev 2's plan** proposed retiring that exclusion in favour of harness propagation. Plan-review measured the result on the plan's own P1",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2419:desc:retiring:6801",
+   "id": "LIN-2419",
+   "source": "ticket",
+   "text": "* **P2 (**`:807`**)** \u2014 keep verbatim; it becomes the behavioural-equivalence witness for retiring `lineageBearingCount`. * **P2b (new)** \u2014 all-lineage-bearing, all-unknown-harness fleet \u21d2 `opencodeSu",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2446:desc:expires on:35721",
+   "id": "LIN-2446",
+   "source": "ticket",
+   "text": "ould have held that working SIGNAL too \u2014 and a held SIGNAL is not free: the target's hold expires on its own budget, the session finalizes to `COMPLETED`, and the NEXT attempt becomes a real `--resume",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2510:desc:until then:4395",
+   "id": "LIN-2510",
+   "source": "ticket",
+   "text": "a forced `followUpTo` to un-wedge it manually (`dispatch` id in the nudge comment below). Until then nothing in SD would ever have moved it. ## The gap (AS FILED \u2014 REFUTED 2026-09-04; see the SHIPPED",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2597:desc:until `stall_failsafe_ms` (60 min) \u2014 and whose failsafe then:6056",
+   "id": "LIN-2597",
+   "source": "ticket",
+   "text": "sion sitting on a blocking dialog that neither fast-fail pass recognises, idling silently until `STALL_FAILSAFE_MS` (60 min) \u2014 and whose failsafe then refires into the same dialog. That PR is what ma",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2618:desc:retire:198",
+   "id": "LIN-2618",
+   "source": "ticket",
+   "text": "paths; loops vocabulary; CLAUDE.md sync; the moving test pins and the header comment they retire; LIN-2027 duplicate at landing; seed byte-identical inside the new system turn) and the driver's review",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-2618:desc:retires:1801",
+   "id": "LIN-2618",
+   "source": "ticket",
+   "text": "s the pins at `tests/unit/flight-companion-turn-route.test.js:890` and `:902` with it and retires the route header comment at `routes/flight-companion.js:121-126` (\"no premature lib/prompts/ extractio",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LIN-2650:desc:retirement:977",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "y** `:NNN` **line reference in the \"WS0 \u2014 prerequisite refactor\" and \"WS4 \u2014 self-resolved retirement\" sections directly below this notice** \u2014 they are the pre-WS3 originals, kept verbatim for history.",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retirement:1577",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "n` one is correct. **Settled by John's ruling (comment** `116db212`**), do not reopen:** retirement is **option (a), no second row** \u2014 the retire check re-scans without calling `recordScan`. --- #",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:1627",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "mment** `116db212`**), do not reopen:** retirement is **option (a), no second row** \u2014 the retire check re-scans without calling `recordScan`. --- # WS0 \u2014 prerequisite refactor (lands first) *(Line",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retirement:2088",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "chine-written outcome.** In-task consumer named up front: the criterion-4 `self-resolved` retirement/un-retirement path (`lib/task-decisions-store.js:240` allowlist, `:246` first-stamp-wins). `answere",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retirement:2102",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "outcome.** In-task consumer named up front: the criterion-4 `self-resolved` retirement/un-retirement path (`lib/task-decisions-store.js:240` allowlist, `:246` first-stamp-wins). `answered`**/**`dismis",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retired:4984",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "eaning | | `public/scan.js:129,176` | Third branch: `outcome === 'self-resolved'` renders retired-with-reason plus an un-retire affordance, instead of falling through to the **interactive** render | a",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:5015",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "176` | Third branch: `outcome === 'self-resolved'` renders retired-with-reason plus an un-retire affordance, instead of falling through to the **interactive** render | a self-resolved row never shows",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retirement:6569",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "IN-2262; ride LIN-2367's identity join for the third KPI arm. --- # WS4 \u2014 self-resolved retirement (on top of WS0) *(Same staleness notice applies here \u2014 corrected numbers and the full route design",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retiring:6847",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "-141`'s `has_decision !== true \u2192 zero-finding` **stays exactly as-is for raising**. For **retiring**, surface the discriminator `parseScanResponse` currently erases: an explicit, well-formed `has_deci",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retirement:7099",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "o `zero-finding` today) and from `error`/`fail-closed`. **Only the explicit-false case is retirement-eligible** \u2014 fail-closed is correct for raising but inverts into fail-**open** for retiring, and wo",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retiring:7193",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "rement-eligible** \u2014 fail-closed is correct for raising but inverts into fail-**open** for retiring, and would clear a live ruling on a malformed response. * New route `POST /workspace/:urlKey/api/scan",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:7313",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "ve ruling on a malformed response. * New route `POST /workspace/:urlKey/api/scan/:issueId/retire` \u2014 re-scans current content via `fetchRecommendationContext` + the LLM call **directly**; **does not ca",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retired:8221",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "weredDecisions`'s `latestByTask` reduction, and `getStatus`/`GET /api/scan/:issueId`) see retired/un-retired state with **no change to their own reduction logic**. `lib/unanswered-decisions.js`, `getS",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retired:8232",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "ons`'s `latestByTask` reduction, and `getStatus`/`GET /api/scan/:issueId`) see retired/un-retired state with **no change to their own reduction logic**. `lib/unanswered-decisions.js`, `getStatus` and",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:8476",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "his ticket. * `public/scan.js` / `public/observation.js`: WS0's third-branch render, plus retire/un-retire actions, carrying the criterion-5 disclaimer on both actions' confirmation copy. ## Safety c",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:8486",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": ". * `public/scan.js` / `public/observation.js`: WS0's third-branch render, plus retire/un-retire actions, carrying the criterion-5 disclaimer on both actions' confirmation copy. ## Safety constraints",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retirement:8774",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "e costs one dismissal; a false negative means a decision that mattered silently vanishes. Retirement must be **visible and reversible** \u2014 record *why* it cleared and against which fingerprint, never a",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:9538",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "ng live\" representation would be invisible to every existing `outcome` reader, forever. * Retire/un-retire must **fail loud, never silently no-op**, on a since-pruned or replaced row (LIN-2211). * The",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:9548",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "epresentation would be invisible to every existing `outcome` reader, forever. * Retire/un-retire must **fail loud, never silently no-op**, on a since-pruned or replaced row (LIN-2211). * The backstop-",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:9765",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "claimer appears on both actions' copy. ## Required tests (WS4, on top of WS0's table) * Retire succeeds **only** on explicit well-formed `has_decision: false`; absent / malformed / `error` / `fail-c",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:9937",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "alformed / `error` / `fail-closed` all leave the row standing (four negative cases). * Un-retire restores the row to unanswered and it re-appears in `listUnansweredForWorkspaces`. * A client-supplied",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:10708",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "within this subtask** \u2014 land the outcome-model widening and its consumer fixes before the retire/un-retire behavior. Independent of the WS1\u2192WS2\u2192WS3 chain, but the parent's \u00a77 calls for **sequential la",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:10718",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "s subtask** \u2014 land the outcome-model widening and its consumer fixes before the retire/un-retire behavior. Independent of the WS1\u2192WS2\u2192WS3 chain, but the parent's \u00a77 calls for **sequential landing**: t",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:12976",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "its | | -- | -- | | WS0 \u2014 reversible `self-resolved` outcome model | `7df5f50f` | | WS4 \u2014 retire/un-retire routes + parser split | `e218de7e` | | WS4 \u2014 UI render branch, Retire button, confirm copy |",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:12986",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "| -- | | WS0 \u2014 reversible `self-resolved` outcome model | `7df5f50f` | | WS4 \u2014 retire/un-retire routes + parser split | `e218de7e` | | WS4 \u2014 UI render branch, Retire button, confirm copy | `5a12dea7`",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:13056",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "| | WS4 \u2014 retire/un-retire routes + parser split | `e218de7e` | | WS4 \u2014 UI render branch, Retire button, confirm copy | `5a12dea7` | | Fix pass (round-1 findings F2, F5) | `ecb2107a` | | Fix pass (rou",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:14261",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "`outcomeReason` is the deterministic server-authored string (never model prose), and the retire route's \"leaves standing\" case ships as `200 { retired: false, reason }`. ### Archive Pre-prune descr",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retired:14315",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "string (never model prose), and the retire route's \"leaves standing\" case ships as `200 { retired: false, reason }`. ### Archive Pre-prune description snapshot: `b893040c-b8a7-4524-9108-42fb1f8a02f1",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2650:desc:retire:15101",
+   "id": "LIN-2650",
+   "source": "ticket",
+   "text": "* (Low) \u2014 the four untested scan-route error branches (503/502 on both POST scan and scan-retire), plus F4's disclosure asymmetry recorded for the record. * **LIN-2726** (Low) \u2014 the two round-2 copy n",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2791:desc:retire:9947",
+   "id": "LIN-2791",
+   "source": "ticket",
+   "text": "dismissed`/`self-resolved`/an earlier `answered` alike) predates it. * **Why not copy the retire route's lookalike** `record.outcome !== 'self-resolved'` **predicate** (`routes/workspace-api.js:2889-2",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2889:desc:retires:2241",
+   "id": "LIN-2889",
+   "source": "ticket",
+   "text": "et's own open question:** answering a row whose current outcome is `'self-resolved'` **un-retires it first** (reusing the existing `reverseOutcome` path already shipped for LIN-2650 WS4), then stamps",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2889:desc:retire:4151",
+   "id": "LIN-2889",
+   "source": "ticket",
+   "text": "Dependencies None upstream. **Blocks Steps 2, 3 and 4.** ## Cleanup / recovery The un-retire-then-answer path is itself already reversible (the existing un-retire route reverses a bad self-resolve",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2889:desc:retire:4221",
+   "id": "LIN-2889",
+   "source": "ticket",
+   "text": "/ recovery The un-retire-then-answer path is itself already reversible (the existing un-retire route reverses a bad self-resolve). A bad *answer* has no separate undo today and this step does not ad",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2889:desc:retire:4609",
+   "id": "LIN-2889",
+   "source": "ticket",
+   "text": "ot `'self-resolved'`. * Regression pins that an ordinary unanswered row **and** a post-un-retire row both still stamp normally (the LIN-2724 ticket's own named \"tests this needs\"). * `buildRulingRef`",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2889:desc:retires:5529",
+   "id": "LIN-2889",
+   "source": "ticket",
+   "text": "Count` (returned only, never persisted); * a shared `TaskDecisionsStore.answer()` that un-retires a row and then answers it, swallowing only the named lost-race error; * a positive-only success rule o",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2891:desc:interim:1196",
+   "id": "LIN-2891",
+   "source": "ticket",
+   "text": "ches (the `collectUnansweredDecisions` reorder, the real-Mongo CAS reversal test, the KPI interim-gap note, and the second-repo emitter), which is why it ran through plan-review and breakdown. ## Imp",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2893:desc:retire:2567",
+   "id": "LIN-2893",
+   "source": "ticket",
+   "text": "ruling forbids. ## Acceptance evidence * Port LIN-2729's own three-line repro (`before retire` / `after retire` / `after dismiss`) into a unit test against `collectUnansweredDecisions`, asserting t",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2893:desc:retire:2584",
+   "id": "LIN-2893",
+   "source": "ticket",
+   "text": "## Acceptance evidence * Port LIN-2729's own three-line repro (`before retire` / `after retire` / `after dismiss`) into a unit test against `collectUnansweredDecisions`, asserting the **newest row's",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2893:desc:retired:3327",
+   "id": "LIN-2893",
+   "source": "ticket",
+   "text": "sion.** This line previously read *\"Landing this discharges **LIN-2729**.\"* That claim is retired as factually wrong, so the record matches reality. Landing this fixes the case where a task's answeri",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-2932:desc:until all resolve) \u00b7 idle 14m 58s`, then:801",
+   "id": "LIN-2932",
+   "source": "ticket",
+   "text": "m that point read `[working \u00b7 verifying] verifying in background (Poll PR #1513 CI checks until all resolve) \u00b7 idle 14m 58s`, then `idle 25m 8s`, with one interleaved self-report: \"Confirmed \u2014 nothing",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-3021:desc:retire:4211",
+   "id": "LIN-3021",
+   "source": "ticket",
+   "text": "LIN-2889**'s main implementation (markOutcome conditional write, stampDecisionAnswers un-retire-then-answer, `/rulings/answer` alignment) \u2014 sequenced first as its own small, low-risk, independently r",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LIN-3124:desc:until finalize, then:36316",
+   "id": "LIN-3124",
+   "source": "ticket",
+   "text": "3 | Step 2: `link()` false, re-read says present (committed) | no reader in this session until finalize, then deleted (residual c: another session's legacy binding can read it) | kept | rolled forwar",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:c74d0439:temporarily:2212",
+   "id": "LIN-3022",
+   "source": "commit LinearViewer c74d0439",
+   "text": "rective-mode periodicals' mint()/ mintObjectiveBreakage() bullets), each witnessed red by temporarily reverting its own clause and green after restoring. Ordering pins confirm both clauses sit after L",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:04c4b0f9:retires:749",
+   "id": "LIN-2889",
+   "source": "commit LinearViewer 04c4b0f9",
+   "text": "gets the same conditional-write discipline. New shared TaskDecisionsStore.answer() un-retires a self-resolved row before re-stamping it answered (a human answer outranks the model's self-resolve",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:247e01af:interim:2143",
+   "id": "LIN-3011",
+   "source": "commit LinearViewer 247e01af",
+   "text": "s a top-level toolPeak (digest-sourced on lean, null on non-lean). Removed the beat-3 interim that restored formatted feedback onto healed rows \u2014 self-heal now only attaches feedbackVersion/feed",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:fd4ca8b2:temporary:3246",
+   "id": "LIN-3011",
+   "source": "commit LinearViewer fd4ca8b2",
+   "text": "at's beat 4), so the sweep's shadow-log classification finds nothing to log. Expected and temporary: same root cause as the beat-2 \"fresh digest\" witness, just surfacing in a pre-existing test. Will r",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:da3893d0:retiring:180",
+   "id": "LIN-2966",
+   "source": "commit LinearViewer da3893d0",
+   "text": "ent-turn.js's runAgentTurn instead of its own inline model-pick/tool-catalog/stream loop, retiring the second implementation of \"an agent turn\" the ticket exists to collapse. - lib/agent-turn.js: two",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:4f8d01d4:temporarily:3148",
+   "id": "LIN-2886",
+   "source": "commit LinearViewer 4f8d01d4",
+   "text": "ockets, 11051/11051 tests passing (with the one unrelated local-only secret-scan artifact temporarily moved aside to get a clean signal). Co-Authored-By: [mid-tier model] ----",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:de478d84:temporarily:5537",
+   "id": "LIN-2773",
+   "source": "commit LinearViewer de478d84",
+   "text": "ch) to include effect/declaredEffect/alternate -- verified red via a targeted mutation (temporarily stripped the three fields from the loop rows.push site, captured the exact AssertionError diff",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:de478d84:temporarily:9854",
+   "id": "LIN-2773",
+   "source": "commit LinearViewer de478d84",
+   "text": "xt as a silent no-op and could never catch a regression here. Confirmed via mutation (temporarily inserted a bogus fetchIssueContext call into the route, observed this test fail with the exact t",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:de478d84:temporary:12478",
+   "id": "LIN-2773",
+   "source": "commit LinearViewer de478d84",
+   "text": "on every file. Additionally rendered the observation page with a fixed fixture at both a temporary git worktree pinned to cda38e28 and at HEAD+this beat's changes; SHA-256 of both outputs matched exa",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:5feeefd0:until then:3066",
+   "id": "LIN-2756",
+   "source": "commit LinearViewer 5feeefd0",
+   "text": ".js) is untouched \u2014 that's beat 4. Client and server composite keys intentionally diverge until then (noted in the rulingKey comment). Co-Authored-By: [mid-tier model] * LIN-2",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:60",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "LIN-2650: WS0+WS4 \u2014 reversible self-resolved outcome model, retire/un-retire (#1428) * LIN-2650: WS0 \u2014 reversible self-resolved outcome model Widens TaskDecisionsStore'",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:70",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "LIN-2650: WS0+WS4 \u2014 reversible self-resolved outcome model, retire/un-retire (#1428) * LIN-2650: WS0 \u2014 reversible self-resolved outcome model Widens TaskDecisionsStore's outcome",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:1757",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "hecks proxy-rulings, the one inherited consumer with its own dedicated route tests. WS4 (retire/un-retire routes) follows on top of this in a later commit. Co-Authored-By: [model]",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:1767",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "y-rulings, the one inherited consumer with its own dedicated route tests. WS4 (retire/un-retire routes) follows on top of this in a later commit. Co-Authored-By: [mid-tier model]",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:1972",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "laude-Session: https://claude.ai/code/session_01WT5MS4vsDfCieDfUmpuo6e * LIN-2650: WS4 \u2014 retire/un-retire routes (server side) Adds the two routes that let a self-resolved outcome be created and rev",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:1982",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "ion: https://claude.ai/code/session_01WT5MS4vsDfCieDfUmpuo6e * LIN-2650: WS4 \u2014 retire/un-retire routes (server side) Adds the two routes that let a self-resolved outcome be created and reversed: -",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retires:2433",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "parseScanResponse's has_decision !== true collapse: only a literal has_decision: false retires; a live decision, absent/malformed input, or a genuine parse/model error all leave the ruling standi",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:2572",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "t, or a genuine parse/model error all leave the ruling standing. - POST .../scan/:issueId/retire: re-scans server-side (fetchRecommendationContext \u2192 buildScanMessages \u2192 streamChat directly, never ge",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retirement:2785",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "cordScan \u2014 no row is minted), ignores any client-supplied verdict, and on an explicit retirement signal calls markOutcome({outcome:'self-resolved', outcomeReason, outcomeBasisHash}) on the row n",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:3522",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "(free-tier-model-clamp-wiring, interactive-openrouter-chain-byte-identity) updated: the retire route is a genuine new interactive resolution site sharing the existing apiKeyToUse/forceDefault sh",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:4604",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "https://claude.ai/code/session_01WT5MS4vsDfCieDfUmpuo6e * LIN-2650: WS4 \u2014 public/scan.js retire/un-retire UI Adds the third render branch and the retire/un-retire affordances the plan's WS4 \u00a75 speci",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:4614",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "aude.ai/code/session_01WT5MS4vsDfCieDfUmpuo6e * LIN-2650: WS4 \u2014 public/scan.js retire/un-retire UI Adds the third render branch and the retire/un-retire affordances the plan's WS4 \u00a75 specifies: - r",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:4662",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "LIN-2650: WS4 \u2014 public/scan.js retire/un-retire UI Adds the third render branch and the retire/un-retire affordances the plan's WS4 \u00a75 specifies: - renderFresh/renderStale gain a self-resolved bran",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:4672",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "WS4 \u2014 public/scan.js retire/un-retire UI Adds the third render branch and the retire/un-retire affordances the plan's WS4 \u00a75 specifies: - renderFresh/renderStale gain a self-resolved branch, tested",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retired:4997",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "ithout this it would silently fall through to the interactive answer UI on an already-retired row). Shows the machine-written outcomeReason and an Un-retire button; renderStale's variant carries",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:5063",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "swer UI on an already-retired row). Shows the machine-written outcomeReason and an Un-retire button; renderStale's variant carries the same \"out of date \u00b7 retired\" naming its dismissed/answered",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retired:5134",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "Reason and an Un-retire button; renderStale's variant carries the same \"out of date \u00b7 retired\" naming its dismissed/answered sibling uses. - The existing interactive/unanswered render path gains a",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:5245",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "ismissed/answered sibling uses. - The existing interactive/unanswered render path gains a Retire button alongside answer/dismiss (renderDecisionBody's scan-answer-actions row). - Two named confirm",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:5639",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "carry the ticket's required backstop-not-guarantee disclaimer. - runRetire/runUnretire: retire's `retired: false` response (nothing changed server-side) restores the prior view rather than errorin",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retired:5649",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "ticket's required backstop-not-guarantee disclaimer. - runRetire/runUnretire: retire's `retired: false` response (nothing changed server-side) restores the prior view rather than erroring; `reti",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retired:5755",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "response (nothing changed server-side) restores the prior view rather than erroring; `retired: true` and un-retire's success both render via the existing renderFresh path, since both response sh",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:5777",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "anged server-side) restores the prior view rather than erroring; `retired: true` and un-retire's success both render via the existing renderFresh path, since both response shapes carry the same",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:5948",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "onse shapes carry the same field family GET/POST scan already use. New tests/unit/scan-retire-ui.test.js (vm-sandboxed against a fake DOM, same house pattern as scan-post-signal.test.js/ brief-reca",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:6158",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "rate.test.js) drives the real init()/wireActions() end to end: the new render branch, the Retire button's presence on the interactive path, confirm() dialog wiring (declining sends no request), both s",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:6281",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "nteractive path, confirm() dialog wiring (declining sends no request), both success/no-op retire outcomes, un-retire, and a regression check that dismissed/answered/zero-finding are unaffected. Revie",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:6301",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "firm() dialog wiring (declining sends no request), both success/no-op retire outcomes, un-retire, and a regression check that dismissed/answered/zero-finding are unaffected. Review-note disposition (",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:temporarily:8493",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "rtion \u2014 reverseOutcome must put a row back into listUnansweredForWorkspaces. Witnessed by temporarily dropping `outcome` from reverseOutcome's cleared-field set, confirming the new assertion fails, th",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:8778",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": ": https://claude.ai/code/session_012DaxurYoZaevm34eQD8AFt * LIN-2650: fix beat 2 \u2014 F1 un-retire disclaimer + F3 swallowed keepalive error F1: review ruled UNRETIRE_CONFIRM_TEXT missing LIN-2241 crit",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:8950",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "M_TEXT missing LIN-2241 criterion 5's backstop-not-guarantee disclaimer, required on both retire's and un-retire's copy. This is a review-required change to plan-approved copy, not a unilateral rewrit",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:8966",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "IN-2241 criterion 5's backstop-not-guarantee disclaimer, required on both retire's and un-retire's copy. This is a review-required change to plan-approved copy, not a unilateral rewrite \u2014 the implemen",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:13912cf5:retire:9261",
+   "id": "LIN-2650",
+   "source": "commit LinearViewer 13912cf5",
+   "text": "d a middle clause naming the disclaimer against the restored scan judgement (which the un-retire write is not itself, but which it puts back in front of the operator), per the review's exact required",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:df034348:until then:1352",
+   "id": "LIN-2616",
+   "source": "commit LinearViewer df034348",
+   "text": "ut itself doesn't exist in the DOM yet \u2014 that's L5, beat 3 \u2014 so these reads are inert until then). - lib/render-settings.js: the preset top-level renderDispatchDefaultRow call site passes effort",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:df034348:temporarily:6136",
+   "id": "LIN-2616",
+   "source": "commit LinearViewer df034348",
+   "text": "effort input is blank before submit and stays blank after create. Fail-first verified: temporarily reverted the L4/L5/G1/G2 source (checked out lib/render-settings.js, public/settings.js, routes/di",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:c5cc2b8d:retired:240",
+   "id": "LIN-1938",
+   "source": "commit LinearViewer c5cc2b8d",
+   "text": "r ruling 2026-09-05) to S1-S3+S6: the self-exchange/refresh mechanism (S4/S5/S7a/S7b) was retired as unsafe and re-homed on LIN-2602/LIN-2603. - lib/proxy-tokens.js: add describeRejectionCause(token)",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:cd233879:retired:6238",
+   "id": "LIN-2302",
+   "source": "commit LinearViewer cd233879",
+   "text": "natural sentence-final \"\u2026adding attachments.\" Uses `\\b`. - The source-ban regex on the retired docblock sentence is DELETED. It encoded the old line-wrap and quote style, and the docblock now quo",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:dff239c5:deprecated:934",
+   "id": "LIN-2253",
+   "source": "commit LinearViewer dff239c5",
+   "text": "r beside it. Renames `noLineageCount` -> `laneLandedCount`, keeping `noLineageCount` as a deprecated one-cycle alias since `__KPI_DATA__` is public wire. Un-stales the `/cost` catalog doc in routes/pr",
+   "verdict": "retirement-condition",
+   "why": "deprecated alias kept for one cycle"
+  },
+  {
+   "key": "LinearViewer:dff239c5:retire:1137",
+   "id": "LIN-2253",
+   "source": "commit LinearViewer dff239c5",
+   "text": ".js for `buildTaskCost()`'s already-shipped `noLineage` null gate. Deliberately does NOT retire `lineageBearingCount` and does NOT propagate harness to lane-landed tickets \u2014 LIN-2418's exclusion mech",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:dff239c5:deprecated:2302",
+   "id": "LIN-2253",
+   "source": "commit LinearViewer dff239c5",
+   "text": "he review's non-blocking findings: migrates render-kpis.js's in-repo consumption from the deprecated noLineageCount alias to the canonical laneLandedCount (keeping the one-cycle wire alias), discloses",
+   "verdict": "retirement-condition",
+   "why": "deprecated alias kept for one cycle"
+  },
+  {
+   "key": "LinearViewer:19ff6d2f:remove once:575",
+   "id": "LIN-1448",
+   "source": "commit LinearViewer 19ff6d2f",
+   "text": "e still returning 200 on the few that resolve no workspace. Its stated exit condition \u2014 \"remove once the lane has been cold for a safe window\" \u2014 is unsatisfiable: this endpoint is the ONLY minter of",
+   "verdict": "retirement-condition",
+   "why": "exit condition for LIN-1447's compat lane, found unsatisfiable"
+  },
+  {
+   "key": "LinearViewer:97079d69:retire:625",
+   "id": "LIN-1206",
+   "source": "commit LinearViewer 97079d69",
+   "text": "+ advances but never closes a DONE window; the runner reaps it on the DONE sentinel. - Retire the end-of-run `close --cascade` (Strategy B): on the completion axis the autopilot closes nothing. -",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:97079d69:retiring:1561",
+   "id": "LIN-1206",
+   "source": "commit LinearViewer 97079d69",
+   "text": "an assumed a mirror that does not exist). Correctness gate (flagged, unverifiable here): retiring the cascade removes the autopilot's only self-reap of its own top-level window. Whether closeOnDone r",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:f19fee7a:remove it when:80",
+   "id": "LIN-1136",
+   "source": "commit LinearViewer f19fee7a",
+   "text": "LIN-1136: Clarify triage prompt to avoid implying completed research - Remove 'remove it when the fix lands' from bug label rule (tags are kept) - Add triage/research boundary: triage is or",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:0c1bb50c:retired:603",
+   "id": "LIN-700",
+   "source": "commit LinearViewer 0c1bb50c",
+   "text": "refactor), reveals exactly the four intended wording diffs in the additions beat, then is retired before the PR (a committed full-prompt snapshot of frequently-tuned strings is not a permanent test).",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:0c1bb50c:retired:3847",
+   "id": "LIN-700",
+   "source": "commit LinearViewer 0c1bb50c",
+   "text": "(once each, all 11, no collateral change). The transient golden-master + fixture are now retired (a committed full-prompt snapshot of frequently-tuned strings would break on every future edit); the f",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:53ef50af:retires:1439",
+   "id": "LIN-843",
+   "source": "commit LinearViewer 53ef50af",
+   "text": "and the orchestrator stands by for the wake instead of hand-rolling a long-poll watch. Retires the long-poll active-wait that was the common root of the beat-boundary deadlock and the LIN-831",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:5fc2bdd7:retires:4522",
+   "id": "LIN-826",
+   "source": "commit LinearViewer 5fc2bdd7",
+   "text": "f polling. Inverts the old \"free the producer\" rule only for the subscribed case (Phase 2 retires the prose). This IS the autopilot session-launch dispatch (its returned id is the session id). Side-e",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:5fc2bdd7:retiring:7458",
+   "id": "LIN-826",
+   "source": "commit LinearViewer 5fc2bdd7",
+   "text": "' section so a subscribed orchestrator is HELD (waitForFollowUps:true) and woken by push, retiring the free-the-producer-must- poll rule for the subscribed case. The wedged-silent-worker liveness nudg",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:51a90689:interim:2253",
+   "id": "LIN-646",
+   "source": "commit LinearViewer 51a90689",
+   "text": "eliberately left untouched \u2014 the external rename owns the slug and GitHub 301s bridge the interim; the new slug is not yet decided. Also out of scope: domain cutover, the Harbour OS app de-clash, and",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "LinearViewer:043e0e18:deprecated:286",
+   "id": "LIN-606",
+   "source": "commit LinearViewer 043e0e18",
+   "text": "-store.js -> agent-status-store.js (canonical proxy path /agent/status; /foreman/status deprecated alias) - Add GitHub provider adapter (lib/providers/github/, LIN-178) to the provider map - Map t",
+   "verdict": "deprecated-no-condition",
+   "why": "a deprecated alias kept with no stated removal condition"
+  },
+  {
+   "key": "LinearViewer:fdd80e13:retire:210",
+   "id": "LIN-595",
+   "source": "commit LinearViewer fdd80e13",
+   "text": "irst-class Observation page at /workspace/:urlKey/observation (footer link, no flag), and retire the experimental `dashboard` flag/view \u2014 replacing it rather than coexisting (LIN-590 forbids two equiv",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:fdd80e13:retire:1499",
+   "id": "LIN-595",
+   "source": "commit LinearViewer fdd80e13",
+   "text": "footer base link (no flag); /observation page route; /dashboard 302s to /observation. - Retire the `dashboard` flag: removed from FEATURES/DEFAULTS/labels/descriptions, EXPERIMENTAL_FEATURES + its",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:fdd80e13:retirement:1898",
+   "id": "LIN-595",
+   "source": "commit LinearViewer fdd80e13",
+   "text": "dashboard.{js,css}). - Docs: view-tiers.md, CLAUDE.md, llms.txt updated for the promotion/retirement. Level-3 drill-down (context graph + per-task worker-session tree + node detail + lazy hydration)",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:b6b4f519:retire:88",
+   "id": "LIN-312",
+   "source": "commit LinearViewer b6b4f519",
+   "text": "LIN-312: neutralize proxy docs onto the unified, source-neutral API Step 6 of LIN-306 (retire the honest raw-Linear proxy). The retire gate was already GREEN at HEAD \u2014 Steps 2/3 (LIN-308/309) re-po",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:b6b4f519:retire:129",
+   "id": "LIN-312",
+   "source": "commit LinearViewer b6b4f519",
+   "text": "unified, source-neutral API Step 6 of LIN-306 (retire the honest raw-Linear proxy). The retire gate was already GREEN at HEAD \u2014 Steps 2/3 (LIN-308/309) re-pointed the consumer surface in-place, so p",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:41c6cd88:retirement:127",
+   "id": "LIN-533",
+   "source": "commit LinearViewer 41c6cd88",
+   "text": "ate from Foreman naming (agent/status canonical + alias) (#499) Session 2 of the Foreman retirement (LIN-451). Makes the kept Tier C agent-status substrate canonical under `agent/status` while keepin",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:41c6cd88:deprecated:272",
+   "id": "LIN-533",
+   "source": "commit LinearViewer 41c6cd88",
+   "text": "s substrate canonical under `agent/status` while keeping `foreman/status` as a forgiving, deprecated alias so existing consumers (the autopilot runner) keep working. - Proxy: `GET`/`POST /api/proxy/a",
+   "verdict": "deprecated-no-condition",
+   "why": "a deprecated alias kept with no stated removal condition"
+  },
+  {
+   "key": "LinearViewer:41c6cd88:deprecated:1362",
+   "id": "LIN-533",
+   "source": "commit LinearViewer 41c6cd88",
+   "text": "ration.md + proxy instructions document agent/status as canonical and foreman/status as deprecated alias. - Tests: alias contract pinned in proxy-route-aliases.test.js (new agent/status pair); pip",
+   "verdict": "deprecated-no-condition",
+   "why": "a deprecated alias kept with no stated removal condition"
+  },
+  {
+   "key": "LinearViewer:a0ad7310:retire:9",
+   "id": "LIN-451",
+   "source": "commit LinearViewer a0ad7310",
+   "text": "LIN-451: retire Foreman observer page + playbook surfaces, relabel engine heading (#498) Foreman was the first agent-d",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "LinearViewer:ed2b108a:retire:988",
+   "id": "LIN-523",
+   "source": "commit LinearViewer ed2b108a",
+   "text": "\u2192 `review`: fold the diff-examination checklist and the explicit verdict into `review`; retire the `code-review` template. (14 templates now) - Fix `review`'s Close-Out Gate: it AUTHORIZES the clo",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "simple-dispatcher:9bec355c:temporarily:1598",
+   "id": "LIN-2187",
+   "source": "commit simple-dispatcher 9bec355c",
+   "text": "ever leaks into the shared constant, which strictEqual alone cannot detect (verified by temporarily injecting the leak and observing the guard fail, then reverting). npm test: 1910 pass / 0 fail",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "simple-dispatcher:0ac3d36a:retiring:492",
+   "id": "LIN-2077",
+   "source": "commit simple-dispatcher 0ac3d36a",
+   "text": "s the three pins beat 1 identified (hook-decision.test.js :375, :752/753, :973) in place, retiring beat 1's separate red-proof tests now that they duplicate the updated pins' assertions.",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  },
+  {
+   "key": "simple-dispatcher:b459de19:temporary:214",
+   "id": "LIN-1790",
+   "source": "commit simple-dispatcher b459de19",
+   "text": "ore Phase B's numbers are treated as reliable. The probe ran on a real Linux kernel via a temporary Actions workflow (runs 30712467098 / 30712377148; the scratch branch is gone, the runs are the artif",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "simple-dispatcher:ac552633:retired:1020",
+   "id": "LIN-1219",
+   "source": "commit simple-dispatcher ac552633",
+   "text": "one place. The hold's founding justification (unreliable `claude --resume`, LIN-789) was retired by LIN-790; a follow-up to a DONE session is NEW work that rides the now-reliable resume path on a sep",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "simple-dispatcher:97a35a99:retire:9",
+   "id": "LIN-909",
+   "source": "commit simple-dispatcher 97a35a99",
+   "text": "LIN-909: retire the dead --finalize e2e scenario (LIN-906 arm-by-default fallout) The `--finalize` e2e scenario proved",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "simple-dispatcher:715dd8af:until the target reaches awaiting_followup (then:1211",
+   "id": "LIN-827",
+   "source": "commit simple-dispatcher 715dd8af",
+   "text": "busy' WITHOUT claiming, so the item stays at the head of Harbour's queue and is re-polled until the target reaches AWAITING_FOLLOWUP (then claimed + signalled). Only session-busy waits \u2014 no-session/no",
+   "verdict": "other",
+   "why": "the word in another sense: a past retirement, a feature named retire, a test made temporarily, a loop condition, an out-of-scope note"
+  },
+  {
+   "key": "simple-dispatcher:ec48cbd8:stopgap:483",
+   "id": "LIN-540",
+   "source": "commit simple-dispatcher ec48cbd8",
+   "text": "Reaping that id aborted live work, which is why runWindowReaper() had been disabled as a stopgap. Pre-compute the set of windowIds held by any non-terminal session and skip them in the selector. A f",
+   "verdict": "retires-old-path",
+   "why": "the change retires (or plans to retire) an older path, rule or surface; no condition for retiring what it adds"
+  }
+ ],
+ "retirementFate": [
+  {
+   "id": "LIN-2323",
+   "what": "a required fresh-context adversarial second-read before a periodical report can reach Done (merged a94d3c7b, 2026-08-26)",
+   "condition": "if after ~1 month of operation the disagreement rate is near zero, the periodical that reviews periodicals should say so and this step should be retired",
+   "fate": "due about 26 September; no ticket description in the snapshot and no paper records the read (comments not searched). LIN-2328 (watch the first real run after LIN-2323) is Todo, and LIN-3113 (the gate is satisfied by a comment that quotes the field list) is Backlog. The step is still in lib/periodicals.js@26014544:236-244.",
+   "met": "not evaluated"
+  },
+  {
+   "id": "LIN-1448",
+   "what": "removal of LIN-1447's temporary ownerless-token compat lane",
+   "condition": "remove once no ownerless tokens remain in use / after the compat branch has been cold for a safe window",
+   "fate": "found unsatisfiable by its own fix (commit 19ff6d2f, 2026-07-25: the lane is the only minter of its label, so it never goes cold); replaced by a switch, DISPATCH_OWNERLESS_BROKER_COMPAT, defaulting compat-on, that an operator turns off. The switch and its policy module are still in lib/ownerless-token-policy.js@26014544.",
+   "met": "replaced by a flag"
+  },
+  {
+   "id": "LIN-2018",
+   "what": "a transitional project-mapping duplication in the Jira provider",
+   "condition": "names LIN-2011 in code as its removal trigger",
+   "fate": "LIN-2011 is Done in the snapshot; whether the duplication was removed was not checked (not process code)",
+   "met": "unchecked"
+  },
+  {
+   "id": "LIN-2253",
+   "what": "the deprecated public-wire alias noLineageCount",
+   "condition": "kept for one deprecation cycle",
+   "fate": "still in lib/terminal-marked-task-cost.js (5 lines) and lib/render-kpis.js (2) at 26014544; no cycle length is defined anywhere",
+   "met": "no"
+  },
+  {
+   "id": "LIN-1475",
+   "what": "regex heuristics kept as a fallback beside a new structured kind field",
+   "condition": "retire once the structured field is available (optional follow-on, declared out of scope)",
+   "fate": "not followed up in the snapshot (no ticket found); not checked in code",
+   "met": "unchecked"
+  }
+ ]
+}
