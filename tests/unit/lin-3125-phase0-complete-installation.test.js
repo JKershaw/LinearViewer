@@ -147,8 +147,7 @@ describe('LIN-3125 Phase 0 — completeAppInstallation collapse + fetchImpl DI',
       assert.doesNotMatch(body, /fetchInstallation\s*\(/, `${rel}: no duplicated installation read`);
     }
 
-    // `fetchInstallation` is called from exactly one place in the corpus: the
-    // shared body (the callers pin makes a reintroduced copy fail here).
+    // `fetchInstallation(` has no caller outside app-auth.js: the shared body and the LIN-3125 Phase 1 `fetchInstallationLogin` read wrapper (the callers pin makes a reintroduced copy fail here).
     assert.deepEqual(
       namedCallOffenders(REAL, ['fetchInstallation'], [APP_AUTH]),
       [],
