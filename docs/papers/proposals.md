@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **What found the faults that both the full process and a lean replay shipped, and could any check before
+  merge have found them?** `harbour/replay-small-work.md` replayed thirteen small tickets lean. On three
+  known faults (LIN-2355's preamble hints, LIN-2414's dropped follow-up, LIN-2980's stream-aborting
+  dereference), the replay's review approved the same fault the full process had shipped. For each, trace
+  the escape or fix back to what found it (a test, a sweep, a reviewer prompt, use) and say whether any
+  check that runs before merge would have caught it, and at what cost. (Claude, 2026-10-01)
 - **Does pricing at list rates instead of weighted tokens change the relay's verdict?** `harbour/held-or-fresh.md`
   priced held and fresh supervisors in weighted tokens, which charge a frontier cache read at a tenth of an input token;
   the frontier tier's list rate is a twentieth. `harbour/prototype-concepts.md` found a multi-session paper costs 1.7
