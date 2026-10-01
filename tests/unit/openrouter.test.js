@@ -1953,6 +1953,65 @@ describe('buildMetaPromptTemplate class-not-member enumeration rule (LIN-1871, r
   });
 });
 
+// LIN-3202 (menu M14): the plan states what it adds beyond the research and
+// cites the findings it relies on instead of restating them. Meta-path mirror of
+// the handwritten pin in tests/unit/prompt-templates.test.js, so each path fails
+// independently.
+describe('buildMetaPromptTemplate cite, don\'t restate (LIN-3202)', () => {
+  function build() {
+    return buildMetaPromptTemplate({
+      issueContext: 'Test context',
+      identifier: 'LIN-1',
+      hasSubtasks: false,
+      subtaskCount: 0,
+      completedCount: 0,
+      inProgressCount: 0,
+      remainingCount: 0,
+      hasComments: false,
+      commentCount: 0,
+      aiHints: 'hints'
+    });
+  }
+
+  test('Plan-prompts rule states what the plan adds beyond the research and cites the rest', () => {
+    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
+    assert.ok(rule.includes('state what it adds beyond the research and cite the rest'),
+      'the rule must carry the cite-don\'t-restate directive');
+    assert.ok(rule.includes('state what it adds beyond the research'),
+      'must ask what the plan adds beyond the research');
+    assert.ok(rule.includes('the research findings it relies on instead of restating them'),
+      'must ask for citations of the findings relied on');
+  });
+
+  test('Plan-prompts rule requires resolvable citations and forbids restatement to look self-contained', () => {
+    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
+    assert.ok(rule.includes('cite by comment (author/heading or id), file:line, or sha'),
+      'citations must be resolvable without the plan paraphrasing them');
+    assert.ok(rule.includes('never restate a finding to "make the plan self-contained"'),
+      'must not instruct restating a finding to appear self-contained');
+    assert.ok(rule.includes('there are no citations to manufacture'),
+      'the no-research case must forbid manufacturing citations');
+  });
+
+  test('Plan-prompts rule states the no-research and disagreement cases as additions, not restatements', () => {
+    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
+    assert.ok(rule.includes('the plan stands alone'),
+      'a plan with no prior research must be allowed to stand alone');
+    assert.ok(rule.includes('that is an addition, not a restatement'),
+      'a disagreement or stale finding must be named as an addition');
+    assert.ok(rule.includes('the citation covers the member list, not the verdict'),
+      'the in/out-of-scope verdict stays the plan\'s own decision');
+  });
+
+  test('Plan-prompts rule leaves the ordering and class-bound text intact', () => {
+    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
+    assert.ok(/Strategy Framing → Scope Assessment → session-fit/.test(rule),
+      'the ordering chain must survive the new sentence');
+    assert.ok(rule.includes('recorded in the issue description alongside the plan'),
+      'the class bound destination must survive the new sentence');
+  });
+});
+
 describe('buildMetaPromptTemplate mutation-check directive (LIN-2274)', () => {
   function build() {
     return buildMetaPromptTemplate({
