@@ -1,0 +1,545 @@
+{
+  "generatedBy": "scripts/eval/eval-dense.mjs",
+  "date": "2026-10-01",
+  "stub": false,
+  "models": [
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.4-mini",
+    "openai/gpt-5-mini",
+    "google/gemini-2.5-flash-lite",
+    "qwen/qwen3.6-flash"
+  ],
+  "repeats": 1,
+  "completedThisRun": 200,
+  "skippedResumed": 0,
+  "totalRuns": 200,
+  "spentThisRunUsd": 6.667505,
+  "totalCostUsd": 6.667505,
+  "maxUsd": 10,
+  "halted": null,
+  "wallSeconds": 3051,
+  "byModel": {
+    "openai/gpt-5.6-sol": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 22,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseRuns": 10,
+      "denseOk": 10,
+      "denseActionHit": 5,
+      "denseDescentHit": 10,
+      "smallRuns": 30,
+      "smallOk": 30,
+      "smallActionHit": 17,
+      "costUsd": 4.212281999999999,
+      "denseCostUsd": 1.984566,
+      "smallCostUsd": 2.227716,
+      "promptOk": 40,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implement": 1,
+          "plan-review": 1
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "plan-review": 2
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "defer": 3,
+          "plan-review": 4,
+          "implement": 1
+        },
+        "implementation": {
+          "implement": 6,
+          "blocked": 1
+        },
+        "blocked": {
+          "blocked": 2
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "research": 1
+        },
+        "plan|research": {
+          "research": 2
+        },
+        "breakdown|implement": {
+          "plan-review": 1
+        },
+        "plan-review": {
+          "plan-review": 2
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "p50LatencyMs": 18542,
+      "p90LatencyMs": 28195,
+      "p50LatencyDenseMs": 18917,
+      "meanCostPerCall": 0.08962302127659573,
+      "meanCostPerDenseCall": 0.1984566
+    },
+    "openai/gpt-5.4-mini": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 27,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseRuns": 10,
+      "denseOk": 10,
+      "denseActionHit": 4,
+      "denseDescentHit": 10,
+      "smallRuns": 30,
+      "smallOk": 30,
+      "smallActionHit": 23,
+      "costUsd": 1.208661,
+      "denseCostUsd": 0.579731,
+      "smallCostUsd": 0.62893,
+      "promptOk": 40,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implementation": 1,
+          "implement": 1
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "plan-review": 1
+        },
+        "breakdown": {
+          "implement": 1,
+          "breakdown": 1
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "implement": 6,
+          "implementation": 2
+        },
+        "implementation": {
+          "breakdown": 1,
+          "implement": 4,
+          "retrospective-audit": 1,
+          "close-out": 1
+        },
+        "blocked": {
+          "context": 1,
+          "plan": 1
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "plan": 1
+        },
+        "plan|research": {
+          "research": 1,
+          "plan": 1
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "plan-review": 1,
+          "implement": 1
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "p50LatencyMs": 3379,
+      "p90LatencyMs": 6463,
+      "p50LatencyDenseMs": 6268,
+      "meanCostPerCall": 0.025716191489361703,
+      "meanCostPerDenseCall": 0.0579731
+    },
+    "openai/gpt-5-mini": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 28,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseRuns": 10,
+      "denseOk": 10,
+      "denseActionHit": 5,
+      "denseDescentHit": 10,
+      "smallRuns": 30,
+      "smallOk": 30,
+      "smallActionHit": 23,
+      "costUsd": 0.653568,
+      "denseCostUsd": 0.25947100000000006,
+      "smallCostUsd": 0.394097,
+      "promptOk": 38,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implement": 2
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "implement": 1,
+          "research": 1
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "implement": 7,
+          "plan-review": 1
+        },
+        "implementation": {
+          "implement": 4,
+          "→": 1,
+          "plan-review": 1,
+          "close-out": 1
+        },
+        "blocked": {
+          "blocked": 1,
+          "plan": 1
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "research": 1
+        },
+        "plan|research": {
+          "research": 2
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "plan-review": 1,
+          "implement": 1
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "p50LatencyMs": 24246,
+      "p90LatencyMs": 32234,
+      "p50LatencyDenseMs": 28335,
+      "meanCostPerCall": 0.013905702127659575,
+      "meanCostPerDenseCall": 0.025947100000000008
+    },
+    "google/gemini-2.5-flash-lite": {
+      "runs": 40,
+      "ok": 29,
+      "errors": 11,
+      "calls": 29,
+      "actionHit": 10,
+      "actionN": 29,
+      "descentHit": 27,
+      "descentN": 29,
+      "denseRuns": 9,
+      "denseOk": 9,
+      "denseActionHit": 0,
+      "denseDescentHit": 9,
+      "smallRuns": 20,
+      "smallOk": 20,
+      "smallActionHit": 10,
+      "costUsd": 0.132724,
+      "denseCostUsd": 0.07885600000000001,
+      "smallCostUsd": 0.053868000000000006,
+      "promptOk": 29,
+      "promptN": 29,
+      "confusion": {
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "implement": 1,
+          "plan": 1
+        },
+        "close-out": {
+          "close-out": 1
+        },
+        "review": {
+          "implement": 3,
+          "review": 1
+        },
+        "implement": {
+          "blocked": 1,
+          "implement": 3,
+          "plan": 1
+        },
+        "implementation": {
+          "review": 1,
+          "implement": 4
+        },
+        "blocked": {
+          "review": 1,
+          "blocked": 1
+        },
+        "retrospective-audit": {
+          "close-out": 2,
+          "review": 1,
+          "implement": 1
+        },
+        "breakdown|plan|research": {
+          "implement": 1
+        },
+        "plan|research": {
+          "plan": 1
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "`implement`": 1
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "p50LatencyMs": 3399,
+      "p90LatencyMs": 5720,
+      "p50LatencyDenseMs": 4193,
+      "meanCostPerCall": 0.004576689655172414,
+      "meanCostPerDenseCall": 0.008761777777777778
+    },
+    "qwen/qwen3.6-flash": {
+      "runs": 40,
+      "ok": 40,
+      "errors": 0,
+      "calls": 47,
+      "actionHit": 31,
+      "actionN": 40,
+      "descentHit": 40,
+      "descentN": 40,
+      "denseRuns": 10,
+      "denseOk": 10,
+      "denseActionHit": 5,
+      "denseDescentHit": 10,
+      "smallRuns": 30,
+      "smallOk": 30,
+      "smallActionHit": 26,
+      "costUsd": 0.46026999999999996,
+      "denseCostUsd": 0.18664799999999998,
+      "smallCostUsd": 0.273622,
+      "promptOk": 39,
+      "promptN": 40,
+      "confusion": {
+        "implement|implementation": {
+          "implement": 2
+        },
+        "implement|implementation|plan": {
+          "implement": 1
+        },
+        "plan|plan-review|research": {
+          "research": 1
+        },
+        "breakdown": {
+          "breakdown": 1,
+          "plan-review": 1
+        },
+        "close-out": {
+          "close-out": 2
+        },
+        "review": {
+          "review": 4
+        },
+        "implement": {
+          "implement": 8
+        },
+        "implementation": {
+          "breakdown": 1,
+          "context": 1,
+          "implement": 4,
+          "blocked": 1
+        },
+        "blocked": {
+          "blocked": 2
+        },
+        "retrospective-audit": {
+          "retrospective-audit": 4
+        },
+        "breakdown|plan|research": {
+          "breakdown": 1
+        },
+        "plan|research": {
+          "plan": 2
+        },
+        "breakdown|implement": {
+          "implement": 1
+        },
+        "plan-review": {
+          "plan-review": 1,
+          "implement": 1
+        },
+        "plan": {
+          "plan": 1
+        }
+      },
+      "p50LatencyMs": 14863,
+      "p90LatencyMs": 22654,
+      "p50LatencyDenseMs": 15398,
+      "meanCostPerCall": 0.009792978723404254,
+      "meanCostPerDenseCall": 0.0186648
+    }
+  },
+  "perAction": {
+    "implement|implementation": {
+      "hit": 7,
+      "n": 8,
+      "descentExpect": "LIN-APB-pos",
+      "dense": false
+    },
+    "implement|implementation|plan": {
+      "hit": 4,
+      "n": 4,
+      "descentExpect": "LIN-APB-neg",
+      "dense": false
+    },
+    "plan|plan-review|research": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "LIN-APB-diverged",
+      "dense": false
+    },
+    "breakdown": {
+      "hit": 2,
+      "n": 10,
+      "descentExpect": "FIX-830-pos",
+      "dense": false
+    },
+    "close-out": {
+      "hit": 9,
+      "n": 9,
+      "descentExpect": "FIX-812-approve-ledger",
+      "dense": false
+    },
+    "review": {
+      "hit": 17,
+      "n": 20,
+      "descentExpect": "FIX-812-noreview",
+      "dense": false
+    },
+    "implement": {
+      "hit": 25,
+      "n": 37,
+      "descentExpect": "HAR-616",
+      "dense": false
+    },
+    "implementation": {
+      "hit": 0,
+      "n": 33,
+      "descentExpect": "LIN-3125",
+      "dense": true
+    },
+    "blocked": {
+      "hit": 6,
+      "n": 10,
+      "descentExpect": "LIN-3059",
+      "dense": true
+    },
+    "retrospective-audit": {
+      "hit": 16,
+      "n": 20,
+      "descentExpect": "LIN-3107",
+      "dense": true
+    },
+    "breakdown|plan|research": {
+      "hit": 4,
+      "n": 5,
+      "descentExpect": "LIN-215",
+      "dense": false
+    },
+    "plan|research": {
+      "hit": 9,
+      "n": 9,
+      "descentExpect": "LIN-202",
+      "dense": false
+    },
+    "breakdown|implement": {
+      "hit": 4,
+      "n": 5,
+      "descentExpect": "LIN-489",
+      "dense": false
+    },
+    "plan-review": {
+      "hit": 5,
+      "n": 9,
+      "descentExpect": "PR-1603-gated-recorded",
+      "dense": false
+    },
+    "plan": {
+      "hit": 5,
+      "n": 5,
+      "descentExpect": "PR-1603-request-changes-1",
+      "dense": false
+    }
+  },
+  "promptQuality": {
+    "ok": 186,
+    "total": 189,
+    "bad": [
+      {
+        "model": "qwen/qwen3.6-flash",
+        "target": "FIX-830-neg",
+        "problems": [
+          "no-header"
+        ]
+      },
+      {
+        "model": "openai/gpt-5-mini",
+        "target": "LIN-596@implement",
+        "problems": [
+          "no-header"
+        ]
+      },
+      {
+        "model": "openai/gpt-5-mini",
+        "target": "PR-1603-clean-small",
+        "problems": [
+          "no-header"
+        ]
+      }
+    ]
+  },
+  "overall": {
+    "ok": 189,
+    "actionHit": 118,
+    "descentHit": 187,
+    "errors": 11
+  }
+}
