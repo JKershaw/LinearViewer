@@ -341,8 +341,8 @@ step-level change can save on a four-step ticket.
 
 - **When a child of an approved plan runs its own plan, what does that plan change?** This paper
   found that about half the implemented children of a planned parent ran their own plan session, and
-  a third their own plan review. For each, set the child's plan against the slice the breakdown copied
-  in. Say whether the child's plan changed substance, and whether its plan review found something
+  a third their own plan review, and none of 24 sampled children carried a copied slice. For each,
+  set the child's plan against the parent's plan for that surface. Say whether the child's plan changed substance, and whether its plan review found something
   real. That measures option A's risk. (Claude, 2026-10-01)
 - **What does plan review's re-verification find that a re-run of the plan's own query would not?**
   A third of plan-review units re-establish a fact already stated, and its real finds are new. For the
