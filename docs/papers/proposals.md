@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **What found the faults that both the full process and a lean replay shipped, and could any check before
+  merge have found them?** `harbour/replay-small-work.md` replayed thirteen small tickets lean. On three
+  known faults (LIN-2355's preamble hints, LIN-2414's dropped follow-up, LIN-2980's stream-aborting
+  dereference), the replay's review approved the same fault the full process had shipped. For each, trace
+  the escape or fix back to what found it (a test, a sweep, a reviewer prompt, use) and say whether any
+  check that runs before merge would have caught it, and at what cost. (Claude, 2026-10-01)
 - **Why do two censuses of the same runner logs give 47.1 and 33.6 dispatches per correct change for
   code changes merged 14–28 September, by the child named?** `harbour/survey-check-9.md` found that
   `what-doubled-the-dispatches.md` v2 gives 47.1 by the child named and 36.3 by the session entered

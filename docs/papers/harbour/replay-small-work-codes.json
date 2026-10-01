@@ -1,0 +1,111 @@
+{
+  "ticket": "LIN-3189",
+  "about": "Hand codes for replay-small-work.md, one record per replayed ticket. The coder is the paper's author, who knew which diff was the original. The blind judgements are not here: survey-replay-analyse.mjs reads them from the blind readers' own transcripts.",
+  "rubric": {
+    "sameThing": "same = the replay's production change has the same observable behaviour as the original's; partial = same core change, but a requirement the original met is missing, or one is added; different = a different production behaviour.",
+    "shippedFailClass": "Only where a shipped test fails on the replay. interface = the test calls a name, an export or a message text the replay did not create; behaviour = the test asserts an outcome the replay's code does not produce.",
+    "knownFault": "Escape stratum only. same = the replay ships the fault the escape or fix records; caught = its own review found it and the close-out fixed it; avoided = the replay never introduced it; notApplicable = clean stratum.",
+    "hindsight": "What the final description carries beyond the pre-implementation spec. shipped = a post-merge section (Shipped, Outcome, Landed, Merged) describing what merged; plan = an approved implementation plan or research recommendation, but no post-merge section; none = neither."
+  },
+  "codes": {
+    "LIN-2123": {
+      "sameThing": "different",
+      "sameWhy": "The original cleared [blocked] on the runner's 'Resumed session' heartbeat. The replay changed no runtime code: it documented the residual and pinned it with tests, because the description says not to widen the derivation and that the fix belongs in simple-dispatcher.",
+      "shippedFailClass": "behaviour",
+      "shippedFailWhy": "2 of 42 fail: the shipped tests expect a resume marker to clear [blocked] to null, and the replay keeps 'blocked' by design.",
+      "knownFault": "avoided",
+      "knownFaultWhy": "The escape is that the original's fix was a production no-op (LIN-2268). The replay ships no fix at all, so it ships no no-op, but the residual stays live: LIN-2268's tests fail 4 of 45 on the replay, as on the original.",
+      "hindsight": "none"
+    },
+    "LIN-2252": {
+      "sameThing": "different",
+      "sameWhy": "The original added bottom padding, which was inert. The replay's implementer did the same, its review rejected it, and the close-out reserved horizontal space with padding-right: 99px. That is the fix LIN-2272 later shipped (740bded7).",
+      "shippedFailClass": null,
+      "knownFault": "caught",
+      "knownFaultWhy": "Its review (REQUEST CHANGES) said bottom padding cannot move a normal-flow button away from a fixed FAB, which is LIN-2272's diagnosis, and the close-out applied LIN-2272's fix. LIN-2272's test is a Playwright spec and was not run.",
+      "hindsight": "none"
+    },
+    "LIN-2355": {
+      "sameThing": "same",
+      "sameWhy": "The same eight route gates, placed at the same point; the blind reader found the production edits identical.",
+      "shippedFailClass": null,
+      "knownFault": "same",
+      "knownFaultWhy": "Neither touched the proxy preamble or the kickoff hints. LIN-2804's tests fail 35 of 475 on the replay, exactly as on the original.",
+      "hindsight": "shipped"
+    },
+    "LIN-2414": {
+      "sameThing": "same",
+      "sameWhy": "The same re-park of a lapsed blocked hold to BLOCKED, clearing pendingFollowUp. The replay gates on phase and holdKind; the original gates on holdKind alone.",
+      "shippedFailClass": null,
+      "knownFault": "same",
+      "knownFaultWhy": "Both clear an undelivered pendingFollowUp on re-park. LIN-2468's tests fail 7 of 53 on the replay, exactly as on the original.",
+      "hindsight": "plan"
+    },
+    "LIN-2980": {
+      "sameThing": "same",
+      "sameWhy": "The production change to readSSEStream is identical; only the docstring and tests differ.",
+      "shippedFailClass": null,
+      "knownFault": "same",
+      "knownFaultWhy": "A handler throw now aborts the stream in both, so the unguarded data.phase dereference (LIN-2983) becomes stream-aborting. The replay's review named it as a nit and deferred it to LIN-2983, which the description names.",
+      "hindsight": "shipped"
+    },
+    "LIN-2406": {
+      "sameThing": "same",
+      "sameWhy": "The same comparisons counter, incremented after the one-sided skip, and the same early-return warning.",
+      "shippedFailClass": "interface",
+      "shippedFailWhy": "1 of 14 fails: the shipped test matches the original's warning text (/not verified this tick/, /zero tier comparisons/), and the replay words its warning differently.",
+      "knownFault": "notApplicable",
+      "hindsight": "plan"
+    },
+    "LIN-2400": {
+      "sameThing": "partial",
+      "sameWhy": "The same secondary-button class on decline. The replay also uses font-size: inherit where the original used 1rem, and adds the home link the ticket lists.",
+      "shippedFailClass": null,
+      "knownFault": "notApplicable",
+      "hindsight": "none"
+    },
+    "LIN-2702": {
+      "sameThing": "partial",
+      "sameWhy": "The same summarizeByFeature and the same optional signal on postScan, but the replay keeps postScan private where the original exports it on window.ScanSection for the next phase.",
+      "shippedFailClass": "interface",
+      "shippedFailWhy": "4 of 34 fail with 'ScanSection.postScan is not a function', the export the replay did not add.",
+      "knownFault": "notApplicable",
+      "hindsight": "shipped"
+    },
+    "LIN-2715": {
+      "sameThing": "same",
+      "sameWhy": "The production change is the same single overflow-y: auto line in both.",
+      "shippedFailClass": null,
+      "knownFault": "notApplicable",
+      "hindsight": "shipped"
+    },
+    "LIN-2981": {
+      "sameThing": "same",
+      "sameWhy": "The same shouldMockAi gate ahead of the feedback-title call, and the same fixture token change.",
+      "shippedFailClass": null,
+      "knownFault": "notApplicable",
+      "hindsight": "shipped"
+    },
+    "LIN-3013": {
+      "sameThing": "same",
+      "sameWhy": "The same lean: true on the swipe route's only loop read.",
+      "shippedFailClass": null,
+      "knownFault": "notApplicable",
+      "hindsight": "shipped"
+    },
+    "LIN-2559": {
+      "sameThing": "partial",
+      "sameWhy": "The same sub-agent registration in resolveAsyncWait. The replay also clears a foreground Agent on its tool_result, after its review caught a regex that misread a finished one as running.",
+      "shippedFailClass": null,
+      "knownFault": "notApplicable",
+      "hindsight": "shipped"
+    },
+    "LIN-2738": {
+      "sameThing": "same",
+      "sameWhy": "The same HOLDING narrowing through an injected readLiveness, and the same degraded-read log line above the kill.",
+      "shippedFailClass": null,
+      "knownFault": "notApplicable",
+      "hindsight": "none"
+    }
+  }
+}
