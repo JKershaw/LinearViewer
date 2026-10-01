@@ -59,7 +59,7 @@ Both papers are corrected as version 2. The corrections change no answer.
 
 ## Findings
 
-**starting-context's census re-runs, and its re-finding range survives four alternative readings.**
+**starting-context's census re-runs, and its re-finding range survives three alternative readings.**
 On the paper's own rules, re-finding is 4.9–12.1% of weighted tokens. Without the bootstrap's
 units, which the paper charges at the first beat's repeat rate, it is 4.4–10.2%. Weighting a
 span's units by its calls instead of its read tokens, it is 4.5–12.0%. Counting only repo files
