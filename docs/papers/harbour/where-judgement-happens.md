@@ -13,13 +13,14 @@ cites: [docs/steady-base.md@26014544, docs/papers/harbour/held-or-fresh.md@cce25
 
 At the gates and in the making, nearly always; in supervision, rarely, and then mostly where a
 cheaper step would do. A September change carries about seven consequential decisions (median
-five): a send-back, a caught error, a scope change, a re-route, a ruling and so on. Two readers
-coded every such decision on 36 sampled Done changes from both repos, 260 in all. 61% needed
-reasoning over the ticket's context, 31% could have been made by a cheaper or shorter step, and
-8% by a stated rule over observable state. They agree on the class 85% of the time (κ 0.67).
+five): a send-back, a caught error, a scope change, a re-route, a ruling and so on. One reader
+coded every such decision on 36 sampled Done changes from both repos, 260 in all, and a second
+coded ten of the tickets blind. 61% needed reasoning over the ticket's context, 31% could have been
+made by a cheaper or shorter step, and 8% by a stated rule over observable state. Where both coded
+a decision they agree on its class 85% of the time (κ 0.67).
 Plan-review, review and close-out make the most decisions (82), then the makers (research, plan,
 implementation, 76), the supervisors (73) and John (26). Per unit of cost the difference is
-large. Plan-review spends 59% of its cost in sessions that changed the outcome, review 48% and
+large. Plan-review spends 59% of its cost in cycles that held such a decision, review 48% and
 close-out 45%. The ticket's own autopilot spends 7–10% that way and half its cost on bookkeeping;
 steppers and legs about 16%. Taken over the whole ticket, a third of the cost sits in cycles that
 held a consequential decision. A quarter sits in ones that needed context, and under 1% in ones a
@@ -80,9 +81,9 @@ decided:
 
 Supervisors hold half the rule-class decisions on a quarter of the census. Their 37 context
 decisions are mostly escalations framed for John (11), re-routes (9) and errors caught in a
-worker's report (6), for example a worker that posted done with no commit, no branch and no PR.
-22 of the 37 rested on a worker's report. Close-out is the gate most
-open to a cheaper step: 14 of its 23 decisions are class b (holding on an undischarged ledger
+worker's report (6), for example a leg that sent a worker's walks back for a missing walk and
+relabelled rows. 22 of the 37 rested on a worker's report. Close-out is the gate most open to a
+cheaper step: 14 of its 23 decisions are class b (holding on an undischarged ledger
 item, filing an out-of-scope item as a follow-up) and 3 are class a. Plan-review is the opposite:
 17 of 18 are class c, as `why-legs-repeat.md` found that a repeated plan-review finds something
 real and new in 30 of 41. By tier, frontier sessions made 188 decisions (64% class c), mid-tier
@@ -104,8 +105,8 @@ units on the sampled tickets (310M), re-weighted to the population:
 
 Figures are charged to the session entered, with the child the log names in brackets where it
 differs. Supervision's 25–27% sits below `where-the-effort-goes.md`'s fleet-wide 35% because the
-Runner is left out (see Limits). By the class of the decision a cycle holds, 24.5% of ticket cost is in cycles with a
-context decision, 7.1% in cheaper-step ones and 0.6% in rule-class ones. Role by role (headline
+Runner is left out (see Limits). By the class of the decision a cycle holds, 24.5% of ticket
+cost is in cycles with a context decision, 7.1% in cheaper-step ones and 0.6% in rule-class ones. Role by role (headline
 chart below): plan-review 59% in decision cycles, review 48%, close-out 45%, plan 37%, research
 36%, implementation 27%, leg 17% (16%), stepper 16% (16%), and the ticket's own autopilot 10%
 (7%), with 50% (57%) of its cost bookkeeping. The figures are upper bounds on what the judgement
@@ -173,7 +174,7 @@ shares overlap the steady-base map's rows and each other; they do not add.
 | 2 | **Put the rule-class calls in code**: escalate at the loop bound, retry once after a harness failure, proceed when a blocker is Done, merge on green where the brief says so | Under 1% of ticket cost directly (0.6% sits in these cycles); removes the engine's misroutes (9 on 6 tickets) | 21 decisions are class a; every engine misroute was corrected by one layer, 4 by a rule | Low. A coded rule acts when its state is stale (the engine's misroutes came from stale hold comments), so it must read current state | Overrides of the engine per ticket; misroutes |
 | 3 | **Run close-out at a cheaper tier, keeping a frontier step for the open questions** | 2–5% of ticket cost (close-out is 6%; a mid tier costs 0.6 of frontier, cheap 0.2) | 17 of close-out's 23 decisions are class a or b; cheap-tier close-outs already made 5 of them, holds and a filing, on LIN-2891, LIN-2995 and LIN-3163 | Six close-out decisions needed context. A cheaper close-out that misreads a ledger lets an undischarged item through; `close-out-claims.md` | Close-out holds overturned; escapes on items the ledger named |
 | 4 | **Retry service faults inside the tools sessions use**, with the duplicate guard in the tool | Not sized: each fault costs a step that re-reads its context, here on 20 of 36 tickets | 47 auth flaps, outages and host faults; none needed a second layer; 37 class a; one duplicate verdict post (LIN-3106) | Low, if the duplicate guard holds | Proxy error retries per ticket; duplicate writes |
-| 5 | **Keep the gates and the makers' judgement whole**: no lighter plan-review or review on the strength of this paper | None: this is the limit on 1–4 | Gates and makers make 158 of 260 decisions, 66% class c; review and plan-review catch 31 of 50 false reports first; the multi-layer faults are wrong premises | n/a | The correct rate under any proportionality change (map row 7) |
+| 5 | **Keep the gates and the makers' judgement whole**: no lighter plan-review or review on the strength of this paper | None: this is the limit on 1–4 | Gates and makers make 158 of 260 decisions, 66% class c; review and plan-review catch 31 of 50 false reports first; the faults that needed more than one layer are wrong premises and false reports (24 of 28) | n/a | The correct rate under any proportionality change (map row 7) |
 
 ## Method
 
