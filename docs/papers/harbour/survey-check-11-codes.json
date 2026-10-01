@@ -1,0 +1,85 @@
+{
+  "ticket": "LIN-3191",
+  "about": "Keys and hand codes for survey-check-11.md, the independent check of replay-small-work.md (LIN-3189). Blind verdicts are not stored here: scripts/survey-check-11.mjs reads them from the readers' own transcripts and maps them through these keys.",
+  "rejudge": {
+    "about": "A fresh frontier-tier reader per ticket, given LIN-3189's own blind prompt with the two diffs re-assigned to A and B by a seeded coin (Python random.Random(3191)), launched in a seeded random order, against a parent tree extracted with git archive. One sentence was added to every prompt: never run an interactive command, and stop a test run that does not finish within two minutes. Two LIN-2414 readers stalled while copying the parent tree and applying the diffs (16 and 8 minutes, no process running) and were stopped; a third was given one more sentence, to judge by reading only, and finished.",
+    "seed": 3191,
+    "launchOrder": ["LIN-2355", "LIN-2123", "LIN-2702", "LIN-2738", "LIN-2559", "LIN-2981", "LIN-2406", "LIN-2715", "LIN-2252", "LIN-2414", "LIN-2400", "LIN-3013", "LIN-2980"],
+    "key": {
+      "LIN-2123": { "origNow": "A" },
+      "LIN-2252": { "origNow": "A" },
+      "LIN-2355": { "origNow": "B" },
+      "LIN-2414": { "origNow": "B" },
+      "LIN-2980": { "origNow": "B" },
+      "LIN-2406": { "origNow": "B" },
+      "LIN-2400": { "origNow": "A" },
+      "LIN-2702": { "origNow": "A" },
+      "LIN-2715": { "origNow": "B" },
+      "LIN-2981": { "origNow": "B" },
+      "LIN-3013": { "origNow": "A" },
+      "LIN-2559": { "origNow": "A" },
+      "LIN-2738": { "origNow": "B" }
+    },
+    "basis": {
+      "about": "What each re-judged preference rests on, coded by this check's author after reading the reader's reasons and re-running tests. production = the two production changes behave differently in use; tests = production identical or equivalent, the preference is test strength (mutation or regression coverage); none = equivalent.",
+      "LIN-2123": "production",
+      "LIN-2252": "production",
+      "LIN-2355": "tests",
+      "LIN-2414": "production",
+      "LIN-2980": "none",
+      "LIN-2406": "tests",
+      "LIN-2400": "production",
+      "LIN-2702": "production",
+      "LIN-2715": "tests",
+      "LIN-2981": "tests",
+      "LIN-3013": "none",
+      "LIN-2559": "production",
+      "LIN-2738": "tests"
+    }
+  },
+  "hindsightFree": {
+    "about": "The same protocol as LIN-3189 (its PROMPTS imported unchanged from scripts/survey-replay-prepare.mjs; mid-tier implementer, reviewer and close-out; one review pass; detached local worktrees at the original's parent), with one change: the ticket text is the earliest recoverable description from before implementation began. Blind reads are frontier tier against the FINAL description, the standard LIN-3189's blind reads used, with A and B set by a seeded coin (random.Random('3191-hfree-<id>')). Both clones' push URLs were set to a non-existent path for the whole run.",
+    "tickets": {
+      "LIN-2414": {
+        "parent": "e554a9d2",
+        "pre": "fleet transcript 3eec0f80 line 115, 2026-09-02T19:35Z, before the research leg's recommendation was appended; first commit 19:53Z",
+        "whatHindsightAdded": "the research recommendation, which prescribes the re-park and tells the implementer to clear pendingFollowUp: the escaped fault itself",
+        "review": "APPROVE",
+        "closeOut": "READY",
+        "fixTests": "LIN-2468 (2ef854b) tests fail 8 of 53 (original and LIN-3189's replay: 7 of 53). Shares 6 of the 7; does not delete pendingFollowUp; fails the stale-refiredAt force-FAIL case the research named",
+        "knownFault": "not reproduced as written (keeps the follow-up), but the refire still loses the follow-up's text, and a second harm the research named is left open",
+        "blindOrigIs": "A"
+      },
+      "LIN-2355": {
+        "parent": "181c3a3b",
+        "pre": "task snapshot 2026-08-29T11:35Z (1,559 characters), 23 minutes before the first commit",
+        "whatHindsightAdded": "a research rewrite: the scope fixed to eight routes, the graphqlErrorStatus alternative rejected, acceptance criteria, the plan and an Outcome section",
+        "review": "REQUEST CHANGES (a committed node_modules symlink only); the preamble's /relations hint named as a non-blocking nit",
+        "closeOut": "READY",
+        "fixTests": "LIN-2804 (f66c82ec) tests fail 35 of 475, as on the original, LIN-3189's replay and the untouched parent",
+        "knownFault": "same: the proxy preamble still points workers at a read that now 422s",
+        "blindOrigIs": "B"
+      },
+      "LIN-2715": {
+        "parent": "5feeefd0",
+        "pre": "fleet transcript 5307df73 line 371, 2026-09-10T19:18Z; first commit 2026-09-11T09:51Z",
+        "whatHindsightAdded": "a Shipped section naming the exact one-line fix (overflow-y: auto on the shared rule in the phone block)",
+        "review": "REQUEST CHANGES (the browser spec does not reproduce the trigger; weak assertion; no screenshots)",
+        "closeOut": "NOT READY (browser checks forbidden by the protocol)",
+        "fixTests": "browser only; see the check",
+        "knownFault": "not applicable (clean stratum)",
+        "blindOrigIs": "A"
+      },
+      "LIN-2980": {
+        "parent": "6c1f8e72",
+        "pre": "the creation POST body, fleet transcript 2c58dfec line 718, 2026-09-21T19:41Z; first commit 2026-09-22T07:07Z",
+        "whatHindsightAdded": "the research ruling (propagate), a Shipped section, and LIN-2983 named as out of scope",
+        "review": "APPROVE (a nit that a literal null frame now reaches handlers; flight-companion.js's data.phase not named)",
+        "closeOut": "READY",
+        "fixTests": "none exist (LIN-2983 is in Backlog)",
+        "knownFault": "same: the production change is the original's, comment for comment but one",
+        "blindOrigIs": "B"
+      }
+    }
+  }
+}

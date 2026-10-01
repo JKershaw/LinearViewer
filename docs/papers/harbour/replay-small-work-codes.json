@@ -1,9 +1,9 @@
 {
   "ticket": "LIN-3189",
-  "about": "Hand codes for replay-small-work.md, one record per replayed ticket. The coder is the paper's author, who knew which diff was the original. The blind judgements are not here: survey-replay-analyse.mjs reads them from the blind readers' own transcripts.",
+  "about": "Hand codes for replay-small-work.md, one record per replayed ticket. The coder is the paper's author, who knew which diff was the original. The blind judgements are not here: survey-replay-analyse.mjs reads them from the blind readers' own transcripts. Version 2 (LIN-3191, survey-check-11.md): these codes were written at 10:17:51Z, after eleven first-order blind results had reached the coder; LIN-2406 is recoded (hindsight shipped; its shipped-test failure behaviour, under the registered rule); notes on LIN-2414, LIN-2980, LIN-2715, LIN-2559 and LIN-2123 are added from the check.",
   "rubric": {
     "sameThing": "same = the replay's production change has the same observable behaviour as the original's; partial = same core change, but a requirement the original met is missing, or one is added; different = a different production behaviour.",
-    "shippedFailClass": "Only where a shipped test fails on the replay. interface = the test calls a name, an export or a message text the replay did not create; behaviour = the test asserts an outcome the replay's code does not produce.",
+    "shippedFailClass": "Only where a shipped test fails on the replay. As pre-registered: interface = the test calls a name or signature the replay did not create; behaviour otherwise. (Version 1 widened interface to include a message text; version 2 restores the registered rule, which moves LIN-2406 to behaviour.)",
     "knownFault": "Escape stratum only. same = the replay ships the fault the escape or fix records; caught = its own review found it and the close-out fixed it; avoided = the replay never introduced it; notApplicable = clean stratum.",
     "hindsight": "What the final description carries beyond the pre-implementation spec. shipped = a post-merge section (Shipped, Outcome, Landed, Merged) describing what merged; plan = an approved implementation plan or research recommendation, but no post-merge section; none = neither."
   },
@@ -15,7 +15,8 @@
       "shippedFailWhy": "2 of 42 fail: the shipped tests expect a resume marker to clear [blocked] to null, and the replay keeps 'blocked' by design.",
       "knownFault": "avoided",
       "knownFaultWhy": "The escape is that the original's fix was a production no-op (LIN-2268). The replay ships no fix at all, so it ships no no-op, but the residual stays live: LIN-2268's tests fail 4 of 45 on the replay, as on the original.",
-      "hindsight": "none"
+      "hindsight": "none",
+      "knownFaultNote": "'Avoided' in the registered sense only (the replay never wrote the no-op). Nothing that runs changed and the residual is live on both, so by outcome it is the same fault; 'declined' describes it better (survey-check-11)."
     },
     "LIN-2252": {
       "sameThing": "different",
@@ -39,7 +40,8 @@
       "shippedFailClass": null,
       "knownFault": "same",
       "knownFaultWhy": "Both clear an undelivered pendingFollowUp on re-park. LIN-2468's tests fail 7 of 53 on the replay, exactly as on the original.",
-      "hindsight": "plan"
+      "hindsight": "plan",
+      "hindsightNote": "The final description is the research leg's recommendation, which tells the implementer to re-park and clear holdingSince/holdKind/pendingFollowUp: the escape LIN-2468 fixed. The replay did as told. Replayed from the pre-research text (survey-check-11), the lean pipeline kept the follow-up but left the stale-refiredAt force-FAIL the research named, and was judged worse."
     },
     "LIN-2980": {
       "sameThing": "same",
@@ -47,15 +49,16 @@
       "shippedFailClass": null,
       "knownFault": "same",
       "knownFaultWhy": "A handler throw now aborts the stream in both, so the unguarded data.phase dereference (LIN-2983) becomes stream-aborting. The replay's review named it as a nit and deferred it to LIN-2983, which the description names.",
-      "hindsight": "shipped"
+      "hindsight": "shipped",
+      "hindsightNote": "The final description names LIN-2983 as out of scope; the original filing named neither the dereference nor the ruling. Replayed from the filing (survey-check-11), the production change is again the original's: the same fault, judged equivalent."
     },
     "LIN-2406": {
       "sameThing": "same",
       "sameWhy": "The same comparisons counter, incremented after the one-sided skip, and the same early-return warning.",
-      "shippedFailClass": "interface",
-      "shippedFailWhy": "1 of 14 fails: the shipped test matches the original's warning text (/not verified this tick/, /zero tier comparisons/), and the replay words its warning differently.",
+      "shippedFailClass": "behaviour",
+      "shippedFailWhy": "1 of 14 fails: the shipped test matches the original's warning text (/not verified this tick/, /zero tier comparisons/), and the replay words its warning differently. A message's wording is not a name or signature, so under the registered rule this is behaviour (version 1 coded it interface).",
       "knownFault": "notApplicable",
-      "hindsight": "plan"
+      "hindsight": "shipped"
     },
     "LIN-2400": {
       "sameThing": "partial",
@@ -77,7 +80,8 @@
       "sameWhy": "The production change is the same single overflow-y: auto line in both.",
       "shippedFailClass": null,
       "knownFault": "notApplicable",
-      "hindsight": "shipped"
+      "hindsight": "shipped",
+      "hindsightNote": "The final description's Shipped section names this exact one-line fix. Replayed from the pre-implementation text (survey-check-11), the lean pipeline wrote a different fix that passes the original's browser witness but was judged worse, and its close-out was NOT READY."
     },
     "LIN-2981": {
       "sameThing": "same",
@@ -98,7 +102,8 @@
       "sameWhy": "The same sub-agent registration in resolveAsyncWait. The replay also clears a foreground Agent on its tool_result, after its review caught a regex that misread a finished one as running.",
       "shippedFailClass": null,
       "knownFault": "notApplicable",
-      "hindsight": "shipped"
+      "hindsight": "shipped",
+      "betterNote": "The regex the review caught was in the replay's own first draft; the original never had it. The original does register every Agent call as a wait, so a finished foreground sub-agent would count as outstanding; no foreground completion appears in 360 recent fleet Agent results, so the difference is latent (survey-check-11)."
     },
     "LIN-2738": {
       "sameThing": "same",

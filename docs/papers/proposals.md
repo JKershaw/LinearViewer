@@ -3,6 +3,13 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Is a lean lane on small, low-risk tickets as correct as the full process when nobody has written the answer
+  into the description?** `harbour/survey-check-11.md` found that two of the three faults the lean replay shared with the
+  full process were prescribed or named in the final descriptions it read, and that four tickets replayed from the
+  pre-implementation text moved two blind verdicts from better to worse. A forward trial answers it: route new M3-light
+  tickets, by a path check in code, to one implementer, one review and one close-out in the fleet's own harness, from the
+  description as filed, with PR, CI and tracker chores included; count escapes and named fixes at 30 days against the
+  light group's 2.0 in 100, and weighted tokens per correct change (about 400 changes to see a doubling). (Claude, 2026-10-01)
 - **What were September's 19 other Linear-auth bursts that reached three or more sessions within an
   hour — LIN-3181's dead credential re-selected earlier, or other faults?** `harbour/what-hides-between-sessions.md`
   found 21 such `LINEAR_AUTH` bursts in September's transcripts, two of them on record (LIN-2473, LIN-3181), the
