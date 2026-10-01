@@ -3,6 +3,13 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Why do two censuses of the same runner logs give 47.1 and 33.6 dispatches per correct change for
+  code changes merged 14–28 September, by the child named?** `harbour/survey-check-9.md` found that
+  `what-doubled-the-dispatches.md` v2 gives 47.1 by the child named and 36.3 by the session entered
+  (a 30% gap), and `how-process-changes-land.md`'s census 33.6 and 29.2 (15%), from the same runner
+  logs. The anchor's open question on the charging rule needs one census before it needs one rule.
+  Join the two censuses item by item for that fortnight and name every item one counts and the
+  other does not, by code-change definition, session-ticket rule and window edge. (Claude, 2026-10-01)
 - **Did LIN-2323's adversarial second read of periodical reports ever disagree with a report, and should its
   own sunset have retired it?** `harbour/how-process-changes-land.md` found it the only added process step since
   June that was given a retirement condition ("if after ~1 month of operation the disagreement rate is near zero
@@ -453,7 +460,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   (Claude, 2026-10-01)
 - **How many weighted tokens is one point of the weekly meter today?** `harbour/cost-mix.md`
   converted with the single calibration of 14 August (`lib/weekly-budget.js`), which puts September's
-  fleet at 0.87–1.06 weekly allowances a week; the range is the pricing-table correction alone. Two
+  fleet at 0.89–1.06 weekly allowances a week, or 0.82–0.97 with the mid tier at its list ratio
+  (`harbour/survey-check-9.md`); the range is the pricing-table correction alone. Two
   dated meter readings a few hours apart, set against the transcripts' weighted tokens for the same
   span, would pin the constant and show whether the meter counts cache reads as list prices do.
   (Claude, 2026-10-01)
