@@ -17,8 +17,9 @@ import { seedLocalWorkspace, workspaceApiLocalSeed } from '../fixtures/local-har
  *   (b) not the owner: no mint button.
  *   (c) proxy off: a notice, and no mint request at all.
  *   (d) dispatch off: the "○ set up ›" run-step notice reaches /runner.
- *   (e) both flags on: "run on my machine ›" is visible beside the ladder and
- *       reaches /runner.
+ *   (e) both flags on: "run on my machine ›" is visible on the Swipe card
+ *       (S4b: under the title, no longer beside the ladder inside Prompts) and
+ *       reaches /runner. Every flag state: runner-link-entry.spec.js.
  *   (f) proxy on, dispatch off: /runner shows the dispatch note and the mint
  *       works.
  *
@@ -140,15 +141,18 @@ test.describe('runner setup page (LIN-3098 S4, phone)', () => {
     await expect(page.getByTestId('runner-setup-page')).toBeVisible();
   });
 
-  test('(e) both flags on: "run on my machine ›" is visible beside the ladder and reaches /runner', async ({ page }) => {
+  test('(e) both flags on: "run on my machine ›" is visible on the Swipe card and reaches /runner', async ({ page }) => {
     const urlKey = await seedOwner(page, 'runner-setup-e', { proxy: true, dispatch: true });
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
-    await openPrompts(page);
-    const link = page.locator('.prompt-section').first().getByTestId('opened-task-runner-link');
+    // S4b: on the card itself, so Prompts need not be opened; the ladder no
+    // longer carries a second copy.
+    const link = page.locator('#swipe-card').getByTestId('opened-task-runner-link');
     await expect(link).toBeVisible();
     await expect(link).toHaveText('run on my machine ›');
-    await page.screenshot({ path: `${SHOTS}/e-ladder-link.png`, fullPage: true });
+    await openPrompts(page);
+    await expect(page.locator('.prompt-section').first().getByTestId('opened-task-runner-link')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/e-card-link.png`, fullPage: true });
     await link.tap();
     await expect(page).toHaveURL(new RegExp(`/workspace/${urlKey}/runner$`));
     await expect(page.getByTestId('runner-setup-page')).toHaveAttribute('data-state', 'owner');

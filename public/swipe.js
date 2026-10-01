@@ -454,6 +454,13 @@ function renderCard(direction) {
     ? `<div class="swipe-card-link"><a href="${_esc(issue.url)}" target="_blank">View in ${_esc(providerName)} \u2192</a></div>`
     : '';
 
+  // LIN-3098 S4b: "run on my machine ›" right under the title, outside every
+  // accordion and whatever the flags say, so it is on the first screen of a
+  // phone. Signed-in only (the landing card has no workspace).
+  const runnerLinkHtml = urlKey && window.PromptSection
+    ? `<div class="swipe-card-runner">${window.PromptSection.runnerLinkHtml(urlKey)}</div>`
+    : '';
+
   const html = `
     <span class="accent-bar accent-bar--${state.cls}" aria-hidden="true"></span>
     <div class="swipe-card-inner">
@@ -465,6 +472,7 @@ function renderCard(direction) {
         <span class="swipe-card-position">${currentIndex + 1} / ${total}</span>
       </div>
       <div class="${titleClass}">${_esc(issue.title)}</div>
+      ${runnerLinkHtml}
       <div class="swipe-card-meta">${metaHtml}</div>
       ${accordionHtml}
       ${linkHtml}

@@ -412,6 +412,11 @@ body:has(.swim-page) {
   word-break: break-word;
 }
 
+/* LIN-3098 S4b: "run on my machine ›" under the task title */
+.swim-popover-runner {
+  margin: calc(-1 * var(--space-1)) 0 var(--space-2);
+}
+
 .swim-popover-meta {
   font-size: 11px;
   color: var(--fg-dim);

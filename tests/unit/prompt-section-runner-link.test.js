@@ -2,8 +2,8 @@
  * LIN-3098 S4 — the runner entry points on the opened-task ladder
  * (public/prompt-section.js), and N3's scoped proxyForce.
  *
- *   - "run on my machine ›" sits BESIDE the ladder (not a rung: no data-rung)
- *     whenever the proxy flag is on, whatever the dispatch flag says;
+ *   - "run on my machine ›" (S4b): the shared markup (runnerLinkHtml), which
+ *     the card renders; the ladder itself no longer carries it in any state;
  *   - the dispatch and proxy "○ set up ›" notices keep their text and gain the
  *     same link; "generate a prompt first" stays byte-identical;
  *   - N3: the enabled run-step rung carries data-proxy-force="runner" only
@@ -225,48 +225,39 @@ async function fresh({ localStorage, proxyEnabled = true, dispatchEnabled = true
   return { ...loaded, container };
 }
 
-describe('"run on my machine ›" beside the ladder', () => {
-  for (const dispatchEnabled of [true, false]) {
-    test(`renders with proxy on (dispatch ${dispatchEnabled ? 'on' : 'off'}), linking to /runner`, () => {
-      const { PromptSection } = loadPromptSection();
-      const container = makeContainer();
-      PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled: true, dispatchEnabled }));
-      assert.ok(container.innerHTML.includes(LINK));
-      assert.match(container.innerHTML, /<a [^>]*href="\/workspace\/ws\/runner"[^>]*data-testid="opened-task-runner-link"[^>]*>run on my machine \u203A<\/a>/);
-    });
+// LIN-3098 S4b moved the link OFF the ladder and onto the card that opens the
+// task (public/swipe.js renders runnerLinkHtml under the title), shown in every
+// flag state. The ladder therefore no longer carries it in any state: one link
+// per card, never a duplicate when Prompts is opened. The surface tests are in
+// runner-link-surfaces.test.js.
+describe('"run on my machine ›": the shared markup, and no longer beside the ladder', () => {
+  test('runnerLinkHtml links to /runner with the shared class and testid', () => {
+    const { PromptSection } = loadPromptSection();
+    assert.equal(
+      PromptSection.runnerLinkHtml('ws'),
+      '<a class="opened-task-runner-link" href="/workspace/ws/runner" data-testid="opened-task-runner-link">run on my machine \u203A</a>',
+    );
+  });
+
+  test('the urlKey is encoded into the href', () => {
+    const { PromptSection } = loadPromptSection();
+    const html = PromptSection.runnerLinkHtml('a"b c');
+    assert.ok(html.includes('href="/workspace/a%22b%20c/runner"'));
+  });
+
+  for (const proxyEnabled of [true, false]) {
+    for (const dispatchEnabled of [true, false]) {
+      test(`the component itself renders no runner link (proxy ${proxyEnabled ? 'on' : 'off'}, dispatch ${dispatchEnabled ? 'on' : 'off'}), idle or fresh`, async () => {
+        const { PromptSection } = loadPromptSection();
+        const container = makeContainer();
+        PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled, dispatchEnabled }));
+        assert.ok(container.innerHTML.includes(LADDER));
+        assert.ok(!container.innerHTML.includes(LINK));
+        const { container: freshContainer } = await fresh({ proxyEnabled, dispatchEnabled });
+        assert.ok(!freshContainer.innerHTML.includes(LINK));
+      });
+    }
   }
-
-  test('not rendered with proxy off', () => {
-    const { PromptSection } = loadPromptSection();
-    const container = makeContainer();
-    PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled: false, dispatchEnabled: true }));
-    assert.ok(!container.innerHTML.includes(LINK));
-  });
-
-  test('it is not a rung: outside the ladder, and no data-rung', () => {
-    const { PromptSection } = loadPromptSection();
-    const container = makeContainer();
-    PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled: true }));
-    const html = container.innerHTML;
-    const ladderOpen = html.indexOf(LADDER);
-    const ladderClose = html.indexOf('</div>', ladderOpen);
-    const linkAt = html.indexOf(LINK);
-    assert.ok(linkAt > ladderClose, 'the link follows the ladder, outside it');
-    const tag = html.slice(html.lastIndexOf('<a ', linkAt), html.indexOf('>', linkAt) + 1);
-    assert.doesNotMatch(tag, /data-rung/);
-  });
-
-  test('also shown in the fresh state', async () => {
-    const { container } = await fresh();
-    assert.ok(container.innerHTML.includes(LINK));
-  });
-
-  test('the urlKey is escaped into the href', () => {
-    const { PromptSection } = loadPromptSection();
-    const container = makeContainer();
-    PromptSection.init(container, baseOpts({ id: 'issue-1', identifier: 'LIN-1' }, { proxyEnabled: true, urlKey: 'a"b' }));
-    assert.ok(!container.innerHTML.includes('href="/workspace/a"b/runner"'));
-  });
 });
 
 describe('the ○ set up › notices', () => {

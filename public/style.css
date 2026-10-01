@@ -4559,3 +4559,25 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
   color: var(--fg-dim);
   opacity: 0.7;
 }
+
+/* LIN-3098 S4/S4b: "run on my machine ›" wherever a task opens (tree detail,
+   Swipe card, Swim popover), and the same link inside the Swipe dispatch/proxy
+   set-up notices. Shared here so every page that opens a task has it. */
+.opened-task-runner-link,
+.opened-task-setup-runner-link {
+  font-family: var(--font-content);
+  color: var(--blue);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.opened-task-runner-link {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.opened-task-runner-link:hover,
+.opened-task-setup-runner-link:hover {
+  text-decoration: underline;
+}
