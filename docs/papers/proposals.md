@@ -524,3 +524,14 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   in 15 of the 28 wrong turns that needed more than one layer. For each September escalation, say what
   the ruling rested on (a standing rule already written down, a fact only John had, or a preference),
   and so how many a standing-rules file could have settled without asking. (Claude, 2026-10-01)
+- **How much of the fleet's cost and idle time sits at the handoffs between sessions, counted
+  once?** `harbour/between-the-sessions.md` argues that a careful fleet's cost and failures gather
+  between sessions, but the papers size the parts separately and they overlap: wakes 29% of
+  September's tokens and quiet wakes 12% (`harbour/wake-inventory.md`), orientation 6–26% and
+  re-finding 4.9–12.1% (`harbour/starting-context.md`), repeat legs 10% (`harbour/why-legs-repeat.md`),
+  and 42 hours of supervisors waiting on lost wakes (`harbour/what-hides-between-sessions.md`).
+  Assign each weighted token and idle hour in September's transcripts to one of a session's own
+  work or a handoff (a wake's delivery and handshake, orientation before the first productive call,
+  a repeat leg, a wait on another session), once each, and report the handoff share with an
+  interval. A share well under a third would narrow the essay's claim to its failures, not its
+  cost. (Claude, 2026-10-01)
