@@ -1983,6 +1983,42 @@ describe('GitHub auth routes', () => {
     assert.equal(res.redirectedTo, '/workspace/octocat/', 'the link completes despite the Connection write failing');
     assert.ok(session.workspaces[0].bindings.some(b => b.scope === 'octocat/repo-a'), 'the binding still lands');
   });
+
+  // LIN-3125 Phase 2 (review 235d8dc7, L1/L2): the route-level pin for the
+  // restored credentials-mode fallback. Residual (a): the real converter's
+  // `link` returns false and the re-read `readConnectionOutcome` returns null,
+  // so `convertToConnectionBacked` yields {connectionBacked:false,
+  // error:'retryable'}. The pre-refactor inline condition fell back on
+  // `!connectionBacked` alone and still wrote the legacy row; the narrowed
+  // Phase 2 helper skipped it. This drives site A (add-source) through the real
+  // route so both the 503 retry page and the put-born row are pinned.
+  test('LIN-3125 residual (a): a new add-source link still takes the legacy fallback write and 503s (pre-refactor behaviour)', async () => {
+    const stores = freshAccountStores();
+    // Force the residual (a) branch on the real converter without touching the
+    // route: `link` cannot commit and the ambiguous re-read finds no row.
+    stores.connectionStore.link = async () => false;
+    stores.connectionStore.readConnectionOutcome = async () => null;
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' },
+      workspaces: [linearWs],
+      activeWorkspaceId: 'org-1',
+    });
+
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
+
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /Connection Not Saved/, 'the retryable result renders the 503 retry page');
+
+    const rows = await stores.connectionStore.collection.find({ accountId: session.accountId, provider: 'github', unitId: '99' }).toArray();
+    assert.equal(rows.length, 1, 'the legacy fallback wrote exactly one Connection row');
+    assert.equal(rows[0]._id, `${session.accountId}::github::99`);
+    assert.equal(rows[0].referents, undefined, 'a put-born legacy row, never connection-managed');
+  });
 });
 
 describe('githubErrorDiagnostic (LIN-746)', () => {
