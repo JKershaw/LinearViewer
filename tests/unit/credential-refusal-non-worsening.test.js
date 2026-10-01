@@ -500,7 +500,11 @@ describe('LIN-1980 anti-drift pin (production source, not the mirror)', () => {
   test('the cache-hit path calls attemptSuspectCredentialRefresh — plan-review round 2\'s "cache-hit path must get the same suspect check as session-scan" edge', () => {
     const flat = stripComments(extractResolveWorkspaceAccessBody(SERVER_SRC)).replace(/\s+/g, ' ');
     const cacheHitIdx = flat.indexOf('workspaceTokenCache.get(cacheKey)');
-    const sessionScanIdx = flat.indexOf('selectOwnerWorkspaceToken(sessions');
+    // LIN-3186: the session-scan selector call is now routed through
+    // lib/superseded-selection.js's wrapper (exactly one `selectOwnerWorkspaceToken(`
+    // call lives there). The mirror above stays on the bare selector deliberately
+    // (LIN-2473 B3: do not copy wrapper logic into a hand-mirrored resolve).
+    const sessionScanIdx = flat.indexOf('selectOwnerWorkspaceTokenExcludingSuperseded(');
     assert.ok(cacheHitIdx >= 0 && sessionScanIdx > cacheHitIdx, 'expected cache-hit block to textually precede the session-scan block');
     const cacheHitBlock = flat.slice(cacheHitIdx, sessionScanIdx);
     assert.match(cacheHitBlock, /attemptSuspectCredentialRefresh\(/, 'the cache-hit branch must attempt suspect-credential recovery, not just the session-scan branch');
