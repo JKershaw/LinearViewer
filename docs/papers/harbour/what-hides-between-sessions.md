@@ -1,36 +1,40 @@
 ---
 title: Which failures in Harbour are invisible to any single session, how often did each happen, what did it cost, and would a detector in code have caught it?
 kind: paper
-version: 1
+version: 2
 date: 2026-10-01
-authors: [Claude (LIN-3188), for John Kershaw]
-model: "frontier tier, claude-code, dispatched by simple-dispatcher (dispatch ac67a21a, kind custom); effort not recorded in the dispatch item. One bounded research session with no plan, review or close-out legs, by the brief's design. Four in-session subagents of the same tier gathered the data in parallel: one read the transcripts and ran D1, D2 and D7; one read the runner's logs and ran D5, D5x and D8; one snapshotted the tracker and hand-coded the incident register; one built the prompt-rule census and the periodicals' and Flight Companion's record. The session wrote the join, the detector scoring and the charts, and re-ran every local script."
-grounded_at: d88e2216 (LinearViewer, origin/main); 3366748 (simple-dispatcher, origin/main). Transcripts read 29 August–1 October 10:14Z; the runner's oplog 12 July–1 October 10:06Z; the tracker snapshot 1 October about 10:50Z.
+authors: [Claude (version 1, LIN-3188), Claude (version 2 corrections, LIN-3190), for John Kershaw]
+model: "frontier tier, claude-code, dispatched by simple-dispatcher (dispatch ac67a21a, kind custom); effort not recorded in the dispatch item. One bounded research session with no plan, review or close-out legs, by the brief's design. Four in-session subagents of the same tier gathered the data in parallel: one read the transcripts and ran D1, D2 and D7; one read the runner's logs and ran D5, D5x and D8; one snapshotted the tracker and hand-coded the incident register; one built the prompt-rule census and the periodicals' and Flight Companion's record. The session wrote the join, the detector scoring and the charts, and re-ran every local script. Version 2: frontier tier, the independent check's session (LIN-3190, kind custom), which re-ran every script and hand-checked a sample of the alarms."
+revision: "Version 2 corrects statements per docs/papers/harbour/survey-check-10.md (LIN-3190). Every script re-runs and every figure reproduces from the snapshots. Corrected: what 'real' means for an unrecorded alarm, and how many are real on a hand check (about 40 distinct incidents, not about 90); the share of incidents on record the rules catch (9 of 19 for all six, 7 of 19 for the two in option A; 9 of 24 counting D1f's own window); the time to discovery, which date-only onsets drive; the lost-wake idle, 61% of which is waiters the runner had already completed; the failsafe re-fires, about half of whose tokens sit inside quiet wakes and so inside map rows 1–3; the failed completion posts, which are not all lost wakes; the D1 burst counts; the 23 September autopilot, which sat because the dispatcher was down; the P2, P5 and P6a September rows; option A's overlap with map row 3; the session counts and cut-off times; and the CPU time. The headline answer and the options stand, with smaller sizes."
+grounded_at: d88e2216 (LinearViewer, origin/main); 3366748 (simple-dispatcher, origin/main). Transcripts read 29 August–1 October 10:36Z (2,077 sessions; 2,076 whose first turn came before 10:14Z, the population counted here); the runner's oplog 12 July–1 October 10:33Z; the tracker snapshot 1 October about 10:50Z.
 cites: [docs/steady-base.md@d88e2216:92-96, docs/steady-base.md@d88e2216:207, docs/papers/harbour/wake-inventory.md@d88e2216 (v2), docs/papers/harbour/wake-inventory-failures.json@d88e2216, docs/papers/harbour/held-or-fresh.md@d88e2216:26, docs/papers/harbour/held-or-fresh.md@d88e2216:124-131, docs/papers/harbour/browser-flakes.md@d88e2216:23-26, docs/papers/harbour/browser-flakes.md@d88e2216:84-90, docs/papers/harbour/what-supervisors-do.md@d88e2216 (v2), docs/papers/harbour/how-process-changes-land.md@d88e2216 (v2), docs/papers/harbour/survey-check-5.md@d88e2216, docs/papers/harbour/survey-check-7.md@d88e2216, docs/incidents/2026-08-09-proxy-401-flood.md@d88e2216:52-66, docs/incidents/2026-08-09-proxy-401-flood.md@d88e2216:340-350, docs/incidents/2026-08-09-proxy-401-flood.md@d88e2216:395-402, routes/proxy-reads.js@d88e2216:68-104, lib/proxy-instructions.js@d88e2216:1110-1114, docs/autopilot-operating-manual.md@d88e2216:270-278, lib/periodicals.js@d88e2216:1-60, simple-dispatcher/hook.js@3366748:2062-2065, simple-dispatcher/feedback.js@3366748:41-70, simple-dispatcher/config.js@3366748:50, LIN-3181 (1 Oct), LIN-3186, LIN-1980, LIN-2473, LIN-2932, LIN-3118, LIN-3122, LIN-2446, LIN-2511, LIN-2879, LIN-3104, LIN-896, LIN-899, LIN-1166, LIN-2364, LIN-2079, LIN-2323, LIN-1938, LIN-826, LIN-1357, LIN-3188 (1 Oct)]
 ---
 
 # Which failures in Harbour are invisible to any single session, how often did each happen, what did it cost, and would a detector in code have caught it?
 
-Most of them, often, and yes for about half of those on record. The tracker holds 107 incidents of
-nine cross-session patterns since June, and 92 of them were invisible to any one session that met
-them. They surfaced a median of 16 hours after they began. Supervisors found 28, the worker that
-hit one 26, John 19, a review or measurement 13, a Flight Companion 9 and code 3. **No periodical
-found one**: the periodicals' only first find was their own four-week outage. Simple rules over
-data Harbour and the runner already hold were run over the history. They caught 9 of the 19
-incidents on record inside their windows, a median of 5 hours before anyone filed them, and raised
-about 90 real alarms that nobody ever recorded. Together they take about 40 seconds of CPU a month
-and no model tokens. The dead credential of LIN-3181 would have alarmed 1.5 hours after onset
-instead of 10. The 1 October circular wait would have alarmed 5 minutes before the Flight
-Companion broke it. The overnight death of the dispatcher on 26 September would have alarmed
+Most of them, often, and yes for about two in five of those on record. The tracker holds 107 incidents
+since June, 101 of them in nine cross-session patterns, and 92 of the 107 were invisible to any one
+session that met them. They surfaced a median of 16 hours after they began, but that figure is driven
+by onsets known only to the day: where the record gives an onset's time, the median is 3 hours.
+Supervisors found 28, the worker that hit one 26, John 19, a review or measurement 13, a Flight
+Companion 9 and code 3. **No periodical found one**: the periodicals' only first find was their own
+four-week outage. Simple rules over data Harbour and the runner already hold were run over the
+history. They caught 9 of the 19 incidents on record that their windows scored, a median of 5 hours
+before anyone filed them (9 of 24 if the feedback rule's own window counts). They raised 93 alarms
+that are on no ticket. On a hand check of a sample, about 40 of those are distinct real faults; most
+of the rest are errors that healed in minutes with no harm. Together the rules take under a minute
+of CPU a month and no model tokens. The dead credential of LIN-3181 would have alarmed 1.5 hours
+after onset instead of 10. The 1 October circular wait would have alarmed 5 minutes before the
+Flight Companion broke it. The overnight death of the dispatcher on 26 September would have alarmed
 9 hours before John found it. The rules miss sessions that leave no transcript (the opencode
-harness, launches that never start), single-session events, and failures of the process that
-hosts the watcher. By token cost the largest pattern is the one already on the map: wakes that
-change nothing, 16% of September's tokens, found as an aggregate only after about 11 weeks. By
-idle wall-clock the largest are lost wakes (108 hours in September) and stalls (165 hours, already
-caught in code, after 60 minutes). The detectors save time to discovery far more than tokens.
-**Code detects, the model decides** fits this record: the instruments that exist today are
-self-scoped by construction, and the agents' vigilance that the prompts ask for sees each
-instance but never adds them up.
+harness, launches that never start), single-session events, and failures of the process that hosts
+the watcher. By token cost the largest pattern is the one already on the map: wakes that change
+nothing, 16% of September's tokens, found as an aggregate only after about 11 weeks. By idle
+wall-clock the largest are lost wakes (108 hours in September by the wait graph, 42 of them in
+sessions still waiting) and stalls (165 hours, already caught in code, after 60 minutes). The
+detectors save time to discovery far more than tokens. **Code detects, the model decides** fits
+this record: the instruments that exist today are self-scoped by construction, and the agents'
+vigilance that the prompts ask for sees each instance but never adds them up.
 
 ![Each cross-session pattern by how often it happened, how long it took to surface, and what it cost, marked by whether a detector catches it](figures/what-hides-between-sessions/patterns.svg)
 
@@ -51,8 +55,8 @@ over shared state between concurrent sessions (3, all in the runner).
 | P4 Wakes that change nothing | 3 | 2 / 1 / 0 | — (an aggregate, see below) | measurement |
 | P5 Lost wakes | 20 | 4 / 11 / 5 | 14.8 (10) | supervisor 9, John 5 |
 | P6 Stalled sessions | 22 | 2 / 19 / 1 | 10.7 (14) | John 8 |
-| P7 Duplicated work | 4 | 4 / 0 / 0 | 116 (2) | — |
-| P8 Loops and wake floods | 9 | 7 / 2 / 0 | 20.5 (2) | — |
+| P7 Duplicated work | 4 | 4 / 0 / 0 | 116 (2) | supervisor 3 |
+| P8 Loops and wake floods | 9 | 7 / 2 / 0 | 20.5 (2) | supervisor 5 |
 | All, with P9 and 6 others | 107 | 54 / 44 / 9 | 15.8 (65; 0.1–210) | supervisor 28, worker 26, John 19 |
 
 "Repo" is where the fault lived and was fixed. Harbour's faults are credentials, flakes and
@@ -67,11 +71,11 @@ of September's 3,497M.
 | Pattern | September | Weighted tokens | Idle wall-clock | Detector |
 |---|---|---|---|---|
 | P1 Healed errors | 25 bursts of one error across 3+ sessions in an hour; 487 proxy errors seen by sessions (Harbour 417, runner 70), 68% healed by a retry | 26.6M retrying (0.76%, an upper bound) | a few hours per burst | D1 caught |
-| P2 Circular waits | 1 cycle (1 Oct) and 2 recorded orphaned waits | none | 3.5 h | D2 caught the cycle |
+| P2 Circular waits | 3 recorded waits (LIN-2559, LIN-2630, LIN-2932), and the 1 October cycle just after the month | none | 3.5 h, the cycle's hour included | D2 caught the cycle |
 | P3 Retry-only passes | about 610 green CI runs a month hid a retried test (`browser-flakes.md` v2: 80% of a 1-in-8 sample) | not measured | 54 re-runs, about 7½ h since June | cited, not re-run |
 | P4 Quiet wakes | 3,233 deliveries into held supervisors (`held-or-fresh.md` v2) | 570M (16.3%) | none | partly: 2,295 visible by class |
-| P5 Lost wakes | 27 waits on a child that had finished, never woken; 14 more woken 24–50 min late; 8 terminal posts lost | not measured | 108 h (capped at 6 h each), plus 18 h late | D2, D5, D5x |
-| P6a Stalls the failsafe sees | 219 failsafe fires on 149 sessions | 54.8M of re-fires (1.57%) | 165 h silent in execution before a fire | in code since July |
+| P5 Lost wakes | 27 waits on a child that had finished, never woken; 14 more woken late, 13 of them by 24–47 min and one by 5.3 h; 8 failed terminal posts | not measured | 108 h (capped at 6 h each), 66 h of it in waiters the runner had already completed; plus 18 h late | D2, D5, D5x |
+| P6a Stalls the failsafe sees | 219 fires on 149 sessions (206 of the stall failsafe, 13 of the start-up watchdog; one is 1 October's, misdated) | 54.8M of re-fire deliveries (1.57%; 0.70% outside quiet wakes into supervisors) | 165 h of logged silence before the 80 fires from execution | in code since July |
 | P6b Stalls of the machinery itself | 8 incidents (the dispatcher killed, a driver wedged, a login expired, a database link degraded) | not measured | 22 h stated in the tickets, and every in-flight session frozen | D2 caught 3 of 8 |
 | P7 Duplicated work | 5 pairs of the same leg running twice at once; 13 more refused by the existing guard | 5.3M (0.15%) | none | D7 |
 | P8 Wake floods | 23 hours with more than 30 deliveries into one session (worst: the passage Runner and an autopilot, about 150 an hour each on 26 Sep) | 94M (2.7%), mostly inside P4 | none | partly (threshold only) |
@@ -81,15 +85,16 @@ correct change, quiet wakes are 6.9 per change by the child the log names and 3.
 each entered (`wake-inventory.md` v2).
 
 **The headline cost is time, not tokens.** Outside P4, which map rows 1–3 already hold, the token
-cost of what hides between sessions is small: retries 0.8%, failsafe re-fires 1.6%, duplicates
-0.15%. What it costs is waiting. A ticket whose supervisor never hears from its child sits until
+cost of what hides between sessions is small: retries 0.8% at most, failsafe re-fires 0.7%,
+duplicates 0.15%. The other 0.9 points of the re-fires' 1.6% are quiet deliveries into
+supervisors, which are inside P4 and inside map row 1's class route. What it costs is waiting. A ticket whose supervisor never hears from its child sits until
 the failsafe re-asks after 60 minutes, or until a person looks. The worst cases idle overnight.
 On 26–27 September the dispatcher was killed at 21:50 by an agent's `pkill`, which also killed
 the failsafe running inside it. Every in-flight session froze for 9 h 20 min until John found it
 in the morning (LIN-3118, LIN-3122). That is latency per ticket and lost overnight capacity. It
 shows in hours per correct change, not in weighted tokens.
 
-**A detector over data already held catches about half of what is on record, hours earlier.**
+**A detector over data already held catches about two in five of what is on record, hours earlier.**
 Six rules were written as committed scripts and run over everything their data reaches. The
 calls were made by hand against each incident's text
 (`what-hides-between-sessions-detector-eval.json`); an ambiguous alarm counts as a miss.
@@ -105,9 +110,12 @@ calls were made by hand against each incident's text
 | D5x lost terminal post | oplog, from 12 Jul | a `[done]`/`[failed]` line whose POST failed | 1 / 0 | 22 | 0 |
 | D7 duplicate launch | transcripts, Sep | same ticket and kind launched twice, overlapping | 0 / 1 | 5 | 2 |
 
-Combined, the rules caught 9 of the 19 incidents on record in their windows (8 of 18 events: LIN-3118
-and LIN-3122 are one night). Their alarms came a median of **5.1 hours** before the record's
-discovery, and 7 of the 9 more than 15 minutes ahead:
+Combined, the rules caught 9 of the 19 incidents on record that were scored in their windows (8 of 18
+events: LIN-3118 and LIN-3122 are one night). D1f's window, from 12 July, holds five more credential
+incidents that were scored only against D1f, so counting them the rules caught 9 of 24. D5x's window
+also holds seven July–August lost wakes that were not scored. The two rules option A proposes, D1 and
+D2, caught 7 of the 19. The alarms came a median of **5.1 hours** before the record's discovery, and 7
+of the 9 more than 15 minutes ahead:
 
 - LIN-3181 (dead credential): 8.8 h ahead.
 - LIN-3118/3122 (the dispatcher killed overnight): 9.0 and 9.3 h ahead.
@@ -127,28 +135,46 @@ supervisor filed it within a minute of the alarm. The misses fall into five grou
 - **Waits the rules do not model:** in-session subagents (LIN-2559), and subtasks duplicated
   across different launches (LIN-2898).
 - **An alarm that could not be tied to the incident:** LIN-2993 (D1's 503 burst came two hours
-  after a person had filed it).
+  after a person had filed it). The scoring file still lists that alarm as a hit, which keeps three
+  bursts of 22–23 September out of D1's unrecorded count; called a miss throughout, D1 has 23.
 
 D1f is the clearest negative. The runner's oplog keeps 60 characters of each feedback line, and a
 session that parks on an error rarely posts it, so the rule never fired. The 8 August flood, which
 three sessions each saw and parked on, was found from its tail about 22 hours after onset
 (`2026-08-09-proxy-401-flood.md`). It left one matching line in the oplog.
 
-**The record is a fraction of what happens.** About 90 of the alarms are real and on no ticket:
+**The record is a fraction of what happens, though less than the alarm count says.** 93 alarms
+are on no ticket, about 90 distinct events. The scripts call an alarm real by its class: an auth or
+transient error for D1, every wait class but a child still working for D2, and every alarm for D5 and
+D5x. On those terms the rules' false alarms are 16 of 42 for D1, 2 of 57 for D2, 2 of 7 for D7 and
+none for D5 and D5x. The independent check read a systematic sample of 33 of the unrecorded alarms
+against the transcripts and the oplog, with "real" fixed beforehand as a fault that idled a waiting
+session 15 minutes or more, lost or duplicated work, or needed a person or the failsafe to recover.
+20 were real, 7 were errors that healed in minutes with no harm, and 6 were false. Taking out
+duplicates across rules, that puts the distinct real incidents at about 40 (25–50):
 
-- **D1:** 20 bursts. Besides the two on record (LIN-2473 and LIN-3181), 19 more `LINEAR_AUTH`
-  bursts reached three or more sessions in September, the largest with 62 sessions over 7.6
-  hours on 24–25 September. Whether they share LIN-3181's cause is not known from this data.
-- **D2:** 43. Mostly lost and late wakes, each idling a supervisor. Of September's 27 lost wakes,
-  5 were rescued by nothing at all.
-- **D5x:** 22 `[done]`/`[failed]` lines lost for good since July. The runner's `sendFeedback` does
-  not retry (`feedback.js:41-70`). In 22 of the 23 cases the runner still wrote `hook.done_posted`,
+- **D1:** 20 bursts, 17 `LINEAR_AUTH` and 3 transient. September held 21 `LINEAR_AUTH` bursts
+  across three or more sessions in all, two on record (LIN-2473 and LIN-3181), the largest with 62
+  sessions over 7.6 hours on 24–25 September. Of 7 sampled, 6 healed within minutes with no session
+  parked or harmed, including the 62-session burst; one was false. Whether they share LIN-3181's
+  cause is not known from this data.
+- **D2:** 43. Mostly lost and late wakes, and five usage-limit stops. Of 11 sampled, 8 were real (2
+  of them usage limits) and 3 false: when a wake lands within three minutes of the waiter saying it
+  waits, the rule folds the wake into the wait and counts a lost wake up to its 6-hour cap. Of
+  September's 27 lost wakes, 2 were rescued by nothing at all; three more the script codes that way
+  were woken within a minute.
+- **D5x:** 22 failed `[done]`/`[failed]` posts since July. The runner's `sendFeedback` does not
+  retry (`feedback.js:41-70`). In 22 of the 23 cases the runner still wrote `hook.done_posted`,
   "the positive proof the completion propagated" (`hook.js:2062-2065`), because that line follows
-  the attempt, not its success.
-- **D5:** 3, two of them on no ticket. On 23 September an autopilot was never woken and sat 23.7
-  hours.
+  the attempt, not its success. Not every one is a lost wake: four of the 23 parents were woken
+  anyway, some posts went again after a failsafe re-check, and four on 26 July failed because their
+  items no longer existed. Of 7 sampled, 4 were real.
+- **D5:** 3, all real, but none a separate incident: two are LIN-2446's wedge and one is the
+  23 September autopilot that sat 23.7 hours. That autopilot sat because the dispatcher itself was
+  down for about a day: the oplog is silent from 06:53Z on 23 September to 06:35Z on the 24th, and no
+  session launched. That outage is on no ticket.
 - **D7:** 5 true duplicates (two plan-review verdicts on LIN-3125; doubled close-outs on LIN-2667
-  and LIN-2718).
+  and LIN-2718; a duplicated implementation and review on LIN-2560).
 
 **The instruments that exist are self-scoped by design.** Three examples:
 
@@ -157,8 +183,8 @@ three sessions each saw and parked on, was found from its tail about 22 hours af
   (`routes/proxy-reads.js:68-104`). It is a careful answer to "is my credential dead?", and by
   construction it cannot say "every session has seen this for an hour".
 - **The stall failsafe runs inside the process it watches.** The runner's failsafe fires after 60
-  minutes of silence (`config.js:50`). It does real work: in September 130 of 142 re-fires got the
-  session working again. But because it runs inside the dispatcher, it died with the dispatcher
+  minutes of silence (`config.js:50`). It does real work: in September 130 of 142 re-fires were followed, at some
+  later point, by the session working again. But because it runs inside the dispatcher, it died with the dispatcher
   on 26 September.
 - **A prompt rule tells each session to absorb the error.** "Don't park on one 401 … retry over
   10–15 minutes" (`lib/proxy-instructions.js:1110`, LIN-1938, 5 September) is the locally right
@@ -179,8 +205,9 @@ from 13 of the 15 templates, 67 run tickets and 109 follow-ups.
   `silentSince` read landed in August (LIN-2079), and nothing reads it.
 
 This is by design. The templates read code and tracker history, never runtime logs or session
-state (`lib/periodicals.js:1-60`). The 26 September batch cost about 112M weighted tokens, 3.2% of
-September, against 40 seconds of CPU for the detectors. Their worth on the other questions they
+state (`lib/periodicals.js:1-60`). The 26 September batch cost about 109M weighted tokens, 3.1% of
+September (112M with two late-August autopilots the script folds in), against under a minute of CPU
+for the detectors. Their worth on the other questions they
 ask is not measured here. In passing, the adversarial second read added by LIN-2323 disagreed
 with 9 of the 12 reports that carry a verdict. Its own retirement condition, "near zero", was
 not met.
@@ -199,7 +226,7 @@ text across both repos watch for, or handle, the patterns, about 36 KB in all
 - **On the record, agents found half the incidents:** 54 of 107 (worker 26, supervisor 28).
 - **Nothing gathers what they see:** seven sampled sessions reported `LINEAR_AUTH` failures between
   2 and 25 September, one calling it "worth a separate look". Nothing added those reports up,
-  and D1 would have counted 21 bursts.
+  and D1 would have counted 14 bursts in those days (21 in the month).
 
 **Quiet wakes are the exception that took longest to see.** Each quiet wake is a no-op to the
 session it enters. Only the sum is a problem. The per-beat wake landed on 16 July (LIN-1357).
@@ -213,9 +240,10 @@ September quiet wakes before a model reads them. The other 938 cannot be told ap
 **Population.**
 - **Tracker:** every issue from LIN-300 onward (about 1 June), snapshotted over the workspace proxy
   in 13 list pages and 110 detail reads at no more than 6 a minute (`survey-hides-tracker.mjs`).
-- **Transcripts:** dispatched Claude Code sessions from 29 August to 1 October (2,076 sessions:
-  1,738 Harbour, 338 runner by the clone they edited; `survey-hides-transcripts.mjs`).
-- **The runner's oplog:** 12 July to 1 October, 315k lines.
+- **Transcripts:** dispatched Claude Code sessions from 29 August to 1 October whose first turn came
+  before 10:14Z (2,076 sessions: 1,738 Harbour, 338 runner by the clone they edited;
+  `survey-hides-transcripts.mjs`, which has no end bound; the snapshot holds one later session).
+- **The runner's oplog:** 12 July to 1 October 10:33Z, 316k lines.
 - **The runner's run logs:** 236 since June, with no per-line timestamps
   (`survey-hides-runner.mjs`).
 - **Git:** both repos.
@@ -260,8 +288,11 @@ September quiet wakes before a model reads them. The other 938 cannot be told ap
   its first commit.
 
 **Re-run.**
-- Run the transcripts, runner, detect, code-waits, analyse and figures scripts in order, about 40
-  seconds of CPU.
+- Run the transcripts, runner, wake extract (`survey-wake-extract.mjs --since 2026-08-29 --out
+  data/survey-hides/wake`, which the runner detector reads), detect, code-waits, analyse and figures
+  scripts in order: 55 seconds of CPU, 18 of them the detectors.
+- `survey-hides-runner.mjs` sorts the manual run logs of July after the newest run log, so that
+  log's fires are dated at its start: one fire counted in September came on 1 October.
 - The tracker, prompts and periodicals scripts are separate; the tracker and periodicals scripts
   call the proxy.
 - Snapshots go to the git-ignored `data/survey-hides/`.
@@ -274,19 +305,28 @@ September quiet wakes before a model reads them. The other 938 cannot be told ap
 - **No opencode transcripts.** Sessions on the opencode harness leave no transcript, and launches
   that never start leave none either. The detectors' counts and hit rates run **low** by their
   share.
-- **The register is what got filed.** About 90 real alarms are on no ticket. Record-based
-  frequencies run **low**, and the record's discovery mix leans to whoever files.
-- **Filing time stands in for discovery.** People notice before they file, and 47 of the 65 onsets
-  are dates read as midnight. Time to discovery runs **high** (by up to a day for those), and
+- **The register is what got filed.** About 40 distinct real faults the rules found are on no
+  ticket, and so is a day-long stop of the dispatcher on 23–24 September. Record-based frequencies
+  run **low**, and the record's discovery mix leans to whoever files.
+- **Filing time stands in for discovery.** People notice before they file, and 47 of the 64 onsets
+  are dates read as midnight. Where the onset has a time the median to discovery is 3.0 hours; where
+  it is a date only, 19.0. Time to discovery runs **high**, by much of the headline's 16 hours, and
   the detectors' lead over discovery runs **high** with it.
 - **Hindsight.** The rules were written knowing LIN-3181 and the 1 October cycle. A rule written
   beforehand might be tuned differently, so hit rates run **high** for a rule written blind.
   Against that, every ambiguous alarm was called a miss, which runs **low**. The net is unknown.
-- **"Real" is by class or by one reader.** D1's unrecorded bursts are real errors, but some may
-  be harmless blips. D2's codes, the register and the vigilance sample are one reader's (no blind
-  second read was possible in one session). The value of unrecorded alarms may run **high**.
+- **"Real" is by class or by one reader.** The scripts call an alarm real by its class. The
+  independent check's sample found most of D1's unrecorded bursts harmless and about a quarter of
+  D2's false, which is why about 40 of the 93 are counted real here. D2's codes, the register and
+  the vigilance sample are one reader's. A second reader's sample of 15 register rows agreed on
+  filing time and repo in all 15, but would recode two finders (LIN-800 and LIN-2232 were found by
+  review, not the worker), two onsets (LIN-1113, LIN-1815), and argue five patterns and three
+  invisibility calls.
 - **Costs are bounds.** Retry cost counts everything between an error and the retry, so it runs
-  **high**. D2's idle is capped at 6 hours, so it runs **low** for the overnight cases.
+  **high**. D2's idle is capped at 6 hours, which runs **low** for the overnight cases, but 66 of
+  its 108 hours are in waiters the runner had already completed, mostly after their ticket was
+  Done, which the failsafe does not re-ask because nothing was waiting on them. As capacity lost,
+  the 108 hours run **high**; 42 are in sessions still waiting.
 - **The periodicals' cost is one batch.** Earlier batches predate the transcripts, and the 45M
   orchestrator that dispatched them is excluded, so it runs **low**. Their record is judged only
   on cross-session patterns. Their value on code quality and drift is not measured here, so the
@@ -303,15 +343,17 @@ Options, not changes. John decides.
 
 | Option | Effect, with range | Evidence | Risk to correctness | How the scorecard would measure it |
 |---|---|---|---|---|
-| **A. Run the cross-session detectors live, outside the processes they watch:** D1 (shared-error burst, 4xx excluded) and D2 (stopped or circular wait), raising one alarm to a person or Flight Companion, not to every agent | Time to discovery for P1, P2, P5 and P6b from a median of 10–15 h to about the detector's lag (0–2 h). On the record, 9 of 19 incidents 0–21 h sooner. Idle: up to the 108 h of lost-wake waiting and the overnight freezes. Tokens: under 1% | D1 and D2 scores; the 26 September night; LIN-3181 | Low if alarms go to a decider and never act on their own. Alarm fatigue if the 4xx class stays in (16 of 42). It must not run inside the dispatcher | Median hours from onset to filing for P1–P6, before and after; idle hours per waiting supervisor; alarms per week acted on |
-| **B. Make the runner's completion post tell the truth:** retry a failed terminal post, and write `hook.done_posted` only on success | Removes the D5x class: 23 lost wakes since July, about 8 a month, each a supervisor waiting until the failsafe or a person | D5x; `feedback.js:41-70`; `hook.js:2062-2065` | Positive: a lost `[done]` is a correctness gap today | Lost terminal posts per month (D5x) to zero |
-| **C. Give the periodicals the alarm log instead of asking them to find runtime faults from code** | Up to 3.2% of September's tokens per batch is spent where no cross-session instance was found first. Pointing a periodical at D1 and D2's alarms makes it a reader of evidence, not a searcher | 0 first finds of P1–P8; the "no stuck-session detection" gap flagged three times | Low for this class; their code-quality findings are untouched | Periodical findings that name a runtime incident; their cost per batch |
-| **D. Retire vigilance text where a detector takes over** | A few KB of the 36 KB of rule text, and the turns agents spend noticing alone. Small in tokens | 38 rules; 14 of 40 sampled mentions acted, none gathered | Medium: Rasmussen's warning, since a defence's worth is invisible until removed. Retire only after A has run a month | Rule bytes per pattern; the discovery time of each pattern stays flat or falls |
+| **A. Run the cross-session detectors live, outside the processes they watch:** D1 (shared-error burst, 4xx excluded) and D2 (stopped or circular wait), raising one alarm to a person or Flight Companion, not to every agent | Time to discovery, for the incidents it catches in P1, P2, P5 and P6b, from a median of about 15 h (3 h where the onset is timed) to about the detector's lag (0–2 h). On the record, D1 and D2 caught 7 of 19 incidents, 0–9.3 h sooner. Idle: up to the 42 h of lost-wake waiting in sessions still waiting, and the overnight freezes. Tokens: under 1% | D1 and D2 scores; the 26 September night; LIN-3181 | Low if alarms go to a decider and never act on their own. Alarm fatigue: 16 of D1's 42 alarms are 4xx request mistakes, and most of its other unrecorded bursts healed in minutes with no harm, so D1 needs a duration or harm threshold; D2 needs its three-minute merge fixed. It must not run inside the dispatcher | Median hours from onset to filing for P1–P6, before and after; idle hours per waiting supervisor; alarms per week acted on |
+| **B. Make the runner's completion post tell the truth:** retry a failed terminal post, and write `hook.done_posted` only on success | Removes the D5x class: 23 failed terminal posts since July, 8 in September. Most left a waiting parent until the failsafe or a person; at least 4 were woken anyway | D5x; `feedback.js:41-70`; `hook.js:2062-2065` | Positive: a lost `[done]` is a correctness gap today | Lost terminal posts per month (D5x) to zero |
+| **C. Give the periodicals the alarm log instead of asking them to find runtime faults from code** | Up to 3.1% of September's tokens per batch is spent where no cross-session instance was found first. Pointing a periodical at D1 and D2's alarms makes it a reader of evidence, not a searcher | 0 first finds of P1–P8; the "no stuck-session detection" gap flagged three times | Low for this class; their code-quality findings are untouched | Periodical findings that name a runtime incident; their cost per batch |
+| **D. Retire vigilance text where a detector takes over** (inside the anchor's row 11) | A few KB of the 36 KB of rule text, and the turns agents spend noticing alone. Small in tokens | 38 rules; 14 of 40 sampled mentions acted, none gathered | Medium: Rasmussen's warning, since a defence's worth is invisible until removed. Retire only after A has run a month | Rule bytes per pattern; the discovery time of each pattern stays flat or falls |
 | **E. An alarm for duplicate launches** (D7) | 0.15% of tokens, 5 pairs a month | D7 | Low | Duplicate pairs per month |
 
 Option A is the principle "code detects, the model decides" at its smallest. It changes no
-supervisor's role and keeps every altitude. It does not overlap map rows 1–3, which route quiet
-wakes; it watches what goes wrong between them. In correct work per budget it is worth little
+supervisor's role and keeps every altitude. In tokens it does not overlap map rows 1–3, which route
+quiet wakes; it watches what goes wrong between them. In mechanism it overlaps row 3, which moves
+the liveness clocks into the runner and dispatch code, and option B is wake-delivery plumbing of the
+kind row 1's safety check names; built separately they would watch the same waits twice. In correct work per budget it is worth little
 directly, a percent or two of tokens. What it buys is latency and the overnight capacity that a
 silent failure loses: hours per correct change, not tokens.
 
@@ -321,7 +363,8 @@ silent failure loses: hours per correct change, not tokens.
   LIN-3181's dead credential re-selected earlier, or other faults? Join D1's episodes to the
   server's credential-selection log, now retained (LIN-3157).
 - If D1 and D2 ran live for four weeks and alarmed to a Flight Companion, how many alarms would it
-  act on? And does the median time from onset to discovery fall from about 15 hours?
+  act on? And does the median time from onset to discovery fall from about 16 hours (3 where the
+  onset is timed)?
 - Sibling papers this wave: `prototype-concepts.md` (John's concepts, with Lighthouse as a
   comparator) and `replay-small-work.md` (the pre-registered replay). This paper does not
   overlap either.

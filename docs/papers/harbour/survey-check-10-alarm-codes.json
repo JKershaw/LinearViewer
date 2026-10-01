@@ -1,0 +1,385 @@
+{
+ "about": "LIN-3190 hand codes of sampled LIN-3188 detector alarms; definitions in definitions.md; transcript refs are <session8>:<line> in ~/.claude/projects/-Users-work-development-simple-dispatcher-workspaces-<session>/<session>.jsonl; oplog line numbers as read 1 Oct.",
+ "codes": [
+  {
+   "id": "D1-01",
+   "det": "D1",
+   "at": "2026-09-05T23:10",
+   "sessions": "4 (6b4248f0,5096bc2f,61e06aba,a9d550d5)",
+   "code": "blip",
+   "why": "every LINEAR_AUTH call healed within ~1 min; co-occurring OpenRouter 403 is a different fault",
+   "evidence": "6b4248f0:394-408; 5096bc2f:2424-2437; 61e06aba:367-429",
+   "sample": "systematic"
+  },
+  {
+   "id": "D1-04",
+   "det": "D1",
+   "at": "2026-09-12T20:24",
+   "sessions": "4",
+   "code": "blip",
+   "why": "orientation reads failed, reviews completed",
+   "evidence": "dfd66d36:63,95; f12c7a3b:56-296",
+   "sample": "systematic"
+  },
+  {
+   "id": "D1-07",
+   "det": "D1",
+   "at": "2026-09-19T20:42",
+   "sessions": "6",
+   "code": "blip",
+   "why": "healed in 5 s-3 min",
+   "evidence": "df0051e5:81-214; 84c1e774:52-154",
+   "sample": "systematic"
+  },
+  {
+   "id": "D1-10",
+   "det": "D1",
+   "at": "2026-09-24T22:23",
+   "sessions": "7",
+   "code": "false",
+   "why": "same LINEAR_AUTH fault as D1-09 split by signature; 2 of 8 events are text artefacts",
+   "evidence": "events.jsonl 530affd2 23:46, 9ce48661 22:39",
+   "sample": "systematic"
+  },
+  {
+   "id": "D1-13",
+   "det": "D1",
+   "at": "2026-09-25T23:46",
+   "sessions": "4",
+   "code": "blip",
+   "why": "retried in same command / optional calls; work completed",
+   "evidence": "3a1972c8:513-541; ac2292f0:53-71",
+   "sample": "systematic"
+  },
+  {
+   "id": "D1-16",
+   "det": "D1",
+   "at": "2026-09-27T12:18",
+   "sessions": "6",
+   "code": "blip",
+   "why": "'unhealed' comment actually got 201 in same command",
+   "evidence": "1237c83a:685-688,820-823",
+   "sample": "systematic"
+  },
+  {
+   "id": "D1-19",
+   "det": "D1",
+   "at": "2026-09-29T19:56",
+   "sessions": "5",
+   "code": "blip",
+   "why": "'healed 1/6' is a matcher artefact; all comments posted",
+   "evidence": "b945a9bd:188-213; 2d5dc999:399-409; fafc3fc8:2684",
+   "sample": "systematic"
+  },
+  {
+   "id": "D1-09",
+   "det": "D1",
+   "at": "2026-09-24T21:45",
+   "sessions": "62",
+   "code": "blip",
+   "why": "claim check: 86 errors/62 sessions/7.63 h confirmed; one persistent fault, no session parked or lost output",
+   "evidence": "94427c7f:311-317; 56508060:697-703; 4932492e:136-154 (that BLOCKED is OpenRouter 402 = D1-08)",
+   "sample": "claim-check"
+  },
+  {
+   "id": "D2-02",
+   "det": "D2",
+   "at": "2026-09-02T12:00",
+   "sessions": "35ec10bc,6229916d -> 8e3613a9/339c7681",
+   "code": "real",
+   "why": "kitty launch failure (LIN-2446 class, third wedge); two supervisors idle ~46 min; script mislabels as late-wake",
+   "evidence": "8e3613a9:258-274; 6229916d:365-379; 35ec10bc:419",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-06",
+   "det": "D2",
+   "at": "2026-09-04T16:02",
+   "sessions": "48fde021 -> 5da4ebc4",
+   "code": "false",
+   "why": "48fde021 was a finished read-only diagnostic awaiting a ruling, not waiting on 5da4ebc4 (the LIN-2559 lane it was diagnosing); D2 resolved a quoted session id as a wait target",
+   "evidence": "48fde021:209-257",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-10",
+   "det": "D2",
+   "at": "2026-09-05T15:27",
+   "sessions": "0b5d36cd -> bf7ceb22",
+   "code": "real-quota",
+   "why": "child hit session usage limit; one event shared by 4 alarms; not a coordination fault",
+   "evidence": "bf7ceb22:385,446; 0b5d36cd:224-242",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-14",
+   "det": "D2",
+   "at": "2026-09-06T13:31",
+   "sessions": "507e1fb6 -> 70c7e4c9",
+   "code": "real-quota",
+   "why": "weekly usage limit stopped fleet until 10 Sep; rescuedBy follow-up resume is wrong",
+   "evidence": "70c7e4c9:241-287; 507e1fb6:599-606",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-18",
+   "det": "D2",
+   "at": "2026-09-17T21:55",
+   "sessions": "6c081c2c,8586bfd9 -> 9396fd85",
+   "code": "real",
+   "why": "warm child said PENDING-INTERNAL, runner waited for 30-min silence re-ask; ~35 min idle per beat; D2-19/20 are the same mechanism",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:220868-221596",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-22",
+   "det": "D2",
+   "at": "2026-09-23T07:17",
+   "sessions": "ebf47d56 (LIN-3001) -> b624f7b6",
+   "code": "real",
+   "why": "child's [done] posted 200; the oplog is silent 23 Sep 06:53:11 to 24 Sep 06:35:30 and no session launched: the dispatcher was not running for 23.7 h; restarted dispatcher set the waiter FAILED. Same as D5-02. On no ticket.",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:235518-235523; ebf47d56:429",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-26",
+   "det": "D2",
+   "at": "2026-09-25T01:07",
+   "sessions": "2781866a -> 79f58e7f",
+   "code": "real",
+   "why": "LIN-2932 class (child held taken by own monitor); 24-30 min idle; rescued by coordinator liveness check, not a wake",
+   "evidence": "2781866a:582-586; 79f58e7f:1323-1344",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-30",
+   "det": "D2",
+   "at": "2026-09-25T07:50",
+   "sessions": "77f9aa89 -> 0a5ba076",
+   "code": "false",
+   "why": "waiter woken 6 s after child BLOCKED, then escalated to John; wake merged into the waiting burst (3-min merge artefact)",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:250762-250779; 77f9aa89:537-553",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-34",
+   "det": "D2",
+   "at": "2026-09-25T13:54",
+   "sessions": "d9f78d93,9b00fa26 -> d50c9c2e",
+   "code": "false",
+   "why": "both waiters woken within 4 s of child DONE and COMPLETED by 13:25; same merge artefact; idle 360 is the cap",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:256849-256896",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-38",
+   "det": "D2",
+   "at": "2026-09-29T01:50",
+   "sessions": "6be29b43 -> 44c79f19",
+   "code": "real",
+   "why": "[done] lost to 502 (hook.done_posted written anyway); parent idle ~3.8 h through two failsafe refires. = D2-40 = D5x-20",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:290579-290586,290796,292394; 6be29b43:656,701",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-42",
+   "det": "D2",
+   "at": "2026-10-01T07:00",
+   "sessions": "ff6fcd71 -> 0f8e7c91",
+   "code": "real",
+   "why": "[done] lost to 502; Flight Companion rescued after 26 min (not a wake). = D5x-21",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:312205-312206,312777; ff6fcd71:253-257",
+   "sample": "systematic"
+  },
+  {
+   "id": "D2-03",
+   "det": "D2",
+   "at": "2026-09-02T12:35",
+   "sessions": "204857de -> 78c8a4fe",
+   "code": "real",
+   "why": "claim check ('rescued by nothing'): child EXECUTING->FAILED 13:26, parent AWAITING_EXTERNAL->FAILED 13:34, kitty-wedge day",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:169657-170000",
+   "sample": "claim-check"
+  },
+  {
+   "id": "D2-31",
+   "det": "D2",
+   "at": "2026-09-25T10:28",
+   "sessions": "49ee3cb6 -> fc4aecad",
+   "code": "false",
+   "why": "claim check ('rescued by nothing'): child COMPLETED 09:58:04, waiter woken 09:58:10 and COMPLETED 09:58:30",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:253955-254004",
+   "sample": "claim-check"
+  },
+  {
+   "id": "D2-35",
+   "det": "D2",
+   "at": "2026-09-27T13:17",
+   "sessions": "f2d1261f -> f285882e/0ba06ac4",
+   "code": "false",
+   "why": "claim check: child f285882e COMPLETED 07:16:16, waiter woken 07:16:22, COMPLETED 07:17:16",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:271962-271988; f2d1261f:435",
+   "sample": "claim-check"
+  },
+  {
+   "id": "D2-36",
+   "det": "D2",
+   "at": "2026-09-27T14:25",
+   "sessions": "aaffefab -> f02e515f/0ba06ac4",
+   "code": "false",
+   "why": "claim check: waiter parked 08:24:18, woken 08:24:58, DONE 08:25:57",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:274401-274457; aaffefab:293,334",
+   "sample": "claim-check"
+  },
+  {
+   "id": "D5-00",
+   "det": "D5",
+   "at": "2026-09-01T22:58",
+   "sessions": "c959989d (LIN-2442) <- 7c6daa31",
+   "code": "real",
+   "why": "lost wake during the LIN-2446 kitty wedge (oplog near-silent 22:58-00:39); same event as the LIN-2446 D2 hit, so not unrecorded",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:168179-168197",
+   "sample": "all"
+  },
+  {
+   "id": "D5-01",
+   "det": "D5",
+   "at": "2026-09-02T07:44",
+   "sessions": "5bb41063 (LIN-2437) <- a9270125",
+   "code": "real",
+   "why": "woken 38 min late (08:23); kitty launch failures still occurring 08:22-08:44 (LIN-2446 wedge continuing), so arguably on record",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:169213-169240,169282,169342",
+   "sample": "all"
+  },
+  {
+   "id": "D5-02",
+   "det": "D5",
+   "at": "2026-09-23T06:53",
+   "sessions": "ebf47d56 (LIN-3001) <- b624f7b6",
+   "code": "real",
+   "why": "= D2-22: dispatcher not running 23.7 h; [done] was not lost",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:235518-235523",
+   "sample": "all"
+  },
+  {
+   "id": "D5x-01",
+   "det": "D5x",
+   "at": "2026-07-26T08:40:43",
+   "sessions": "e265806f",
+   "code": "false",
+   "why": "404: every post from 4 ~16-h-old sessions resumed by the failsafe 404d (items no longer existed in Harbour); not a lost wake. D5x-01..04 are one event",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:47462-47495",
+   "sample": "systematic"
+  },
+  {
+   "id": "D5x-04",
+   "det": "D5x",
+   "at": "2026-07-26T08:47:53",
+   "sessions": "42dcf3e6",
+   "code": "false",
+   "why": "same 404 event as D5x-01",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:47548-47559",
+   "sample": "systematic"
+  },
+  {
+   "id": "D5x-07",
+   "det": "D5x",
+   "at": "2026-08-03T10:01:29",
+   "sessions": "cbad8bc2 (parent 33f800a8 by timing)",
+   "code": "real",
+   "why": "parent parked 09:51:42 right after launching cbad8bc2; not woken; hold expired 10:51; child re-confirmed 10:55-11:02 and parent woke 11:03:04 (6 s after); ~62 min idle. [done] re-posted later, so not lost for good",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:79819,79920-79928,80028-80075",
+   "sample": "systematic"
+  },
+  {
+   "id": "D5x-10",
+   "det": "D5x",
+   "at": "2026-08-24T20:47:05",
+   "sessions": "1ac34260",
+   "code": "blip",
+   "why": "no session parked AWAITING_* at the time; any parent was not held; no idle attributable",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:141971-142172",
+   "sample": "systematic"
+  },
+  {
+   "id": "D5x-13",
+   "det": "D5x",
+   "at": "2026-08-29T15:35:58",
+   "sessions": "7c4b1e35 (parent e7d5be17 by timing)",
+   "code": "real",
+   "why": "script says no parent edge, but e7d5be17 parked 15:19:15 five s after launching it, never woken, hold expired 16:19, failsafe refire 17:19: ~103 min idle",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:152174-152177,152673,153116",
+   "sample": "systematic"
+  },
+  {
+   "id": "D5x-16",
+   "det": "D5x",
+   "at": "2026-09-25T03:25:10",
+   "sessions": "05462839 (LIN-3026) -> parent 4c1bc65d (LIN-2994)",
+   "code": "real",
+   "why": "script says no parent edge, but 4c1bc65d waited on the LIN-3026 sub-run; idle 03:25-04:37 (72 min) until a check-in; 'its done never reached me'",
+   "evidence": "4c1bc65d:1788,1796-1822; 05462839:1027",
+   "sample": "systematic"
+  },
+  {
+   "id": "D5x-19",
+   "det": "D5x",
+   "at": "2026-09-28T21:43:17",
+   "sessions": "6136be17 -> b231b9fc (LIN-1892)",
+   "code": "real",
+   "why": "[done] 502 (done_posted anyway); parent idle 21:43-22:10 (27 min). = D2-37",
+   "evidence": "/Users/work/development/simple-dispatcher/state/oplog.jsonl:286464-286475,287022; b231b9fc:571-572",
+   "sample": "systematic"
+  },
+  {
+   "id": "D7-LIN-3125",
+   "det": "D7",
+   "at": "2026-09-29T17:37",
+   "sessions": "ac1e2787 / fc56682a",
+   "code": "real",
+   "why": "two stepper orchestrators (e4c8d94a and cddfa067) each ran the final round-2 plan review; two Approve verdicts 604637a6 and 9ad4355c",
+   "evidence": "ac1e2787:456; fc56682a:57,430; events.jsonl waits e4c8d94a 17:37:55, cddfa067 17:45:05",
+   "sample": "all"
+  },
+  {
+   "id": "D7-LIN-2560-impl",
+   "det": "D7",
+   "at": "2026-09-05T11:51",
+   "sessions": "2e868e65 / f58e979a",
+   "code": "real",
+   "why": "second implementer found the fix already shipped 'by a concurrent duplicate dispatch'",
+   "evidence": "2e868e65:392; f58e979a:513",
+   "sample": "all"
+  },
+  {
+   "id": "D7-LIN-2667",
+   "det": "D7",
+   "at": "2026-09-06T00:38",
+   "sessions": "331f9ccf / a0c93f87",
+   "code": "real",
+   "why": "both closed out PR #1421 (7465b4a6) a minute apart",
+   "evidence": "331f9ccf:641; a0c93f87:295",
+   "sample": "all"
+  },
+  {
+   "id": "D7-LIN-2718",
+   "det": "D7",
+   "at": "2026-09-10T17:06",
+   "sessions": "90b8d51c / 42267070",
+   "code": "real",
+   "why": "both report merging PR #1430 as 3da6d190 (second launched 97 min into the first)",
+   "evidence": "90b8d51c:564; 42267070:382",
+   "sample": "all"
+  },
+  {
+   "id": "D7-LIN-2560-review",
+   "det": "D7",
+   "at": "2026-09-05T12:02",
+   "sessions": "9f89b408 / b024c873",
+   "code": "real",
+   "why": "two Approve verdicts on PR #222 (5fbe6866, 418f655a)",
+   "evidence": "9f89b408:364; b024c873:427",
+   "sample": "all"
+  }
+ ]
+}
