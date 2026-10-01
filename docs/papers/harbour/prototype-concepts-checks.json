@@ -1,0 +1,502 @@
+{
+ "about": "prototype-concepts.md (LIN-3187): what each independent check of a Harbour paper or essay found, coded from the check's own text by an in-session subagent and spot-checked by the paper's author. answer: held (the headline held and no load-bearing claim changed), held-qualified (the headline held, a load-bearing claim changed), changed (the headline answer itself changed); ties went to the less favourable code. loadBearingOverturned: claims the check says do not hold, as it counts them where it states a count. figuresChanged: as the check states it where it does (three checks), otherwise the corrected figures it lists, approximate. evidence: the check's own lines.",
+ "pairs": [
+  {
+   "check": "survey-check.md",
+   "checkTicket": "LIN-3153",
+   "checkLanded": "2026-09-30",
+   "paper": "growth-atlas.md",
+   "paperTicket": "LIN-3147",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 7,
+   "figuresChanged": 11,
+   "reran": "partly",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check.md:83 \"The product-against-process conclusion survives every definition we tried.\"",
+    "survey-check.md:67 \"Seven statements are wrong. Version 2 corrects each one.\"",
+    "survey-check.md:48 \"Every git figure re-runs exactly; the tracker and fleet figures within 1–2%.\""
+   ]
+  },
+  {
+   "check": "survey-check.md",
+   "checkTicket": "LIN-3153",
+   "checkLanded": "2026-09-30",
+   "paper": "where-the-effort-goes.md",
+   "paperTicket": "LIN-3148",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "changed",
+   "loadBearingOverturned": 2,
+   "figuresChanged": 10,
+   "reran": "partly",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check.md:143 \"\\\"Dispatches doubled at every size while working time stayed flat\\\" does not hold.\"",
+    "survey-check.md:202 \"\\\"Gets no more dispatches than any other\\\" is not established; neither is its opposite.\"",
+    "survey-check.md:159 \"The supervision share holds; its rise is one new layer.\"",
+    "survey-check.md:141 \"nine transcripts of 31 August were deleted between the author's run and ours\""
+   ]
+  },
+  {
+   "check": "survey-check.md",
+   "checkTicket": "LIN-3153",
+   "checkLanded": "2026-09-30",
+   "paper": "reliability-baseline.md",
+   "paperTicket": "LIN-3149",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 4,
+   "figuresChanged": 8,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check.md:222 \"Every figure re-runs; the classification under four of them does not hold.\"",
+    "survey-check.md:281 \"\\\"Finding, not making\\\" holds for LinearViewer, more strongly than the paper says.\"",
+    "survey-check.md:287 \"For simple-dispatcher the paper's direction is right and its evidence is wrong.\""
+   ]
+  },
+  {
+   "check": "survey-check-2.md",
+   "checkTicket": "LIN-3154",
+   "checkLanded": "2026-09-30",
+   "paper": "what-supervisors-do.md",
+   "paperTicket": "LIN-3150",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 4,
+   "figuresChanged": 9,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-2.md:34 \"But two of its claims are wrong: that the prompts ask for polling alongside wakes, and that the merge-and-Done gate is only prose.\"",
+    "survey-check-2.md:165 \"None of version 1's five \\\"supervisor's own mechanical slips\\\" holds up as one. The headline, mechanical and mostly plumbing, stands.\"",
+    "survey-check-2.md:57 \"Every script re-runs byte for byte, and every printed number matches.\""
+   ]
+  },
+  {
+   "check": "survey-check-2.md",
+   "checkTicket": "LIN-3154",
+   "checkLanded": "2026-09-30",
+   "paper": "test-estate.md",
+   "paperTicket": "LIN-3151",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 9,
+   "figuresChanged": 12,
+   "reran": "partly",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-2.md:182 \"The measurements re-run; several of the readings built on them do not.\"",
+    "survey-check-2.md:226 \"Several CI statements are wrong in detail.\"",
+    "survey-check-2.md:246 \"So \\\"rewritten three times as often as either\\\" is wrong.\"",
+    "survey-check-2.md:200 \"no committed source | cannot be re-run\""
+   ]
+  },
+  {
+   "check": "survey-check-2.md",
+   "checkTicket": "LIN-3154",
+   "checkLanded": "2026-09-30",
+   "paper": "measuring-throughput.md",
+   "paperTicket": "LIN-3152",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 5,
+   "figuresChanged": 12,
+   "reran": "partly",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-2.md:353 \"The weekly detection power holds; the per-change power does not.\"",
+    "survey-check-2.md:309 \"\\\"the median is filed the same day … this agrees with the reliability paper's 1.4 days\\\" is wrong twice.\"",
+    "survey-check-2.md:379 \"Two citations do not stand after survey-check.md, and version 2 replaces both.\"",
+    "survey-check-2.md:284 \"Every line of the scorecard's output matches, except three.\""
+   ]
+  },
+  {
+   "check": "survey-check-3.md",
+   "checkTicket": "LIN-3167",
+   "checkLanded": "2026-09-30",
+   "paper": "why-throughput-halved.md",
+   "paperTicket": "LIN-3155",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 3,
+   "figuresChanged": 8,
+   "reran": "yes",
+   "revisedTo": 3,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-3.md:24 \"On their headlines, yes. On timing and attribution, not fully.\"",
+    "survey-check-3.md:97 \"The plan-review leg came two weeks after the step.\"",
+    "survey-check-3.md:80 \"More than half of the escape rise is finder rows.\"",
+    "survey-check-3.md:52 \"Every script re-runs byte for byte, and every number matches.\""
+   ]
+  },
+  {
+   "check": "survey-check-3.md",
+   "checkTicket": "LIN-3167",
+   "checkLanded": "2026-09-30",
+   "paper": "which-rules-pay.md",
+   "paperTicket": "LIN-3156",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 3,
+   "figuresChanged": 7,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-3.md:202 \"Two of the top four clear the zero rules' bound, not four.\"",
+    "survey-check-3.md:225 \"The unfair part is the lede's \\\"most are gates\\\".\"",
+    "survey-check-3.md:228 \"Three rules existed for only the last six days of the window.\"",
+    "survey-check-3.md:152 \"Every script re-runs byte for byte, and every number matches.\""
+   ]
+  },
+  {
+   "check": "survey-check-4.md",
+   "checkTicket": "LIN-3171",
+   "checkLanded": "2026-09-30",
+   "paper": "model-choice.md",
+   "paperTicket": "LIN-3165",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 3,
+   "figuresChanged": 13,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-4.md:24 \"Their conclusions mostly survive. Most of their load-bearing figures do not, and one explanation does not.\"",
+    "survey-check-4.md:68 \"Tier attribution is the main error.\"",
+    "survey-check-4.md:109 \"\\\"about equal\\\" holds, within noise\"",
+    "survey-check-4.md:61 \"Every script re-runs, and every number matches when the inputs are pinned.\""
+   ]
+  },
+  {
+   "check": "survey-check-4.md",
+   "checkTicket": "LIN-3171",
+   "checkLanded": "2026-09-30",
+   "paper": "what-doubled-the-dispatches.md",
+   "paperTicket": "LIN-3170",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "changed",
+   "loadBearingOverturned": 5,
+   "figuresChanged": 10,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-4.md:37 \"The step and the flat fresh sessions hold. The late-September wake figure does not.\"",
+    "survey-check-4.md:171 \"The passage layer did not double the wakes; the rise sits on the tickets it flew.\"",
+    "survey-check-4.md:177 \"LIN-1219 makes cold resumes, not sessions.\"",
+    "survey-check-4.md:141 \"Every script re-runs, and the analysis reproduces byte for byte.\""
+   ]
+  },
+  {
+   "check": "survey-check-4.md",
+   "checkTicket": "LIN-3171",
+   "checkLanded": "2026-09-30",
+   "paper": "proportional-process-backtest.md",
+   "paperTicket": "LIN-3166",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 1,
+   "figuresChanged": 7,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-4.md:49 \"\\\"Light work already costs about half of heavy work\\\" is a size effect.\"",
+    "survey-check-4.md:279-280 \"What does not follow is that the process already treats light work lightly.\"",
+    "survey-check-4.md:292 \"Smaller slips, each corrected in version 2.\"",
+    "survey-check-4.md:249 \"Every script re-runs, and every number matches.\""
+   ]
+  },
+  {
+   "check": "survey-check-5.md",
+   "checkTicket": "LIN-3173",
+   "checkLanded": "2026-09-30",
+   "paper": "wake-inventory.md",
+   "paperTicket": "LIN-3172",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 2,
+   "figuresChanged": 15,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-5.md:23 \"Their descriptions of the traffic hold. Their explanations do not, in two places each.\"",
+    "survey-check-5.md:102 \"The inventory's minting claim holds; its delivery and \\\"not a wake\\\" claims do not.\"",
+    "survey-check-5.md:59 \"Every script re-runs, and the analysis reproduces byte for byte.\""
+   ]
+  },
+  {
+   "check": "survey-check-5.md",
+   "checkTicket": "LIN-3173",
+   "checkLanded": "2026-09-30",
+   "paper": "browser-flakes.md",
+   "paperTicket": "LIN-3168",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "changed",
+   "loadBearingOverturned": 3,
+   "figuresChanged": 12,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-5.md:43 \"The causes do not hold.\"",
+    "survey-check-5.md:220 \"The causes, read from the source, are not the paper's three.\"",
+    "survey-check-5.md:262 \"Masking: two claims are wrong.\"",
+    "survey-check-5.md:193 \"Every script re-runs, and every output reproduces.\""
+   ]
+  },
+  {
+   "check": "survey-check-6.md",
+   "checkTicket": "LIN-3175",
+   "checkLanded": "2026-09-30",
+   "paper": "why-legs-repeat.md",
+   "paperTicket": "LIN-3174",
+   "paperLanded": "2026-09-30",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 5,
+   "figuresChanged": 14,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-6.md:22 \"Its answer holds; five of its secondary claims do not.\"",
+    "survey-check-6.md:74-92 (14 rows marked \"corrected\" in the figure table)",
+    "survey-check-6.md:66 \"Every script re-runs, and every number reproduces.\""
+   ]
+  },
+  {
+   "check": "survey-check-7.md",
+   "checkTicket": "LIN-3183",
+   "checkLanded": "2026-10-01",
+   "paper": "held-or-fresh.md",
+   "paperTicket": "LIN-3176",
+   "paperLanded": "2026-10-01",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 3,
+   "figuresChanged": 13,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-7.md:22 \"Their measurements hold. The relay's price and the rule class do not hold as stated.\"",
+    "survey-check-7.md:30 \"The verdict stands: no reliable saving.\"",
+    "survey-check-7.md:31 \"The mechanical share was pooled over equally sampled roles.\"",
+    "survey-check-7.md:63 \"Every script re-runs, and every number reproduces.\""
+   ]
+  },
+  {
+   "check": "survey-check-7.md",
+   "checkTicket": "LIN-3183",
+   "checkLanded": "2026-10-01",
+   "paper": "where-judgement-happens.md",
+   "paperTicket": "LIN-3177",
+   "paperLanded": "2026-10-01",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 1,
+   "figuresChanged": 5,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-7.md:39 \"The rule class does not reproduce.\"",
+    "survey-check-7.md:43 \"So the paper's 61% is a low end and its 8% a high end.\"",
+    "survey-check-7.md:185 \"So the paper's \\\"a third\\\" and \\\"12–14%\\\" are low ends.\"",
+    "survey-check-7.md:151 \"where-judgement-happens: every figure reproduces.\""
+   ]
+  },
+  {
+   "check": "survey-check-8.md",
+   "checkTicket": "LIN-3184",
+   "checkLanded": "2026-10-01",
+   "paper": "starting-context.md",
+   "paperTicket": "LIN-3178",
+   "paperLanded": "2026-10-01",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 5,
+   "figuresChanged": 4,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-8.md:25 \"Their answers hold, and so do most of the figures in their findings. Their Options sizes hold less well.\"",
+    "survey-check-8.md:37 \"Two of starting-context's option sizes are too high, and one is too low.\"",
+    "survey-check-8.md:58 \"Both papers are corrected as version 2. The corrections change no answer.\"",
+    "survey-check-8.md:26 \"starting-context's analysis reproduces from fresh transcripts within 0.1 points\""
+   ]
+  },
+  {
+   "check": "survey-check-8.md",
+   "checkTicket": "LIN-3184",
+   "checkLanded": "2026-10-01",
+   "paper": "step-overlap.md",
+   "paperTicket": "LIN-3179",
+   "paperLanded": "2026-10-01",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 5,
+   "figuresChanged": 5,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-8.md:32 \"It does not confirm \\\"cited one time in nine\\\".\"",
+    "survey-check-8.md:47 \"step-overlap's ticket-read share is 1.3%, not 1.6%.\"",
+    "survey-check-8.md:58 \"The corrections change no answer.\"",
+    "survey-check-8.md:28 \"step-overlap's reproduces exactly from its author's proxy snapshot.\""
+   ]
+  },
+  {
+   "check": "survey-check-9.md",
+   "checkTicket": "LIN-3185",
+   "checkLanded": "2026-10-01",
+   "paper": "cost-mix.md",
+   "paperTicket": "LIN-3180",
+   "paperLanded": "2026-10-01",
+   "kind": "paper",
+   "answer": "changed",
+   "loadBearingOverturned": 5,
+   "figuresChanged": 9,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-9.md:37 \"Five claims do not hold:\"",
+    "survey-check-9.md:153-155 \"The paper's sharpest contrast ... becomes \\\"small changes escape at most as often, probably about half as often\\\".\"",
+    "survey-check-9.md:32 \"Its Amdahl bound survives every test made here\"",
+    "survey-check-9.md:82 \"Every script re-runs, and every printed number reproduces.\""
+   ]
+  },
+  {
+   "check": "survey-check-9.md",
+   "checkTicket": "LIN-3185",
+   "checkLanded": "2026-10-01",
+   "paper": "how-process-changes-land.md",
+   "paperTicket": "LIN-3182",
+   "paperLanded": "2026-10-01",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 4,
+   "figuresChanged": 4,
+   "reran": "yes",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "survey-check-9.md:60 \"Its history, half-finished census, accretion ratio (κ 0.72) and trial sizes reproduce. Four claims do not hold:\"",
+    "survey-check-9.md:26 \"Their counts hold, but several of their readings do not.\"",
+    "survey-check-9.md:89 \"all five landing scripts give the author's JSON, with heads and timestamps removed.\""
+   ]
+  },
+  {
+   "check": "steady-base-check.md",
+   "checkTicket": "LIN-3145",
+   "checkLanded": "2026-09-30",
+   "paper": "steady-base.md",
+   "paperTicket": "LIN-3143",
+   "paperLanded": "2026-09-29",
+   "kind": "paper",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 4,
+   "figuresChanged": 6,
+   "reran": "partly",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "steady-base-check.md:26 \"On its headline, yes; on four of its load-bearing claims, no.\"",
+    "steady-base-check.md:61 \"Six figures are wrong. Version 2 corrects each one.\"",
+    "steady-base-check.md:43 \"Most figures reproduce exactly.\"",
+    "steady-base-check.md:66 \"The paper's session ran the report on a cache that was still filling\""
+   ]
+  },
+  {
+   "check": "paid-where-written-check.md",
+   "checkTicket": "LIN-3146",
+   "checkLanded": "2026-09-30",
+   "paper": "paid-where-written.md",
+   "paperTicket": "LIN-3144",
+   "paperLanded": "2026-09-30",
+   "kind": "essay",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 10,
+   "figuresChanged": 11,
+   "reran": "partly",
+   "revisedTo": 2,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "paid-where-written-check.md:33 \"Its centre holds. Its edges do not hold as written.\"",
+    "paid-where-written-check.md:74 \"Eleven figures change. Each is corrected in the essay's version 2.\"",
+    "paid-where-written-check.md:90 \"Seven readings went past their source, and are narrowed in the essay's version 2.\"",
+    "paid-where-written-check.md:356 \"This check re-ran only the render, the inventory and the CLAUDE.md split.\""
+   ]
+  },
+  {
+   "check": "what-should-an-agent-leave-behind-check.md",
+   "checkTicket": null,
+   "checkLanded": "2026-09-20",
+   "paper": "what-should-an-agent-leave-behind.md",
+   "paperTicket": "LIN-2961",
+   "paperLanded": "2026-09-20",
+   "kind": "paper",
+   "answer": "held",
+   "loadBearingOverturned": 0,
+   "figuresChanged": 0,
+   "reran": "partly",
+   "revisedTo": 1,
+   "bumpAfterCheck": false,
+   "evidence": [
+    "what-should-an-agent-leave-behind-check.md:18 \"Yes, within its stated limits.\" \"I found no blocking factual or inference problem in the checked central claims.\"",
+    "what-should-an-agent-leave-behind-check.md:28 \"Running the existing recomputation ... reproduced 181/187 ledger units, 109/429 method units and 463/957 units overall.\"",
+    "what-should-an-agent-leave-behind-check.md:36 \"No model trials were run.\""
+   ]
+  },
+  {
+   "check": "learning-while-the-tools-change-check.md",
+   "checkTicket": null,
+   "checkLanded": "2026-09-21",
+   "paper": "learning-while-the-tools-change.md",
+   "paperTicket": null,
+   "paperLanded": "2026-09-21",
+   "kind": "essay",
+   "answer": "held-qualified",
+   "loadBearingOverturned": 2,
+   "figuresChanged": 0,
+   "reran": "n/a",
+   "revisedTo": 5,
+   "bumpAfterCheck": true,
+   "evidence": [
+    "learning-while-the-tools-change-check.md:24 \"yes, on every claim that can be checked against a number or an attribution\"",
+    "learning-while-the-tools-change-check.md:26 \"The failures are of reach and of position, not of fact.\"",
+    "learning-while-the-tools-change-check.md:56 \"One reading runs past its source.\"",
+    "learning-while-the-tools-change-check.md:69 \"One source is renamed in a way that loses what it named.\""
+   ]
+  }
+ ]
+}
