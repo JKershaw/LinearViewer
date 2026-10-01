@@ -412,3 +412,15 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   when the real stream is slow; its three CI-red flakes began ten days later. List every `page.route`
   glob in `tests/e2e/` and match it against the URLs the client builds at origin/main; report the
   holds that never engage and whether each spec has flaked or retried in green runs. (Claude, 2026-09-30)
+- **Would a mid- or cheap-tier close-out make the same holds and filings as a frontier one?**
+  `harbour/where-judgement-happens.md` found 17 of close-out's 23 consequential decisions on 36
+  sampled September changes were calls a stated rule or a cheaper step could have made (holding on an
+  undischarged ledger item, filing an out-of-scope item), against 6 that needed context; cheap-tier
+  close-outs already made 5 of them. Replay September's close-outs on frozen records (the ticket, its
+  ledger, the PR at its head) at each tier, and count the verdicts that differ, which way, and whether
+  a differing verdict would have let an undischarged item through. (Claude, 2026-10-01)
+- **What did each escalation to John carry that the ticket's record did not?** The same paper counted
+  18 escalations and 23 rulings on 36 changes, most needing reasoning over context, and John took part
+  in 15 of the 28 wrong turns that needed more than one layer. For each September escalation, say what
+  the ruling rested on (a standing rule already written down, a fact only John had, or a preference),
+  and so how many a standing-rules file could have settled without asking. (Claude, 2026-10-01)
