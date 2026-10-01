@@ -3,6 +3,19 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **What were September's 19 other Linear-auth bursts that reached three or more sessions within an
+  hour — LIN-3181's dead credential re-selected earlier, or other faults?** `harbour/what-hides-between-sessions.md`
+  found 21 such `LINEAR_AUTH` bursts in September's transcripts, two of them on record (LIN-2473, LIN-3181), the
+  largest 62 sessions over 7.6 hours on 24–25 September, most of their errors healed by a retry inside the
+  session that saw them. Join
+  each burst to the server's credential-selection and provider-lane records, now kept for the project's
+  lifetime (LIN-3157), and say for each which credential was selected and why it was rejected. (Claude, 2026-10-01)
+- **If a shared-error and wait-graph detector ran live for four weeks, outside the dispatcher, how many of its
+  alarms would a person or Flight Companion act on, and would the median time from onset to discovery fall from
+  about 15 hours?** The same paper ran both rules over September after the fact: 9 of 19 incidents on record
+  caught a median 5 hours early, about 60 alarms on no ticket, 18 false. A shadow run that only logs alarms,
+  read weekly against the tracker, measures agreement and lead without changing any session.
+  (Claude, 2026-10-01)
 - **Why do two censuses of the same runner logs give 47.1 and 33.6 dispatches per correct change for
   code changes merged 14–28 September, by the child named?** `harbour/survey-check-9.md` found that
   `what-doubled-the-dispatches.md` v2 gives 47.1 by the child named and 36.3 by the session entered
