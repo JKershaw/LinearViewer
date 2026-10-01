@@ -194,6 +194,14 @@
     return `/workspace/${encodeURIComponent(opts.urlKey || '')}/runner`;
   }
 
+  // LIN-3098 S4b: "run on my machine ›", shown wherever a task opens and
+  // whatever the flags say (/runner explains what to turn on). The card that
+  // hosts this component renders it (public/swipe.js), outside the collapsed
+  // Prompts section; lib/components/runner-link.js is the server twin.
+  function runnerLinkHtml(urlKey) {
+    return `<a class="opened-task-runner-link" href="${esc(runnerSetupHref({ urlKey }))}" data-testid="opened-task-runner-link">run on my machine \u203A</a>`;
+  }
+
   // LIN-3098 N3: has THIS browser set up a runner for this workspace?
   // public/runner-setup.js writes the marker after a successful mint. Storage
   // can throw (private mode, blocked site data), which reads as "no".
@@ -249,12 +257,9 @@
     } else {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-task" data-action="setup" data-setup-needs="proxy">run the whole task <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
-    // LIN-3098 S4: "run on my machine ›" sits BESIDE the ladder, never as a
-    // rung (no data-rung), whenever the proxy flag is on, whatever dispatch says.
-    const runnerLink = opts.proxyEnabled
-      ? `<a class="opened-task-runner-link" href="${esc(runnerSetupHref(opts))}" data-testid="opened-task-runner-link">run on my machine \u203A</a>`
-      : '';
-    return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>${runnerLink}`;
+    // "run on my machine ›" is not a rung: since S4b it sits on the card that
+    // opens the task (runnerLinkHtml), so it is not repeated here.
+    return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>`;
   }
 
   /**
@@ -972,5 +977,5 @@
     return memory ? { label: memory.label, name: memory.name } : null;
   }
 
-  window.PromptSection = { init, getCached };
+  window.PromptSection = { init, getCached, runnerLinkHtml };
 })();

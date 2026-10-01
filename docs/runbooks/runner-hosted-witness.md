@@ -7,13 +7,9 @@ Read this on any phone. Do the steps on a
 laptop. Open this page on the laptop too,
 so you can copy the lines in step 2.
 
-**First link** (put your urlKey in):
-
-https://harbour.cat/workspace/URLKEY/runner
-
-Your urlKey is the part after `/workspace/`
-in the address bar when you're in the
-workspace.
+In the links below, URLKEY is the part
+after `/workspace/` in the address bar
+when you're in the workspace.
 
 ## Before you start
 
@@ -43,12 +39,19 @@ workspace.
 
 ## 1. Get the prompt
 
-1. On the laptop's browser, open the first
-   link above.
-2. Tap **create runner prompt**, then
+1. On the laptop's browser, open the
+   workspace and tap your **Say hello**
+   task to open it.
+2. Tap **run on my machine ›**. It shows
+   as soon as the task opens, and opens
+   the runner page.
+3. Tap **create runner prompt**, then
    **copy**. It shows `copied ✓`.
-3. Use this same browser for steps 3–4.
+4. Use this same browser for steps 3–4.
    Paste the copy within 1 hour.
+
+No link? Open
+https://harbour.cat/workspace/URLKEY/runner
 
 ## 2. Start the runner
 
@@ -151,13 +154,14 @@ did in the comment.
   Then tell the runner: `run runner poll`.
   Expect a 401 (credential rejected).
 - **Phone copy.** On your phone (any
-  browser), open the first link. Tap
+  browser), open **Say hello** and tap
+  **run on my machine ›**. Tap
   **create runner prompt**, then **copy**.
   Note whether it shows `copied ✓`. Don't
   paste it; it expires unused in 1h.
 - **Copy fallback.** On the laptop, open
-  the first link and the browser's
-  developer console. Run:
+  the runner page (step 1) and the
+  browser's developer console. Run:
 
 ```js
 navigator.clipboard.writeText =
