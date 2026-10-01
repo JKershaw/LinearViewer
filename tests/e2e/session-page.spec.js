@@ -327,12 +327,28 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     const sessionId = await discoverSessionId(page);
 
     // The feed rolls the session up to a waiting status with the blocked message.
-    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
-    const body = await feed.json();
-    const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
-    expect(s.status).toBe('waiting');
-    expect(s.waiting).toBe(true);
-    expect(s.waitingMessage).toContain('need your decision on the auth flow');
+    //
+    // LIN-3198: polled for the same reason as the terminal-gate read below — the
+    // feed is eventually consistent (5s stale-while-revalidate cache + the async
+    // materializer's backfill), and `discoverSessionId` has just warmed the cache
+    // with whatever snapshot the materializer held. A mid-seed snapshot (worker
+    // taken, not yet [blocked]) reads `in-progress`; one read then fails (seen
+    // 1/20 in the seven-spec ×20 run). The assertions are unchanged: the session
+    // must become waiting with the blocked message once the read model settles.
+    await expect.poll(async () => {
+      const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
+      const body = await feed.json();
+      const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
+      if (!s) return null;
+      return { status: s.status, waiting: s.waiting, waitingMessage: s.waitingMessage };
+    }, {
+      timeout: 15000,
+      message: 'session feed reflects the [blocked] worker once the async materializer settles',
+    }).toMatchObject({
+      status: 'waiting',
+      waiting: true,
+      waitingMessage: expect.stringContaining('need your decision on the auth flow'),
+    });
 
     // The session page renders the prominent alert banner + follow-up CTA.
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);

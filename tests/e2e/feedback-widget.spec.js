@@ -23,8 +23,7 @@ test.describe('Feedback widget', () => {
     await expect(toggle).toHaveAttribute('data-enabled', 'false')
 
     // Toggling reloads the page; the FAB then appears.
-    await toggle.click()
-    await page.waitForLoadState('networkidle')
+    await clickAndAwaitReload(page, toggle)
 
     await expect(page.getByTestId('footer-feedback-toggle')).toHaveAttribute('data-enabled', 'true')
     await expect(page.getByTestId('nav-feedback-trigger')).toBeVisible()
@@ -547,11 +546,17 @@ async function dropFileOnZone(page, { name, type, bytes, size }) {
 // the trigger ships `disabled` and public/feedback-widget.js clears that only
 // after the panel is built and the click handler bound. Waiting on it means
 // waiting on hydration, not on paint.
+//
+// LIN-3198: the click no longer waits on `networkidle` (which, as above,
+// resolves at once against the pre-reload page). That left `toBeEnabled()`'s
+// 5s expect timeout to cover the toggle POST, the whole reload AND hydration;
+// under load it ran out with the trigger still `disabled` (1/440 in the
+// seven-spec ×20 run). `clickAndAwaitReload` waits on the reload the app
+// actually triggers instead, so `toBeEnabled()` only checks hydration.
 async function enableWidget(page, urlKey) {
   await page.goto(`/workspace/${urlKey}/`)
   await page.waitForLoadState('networkidle')
-  await page.getByTestId('footer-feedback-toggle').click()
-  await page.waitForLoadState('networkidle')
+  await clickAndAwaitReload(page, page.getByTestId('footer-feedback-toggle'))
   await expect(page.getByTestId('nav-feedback-trigger')).toBeEnabled()
   // `toBeEnabled()` can resolve at readyState 'interactive': /feedback-widget.js
   // is `defer`, its init runs on DOMContentLoaded, and it clears `disabled`
@@ -559,4 +564,15 @@ async function enableWidget(page, urlKey) {
   // without this the DCL->load window would surface as a confusing hard error
   // rather than a wait. Narrow, but the failure is ugly and the fix is a line.
   await page.waitForLoadState('load')
+}
+
+// The footer toggle POSTs and then calls `window.location.reload()`
+// (public/feedback-widget.js). Arm the `load` listener BEFORE the click so the
+// app-triggered reload can never fire unseen, then click and await it — the
+// same shape as dispatch-presets.spec.js (LIN-3198). `networkidle` stays after
+// plain `goto`/`reload`, where no app-triggered navigation is in flight.
+async function clickAndAwaitReload(page, locator) {
+  const loaded = page.waitForEvent('load')
+  await locator.click()
+  await loaded
 }
