@@ -164,8 +164,8 @@ budget claim from this runner — never as a flat, shape-independent rule:
   that the bound is voluntary, not enforced.
 
 **You don't declare your own `maxTasks` — whoever launches you does (LIN-2975).** The ratified
-pool size is `maxTasks` on the `POST /dispatch` (or equivalent) call that launched this passage
-run; there is no seam for you to set it retroactively on yourself. Read your own bound with
+pool size is `maxTasks` on the Planner's `POST /autopilot/kickoff` call that launched this
+passage run; there is no seam for you to set it retroactively on yourself. Read your own bound with
 `GET /dispatch/{your own dispatch id}` → `maxTasks`. If that reads `null`, the pool was never
 declared — say so plainly in the landing report rather than restating the ratified figure as if
 it were enforced; a `maxTasks` your launcher forgot to pass is genuinely undeclared, not a

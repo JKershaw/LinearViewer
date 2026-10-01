@@ -99,10 +99,59 @@ server-side.
 | Grant | Authorises | Status |
 | --- | --- | --- |
 | `take` | `GET /api/proxy/runner/poll`, `POST /api/proxy/runner/take/{id}`, `POST /api/proxy/runner/feedback/{id}` | Enforced (LIN-3059 S2a) |
-| `dispatch` | `POST /api/proxy/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff` | **Not yet enforced** (LIN-2884): `readWrite` still passes these today |
+| `dispatch` | `POST /api/proxy/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff` | Enforced (LIN-2884 T3 / LIN-3136): `403 DISPATCH_GRANT_REQUIRED` without it |
 
 A plain `read`/`readWrite` token carries no grants, so it gets `403 TAKE_GRANT_REQUIRED` on the
-runner routes. Only the owner-minted **runner copy** carries `take` + `dispatch`.
+runner routes and `403 DISPATCH_GRANT_REQUIRED` on the enqueue routes. What each token opens:
+
+| Token | Reads | Writes (issues, comments, …) | Enqueue | Runner routes |
+| --- | --- | --- | --- | --- |
+| `read` | yes | no | no | no |
+| `readWrite` | yes | yes | no | no |
+| `readWrite` + `dispatch` | yes | yes | yes | no |
+| `readWrite` + `take` + `dispatch` (runner copy) | yes | yes | yes | yes |
+
+Who carries `dispatch`: the owner-minted **runner copy** (`take` + `dispatch`); the owner's
+**driver copies** (below), which hold `dispatch` alone; and the orchestrators the server
+launches for the owner, which it declares `dispatch` for: an `/autopilot/kickoff` child, an
+owner's Autopilot dispatch (including a periodical "+ Autopilot"), and a feedback-widget
+"Save + autopilot". Everything else is grant-less — a `+proxy` toggle-path copy, a Settings
+token, and every worker an orchestrator dispatches (a worker is a leaf: it cannot enqueue).
+
+### Enqueue routes and the dispatch grant (LIN-3136)
+
+`POST /api/proxy/dispatch` (including `abort`, `cascade` and `followUpTo`),
+`POST /api/proxy/recommend-and-dispatch` and `POST /api/proxy/autopilot/kickoff` each require a
+`readWrite` token that **also** holds `dispatch`. The chain on each is rate limit → token → scope
+→ grant → handler, so the grant is checked after the scope and **before any body validation**:
+a token without it gets the same `403` whatever the body, and nothing is enqueued.
+
+```json
+{ "error": "This token cannot enqueue work (no dispatch grant). Ask the workspace owner to copy the prompt again from the app (Autopilot, Flight Companion and Passage Planner copies carry the dispatch grant), or use the runner copy from Settings.",
+  "code": "DISPATCH_GRANT_REQUIRED", "category": "auth", "retryable": false }
+```
+
+A `read` token (with or without grants) still gets the scope's own `403` first. The reads
+(`GET /api/proxy/dispatch`, `/dispatch/{id}`, `/dispatch/{id}/prompt`) need no grant.
+
+`/autopilot/kickoff` declares `dispatch` for the child it launches: for your token's own owner,
+in the workspace your token was minted for, re-checking ownership at the mint. If ownership has
+changed since: `403 GRANT_OWNER_ONLY`; no recorded owner: `409 WORKSPACE_OWNER_UNSET`; a token
+with no workspace binding: `400 INVALID_GRANTS`. Nothing is enqueued on any of these. A plain
+`POST /dispatch` (even with `kind: "autopilot"`) launches a grant-less worker; to launch an
+orchestrator, use the kickoff.
+
+Three `POST /api/proxy/dispatch` body fields the endpoint reference below does not spell out:
+
+- `waitForFollowUps` (boolean, default `false`; `cli`/`web` only) — the completion hold: the
+  runner keeps the session open at completion for in-session follow-ups instead of finalizing.
+  Set it for a worker you will keep feeding; leave it off for an orchestrator.
+- `queueIfBusy` (boolean, default `false`) — for a follow-up (`followUpTo`) whose target session
+  is busy: the runner leaves it unclaimed until the session can take it, rather than failing it
+  (LIN-827). Stored and forwarded; the runner owns the behaviour.
+- `subscription` (`"terminal-only"` (default) | `"everything"`) — which of this item's events wake
+  the session named in `sessionId` (LIN-900 §6): `"everything"` wakes it on every report,
+  `"terminal-only"` only on DONE/FAILED/BLOCKED. Declared on the edge, never inferred.
 
 ### Single-Use Tokens
 
@@ -171,10 +220,13 @@ uses which one so a value change there is not also a doc-drift bug here.
 | Dispatch preamble bootstrap | `BOOTSTRAP_TOKEN_TTL_SECONDS` | 48h |
 | Refire broker bootstrap (`POST /api/dispatch/broker-token`) | `BOOTSTRAP_TOKEN_TTL_SECONDS` | 48h |
 | Operator bootstrap mint (`"bootstrap": true`) | `BOOTSTRAP_TOKEN_TTL_SECONDS` | 48h |
-| Operator standard mint, label `prompt-proxy` | `PROMPT_PROXY_TOKEN_TTL_SECONDS` | 48h |
+| Operator standard mint, label `prompt-proxy` (the `+proxy` toggle path's label; grant-less) | `PROMPT_PROXY_TOKEN_TTL_SECONDS` | 48h |
 | Operator standard mint, any other label | `ProxyTokenStore.defaultTtl` (store default) | 90 days |
 | Runner copy bootstrap (`{ "runner": true }`) | `RUNNER_BOOTSTRAP_TTL_SECONDS` (`lib/proxy-scopes.js`) | 1h |
 | Runner copy working token (its exchange) | `RUNNER_WORKING_TTL_SECONDS` (`lib/proxy-scopes.js`) | 24h |
+| Driver copy bootstrap (`{ "purpose": "driver" }`, label `prompt-driver`) | `LIFETIME_PROFILES.worker` (`lib/proxy-scopes.js`) | 48h |
+| Driver copy working token (its exchange) | `LIFETIME_PROFILES.worker` | 48h |
+| An orchestrator's declared launch credential (kickoff child, owner Autopilot dispatch, feedback autopilot): bootstrap and working token | `LIFETIME_PROFILES.worker` | 48h |
 | Dispatch tokens (`DispatchTokenStore`) | — (schema has no `expiresAt`) | never expires |
 
 Every ordinary path an agent reaches programmatically is 48h; a **runner copy** is the 1h/24h
@@ -215,6 +267,31 @@ body itself is the runner-prompt ticket's (LIN-3098); this is only the credentia
 | another account owns the workspace | 403 | `GRANT_OWNER_ONLY` |
 | owner check unwired, erroring, or a corrupt merge chain | 503 (retryable) | `OWNER_CHECK_UNAVAILABLE` |
 | body carries `grants` | 400 | `GRANTS_NOT_CLIENT_SETTABLE` |
+
+### Driver copies (LIN-3136)
+
+A **driver copy** is the owner-checked single-use bootstrap behind a copy button whose prompt
+drives work: the Autopilot copy and download (task, home and periodical "+ Autopilot"), the
+Flight Companion copy and the Passage Planner copy. The browser mints it with `POST
+/workspace/:urlKey/api/proxy/tokens` and the body `{ "purpose": "driver" }`, once per copy (never
+cached), and its exchange yields a working token holding `dispatch` alone on the 48h `worker`
+profile, so the pasted session can enqueue.
+
+- **Only the workspace owner can mint one**, exactly as for a runner copy. The server resolves
+  the grant (`['dispatch']`, never `take`), the lifetime profile and the label (`prompt-driver`);
+  client `scope` and `label` are ignored. The purpose table is closed: `purpose` is `"runner"`
+  (the same as `{ "runner": true }`) or `"driver"`.
+- **No purpose, no grant.** The `+proxy` toggle's copy (`{ "label": "prompt-proxy", "scope":
+  "readWrite", "bootstrap": true }`) is unchanged and grant-less: a session pasted from it can read
+  and write but gets `403 DISPATCH_GRANT_REQUIRED` if it tries to enqueue.
+- **A refused copy copies nothing.** The page shows why (for example "Only this workspace's owner
+  can copy a prompt that can queue work on their machine…"); there is no grant-less fallback.
+- **Mint refusals** — the runner table above, with the driver subject, plus:
+
+| Case | Status | Code |
+| --- | --- | --- |
+| `purpose` unknown, not a string, or `{ "runner": true }` with another purpose | 400 | `INVALID_PURPOSE` |
+| another account owns the workspace | 403 | `GRANT_OWNER_ONLY` ("Only this workspace's owner can mint a driver credential") |
 
 ### The runner prompt (LIN-3098)
 
@@ -1750,7 +1827,7 @@ GET /api/proxy/passage-runner/prompt
 
 Returns the **Passage Runner kickoff prompt** as **plain text** (`text/plain`) — the pasteable body of `docs/passage-runner-prompt.md` (preamble stripped). This is the same text a fresh Passage Runner session starts from; fetch here to re-read a part mid-run. `read`-scope is sufficient.
 
-**Declaring the runner's task pool (LIN-2975).** This endpoint only returns the kickoff prose — there is no dedicated launch route. A passage runner is launched as a plain `POST /api/proxy/dispatch`, and the ratified pool size is whatever `maxTasks` the launcher passes on **that** call; the runner has no seam to declare it on itself after the fact. Pass `maxTasks` when dispatching the runner, or its own `GET /dispatch/{id}` will read `maxTasks: null` and the runner will (correctly) report its pool as undeclared. The same applies to `maxSessionsPerTask` (LIN-2934) for a scoped one-task runner.
+**Declaring the runner's task pool (LIN-2975).** This endpoint only returns the kickoff prose — there is no dedicated launch route for it. The Passage Planner launches a passage runner with one `POST /api/proxy/autopilot/kickoff` (an orchestrator launch, so the run holds the `dispatch` grant it needs to fan out its legs; a plain `POST /api/proxy/dispatch` would launch a grant-less worker), and the ratified pool size is whatever `maxTasks` the launcher passes on **that** call; the runner has no seam to declare it on itself after the fact. Pass `maxTasks` when dispatching the runner, or its own `GET /dispatch/{id}` will read `maxTasks: null` and the runner will (correctly) report its pool as undeclared. The same applies to `maxSessionsPerTask` (LIN-2934) for a scoped one-task runner.
 
 ### Write Endpoints
 

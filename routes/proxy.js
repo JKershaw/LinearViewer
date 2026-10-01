@@ -584,8 +584,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       req.proxyTokenLabel = result.label;
       req.proxyTokenScope = result.scope;
       req.proxyCreatedBy = result.createdBy;
-      // LIN-3129: the token's grant set, additively. Nothing reads it until a
-      // mount uses requireGrant (LIN-2884) — S1 adds no mount.
+      // LIN-3129: the token's grant set, additively. `requireGrant` reads it at
+      // the runner (`take`) and enqueue (`dispatch`, LIN-3136) mounts.
       req.proxyTokenGrants = result.grants || [];
       // LIN-3136: the token's own stored workspace id (null when it has none).
       // The kickoff's declared mint (M1) reads it; it is never client-supplied.

@@ -104,6 +104,6 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 - `ci-success` must be green on a PR before merging (it aggregates the unit and e2e jobs).
 - A PAT-mode session still supports OAuth if OAuth vars are configured; see `docs/architecture/auth.md`.
 - Workspace owner = its `role:'owner'` edge (first binder, LIN-1892); read via `getWorkspaceOwnerAccountId`. Not the credential-scope `ownerAccountId`; see `docs/architecture/auth.md`.
-- Runner copies (`{ "runner": true }`) are owner-only, carry server-resolved `take`+`dispatch` grants (`dispatch` not yet enforced), live 1h/24h and revoke by lineage; see `docs/proxy-integration.md`.
+- Runner copies (`{ "runner": true }`) are owner-only, carry server-resolved `take`+`dispatch` grants, live 1h/24h and revoke by lineage. Enqueue (`/dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`) requires `dispatch` (LIN-3136); see `docs/proxy-integration.md`.
 - The scheduler's registered-job roster and the prompt-template count are hand-written in `docs/architecture/source-map.md`, but checked against source at test time, never trusted as written.
 - Email is an **identity type, never a provider** (no `lib/providers/email`): `lib/email-auth.js` + `routes/email-auth.js`. `lib/email-availability.js` is the one availability predicate (never enabled by `NODE_ENV` alone); see `docs/architecture/auth.md`.

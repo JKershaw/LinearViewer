@@ -198,7 +198,10 @@ corrupt `mergedInto` chain fails closed as `503 OWNER_CHECK_UNAVAILABLE`. Owners
 `409 WORKSPACE_OWNER_UNSET` (no owner edge) and `403 GRANT_OWNER_ONLY` (a different account owns
 it); `503 GRANT_OWNERLESS` is a session with no account. Any signed-in member may list and revoke
 runner credentials from the Proxy page, and revoking one revokes its whole lineage. `dispatch` is
-stamped on the runner copy but is **not yet enforced** (LIN-2884).
+**enforced** on the three enqueue routes (`requireGrant('dispatch')`, LIN-2884 T3 / LIN-3136): the
+runner copy carries it, as do the owner's driver copies (`{ "purpose": "driver" }`, `['dispatch']`
+only, the 48h `worker` profile) and the orchestrators the server declares it for (kickoff child,
+owner Autopilot dispatch, feedback autopilot).
 
 The same owner edge also gates the **legacy dispatch-token mint** (LIN-3137 / LIN-2884 J5). A
 legacy dispatch token is a never-expiring take path, so only the workspace owner may mint one:
