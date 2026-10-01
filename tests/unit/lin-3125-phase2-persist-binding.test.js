@@ -143,6 +143,37 @@ describe('LIN-3125 Phase 2 — persistBinding', () => {
       assert.equal(row.credentials.token, 'ghs');
     });
 
+    test('residual (a): {connectionBacked:false, error:\'retryable\'} still takes the fallback write and surfaces retryable', async () => {
+      const store = freshStore();
+      // Residual (a) on the real converter: `link()` returns false and the
+      // re-read `readConnectionOutcome()` returns null, so the result is
+      // {connectionBacked:false, error:'retryable'} for a *new* binding. The old
+      // inline condition fell back on `!connectionBacked` alone, so the legacy
+      // write must still run here and the retryable error must surface.
+      const workspace = { id: 'ws-1', urlKey: 'acme', bindings: [{ provider: PROVIDER, scope: SCOPE, credentials: CREDS }] };
+      const session = { accountId: ACCT, workspaces: [workspace] };
+      const { fn, log } = spyWriteConnection();
+
+      const out = await persistBinding({
+        connectionStore: store,
+        session,
+        accountId: ACCT,
+        workspace,
+        provider: PROVIDER,
+        scope: SCOPE,
+        credentials: CREDS,
+        prior: 'none',
+        writesEnabled: true,
+        convertToConnectionBacked: async () => ({ connectionBacked: false, error: 'retryable' }),
+        writeConnection: fn,
+      });
+
+      assert.equal(out.connectionBacked, false);
+      assert.equal(out.error, 'retryable');
+      assert.equal(log.length, 1, 'the fallback write ran exactly once on residual (a)');
+      assert.deepEqual(log[0], [store, ACCT, workspace, PROVIDER, SCOPE]);
+    });
+
     test('legacy result with no store: no fallback and no throw', async () => {
       const workspace = { id: 'ws-1', urlKey: 'acme', bindings: [{ provider: PROVIDER, scope: SCOPE, credentials: CREDS }] };
       const session = { accountId: ACCT, workspaces: [workspace] };

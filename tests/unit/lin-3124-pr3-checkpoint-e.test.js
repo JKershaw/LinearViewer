@@ -636,16 +636,25 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
       // flow's `persistBinding(` calls (each sits after its establishAccount /
       // `!established.ok` return) rather than a per-file convert scan.
       const flow = read('lib/github-install-flow.js');
+      const anchors = [];
       let idx = flow.indexOf('await persistBinding({');
-      let seen = 0;
       while (idx >= 0) {
-        seen++;
+        anchors.push(idx);
         const head = flow.slice(0, idx);
         const refusal = Math.max(head.lastIndexOf('if (!established.ok)'), head.lastIndexOf('const established = await establishAccount('));
         assert.ok(refusal >= 0, 'a persistBinding with no establishAccount/refusal before it');
         idx = flow.indexOf('await persistBinding({', idx + 1);
       }
-      assert.equal(seen, 3, 'the three GitHub sites');
+      assert.equal(anchors.length, 3, 'the three GitHub sites');
+      // L3 per-site ordering: the file-wide refusal check above lets site A's
+      // `establishAccount` satisfy sites B/C, so E4 (a site moved above its OWN
+      // establishAccount) would pass. Pin each site's own establishAccount anchor
+      // to sit after the previous site's persistBinding call.
+      anchors.forEach((anchor, i) => {
+        const ownEstablish = flow.lastIndexOf('const established = await establishAccount(', anchor);
+        assert.ok(ownEstablish >= 0, `site ${i}: no establishAccount before its persistBinding`);
+        assert.ok(ownEstablish > (anchors[i - 1] ?? -1), `site ${i}: its own establishAccount must come after the previous persistBinding`);
+      });
       for (const rel of ['routes/auth.js', 'routes/jira-auth.js', 'routes/account-merge.js']) {
         const src = read(rel);
         let idx = src.indexOf('convertToConnectionBacked({');
