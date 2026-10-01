@@ -798,6 +798,43 @@ describe('sumTranscriptUsage folds repeated snapshots per message.id (LIN-3212)'
     assert.equal(growing[0], 4); // first-wins would record this
     assert.equal(Math.max(...growing), 535); // max-per-id records this
   });
+
+  test('takes the MAX of each field, not the last snapshot, and a line with no id is its own message', () => {
+    // Synthetic (review 2363ff88, ledger items 3 and 4): the real fixture is
+    // monotonic, so last-wins passes it. Here msg_a's fields peak on different
+    // snapshots, so first-wins, last-wins and max all disagree.
+    const line = (id, [input, output, cacheCreation, cacheCreation1h, cacheRead]) => JSON.stringify({
+      type: 'assistant',
+      message: {
+        ...(id ? { id } : {}),
+        model: 'claude-sonnet-5-5',
+        usage: {
+          input_tokens: input,
+          output_tokens: output,
+          cache_creation_input_tokens: cacheCreation,
+          cache_creation: { ephemeral_1h_input_tokens: cacheCreation1h },
+          cache_read_input_tokens: cacheRead
+        }
+      }
+    });
+    const u = sumTranscriptUsage([
+      line('msg_a', [10, 4, 500, 200, 1000]),
+      line('msg_a', [12, 300, 500, 200, 900]),
+      line('msg_a', [11, 250, 0, 0, 1200]), // later and lower on input, output and cache creation
+      line('msg_b', [3, 50, 0, 0, 100]),
+      line(null, [2, 7, 0, 0, 0]),
+      line(null, [2, 7, 0, 0, 0]) // identical, but no id: a second message, not a repeat
+    ]);
+    assert.deepEqual(u, {
+      harness: 'claude-code',
+      model: 'claude-sonnet-5-5',
+      inputTokens: 12 + 3 + 2 + 2,
+      outputTokens: 300 + 50 + 7 + 7,
+      cacheCreationInputTokens: 500,
+      cacheCreation1hInputTokens: 200,
+      cacheReadInputTokens: 1200 + 100
+    });
+  });
 });
 
 describe('subagentModelFor (NB5: map model onto the subagent, ignore effort)', () => {
