@@ -282,6 +282,10 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(body.issueIdentifier).toBe(identifier);
       expect(body.target).toBe('cli');
       expect(body.prompt).toBeTruthy();
+      // LIN-3211: the rung sends the card panel's harness (claude-code by
+      // default), so the item carries the structured bootstrapToken rather than
+      // a token in prompt prose. HEAD sent none (the rung sits outside the panel).
+      expect(body.harness).toBe('claude-code');
     });
 
     test('a remembered AI prompt disables regenerate and spends nothing when AI is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
