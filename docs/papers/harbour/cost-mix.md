@@ -1,10 +1,11 @@
 ---
 title: Where does Harbour's weekly budget go by kind of change, and where does more effort buy correctness?
 kind: paper
-version: 1
+version: 2
 date: 2026-10-01
-authors: [Claude (LIN-3180), for John Kershaw]
-model: "Frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 747fe269, kind custom, LIN-3180), effort not recorded in the dispatch item. One bounded session with no research, plan, review or close-out legs, by the brief's design. One in-session subagent of the same tier read the prior papers. No hand coding: catches come from the committed codes of which-rules-pay.md and reliability-baseline.md. Not yet checked."
+authors: [Claude (version 1, LIN-3180), Claude (version 2 corrections, LIN-3185), for John Kershaw]
+model: "Frontier tier, Claude Code CLI dispatched by simple-dispatcher (dispatch 747fe269, kind custom, LIN-3180), effort not recorded in the dispatch item. One bounded session with no research, plan, review or close-out legs, by the brief's design. One in-session subagent of the same tier read the prior papers. No hand coding: catches come from the committed codes of which-rules-pay.md and reliability-baseline.md. Version 2: frontier tier, claude-code, the independent check's session (dispatch 1c1b8348, LIN-3185), which re-ran every script."
+revision: "Version 2 corrects statements per docs/papers/harbour/survey-check-9.md (LIN-3185): escapes by size counted on reliability-baseline.md v2's terms, without review residue and finder rows, are 1.3, 2.1 and 2.2 in 100, not a flat 3; the backtest's 5 of 249 are failures after merge, not faults review caught, and review caught a real fault on 8 of its 328 small low-risk changes; about half of the standalone changes' cost is the small-change floor, which is a lower bound on the fixed part, not half of a small change's cost; the fleet-machinery class holds about 10 points of rulings, Flight Companion and scan-due work, and the ceiling with it held is 2.7 only if that work must stay rigorous too; LIN-2113's +18.2% is a markup, so one allowance is 793–937M, not 790–970M, and the September mid tier is weighted at 0.6 but listed at 0.4 of the frontier tier, so September used 0.82–0.97 allowances a week at list ratios (0.89–1.06 on these weights); option 4 is 1.2× on the changes it touches, not 1.5×. Every printed count, share and bound reproduces; the figures are version 1's."
 grounded_at: 26014544 (LinearViewer, origin/main); 33667480 (simple-dispatcher, origin/main). Transcripts and runner logs read on 1 October 2026; tracker snapshot taken the same day.
 cites:
   - "docs/papers/harbour/steady-base.md@26014544:432-441 (the three risk tiers) and :447-455 (what every step protects)"
@@ -23,6 +24,9 @@ cites:
   - "docs/reviews/capacity-test-run-review-2026-08-14.md@26014544:127-135 (27 meter points against $1,070.58)"
   - "lib/weekly-budget.js@26014544:1-12 (the one meter calibration)"
   - "docs/papers/harbour/efficiency-levers.md@26014544:61 (LIN-2113: the old pricing table understated the day by 18.2%)"
+  - "lib/model-pricing.js@26014544:111-129 (list prices by tier) and docs/reviews/intra-session-efficiency-review-2026-08-14.md@26014544:141-149 (the +18.2%)"
+  - "docs/papers/harbour/survey-check-readings.json@26014544 (the residue and finder rows reliability-baseline.md v2 removed)"
+  - "docs/papers/harbour/survey-check-9.md (LIN-3185, the check of version 1)"
   - "LIN-3180 (2026-10-01)"
 ---
 
@@ -35,17 +39,21 @@ parent tickets, unmerged tickets and sessions with no ticket. A tenth went to th
 Credential and auth work took only a tenth. Review's real catches do not follow the budget. In
 the last 100 reviewed tickets every one of the 43 real faults found sat in a change of 50
 production lines or more, three-quarters of them in changes of 300 or more, and none in the 23
-small or docs-only changes. Escapes run at about 3 in 100 changes in every size band that has
-production code. So the curve from effort to correctness is steep for large changes and for
-credential and fleet machinery. It is flat for small changes and docs, where review neither
-catches faults nor stops the escapes that happen. Amdahl's law then sets the bound. Hold
-credential work at today's cost and cut everything else by a factor of three, and a weekly budget
-buys at most 2.5 times the correct work. Cut everything else by ten and it buys 5.3 times. The
-ceiling, with everything else free, is about ten. Two other limits bind sooner. About half of a
-small change's cost is fixed, whatever its size. A split family of tickets costs 1.8 times what
-its children would have cost as standalone tickets.
+small or docs-only changes, though across June to September review caught a real fault on about
+2 in 100 small changes. Escapes run at 1.3 to 3 in 100 small changes, depending on whether faults
+that later reviews found are counted, and at 2 to 4 in 100 larger ones. So the curve from effort
+to correctness is steep for large changes and for credential and fleet machinery. It is shallow
+for small changes and docs, where review catches little and little escapes. Amdahl's law then
+sets the bound. Hold credential work at today's cost and cut everything else by a factor of
+three, and a weekly budget buys at most 2.5 times the correct work. Cut everything else by ten
+and it buys 5.3 times. The ceiling, with everything else free, is about ten. Two other limits
+bind sooner. At least half of what a standalone change costs does not depend on its size. A
+split family of tickets costs 1.8 times what its children would have cost as standalone
+tickets.
 
 ![September's budget by kind of change, against where review caught faults and where faults escaped](figures/cost-mix/budget-vs-catches.svg)
+
+The figures were drawn for version 1 and still show its escape counts. The tables are version 2's.
 
 ![The bound: the gain in correct work per budget if some spend falls and the rest is held](figures/cost-mix/bound-curve.svg)
 
@@ -83,6 +91,13 @@ September's tokens by themselves. That is research spend, not the cost of a chan
 change of its own** is the orchestration of split tickets, the V1 passage (LIN-3099) among them.
 **No ticket** is mostly sessions that never fetched an item naming one: diagnostics and ad hoc
 prompts. In August it also includes dispatches whose log names no issue.
+
+**Fleet machinery** is broader than its name. Its path rule includes the rulings feed, the Flight
+Companion, briefs, recaps and periodicals. Twenty-one of its 91 tickets with September spend are
+rulings, Flight Companion and scan-due work by title, read by hand: 9.7 of its 27.1 points
+(`survey-check-9.md`). The credential rule, by contrast, mostly finds credential work. Three
+tickets that are not credential work are filed under it (LIN-3139, LIN-3130 and LIN-2360), under
+1% of the budget.
 
 **By size, the budget sits in the middle and large changes. By shape, children of a split take
 as much as standalone tickets.** Of September's tokens, changes of 0 lines took 18.0%, 10 points
@@ -124,33 +139,45 @@ The earlier samples point the same way:
   blockers, 22 of them from code review. Fifteen are on changes of 300+ lines, eight of them
   LIN-2081's credential work. One is on a change under 50 lines.
 - **`proportional-process-backtest.md`'s light group.** Review and plan review found real faults
-  on small changes, but rarely. Across the changes its rules routed light, there was one fault on
-  each of five changes of 1–49 lines. Its small, low-risk rule alone routed 249 changes light.
+  on small changes, but rarely: on 8 of the 328 changes its small, low-risk rule routed light,
+  11 of 15 findings at plan review. Five of those eight were docs-only, and three were small code
+  changes. At that rate, 23 changes show no catch about half the time, so the 0 of 23 above says
+  little on its own. Separately, 5 of that rule's 249 mature light changes went wrong after merge.
 
-**Escapes do not follow size, and they follow class only weakly.** Each escaped Bug that names
-the change that introduced it was charged to that change. The table counts changes merged June to
-August, which have had at least 30 days to show a fault. The intervals are Wilson 95%.
+**Escapes follow size weakly, and class more.** Each escaped Bug that names the change that
+introduced it was charged to that change. The table counts changes merged June to August, which
+have had at least 30 days to show a fault. The intervals are Wilson 95%.
 
-| Kind of change | Changes, Jun–Aug | With a named escape | Rate (95%) |
+The first column counts every such Bug, 34 of them. The second uses `reliability-baseline.md`
+v2's terms, which leave 18. That removes review residue, a Bug filed from another ticket's review
+ledger. It also removes finder rows, where the named ticket is the one whose review found an
+older fault (`survey-check.md`). Neither is exact. Some residue does name the change that wrote
+the fault, such as LIN-2272 against LIN-2252.
+
+| Kind of change | Changes, Jun–Aug | Every named escape | Without residue and finder rows |
 |---|--:|--:|--:|
-| credentials, auth | 78 | 4 | 5.1% (2.0–12.5) |
-| fleet machinery | 388 | 17 | 4.4% (2.8–6.9) |
-| simple-dispatcher | 140 | 5 | 3.6% (1.5–8.1) |
-| UI | 134 | 2 | 1.5% (0.4–5.3) |
-| other | 172 | 3 | 1.7% (0.6–5.0) |
-| docs and tests only | 92 | 1 | 1.1% (0.2–5.9) |
-| 1–49 lines (any class) | 297 | 9 | 3.0% (1.6–5.7) |
-| 50–299 lines | 434 | 16 | 3.7% (2.3–5.9) |
-| 300+ lines | 181 | 6 | 3.3% (1.5–7.0) |
+| credentials, auth | 78 | 4, 5.1% (2.0–12.5) | 4, 5.1% (2.0–12.5) |
+| fleet machinery | 388 | 17, 4.4% (2.8–6.9) | 9, 2.3% (1.2–4.3) |
+| simple-dispatcher | 140 | 5, 3.6% (1.5–8.1) | 2, 1.4% (0.4–5.1) |
+| UI | 134 | 2, 1.5% (0.4–5.3) | 0 (0–2.8) |
+| other | 172 | 3, 1.7% (0.6–5.0) | 2, 1.2% (0.3–4.1) |
+| docs and tests only | 92 | 1, 1.1% (0.2–5.9) | 0 (0–4.0) |
+| 1–49 lines (any class) | 297 | 9, 3.0% (1.6–5.7) | 4, 1.3% (0.5–3.4) |
+| 50–299 lines | 434 | 16, 3.7% (2.3–5.9) | 9, 2.1% (1.1–3.9) |
+| 300+ lines | 181 | 6, 3.3% (1.5–7.0) | 4, 2.2% (0.9–5.5) |
 
-Credential and fleet work escape about three times as often as UI and other code. Every interval
-overlaps, though, and only about one escaped Bug in six names its introducer at all
-(`measuring-throughput.md`). By size, the rate is flat at about 3 in 100. Put the two tables
-together:
-- **Large changes:** review catches several faults per change and their escape rate is no
-  higher than a small change's. More checking buys correctness here.
-- **Small changes:** review almost never catches anything, yet they escape at the same 3 in
-  100. What escapes there is not what review looks for.
+Credential and fleet work escape more often than UI and other code under either count, and fleet
+machinery holds about half the escapes under both. Every interval overlaps, though, and only
+about one escaped Bug in six names its introducer at all (`measuring-throughput.md`).
+
+By size, counting every Bug gives a flat 3 in 100. On v2's terms small changes escape at about
+half the rate of larger ones, the order `reliability-baseline.md` found on total lines (0.7, 1.2
+and 2.5 per 100). Put the tables together:
+- **Large changes:** review catches several faults per change, and their escape rate is no lower
+  than a small change's. More checking buys correctness here.
+- **Small changes:** review catches a real fault on about 2 in 100 across June to September, and
+  they escape at 1.3 to 3 in 100. Both rates are low and close. Neither table can say how much of
+  the escape rate review would have prevented.
 
 **Within a class, more effort for a change's size does not go with fewer wrong changes.**
 Mature changes with runner hours, 423 of them, were split within each class into terciles of
@@ -193,16 +220,21 @@ share ÷ factor) if the output stays the same. The shares are September's tokens
 | all spend that merged no change of its own | 22.5% (20.3%) | 1.6 | 2.1 | 2.6 | 3.3 | 4.4 (4.9) |
 | everything except docs, tests and UI | 73.5% (72.5%) | 1.2 | 1.2 | 1.3 | 1.3 | 1.4 (1.4) |
 
+The bound barely moves if the September mid tier is weighted at its list ratio, 0.4 of the
+frontier tier rather than 0.6 (Limits). It becomes 2.5×, 5.2× and a ceiling of 9.9, or 2.8 with
+fleet machinery held.
+
 Two classes dominate the bound. Credentials are small, so holding them alone still allows about
 ten. Fleet machinery is a quarter of the budget, carries half of review's catches and half of the
 escapes, and has the second-highest escape rate. If rigour has to stay there too, the ceiling
-falls to 2.7. A light lane for docs, tests and UI alone, the obvious first tier, is worth at most
+falls to 2.7. That counts the class's rulings, Flight Companion and scan-due work, 9.7 points of
+it, as machinery. Cut too, they would leave a ceiling of about 3.7. A light lane for docs, tests and UI alone, the obvious first tier, is worth at most
 1.4. The overhead rows are a fifth of the budget, so even a perfect process for the changes
 themselves would stop at 4.4 if overhead stayed.
 
 ![Median weighted tokens per change by production lines changed](figures/cost-mix/fixed-cost.svg)
 
-**About half of a change's cost is fixed.** These are standalone changes whose every dispatch
+**At least half of a standalone change's cost is fixed.** These are standalone changes whose every dispatch
 fell in September, so all of their spend is in the transcripts. Children are left out because
 part of their work is spent in their parent's session.
 
@@ -214,9 +246,12 @@ part of their work is spent in their parent's session.
 | 300+ | 11 | 12.1M (8.9–25.8) | 23 | 2.5 |
 
 A change of a few lines still costs about 4 million weighted tokens, ten dispatches and an hour
-of work. A change of a few hundred lines costs only two to three times that. If every one
-of these 120 changes had cost the 1–49-line median, they would have cost 49.6% of what they did.
-So a process that shrank only the size-dependent work could at most double output per budget. A
+of work. A change of a few hundred lines costs only two to three times that. If every one of these
+120 changes had cost the 1–49-line median, they would have cost 49.6% of what they did. That
+floor is a lower bound on the fixed part, and 50 of the 120 are docs-only changes, mostly papers.
+A linear fit of tokens on production lines over the 70 code changes puts the intercept at 7.8M of
+an 8.8M mean. So a process that shrank only the size-dependent work would raise output per budget
+by somewhere between about 1.1× and 2×. A
 large multiple needs the fixed part to fall: orientation, gates, supervision, wakes. That is
 where the sibling papers look (`starting-context.md`, `held-or-fresh.md`, `step-overlap.md`).
 
@@ -227,12 +262,15 @@ spent 1,572M tokens, 44% of the month. Had each child cost the standalone mean f
 they would have spent 889M. The parent's own sessions were 39.5% of the family's spend. Across all 26 families with
 September spend, the parent adds 52% on top of its children when charged to the child named, and
 56% when charged to the session entered. This overstates what splitting itself adds, because work is split when it is large or
-uncertain. It is still the largest single lever on the fixed part that the data show.
+uncertain. Children cost more than standalone changes of their size even before the parent's spend
+(951M against 889M), so about 0.1 of the 1.8× is the children themselves. It is still the largest
+single lever on the fixed part that the data show.
 
 **Correct, complete changes per budget: about 71 per billion weighted tokens, or 14M per change.** September's merges are scored on the scorecard's terms, and they are provisional because their
 30-day window is still open. The fleet spent 3,593M weighted tokens and merged 330 changes, of which
 254 were correct and complete: 14.1M each, or 70.7 per billion. That sits inside
-`measuring-throughput.md`'s weekly range of 11.4–16.0M.
+`measuring-throughput.md`'s weekly range of 11.4–16.0M. With the mid tier at its list ratio it is
+13.0M.
 
 Charging each class only its own spend leaves out the fifth that merged no change of its own:
 
@@ -253,15 +291,20 @@ figures understate what each class costs, because the overhead rows are not allo
 There is one calibration of the weekly meter. On 14 August it moved 27 points while the fleet
 spent $1,070.58 at list prices (`lib/weekly-budget.js`). LIN-2113 later found that the pricing
 table of that day understated spend by 18.2%. At $5 per million weighted tokens, one weekly
-allowance is therefore about 790–970M weighted tokens. September's fleet spent 838M a week. That
-is 0.87–1.06 allowances a week from Harbour alone. On this machine, other projects were 1.5% of
+allowance is therefore about 793–937M weighted tokens: the +18.2% is a markup on the day's
+priced spend. September's fleet spent 838M a week, which is 0.89–1.06 allowances a week from
+Harbour alone. These weights price the September mid tier at 0.6 of the frontier tier, but the
+list table that priced the calibration day has it at 0.4. At list ratios September is 773M a week,
+0.82–0.97 allowances. On this machine, other projects were 1.5% of
 September's Claude tokens. Use on claude.ai and on other machines is invisible here. Three things
 follow:
-- **The meter's units are this paper's units.** The meter is a share of a list-price-like
-  budget, and weighted tokens are list-price ratios. The conversion is one constant that one
-  more paired reading would pin down.
-- **Today's correct work is capped by the allowance, not by demand.** At about one allowance a
-  week, any gain shows as more correct changes per week, not as a lower meter reading.
+- **The meter's units are nearly this paper's units.** The meter is a share of a list-price-like
+  budget. Weighted tokens are list-price ratios for the frontier and cheap tiers, and overweight
+  the September mid tier by half. The conversion is one constant that one more paired reading
+  would pin down.
+- **Today's correct work is probably capped by the allowance, not by demand.** At about one
+  allowance a week, any gain should show as more correct changes per week, not as a lower meter
+  reading. That is an inference from being near one, not a measurement.
 - **A multiple of correct work per budget is the same number as a multiple of correct changes
   per weighted token.** That makes the scorecard's tokens-per-correct-change the measure to
   track.
@@ -273,16 +316,17 @@ use September's shares under the child-named rule and assume the same correct ou
 
 | Option | Estimated gain in correct work per budget | Evidence | Risk to correctness | How the scorecard would measure it |
 |---|---|---|---|---|
-| **1. A light lane for small, non-credential changes** (0–49 production lines; survey papers excluded) at a third of today's cost | 1.1× (1.08× at a half, 1.14× at a fifth) | Small changes are 15.3% of the budget. Review found no real fault on the 23 small or docs-only changes it coded in September. Their escape rate equals large changes' | Low. The backtest found 5 faults on 249 small changes that review caught, mostly at plan review. Some of those would ship | Tokens per correct change in the 1–49 band, which shows first. Its escape rate, with intervals: at about 75 small changes a month, a doubling from 3 in 100 would take most of a year to see |
+| **1. A light lane for small, non-credential changes** (0–49 production lines; survey papers excluded) at a third of today's cost | 1.1× (1.08× at a half, 1.14× at a fifth) | Small changes are 15.3% of the budget. Review found no real fault on the 23 small or docs-only changes it coded in September, and on 8 of 328 across June to September. They escape at 1.3–3 in 100, no more often than large changes | Low. Review caught a real fault on 8 of the backtest's 328 small low-risk changes, mostly at plan review, and some of those would ship. 5 of its 249 mature light changes went wrong after merge even with today's process | Tokens per correct change in the 1–49 band, which shows first. Its escape rate, with intervals: at about 75 small changes a month, a doubling from 1.3–3 in 100 would take a year or more to see |
 | **2. Lighter orchestration of split families** (parents at half their spend) | 1.1× alone, 1.2× with option 1 | Parent-only spend is 13% of the budget, and families cost 1.8× their children's standalone equivalent | Low to moderate. Parents hold the cross-child checks. The V1 passage is live and its data are fair to read | Family spend divided by children's standalone equivalent, monthly. Escapes on children |
 | **3. Cut the fixed part** (orientation, gates, wakes) by half, everywhere | 1.3× | Half of a small change's cost does not depend on its size. Supervision is 35% of tokens (`where-the-effort-goes.md`) | Depends on what is cut. The sibling papers size each piece | Median tokens for a 1–49-line standalone change. Today it is 4.2M (3.0–5.5) |
-| **4. Size the gates to the change:** keep today's process for credentials and 300+ line changes, halve the rest | 1.5× | 32 of 43 coded faults were in 300+ line changes, and none in 0–49 | Moderate. The 50–299 band holds 11 of 43 catches and the highest escape rate (3.7%) | Catches per 100M review tokens by band (today 0 at 0–49). Escapes by band |
+| **4. Size the gates to the change:** keep today's process for credentials and 300+ line changes, halve the rest | 1.2× on the 0–299-line changes it touches; 1.5× only if the papers', parents' and unmerged spend halve too | 32 of 43 coded faults were in 300+ line changes, and none in 0–49 | Moderate. The 50–299 band holds 11 of 43 catches and 2.1–3.7% escapes | Catches per 100M review tokens by band (today 0 at 0–49). Escapes by band |
 | **5. Hold credentials; cut everything else to a third** | 2.5× | The Amdahl table above | High. Fleet machinery carries half the catches and half the escapes | All of the above. Escapes in fleet machinery would show first |
 | **6. Hold credentials; cut everything else to a tenth** | 5.3× | The Amdahl table above | Very high on today's evidence | Same as option 5 |
 
-Options 1 to 4 together come to about 1.7×, not their product, because they cut the same spend.
+Options 1 to 4 together come to about 1.7–1.8×, not their product, because they cut the same spend.
 For example, holding credentials and 300+ line changes, halving everything else, and cutting the
-held work's fixed part by half gives 1.74×. Beyond
+held work's fixed part by half gives 1.74×. That example halves the papers', parents' and unmerged
+spend as well. Beyond
 that the evidence offers nothing yet. Reaching 5× or more needs fleet machinery to become cheap
 without its catches moving into escapes. No paper has measured whether that is possible.
 
@@ -392,8 +436,9 @@ node scripts/survey-costmix-figures.mjs                    # docs/papers/harbour
   tickets' worth of zeros. Most of those are probably small changes, which would only sharpen
   the size gradient. Faults per 100M review tokens use September's spend on tickets that may have
   started in August, which biases the rate up.
-- **Escapes are floors.** About one escaped Bug in six names its introducer, and a few name the
-  finder rather than the writer (`reliability-baseline.md`). If credential faults are reported
+- **Escapes are floors, and their convention matters.** About one escaped Bug in six names its
+  introducer. Sixteen of the 34 named here are review residue or finder rows, which
+  `reliability-baseline.md` v2 removes; the Findings give both counts. If credential faults are reported
   more readily, their rate is biased up against the other classes. Counts are too small for the
   class differences to be more than suggestive.
 - **The curve is observational.** Working hours for size measure struggle as much as rigour. A
@@ -401,6 +446,10 @@ node scripts/survey-costmix-figures.mjs                    # docs/papers/harbour
   be named. Both push toward a positive slope that is not causal.
 - **The bound assumes the same correct output.** It is the best case for each cut. It cannot see
   a cut that moves catches into escapes, which is exactly the risk in fleet machinery.
+- **The weights are list ratios for the frontier and cheap tiers only.** `fleet-complexity-read.md`
+  set the mid tier at 0.6 when its list price was 0.6 of the frontier tier's. The September mid
+  tier lists at 0.4 and carried 23.6% of weighted tokens. So the totals here are about 8% above
+  list ratios. Shares move by under 1.5 points and the bound by under 0.4.
 - **The meter conversion rests on one day.** That day included about two hours of ramp below the
   first reading and "not much" personal use. Model prices and the subscription's own accounting
   may have changed since, and the conversion assumes the meter counts cache reads at list ratios.
