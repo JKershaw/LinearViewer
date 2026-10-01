@@ -1,246 +1,225 @@
-# Runbook: witness the runner on harbour.cat
+# Witness: the runner on harbour.cat
 
-For John, on harbour.cat. Readable on a phone.
-LIN-3098 S5. The same run also covers
-LIN-3059's hosted criterion.
+For John. LIN-3098, and LIN-3059's hosted
+criterion. About 45 minutes.
 
-This proves the Claude Code runner works
-for real: a phone mints it, a laptop runs it,
-and Harbour sees every step.
+Read this on any phone. Do the steps on a
+laptop. Open this page on the laptop too,
+so you can copy the lines in step 2.
 
-**You do this run yourself.** No agent does
-it for you. Post what you capture on LIN-3098.
+**First link** (put your urlKey in):
 
-Each **☐** below is a check to observe and
-capture. Note what you saw, or take a
-screenshot.
+https://harbour.cat/workspace/URLKEY/runner
+
+Your urlKey is the part after `/workspace/`
+in the address bar when you're in the
+workspace.
 
 ## Before you start
 
-- **Claude Code only.** opencode has no
-  subagents, so it can't be the runner.
-- On the laptop you need Node 18+, and macOS
-  or Linux.
-- The copied prompt carries a bootstrap. It
-  works **once**, and only for **1h**. Once
-  pasted, it becomes a credential that lasts
-  **24h**.
-- **Sleep is fine; closing is not.** If the
-  laptop sleeps, everything pauses and picks
-  up again when it wakes. If the laptop
-  closes, or the Claude Code session ends,
-  the runner is gone. Rows it took stay
-  `taken` until history expires them (30
-  days), and a parent Autopilot waiting on
-  one hangs. To recover, see step 7.
-- Keep these to hand: your iPhone (Safari),
-  the laptop with Claude Code, and a second
-  OS user on the laptop for step 3.
-- **Same-user boundary.** Subagents never
-  get a token. But any process running as
-  your OS user could read the credential
-  file or use a live broker. Run only work
-  you'd run yourself.
+- **The runner is a laptop.** A Mac or
+  Linux machine with Claude Code and
+  Node 18+. A phone can't be the runner,
+  and nor can a claude.ai/code session
+  (see "Why a laptop" below).
+- **A fresh workspace** that Simple
+  Dispatcher doesn't poll. To make one,
+  signed in, open
+  https://harbour.cat/workspace/witness/
+  It says "Workspace Not Found". Type
+  `Runner witness` and tap **Create a local
+  workspace**. You land in it, and the
+  address bar shows its urlKey. (Already
+  made one this morning? Use it.)
+- **Two toggles.** In that workspace's
+  Settings, turn on **Linear API proxy**
+  and **Dispatch queue** (they may already
+  be on):
+  https://harbour.cat/workspace/URLKEY/settings
+- **One tiny task.** On the workspace page,
+  tap **+ Add task**. Title: `Say hello`.
+  Description: `Reply with one sentence.
+  Change no files.`
 
-## 1. A fresh workspace
+## 1. Get the prompt
 
-1. On harbour.cat, signed in as the owner,
-   pick a **fresh** workspace that Simple
-   Dispatcher does not poll.
-2. Make **no** dispatch token for it.
-3. In **Settings**, turn on **Linear API
-   proxy** (workspace API access) and
-   **Dispatch queue**.
-
-## 2. Mint and copy, on the phone
-
-Do this in **iOS Safari** on your iPhone.
-
-1. Open any task. Tap **run on my machine ›**,
-   beside the ladder. The Dispatch page links
-   there too.
+1. On the laptop's browser, open the first
+   link above.
 2. Tap **create runner prompt**, then
-   **copy**.
-3. ☐ **iOS Safari copy works.** The page
-   shows `copied ✓`. Paste it into Claude
-   Code on the laptop **within 1h**.
-   Universal Clipboard works for this. If
-   you don't have it, see the note below.
-4. ☐ **The long-press fallback works.** Force
-   it once. With the iPhone plugged in, open
-   Mac Safari → **Develop** → your iPhone →
-   this page. In its console, run:
+   **copy**. It shows `copied ✓`.
+3. Use this same browser for steps 3–4.
+   Paste the copy within 1 hour.
+
+## 2. Start the runner
+
+1. In a laptop terminal, start Claude Code
+   in an empty folder, so no task can touch
+   your code:
+
+```sh
+mkdir -p ~/witness
+cd ~/witness
+claude
+```
+
+2. Paste the whole copy and send it. It
+   fetches the kit, prints `kit ok`, logs
+   in, and starts waiting for work.
+3. Then send this line, unchanged:
+
+```text
+This is the LIN-3098 hosted witness.
+Keep notes for a final report.
+For each item: dispatch id, subagent id,
+handoff (new or continued), the [usage]
+harness and model, and the outcome.
+Also check and note:
+1. my credential block's baseUrl is https;
+2. the grants login printed, and that its
+   expiresAt is about 24h from now;
+3. running login again with the same block
+   now fails with HTTP 401;
+4. while the first item runs: curl through
+   its socket to /api/proxy/instructions
+   gives 200; to /api/proxy/runner/poll
+   gives 403; a bare curl (no socket) to
+   http://harbour-runner.invalid/api/proxy/instructions
+   fails (note the exit code, and whether
+   http_proxy or HTTPS_PROXY is set);
+5. each time wait exits: its reason, and
+   that you re-armed it.
+```
+
+## 3. Run one step
+
+1. In the same browser, open Swipe:
+   https://harbour.cat/workspace/URLKEY/swipe
+2. Swipe to the **Say hello** card.
+3. Tap **Prompts** on the card to open it.
+4. Under **other prompts**, tap
+   **look into**. (Or tap **✦**: either
+   gives a prompt.)
+5. Scroll down. Tap **run this step**.
+6. Watch the runner. It takes the item and
+   runs it in a subagent. Wait until it
+   says the item is done.
+
+## 4. Run one tiny task
+
+1. On the same card, tap **run the whole
+   task**.
+2. Leave the runner working. Autopilot
+   sends follow-ups, and the runner
+   continues the same subagent for each.
+   Wait until it says the task is done
+   (or blocked).
+
+## 5. Done: paste this back
+
+1. Send this line to the runner:
+
+```text
+Stop the runner now. Give me one
+plain-text block for LIN-3098:
+1. your end summary: every dispatch id
+   with its subagent, handoff, [usage]
+   model and outcome; anything left
+   queued or taken;
+2. each check I asked for, and what
+   you saw;
+3. the output of runner status and
+   runner ledger.
+No tokens.
+```
+
+2. Copy its reply. Post it as a comment on
+   **LIN-3098**. That's the witness.
+
+The runner can't post to LIN-3098 itself.
+Its credential only reaches the witness
+workspace, and LIN-3098 lives in another
+one.
+
+## If you have 5 more minutes (optional)
+
+Each is optional. Skip any. Say which you
+did in the comment.
+
+- **Revoke.** After step 5, tap **Revoke**
+  in Runner credentials:
+  https://harbour.cat/workspace/URLKEY/proxy
+  Then tell the runner: `run runner poll`.
+  Expect a 401 (credential rejected).
+- **Phone copy.** On your phone (any
+  browser), open the first link. Tap
+  **create runner prompt**, then **copy**.
+  Note whether it shows `copied ✓`. Don't
+  paste it; it expires unused in 1h.
+- **Copy fallback.** On the laptop, open
+  the first link and the browser's
+  developer console. Run:
 
 ```js
 navigator.clipboard.writeText =
   () => Promise.reject()
 ```
 
-   Then tap **copy** again. The page should
-   say "Copying didn't work here", with the
-   text selected. Long-press it, choose
-   **Copy**, and check that it pastes.
-5. ☐ **The block carries an `https`
-   baseUrl.** In the pasted text, the
-   `## Your runner credential` block has
-   `- baseUrl: https://harbour.cat`.
-
-Note: the browser that mints is the one
-whose **run this step** forces API access
-(step 3). If you can't paste from the phone
-to the laptop, do the two checks above, then
-mint again in the laptop's browser and run
-step 3 from that browser.
-
-Use only a copy from the `/runner` page.
-Don't use the API route.
-
-## 3. Start the runner (laptop)
-
-Paste the whole copy into Claude Code. It
-fetches the kit, checks it, and logs in.
-
-1. ☐ **`kit ok`**: the verify step prints
-   `kit ok` against harbour.cat.
-2. ☐ **Exchange**: `login` prints grants
-   `take` and `dispatch`, and no token.
-3. ☐ **`wait` is running** in the
-   background.
-
-### Run 1: run this step
-
-1. In the browser that minted, open a task
-   and tap **run this step**.
-2. ☐ **The forced dispatch reaches the
-   runner.** The runner takes the item and
-   posts `[handoff] … (new)`.
-3. ☐ **The subagent has API access.** Its
-   first Harbour call is a
-   `curl --unix-socket …` and returns data.
-4. While it runs, check the socket by hand
-   in a laptop terminal:
+  Then tap **create runner prompt** and
+  **copy**. Expect "Copying didn't work
+  here", with the text selected.
+- **Another OS user.** In a laptop terminal,
+  while an item runs, with a second OS user:
 
 ```sh
 ls ~/.harbour-runner/s/
 ```
 
 ```sh
-S=~/.harbour-runner/s/<id8>.sock
-B=http://harbour-runner.invalid
+sudo -u OTHERUSER curl --unix-socket \
+  ~/.harbour-runner/s/ID8.sock \
+  http://harbour-runner.invalid/api/proxy/instructions
 ```
 
-5. ☐ **The socket works.**
+  Expect "Permission denied".
+- **Laptop sleep.** During step 4, sleep the
+  laptop (don't close Claude Code) for 5
+  minutes. On waking, ask the runner for
+  `runner status`. Expect
+  `heartbeat.stale: false`, and the runner
+  carrying on.
+- **Idle re-arm.** Leave the runner idle
+  25 minutes. Expect a `wait` exit with
+  reason `cap`, and the runner re-arming.
+- **A plain read-write token.** On the
+  Proxy page, make a read-write token.
+  Then, on the laptop:
 
 ```sh
-curl --unix-socket $S \
-  $B/api/proxy/instructions
+curl -H "Authorization: Bearer TOKEN" \
+  https://harbour.cat/api/proxy/runner/poll
 ```
 
-   Expect a 200.
+  Expect 403. Revoke the token after.
 
-6. ☐ **Bare curl fails closed.**
+## Why a laptop
 
-```sh
-curl $B/api/proxy/instructions
-echo $?
-```
+The runner keeps a Claude Code session open.
+It runs a background `wait` loop, starts a
+subagent per item, and gives each one a
+local Unix socket. The kit needs Node 18+
+and macOS or Linux. Windows isn't supported.
 
-   Expect exit `6`, because `.invalid` never
-   resolves.
+A claude.ai/code session from a phone isn't
+a supported runner. Nothing in the kit or
+its tests covers one, its sandbox may not
+reach harbour.cat, and it isn't a machine
+you keep open.
 
-7. ☐ **Another OS user is refused.**
+## If the runner dies
 
-```sh
-sudo -u <other> curl \
-  --unix-socket $S \
-  $B/api/proxy/instructions
-```
-
-   Expect "Permission denied" (EACCES).
-
-8. ☐ **`[usage]` is real.** When the item
-   ends, its `[usage]` line has
-   `"harness":"claude-code"` and a real
-   `"model"`.
-
-## 4. Run 2: run the whole task
-
-Tap **run the whole task** on a tiny
-throwaway task.
-
-1. ☐ **Follow-ups continue the same
-   subagent.** Each wake is a `followUpTo`
-   item. Its `[handoff]` says
-   `(continued from <root id>)`, with the
-   **same** subagent id as the root.
-2. ☐ **`wait` re-arms.** When the background
-   `wait` exits, Claude Code is re-invoked
-   and runs `wait` again. Leave it idle for
-   25 min to see a `cap` exit and the
-   re-arm.
-3. ☐ **Laptop sleep.** Mid-run, put the
-   laptop to sleep (don't quit, and don't
-   shut down) for about 5 minutes. When it
-   wakes, `wait` re-arms, and
-   `runner status` shows `stale: false`.
-   Note whether the subagent carried on, or
-   had to retry a step.
-4. ☐ **`[usage]` per item**, as in step 3.
-
-## 5. Capture
-
-On the **Proxy** page, make a **read-only**
-token for these reads. Revoke it when
-you're done.
-
-```sh
-T=<read-only token>
-H=https://harbour.cat/api/proxy
-A="Authorization: Bearer $T"
-```
-
-1. Every dispatch id: the root, each child,
-   and each wake. The runner's end summary
-   lists them.
-2. `GET /api/proxy/dispatch/:id` for each.
-   Note the status, `[handoff]`, `[usage]`,
-   and the terminal marker.
-
-```sh
-curl -H "$A" $H/dispatch/<id>
-```
-
-3. `GET /api/proxy/issues/:id/cost` for both
-   tasks.
-
-```sh
-curl -H "$A" $H/issues/<LIN-id>/cost
-```
-
-4. The runner's end summary. Ask the session
-   to stop and report.
-
-## 6. Optional probes
-
-- A **read-write** token on
-  `/api/proxy/runner/poll` → 403.
-- A second exchange of the same bootstrap →
-  401.
-- Revoke the credential in **Runner
-  credentials** → the next poll gets 401.
-- An item from another account stays
-  queued, and mints no wake.
-
-## 7. If the runner dies
-
-- Rows it took stay `taken`. Nothing can
-  close them from outside.
-- Re-dispatch the task.
-- The next session's `recover` posts
-  `[failed] runner restarted: subagent lost`
-  on rows that credential took, and lists
-  the rest as orphans.
-
-Post the captures on **LIN-3098**: the ☐
-results, the ids, the reads, the cost, and
-the end summary.
+If the laptop closes or the session ends,
+the runner is gone. Rows it took stay
+`taken`, and an Autopilot waiting on one
+hangs. Re-dispatch the task, and paste a
+fresh copy into a new session. Its
+`recover` closes out the old rows it can.
