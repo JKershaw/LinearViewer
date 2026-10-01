@@ -50,9 +50,11 @@ const BOARD_SLUG_REGEX = /^[\w.-]+\/\d+$/
  * @param {Object} [options.connectionStore] - LIN-3127: optional write-only Connection store, dual-written after a successful link (best-effort; absent is a no-op).
  * @returns {Router} Express router
  */
-export function createGitHubProjectsAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore } = {}) {
+export function createGitHubProjectsAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore, listAuthorizedAccountConnections, connectionBackedWritesEnabled } = {}) {
   return createGitHubInstallFlowRoutes({
     sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore,
+    // LIN-3125 Phase 3 (C1): the held-entry hook's injected reads/D11 predicate.
+    listAuthorizedAccountConnections, connectionBackedWritesEnabled,
 
     basePath: '/auth/github-projects',
     providerOkKey: 'github-projects',
@@ -85,6 +87,7 @@ export function createGitHubProjectsAuthRoutes({ sessionStore, provider, account
       linkCatch: 'GitHub Projects link error:',
       statelessRestart: 'GitHub Projects stateless-return restart:',
       guardRejected: 'GitHub Projects session guard rejected:',
+      heldEntry: 'GitHub Projects held-entry resolver error:',
     },
 
     copy: {

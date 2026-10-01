@@ -1430,6 +1430,22 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // proving the canonical model survives GitHub's hostile schema end-to-end.
   // ---------------------------------------------------------------------------
   const GITHUB_WS_UUID = '44444444-4444-4444-4444-444444444444';
+  // LIN-3125 Phase 3 (D-F7): server-side counters for the held-connection e2e
+  // twin. The fake's installation enumeration and the singleton's auth/install
+  // methods are wrapped, so `/test/github-fake-counters` can prove a held add
+  // causes no auth/install round trip — the browser's `page.route` only sees
+  // BROWSER traffic and cannot (see the twin's comment).
+  const githubFakeCounters = { listUserInstallations: 0, beginAuth: 0, beginInstall: 0, completeAuth: 0, completeInstallation: 0 };
+  let githubCountersWired = false;
+  const wrapGithubMethodCounters = (provider) => {
+    if (githubCountersWired) return;
+    githubCountersWired = true;
+    for (const m of ['beginAuth', 'beginInstall', 'completeAuth', 'completeInstallation']) {
+      if (typeof provider[m] !== 'function') continue;
+      const orig = provider[m].bind(provider);
+      provider[m] = (...a) => { githubFakeCounters[m] += 1; return orig(...a); };
+    }
+  };
   // Stand-in installation access token (LIN-711/LIN-713): the binding credential
   // is the installation token, NOT the repo slug. The clientFactory seam ignores
   // it (returns the fake), but it travels through the real read/write call scope.
@@ -1460,8 +1476,19 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // bare-string boot call, and `repo` is the "+ Add task" deep-link default.
       const provider = getProvider('github');
       if (!provider) throw new Error('github provider not registered');
-      const fake = createFakeGitHubClient({ [GITHUB_REPO]: seed });
-      provider.configure({ client: fake, clientFactory: () => fake, repo: GITHUB_REPO });
+      for (const k of Object.keys(githubFakeCounters)) githubFakeCounters[k] = 0;
+      wrapGithubMethodCounters(provider);
+      // LIN-3125 Phase 3: let a spec seed the held picker's scopes. `repos`
+      // defaults to the single bound repo (byte-identical to before); the twin
+      // passes three. `_repos` feeds `listRepos` -> `listConnectionScopes`.
+      const heldRepos = Array.isArray(body.repos) && body.repos.length ? body.repos : [{ full_name: GITHUB_REPO, private: false }];
+      const installations = Array.isArray(body.installations) ? body.installations : [{ id: 4242, account: { login: 'octocat' }, repositories: heldRepos }];
+      const fake = createFakeGitHubClient({ [GITHUB_REPO]: seed, _repos: heldRepos, _installations: installations });
+      const countingFake = {
+        ...fake,
+        listUserInstallations: async (...a) => { githubFakeCounters.listUserInstallations += 1; return fake.listUserInstallations(...a); },
+      };
+      provider.configure({ client: countingFake, clientFactory: () => countingFake, repo: GITHUB_REPO });
 
       // GitHub App binding shape (LIN-711): the credential is an INSTALLATION
       // TOKEN, and the repo is the binding SCOPE (not the token). The read/write
@@ -1502,6 +1529,10 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   };
   router.get('/test/set-github-session', setGitHubSession);
   router.post('/test/set-github-session', setGitHubSession);
+
+  // LIN-3125 Phase 3 (D-F7): read-only server-side counters for the held e2e
+  // twin. Test-only (this whole router is mounted under NODE_ENV=test).
+  router.get('/test/github-fake-counters', (req, res) => res.json({ ...githubFakeCounters }));
 
   // Exercise the GitHub provider WRITE path directly (createIssue → fake backend),
   // so a subsequent dashboard load proves the no-proxy write round-trip.

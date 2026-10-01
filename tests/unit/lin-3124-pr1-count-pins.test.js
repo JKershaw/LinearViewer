@@ -82,6 +82,43 @@ function countBindingWriters(sources) {
 
 const countRawAccessTokenWriters = (s) => total(s, /\.accessToken *=[^=]/g);
 
+/**
+ * LIN-3125 Phase 3 (F8): account↔workspace edge writers — every
+ * `bindAccountToWorkspace(` CALL (never the method definition in
+ * lib/account-workspace-store.js). 3 -> 4: the held `mode=new` picker arm writes
+ * the new workspace's owner edge DIRECTLY (no `establishAccount`, so no
+ * identityAuthenticatedAt freshness stamp). The reason is stated here and at the
+ * call site in routes/held-connection.js.
+ */
+function countWorkspaceEdgeWriters(sources) {
+  let n = 0;
+  for (const src of sources.values()) {
+    for (const line of src.split('\n')) {
+      if (!/function\s+bindAccountToWorkspace/.test(line) && !/async\s+bindAccountToWorkspace/.test(line) && /(^|[^a-zA-Z])bindAccountToWorkspace\(/.test(line)) n++;
+    }
+  }
+  return n;
+}
+
+/**
+ * LIN-3125 Phase 3 (F1): the EXPLICIT held-entry marker emitters — every
+ * `withHeldMarker(` CALL (never the definition in lib/held-connection-entry.js).
+ * Byte-stable at exactly 4: the switcher add row, Settings "as a new
+ * workspace", and the two server.js add-source redirects (github,
+ * github-projects). A fifth call site means an entry the plan did not approve is
+ * being captured (or a bare emitter was marked) — the exact F1 class the marker
+ * exists to bound.
+ */
+function countHeldMarkerEmitters(sources) {
+  let n = 0;
+  for (const src of sources.values()) {
+    for (const line of src.split('\n')) {
+      if (!/function\s+withHeldMarker/.test(line) && /(^|[^.\w])withHeldMarker\(/.test(line)) n++;
+    }
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // The pins: value + (check, plus, minus)
 // ---------------------------------------------------------------------------
@@ -129,12 +166,29 @@ const PINS = [
   },
   {
     id: 'binding-writers',
-    label: 'binding writers (linkProvider 12 + upsertWorkspace 6)',
-    expected: { link: 12, upsert: 6, total: 18 },
+    label: 'binding writers (linkProvider 12 + upsertWorkspace 7)',
+    // LIN-3125 Phase 3 (F3): upsertWorkspace 6 -> 7. The held `mode=new` picker
+    // arm (`routes/held-connection.js`) builds a fresh container and upserts it
+    // before persisting the held binding — the plan's deliberate +1. linkProvider
+    // is unchanged at 12 (held mode never calls it; the converter rewrites the
+    // binding directly). Reason stated at the call site too.
+    expected: { link: 12, upsert: 7, total: 19 },
     sources: REAL,
     count: countBindingWriters,
     plus: (s) => countBindingWriters(withLine(withLine(s, 'lib/workspace.js', "linkProvider(ws, 'x', 'y', {});"), 'lib/workspace.js', 'upsertWorkspace(sess, w);')),
     minus: (s) => countBindingWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])linkProvider\(/, /^(?!lib\/workspace\.js).*/)),
+  },
+  {
+    // LIN-3125 Phase 3 (F8): the account↔workspace edge writers. 3 -> 4 (the
+    // held new-workspace owner edge). Deliberate new pin; reason in
+    // `countWorkspaceEdgeWriters` and at the call site.
+    id: 'workspace-edge-writers',
+    label: 'account<->workspace edge writers (bindAccountToWorkspace)',
+    expected: 4,
+    sources: REAL,
+    count: countWorkspaceEdgeWriters,
+    plus: (s) => countWorkspaceEdgeWriters(withLine(s, 'lib/workspace.js', "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');")),
+    minus: (s) => countWorkspaceEdgeWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])bindAccountToWorkspace\(/, /^(?!lib\/account-workspace-store\.js).*/)),
   },
   {
     id: 'raw-accesstoken-writers',
@@ -144,6 +198,19 @@ const PINS = [
     count: countRawAccessTokenWriters,
     plus: (s) => countRawAccessTokenWriters(withLine(s, 'lib/workspace.js', "ws.accessToken = 'x';")),
     minus: (s) => countRawAccessTokenWriters(withoutFirstMatch(s, /\.accessToken *=[^=]/)),
+  },
+  {
+    // LIN-3125 Phase 3 (F1): the EXPLICIT held-entry marker emitters. Exactly 4 —
+    // navbar switcher add row, render-settings "as a new workspace", and the two
+    // server.js add-source redirects. Deliberate new pin (the plan's
+    // `held-marker-emitters`); the reason is stated here and in §D-F1.
+    id: 'held-marker-emitters',
+    label: 'explicit held-entry marker emitters (LIN-3125 F1)',
+    expected: 4,
+    sources: REAL,
+    count: countHeldMarkerEmitters,
+    plus: (s) => countHeldMarkerEmitters(withLine(s, 'lib/workspace.js', "const u = withHeldMarker('/auth/github', p);")),
+    minus: (s) => countHeldMarkerEmitters(withoutFirstMatch(s, /(^|[^.\w])withHeldMarker\(/, /^(?!lib\/held-connection-entry\.js).*/)),
   },
 ];
 

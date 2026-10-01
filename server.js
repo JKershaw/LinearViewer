@@ -61,9 +61,10 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh } from './lib/connection-credential.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, createAuthorizedAccountConnectionReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
 import { isConnectionBacked, activeBindingIsConnectionBacked, activeConnectionBackedBinding, readWorkspaceCredential } from './lib/connection-binding.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
+import { withHeldMarker } from './lib/held-connection-entry.js'
 import { ObserverStateStore } from './lib/observer-state-store.js'
 import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { createObserverPassRun } from './lib/observer-pass.js'
@@ -98,6 +99,7 @@ import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, remo
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
+import { createHeldConnectionRoutes } from './routes/held-connection.js'
 import { createAccountMergeRoutes } from './routes/account-merge.js'
 import { createEnsurePATSession } from './lib/pat-session.js'
 import { createEmailAuthRoutes, accountHomeRedirect } from './routes/email-auth.js'
@@ -1270,10 +1272,16 @@ app.use((req, res, next) => {
 // LIN-2010: the barrel moved `local` from 2nd to last in registration order;
 // inert here — `local` implements no getAuthRouter (skipped via NotImplementedError)
 // and the relative order of `github`/`github-projects`/`jira` (the three that do) is unchanged.
+// LIN-3125 Phase 3 (C1): the owner-scoped held reader, bound to the store here
+// (the reader module owns the `readConnectionsByAccountPrefix` call; the flow
+// and the picker route receive only this function). The shared factory keeps
+// the production wiring and the tests on the exact same construction.
+const listAuthorizedAccountConnectionsFor = createAuthorizedAccountConnectionReader({ connectionStore })
+
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
@@ -2301,6 +2309,23 @@ const refreshConnectionCredential = createConnectionRefresher({
   evict: (urlKey, ownerAccountId) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, ownerAccountId),
   lifecycleEventStore: credentialLifecycleEventStore,
 });
+
+// LIN-3125 Phase 3: the registry-driven held-connection picker, mounted after
+// the one connection refresher exists (it refreshes a stale held token before
+// scope enumeration). It resolves `:provider` through the registry; every
+// connection-store/credential capability — including the C1 reader and the D11
+// predicate — is injected here, so the route imports no connection module.
+app.use(createHeldConnectionRoutes({
+  connectionStore,
+  accountWorkspaceStore,
+  listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor,
+  heldConnectionCredentials,
+  connectionBackedWritesEnabled,
+  refreshConnection: refreshConnectionCredential,
+  convertToConnectionBacked,
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  connectionRetry: { title: CONNECTION_RETRY_TITLE, message: CONNECTION_RETRY_MESSAGE },
+}))
 
 // LIN-1373: TTL-preserving persist-back for refresh-on-resolve. Deliberately
 // NOT sessionStore.set() (lib/session-store.js's MongoSessionStore.set), which
@@ -4100,14 +4125,14 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
   // the session's active one — a multi-workspace user viewing A while B is active
   // must bind onto A (LIN-541).
   if (provider === 'github') {
-    return res.redirect(`/auth/github?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
+    return res.redirect(withHeldMarker(`/auth/github?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`, getProvider('github')));
   }
 
   // GitHub Projects add-source (LIN-560 Session 2) — the board-picker sibling of
   // the Issues flow, on the same shared GitHub App. Carries the same add-source
   // mode + viewed-workspace urlKey so the callback binds onto THIS workspace.
   if (provider === 'github-projects') {
-    return res.redirect(`/auth/github-projects?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`);
+    return res.redirect(withHeldMarker(`/auth/github-projects?mode=add-source&workspace=${encodeURIComponent(workspace.urlKey)}`, getProvider('github-projects')));
   }
 
   // Linear add-source (LIN-1351): connect an ADDITIONAL Linear org for the
