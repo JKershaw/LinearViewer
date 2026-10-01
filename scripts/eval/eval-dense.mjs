@@ -169,24 +169,43 @@ function installStub(fixtures) {
 
 // ---- one recommend hop with per-call usage capture --------------------------------
 let pendingCalls = [];
-function makeComputeOne(bundles, model, onCall) {
+function makeComputeOne(bundles, model, onCall, hopLog) {
   return async function computeOne(identifier) {
     const b = bundles[identifier];
     if (!b) throw new Error(`not found: ${identifier}`);
-    pendingCalls = [];
-    const t0 = Date.now();
-    const recommendation = await getRecommendation(
-      b.issue,
-      {
-        parent: b.parent, siblings: b.siblings || [], siblingsTotal: b.siblingsTotal || 0,
-        project: b.project, children: b.children || [], comments: b.comments || [],
-        focusedChild: b.focusedChild || null
-      },
-      { apiKey: OPENROUTER_API_KEY, model, featureFlags: {} }
-    );
-    const wallMs = Date.now() - t0;
+    const callOnce = async () => {
+      pendingCalls = [];
+      const t0 = Date.now();
+      const recommendation = await getRecommendation(
+        b.issue,
+        {
+          parent: b.parent, siblings: b.siblings || [], siblingsTotal: b.siblingsTotal || 0,
+          project: b.project, children: b.children || [], comments: b.comments || [],
+          focusedChild: b.focusedChild || null
+        },
+        { apiKey: OPENROUTER_API_KEY, model, featureFlags: {} }
+      );
+      return { recommendation, wallMs: Date.now() - t0 };
+    };
+    let res;
+    try {
+      res = await callOnce();
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
+      // Credit exhaustion is terminal — never retry it. Any OTHER error gets at most
+      // ONE retry for this call, then it propagates (recorded as an error, not a miss).
+      if (CREDIT_RE.test(msg)) throw e;
+      res = await callOnce();
+    }
+    const { recommendation, wallMs } = res;
     for (const c of pendingCalls) onCall({ model, hop: identifier, wallMs, ...c });
     pendingCalls = [];
+    if (hopLog) hopLog.push({
+      hop: identifier,
+      action: recommendation.recommendedAction || null,
+      deferTo: recommendation.deferTo || null,
+      reasoning: recommendation.reasoning ? recommendation.reasoning.slice(0, 2000) : null
+    });
     return {
       identifier: b.issue.identifier,
       reasoning: recommendation.reasoning,
@@ -206,8 +225,9 @@ async function runOne(model, ws, target, state) {
   const accept = acceptOf(target);
   const descentExpect = target.descentExpect || target.id;
   const calls = [];
+  const hopLog = [];
   let runCost = 0;
-  const computeOne = makeComputeOne(ws.bundles, model, (c) => { calls.push(c); runCost += Number(c.cost) || 0; });
+  const computeOne = makeComputeOne(ws.bundles, model, (c) => { calls.push(c); runCost += Number(c.cost) || 0; }, hopLog);
   let out;
   try {
     const { recommendation, deferredVia, deferTruncated, deferStopReason } =
@@ -225,6 +245,10 @@ async function runOne(model, ws, target, state) {
       truncated: !!recommendation?.truncated, deferTruncated, deferStopReason,
       promptLength: prompt ? prompt.length : 0,
       promptOk: pq.ok, promptProblems: pq.problems,
+      // The model's own stated assessment per hop (truncated) so beat 3 can tell a
+      // wrong LABEL from a wrong MODEL on every dense target and every miss.
+      reasoning: recommendation?.reasoning ? recommendation.reasoning.slice(0, 2000) : null,
+      hops: hopLog,
       runCostUsd: Number(runCost.toFixed(6)),
       calls: calls.map(c => ({ hop: c.hop, promptTokens: c.promptTokens, completionTokens: c.completionTokens, totalTokens: c.totalTokens, costUsd: c.cost, latencyMs: c.wallMs, finishReason: c.finishReason }))
     };
@@ -233,6 +257,7 @@ async function runOne(model, ws, target, state) {
     out = {
       model, target: target.id, workspace: ws.name, error: msg,
       credited402: CREDIT_RE.test(msg), actionCorrect: false, descentCorrect: false,
+      hops: hopLog,
       runCostUsd: Number(runCost.toFixed(6)),
       calls: calls.map(c => ({ hop: c.hop, promptTokens: c.promptTokens, completionTokens: c.completionTokens, totalTokens: c.totalTokens, costUsd: c.cost, latencyMs: c.wallMs, finishReason: c.finishReason }))
     };
@@ -280,26 +305,44 @@ for (const ws of fixtures) {
 const runs = readJsonl(RUNS_PATH);
 const calls = readJsonl(CALLS_PATH);
 const sum = (a) => a.reduce((x, y) => x + (Number(y) || 0), 0);
+const isDense = (r) => r.workspace === 'LargeDense';
+const order = () => ({ runs: 0, ok: 0, errors: 0, calls: 0, actionHit: 0, actionN: 0, descentHit: 0, descentN: 0, denseRuns: 0, denseOk: 0, denseActionHit: 0, denseDescentHit: 0, smallRuns: 0, smallOk: 0, smallActionHit: 0, costUsd: 0, denseCostUsd: 0, smallCostUsd: 0, promptOk: 0, promptN: 0, latencyAll: [], latencyDense: [], confusion: {} });
 const byModel = {};
 for (const r of runs) {
-  const m = byModel[r.model] = byModel[r.model] || { calls: 0, runs: 0, actionHit: 0, descentHit: 0, error: 0, costUsd: 0, promptOk: 0, promptTotal: 0, latencies: [] };
-  m.runs++; if (r.error) m.error++;
-  if (r.actionCorrect) m.actionHit++;
-  if (r.descentCorrect) m.descentHit++;
+  const m = byModel[r.model] = byModel[r.model] || order();
+  m.runs++;
+  const dense = isDense(r);
+  if (r.error) { m.errors++; continue; } // errors are counted separately, never as misses
+  m.ok++;
   m.costUsd += Number(r.runCostUsd) || 0;
-  if (typeof r.promptOk === 'boolean') { m.promptTotal++; if (r.promptOk) m.promptOk++; }
-  for (const c of r.calls || []) m.latencies.push(c.latencyMs);
+  if (dense) m.denseRuns++; else m.smallRuns++;
+  if (dense) m.denseCostUsd += Number(r.runCostUsd) || 0; else m.smallCostUsd += Number(r.runCostUsd) || 0;
+  m.actionN++; if (r.actionCorrect) m.actionHit++;
+  m.descentN++; if (r.descentCorrect) m.descentHit++;
+  if (dense) { m.denseOk++; if (r.actionCorrect) m.denseActionHit++; if (r.descentCorrect) m.denseDescentHit++; }
+  else { m.smallOk++; if (r.actionCorrect) m.smallActionHit++; }
+  if (typeof r.promptOk === 'boolean') { m.promptN++; if (r.promptOk) m.promptOk++; }
+  for (const c of r.calls || []) { m.latencyAll.push(c.latencyMs); if (dense) m.latencyDense.push(c.latencyMs); }
+  const key = (r.expected || []).map(norm).sort().join('|') || '—';
+  const c = m.confusion[key] = m.confusion[key] || {};
+  const got = norm(r.action) || '—';
+  c[got] = (c[got] || 0) + 1;
 }
-for (const c of calls) { const m = byModel[c.model] = byModel[c.model] || { calls: 0, runs: 0, actionHit: 0, descentHit: 0, error: 0, costUsd: 0, promptOk: 0, promptTotal: 0, latencies: [] }; m.calls++; }
+for (const c of calls) { const m = byModel[c.model] = byModel[c.model] || order(); m.calls++; }
+const pctl = (arr, p) => { if (!arr.length) return null; const s = [...arr].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
 for (const m of Object.values(byModel)) {
-  m.latencies.sort((a, b) => a - b);
-  m.p50LatencyMs = m.latencies.length ? m.latencies[Math.floor(m.latencies.length / 2)] : null;
-  delete m.latencies;
+  m.p50LatencyMs = pctl(m.latencyAll, 0.5);
+  m.p90LatencyMs = pctl(m.latencyAll, 0.9);
+  m.p50LatencyDenseMs = pctl(m.latencyDense, 0.5);
+  m.meanCostPerCall = m.calls ? m.costUsd / m.calls : 0;
+  m.meanCostPerDenseCall = m.denseRuns ? m.denseCostUsd / m.denseRuns : 0;
+  delete m.latencyAll; delete m.latencyDense;
 }
 const perAction = {};
 for (const r of runs) {
+  if (r.error) continue;
   const k = (r.expected || []).map(norm).sort().join('|') || '—';
-  const a = perAction[k] = perAction[k] || { hit: 0, n: 0, descentExpect: r.descentExpect };
+  const a = perAction[k] = perAction[k] || { hit: 0, n: 0, descentExpect: r.descentExpect, dense: isDense(r) };
   a.n++; if (r.actionCorrect) a.hit++;
 }
 const promptQuality = { ok: runs.filter(r => r.promptOk).length, total: runs.filter(r => typeof r.promptOk === 'boolean').length, bad: runs.filter(r => r.promptProblems && r.promptProblems.length && !(r.promptProblems.length === 1 && r.promptProblems[0] === 'defer')).map(r => ({ model: r.model, target: r.target, problems: r.promptProblems })) };
@@ -311,7 +354,7 @@ const summary = {
   totalCostUsd: Number(sum(runs.map(r => r.runCostUsd)).toFixed(6)),
   maxUsd: MAX_USD, halted: state.halted, wallSeconds: Math.round((Date.now() - startedAt) / 1000),
   byModel, perAction, promptQuality,
-  overall: { actionHit: runs.filter(r => r.actionCorrect).length, n: runs.length, descentHit: runs.filter(r => r.descentCorrect).length, errors: runs.filter(r => r.error).length }
+  overall: { ok: runs.filter(r => !r.error).length, actionHit: runs.filter(r => r.actionCorrect).length, descentHit: runs.filter(r => r.descentCorrect).length, errors: runs.filter(r => r.error).length }
 };
 writeFileSync(join(OUT_DIR, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
 
@@ -319,16 +362,21 @@ const pct = (x, n) => n ? Math.round((x / n) * 100) + '%' : '-';
 const lines = [
   `# LIN-1693 dense recommendation sweep — ${DATE}${STUB ? ' (STUB dry run)' : ''}`, '',
   `harness: \`scripts/eval/eval-dense.mjs\` · models: ${MODELS.join(', ')} · K=${K} · cap $${MAX_USD}`,
-  `runs: ${runs.length} · spend: $${summary.totalCostUsd.toFixed(4)}${state.halted ? ` · HALTED: ${state.halted.reason}` : ''}`, '',
-  '| model | runs | action-acc | descent-acc | prompt-ok | errors | mean $/run | p50 latency |',
-  '|---|---|---|---|---|---|---|---|'
+  `runs: ${runs.length} (ok ${summary.overall.ok}, errors ${summary.overall.errors}) · spend: $${summary.totalCostUsd.toFixed(4)}${state.halted ? ` · HALTED: ${state.halted.reason}` : ''}`, '',
+  '| model | ok | err | action-acc | small-acc | dense-acc | descent-acc (LIN-2149) | prompt-ok | mean $/call | dense $/call | p50 lat | p90 lat |',
+  '|---|---|---|---|---|---|---|---|---|---|---|---|'
 ];
 for (const [m, v] of Object.entries(byModel)) {
-  lines.push(`| ${m} | ${v.runs} | ${v.actionHit}/${v.runs} (${pct(v.actionHit, v.runs)}) | ${v.descentHit}/${v.runs} (${pct(v.descentHit, v.runs)}) | ${v.promptOk}/${v.promptTotal} | ${v.error} | $${(v.costUsd / (v.runs || 1)).toFixed(4)} | ${v.p50LatencyMs != null ? v.p50LatencyMs + 'ms' : '—'} |`);
+  lines.push(`| ${m} | ${v.ok} | ${v.errors} | ${v.actionHit}/${v.actionN} (${pct(v.actionHit, v.actionN)}) | ${v.smallActionHit}/${v.smallOk} (${pct(v.smallActionHit, v.smallOk)}) | ${v.denseActionHit}/${v.denseOk} (${pct(v.denseActionHit, v.denseOk)}) | ${v.denseDescentHit}/${v.denseOk} (${pct(v.denseDescentHit, v.denseOk)}) | ${v.promptOk}/${v.promptN} | $${v.meanCostPerCall.toFixed(4)} | $${v.meanCostPerDenseCall.toFixed(4)} | ${v.p50LatencyMs != null ? v.p50LatencyMs + 'ms' : '—'} | ${v.p90LatencyMs != null ? v.p90LatencyMs + 'ms' : '—'} |`);
 }
-lines.push('', '### Per expected-action', '', '| expect | descentExpect | accuracy |', '|---|---|---|');
-for (const [k, v] of Object.entries(perAction)) lines.push(`| ${k} | ${v.descentExpect} | ${v.hit}/${v.n} (${pct(v.hit, v.n)}) |`);
+lines.push('', '### Confusion by expected action (ok runs)', '', '| model | expect | got | n |', '|---|---|---|---|');
+for (const [m, v] of Object.entries(byModel)) {
+  for (const [exp, got] of Object.entries(v.confusion || {})) for (const [g, n] of Object.entries(got)) lines.push(`| ${m} | ${exp} | ${g} | ${n} |`);
+}
+lines.push('', '### Per expected-action (all models pooled)', '', '| expect | dense | descentExpect | accuracy |', '|---|---|---|---|');
+for (const [k, v] of Object.entries(perAction)) lines.push(`| ${k} | ${v.dense ? 'dense' : ''} | ${v.descentExpect} | ${v.hit}/${v.n} (${pct(v.hit, v.n)}) |`);
 writeFileSync(join(OUT_DIR, 'summary.md'), lines.join('\n') + '\n');
+
 
 console.log(`\n[${STUB ? 'STUB' : 'sweep'}] runs=${runs.length} completed=${completed} skipped=${skipped} spend=$${summary.totalCostUsd.toFixed(4)}${state.halted ? ` HALTED=${state.halted.reason}` : ''}`);
 console.log(`  ${join(OUT_DIR, 'summary.md')}`);
