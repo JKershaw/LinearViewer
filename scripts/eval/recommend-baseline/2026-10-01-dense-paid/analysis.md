@@ -16,8 +16,9 @@ correctness from the current fixture accept-sets; never edits `runs.jsonl`).
 > key is shared with production traffic, so any account-level figure is contaminated. They
 > are therefore **bounded**: 22 lost attempts × gemini's max observed per-call cost
 > ($0.0181) ≤ **$0.40**. Success-after-retry runs are **not identifiable** from the
-> committed rows (each successful attempt still records exactly one call per hop), so any
-> such loss is included in that bound, not separately quantified. The figures below keep
+> committed rows (each successful attempt still records exactly one call per hop); the §9
+> `usage_daily` cross-check bounds *all* unrecorded spend that day, including any such loss,
+> at ≤$0.0564, below the $0.3972 bound used here. The figures below keep
 > the original recorded number and add the bound; the recommendation is unchanged.
 
 ## 1. Label corrections

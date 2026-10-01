@@ -164,6 +164,8 @@ max observed per-call ($0.0181) ≤ **$0.3972**, giving corrected figures:
 - gemini mean **$0.0046 → ≤$0.0104**/call, dense **$0.0079 → ≤$0.0115**/run.
 
 The other four models had zero error runs. Success-after-retry runs are not identifiable
-from the committed rows, so any such loss is inside that bound. `runs.jsonl` is the raw
-record and is deliberately unchanged; this file is annotated, not regenerated (RESCORE
-cannot recover spend that was never written). The recommendation is unchanged.
+from the committed rows; the §9 `usage_daily` cross-check bounds *all* unrecorded spend
+that day, including any such loss, at ≤$0.0564, below the $0.3972 bound used here.
+`runs.jsonl` is the raw record and is deliberately unchanged; this file is annotated, not
+regenerated (RESCORE cannot recover spend that was never written). The recommendation is
+unchanged.

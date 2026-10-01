@@ -18,9 +18,9 @@
  *   - resumable, append-after-every-call JSONL output;
  *   - a `MAX_USD` spend cap checked before each run: it halts once spend has met
  *     the cap, or once spend plus the largest run cost seen so far would exceed
- *     it — so a steady sweep halts BEFORE exceeding it. The first run of a sweep
- *     is unconditional (there is no observed cost to project from yet), so a
- *     single run can still carry spend over the cap;
+ *     it — so a steady sweep halts BEFORE exceeding it. A run costing more than
+ *     any seen so far (always including the first) can still carry spend over the
+ *     cap, by at most that one run;
  *   - an immediate stop (no retry) on a 402 / "exceed your available credits";
  *   - a cheap deterministic prompt-quality check (structure + description-copy);
  *   - a STUB model mode for a full end-to-end dry run with zero paid calls.
@@ -332,8 +332,8 @@ for (const ws of fixtures) {
         if (state.halted) break outer;
         // Cap checked BEFORE each run. Once a run cost has been observed, halt if the
         // next run could cross the cap, so a steady sweep stops before exceeding it.
-        // The FIRST run is unconditional (nothing to project from yet), so the cap can
-        // still be overshot by that one run.
+        // A run costing more than any seen so far (always including the first) can still
+        // carry spend over the cap, by at most that one run.
         const projected = state.maxRunCostUsd > 0 ? state.spentUsd + state.maxRunCostUsd : state.spentUsd;
         if (state.spentUsd >= MAX_USD || projected > MAX_USD) {
           state.halted = { reason: 'budget', detail: `spend ${state.spentUsd.toFixed(4)} + projected ${state.maxRunCostUsd.toFixed(4)} > MAX_USD ${MAX_USD}` };
