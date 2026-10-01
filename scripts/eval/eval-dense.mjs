@@ -16,7 +16,11 @@
  *     prompt/completion tokens and the ACTUAL USD `cost` (usage.include:true),
  *     plus wall-clock latency — via the existing `setLlmCallRecorder` hook;
  *   - resumable, append-after-every-call JSONL output;
- *   - a hard `MAX_USD` spend cap that halts the sweep before exceeding it;
+ *   - a `MAX_USD` spend cap checked before each run: it halts once spend has met
+ *     the cap, or once spend plus the largest run cost seen so far would exceed
+ *     it — so a steady sweep halts BEFORE exceeding it. The first run of a sweep
+ *     is unconditional (there is no observed cost to project from yet), so a
+ *     single run can still carry spend over the cap;
  *   - an immediate stop (no retry) on a 402 / "exceed your available credits";
  *   - a cheap deterministic prompt-quality check (structure + description-copy);
  *   - a STUB model mode for a full end-to-end dry run with zero paid calls.
@@ -31,11 +35,11 @@
  *   OPENROUTER_API_KEY  OpenRouter key (env or .env); required unless STUB=1
  *   MODELS              comma-separated model ids (default: the 5 planned models)
  *   K                   repeats per (model,target)             (default 1)
- *   MAX_USD             hard spend cap for THIS sweep          (default 10)
+ *   MAX_USD             spend cap for THIS sweep, checked before each run (default 10)
  *   STUB                when set, install a fake transport; zero calls, zero cost
  *   ONLY                substring filter on target id
  *   FIXTURES_DIR        fixtures dir override
- *   OUT_DIR             output dir override (default recommend-baseline/<DATE>-dense)
+ *   OUT_DIR             output dir override (default recommend-baseline/<DATE>-dense[-stub])
  *   DATE                output date stamp (default 2026-10-01)
  *
  * Output (append-only; safe to re-run — completed (model,target,run) rows are skipped):
@@ -54,6 +58,10 @@ import { resolveRecommendation } from '../../lib/recommend-recurse.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STUB = !!process.env.STUB;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+// STUB never reaches the network, so it must not require a real key. Supply a
+// placeholder so `getRecommendation` gets past its key check and lands on the
+// injected stub transport. The paid path keeps its normal key requirement.
+const API_KEY = OPENROUTER_API_KEY || (STUB ? 'stub-dry-run-placeholder' : undefined);
 const RESCORE = !!process.env.RESCORE;
 if (!STUB && !RESCORE && !OPENROUTER_API_KEY) { console.error('Set OPENROUTER_API_KEY (env or .env), or STUB=1 for a dry run'); process.exit(1); }
 
@@ -72,7 +80,7 @@ const ONLY = process.env.ONLY;
 const DENSE_ONLY = !!process.env.DENSE_ONLY;
 const DATE = process.env.DATE || '2026-10-01';
 const FIXTURES_DIR = process.env.FIXTURES_DIR || join(HERE, 'fixtures', 'recommend');
-const OUT_DIR = process.env.OUT_DIR || join(HERE, 'recommend-baseline', `${DATE}-dense`);
+const OUT_DIR = process.env.OUT_DIR || join(HERE, 'recommend-baseline', `${DATE}-dense${STUB ? '-stub' : ''}`);
 
 const CALLS_PATH = join(OUT_DIR, 'calls.jsonl');
 const RUNS_PATH = join(OUT_DIR, 'runs.jsonl');
@@ -126,10 +134,15 @@ function checkPrompt(prompt, issue) {
 //   STUB_COST=<n>     report a fake USD cost per call (proves the MAX_USD cap)
 //   STUB_FAIL_AT=<n>  make call #n return HTTP 402 "exceed your available credits"
 //                     (proves the immediate-stop-on-402 behaviour)
+//   STUB_BAD_AT=<n>   make call #n return a 200 whose body fails the parser
+//                     (a retriable format error — exercises retry cost accounting)
+//   STUB_BAD_ALWAYS   make EVERY call fail the parser (exercises error-run cost)
 function installStub(fixtures) {
   const actionFor = {};
   const stubCost = Number(process.env.STUB_COST) || 0;
   const failAt = Number(process.env.STUB_FAIL_AT) || 0;
+  const badAt = Number(process.env.STUB_BAD_AT) || 0;
+  const badAlways = !!process.env.STUB_BAD_ALWAYS;
   let n = 0;
   const add = (key, a) => { if (key && a) actionFor[key] = a; };
   for (const ws of fixtures) for (const t of ws.targets) {
@@ -150,7 +163,9 @@ function installStub(fixtures) {
     const id = idM ? idM[1] : 'UNKNOWN';
     const suggested = prompt.match(/SUGGESTED NEXT \(defer candidate\): ([A-Za-z0-9][A-Za-z0-9._-]*)/);
     let content;
-    if (suggested) {
+    if (badAlways || (badAt && n === badAt)) {
+      content = 'malformed stub response (missing ## Reasoning and ## Prompt)\n';
+    } else if (suggested) {
       content = `## Reasoning\nHealthy container; the next work lives in the child.\n\n→ **defer**\n\n**DeferTo:** ${suggested[1]}\n`;
     } else {
       const action = actionFor[id] || 'research';
@@ -175,8 +190,19 @@ function makeComputeOne(bundles, model, onCall, hopLog) {
   return async function computeOne(identifier) {
     const b = bundles[identifier];
     if (!b) throw new Error(`not found: ${identifier}`);
+    // Every recorder row captured from this hop's FIRST attempt onward is real spend,
+    // whether the attempt is retried or the hop ultimately throws. Keep them all and
+    // flush them together; resetting per attempt (the old behaviour) silently dropped
+    // the retried attempt's cost, and never flushing on a throw recorded every error
+    // run as $0 — spend `MAX_USD` then could not see.
+    const hopStart = pendingCalls.length;
+    const flush = () => {
+      for (const c of pendingCalls.slice(hopStart)) {
+        onCall({ model, hop: identifier, wallMs: c.durationMs != null ? c.durationMs : c.wallMs, ...c });
+      }
+      pendingCalls.length = hopStart;
+    };
     const callOnce = async () => {
-      pendingCalls = [];
       const t0 = Date.now();
       const recommendation = await getRecommendation(
         b.issue,
@@ -185,7 +211,7 @@ function makeComputeOne(bundles, model, onCall, hopLog) {
           project: b.project, children: b.children || [], comments: b.comments || [],
           focusedChild: b.focusedChild || null
         },
-        { apiKey: OPENROUTER_API_KEY, model, featureFlags: {} }
+        { apiKey: API_KEY, model, featureFlags: {} }
       );
       return { recommendation, wallMs: Date.now() - t0 };
     };
@@ -196,12 +222,16 @@ function makeComputeOne(bundles, model, onCall, hopLog) {
       const msg = e && e.message ? e.message : String(e);
       // Credit exhaustion is terminal — never retry it. Any OTHER error gets at most
       // ONE retry for this call, then it propagates (recorded as an error, not a miss).
-      if (CREDIT_RE.test(msg)) throw e;
-      res = await callOnce();
+      if (CREDIT_RE.test(msg)) { flush(); throw e; }
+      try {
+        res = await callOnce();
+      } catch (e2) {
+        flush();
+        throw e2;
+      }
     }
-    const { recommendation, wallMs } = res;
-    for (const c of pendingCalls) onCall({ model, hop: identifier, wallMs, ...c });
-    pendingCalls = [];
+    const { recommendation } = res;
+    flush();
     if (hopLog) hopLog.push({
       hop: identifier,
       action: recommendation.recommendedAction || null,
@@ -285,7 +315,7 @@ for (const ws of fixtures) for (const t of ws.targets) {
 setLlmCallRecorder((rec) => { pendingCalls.push(rec); });
 
 const done = new Set(readJsonl(RUNS_PATH).map(r => `${r.model}|${r.target}|${r.run}`));
-const state = { spentUsd: 0, halted: null };
+const state = { spentUsd: 0, maxRunCostUsd: 0, halted: null };
 let completed = 0, skipped = 0;
 const startedAt = Date.now();
 
@@ -300,8 +330,17 @@ for (const ws of fixtures) {
         const key = `${model}|${target.id}|${run}`;
         if (done.has(key)) { skipped++; continue; }
         if (state.halted) break outer;
-        if (state.spentUsd >= MAX_USD) { state.halted = { reason: 'budget', detail: `spend ${state.spentUsd.toFixed(4)} >= MAX_USD ${MAX_USD}` }; break outer; }
+        // Cap checked BEFORE each run. Once a run cost has been observed, halt if the
+        // next run could cross the cap, so a steady sweep stops before exceeding it.
+        // The FIRST run is unconditional (nothing to project from yet), so the cap can
+        // still be overshot by that one run.
+        const projected = state.maxRunCostUsd > 0 ? state.spentUsd + state.maxRunCostUsd : state.spentUsd;
+        if (state.spentUsd >= MAX_USD || projected > MAX_USD) {
+          state.halted = { reason: 'budget', detail: `spend ${state.spentUsd.toFixed(4)} + projected ${state.maxRunCostUsd.toFixed(4)} > MAX_USD ${MAX_USD}` };
+          break outer;
+        }
         const rec = await runOne(model, ws, target, state);
+        state.maxRunCostUsd = Math.max(state.maxRunCostUsd, Number(rec.runCostUsd) || 0);
         rec.run = run;
         // append the per-call rows first (the durable, per-call record) then the run row
         for (const c of rec.calls || []) appendJsonl(CALLS_PATH, { model: rec.model, target: rec.target, run, ...c });
