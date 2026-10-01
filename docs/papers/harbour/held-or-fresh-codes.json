@@ -1,0 +1,4072 @@
+{
+ "about": "LIN-3176 (held-or-fresh.md). cards: a systematic sample of September wakes into held supervisors that acted (survey-held-sample.mjs), each coded blind by two coders of the frontier tier from codebook; failures: the 25 supervisor failures on record (wake-inventory-failures.json), each ticket read with its comments and coded blind by two coders from failuresCodebook.",
+ "codebook": "# Codebook: what a held supervisor's decision used, and where each fact lived (LIN-3176)\n\nEach card is one wake into a held supervisor session (a Runner, a leg, a stepper or a ticket autopilot) that **acted**: it wrote, pushed, edited or dispatched. The card shows the delivered message, every step the session took until its next delivery, the tool calls and their results (clipped). It also names the session's full transcript (a JSONL file). You may search the transcript's lines **before** the card's `delivered at` timestamp to see what the session already knew (for example `grep -n \"<phrase>\" <transcript> | head`, or a short python/node read that stops at that timestamp). Do not read after it.\n\nThe question: if this session had been started fresh for this step from the record (tracker, dispatch rows, PR, CI, files on disk) instead of being held open, what would it have lost?\n\nFor each card:\n\n1. **decision**: one line: the main outward action this wake took (what it dispatched, wrote, merged, posted) and the choice in it.\n2. **mj**: `M` if the action was fully determined by observable state (a fixed rule applied to fields that could be read directly), `J` if it needed reading and weighing text (judging a report, writing a new beat, framing a ruling).\n3. **facts**: the 2–8 facts the decision actually rested on. For each, one `source`:\n   - `delivered`: in the delivered message or the dispatch item it fetched (the child's outcome line, the feedback). This is Harbour's dispatch record.\n   - `dispatch`: read in this wake from Harbour's dispatch rows or feedback beyond the delivered item.\n   - `tracker`: read in this wake from the ticket, its comments, relations or status.\n   - `pr-git`: read in this wake from a PR, git history, a diff or the code.\n   - `ci`: read in this wake from CI status.\n   - `notes`: read in this wake from the session's own notes file on disk (RUN.md, autopilot-state.md, a scratchpad file).\n   - `prompt`: the session's own task prompt or standing rules (the kickoff text it was launched with). A fresh session would be given these again.\n   - `memory-recorded`: not read in this wake; the session knew it from earlier, and earlier it came from a record a fresh session could read again (it appears in an earlier tool result from the tracker, dispatch rows, a PR, CI, git or a file).\n   - `memory-only`: not read in this wake, and it exists only in the session's own earlier turns: its own reasoning, a plan or count it kept in its head, something it was told in a delivered message that no record keeps. Before choosing this, search the transcript: if the fact appears in an earlier tool result from a record, it is `memory-recorded`.\n4. **memoryAlone**: `true` only if the decision would have come out differently, or could not have been made, without at least one `memory-only` fact. A fact that merely made the step faster is not enough.\n5. **handoffChars**: your estimate, in characters, of the smallest note that would carry every `memory-recorded` and `memory-only` fact this decision used to a fresh session (0 if none).\n6. **note**: one line, only if something is unclear.\n\nWrite your output as a JSON array, one object per card:\n`{\"card\":\"card-01\",\"decision\":\"…\",\"mj\":\"M|J\",\"facts\":[{\"fact\":\"…\",\"source\":\"…\"}],\"memoryAlone\":false,\"handoffChars\":0,\"note\":\"\"}`\n\nCode from what the card and the transcript show. When you cannot tell, say so in `note` and choose the source that the evidence supports best; do not guess `memory-only` without searching.\n",
+ "failuresCodebook": "# Codebook: how each supervisor failure on record was recovered (LIN-3176)\n\nEach file in `failures-text/` is one of the 25 supervisor failures on record (`docs/papers/harbour/wake-inventory-failures.json`): a ticket's title, description and comments. A *supervisor* is a held session that dispatches and checks other sessions: a ticket autopilot, a leg, a stepper or the passage Runner. *Held* means one session is kept open and woken again and again, so it remembers what happened earlier in its run.\n\nThe question is about a proposed change, the *relay*. Code would handle the mechanical wakes, and every step that needs judgement would start a fresh session that reads the record (tracker ticket and comments, Harbour's dispatch rows and feedback, PRs, CI, git, logs) instead of a held session's memory.\n\nFor each ticket:\n\n1. **incident**: one line: what went wrong.\n2. **detectedBy**: who first noticed it. One of `held-session` (the affected supervisor, in its own session), `other-session` (another agent session: parent, child, Runner, reviewer, a later session), `code` (a runner failsafe, a reaper, a test, a monitor), `person` (John), `unknown`.\n3. **recoveredBy**: who got the work moving again, from the same list.\n4. **recoveryUsed**: what the recovery depended on.\n   - `memory`: facts only the held session's own memory had, such as what it had dispatched or decided earlier and never wrote down.\n   - `record`: the tracker, dispatch rows or feedback, PRs, CI, git or logs. A fresh session could have done it.\n   - `both`: both were needed.\n   - `none`: the incident was not recovered in-flight; only a later fix exists.\n   - `unclear`.\n5. **relayEffect**: under the relay, would this failure have been `avoided` (the failing mechanism does not exist), `unchanged`, `worsened` (for example, the recovery relied on memory the relay would lose), or `unclear`? Give one line saying why.\n6. **evidence**: a quote of 25 words or fewer from the ticket that supports recoveryUsed.\n\nRead each ticket's description and its comments (they can be long; skim for the incident, how it was noticed and how it was resolved).\n\nOutput: a JSON array, one object per ticket:\n`{\"id\":\"LIN-353\",\"incident\":\"…\",\"detectedBy\":\"…\",\"recoveredBy\":\"…\",\"recoveryUsed\":\"…\",\"relayEffect\":\"…\",\"relayWhy\":\"…\",\"evidence\":\"…\"}`\n",
+ "sample": {
+  "population": 2970,
+  "byLayer": {
+   "Runner": 67,
+   "leg": 696,
+   "stepper": 1298,
+   "autopilot": 909
+  },
+  "cards": [
+   {
+    "id": "card-01",
+    "layer": "Runner",
+    "issue": "LIN-2888",
+    "session": "ee01b6e8-e55c-4527-96a0-1365b2193635",
+    "at": "2026-09-17T21:07:33.105Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-02",
+    "layer": "Runner",
+    "issue": "LIN-2888",
+    "session": "ee01b6e8-e55c-4527-96a0-1365b2193635",
+    "at": "2026-09-17T23:19:20.807Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-03",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-26T20:46:40.014Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": "pause"
+   },
+   {
+    "id": "card-04",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-27T09:01:54.432Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-05",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-27T11:32:50.977Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-06",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-28T20:02:14.790Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-07",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-28T20:11:14.091Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-08",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-28T21:31:50.982Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-09",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-28T23:37:45.500Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-10",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-29T06:13:32.992Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-11",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-29T11:59:28.877Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-12",
+    "layer": "Runner",
+    "issue": "LIN-3099",
+    "session": "77d05717-e815-4809-90e7-c36d415d140c",
+    "at": "2026-09-29T13:15:53.219Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-13",
+    "layer": "leg",
+    "issue": "LIN-2887",
+    "session": "97947e0f-f81e-4141-9c5d-70d2eaa1adcd",
+    "at": "2026-09-17T21:45:50.675Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-14",
+    "layer": "leg",
+    "issue": "LIN-2889",
+    "session": "39bbd5ea-ccad-41e2-8d85-9e610293c33e",
+    "at": "2026-09-24T20:54:01.711Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-15",
+    "layer": "leg",
+    "issue": "LIN-3102",
+    "session": "ad6fb4ec-320b-4d71-8d56-2369acf7e739",
+    "at": "2026-09-26T20:01:48.429Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-16",
+    "layer": "leg",
+    "issue": "LIN-3106",
+    "session": "6265600b-992d-4926-abfe-0b9df1876b0e",
+    "at": "2026-09-26T20:55:48.365Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-17",
+    "layer": "leg",
+    "issue": "LIN-3105",
+    "session": "0ba06ac4-1ed2-44ba-974e-47682e63187f",
+    "at": "2026-09-27T07:33:57.932Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-18",
+    "layer": "leg",
+    "issue": "LIN-3127",
+    "session": "e610605c-4a0e-4be0-9c30-7a376d51aa3f",
+    "at": "2026-09-27T09:30:29.507Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-19",
+    "layer": "leg",
+    "issue": "LIN-1892",
+    "session": "e02dc0cd-16d6-4a8f-83d9-f808f5eb45e2",
+    "at": "2026-09-27T11:00:28.097Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-20",
+    "layer": "leg",
+    "issue": "LIN-3124",
+    "session": "83a490a7-9597-488f-9448-9cd082243958",
+    "at": "2026-09-28T20:25:46.516Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-21",
+    "layer": "leg",
+    "issue": "LIN-2944",
+    "session": "6be29b43-ecbc-44e7-9398-3e654efa20cd",
+    "at": "2026-09-28T23:21:38.848Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-22",
+    "layer": "leg",
+    "issue": "LIN-3124",
+    "session": "83a490a7-9597-488f-9448-9cd082243958",
+    "at": "2026-09-29T08:48:00.471Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-23",
+    "layer": "leg",
+    "issue": "LIN-3124",
+    "session": "83a490a7-9597-488f-9448-9cd082243958",
+    "at": "2026-09-29T13:41:27.504Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-24",
+    "layer": "leg",
+    "issue": "LIN-3142",
+    "session": "2d5dc999-f36e-470b-8e72-78c14c8f0e66",
+    "at": "2026-09-29T19:45:53.609Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-25",
+    "layer": "stepper",
+    "issue": "LIN-2534",
+    "session": "18325b63-0683-4d46-a84c-e3be174a5939",
+    "at": "2026-09-04T12:15:18.559Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-26",
+    "layer": "stepper",
+    "issue": "LIN-2633",
+    "session": "ac5893bf-c705-44b4-a4c9-379d2cf2b8aa",
+    "at": "2026-09-05T16:09:25.148Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-27",
+    "layer": "stepper",
+    "issue": "LIN-2701",
+    "session": "9a88dc1d-6c3c-4a0e-a3b6-c5f2aec9865b",
+    "at": "2026-09-06T06:02:01.490Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-28",
+    "layer": "stepper",
+    "issue": "LIN-2670",
+    "session": "c5156bd0-872a-435e-93e9-1403bb5ae4eb",
+    "at": "2026-09-10T10:04:23.407Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-29",
+    "layer": "stepper",
+    "issue": "LIN-2737",
+    "session": "a4df6577-163f-42d4-af1c-37dd7d1b6fdd",
+    "at": "2026-09-11T00:39:40.004Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-30",
+    "layer": "stepper",
+    "issue": "LIN-2759",
+    "session": "dd0a5e89-54a2-4096-a0e2-94c741b0be21",
+    "at": "2026-09-11T14:03:25.865Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-31",
+    "layer": "stepper",
+    "issue": "LIN-2758",
+    "session": "93ba2b3d-d9eb-401a-a6d1-5c31c6b9e740",
+    "at": "2026-09-12T05:46:27.908Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-32",
+    "layer": "stepper",
+    "issue": "LIN-3012",
+    "session": "bc6c8247-febc-4a43-9548-7ba9a2e4b64e",
+    "at": "2026-09-24T13:46:39.031Z",
+    "outcome": "act",
+    "source": "task-notification",
+    "wake": null
+   },
+   {
+    "id": "card-33",
+    "layer": "stepper",
+    "issue": "LIN-3026",
+    "session": "05462839-61f3-49be-8678-4d83a96b90d6",
+    "at": "2026-09-25T01:38:34.674Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-34",
+    "layer": "stepper",
+    "issue": "LIN-3042",
+    "session": "91c7d99d-9940-4470-9911-dd654acbb0c3",
+    "at": "2026-09-25T10:46:41.397Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": "pause"
+   },
+   {
+    "id": "card-35",
+    "layer": "stepper",
+    "issue": "LIN-3129",
+    "session": "af1732d5-e564-486b-be06-8346919faf05",
+    "at": "2026-09-28T22:11:26.385Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-36",
+    "layer": "stepper",
+    "issue": "LIN-3134",
+    "session": "d5a4d7e3-6d08-4f68-b0af-84df61c1cb84",
+    "at": "2026-09-29T10:12:55.737Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-37",
+    "layer": "autopilot",
+    "issue": null,
+    "session": "4769973a-d343-4d11-8700-f69a61de1066",
+    "at": "2026-09-03T09:40:49.501Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-38",
+    "layer": "autopilot",
+    "issue": "LIN-679",
+    "session": "94bf7683-0df1-4a45-9c1c-2083bb1dd9c7",
+    "at": "2026-09-04T15:03:00.399Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-39",
+    "layer": "autopilot",
+    "issue": "LIN-679",
+    "session": "94bf7683-0df1-4a45-9c1c-2083bb1dd9c7",
+    "at": "2026-09-05T00:17:22.580Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-40",
+    "layer": "autopilot",
+    "issue": "LIN-2566",
+    "session": "d5b4bd4f-9354-42cd-bd53-d8129d339e93",
+    "at": "2026-09-05T13:55:36.100Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-41",
+    "layer": "autopilot",
+    "issue": "LIN-2875",
+    "session": "fa98bfdc-b7fa-417c-bc91-6a0dc81eecf6",
+    "at": "2026-09-14T08:16:33.129Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-42",
+    "layer": "autopilot",
+    "issue": "LIN-2962",
+    "session": "a8db168f-26c7-4f94-af1e-dc06a9dfd6b6",
+    "at": "2026-09-20T16:56:01.470Z",
+    "outcome": "act",
+    "source": "item-ready",
+    "wake": null
+   },
+   {
+    "id": "card-43",
+    "layer": "autopilot",
+    "issue": "LIN-2974",
+    "session": "9ddd761e-c8f5-4de3-b98a-90fc62451160",
+    "at": "2026-09-22T21:19:30.391Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "custom"
+   },
+   {
+    "id": "card-44",
+    "layer": "autopilot",
+    "issue": "LIN-2994",
+    "session": "4c1bc65d-3c4d-47ea-978e-5f1bf3f31f7d",
+    "at": "2026-09-24T21:44:31.452Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "custom"
+   },
+   {
+    "id": "card-45",
+    "layer": "autopilot",
+    "issue": "LIN-2932",
+    "session": "77f9aa89-234b-4c61-82e9-135b99896745",
+    "at": "2026-09-25T03:54:07.596Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "custom"
+   },
+   {
+    "id": "card-46",
+    "layer": "autopilot",
+    "issue": "LIN-3049",
+    "session": "dc7810c9-bdd0-4fa5-915a-1bf532430dcc",
+    "at": "2026-09-25T15:18:00.036Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-47",
+    "layer": "autopilot",
+    "issue": "LIN-2995",
+    "session": "d977bafd-17c1-4f79-9111-8f2bd54c49a2",
+    "at": "2026-09-26T08:07:10.127Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "terminal"
+   },
+   {
+    "id": "card-48",
+    "layer": "autopilot",
+    "issue": "LIN-3107",
+    "session": "0cb2f969-9618-4c77-a79f-dde58389af80",
+    "at": "2026-09-27T08:31:24.071Z",
+    "outcome": "dispatch",
+    "source": "item-ready",
+    "wake": "terminal"
+   }
+  ]
+ },
+ "cards": {
+  "A": [
+   {
+    "card": "card-01",
+    "decision": "Appended a 'CI confirmed green' close-out to its open voyage-log comment (PATCH 54247163 on LIN-2888), marking the Harbour seam leg's making-port fully met",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Post-merge CI run on 4f8d01d4 completed success",
+      "source": "ci"
+     },
+     {
+      "fact": "4f8d01d4 is LIN-2886's merged commit whose main run was still in progress at the last log",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "The voyage-log comment 54247163 had left a 'post-merge run still in progress' line open",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Leg making-port: both anchors Done with merged PRs and CI green; LIN-2885 already green",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Child LIN-2809 paused pending with breakdown dispatched (context for the reply)",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-02",
+    "decision": "Verified LIN-2897's CLAUDE.md shrink on origin/main and posted a 'LIN-2897 landed' comment on LIN-2888",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Child reports LIN-2897 verified complete; LIN-2896 at implementation beat 3/5",
+      "source": "delivered"
+     },
+     {
+      "fact": "CLAUDE.md on origin/main is 85 lines / 4,579 bytes; PR #240 merged as 8ad1b52; beats in git log",
+      "source": "pr-git"
+     },
+     {
+      "fact": "CI success on the merge commit and predecessors",
+      "source": "ci"
+     },
+     {
+      "fact": "Baseline was 698 lines / 59,586 bytes",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John's ruled budget: <=90 lines / <=7,000 B, bytes binding, for simple-dispatcher",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Standing rule: report every leg landing as a comment on LIN-2888 and verify making-port yourself",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-03",
+    "decision": "Logged on LIN-3099 that LIN-3102 is blocked on the existing ruling lin3102-planloop, choosing not to raise a duplicate ruling and not to hold the later legs",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "LIN-3102 blocked on a human ruling; six other periodicals still running",
+      "source": "delivered"
+     },
+     {
+      "fact": "Ruling lin3102-planloop exists with options a/b/c, recommended a, resumable",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Runner rules: rulings are John's; don't raise duplicate rulings; voyage-log material deviations on LIN-3099",
+      "source": "prompt"
+     },
+     {
+      "fact": "Maintenance leg wind-down rule: an unlanded periodical is not re-run and no other leg waits on it",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go and front-door legs are held until the Maintenance leg reports",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": ""
+   },
+   {
+    "card": "card-04",
+    "decision": "Verified all seven Maintenance periodicals Done and posted voyage log 7 on LIN-3099 declaring the leg made port (7/7)",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Maintenance leg child 0599e12d ended done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Dispatch rows: 0599e12d done; Go b44580e4 and front door 8c6a92f5 still taken",
+      "source": "dispatch"
+     },
+     {
+      "fact": "LIN-3100 to LIN-3106 all Done; LIN-3105 PR #1593 merged 2c00dee3, CI 7/7, gated Done 08:56:30Z",
+      "source": "tracker"
+     },
+     {
+      "fact": "Leg making-port: each of the seven periodicals has a recorded run and a landed report; leg budget 7 tasks; passage maxTasks 60",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "The three leg child ids to check",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Ruling lin3102-planloop was answered (option a) but its row still open",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Leg used 21 tasks against a planned 7",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 450,
+    "note": "Source of the 21-task count not found by search; may have come from the clipped voyage-log read this wake. Not decisive for the made-port call."
+   },
+   {
+    "card": "card-05",
+    "decision": "Logged on LIN-3099 (voyage log 12) that LIN-1892 S1's merge is held on ruling lin1892-s1-edgeless-owner, without raising a duplicate and judging the leg's wind-down trigger not tripped",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "LIN-1892 S1 merge held on John's ruling lin1892-s1-edgeless-owner; other front-door steppers' positions",
+      "source": "delivered"
+     },
+     {
+      "fact": "Ruling question, options (run-dryrun recommended), raised by the stepper, case comment e3072091",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Runner rules: no duplicate rulings, don't nudge children blocked on humans, voyage-log deviations",
+      "source": "prompt"
+     },
+     {
+      "fact": "Front-door wind-down trigger: moving existing workspaces needs a data decision that is John's",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go leg state (LIN-3059 in research; run leg held behind Go)",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-06",
+    "decision": "Logged on LIN-3099 that the Flight Companion's front-door resume failed (session archived) and raised a DECISION on who re-dispatches, choosing not to re-dispatch it itself",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Dispatch 6dc50006 'Resume after weekly cap - front-door leg' failed; 82da8ec4 Runner resume taken",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Failure text: no live session to resume, original dispatch 8c6a92f5 archived",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Resume order 82da8ec4: the front-door leg is being resumed separately by the Flight Companion; finish before starting; no new legs",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Front-door positions are in leg record comment 75d1229e on LIN-3099",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Front-door steppers 87671de0, 794948b8, ef57e01a are failed or aborted",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner prompt: a '[failed] no live session to resume' is re-dispatched fresh",
+      "source": "prompt"
+     },
+     {
+      "fact": "Pending rulings lin3059-credential-boundary-j1-j4 and lin1892-s1-edgeless-owner",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 700,
+    "note": "The delivered message is a compaction summary of the session's own memory; each fact was coded by where it originally came from (records it had read), not as delivered."
+   },
+   {
+    "card": "card-07",
+    "decision": "Posted a voyage log on LIN-3099 that the Go leg is flying again with LIN-3059 on plan beat 1/3",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Child pending: stepper 9a7b0b86 (LIN-3059) on plan beat 1/3, John's rec recorded, LIN-2884 to follow on the shared design",
+      "source": "delivered"
+     },
+     {
+      "fact": "This wake comes from the Go leg b44580e4 (LIN-3059 is a Go anchor)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go leg had wound down blocked on its security-boundary trigger; John endorsed rec on lin3059-credential-boundary-j1-j4",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go ordering: LIN-3079, then LIN-3059 + LIN-2884 designed together, then LIN-3098, then LIN-2942",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run leg stays closed unless Go proves the hosted run and the Flight Companion confirms budget",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 450,
+    "note": ""
+   },
+   {
+    "card": "card-08",
+    "decision": "Logged on LIN-3099 that LIN-3124 is parked on ruling lin3124-pr2-revise (plan-loop limit), judging it not the front door's data-decision trigger, and noted Go flying again",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "LIN-3124 parked on lin3124-pr2-revise raised by its child; LIN-3125 held; LIN-1892 S2 merging PR #1603; LIN-2944 on step 4/4",
+      "source": "delivered"
+     },
+     {
+      "fact": "LIN-3124 research found no bulk migration needed, so the data-decision trigger has not fired",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Front-door wind-down trigger text (existing-workspace data decision is John's)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John answered lin3059-plan-third-round and the Go leg resumed",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rule: no duplicate rulings",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 400,
+    "note": ""
+   },
+   {
+    "card": "card-09",
+    "decision": "Logged on LIN-3099 that the front-door leg parked blocked again on three rulings",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Front-door leg terminal [blocked]: LIN-1892 S2 landed (PR #1603, c88f9569, CI green); needs lin3124-pr3-revise, lin2944-p0-round4-handoff, lin1892-s1-edgeless-owner",
+      "source": "delivered"
+     },
+     {
+      "fact": "Front-door child is 7a85309e and had resumed LIN-3124 after John answered lin3124-pr2-revise",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Earlier front-door landings LIN-2882 and LIN-3127",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go leg state (LIN-3059 S2a on PR #1606, LIN-2884 breakdown)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rule: voyage-log every park",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": ""
+   },
+   {
+    "card": "card-10",
+    "decision": "Logged on LIN-3099 that the front-door leg is back in flight on LIN-1892 S1 (stepper d529fde8)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Front-door pending: stepper d529fde8 re-verifying, merging and deploying S1 PR #1601, then S3; LIN-3124 on lin3124-pr5-gate-scope",
+      "source": "delivered"
+     },
+     {
+      "fact": "This wake is the front-door leg 7a85309e",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "S1 deploy is what the Go leg needs to start LIN-3059 S2b",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go leg on LIN-2884 T2-i (LIN-3138, PR #1609) then T2-ii (LIN-3139)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run leg stays closed",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-11",
+    "decision": "Logged on LIN-3099 that LIN-1892 S3 merged as 5f25b4a0",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "LIN-1892 S3 merged as 5f25b4a0; d529fde8 on close-out 2/2; 420c3541 implementing LIN-3124 PR3",
+      "source": "delivered"
+     },
+     {
+      "fact": "S3 had been parked on ruling lin1892-s3-h1 and resumed",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go leg state: T4 (LIN-3137) and T2c (LIN-3135) beats; T3 (LIN-3136) blocked",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John still owes the LIN-3059 hosted harbour.cat runs",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rule: voyage-log every landing",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": "S3 PR number #1611 not read this wake; assumed from earlier dispatch reports."
+   },
+   {
+    "card": "card-12",
+    "decision": "Logged on LIN-3099 that the Go leg resumed on LIN-3098 (stepper 1a17f593) after its earlier wind-down",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Go pending: LIN-3098 stepper 1a17f593 with expected deliverables; #1616 and #1617 held on John's rulings; LIN-3059 parked until witness",
+      "source": "delivered"
+     },
+     {
+      "fact": "Voyage log c46 had recorded the Go leg as wound down",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "LIN-3098 is in the Go leg's scope",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Holding rulings lin3135-r2-sd-refire-ruling and lin3137-rj51-owner-lockout",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Front-door stepper 420c3541 on LIN-3124 PR3; OpenRouter credit top-up owed",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 400,
+    "note": ""
+   },
+   {
+    "card": "card-13",
+    "decision": "Tried to dispatch LIN-2896 implementation, got 409 BUDGET_EXHAUSTED (count 1, maxTasks 1), then posted the final run summary on LIN-2887 and stopped",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Breakdown child terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Breakdown dispatch 31f1f54d status done",
+      "source": "dispatch"
+     },
+     {
+      "fact": "recommend-and-dispatch for LIN-2896 returned 409 BUDGET_EXHAUSTED count 1 / maxTasks 1",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Breakdown dispatch id 31f1f54d and session id a9e59c26",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "LIN-2896 and LIN-2897 exist with byte/line budgets and anchor resolver",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John's ruling a1d70ce2: relaunch implementation with maxTasks >= 3",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": ""
+   },
+   {
+    "card": "card-14",
+    "decision": "Verified LIN-2889 research landed and dispatched the plan step, letting the plan absorb the extra same-class scope rather than asking John",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Research child terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Research dispatch a023975e done with DONE line naming comment abd7726d",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Research dispatch id a023975e",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Ticket In Progress; description has a research-findings section; comment abd7726d with the race and third answer path",
+      "source": "tracker"
+     },
+     {
+      "fact": "Extra scope is the same bug class as the ticket",
+      "source": "tracker"
+     },
+     {
+      "fact": "Autopilot ladder rules: verify each step against the tracker, then recommend-and-dispatch next",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 80,
+    "note": ""
+   },
+   {
+    "card": "card-15",
+    "decision": "Verified the LIN-3102 plan on the ticket and dispatched plan-review beat 1/3 with its own beat prompt",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Plan stage child terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Plan dispatch 1460f916 DONE line: plan appended, comment 7bbcd520, plan-review next",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Plan root dispatch id 1460f916",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Description grew 16,999 to 27,107 with prefix intact; plan section; summary comment",
+      "source": "tracker"
+     },
+     {
+      "fact": "Pre-plan description saved in scratchpad, used for the prefix check",
+      "source": "notes"
+     },
+     {
+      "fact": "Recommend engine routes to plan-review",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Stepper rules: split the stage into beats in one worker session; verify, don't redesign",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 80,
+    "note": ""
+   },
+   {
+    "card": "card-16",
+    "decision": "Verified the LIN-3106 fix pass (PR #1592 at 9d8de13c, CI green) and dispatched re-review beat 1/2",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Fix child terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Fix beat 3 dispatch 6bc3350e: commit 9d8de13c pushed, CI run success, summary comment",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Fix dispatch id 6bc3350e",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR #1592 open, 2 commits, one file",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Recommend engine routes to review again",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Prior Request Changes review 43888cb5 serves as the checklist",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Step history: research, plan, implementation, review, fix; one fix round is not looping",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 200,
+    "note": ""
+   },
+   {
+    "card": "card-17",
+    "decision": "Judged LIN-3109 revision 2 clean and kicked the LIN-3110 re-review-2 child autopilot with a goal text",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "LIN-3109 child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "6619954b DONE line: head 8d4a4622, 7/7 CI, 4 non-owning editions, dce2a1d6 recorded",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Revision child id 6619954b",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR #1593 head 8d4a4622, one file; N1 to N3 fixes present in the report",
+      "source": "pr-git"
+     },
+     {
+      "fact": "All 7 checks pass",
+      "source": "ci"
+     },
+     {
+      "fact": "Prior verdict 72f2e767 Request Changes at 51c1dcbb naming N1 to N3; D1, D2, D3, D5 resolved",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Its own ruling that dce2a1d6 is out of scope and recorded",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Plan: approve leads to LIN-3111 close-out; otherwise BLOCKED with DECISION",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-18",
+    "decision": "Accepted LIN-3127 research beat 2 and sent beat 3/4 challenging the ~10-seam count and two keying questions",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Beat 2 report: writer census, per-provider keys, ~10 hook-in points",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Beat 2 dispatch id 6dc1322f and root 927eafa8",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Ticket requires the dual-write through as few seams as possible",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Research is a 4-beat run; beat 3 covers classes, witness, history",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": "The beat split is the session's own plan, written to state.md on disk earlier; coded memory-recorded because it lives in a file a fresh session could read."
+   },
+   {
+    "card": "card-19",
+    "decision": "Accepted LIN-1892 S1 beat 2 and dispatched S1 beat 3/3 (docs, checks, push, PR, CI green)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 2 committed f5acfa1e not pushed, suites green",
+      "source": "delivered"
+     },
+     {
+      "fact": "Worker notes.md: MangoDB projection probes, mutation tests, deviations",
+      "source": "notes"
+     },
+     {
+      "fact": "CI workflow has a ci-success job",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Plan-review binding condition S1-1 options (i)/(ii)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Branch feat/lin-1892-s1-ownership-mark, S1 root 00a7b320, session 87671de0",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "What remains for beat 3 (docs, proxy-arm hermetic, e2e, PR)",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-20",
+    "decision": "Verified the LIN-3124 plan on the ticket and dispatched plan-review beat 1/4",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Plan stage child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "bb7deae4 DONE line: plan appended, comment 75a73e28, gate yes",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Plan beat dispatch id bb7deae4",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Description 8,511 to 45,712 with prefix identical; plan sections; gate plan-review due: yes",
+      "source": "tracker"
+     },
+     {
+      "fact": "Pre-plan description saved as issue.json",
+      "source": "notes"
+     },
+     {
+      "fact": "Recommend engine routes to plan-review",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Stepper rules: beats in one session, verify don't redesign, no new tickets",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 60,
+    "note": ""
+   },
+   {
+    "card": "card-21",
+    "decision": "Stopped LIN-2944 P0 after review round 4, posted a resume-position comment and ended BLOCKED on the existing ruling lin2944-p0-round4-handoff (no duplicate)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review dispatch 40b7e9da done",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Review dispatch id 40b7e9da",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Verdict a1f95b25: Request Changes round 4, N4 and T1 open in the same setup-notice class",
+      "source": "tracker"
+     },
+     {
+      "fact": "Ruling lin2944-p0-round4-handoff already raised by the reviewer",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Its stop rule posted on LIN-2944: if a fourth round finds the same class, stop and hand back",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Dispatch counts on the session: 4 reviews, 9 implementation",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-22",
+    "decision": "Accepted LIN-3124 PR2 beat 3 and dispatched beat 4 (push, open PR2, CI, tracker)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Beat 3 report 04130469: commit 9426730f, 18 files, tests green, decisions F5/F6",
+      "source": "dispatch"
+     },
+     {
+      "fact": "PR1 landed as #1610; origin/main baseline b45a390e",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Follow-up root aabb6678 into engineer session f15e47ff; branch feat/lin-3124-pr2-foundations",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR2 is 2 of 3; beat 4 is push/PR/CI",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-23",
+    "decision": "Accepted the LIN-3124 PR3 review analysis and dispatched review beat 2/2 with a correction to its own F4 instruction",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Review beat child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "5f9d54de DONE: Request Changes, six blockers plus a test gap",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Reviewer's full beat-1 report",
+      "source": "notes"
+     },
+     {
+      "fact": "F4 (mirror/expiry accessors stay raw E2) was the orchestrator's own instruction to implementation",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR1's T1 to T3 pin raw E2 for legacy workspaces",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Reviewer session 43ede85e via root 5f9d54de",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": "F4 is the session's own decision, but it lives in a dispatch prompt and was echoed in an implementation report, so coded memory-recorded."
+   },
+   {
+    "card": "card-24",
+    "decision": "Re-dispatched LIN-3142 research beat 3 as a fresh claude-code session after a credit failure, aborted the malformed dispatch, and queued a corrected re-dispatch",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 3 failed on exhausted credits",
+      "source": "delivered"
+     },
+     {
+      "fact": "1043b993 status failed",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Beat 1 and 2 reports and the beat 3 draft",
+      "source": "notes"
+     },
+     {
+      "fact": "Brief: where the recommender fails, dispatch on the claude-code target",
+      "source": "prompt"
+     },
+     {
+      "fact": "Beats 1 to 2 were accepted after spot-checks of citations on origin/main",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John's ruling covers only the backfill rule",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "DUPLICATE_DISPATCH guard on e2be87c0, retry after ~260s",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": ""
+   },
+   {
+    "card": "card-25",
+    "decision": "Dispatched plan-review beat 3/3 (verdict) to the warm review session, framing it to weigh F1 (limiter-lifetime contradiction) as changing step 8 alongside beat-1 findings",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1/3 child reached [done]",
+      "source": "delivered"
+     },
+     {
+      "fact": "Beat 2/3 (a93ac50a) is done; findings comment 4bd74240 posted, no verdict by design",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Checks 4-6 hold; check 7 F1 is a contradiction that changes the PR's step 8 (NODE_ENV is a per-test variable)",
+      "source": "tracker"
+     },
+     {
+      "fact": "Beat-1 findings C1/C2/G1/G2/G3 to fold into the verdict",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Verdict comment format (### Plan Review Verdict, Approve/Request Changes wording) from the plan-review gate template",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat-2 dispatch id and review-session root to follow up (3b38243c)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "plan-review -> plan round-trip is the gate's single permitted revision cycle",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 600,
+    "note": "Session's own earlier acceptance of the limiter claim and its independence choice are memory-only but did not change the dispatch."
+   },
+   {
+    "card": "card-26",
+    "decision": "Verified S1 merge/CI and ticket states, posted the run summary on LIN-2633 and parked the run BLOCKED at the S2 operator-run gate with a decision",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Close-out #2 child reached [done]",
+      "source": "delivered"
+     },
+     {
+      "fact": "Close-out 73cd48e6 reported PR #1406 merged as d00a4941, LIN-2653 Done",
+      "source": "dispatch"
+     },
+     {
+      "fact": "PR #1406 MERGED and d00a4941 is an ancestor/tip of origin/main",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Post-merge CI on d00a4941 success",
+      "source": "ci"
+     },
+     {
+      "fact": "LIN-2653 Done, LIN-2654/LIN-2655 Todo, parent In Progress; S3 needs John's yes",
+      "source": "tracker"
+     },
+     {
+      "fact": "MONGODB_URI unset here; scan-mis-mirrored script precedent of merged-but-unrun operator scripts",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run history (plan, plan-review RC, revision, approve, breakdown, impl, review, close-out held, ledger discharge)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Close-out #2 dispatch id 73cd48e6",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 900,
+    "note": ""
+   },
+   {
+    "card": "card-27",
+    "decision": "Verified beat 2's wiring finding, ruled to plan the estimate wiring as a disclosed blast-radius deviation (refusing drop-estimate and extend-scan-due-route), and dispatched beat 3/4",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 2/4 child done and raised decision lin2701-estimate-wiring (summarizeByFeature has no production wiring)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "summarizeByFeature has zero production callers; observationData is {urlKey,workspaces}; llmCallLogStore not passed to createDashboardRoutes",
+      "source": "pr-git"
+     },
+     {
+      "fact": "LIN-2651 approved plan mandates the pre-run estimate but never specifies its delivery path",
+      "source": "tracker"
+     },
+     {
+      "fact": "Parent criterion 3 requires the pre-run estimate",
+      "source": "tracker"
+     },
+     {
+      "fact": "routes/workspace-api.js is on the do-not-change list; dashboard.js/server.js are not",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat 2 dispatch id d77236e0 and the 4-beat plan (beat 3 = strategy + Implementation Plan)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat-2 evidence section present in LIN-2701 description",
+      "source": "tracker"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 600,
+    "note": ""
+   },
+   {
+    "card": "card-28",
+    "decision": "Verified CI on the new head 8de386bd and dispatched close-out beat 2/3 (discharge L3-L5, then gated merge and Done) to the warm root",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1/3 paused pending: L1+L2 discharged, pushed 8de386bd, beat 2 = L3/L4/L5 + gated merge, beat 3 = archive/prune",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR #1429 head 8de386bd OPEN/MERGEABLE/CLEAN",
+      "source": "pr-git"
+     },
+     {
+      "fact": "All six checks pass; run 34463439136 success on that exact SHA",
+      "source": "ci"
+     },
+     {
+      "fact": "Ledger items L3-L5 content (e.g. public/roadmap.js unhandled sibling) from the review",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Close-out ROOT 5c512ba0 for the follow-up",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 1000,
+    "note": ""
+   },
+   {
+    "card": "card-29",
+    "decision": "Re-verified beat 4's npm-test baseline correction and dispatched beat 5/5 (write plan into description, session fit, plan-review gate)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 4/5 pending; comment 1ec9e364 posted with baseline correction (darwin npm test fails 2 skip-on-CI AppleScript cells)",
+      "source": "delivered"
+     },
+     {
+      "fact": "CI runs ubuntu-latest; failures at build-launch-applescript.test.js:130/:135 are { skip: !CAN_COMPILE }",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Beat comments 17760d78, d8deef48, d01f8b36, 1ec9e364 exist on LIN-2737",
+      "source": "tracker"
+     },
+     {
+      "fact": "Corrections from beats 1-4 (S9, S10 etc.) to carry into the plan",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "LIN-2652 is the routed-around contract gap named in beat 3",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Warm root db93e9b5 as followUpTo anchor",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 900,
+    "note": ""
+   },
+   {
+    "card": "card-30",
+    "decision": "Verified S1 (LIN-2773) merged with green CI, posted S1's self-match finding on LIN-2775, and kicked off LIN-2774 and LIN-2775 as parallel stepper child autopilots",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Child autopilot LIN-2773 reached [done]",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR #1441 merged as de478d84, head of origin/main",
+      "source": "pr-git"
+     },
+     {
+      "fact": "CI completed/success on landed commit de478d84",
+      "source": "ci"
+     },
+     {
+      "fact": "LIN-2773 Done, LIN-2777 Done, LIN-2774/2775 Todo blocked only by LIN-2773, independent of each other",
+      "source": "tracker"
+     },
+     {
+      "fact": "liveDispatchOnAnchor scans the same loop set so a non-terminal loop matches itself (S1 review finding)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "S1 took three review passes on contract prose",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own autopilot session id c7c748e9 for child kickoff",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 700,
+    "note": ""
+   },
+   {
+    "card": "card-31",
+    "decision": "Verified beat 3's Implementation Plan in the description and dispatched planning beat 4/4 (contract-gap line, session fit, plan-review gate, planning comment)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 3 child (8c53c501) done: Implementation Plan written, 20,033 chars",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Description has ## Implementation Plan with nine subsections; contract-gap, session-fit and plan-review due lines absent",
+      "source": "tracker"
+     },
+     {
+      "fact": "Own pushbacks to beat 3 (try/finally teardown, 1-based counter) to check against",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Contract-gap statement lives only in the beat-2 comment",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat-3 dispatch id and ROOT 03f4821a",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Planning workflow requires session-fit sentence and plan-review due line",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 500,
+    "note": "Pushbacks were the session's own beat-3 prompt text; kept in the dispatch row, so coded memory-recorded."
+   },
+   {
+    "card": "card-32",
+    "decision": "On main CI green for the merge commit, posted the run-summary comment on LIN-3012 and declared DONE",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Main CI run 36007354785 on merge commit d94b05fd success 7/7",
+      "source": "ci"
+     },
+     {
+      "fact": "PR #1559 merged as d94b05fd from head 585db4d3, PR-head CI green",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat history and process note (beat 1 declared DONE not PENDING)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Ledger L3 handed to LIN-3011",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run summary comment required before finishing",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 600,
+    "note": "Close decision is rule-applied; summary text composition is reporting."
+   },
+   {
+    "card": "card-33",
+    "decision": "Dispatched plan re-review beat 2/2 (check 7 + verdict comment) to the warm reviewer session",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1/2 child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Beat-1 dispatch b2e703d0: checks 1-6 hold, F1-F3 resolved, N1/N2 non-blocking",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Beat-1 detailed report (stale commit count, PR #1573 rebased to 6e1342dc)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Check 7 scope: LIN-2994 plan + approving verdict d3c9cbcb (D1-D4), LIN-3024 code",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "A second Request Changes goes to the human, not a third plan round",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 500,
+    "note": "Beat-1 detail was read from the child's transcript file on disk; coded as dispatch (child report)."
+   },
+   {
+    "card": "card-34",
+    "decision": "Located the worker clone, confirmed beat 1's red tests, and dispatched implementation beat 2/4 (resolveAbortForSession + delegation only)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1/4 pending: branch at f2a839d, 14 red tests",
+      "source": "delivered"
+     },
+     {
+      "fact": "Beat-1 dispatch 168ff954 feedback",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Branch adds exactly two test files with planned cases",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Plan's exact resolveAbortForSession spec (no-origin reject shape, humanContinued/force)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat split: verdict layer in beat 2, applyAbortEffects + route in beat 3",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 800,
+    "note": ""
+   },
+   {
+    "card": "card-35",
+    "decision": "Read the conditional Approve and recommend-and-dispatched close-out for LIN-3129 (engine pick)",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review dispatch a46ba8c5 status done",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Review comment 9936f318: Approve conditional on ledger (L2 inside)",
+      "source": "tracker"
+     },
+     {
+      "fact": "Session id 37c33e51 for dispatch",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 80,
+    "note": ""
+   },
+   {
+    "card": "card-36",
+    "decision": "Dispatched parent review beat 2/2 (class check, decide two surviving mutants, verdict comment with full tables)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1/2 child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Beat-1 report: scope union complete, inertness holds, CI 7/7, 25/27 mutants red, two survivors (aliased and bracket-access writer)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Beat-1 detail did not reach the feedback channel",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Review brief steps 5-7 cover class check and verdict",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Session to follow up ae87c005",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-37",
+    "decision": "Verified the LIN-2505 research deliverable and recommend-and-dispatched plan (engine pick), withdrawing its earlier git flag",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Research child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Research dispatch 494f48cf feedback with comment id",
+      "source": "dispatch"
+     },
+     {
+      "fact": "LIN-2505 description grew to 9369 chars and research comment 33594c82 exists",
+      "source": "tracker"
+     },
+     {
+      "fact": "Description was 3464 chars before",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Worker git ran fine; only own shell's git is broken",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Session id ad1a2ba7",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 120,
+    "note": ""
+   },
+   {
+    "card": "card-38",
+    "decision": "Read the conditional Approve on LIN-2534 and recommend-and-dispatched close-out (engine pick)",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Implementation Review Verdict: Approve conditional, ledger discharged by execution, one F1 comment edit",
+      "source": "tracker"
+     },
+     {
+      "fact": "Autopilot session id 162bc048",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": ""
+   },
+   {
+    "card": "card-39",
+    "decision": "Read the clean Approve on LIN-2543 and recommend-and-dispatched close-out; also checked group F's liveness",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review verdict Approve with mutation-tested witnesses",
+      "source": "tracker"
+     },
+     {
+      "fact": "Autopilot session id 162bc048",
+      "source": "prompt"
+     },
+     {
+      "fact": "Group F dispatch id 412f3618",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "F status taken, idle 23m on npm test",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 60,
+    "note": ""
+   },
+   {
+    "card": "card-40",
+    "decision": "Recorded John's ship_empty ruling as a comment and dispatched the LIN-2641 re-plan (kind pinned) carrying the ruling, D10 and the plan-review F1 fix",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "John ruled ship_empty; LIN-2567 is running under autopilot 515e9c2c; dispatch the re-plan",
+      "source": "delivered"
+     },
+     {
+      "fact": "LIN-2567 In Progress",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2567 dispatch rows: research and plan done, plan-review taken",
+      "source": "dispatch"
+     },
+     {
+      "fact": "D10 prohibition on substituting requested effort",
+      "source": "delivered"
+     },
+     {
+      "fact": "Plan-review F1 finding and prior settlements (normalizeDispatchRow, G2, S1 tier a/b)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Autopilot session id 543ff89e",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 500,
+    "note": ""
+   },
+   {
+    "card": "card-41",
+    "decision": "Executed the reworked predicate against real incident rows, found F1 still unfixed, and posted a stop comment instead of dispatching a third LIN-2872 leg",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Fix leg 4709fdf7 reported F1+F2 fixed",
+      "source": "dispatch"
+     },
+     {
+      "fact": "PR #1493 head 1e7edddf open, mergeable",
+      "source": "pr-git"
+     },
+     {
+      "fact": "All checks green on head",
+      "source": "ci"
+     },
+     {
+      "fact": "Shipped isLaunchTimeFailure source exempts only 'Session launched'",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Incident rows a995b517/2c174598 carry a post-failure [working] reaper beat; predicate returns false",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Incident row ids and that the first pass missed the same rows (review F1)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Handbook: stop a looping lane rather than dispatch another worker",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 500,
+    "note": ""
+   },
+   {
+    "card": "card-42",
+    "decision": "Verified LIN-2962's close-out merge, posted a status-correction comment on LIN-2068 that its pre-merge note is stale, and ended DONE with a decision on LIN-2068's ledger",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Close-out child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR #1524 merged as 3b33aae0 at head e93df6a7",
+      "source": "pr-git"
+     },
+     {
+      "fact": "LIN-2962 Done; close-out comment says LIN-2068's close is not this pass",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2068 carry-forward note is written as pre-merge; ledger items 3-5 undischarged",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2068's warning note concerned this exact merge",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run scoped to LIN-2962 with maxTasks 2",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 150,
+    "note": ""
+   },
+   {
+    "card": "card-43",
+    "decision": "Following John's investigate_read choice, filed LIN-3003 (blocks LIN-2974), labelled Bug, kicked a stepper child autopilot on it, and posted a hand-off note on LIN-2974",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "John chose investigate_read",
+      "source": "delivered"
+     },
+     {
+      "fact": "Only TEST_ Linear tokens on this host",
+      "source": "pr-git"
+     },
+     {
+      "fact": "No existing ticket covers blank project bodies",
+      "source": "tracker"
+     },
+     {
+      "fact": "Observed /projects returns blank content and /known-repos returns [] or times out",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "L5 is npm run check:repo-namespace on the live host; simple-dispatcher #243 unmerged at 3c03754",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own session id fdad098b for kickoff",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 700,
+    "note": ""
+   },
+   {
+    "card": "card-44",
+    "decision": "On the credits-topped-up instruction, recommend-and-dispatched the LIN-2994 plan step",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "John topped up credits; resume and dispatch plan",
+      "source": "delivered"
+     },
+     {
+      "fact": "Session id 238b04a5 (followUpTo)",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": ""
+   },
+   {
+    "card": "card-45",
+    "decision": "Checked the plan-limit instruction against rulings and the ticket, then recommend-and-dispatched plan revision 3 for LIN-2932",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Instruction: one more limited plan revision adding signals 4 and 5, then plan-review; leave bullet 2",
+      "source": "delivered"
+     },
+     {
+      "fact": "Rulings lin2932-plan-loop and lin2932-bullet2-rescope state",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Instruction recorded as a comment on LIN-2932",
+      "source": "tracker"
+     },
+     {
+      "fact": "Session id d3a7050e",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": ""
+   },
+   {
+    "card": "card-46",
+    "decision": "After the engine returned 503 twice (OpenRouter key limit), posted a halt comment and parked LIN-3049 BLOCKED with a decision instead of forcing implementation",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review a74494b6 done: Request Changes R1-R4",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Review comment 8a915947 Request Changes, next step implementation",
+      "source": "tracker"
+     },
+     {
+      "fact": "recommend-and-dispatch 503: OpenRouter daily key limit, twice",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Loop history: plan approved c70a666d, PR #1579, 7 held subtasks",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Don't bypass the engine by overriding the verb",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-47",
+    "decision": "Read the conditional Approve on LIN-2995 and recommend-and-dispatched close-out (engine pick)",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review 879fc335: Approve conditional; R1/R2 exact README text for close-out",
+      "source": "tracker"
+     },
+     {
+      "fact": "Session id 2a9ef6fd",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": ""
+   },
+   {
+    "card": "card-48",
+    "decision": "Verified ledger fixes on PR #1598 (CI, diff confined to scripts/eval, no test weakened) and recommend-and-dispatched review",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Implement child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Ledger follow-up 1d87e7e8 discharged items 6-9, new head 1dffc408 (was reviewed 09241ba1)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "PR open, mergeable, no files outside scripts/eval",
+      "source": "pr-git"
+     },
+     {
+      "fact": "All checks pass on 1dffc408",
+      "source": "ci"
+     },
+     {
+      "fact": "Ledger follow-up dispatch id 1d87e7e8",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Session id 6ded0cfd",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 60,
+    "note": ""
+   }
+  ],
+  "B": [
+   {
+    "card": "card-24",
+    "decision": "Re-dispatched LIN-3142 research beat 3/4 as a fresh claude-code session carrying the accepted beat 1-2 reports (then aborted the corrupted send and queued a corrected re-dispatch after the duplicate window), rather than retrying on the default OpenCode/OpenRouter target",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 3 child failed: OpenRouter credits exhausted",
+      "source": "delivered"
+     },
+     {
+      "fact": "Kickoff brief: recommender is down; dispatch beats directly with an explicit prompt on the claude-code target",
+      "source": "prompt"
+     },
+     {
+      "fact": "Beat 1 and beat 2 reports (from saved dispatch feedback b1.json/b2.json) and the beat-3 instructions beat3.md / tpl-research.md",
+      "source": "notes"
+     },
+     {
+      "fact": "Beats 1-2 were accepted after spot-checking their citations on origin/main (db-indexes.js, account-workspace-store.js, repair-account-merge-lin2233.js:41, account-store.js:91)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John's ruling covers only the backfill rule; other choices (who may call a route) stay open decisions (LIN-3142 description)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Built prompt had shell-eaten code spans and a leaked clone path; dispatch e2be87c0 must be aborted; duplicate guard retryAfter 260s",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 450,
+    "note": "Delivered child label says beat 1/4 but the fetched item is the beat 3 dispatch; the decision is about beat 3."
+   },
+   {
+    "card": "card-23",
+    "decision": "Accepted review beat 1 (Request Changes, 6 blockers + 1 test gap on PR #1618) and dispatched review beat 2/2 into the same reviewer session to post the verdict, adding an orchestrator correction that its own earlier F4 instruction (mirror/expiry stay raw E2) was wrong for connection-backed workspaces",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1 done: intended verdict Request Changes, CI 7/7 green on head a36eec1e, draft ledger ready for beat 2",
+      "source": "delivered"
+     },
+     {
+      "fact": "Full beat-1 review findings (finding 1: accessors read raw token, NaN expiry for new workspaces, etc.) read from the reviewer session's last report",
+      "source": "dispatch"
+     },
+     {
+      "fact": "The 'mirror/expiry accessors stay raw E2' instruction (F4) came from this orchestrator in an earlier implementation dispatch",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR1's T1-T3 characterization tests pin raw E2 for legacy workspaces",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Review is a 2-beat plan in reviewer session 43ede85e, follow-up via item 5f9d54de; beat 2 posts the verdict",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": "The reviewer's full report was read via a helper that parses the child session transcript on disk; coded as dispatch (child outcome record)."
+   },
+   {
+    "card": "card-22",
+    "decision": "Accepted PR2 implementation beat 3 (commit 9426730f, not pushed) and dispatched beat 4 into engineer session f15e47ff: merge main if moved past b45a390e, push, open PR2, confirm CI, update tracker",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 3 complete: commit 9426730f on feat/lin-3124-pr2-foundations, 18 files, tests green, not pushed; F5/F6 decisions",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Child reached terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR1 landed as #1610, merge b45a390e on main",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR2 is the 2nd of 3 PRs under LIN-3124 per the Implementation Plan",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Engineer session f15e47ff and its follow-up root item aabb6678 for PR2 beats",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR2 runs as 4 beats, beat 4 = push/PR/CI/tracker",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-21",
+    "decision": "Stopped the LIN-2944 run and handed it back to the operator: posted a resume-position comment on LIN-2944 and parked BLOCKED on the reviewer's existing ruling lin2944-p0-round4-handoff instead of dispatching a 4th fix-up",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Review round 4 verdict a1f95b25: Request Changes, N4 and T1 still open in the same setup-notice class",
+      "source": "tracker"
+     },
+     {
+      "fact": "Review child finished done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Stop rule: if a fourth round finds another defect in this class, stop and hand back instead of dispatching another patch (own earlier tracker comment a6d28bf0)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Open ruling lin2944-p0-round4-handoff already raised by the reviewer (no duplicate needed)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Dispatch history for the autopilot: 9 implementation, 4 review rounds",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Earlier rounds F1 -> N1 -> N3 in the same class; PR #1604 head 802f587f with CI success run 36496285571",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": ""
+   },
+   {
+    "card": "card-20",
+    "decision": "Verified plan stage (Implementation Plan appended, prefix intact, comment 75a73e28, plan-review due yes), then dispatched plan-review beat 1/4 (onboard + completeness) as a fresh reviewer session",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Plan beat 4 DONE: plan appended, comment 75a73e28, gate plan-review due: yes",
+      "source": "delivered"
+     },
+     {
+      "fact": "Tracker description grew 8511 -> 45712 with original as exact prefix; plan sections present",
+      "source": "tracker"
+     },
+     {
+      "fact": "Original description snapshot issue.json used for the prefix check",
+      "source": "notes"
+     },
+     {
+      "fact": "Recommend engine: plan-review; served plan-review prompt with seven checks",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Plan research pinned at SHA 50588aef; plan commits to 3 PRs",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 120,
+    "note": ""
+   },
+   {
+    "card": "card-19",
+    "decision": "Accepted LIN-1892 S1 implementation beat 2 (commit f5acfa1e) and dispatched beat 3/3 (docs, remaining checks, push, PR, CI green) into the same worker session",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Child paused: beat 2 committed f5acfa1e, not pushed; unit 11974/11974, hermetic 12025/12025, mongo-smoke 44/44",
+      "source": "delivered"
+     },
+     {
+      "fact": "Worker notes.md: MangoDB drops array elements in dotted projection, so option (i) impossible; option (ii) used; _id-only projection leak caught; mutation table; deviations",
+      "source": "notes"
+     },
+     {
+      "fact": "CI workflow has a ci-success aggregate job",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Plan-review binding condition S1-1 (count every workspace on both MangoDB and MongoDB) with options i/ii",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "S1 runs as 3 beats in session 87671de0 (root 00a7b320); beat 3 = docs/checks/push/PR/CI",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-18",
+    "decision": "Accepted LIN-3127 research beat 2 and dispatched beat 3/4 (classes, witness, history) into the same worker, challenging its ~10 hook-in points and asking it to settle Jira Basic and PAT keying",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 2 report: writer census, linkProvider cannot host the write, per-provider keys, ~10 seams",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Child reached terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Ticket requires the dual-write through as few seams as possible (LIN-3127 description)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Research steps from the engine prompt, with beat 3 covering classes, acceptance-witness validation and history",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Worker follow-up root 927eafa8 and the send-beat helper",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-17",
+    "decision": "Verified LIN-3109 revision 2 on PR #1593 (head 8d4a4622, 7/7 CI, N1-N3 fixed) and kicked the LIN-3110 re-review #2 child autopilot, treating it as the final pass before escalation",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Child done: revision 2 at 8d4a4622, CI run 36303154106, dce2a1d6 recorded per parent's ruling, LIN-3109 Done",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR #1593 open, one file, head 8d4a4622; N1-N3 visible in the report diff",
+      "source": "pr-git"
+     },
+     {
+      "fact": "All 7 checks pass on the head",
+      "source": "ci"
+     },
+     {
+      "fact": "Last verdict 72f2e767 was Request Changes at 51c1dcbb naming N1-N3; D1-D3, D5 resolved",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own earlier ruling that drift hit dce2a1d6 is out of scope (sent as a dispatch prompt)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Plan: if Approve kick LIN-3111 close-out, else BLOCKED + DECISION (autopilot-state.md)",
+      "source": "notes"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": "The notes line was written this wake rather than read; the 'final before escalation' bound was the session's own judgement, and the loop-bound rule is in the standing manual."
+   },
+   {
+    "card": "card-16",
+    "decision": "Verified LIN-3106 fix-up beat 3 (commit 9d8de13c pushed, CI green) and dispatched a fresh 2-beat re-review (beat 1/2: verify corrections) from the engine's review prompt",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Fix beat 3 report: quote restored, commit 9d8de13c pushed to PR #1592, CI run 36270791371 success",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Child reached terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Recommend engine: review of corrected head 9d8de13c with prior Request Changes as checklist",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Prior Request Changes review 43888cb5 and fix summary 016c2da3 with four deliberate deviations",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Stage history research->plan->impl->review->impl->review is one fix round, not looping",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 200,
+    "note": ""
+   },
+   {
+    "card": "card-15",
+    "decision": "Verified LIN-3102 plan stage (plan appended with prefix intact, comment 7bbcd520) and dispatched plan-review beat 1/3 (checks 1-3) as a fresh verifier session",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Plan beat 3/3 DONE: plan appended, summary comment 7bbcd520, recommends plan-review",
+      "source": "delivered"
+     },
+     {
+      "fact": "Tracker: description 16999 -> 27107, prefix intact, plan at offset 17001, comments present",
+      "source": "tracker"
+     },
+     {
+      "fact": "Plan text (strategy C, plan-review due: yes (a))",
+      "source": "notes"
+     },
+     {
+      "fact": "Recommend engine: plan-review, with served plan-review prompt",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": "Pre-plan description length came from an earlier issue snapshot on disk, read this wake."
+   },
+   {
+    "card": "card-14",
+    "decision": "Verified LIN-2889 research landed (comment abd7726d, findings section in description) and recommend-and-dispatched the next stage (plan) into the same session, letting plan absorb the wider same-class scope rather than escalating",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Research child done; session feeefce2",
+      "source": "delivered"
+     },
+     {
+      "fact": "DONE line: posted comment abd7726d, description updated, next step plan",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Tracker: comment abd7726d present, Research findings section and recommended approach in description, In Progress",
+      "source": "tracker"
+     },
+     {
+      "fact": "Standing rule: scope growth in the same class is absorbed, not escalated; use recommend-and-dispatch",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": "Mostly mechanical (engine picked plan); coded J for the judgement that the wider race and third path stay in scope without asking."
+   },
+   {
+    "card": "card-13",
+    "decision": "After breakdown finished, tried to dispatch LIN-2896 implementation, got 409 BUDGET_EXHAUSTED (maxTasks 1), posted the final run summary on LIN-2887 and stopped",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Breakdown child terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "recommend-and-dispatch refused: 409 BUDGET_EXHAUSTED count 1 / maxTasks 1",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Subtasks LIN-2896 (and LIN-2897 named as sibling) under LIN-2887",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John's ruling a1d70ce2: guard bytes-binding, no third plan pass, relaunch with maxTasks >= 3",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run history research->plan->plan-review x2->ruling->breakdown",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": "Session said both subtasks were verified, but no tracker read appears in this wake; LIN-2897's creation was not seen in an earlier tool result (only its name in LIN-2896's description)."
+   },
+   {
+    "card": "card-12",
+    "decision": "Posted voyage log c47 on LIN-3099: the Go leg resumed on LIN-3098 (stepper 1a17f593) after c46 recorded its wind-down; listed what's still held",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Go leg child pending on LIN-3098 stepper 1a17f593 with expected deliverables; #1616/#1617 held on John; LIN-3059 parked",
+      "source": "delivered"
+     },
+     {
+      "fact": "Earlier voyage log c46 recorded the Go leg (b44580e4) as wound down",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "LIN-3098 is in the Go leg's scope (leg block on LIN-3099)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Held ruling ids lin3135-r2-sd-refire-ruling and lin3137-rj51-owner-lockout; OpenRouter top-up owed",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Front-door stepper 420c3541 on LIN-3124 PR3",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rule: keep the voyage log of material deviations on LIN-3099",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 350,
+    "note": "Log entry restating state; borderline M/J."
+   },
+   {
+    "card": "card-11",
+    "decision": "Posted voyage log c42 on LIN-3099 recording the LIN-1892 S3 merge (5f25b4a0) and the current state of both legs",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "S3 merged as 5f25b4a0; d529fde8 on close-out step 2 of 2; 420c3541 on LIN-3124 PR3; LIN-3125 next",
+      "source": "delivered"
+     },
+     {
+      "fact": "S3 is PR #1611, merged after ruling lin1892-s3-h1",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go leg: T4 (LIN-3137) beat 3/5, T2c (LIN-3135) beat 3/4, T3 (LIN-3136) blocked",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "LIN-3059 hosted runs owed by John; run leg closed",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rule: log landings on LIN-3099",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-10",
+    "decision": "Posted voyage log c37 on LIN-3099: front-door leg back in flight on LIN-1892 S1 (PR #1601 re-verify/merge/deploy, then S3)",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Front-door child pending on d529fde8 (S1 PR #1601 re-verify, merge, deploy, then S3); LIN-3124 on ruling lin3124-pr5-gate-scope; LIN-3125 held",
+      "source": "delivered"
+     },
+     {
+      "fact": "S1 deploy gates the Go leg's LIN-3059 S2b (plan: #1601 merged+deployed -> S2b)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Go leg on LIN-2884 T2-i (LIN-3138, PR #1609) then T2-ii (LIN-3139)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run leg stays closed",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rule: keep the voyage log",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-09",
+    "decision": "Posted voyage log c32 on LIN-3099: front-door leg parked blocked again on three rulings, with a table of rulings and recommendations; raised nothing new",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Front-door child blocked: LIN-1892 S2 landed (PR #1603, c88f9569, CI green); needs lin3124-pr3-revise, lin2944-p0-round4-handoff, lin1892-s1-edgeless-owner",
+      "source": "delivered"
+     },
+     {
+      "fact": "Leg had resumed LIN-3124 after John answered lin3124-pr2-revise",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Front-door landings so far LIN-2882, LIN-3127, LIN-1892 S2; Go leg on LIN-3059 S2a PR #1606 and LIN-2884 breakdown",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rules: log deviations, don't raise duplicate rulings or nudge children blocked on humans",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-08",
+    "decision": "Posted voyage log c27 on LIN-3099: LIN-3124 parked on the plan-loop ruling lin3124-pr2-revise, which the log classifies as not the front door's data-decision wind-down trigger; Go flying again",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Front-door child pending; LIN-3124 parked on ruling lin3124-pr2-revise (plan-loop limit); LIN-1892 S2 close-out merging #1603; LIN-2944 P0 step 4/4",
+      "source": "delivered"
+     },
+     {
+      "fact": "Front-door wind-down trigger: moving existing workspaces needs a data decision that is John's (leg block)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "LIN-3124 research found no bulk migration needed",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "John answered lin3059-plan-third-...; Go leg b44580e4 flying again",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rules: cite wind-down triggers, no duplicate rulings",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-07",
+    "decision": "Posted voyage log c22 on LIN-3099: Go leg flying again after John's rec answer cleared its security-boundary wind-down; LIN-3059 on plan beat 1/3, LIN-2884 to follow on the shared design",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Go child pending on stepper 9a7b0b86 (LIN-3059 plan beat 1/3, worker 92f280e7) after John's rec ruling; LIN-2884 after plan-review",
+      "source": "delivered"
+     },
+     {
+      "fact": "Go leg had wound down blocked on the security-boundary trigger, ruling lin3059-credential-boundary-j1-j4",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Leg ordering: LIN-3059 and LIN-2884 designed together, then LIN-3098, then LIN-2942",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run leg stays closed unless Go proves hosted run and Flight Companion confirms budget",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rule: keep the voyage log",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-06",
+    "decision": "Logged on LIN-3099 (c17) that the Flight Companion's front-door resume 6dc50006 failed because 8c6a92f5 is archived, did not re-dispatch it, and raised DECISION lin3099-frontdoor-redispatch on who restarts it",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Dispatch log: 6dc50006 'Resume after weekly cap - front-door leg' failed; 82da8ec4 Runner resume taken",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Failure reason: no live session to resume, original 8c6a92f5 archived",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Resumption order 82da8ec4: front-door leg is resumed separately by the Flight Companion; finish before starting, no new legs",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Front-door steppers 87671de0, 794948b8, ef57e01a failed/aborted; positions in leg record 75d1229e",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Pending rulings lin3059-credential-boundary-j1-j4 and lin1892-s1-edgeless-owner",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rules: re-dispatch fresh after failed resume; voyage-log deviations",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 500,
+    "note": "Delivered message is a compaction summary, not a dispatch item; its facts were checked against earlier tool results in the transcript (all present there)."
+   },
+   {
+    "card": "card-05",
+    "decision": "Posted voyage log 12 on LIN-3099: LIN-1892 S1 merge held on ruling lin1892-s1-edgeless-owner (raised by its stepper), judged adjacent to but not tripping the front door's data-decision wind-down trigger",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Front-door child pending: S1 close-out merge held on lin1892-s1-edgeless-owner; S2 step 1/5; LIN-3127 on PR/CI; LIN-2944 planning",
+      "source": "delivered"
+     },
+     {
+      "fact": "Ruling text and options (run-dryrun recommended) for lin1892-s1-edgeless-owner",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Front-door wind-down trigger about data decisions for existing workspaces (leg block)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Runner rules: cite triggers verbatim, no duplicate rulings",
+      "source": "prompt"
+     },
+     {
+      "fact": "Voyage log numbering (entry 12)",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 200,
+    "note": ""
+   },
+   {
+    "card": "card-04",
+    "decision": "Verified the Maintenance first leg made port (7/7 periodicals Done, LIN-3105 merged with CI green) and posted voyage log 7 on LIN-3099",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Leg child 0599e12d terminal done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Dispatch statuses: 0599e12d done, Go b44580e4 and front door 8c6a92f5 taken",
+      "source": "dispatch"
+     },
+     {
+      "fact": "LIN-3100..LIN-3106 all Done; LIN-3105 evidence summary with PR #1593 merge 2c00dee3 and CI",
+      "source": "tracker"
+     },
+     {
+      "fact": "Previous voyage logs on LIN-3099 (log 5: LIN-3105 not landed then)",
+      "source": "tracker"
+     },
+     {
+      "fact": "Making-port criteria and leg budget (7) from the leg block; 21 tasks used",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "lin3102-planloop ruling settled by delegated ruling but row still open",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-03",
+    "decision": "Posted a voyage log on LIN-3099 that LIN-3102 is blocked on the existing ruling lin3102-planloop, without raising a duplicate ruling",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Leg child pending; LIN-3102 child 44f38b91 blocked on a human ruling",
+      "source": "delivered"
+     },
+     {
+      "fact": "Ruling lin3102-planloop: plan-review looped twice, options a/b/c, recommended a",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Runner rules: no duplicate rulings; voyage-log deviations",
+      "source": "prompt"
+     },
+     {
+      "fact": "Maintenance leg wind-down: a non-landing periodical is recorded and later legs don't wait on it; leg child 0599e12d",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 200,
+    "note": ""
+   },
+   {
+    "card": "card-02",
+    "decision": "Verified LIN-2897 landed on simple-dispatcher main (CLAUDE.md 85 lines / 4,579 bytes, PR #240 merged, CI success) and posted a landing comment on the passage ticket",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "LIN-2887 coordinator pending; reports LIN-2897 verified complete, LIN-2896 at beat 3/5",
+      "source": "delivered"
+     },
+     {
+      "fact": "origin/main CLAUDE.md is 85 lines / 4579 bytes; PR #240 merged as 8ad1b52; beat commits incl. close-out ledger discharge",
+      "source": "pr-git"
+     },
+     {
+      "fact": "CI success on merge commit and predecessors",
+      "source": "ci"
+     },
+     {
+      "fact": "Prior size 698 lines / 59,586 bytes",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Budget 90 lines / 7,000 bytes, bytes binding, per John's ruling",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 200,
+    "note": ""
+   },
+   {
+    "card": "card-01",
+    "decision": "Confirmed LIN-2886 post-merge CI run on 4f8d01d4 succeeded and PATCHed the Harbour seam lane voyage-log comment to close the pending line (leg made port fully)",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Wake from LIN-2809 child (carry-forward judged, breakdown dispatched)",
+      "source": "delivered"
+     },
+     {
+      "fact": "Post-merge Tests run on 4f8d01d4 now completed success",
+      "source": "ci"
+     },
+     {
+      "fact": "That run (35274434160) was still in progress at last check and the log recorded CI green as pending",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Voyage log comment 54247163 to update; leg making-port: both anchors Done with merged PRs and CI green",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Draft log text cC.md on disk (appended to)",
+      "source": "notes"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-48",
+    "decision": "After verifying the LIN-3107 fix-up (items 6-9) on PR #1598, dispatched a second review via recommend-and-dispatch rather than going straight to close-out",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Fix-up child 1d87e7e8 done; its summary says review items 6-9 discharged on new head 1dffc408",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Fix-up child's dispatch id 1d87e7e8 and that it was dispatched to fix review items 6-9",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Previously reviewed head was 09241ba1 (diff baseline)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR #1598 open, mergeable, all files under scripts/eval/",
+      "source": "pr-git"
+     },
+     {
+      "fact": "All CI checks pass on 1dffc408",
+      "source": "ci"
+     },
+     {
+      "fact": "Test file diff only removes the old import line (no test weakened)",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Lifecycle: fix-up is followed by re-review, then close-out",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 180,
+    "note": ""
+   },
+   {
+    "card": "card-47",
+    "decision": "Dispatched close-out for LIN-2995 after a conditional Approve, judging the two quoted README corrections small enough for close-out to apply directly",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Review child finished done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review comment 879fc335: Approve conditional on close-out, R1/R2 one-sentence README fixes with exact replacement text",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2995 is In Progress",
+      "source": "tracker"
+     },
+     {
+      "fact": "Session id to follow up on (2a9ef6fd)",
+      "source": "delivered"
+     },
+     {
+      "fact": "Engine selected close-out",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": ""
+   },
+   {
+    "card": "card-46",
+    "decision": "Engine dispatch failed (OpenRouter 403 daily limit); halted LIN-3049, posted a halt comment and raised a decision instead of forcing the implementation step by hand",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Review child a74494b6 done: Request Changes R1-R4, next step implementation",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Review comment 8a915947 Request Changes, PR #1579 head 6d4aeab2, CI green",
+      "source": "tracker"
+     },
+     {
+      "fact": "Review dispatch id a74494b6",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "recommend-and-dispatch returned 503 twice (OpenRouter key limit exceeded)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Plan was approved earlier (plan-review comment c70a666d)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Rule: do not route around a broken tool; escalate as a decision",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 120,
+    "note": ""
+   },
+   {
+    "card": "card-45",
+    "decision": "Applied the relayed owner ruling: dispatched one more limited plan revision (adding signals 4 and 5) for LIN-2932 after confirming it is recorded on the ticket",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Delivered instruction: one more limited plan revision adding 4 and 5, bullet 2 left pending lin2932-bullet2-rescope",
+      "source": "delivered"
+     },
+     {
+      "fact": "Rulings feed shows lin2932-plan-loop and lin2932-bullet2-rescope state",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Ticket comment at 03:54 records the instruction",
+      "source": "tracker"
+     },
+     {
+      "fact": "Session id d3a7050e from followUpTo",
+      "source": "delivered"
+     },
+     {
+      "fact": "Engine returned kind=plan",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": ""
+   },
+   {
+    "card": "card-44",
+    "decision": "On the credits-topped-up resume instruction, re-triggered recommend-and-dispatch; engine queued the plan step for LIN-2994",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Delivered instruction: credits topped up, decision resolved, dispatch the plan step",
+      "source": "delivered"
+     },
+     {
+      "fact": "Session id 238b04a5 from followUpTo",
+      "source": "delivered"
+     },
+     {
+      "fact": "Engine returned kind=plan, queued",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": ""
+   },
+   {
+    "card": "card-43",
+    "decision": "On John's investigate_read choice, filed LIN-3003 (blank Linear project bodies / empty known-repos) as a bug blocking LIN-2974, and launched a stepper child autopilot on it",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "John chose investigate_read: check Linear for repo= lines, file and fix the blank read as its own bug, then rerun L5",
+      "source": "delivered"
+     },
+     {
+      "fact": "/projects returns all 11 started projects with empty content; /known-repos returns [] or times out (close-out child's L5 report)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Yesterday's failing dispatch 87b5456d got a non-empty knownRepos list",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Only TEST_ Linear tokens exist on this host, so Linear can't be read directly",
+      "source": "pr-git"
+     },
+     {
+      "fact": "No existing ticket covers this (search)",
+      "source": "tracker"
+     },
+     {
+      "fact": "L5 (check:repo-namespace) can't pass until fixed; #243 unmerged at 3c03754",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own session id fdad098b for the child subscription",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 450,
+    "note": ""
+   },
+   {
+    "card": "card-42",
+    "decision": "After verifying the LIN-2962 close-out merged #1524, posted a status-correction comment on LIN-2068 (stale pre-merge carry-forward note) and ended the run DONE with a decision on how to close LIN-2068",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Close-out child finished done",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR #1524 merged at 3b33aae0, head e93df6a7",
+      "source": "pr-git"
+     },
+     {
+      "fact": "LIN-2962 Done; close-out comment ledger disposition",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2068 carry-forward note is written as a pre-merge instruction",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2068 review ledger items 3-5 (label layer) are mutation-proven gaps not discharged",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2068 was last reviewed at b4d55e4a; LIN-2963 Done",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run budget maxTasks 2 and own autopilot id 5979dfb9",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 150,
+    "note": ""
+   },
+   {
+    "card": "card-41",
+    "decision": "Verified by running the shipped predicate on real incident rows that the LIN-2872 rework still misses F1; posted a stop comment and parked the lane on a human semantics decision instead of dispatching a third fix leg",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Fix leg 4709fdf7 reported F1+F2 fixed, PR #1493 head 1e7edddf",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Fix leg id 4709fdf7 and that it was the second pass at F1",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Incident rows a995b517/2c174598 are the cases the review used for F1",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "PR #1493 open/clean, CI 7/7 green",
+      "source": "ci"
+     },
+     {
+      "fact": "Shipped isLaunchTimeFailure code at 1e7edddf",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Incident rows' stored feedback includes a post-failure reaper [working] beat",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Running the predicate on those rows still returns false",
+      "source": "pr-git"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-40",
+    "decision": "Recorded John's ship_empty ruling on LIN-2566 and dispatched the LIN-2641 re-plan (kind pinned to plan) after confirming LIN-2567 is already running",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "John's ruling ship_empty, D10 stands, LIN-2567 running, dispatch the LIN-2641 re-plan",
+      "source": "delivered"
+     },
+     {
+      "fact": "LIN-2567 In Progress with autopilot 515e9c2c, research and plan done",
+      "source": "tracker"
+     },
+     {
+      "fact": "LIN-2567 dispatch rows (plan-review in flight)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Plan-review's other finding (F1) to fix in the same revision, plus prior settlements (normalizeDispatchRow adapter, tier a/b)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own session id 543ff89e",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": ""
+   },
+   {
+    "card": "card-39",
+    "decision": "After a clean Approve on LIN-2543, dispatched close-out via the engine",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review comment: Approve, no blocking findings, claims reproduced",
+      "source": "tracker"
+     },
+     {
+      "fact": "Own session id 162bc048",
+      "source": "prompt"
+     },
+     {
+      "fact": "Engine selected close-out",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": "A secondary liveness check of group F (dispatch 412f3618) used a remembered id; not the main action."
+   },
+   {
+    "card": "card-38",
+    "decision": "After a conditional Approve on LIN-2534 (one non-blocking F1 comment edit), dispatched close-out via the engine",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review verdict: Approve conditional on the ledger; ledger discharged by execution; F1 non-blocking",
+      "source": "tracker"
+     },
+     {
+      "fact": "Own session id 162bc048",
+      "source": "prompt"
+     },
+     {
+      "fact": "Engine selected close-out",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 0,
+    "note": "Close call between M and J: the session read the ledger, but the routing was the engine's fixed approve-to-close-out step."
+   },
+   {
+    "card": "card-37",
+    "decision": "Verified the LIN-2505 research deliverable landed and dispatched plan via the engine (also withdrew its earlier git-broken flag)",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Research child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Research dispatch 494f48cf feedback: research comment 33594c82 posted",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Research dispatch id 494f48cf",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Description grew from 3464 (pre-research length) to 9369 chars; research comment present",
+      "source": "tracker"
+     },
+     {
+      "fact": "Workers' git works; only this shell's xcode git is broken",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Engine selected plan",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 60,
+    "note": ""
+   },
+   {
+    "card": "card-36",
+    "decision": "Accepted LIN-3134 parent-review beat 1 and wrote/dispatched beat 2/2 (class check, ruling on the two surviving mutants, verdict)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1 child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Beat 1 report: review SHA b15a48b6, scope union complete, CI 7/7, 721/721, 25/27 mutants red, two survivors (aliased and bracket-access writers)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Beat 1 dispatch id 43e0c9ce and the beat split (beat 1 = brief steps 1-4, beat 2 = 5-7 + verdict)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat 1 detail didn't reach the feedback channel, so the verdict must carry the tables in full",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Session id ae87c005 from followUpTo",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 150,
+    "note": ""
+   },
+   {
+    "card": "card-35",
+    "decision": "After a conditional Approve on LIN-3129 (ledger item L2 left for close-out), dispatched close-out via the engine",
+    "mj": "M",
+    "facts": [
+     {
+      "fact": "Review child done",
+      "source": "delivered"
+     },
+     {
+      "fact": "Review dispatch a46ba8c5 feedback",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Review dispatch id a46ba8c5",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Review comment 9936f318: Approve conditional on ledger, next stage close-out, L2 inside",
+      "source": "tracker"
+     },
+     {
+      "fact": "Engine selected close-out",
+      "source": "dispatch"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 40,
+    "note": ""
+   },
+   {
+    "card": "card-34",
+    "decision": "Verified LIN-3042 implementation beat 1 (red tests) in the worker's local clone and wrote/dispatched beat 2/4 (resolveAbortForSession + delegation only)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1 pending report: branch feat/lin-3042-abort-effects @ f2a839d, 14 red tests, 4 witnesses green",
+      "source": "delivered"
+     },
+     {
+      "fact": "Branch has exactly two new test files; test names",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Planned resolveAbortForSession signature and no-origin reject shape (Implementation Plan on ticket)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat decomposition: beat 2 = verdict layer, beat 3 = applyAbortEffects + dispatcher route",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Session id f05f3f6d from followUpTo",
+      "source": "delivered"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 250,
+    "note": "Beat split is the session's own plan, but it appears in its earlier beat prompts (dispatch rows), so coded memory-recorded."
+   },
+   {
+    "card": "card-33",
+    "decision": "Accepted LIN-3026 plan re-review beat 1 and wrote/dispatched beat 2/2 (check 7 + verdict comment)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1 child done; done line says checks 1-6 hold, F1-F3 resolved, N1/N2 noted",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Beat 1 full report read from the worker's transcript on disk (stale 13-vs-3 commits, PR #1573 head 6e1342dc)",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Beat split: beat 1 = checks 1-6, beat 2 = check 7 + verdict",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "LIN-2994 plan approving verdict d3c9cbcb is the source of truth for check 7",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own session id 02ac9892",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 150,
+    "note": "The worker transcript file is a record on disk, not Harbour dispatch rows; coded as dispatch for lack of a better category."
+   },
+   {
+    "card": "card-32",
+    "decision": "After main CI went green on merge commit d94b05fd, posted the LIN-3012 run-summary comment and declared DONE",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Main CI run 36007354785 on d94b05fd succeeded (7/7)",
+      "source": "ci"
+     },
+     {
+      "fact": "PR #1559 merged as d94b05fd from head 585db4d3; PR-head CI run 36006420061 green",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat history and outcomes (beat 1 worker declared DONE, later beats resumed cold)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Ledger L3 handed to LIN-3011 by close-out",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run summary comment is required at the end",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 700,
+    "note": ""
+   },
+   {
+    "card": "card-31",
+    "decision": "Verified LIN-2758 planning beat 3 in the description and wrote/dispatched beat 4/4 (contract-gap line, session fit, plan-review due line, planning comment)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 3 child done: Implementation Plan written, 20,033 chars",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Description headings and phrase counts: try/finally and 1-based counter present; plan-review due / none identified absent",
+      "source": "tracker"
+     },
+     {
+      "fact": "The two corrections the session had pushed into beat 3 (try/finally teardown, 1-based counter)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Contract-gap statement lives only in the beat-2 comment",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat plan and ROOT 03f4821a with force for follow-ups (RUN.md)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Planning workflow requires session-fit and plan-review due lines",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": "Delivered wake names beat 1/4 (the root's label) but the report is beat 3."
+   },
+   {
+    "card": "card-30",
+    "decision": "Verified S1 (LIN-2773) merged and green on main, posted inherited-context comment on LIN-2775, and kicked off stepper autopilots for LIN-2774 and LIN-2775 in parallel",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Child autopilot LIN-2773 done",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR #1441 merged as de478d84, head of origin/main",
+      "source": "pr-git"
+     },
+     {
+      "fact": "CI on de478d84 completed/success",
+      "source": "ci"
+     },
+     {
+      "fact": "LIN-2773 and LIN-2777 Done; LIN-2774/2775 Todo, blocked only by LIN-2773, not by each other",
+      "source": "tracker"
+     },
+     {
+      "fact": "S1 review finding: liveDispatchOnAnchor self-matches non-terminal loops (cost three review passes)",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own session id c7c748e9 for subscription",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 400,
+    "note": ""
+   },
+   {
+    "card": "card-29",
+    "decision": "Verified LIN-2737 planning beat 4's baseline correction (darwin npm test fails on CAN_COMPILE cells; CI is ubuntu) and wrote/dispatched beat 5/5 (write the plan, session fit, plan-review gate)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 4 pending report: comment 1ec9e364, drifted npm test triple, two darwin-only failures",
+      "source": "delivered"
+     },
+     {
+      "fact": "CI runs ubuntu-latest; failing tests are { skip: !CAN_COMPILE }",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Comments 17760d78, d8deef48, d01f8b36, 1ec9e364 exist; task In Progress",
+      "source": "tracker"
+     },
+     {
+      "fact": "Corrections from beats 1-3 and LIN-2652 as the routed-around contract gap",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat plan and warm ROOT db93e9b5 with force (RUN.md)",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 500,
+    "note": ""
+   },
+   {
+    "card": "card-28",
+    "decision": "Verified CI green on PR #1429's exact head after close-out beat 1 and wrote/dispatched close-out beat 2/3 (discharge L3-L5, then gated merge and Done)",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 1 pending report: L1+L2 discharged, pushed 8de386bd, CI green",
+      "source": "delivered"
+     },
+     {
+      "fact": "PR #1429 head 8de386bd, OPEN/MERGEABLE/CLEAN",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Run 34463439136 success on exactly 8de386bd",
+      "source": "ci"
+     },
+     {
+      "fact": "Ledger items L3-L5 content (e.g. public/roadmap.js sibling) from the review",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Close-out beat plan (3 beats) and ROOT 5c512ba0",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 500,
+    "note": ""
+   },
+   {
+    "card": "card-27",
+    "decision": "Verified LIN-2701 beat 2's wiring finding and ruled on its decision: beat 3 plans the estimate wiring through dashboard.js/server.js as a disclosed deviation (refusing drop-estimate and the frozen scan-due route); dispatched beat 3/4 and surfaced the choice upward",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 2 done with decision lin2701-estimate-wiring",
+      "source": "dispatch"
+     },
+     {
+      "fact": "summarizeByFeature has zero production callers; observationData is {urlKey, workspaces}; llmCallLogStore not injected into createDashboardRoutes",
+      "source": "pr-git"
+     },
+     {
+      "fact": "LIN-2651 approved plan requires the pre-run estimate but never says how it reaches the page",
+      "source": "tracker"
+     },
+     {
+      "fact": "routes/workspace-api.js is on the do-not-change list; dashboard.js/server.js are not",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Evidence section present in the description",
+      "source": "tracker"
+     },
+     {
+      "fact": "Beat plan and ROOT c8a28ae5 (run-state.md)",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 300,
+    "note": ""
+   },
+   {
+    "card": "card-26",
+    "decision": "Verified LIN-2653 (S1) merged and green post-merge, posted the LIN-2633 run summary, and reported BLOCKED with a decision because S2 needs production DB access",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Close-out child 73cd48e6 done: PR #1406 merged as d00a4941, LIN-2653 Done",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Close-out dispatch id 73cd48e6",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "d00a4941 is on main; PR merged",
+      "source": "pr-git"
+     },
+     {
+      "fact": "Post-merge CI on d00a4941 success",
+      "source": "ci"
+     },
+     {
+      "fact": "LIN-2653 Done; LIN-2654/2655 Todo; parent In Progress",
+      "source": "tracker"
+     },
+     {
+      "fact": "MONGODB_URI unset here; lin1981 scan script unrun since 2026-08-23 for the same reason",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Run history (plan, reviews, close-out #1 held) for the summary",
+      "source": "memory-recorded"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 800,
+    "note": ""
+   },
+   {
+    "card": "card-25",
+    "decision": "Read LIN-2534 plan-review beat 2's findings (F1 limiter contradiction) and wrote/dispatched the verdict beat 3/3",
+    "mj": "J",
+    "facts": [
+     {
+      "fact": "Beat 2 child done; report says checks 4-6 hold, check 7 has F1",
+      "source": "dispatch"
+     },
+     {
+      "fact": "Findings comment 4bd74240: F1 contradiction (NODE_ENV can be flipped per test), check 7b count 7 not 6",
+      "source": "tracker"
+     },
+     {
+      "fact": "Beat-1 findings C1/C2/G1-G3 to fold into the verdict",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Beat split: beat 3 = verdict; review root 3b38243c",
+      "source": "memory-recorded"
+     },
+     {
+      "fact": "Own session id 255f2657",
+      "source": "prompt"
+     }
+    ],
+    "memoryAlone": false,
+    "handoffChars": 200,
+    "note": ""
+   }
+  ]
+ },
+ "failures": {
+  "A": [
+   {
+    "id": "LIN-1059",
+    "incident": "Subscribed stepper child's terminal wake was severed by a follow-up itemId repoint, so the parent orchestrator hung in AWAITING_FOLLOWUP.",
+    "detectedBy": "person",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "The edge broke because the held stepper was resumed by follow-ups that repointed its feedback item; with no held resume there is no repoint.",
+    "evidence": "sat AWAITING_FOLLOWUP indefinitely until a human intervened"
+   },
+   {
+    "id": "LIN-1165",
+    "incident": "An autopilot's own cross-check sentinel minted an up-chain wake back into itself, so wakes self-looped and stale child terminals were re-delivered.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "unclear",
+    "relayEffect": "avoided",
+    "relayWhy": "The loop needs one persistent session that is both the producer and the target of the wake; relay judgement sessions are not re-woken.",
+    "evidence": "Filed by the LIN-1159 autopilot run after landing that task (PR #858 / merge 48e5848); the loop was observed first-hand during that run."
+   },
+   {
+    "id": "LIN-1280",
+    "incident": "A Stop-hook re-entry guard swallowed the completion self-check, so sessions (including the close-out and the autopilot) went quiet in EXECUTING with no sentinel.",
+    "detectedBy": "person",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "unchanged",
+    "relayWhy": "The swallowed completion self-check is in the Stop-hook path every session uses, held or fresh, so relay sessions would wedge the same way.",
+    "evidence": "Root cause found + fixed — the completion sentinel never fires (LIN-1266 regression)"
+   },
+   {
+    "id": "LIN-1323",
+    "incident": "An orchestrator's own background poll loop overrode its PENDING-EXTERNAL park, locking out the follow-up wake so it woke about 90 s late each time.",
+    "detectedBy": "unknown",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "Code would handle the wake on the child's terminal; there would be no held parent running a self-poll that competes with the push wake.",
+    "evidence": "poll loop #1 ends; parent re-invoked and reads status: done — ~1m 27s after the worker finished."
+   },
+   {
+    "id": "LIN-1355",
+    "incident": "An edge-keyed terminalWakeEnqueued one-shot dropped every beat-2..N terminal wake on a stepper drip, so two subscribed children hung for ~1-2 hours.",
+    "detectedBy": "person",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "The one-shot exists to wake a held subscriber across a warm followUpTo:ROOT drip; code reading each beat's terminal from the record has no shared edge to poison.",
+    "evidence": "followUpTo: <child dispatch id> + a one-line liveness prompt resumed both children immediately"
+   },
+   {
+    "id": "LIN-1357",
+    "incident": "A held stepper child was not re-invoked by its worker's terminal [done] and sat silent ~31 minutes until the coordinator's liveness probe nudged it.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "The lost wake was the push into a parked held child; under the relay code starts a fresh judgement session from the worker's terminal in the record.",
+    "evidence": "A GET /dispatch?issueIdentifier=LIN-1316 at 07:34Z showed only 3 dispatches"
+   },
+   {
+    "id": "LIN-1451",
+    "incident": "The orchestrator stayed parked waiting on a review worker that hung after an API error with no Stop hook; abort fired no wake and telemetry looked frozen.",
+    "detectedBy": "person",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The trigger was a worker's API-error turn end that fired no Stop hook, and abort posted no child feedback; code-driven wakes would also miss those.",
+    "evidence": "The whole docket stalled until a human (flight-companion) cascade-aborted the orchestrator and resumed driving manually."
+   },
+   {
+    "id": "LIN-1656",
+    "incident": "The autopilot and a manual dispatcher dispatched the same issue and kind minutes apart, so duplicate work ran in parallel and one result was discarded.",
+    "detectedBy": "unknown",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "unchanged",
+    "relayWhy": "Two independent deciders with no dispatch-time check collide whether either is held or fresh; the fix is an API guard.",
+    "evidence": "Corroborated in git: two branches exist ... committed 19s apart. One was discarded."
+   },
+   {
+    "id": "LIN-1697",
+    "incident": "The 60-min stall failsafe killed orchestrators that were correctly silent while standing by for child wakes, so the whole orchestrator pattern failed overnight.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "There would be no held parent sitting silent for a wake, which is exactly the state the failsafe killed.",
+    "evidence": "The operator retired it mid-run and hand-drove every step at 30-minute wake granularity"
+   },
+   {
+    "id": "LIN-1698",
+    "incident": "A child finished but its held parent never got the wake (witness set at enqueue, wake lost on launch), and failed wake dispatches were never re-delivered.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "There would be no wake delivered into a held parent; a failed launch of a fresh judgement session can be retried from the child's terminal in the record.",
+    "evidence": "Manually delivering the outcome via followUpTo resumed the parent instantly."
+   },
+   {
+    "id": "LIN-1816",
+    "incident": "After a host freeze, the orchestrator never reacted to its implementation child's [done]: a foreign consumer failed the wake and a sticky refiredAt later killed the session.",
+    "detectedBy": "other-session",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "avoided",
+    "relayWhy": "The wake into the held session and the reaper kill of a long-parked held session both disappear; a fresh session can start from the child's [done] on any host.",
+    "evidence": "External supervision caught it by polling — that should not be the detection mechanism."
+   },
+   {
+    "id": "LIN-2078",
+    "incident": "Abort items carrying sessionId produced duplicate terminal-notice wakes, so the orchestrator was re-woken by its own aborts as if they were worker outcomes.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "memory",
+    "relayEffect": "worsened",
+    "relayWhy": "The remedy lived only in the run's memory; under the relay each duplicate wake could start a fresh session that would have to rediscover it.",
+    "evidence": "Its adopted remedy was behavioural (omit sessionId on abort items) and lives only in that run's context"
+   },
+   {
+    "id": "LIN-2145",
+    "incident": "The runner's DONE/PENDING verify turn overwrote the worker's final report, so the stepper got a thin recap it could not judge a beat from.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The lossy recap channel is in the runner; a fresh judgement session reading feedback gets the same thin recap unless it reads the artifact.",
+    "evidence": "the worker writes the plan into the Linear description, and the stepper reads and judges the artifact directly instead of trusting the recap."
+   },
+   {
+    "id": "LIN-2511",
+    "incident": "The stall reaper force-FAILed a healthy resumed orchestrator 27 ms after delivering its child wake, leaving the ticket's close-out undispatched.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "The kill hit a held session parked in AWAITING_FOLLOWUP with stale refire bookkeeping; with no held park it does not happen, and a fresh run finished it here.",
+    "evidence": "The operator had to relaunch a fresh autopilot to finish the run."
+   },
+   {
+    "id": "LIN-2517",
+    "incident": "A wake delivered into a held session whose consumer had died was destroyed by the stall reaper's FAILED arm.",
+    "detectedBy": "other-session",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "avoided",
+    "relayWhy": "The problem is a pendingFollowUp written into a held session's hold; the relay does not deliver wakes into held sessions.",
+    "evidence": "The :1725 FAILED branch therefore silently destroys an undelivered wake — the loss measured by LIN-2511's first plan-review."
+   },
+   {
+    "id": "LIN-2720",
+    "incident": "An OpenCode autopilot claimed to be holding when no process held it, so its child's wake and John's follow-up were never received and the autopilot stalled at its first wait.",
+    "detectedBy": "person",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "avoided",
+    "relayWhy": "The record claimed a hold that nothing kept; under the relay there is no hold, and each wake starts a fresh session.",
+    "evidence": "John's follow-up → [failed] Follow-up could not be delivered: the opencode session's hold lapsed"
+   },
+   {
+    "id": "LIN-2932",
+    "incident": "A worker finished its work but idled 30+ minutes behind its own CI monitor, so the scoped autopilot waited on it while the PR went unmergeable.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The idle wait is in the worker, which is already fresh; the relay's code would wait on the same taken row.",
+    "evidence": "Merged main into the PR branch by hand to clear the conflict and left the dispatch row alone."
+   },
+   {
+    "id": "LIN-2974",
+    "incident": "Harbour accepted a dispatch repo name the runner then refused, so the passage-runner dispatch failed and the duplicate guard blocked the immediate retry.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "It is a mismatch between Harbour and runner validation that any dispatcher hits, held or fresh.",
+    "evidence": "The immediate corrected retry was refused 409 DUPLICATE_DISPATCH with retryAfter: 179, pointing at the failed row."
+   },
+   {
+    "id": "LIN-2975",
+    "incident": "Proxy POST /dispatch dropped maxTasks and list reads hid sessionId, so the passage runner's ratified task pool was never declared or enforced.",
+    "detectedBy": "held-session",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "unchanged",
+    "relayWhy": "The dropped field is a proxy API defect; it hits any session that dispatches.",
+    "evidence": "At cycle 2, with two legs in flight, the enforced bound across the whole voyage was zero."
+   },
+   {
+    "id": "LIN-353",
+    "incident": "Triggering container HAR-589 kept re-descending to Done HAR-591 and dispatching no-op look-intos instead of advancing.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "both",
+    "relayEffect": "worsened",
+    "relayWhy": "The held session spotted the loop by remembering it had triggered twice; a fresh session would have to find that history in the dispatch rows.",
+    "evidence": "Triggering the container HAR-589 twice in a row looped ... I verified the remaining sub-gates are all unblocked"
+   },
+   {
+    "id": "LIN-366",
+    "incident": "recommend-and-dispatch kept re-dispatching investigation on a bug ticket after the investigation was done, instead of moving on to implementation.",
+    "detectedBy": "held-session",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The loop is in the recommender's bug-label branch, which any caller hits; the two redundant comments are visible in the record either way.",
+    "evidence": "A scoped autopilot run can't break it from its own levers ... so it has to pause for a human"
+   },
+   {
+    "id": "LIN-384",
+    "incident": "Descent did not defer epic LIN-174 to its ready child LIN-378 and dispatched an epic-scoped implementation prompt.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The misroute is in the recommend/descent engine; the worker recovered by re-grounding on the tracker, which any session can do.",
+    "evidence": "The dispatched worker re-grounded, recognised LIN-378 as the actual remaining work, and implemented that"
+   },
+   {
+    "id": "LIN-430",
+    "incident": "The autopilot merged two red-CI PRs to main, turning main red and halting deploys.",
+    "detectedBy": "unknown",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "unclear",
+    "relayWhy": "The missing CI gate in the loop remains, but a fresh session reading CI from the record might not carry the held run's 'ride it out' pressure.",
+    "evidence": "merged two red-CI PRs (#539, #540) directly to main, turning it red and halting all deploys until a manual revert (PR #541)."
+   },
+   {
+    "id": "LIN-870",
+    "incident": "Woken or monitoring sessions zombied for 40-140 minutes, making no progress and not terminating, until they were manually aborted.",
+    "detectedBy": "unknown",
+    "recoveredBy": "person",
+    "recoveryUsed": "unclear",
+    "relayEffect": "avoided",
+    "relayWhy": "The orchestrator half is a held session that zombies after a wake, which the relay removes; worker monitor idles would remain.",
+    "evidence": "idles 40–140 min holding a runner slot until manually aborted."
+   },
+   {
+    "id": "LIN-881",
+    "incident": "Stepper beats carried the hold flag but not the wake flag, so a beat's PENDING never woke the head and both sides deadlocked at every beat boundary.",
+    "detectedBy": "unknown",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "avoided",
+    "relayWhy": "The deadlock comes from the warm-drip hold/wake pair between held sessions; under the relay code drives each beat boundary.",
+    "evidence": "Live casualties: LIN-835, LIN-877 (both currently held; recover after this deploys)."
+   }
+  ],
+  "B": [
+   {
+    "id": "LIN-881",
+    "incident": "Stepper beats dispatched with the hold flag but not the wake flag, so a beat's PENDING never woke the head; deadlock at every beat boundary.",
+    "detectedBy": "person",
+    "recoveredBy": "person",
+    "recoveryUsed": "none",
+    "relayEffect": "avoided",
+    "relayWhy": "Under the relay, code handles mechanical wakes, so no LLM has to remember to set a subscribe flag on each beat dispatch.",
+    "evidence": "LIN-835 — after a clean re-dispatch, ran end-to-end on head 04341a86, beats advancing across every boundary autonomously"
+   },
+   {
+    "id": "LIN-870",
+    "incident": "Woken or monitoring sessions zombied for 40-140 min, neither progressing nor terminating, holding runner slots.",
+    "detectedBy": "person",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "No held session sits waiting to be woken; code starts a fresh session per judgement step, though a worker's dead monitor loop could still idle.",
+    "evidence": "it zombies: idles 40–140 min holding a runner slot until manually aborted"
+   },
+   {
+    "id": "LIN-430",
+    "incident": "Autopilot merged two red-CI PRs to main, turning main red and halting deploys.",
+    "detectedBy": "unknown",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The merge decision is still a judgement step; a fresh session could misread or override CI the same way unless a code gate enforces green.",
+    "evidence": "merged two red-CI PRs (#539, #540) directly to main, turning it red and halting all deploys until a manual revert (PR #541)"
+   },
+   {
+    "id": "LIN-384",
+    "incident": "Descent routing gave the container epic its own implementation prompt instead of deferring to its ready child.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "Routing defect is in the recommend engine, not in held-session memory; a fresh session would receive the same misroute.",
+    "evidence": "The dispatched worker re-grounded, recognised LIN-378 as the actual remaining work, and implemented that"
+   },
+   {
+    "id": "LIN-366",
+    "incident": "Recommend-and-dispatch kept re-recommending investigation after a completed investigation, looping with no progress.",
+    "detectedBy": "held-session",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "Loop comes from the recommender reading the bug label; a fresh session would hit the same recommendation, though it could see the prior investigation comments.",
+    "evidence": "Each produced a thorough, code-grounded findings comment on LIN-365 (2 comments now ...) ... so it has to pause for a human"
+   },
+   {
+    "id": "LIN-353",
+    "incident": "Triggering a container repeatedly re-descended into an already-Done child and dispatched no-op look-intos.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "Descent bug is in the recommender; the workaround (verify sub-gates on the tracker, steer at a ready child) is available to a fresh session.",
+    "evidence": "I verified the remaining sub-gates are all unblocked ... and steered around it by pointing recommend-and-dispatch at a ready child directly."
+   },
+   {
+    "id": "LIN-2975",
+    "incident": "Passage runner's ratified 16-task pool was silently dropped by proxy POST /dispatch, and list reads hid sessionId/maxTasks so the runner misread rows.",
+    "detectedBy": "held-session",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "unchanged",
+    "relayWhy": "An API contract defect; relay sessions read the same lossy list and dispatch through the same endpoint, so the relay changes nothing here.",
+    "evidence": "LIN-2972's practical exposure was bounded by construction (fixed 8-ticket anchor set, verified children, gated later legs)"
+   },
+   {
+    "id": "LIN-2974",
+    "incident": "Dispatching the passage runner with a repo name Harbour accepted but the runner refused failed terminally and burned the duplicate guard.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "Namespace mismatch between Harbour and the runner; any dispatcher, held or fresh or code, hits it. Recovery used the failed row and 409 response.",
+    "evidence": "The immediate corrected retry was refused 409 DUPLICATE_DISPATCH with retryAfter: 179, pointing at the failed row."
+   },
+   {
+    "id": "LIN-2932",
+    "incident": "Scoped autopilot waited indefinitely in PENDING-EXTERNAL on a worker idling behind its own CI monitor after its work was done.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The stall is a worker's self-imposed monitor; the supervisor's wait for that row to end would persist under the relay unless code bounds it.",
+    "evidence": "Merged main into the PR branch by hand to clear the conflict and left the dispatch row alone."
+   },
+   {
+    "id": "LIN-2720",
+    "incident": "An OpenCode autopilot's advertised hold had no process keeping it, so the child-completion wake landed nowhere and the autopilot stalled at its first wait.",
+    "detectedBy": "person",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "avoided",
+    "relayWhy": "The relay has no held session to keep a hold for; a wake would start a fresh session from the record.",
+    "evidence": "John's ruling on LIN-2670 ... addressed to a session that was already dead: \"You may need to compensate (and file a bug ticket, urgent priority).\""
+   },
+   {
+    "id": "LIN-2517",
+    "incident": "Stall reaper deleted a wake delivered into a held session, and the naive guard would have stranded such sessions forever.",
+    "detectedBy": "other-session",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "avoided",
+    "relayWhy": "The failure is wake delivery into held sessions via pendingFollowUp; with no held sessions under the relay, that mechanism does not exist.",
+    "evidence": "The :1725 FAILED branch therefore silently destroys an undelivered wake — the loss measured by LIN-2511's first plan-review."
+   },
+   {
+    "id": "LIN-2511",
+    "incident": "Stall reaper force-FAILed a healthy resumed orchestrator 27 ms after delivering the wake it was parked on, killing the run before close-out.",
+    "detectedBy": "person",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "No parked held orchestrator for the reaper to kill; the recovery itself (a fresh autopilot finishing from the record) is the relay pattern.",
+    "evidence": "LIN-2509 left In Progress with PR #212 open and approved. The operator had to relaunch a fresh autopilot to finish the run."
+   },
+   {
+    "id": "LIN-2145",
+    "incident": "Runner's DONE/PENDING verify turn overwrote the worker's final report, so the stepper received a recap too thin to judge.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The lossy recap channel is in the record a relay session would also read; the artifact workaround works for either.",
+    "evidence": "fixed it by switching to artifact-as-channel: the worker writes the plan into the Linear description, and the stepper reads and judges the artifact directly"
+   },
+   {
+    "id": "LIN-2078",
+    "incident": "Abort items stamped with the orchestrator's sessionId woke it with duplicate terminal notices.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "both",
+    "relayEffect": "worsened",
+    "relayWhy": "The behavioural remedy lived only in the held run's context; fresh relay sessions would lose it and keep stamping sessionId unless code changes.",
+    "evidence": "Its adopted remedy was behavioural (omit sessionId on abort items) and lives only in that run's context"
+   },
+   {
+    "id": "LIN-1816",
+    "incident": "Orchestrator silently stopped mid-pipeline: its child-completion wake was claimed and failed by a foreign consumer, then a sticky refiredAt reaper killed it.",
+    "detectedBy": "other-session",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "unclear",
+    "relayEffect": "avoided",
+    "relayWhy": "The relay needs no machine-affine resume of a held session and has no parked session for the reaper to kill; a fresh session could run on any host.",
+    "evidence": "LIN-1737 sat unattended ~3h with a finished child and no next step ... External supervision caught it by polling"
+   },
+   {
+    "id": "LIN-1698",
+    "incident": "Up-chain wake witness was set at enqueue, so a wake lost on the launch path never reached the subscribed parent and was never re-delivered.",
+    "detectedBy": "unknown",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "The relay also relies on code launching a session when a child goes terminal; a lost launch with no reconciliation fails the same way.",
+    "evidence": "Its subscribed parent waited 30+ min and never received the wake. Manually delivering the outcome via followUpTo resumed the parent instantly."
+   },
+   {
+    "id": "LIN-1697",
+    "incident": "Stall-failsafe selectors killed orchestrators standing by silently for a child wake, since silence was the correct waiting state.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "Under the relay no orchestrator waits silently in a held session, so the failsafe cannot mistake a correct wait for a wedge.",
+    "evidence": "The operator retired it mid-run and hand-drove every step at 30-minute wake granularity"
+   },
+   {
+    "id": "LIN-1656",
+    "incident": "An autopilot and a manual driver dispatched the same issue and kind minutes apart, duplicating work; one result was discarded.",
+    "detectedBy": "unknown",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "record",
+    "relayEffect": "unchanged",
+    "relayWhy": "Two independent deciders with no shared check on the creation path; relay sessions are equally blind unless code guards dispatch.",
+    "evidence": "Corroborated in git: two branches exist ... both cut from 952fb659, committed 19s apart. One was discarded."
+   },
+   {
+    "id": "LIN-1451",
+    "incident": "Autopilot orchestrator froze waiting on a child terminal wake it never received while a worker hung unreaped; the docket stalled for hours.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "No orchestrator parks waiting for a wake under the relay; the recovery (driving manually from the record) is relay-like. The worker hang remains.",
+    "evidence": "The whole docket stalled until a human (flight-companion) cascade-aborted the orchestrator and resumed driving manually."
+   },
+   {
+    "id": "LIN-1357",
+    "incident": "Held stepper child was not woken by its worker's terminal done and sat silent ~31 min until a liveness nudge.",
+    "detectedBy": "other-session",
+    "recoveredBy": "other-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "The per-edge witness suppressed a second terminal to the same held parent; with fresh sessions per step, that held-parent edge does not exist.",
+    "evidence": "A GET /dispatch?issueIdentifier=LIN-1316 at 07:34Z showed only 3 dispatches ...; no beat-3 item existed."
+   },
+   {
+    "id": "LIN-1355",
+    "incident": "One-shot wake witness dropped every beat 2..N terminal wake, so subscribed orchestrators hung for ~1-2 hours.",
+    "detectedBy": "person",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "Wakes to one held parent over a shared edge are what the one-shot guard suppressed; under the relay, code starts fresh sessions from the record instead.",
+    "evidence": "would have hung indefinitely had a human not asked the orchestrator to check. Work was NOT lost"
+   },
+   {
+    "id": "LIN-1323",
+    "incident": "Orchestrator's own background poll loop overrode its PENDING-EXTERNAL park, so the push wake was locked out and it woke ~90s late.",
+    "detectedBy": "unknown",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "Code handles the mechanical wait under the relay, so there is no in-session poll loop competing with the wake path.",
+    "evidence": "13:56:37 poll loop #1 ends; parent re-invoked and reads status: done — ~1m 27s after the worker finished."
+   },
+   {
+    "id": "LIN-1280",
+    "incident": "Close-out then autopilot sessions stalled in EXECUTING because a hook re-entry guard swallowed the completion self-check.",
+    "detectedBy": "person",
+    "recoveredBy": "unknown",
+    "recoveryUsed": "none",
+    "relayEffect": "unchanged",
+    "relayWhy": "A runner hook regression that affects any session's completion, so fresh relay sessions would stall the same way.",
+    "evidence": "the swallowed-self-check sessions accumulated for hours instead of being force-completed"
+   },
+   {
+    "id": "LIN-1165",
+    "incident": "Autopilot's own up-chain wake looped back into itself, re-firing cross-check wakes and stale re-deliveries.",
+    "detectedBy": "held-session",
+    "recoveredBy": "held-session",
+    "recoveryUsed": "unclear",
+    "relayEffect": "unclear",
+    "relayWhy": "The self-loop comes from a held session posting a sentinel after a received wake; whether relay wake minting could loop the same way is not clear.",
+    "evidence": "Filed by the LIN-1159 autopilot run after landing that task ... the loop was observed first-hand during that run."
+   },
+   {
+    "id": "LIN-1059",
+    "incident": "Follow-up repoint severed the up-chain wake edge, so the parent orchestrator never got the stepper child's terminal and hung.",
+    "detectedBy": "person",
+    "recoveredBy": "person",
+    "recoveryUsed": "record",
+    "relayEffect": "avoided",
+    "relayWhy": "The edge to a held parent is what was severed; under the relay, code reads the record (child Done, PR merged) instead of relying on that edge.",
+    "evidence": "sat AWAITING_FOLLOWUP indefinitely until a human intervened"
+   }
+  ]
+ }
+}
