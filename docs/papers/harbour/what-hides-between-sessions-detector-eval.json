@@ -1,0 +1,66 @@
+{
+  "about": "LIN-3188: each detector's verdict on every incident on record (what-hides-between-sessions-register.json) whose pattern it targets and whose onset falls inside the detector's data window, hand-called by the author from the alarms scripts/survey-hides-analyse.mjs --near lists within 2 h before to 24 h after the onset (30 h when the onset is a date only), read against each incident's description. hit: an alarm in that window is the incident (same sessions, ticket or mechanism). miss: none is. Where an alarm is plausible but its sessions could not be tied to the incident, the call is miss, so hits are a floor. Alarms not tied to any incident were coded by the scripts' own readers (d2-codes.json, d7-codes.json) or, for D1, by signature class: auth and transient episodes are real errors seen by three or more sessions; client episodes (a repeated request mistake, e.g. 'no valid fields to update') are false alarms of a rule that does not exclude 4xx request errors.",
+  "detectors": [
+    {
+      "id": "D1", "label": "same error in 3+ sessions within an hour", "patterns": ["P1"], "repo": "harbour", "window": ["2026-08-29", "2026-10-01"], "source": "transcripts",
+      "script": "scripts/survey-hides-detect-sessions.mjs",
+      "calls": [
+        { "id": "LIN-2473", "verdict": "hit", "alarmAt": "2026-09-02T19:25Z", "note": "LINEAR_AUTH episode, 18 sessions, 5 min after the onset" },
+        { "id": "LIN-3181", "verdict": "hit", "alarmAt": "2026-09-30T22:01Z", "note": "LINEAR_AUTH, 6 sessions, 1.5 h after onset; again 1 Oct 06:20, 21 sessions" },
+        { "id": "LIN-2933", "verdict": "miss", "note": "one ruling press in one session; the nearest episode is 3.7 h later" },
+        { "id": "LIN-2451", "verdict": "miss", "note": "the runner stopped deploying merged fixes; no session sees an error" }
+      ],
+      "alsoHit": [{ "id": "LIN-2993", "pattern": "P6", "alarmAt": "2026-09-22T21:23Z", "note": "http-503 episode about 2 h after the database reads began hanging; counted under P6, not here" }]
+    },
+    {
+      "id": "D1f", "label": "auth or outage lines in 3+ sessions' feedback within 6 h", "patterns": ["P1"], "repo": "harbour", "window": ["2026-07-12", "2026-10-01"], "source": "runner oplog (first 60 characters of each feedback line)",
+      "script": "scripts/survey-hides-detect-runner.mjs",
+      "calls": [],
+      "note": "no alarm at all: the oplog keeps 60 characters of a line and sessions that park on an error rarely post it; every P1 incident on record in the window is a miss"
+    },
+    {
+      "id": "D2", "label": "wait graph: a wait whose awaited chain has stopped, or a cycle", "patterns": ["P2", "P5", "P6"], "repo": "both", "window": ["2026-08-29", "2026-10-01"], "source": "transcripts",
+      "script": "scripts/survey-hides-detect-sessions.mjs",
+      "calls": [
+        { "id": "WAIT-2026-10-01", "verdict": "hit", "alarmAt": "2026-10-01T09:05Z", "note": "the LIN-2884 / LIN-3142 cycle, 30 min after it closed and about 5 min before the Flight Companion broke it" },
+        { "id": "LIN-2932", "verdict": "hit", "alarmAt": "2026-09-19T13:12Z", "note": "the LIN-2929 autopilot's wait on a finished worker held behind its own CI monitor; the planning session filed it at about the same time" },
+        { "id": "LIN-3118", "verdict": "hit", "alarmAt": "2026-09-26T22:13Z", "note": "dispatcher dead overnight; waits on frozen children alarm from 22:13; John found it at 07:09" },
+        { "id": "LIN-3122", "verdict": "hit", "alarmAt": "2026-09-26T22:13Z", "note": "the same night as LIN-3118 (the cause: an agent's pkill)" },
+        { "id": "LIN-2446", "verdict": "hit", "alarmAt": "2026-09-01T23:07Z", "note": "the kitty driver wedge: lost-wake alarms 21 min after onset" },
+        { "id": "LIN-2559", "verdict": "miss", "note": "the wait was on an in-session subagent, which D2 does not model" },
+        { "id": "LIN-2511", "verdict": "miss", "note": "the parent was failed, not left waiting; D5 sees it" },
+        { "id": "LIN-2720", "verdict": "miss", "note": "opencode sessions leave no transcript" },
+        { "id": "LIN-2879", "verdict": "miss", "note": "the child's [done] POST was lost; no waiter in the transcripts names it" },
+        { "id": "LIN-2510", "verdict": "miss", "note": "a bootstrap re-fire that never ended; nobody was waiting on it" },
+        { "id": "LIN-2515", "verdict": "miss", "note": "expired host login: sessions never started, so left no transcript" },
+        { "id": "LIN-2874", "verdict": "miss", "note": "silent terminations, one in opencode; no alarm tied to them" },
+        { "id": "LIN-2876", "verdict": "miss", "note": "opencode workers wedged on a permission prompt" },
+        { "id": "LIN-2993", "verdict": "miss", "note": "lost-wake alarms that night could not be tied to the database hang" }
+      ]
+    },
+    {
+      "id": "D5", "label": "lost wake: parent parked, child's terminal line, no delivery in 15 min", "patterns": ["P5"], "repo": "runner", "window": ["2026-08-29", "2026-10-01"], "source": "runner oplog + transcripts",
+      "script": "scripts/survey-hides-detect-runner.mjs",
+      "calls": [
+        { "id": "LIN-2511", "verdict": "hit", "alarmAt": "2026-09-03T15:50Z", "note": "the parent failed 2 s after its child's [done]; the class LIN-2511/2517 fixed, instance unverified" },
+        { "id": "LIN-2720", "verdict": "miss", "note": "opencode" },
+        { "id": "LIN-2879", "verdict": "miss", "note": "the terminal POST itself failed, so no line reached the oplog's success path; D5x sees it" }
+      ]
+    },
+    {
+      "id": "D5x", "label": "a wake-minting [done]/[failed] line whose POST failed", "patterns": ["P5"], "repo": "runner", "window": ["2026-07-12", "2026-10-01"], "source": "runner oplog",
+      "script": "scripts/survey-hides-detect-runner.mjs",
+      "calls": [
+        { "id": "LIN-2879", "verdict": "hit", "alarmAt": "2026-09-13T13:50Z", "note": "the 502 on the [done] line at 13:50" }
+      ],
+      "note": "the other P5 incidents on record in the window lost their wake by other mechanisms; D5x targets only this one and is scored only on it"
+    },
+    {
+      "id": "D7", "label": "same ticket and kind launched twice, overlapping", "patterns": ["P7"], "repo": "both", "window": ["2026-08-29", "2026-10-01"], "source": "transcripts",
+      "script": "scripts/survey-hides-detect-sessions.mjs",
+      "calls": [
+        { "id": "LIN-2898", "verdict": "miss", "note": "a breakdown leg duplicated another's subtasks; different launches, so D7 cannot see it" }
+      ]
+    }
+  ]
+}

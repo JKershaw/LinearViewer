@@ -1,0 +1,694 @@
+{
+ "about": "LIN-3188: served prompt rules per cross-session failure pattern, written by scripts/survey-hides-prompts.mjs. at is path:line at the heads below; bytes is the containing paragraph(s); introduced is the oldest commit adding the anchor; for lib/proxy-instructions.js it is an upper bound, since the catalog moved there from routes/ on 3 Sep (LIN-2245).",
+ "heads": {
+  "LinearViewer": "d88e2216",
+  "simple-dispatcher": "3366748"
+ },
+ "byPattern": {
+  "P1": {
+   "rules": 6,
+   "copies": 6,
+   "bytes": 2265,
+   "roles": {
+    "heal": 3,
+    "watch": 3
+   },
+   "earliest": "2026-08-03",
+   "repos": {
+    "LinearViewer": 6
+   }
+  },
+  "P2": {
+   "rules": 4,
+   "copies": 4,
+   "bytes": 4559,
+   "roles": {
+    "declare": 2,
+    "assert-away": 1,
+    "watch": 1
+   },
+   "earliest": "2026-06-17",
+   "repos": {
+    "simple-dispatcher": 1,
+    "LinearViewer": 3
+   }
+  },
+  "P3": {
+   "rules": 3,
+   "copies": 3,
+   "bytes": 3017,
+   "roles": {
+    "watch": 3
+   },
+   "earliest": "2026-06-13",
+   "repos": {
+    "LinearViewer": 3
+   }
+  },
+  "P4": {
+   "rules": 3,
+   "copies": 3,
+   "bytes": 958,
+   "roles": {
+    "handle": 3
+   },
+   "earliest": "2026-09-05",
+   "repos": {
+    "LinearViewer": 3
+   }
+  },
+  "P5": {
+   "rules": 3,
+   "copies": 5,
+   "bytes": 7638,
+   "roles": {
+    "watch": 3
+   },
+   "earliest": "2026-06-30",
+   "repos": {
+    "LinearViewer": 3
+   }
+  },
+  "P6": {
+   "rules": 9,
+   "copies": 11,
+   "bytes": 10239,
+   "roles": {
+    "watch": 4,
+    "handle": 5
+   },
+   "earliest": "2026-06-14",
+   "repos": {
+    "LinearViewer": 8,
+    "simple-dispatcher": 1
+   }
+  },
+  "P7": {
+   "rules": 5,
+   "copies": 5,
+   "bytes": 3739,
+   "roles": {
+    "handle": 4,
+    "watch": 1
+   },
+   "earliest": "2026-07-26",
+   "repos": {
+    "LinearViewer": 5
+   }
+  },
+  "P8": {
+   "rules": 5,
+   "copies": 5,
+   "bytes": 3513,
+   "roles": {
+    "watch": 5
+   },
+   "earliest": "2026-06-06",
+   "repos": {
+    "LinearViewer": 5
+   }
+  }
+ },
+ "sweepCandidateLines": {
+  "P1": 140,
+  "P2": 27,
+  "P3": 15,
+  "P4": 17,
+  "P5": 4,
+  "P6": 226,
+  "P7": 36,
+  "P8": 11
+ },
+ "rules": [
+  {
+   "pattern": "P1",
+   "role": "heal",
+   "repo": "LinearViewer",
+   "at": "lib/proxy-instructions.js:1110",
+   "copies": 1,
+   "paraphrase": "Provider-lane 401s are transient OAuth windows: retry over 10–15 minutes before concluding the credential is disconnected",
+   "bytes": 665,
+   "introduced": {
+    "sha": "c5cc2b8d",
+    "date": "2026-09-05",
+    "ticket": "LIN-1938",
+    "subject": "LIN-1938: document per-path token lifetimes, self-describe expired-token 401s, audit the expiry, add Class-B retry guida"
+   }
+  },
+  {
+   "pattern": "P1",
+   "role": "heal",
+   "repo": "LinearViewer",
+   "at": "lib/proxy-instructions.js:1090",
+   "copies": 1,
+   "paraphrase": "An empty or non-JSON body is network flakiness: retry a read once",
+   "bytes": 606,
+   "introduced": {
+    "sha": "937555cd",
+    "date": "2026-09-03",
+    "ticket": "LIN-2245",
+    "subject": "LIN-2245: extract the /api/proxy/instructions catalog to lib/proxy-instructions.js (#1339)"
+   }
+  },
+  {
+   "pattern": "P1",
+   "role": "heal",
+   "repo": "LinearViewer",
+   "at": "docs/runner-prompt.md:102",
+   "copies": 1,
+   "paraphrase": "A 429 or 5xx on the runner's poll: re-arm and carry on",
+   "bytes": 98,
+   "introduced": {
+    "sha": "150c4e4d",
+    "date": "2026-09-29",
+    "ticket": "LIN-3098",
+    "subject": "LIN-3098 S3 review N1: every wait reason handled; transient failures re-arm"
+   }
+  },
+  {
+   "pattern": "P1",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/runner-prompt.md:104",
+   "copies": 1,
+   "paraphrase": "Only an explicit rejection means the runner credential is dead; anything else is transient",
+   "bytes": 289,
+   "introduced": {
+    "sha": "150c4e4d",
+    "date": "2026-09-29",
+    "ticket": "LIN-3098",
+    "subject": "LIN-3098 S3 review N1: every wait reason handled; transient failures re-arm"
+   }
+  },
+  {
+   "pattern": "P1",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/proxy-instructions.js:48",
+   "copies": 1,
+   "paraphrase": "GET /credential-health reports this token's provider-credential 401s over a window",
+   "bytes": 336,
+   "introduced": {
+    "sha": "937555cd",
+    "date": "2026-09-03",
+    "ticket": "LIN-2245",
+    "subject": "LIN-2245: extract the /api/proxy/instructions catalog to lib/proxy-instructions.js (#1339)"
+   }
+  },
+  {
+   "pattern": "P1",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/passage-planner-prompt.md:77",
+   "copies": 1,
+   "paraphrase": "An empty board may be a transient store failure: hold the reading lightly",
+   "bytes": 271,
+   "introduced": {
+    "sha": "31fcf36b",
+    "date": "2026-08-03",
+    "ticket": "LIN-1850",
+    "subject": "LIN-1850: revise passage planner prompt to v0.1 (#1065)"
+   }
+  },
+  {
+   "pattern": "P2",
+   "role": "declare",
+   "repo": "simple-dispatcher",
+   "at": "hook.js:425",
+   "copies": 1,
+   "paraphrase": "At the completion gate, name the other session you wait on and what you expect back",
+   "bytes": 2917,
+   "introduced": {
+    "sha": "4aee29e",
+    "date": "2026-07-02",
+    "ticket": "LIN-905",
+    "subject": "LIN-905: five-outcome completion sentinel (DONE/FAILED/BLOCKED/PENDING-internal/external)"
+   }
+  },
+  {
+   "pattern": "P2",
+   "role": "declare",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:452",
+   "copies": 1,
+   "paraphrase": "A child waiting on its parent emits PENDING-EXTERNAL, not BLOCKED",
+   "bytes": 477,
+   "introduced": {
+    "sha": "d71054e6",
+    "date": "2026-08-22",
+    "ticket": "LIN-1732",
+    "subject": "LIN-1732: escalation-discipline rubric — Principle 0 gate + self-sufficient ruling format (#1164)"
+   }
+  },
+  {
+   "pattern": "P2",
+   "role": "assert-away",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:274",
+   "copies": 1,
+   "paraphrase": "Under push a subscribed child has no mutual wait with its parent, so the hold is safe",
+   "bytes": 904,
+   "introduced": {
+    "sha": "5fc2bdd7",
+    "date": "2026-06-30",
+    "ticket": "LIN-826",
+    "subject": "LIN-826: push-based inter-session comms — Phase 1 (Harbour wiring) + Phase 2 (autopilot adoption) (#695)"
+   }
+  },
+  {
+   "pattern": "P2",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/meta-prompt-template.js:180",
+   "copies": 1,
+   "paraphrase": "The recommender reads Blocked from an incomplete blocks/blocked-by relation",
+   "bytes": 261,
+   "introduced": {
+    "sha": "d693e184",
+    "date": "2026-06-17",
+    "ticket": "LIN-357",
+    "subject": "LIN-357: remove the `blocked` label and `in-review` state usage (#503)"
+   }
+  },
+  {
+   "pattern": "P3",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/autopilot-kickoff.js:505",
+   "copies": 1,
+   "paraphrase": "Brief a sub-agent to say flake or regression, and whether the specs also fail on main",
+   "bytes": 1330,
+   "introduced": {
+    "sha": "381dea33",
+    "date": "2026-06-13",
+    "ticket": "LIN-467",
+    "subject": "LIN-467: refine autopilot guide to hold altitude on long runs (#452)"
+   }
+  },
+  {
+   "pattern": "P3",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:75",
+   "copies": 1,
+   "paraphrase": "Re-derive 'is this a flake?' from evidence each time, not from the last answer",
+   "bytes": 364,
+   "introduced": {
+    "sha": "381dea33",
+    "date": "2026-06-13",
+    "ticket": "LIN-467",
+    "subject": "LIN-467: refine autopilot guide to hold altitude on long runs (#452)"
+   }
+  },
+  {
+   "pattern": "P3",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/periodicals.js:282",
+   "copies": 1,
+   "paraphrase": "The Test Coverage Gap periodical reads CI history for flaky or unreliable tests",
+   "bytes": 1323,
+   "introduced": {
+    "sha": "85f9d446",
+    "date": "2026-07-03",
+    "ticket": "LIN-701",
+    "subject": "LIN-701: test-coverage periodical — widen remit to coverage AND reliability + pin with tests (#755)"
+   }
+  },
+  {
+   "pattern": "P4",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "docs/runner-prompt.md:101",
+   "copies": 1,
+   "paraphrase": "A wait that ends at its cap with nothing new: re-arm",
+   "bytes": 42,
+   "introduced": {
+    "sha": "816bf9b7",
+    "date": "2026-09-29",
+    "ticket": "LIN-3098",
+    "subject": "LIN-3098 S3: served runner prompt + /api/proxy/runner/prompt + marker pins"
+   }
+  },
+  {
+   "pattern": "P4",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/flight-companion-brief.js:325",
+   "copies": 1,
+   "paraphrase": "Flight Companion brief: no new decision, stall or landing means say nothing",
+   "bytes": 709,
+   "introduced": {
+    "sha": "8f15565e",
+    "date": "2026-09-05",
+    "ticket": "LIN-2618",
+    "subject": "LIN-2618: one shared brief for the kickoff and the in-page chat (#1403)"
+   }
+  },
+  {
+   "pattern": "P4",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/flight-companion-brief.js:168",
+   "copies": 1,
+   "paraphrase": "An unchanged picture is not news",
+   "bytes": 207,
+   "introduced": {
+    "sha": "8f15565e",
+    "date": "2026-09-05",
+    "ticket": "LIN-2618",
+    "subject": "LIN-2618: one shared brief for the kickoff and the in-page chat (#1403)"
+   }
+  },
+  {
+   "pattern": "P5",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/autopilot-kickoff.js:133,155,393",
+   "copies": 3,
+   "paraphrase": "Do not wait indefinitely on a push wake; the ~30-minute silence clock applies",
+   "bytes": 5449,
+   "introduced": {
+    "sha": "6c96bb41",
+    "date": "2026-09-05",
+    "ticket": "LIN-2332",
+    "subject": "LIN-2332: the blocked-silence clause's premise is false; replace it (#1389)"
+   }
+  },
+  {
+   "pattern": "P5",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:343",
+   "copies": 1,
+   "paraphrase": "Do not wait indefinitely on a push wake",
+   "bytes": 1310,
+   "introduced": {
+    "sha": "6c96bb41",
+    "date": "2026-09-05",
+    "ticket": "LIN-2332",
+    "subject": "LIN-2332: the blocked-silence clause's premise is false; replace it (#1389)"
+   }
+  },
+  {
+   "pattern": "P5",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:286",
+   "copies": 1,
+   "paraphrase": "A worker silent without terminating sends no wake; probe it yourself",
+   "bytes": 879,
+   "introduced": {
+    "sha": "5fc2bdd7",
+    "date": "2026-06-30",
+    "ticket": "LIN-826",
+    "subject": "LIN-826: push-based inter-session comms — Phase 1 (Harbour wiring) + Phase 2 (autopilot adoption) (#695)"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/autopilot-kickoff.js:156,368,393",
+   "copies": 3,
+   "paraphrase": "After ~30 minutes with no activity, send a liveness nudge, then re-dispatch fresh",
+   "bytes": 4775,
+   "introduced": {
+    "sha": "0ecc67de",
+    "date": "2026-06-20",
+    "ticket": null,
+    "subject": "Autopilot: give completion handling a clean done-vs-waiting read and a silence ceiling"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/autopilot-kickoff.js:591",
+   "copies": 1,
+   "paraphrase": "A [stalled?] line on Bash is usually a long command: check before re-dispatching",
+   "bytes": 173,
+   "introduced": {
+    "sha": "1403655c",
+    "date": "2026-06-14",
+    "ticket": null,
+    "subject": "Rebalance Autopilot kickoff: cut abstract warnings, consolidate instrument facts (#462)"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/autopilot-kickoff.js:599",
+   "copies": 1,
+   "paraphrase": "~30 minutes with zero activity is a wedged session: nudge then re-dispatch",
+   "bytes": 817,
+   "introduced": {
+    "sha": "b9ebfb3a",
+    "date": "2026-07-19",
+    "ticket": "LIN-1324",
+    "subject": "LIN-1324: standalone kickoff keys wait discipline off the Setup session-id check (#956)"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:204",
+   "copies": 1,
+   "paraphrase": "A long silence may be a wedged or dead session: probe it",
+   "bytes": 1234,
+   "introduced": {
+    "sha": "0ecc67de",
+    "date": "2026-06-20",
+    "ticket": null,
+    "subject": "Autopilot: give completion handling a clean done-vs-waiting read and a silence ceiling"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:337",
+   "copies": 1,
+   "paraphrase": "A child silent too long gets a liveness nudge, then a fresh re-dispatch",
+   "bytes": 1310,
+   "introduced": {
+    "sha": "8cea96ca",
+    "date": "2026-07-07",
+    "ticket": "LIN-874",
+    "subject": "LIN-874: flip child-autopilot coordination from serial to parallel fan-out/fan-in (#770)"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "docs/runner-prompt.md:198",
+   "copies": 1,
+   "paraphrase": "The runner kit's watchdog flags silent subagents; stop those it marks",
+   "bytes": 461,
+   "introduced": {
+    "sha": "816bf9b7",
+    "date": "2026-09-29",
+    "ticket": "LIN-3098",
+    "subject": "LIN-3098 S3: served runner prompt + /api/proxy/runner/prompt + marker pins"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/flight-companion-kickoff.js:114",
+   "copies": 1,
+   "paraphrase": "A [blocked] session is parked on a human, never report it as stalled",
+   "bytes": 352,
+   "introduced": {
+    "sha": "7c6d811d",
+    "date": "2026-08-16",
+    "ticket": "LIN-2079",
+    "subject": "LIN-2079: derive `blocked` as a first-class read-time dispatch status (Session A) (#1146)"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/flight-companion-brief.js:66",
+   "copies": 1,
+   "paraphrase": "Without evidence, say a session has gone quiet, not that it is stuck",
+   "bytes": 228,
+   "introduced": {
+    "sha": "8f15565e",
+    "date": "2026-09-05",
+    "ticket": "LIN-2618",
+    "subject": "LIN-2618: one shared brief for the kickoff and the in-page chat (#1403)"
+   }
+  },
+  {
+   "pattern": "P6",
+   "role": "handle",
+   "repo": "simple-dispatcher",
+   "at": "reapers.js:1208",
+   "copies": 1,
+   "paraphrase": "Code detects 60 minutes of silence and asks the session to re-confirm its state",
+   "bytes": 889,
+   "introduced": {
+    "sha": "6f85b8b",
+    "date": "2026-07-02",
+    "ticket": "LIN-907",
+    "subject": "LIN-907: collapse the three stall reapers into one ~60-min sentinel-re-fire failsafe (§8.2)"
+   }
+  },
+  {
+   "pattern": "P7",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/autopilot-kickoff.js:605",
+   "copies": 1,
+   "paraphrase": "A 409 DUPLICATE_DISPATCH: adopt the live dispatch, do not retry or re-word",
+   "bytes": 808,
+   "introduced": {
+    "sha": "08c80c49",
+    "date": "2026-07-26",
+    "ticket": "LIN-1656",
+    "subject": "LIN-1656: API-level duplicate-dispatch guard (#1023)"
+   }
+  },
+  {
+   "pattern": "P7",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "lib/proxy-instructions.js:788",
+   "copies": 1,
+   "paraphrase": "Code refuses a fresh dispatch of the same issue and kind within five minutes",
+   "bytes": 1123,
+   "introduced": {
+    "sha": "937555cd",
+    "date": "2026-09-03",
+    "ticket": "LIN-2245",
+    "subject": "LIN-2245: extract the /api/proxy/instructions catalog to lib/proxy-instructions.js (#1339)"
+   }
+  },
+  {
+   "pattern": "P7",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "docs/passage-runner-prompt.md:212",
+   "copies": 1,
+   "paraphrase": "The passage Runner adopts the refused duplicate instead of re-dispatching",
+   "bytes": 702,
+   "introduced": {
+    "sha": "3f0d078f",
+    "date": "2026-08-20",
+    "ticket": "LIN-1870",
+    "subject": "LIN-1870: Passage Runner kickoff generator + route + drift monitor (#1155)"
+   }
+  },
+  {
+   "pattern": "P7",
+   "role": "handle",
+   "repo": "LinearViewer",
+   "at": "docs/passage-planner-prompt.md:209",
+   "copies": 1,
+   "paraphrase": "The planner reports a duplicate refusal and stops; never retries",
+   "bytes": 500,
+   "introduced": {
+    "sha": "d68a19f3",
+    "date": "2026-09-26",
+    "ticket": "LIN-2175",
+    "subject": "LIN-2175: Planner launches the ratified passage on the human's say-so"
+   }
+  },
+  {
+   "pattern": "P7",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/proxy-instructions.js:1092",
+   "copies": 1,
+   "paraphrase": "Do not blind-retry a write on a lost response; re-read to confirm first",
+   "bytes": 606,
+   "introduced": {
+    "sha": "937555cd",
+    "date": "2026-09-03",
+    "ticket": "LIN-2245",
+    "subject": "LIN-2245: extract the /api/proxy/instructions catalog to lib/proxy-instructions.js (#1339)"
+   }
+  },
+  {
+   "pattern": "P8",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/autopilot-kickoff.js:469",
+   "copies": 1,
+   "paraphrase": "The same step kind repeating is looping; a second plan round-trip escalates",
+   "bytes": 1955,
+   "introduced": {
+    "sha": "de4e6af1",
+    "date": "2026-06-06",
+    "ticket": "LIN-321",
+    "subject": "LIN-321: Reframe the shipped Autopilot kickoff onto the fused verb"
+   }
+  },
+  {
+   "pattern": "P8",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:61",
+   "copies": 1,
+   "paraphrase": "The same move repeating is looping; the bound says escalate",
+   "bytes": 432,
+   "introduced": {
+    "sha": "1403655c",
+    "date": "2026-06-14",
+    "ticket": null,
+    "subject": "Rebalance Autopilot kickoff: cut abstract warnings, consolidate instrument facts (#462)"
+   }
+  },
+  {
+   "pattern": "P8",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:66",
+   "copies": 1,
+   "paraphrase": "The same failure waved off the same way twice is the tell nobody zoomed out",
+   "bytes": 218,
+   "introduced": {
+    "sha": "37e6b197",
+    "date": "2026-06-07",
+    "ticket": null,
+    "subject": "Claude/project autopilot overview nop nt (#345)"
+   }
+  },
+  {
+   "pattern": "P8",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "docs/autopilot-operating-manual.md:138",
+   "copies": 1,
+   "paraphrase": "A task failing the same way twice is a task problem: change something first",
+   "bytes": 472,
+   "introduced": {
+    "sha": "1403655c",
+    "date": "2026-06-14",
+    "ticket": null,
+    "subject": "Rebalance Autopilot kickoff: cut abstract warnings, consolidate instrument facts (#462)"
+   }
+  },
+  {
+   "pattern": "P8",
+   "role": "watch",
+   "repo": "LinearViewer",
+   "at": "lib/prompts/meta-prompt-template.js:213",
+   "copies": 1,
+   "paraphrase": "A second Request Changes on one task: recommend blocked and escalate",
+   "bytes": 436,
+   "introduced": {
+    "sha": "7f1efdb8",
+    "date": "2026-07-26",
+    "ticket": "LIN-1603",
+    "subject": "LIN-1603: the plan-review gate, its routing branch, the one-cycle loop bound, and the eval (#1024)"
+   }
+  }
+ ]
+}
