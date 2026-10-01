@@ -14,6 +14,8 @@ cites:
   - "docs/papers/harbour/which-rules-pay.md@26014544:62 and which-rules-pay-codes.json@26014544 (44 real faults review fixed, in 18 tickets)"
   - "docs/papers/harbour/review-consumption.md@26014544:4-12 (half of a review's sentences are consumed downstream)"
   - "docs/papers/harbour/what-doubled-the-dispatches.md@26014544 (the two charging rules)"
+  - "docs/papers/harbour/starting-context.md (sibling, LIN-3178, PR #1669): re-finding in orientation, 4.9–12.1% of weighted tokens"
+  - "docs/papers/harbour/held-or-fresh.md (sibling, LIN-3176, PR #1667), where-judgement-happens.md (LIN-3177, PR #1668), cost-mix.md (LIN-3180, PR #1671), cited by name"
   - "lib/prompt-template-defs.js@26014544:180 (plan: document the plan in the description), :250 (a revision replaces the plan), :282 (plan: work from research's classes), :589 (research: the plan works from this list), :840-844 and :868-874 (plan-review: independently re-run the plan's grounding claims), :439 and :485 (breakdown: copy an approved plan's slice and a plan-review-due-no line into each child)"
   - "scripts/steady-base-carry.mjs@26014544 (the carried-token rule)"
   - "docs/papers/harbour/writing-length.md@26014544 and measuring-throughput.md@26014544 (the scorecard)"
@@ -97,6 +99,11 @@ earlier session read are 5.1% of their carried context, 4.2% across steps, out o
 reads. By repo it is 4.6% on LinearViewer's 25 tickets, 7.3% on simple-dispatcher's 8 and 5.3% on
 the 4 in both. An implementer has to read a file to change it, and a reviewer has to read the code
 it checks, so this is a ceiling on what a hand-over could save, not a saving.
+`starting-context.md`, a sibling paper in this wave, measures the same re-reading fleet-wide while
+sessions orient. There, 53% of what they read was already read on the ticket, and re-finding is
+4.9–12.1% of weighted tokens. Its figure is the one to use for the fleet. This one is narrower: file
+reads only, on four-step tickets, over the whole session and unweighted. It is given here to show
+which step re-reads which.
 
 **The overlap is not where the value is: what review and plan review find is new.** The value
 readers took every real fault that code review led a fix for in `which-rules-pay.md` (44 in 18
@@ -206,9 +213,10 @@ runner log (from 20 June), every k-th by number, 10 a bin (3 in late June, all t
 *The split set*: the eight parents with the most children that had a research or plan session on disk, three children each, lowest-numbered (24). The split census is every parent in the ticket list with two or more children with a session on disk.
 
 **What this paper leaves to its siblings.** Five papers in this wave ran at the same time.
-`starting-context.md` measures what a session loads before it starts work, and `held-or-fresh.md`
-whether a step should resume a held session or start fresh; this paper counts only ticket text and
-file reads. `where-judgement-happens.md`, `cost-mix.md` and `how-process-changes-land.md` are not
+`starting-context.md` measures what a session reads before its first productive call, including
+the re-finding of what earlier sessions read, and `held-or-fresh.md` what a supervisor costs held
+open against started fresh. This paper counts ticket text and file reads between steps, and cites
+the first where the two meet. `where-judgement-happens.md`, `cost-mix.md` and `how-process-changes-land.md` are not
 re-measured here.
 
 **Which step wrote what.** A comment belongs to the step of the session that posted it. The
@@ -334,7 +342,7 @@ step-level change can save on a four-step ticket.
 | **A. A child of an approved plan does not plan again.** The breakdown already copies the approved slice and a "plan-review due: no" line into each child (`lib/prompt-template-defs.js:439`, `:485`); the child's own plan and plan-review sessions would run only when the slice has drifted | Up to 4.5% of all tokens on disk, the planning sessions of planned parents' children. The real figure is lower, because some children need their own plan; perhaps 1–3% | Half the implemented children of a planned parent ran their own plan, a third their own plan review; none of 24 sampled children carried the breakdown's inherited-plan line; siblings share about a fifth of their code references | Medium. A child whose slice has drifted needs its own plan, and none of plan review's 30 real finds was in the research, so a skipped plan review may skip a find. The sample has no measure of what the children's own plans changed (see Next) | Planning dispatches and tokens per child; the correct rate of children with and without their own plan |
 | **B. The plan states what it adds to the research and cites the rest.** It would not restate it | A quarter of a plan's units restate the research. At the median plan of 1,763 words, about 440 words. Under 1% of a four-step ticket's tokens, because plans are 10% of them and ticket text is 1.6% of what sessions carry | Coded sample: plan restates 25%, re-verifies 7%; research is cited one time in nine when it is used | Low. A cited finding stays checkable, and plan review still re-runs the claims | Plan words per ticket; plan-review rounds; correct rate |
 | **C. Plan review re-runs a bound the plan made reproducible, and re-derives only what it left unbounded.** That is the prompt's own instruction (`:874`); how often it is followed is unmeasured | Re-verification is 35% of plan-review units, and plan review is 8% of these tickets' tokens, so at most about 3%. Likely much less, since much of it is already a re-run query | Coded sample; plan review re-reads few of the research's or plan's files in its first round (median 3% of its bytes) | High. Plan review's finds are new: none of its 30 real finds was in the research, and checking by re-deriving may be how it finds them | Plan-review NEW findings per round; escapes on plan-reviewed tickets |
-| **D. Each step leaves a file map for the next** (paths read, at which sha, and why), so a later session reads only what changed | Re-reads of files an earlier session read are 5.1% of later sessions' carried context, 4.2% across steps (implementation 6.5%). A map would save a fraction of that: perhaps 1–3% of later steps' tokens | Transcripts of 296 later sessions on the census | Low to medium. A stale map misleads; an implementer still reads what it edits | Carried tokens per change; correct rate |
+| **D. Each step leaves a file map for the next** (paths read, at which sha, and why), so a later session reads only what changed | Re-reads of files an earlier session read are 5.1% of later sessions' carried context, 4.2% across steps (implementation 6.5%). A map would save a fraction of that: perhaps 1–3% of later steps' tokens | Transcripts of 296 later sessions on the census; `starting-context.md` sizes the same re-finding fleet-wide and tests a path-list finder | Low to medium. A stale map misleads; an implementer still reads what it edits | Carried tokens per change; correct rate |
 | **E. Writing less, for tokens' sake.** Listed so that it can be ruled out | Small. Ticket text is 1.6% of carried context, and a word reaches about 1.4 later sessions | Read multiplier and token share, September | Unknown; the text is how steps hand over | Not worth measuring on token grounds; the case for shorter writing is the human reader's (`writing-length.md`) |
 
 ## Next
