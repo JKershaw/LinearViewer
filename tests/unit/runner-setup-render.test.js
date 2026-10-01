@@ -137,11 +137,12 @@ describe('the honesty copy, consistent with the S3 prompt', () => {
     assert.match(text, /Node 18\+/);
     assert.match(text, /macOS or Linux/);
   });
-  test('laptop sleep and close, with the orphan truth', () => {
+  test('laptop sleep and close, with the orphan truth (LIN-3163: no 30-day claim)', () => {
     assert.match(text, /laptop sleeps/i);
     assert.match(text, /laptop closes/i);
     assert.match(text, /stay taken/);
-    assert.match(text, /30 days/);
+    assert.doesNotMatch(text, /30 days/i, 'history is lifetime-retained (LIN-3163); no 30-day expiry claim');
+    assert.match(text, /project's lifetime/i);
     assert.match(text, /re-dispatch/i);
   });
   test('the credential lifetimes: the bootstrap window and the working life, from source', () => {
@@ -149,9 +150,10 @@ describe('the honesty copy, consistent with the S3 prompt', () => {
     assert.match(text, new RegExp(`${RUNNER_WORKING_TTL_SECONDS / 3600}h`));
     assert.match(text, /mint again/i);
   });
-  test('the owner-only rule, unconditionally', () => {
+  test('the owner-only rule, permanently', () => {
     assert.match(text, /only items the workspace owner enqueued/i);
-    assert.doesNotMatch(text, /before T3[^.]*owner/i);
+    assert.doesNotMatch(text, /(before|until|after|once) T3/i);
+    assert.match(text, /owner-only rule is permanent/i);
   });
   test('the same-user boundary, stated plainly', () => {
     assert.match(text, /same OS user/i);
@@ -275,4 +277,12 @@ describe('the witness runbook link (LIN-3098 S5)', () => {
       assert.match(html, /<a href="https:\/\/github\.com\/JKershaw\/LinearViewer\/blob\/main\/docs\/runbooks\/runner-hosted-witness\.md"[^>]*data-testid="runner-setup-runbook-link"[^>]*>witness runbook<\/a>/);
     });
   }
+
+  test('the runbook carries the post-T3 Autopilot re-witness step (LIN-3098 S6)', () => {
+    const runbook = readFileSync(join(ROOT, 'docs', 'runbooks', 'runner-hosted-witness.md'), 'utf8');
+    assert.match(runbook, /post-T3/i);
+    assert.match(runbook, /Autopilot/);
+    assert.match(runbook, /DISPATCH_GRANT_REQUIRED/);
+    assert.match(runbook, /re-witness|re-launch|re-dispatch/i);
+  });
 });

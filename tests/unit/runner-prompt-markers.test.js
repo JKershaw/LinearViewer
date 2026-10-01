@@ -136,3 +136,23 @@ describe('the kit-authored lines are exactly what runner.mjs emits', () => {
     has(postTakeCheck(polled, { id: K, prompt: 'b', followUpTo: null, abort: false, abortTo: null, dispatchedBy: 'o' }));
   });
 });
+
+// S6 (post-T3): a grant-less enqueue now answers 403 DISPATCH_GRANT_REQUIRED.
+// The rule lives in the prompt (the kit has no enqueue path), so its `[failed]`
+// line is pinned in the markers block and in the prose that quotes it.
+describe('S6: the enqueue 403 marker', () => {
+  const LINE = '[failed] enqueue blocked: DISPATCH_GRANT_REQUIRED';
+
+  test('the markers block carries the enqueue-403 [failed] line', () => {
+    assert.ok(lines.includes(LINE), `the markers block lacks:\n  ${LINE}`);
+  });
+
+  test('it reads as a terminal failure', () => {
+    assert.equal(findTerminalFeedback(at(LINE)).status, 'failed');
+  });
+
+  test('the prose quotes it, so the block and the prose cannot drift', () => {
+    const body = prompt.replace(/```markers[\s\S]*?```/, '');
+    assert.match(body, /\[failed\] enqueue blocked: DISPATCH_GRANT_REQUIRED/);
+  });
+});
