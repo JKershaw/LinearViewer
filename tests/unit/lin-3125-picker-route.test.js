@@ -242,6 +242,9 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     const res = await post(buildRoute(connectionStore, { provider: githubProvider() }), session, { repo: 'octo/not-offered' });
     assert.equal(res.statusCode, 409);
     assert.equal(session.workspaces[0].bindings.length, 0, 'no partial binding');
+    assert.match(res.body, /Source Unavailable/, 'the empty-offer retry arm, not the terminal connection-gone arm');
+    assert.ok(session.heldEntry, 'empty-offer retry keeps the held intent');
+    assert.match(res.body, /href="\/connect\/github\/held"/, 'Back returns to the live picker');
   });
 
   test('foreign connection is never listed and is rejected at POST', async () => {
@@ -265,6 +268,8 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     const res = await post(buildRoute(connectionStore, { provider: githubProvider() }), session, { repo: 'octo/a' });
     assert.equal(res.statusCode, 409);
     assert.equal(session.workspaces[0].bindings.length, 0, 'no partial binding');
+    assert.equal(session.heldEntry, undefined, 'connection-gone 409 consumes the held intent');
+    assert.match(res.body, /href="\/auth\/github\?mode=add-source&amp;workspace=acme"/, 'Back returns to the bare begin flow');
   });
 
   test('already-bound scope at POST is idempotent (existing binding kept, no write)', async () => {
@@ -306,6 +311,8 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /Connection Not Saved/);
     assert.equal(session.workspaces[0].bindings.length, 0);
+    assert.equal(session.heldEntry, undefined, 'POST D11-off consumes the held intent');
+    assert.match(res.body, /href="\/auth\/github\?mode=add-source&amp;workspace=acme"/, 'Back returns to the bare begin flow');
   });
 
   test('expired heldEntry => Session Expired (GET and POST)', async () => {
