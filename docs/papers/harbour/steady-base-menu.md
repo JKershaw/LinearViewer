@@ -258,8 +258,8 @@ else; three times cheaper gives 2.5×. The stacks above cut mechanical overhead 
 tickets too, which keeps their gates but not their bookkeeping, so they are not strictly below the
 bound. On the bound's footing, with the 9.7% of credential spend held entire, the whole menu's top
 is ×2.14 and its low end ×1.47. Three times cheaper everywhere else is a 67% cut; the whole menu's
-top is a 59% cut. The plausible top is therefore a little under the bound, and both sit near 2×
-only if every structural row delivers at its high end. Cost-mix's own options 1–4 at 1.7–1.8× are
+top is a 59% cut. The plausible top is therefore a little under the bound, and it clears 2× only if
+every structural row delivers at its high end. Cost-mix's own options 1–4 at 1.7–1.8× are
 the proportionality and fixed-part rows alone; the menu adds the structural rows, which is where
 the rest comes from, as the anchor said it must.
 
