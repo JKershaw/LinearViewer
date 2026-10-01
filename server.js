@@ -27,7 +27,8 @@ import { createSessionOptions, SESSION_TTL_SECONDS } from './lib/session-options
 import { UserPreferencesStore, VALID_THEMES, setThemeCookie } from './lib/user-preferences.js'
 import { getWorkspaceOpenRouterKey as resolveOpenRouterKey, getUnattendedOpenRouterKey } from './lib/openrouter-key-resolver.js'
 import { getWorkspaceNorthStar as resolveNorthStar, getWorkspaceNorthStarDocVersion as resolveNorthStarDocVersion } from './lib/north-star-resolver.js'
-import { UNSCOPED, selectOwnerWorkspaceToken, selectOwnerSessionRow, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
+import { UNSCOPED, selectOwnerSessionRow, classifyWorkspaceFailure, describeWorkspaceResolution } from './lib/workspace-token-resolver.js'
+import { selectOwnerWorkspaceTokenExcludingSuperseded } from './lib/superseded-selection.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { attemptSuspectCredentialRefresh as attemptSuspectCredentialRefreshImpl } from './lib/suspect-credential-refresh.js'
 import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
@@ -2446,7 +2447,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     });
     if (recovered) {
       workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
-      rejectedCredentialRegistry.accept(cachedFingerprint);
+      rejectedCredentialRegistry.accept(cachedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
       return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
     }
     return { token: cached.token, reason: 'ok', provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt, credentialFingerprint: cachedFingerprint };
@@ -2471,7 +2472,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       connectionSummary = arm?.connectionSummary || null;
     }
 
-    const selected = selectOwnerWorkspaceToken(sessions, urlKey, ownerAccountId);
+    const selected = selectOwnerWorkspaceTokenExcludingSuperseded(sessions, urlKey, ownerAccountId, rejectedCredentialRegistry);
 
     if (selected.token) {
       const selectedFingerprint = fingerprintCredential(selected.scope ?? selected.token);
@@ -2486,7 +2487,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       });
       if (recovered) {
         workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
-        rejectedCredentialRegistry.accept(selectedFingerprint);
+        rejectedCredentialRegistry.accept(selectedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
         return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
       }
       workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });

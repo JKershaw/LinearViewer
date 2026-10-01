@@ -12,6 +12,75 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 
+// LIN-3186: `rejectionCounts` / `supersessions` — two independent, limit-only
+// (never time-pruned) maps. `accept(fingerprint, {supersededBy, source})` records
+// a supersession; it still clears the suspect mark and never touches scopeAttempts.
+describe('supersession history (LIN-3186)', () => {
+  test('accept with supersededBy records a terminal supersession and clears the suspect mark', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    registry.markSuspect('fp-old');
+    registry.accept('fp-old', { supersededBy: 'fp-new', source: 'durable-adopt' });
+    assert.equal(registry.isSuspect('fp-old'), false, 'the mark is still cleared');
+    assert.equal(registry.isSuperseded('fp-old'), true);
+    assert.deepEqual([...registry.supersededFingerprints()], ['fp-old']);
+  });
+
+  test('accepting a fingerprint as its own replacement is not a supersession', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    registry.markSuspect('fp-a');
+    registry.accept('fp-a', { supersededBy: 'fp-a' });
+    assert.equal(registry.isSuperseded('fp-a'), false);
+  });
+
+  test('old one-arg accept() stays valid and records nothing', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    assert.doesNotThrow(() => registry.accept('fp-a'));
+    assert.equal(registry.isSuperseded('fp-a'), false);
+    assert.doesNotThrow(() => registry.accept(null));
+  });
+
+  test('rejectionCount is per-fingerprint and survives the suspect mark lapsing', () => {
+    let now = 1000;
+    const registry = createRejectedCredentialRegistry({ suspectTtlMs: 10, now: () => now });
+    registry.markSuspect('fp-a');
+    registry.markSuspect('fp-a');
+    registry.markSuspect('fp-b');
+    assert.equal(registry.rejectionCount('fp-a'), 2);
+    assert.equal(registry.rejectionCount('fp-b'), 1);
+    assert.equal(registry.rejectionCount('fp-unseen'), 0);
+    now += 1000;
+    assert.equal(registry.isSuspect('fp-a'), false, 'sanity: the mark lapsed');
+    assert.equal(registry.rejectionCount('fp-a'), 2, 'the count is limit-only, never TTL-pruned');
+  });
+
+  test('a supersession captures the rejection count at supersession time', () => {
+    const registry = createRejectedCredentialRegistry({ now: () => 1000 });
+    registry.markSuspect('fp-a');
+    registry.markSuspect('fp-a');
+    registry.accept('fp-a', { supersededBy: 'fp-b', source: 'durable-adopt' });
+    assert.equal(registry.rejectionCount('fp-a'), 2);
+  });
+
+  test('supersessions are bounded by the same limit (limit-only eviction, no TTL)', () => {
+    const registry = createRejectedCredentialRegistry({ limit: 2, now: () => 1000 });
+    for (const fp of ['fp-1', 'fp-2', 'fp-3']) {
+      registry.markSuspect(fp);
+      registry.accept(fp, { supersededBy: `${fp}-next` });
+    }
+    assert.equal(registry.isSuperseded('fp-1'), false, 'the oldest supersession was evicted');
+    assert.equal(registry.isSuperseded('fp-3'), true);
+    assert.equal(registry.supersededFingerprints().size, 2);
+  });
+
+  test('fail-open: supersession reads/records on a falsy fingerprint are harmless', () => {
+    const registry = createRejectedCredentialRegistry();
+    assert.equal(registry.isSuperseded(null), false);
+    assert.equal(registry.isSuperseded(undefined), false);
+    assert.equal(registry.rejectionCount(null), 0);
+    assert.doesNotThrow(() => registry.accept(null, { supersededBy: 'fp-b' }));
+  });
+});
+
 describe('markSuspect / isSuspect', () => {
   test('a single rejection marks the fingerprint suspect immediately', () => {
     const registry = createRejectedCredentialRegistry({ now: () => 1000 });

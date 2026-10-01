@@ -8,6 +8,7 @@
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { classifyDonePosts } from './survey-hides-d5x-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const state = arg('--state', '/Users/work/development/simple-dispatcher/state');
@@ -140,12 +141,18 @@ for (const p of terminalPosts) {
 
 // ---- D5x: a terminal line the runner failed to post (fire-and-forget, no retry) -----------------------------------------
 // If Harbour never stored the line, no wake was minted. Within the transcript window, look for a wake anywhere that carries it.
+// LIN-3210: the counts distinguish a retry that HEALED (an ok [done] feedback.post for the item — no longer a false
+// posted) from an unhealed loss, and count done_post_failed / unresolved (a done_post_started with no outcome).
+const d5xCounts = classifyDonePosts(ops, runner.feedback.failures);
+const falsePostedItems = new Set(d5xCounts.falseDonePosted.map((o) => o.item));
 const d5x = runner.feedback.failures.filter((f) => TERM.test(f.msg || '')).map((f) => {
   const t = Date.parse(f.ts); const inWindow = t >= since;
   const w = inWindow ? deliveries.find((d) => d.outcomeLine && d.outcomeLine.slice(0, 28) === f.msg.slice(0, 28) && Date.parse(d.at) >= t - 6e4 && Date.parse(d.at) - t < 6 * 36e5) : null;
   const e = edges.get(f.item) || null;
-  // The runner still logs hook.done_posted ("the parent-wake signal is on the wire", hook.js) after a failed [done] POST.
-  const provedAnyway = ops.some((o) => o.event === 'hook.done_posted' && o.item === f.item && o.t >= t && o.t - t < 6e4);
+  // LIN-3210: a FALSE done_posted is one with no ok [done] row for the item. A healed retry has one, so it is
+  // not "logged anyway" (and is not a loss). This replaces the old 60 s hook.done_posted window, which read a
+  // recovered retry as a false posted (red while right).
+  const provedAnyway = !f.healed && falsePostedItems.has(f.item);
   let parent = null;
   if (e) {
     const ps = e.parent.slice(0, 8); const woke = (phases.get(ps) || []).find((x) => x.t >= t && /^AWAITING_/.test(x.from));
@@ -172,7 +179,7 @@ const result = {
   about: 'LIN-3188 runner-side detectors. Windows: D1f and D5x 12 Jul-1 Oct (oplog); D5 and D8 29 Aug-1 Oct (transcripts).',
   d1f: { rule: '>=3 distinct sessions post a feedback line with an auth/outage signature inside 6 h', lines: sigLines.length, episodes: d1f, record: RECORD, sigLines: sigLines.map(({ t, ...r }) => r) },
   d5: { rule: 'parent parked (AWAITING_FOLLOWUP/EXTERNAL) when its child posts a wake-minting terminal line, and no delivery carrying that line within 15 min', edges: edges.size, edgeVia: [...edges.values()].reduce((m, e) => ((m[e.via] = (m[e.via] || 0) + 1), m), {}), terminalPostsInWindow: terminalPosts.length, withParentEdge: checked, parentParked: parkedChecked.length, hits: d5, parkedChecked },
-  d5x: { rule: 'a wake-minting terminal line whose POST failed (no retry in feedback.js)', n: d5x.length, rows: d5x },
+  d5x: { rule: 'a wake-minting terminal line whose POST failed; doneLoggedAnyway counts a FALSE done_posted (no ok [done] feedback.post for the item), donePostFailed an honest loss, unresolved a done_post_started with no outcome', n: d5x.length, doneLoggedAnyway: d5xCounts.doneLoggedAnyway, donePostFailed: d5xCounts.donePostFailed, unresolved: d5xCounts.unresolved, healedLosses: d5xCounts.healedLosses, unhealedLosses: d5xCounts.unhealedLosses, rows: d5x },
   d8: { floods: floods.slice(0, 40), floodsN: { over12: floods.length, over30: floods.filter((f) => f.perHour > 30).length, over60: floods.filter((f) => f.perHour > 60).length }, floodsByMonth: floods.reduce((m, f) => ((m[f.from.slice(0, 7)] = (m[f.from.slice(0, 7)] || 0) + 1), m), {}), selfWakes },
 };
 writeFileSync(join(out, 'detect-runner.json'), JSON.stringify(result, null, 1));
@@ -180,5 +187,5 @@ console.log('D1f lines by day', JSON.stringify(sigLines.reduce((m, x) => { const
 console.log('D1f lines', sigLines.length, 'episodes', JSON.stringify(d1f));
 console.log('edges', edges.size, result.d5.edgeVia, 'terminal posts', terminalPosts.length, 'with edge', checked, 'parent parked', parkedChecked.length, 'D5 hits', d5.length);
 for (const h of d5) console.log('  D5', JSON.stringify(h));
-console.log('D5x', JSON.stringify(d5x));
+console.log('D5x', JSON.stringify({ n: d5x.length, doneLoggedAnyway: d5xCounts.doneLoggedAnyway, donePostFailed: d5xCounts.donePostFailed, unresolved: d5xCounts.unresolved, healedLosses: d5xCounts.healedLosses, unhealedLosses: d5xCounts.unhealedLosses }), JSON.stringify(d5x));
 console.log('D8', JSON.stringify(result.d8.floodsN), JSON.stringify(result.d8.floodsByMonth), JSON.stringify(floods.slice(0, 8)), 'self-wakes', selfWakes.length);

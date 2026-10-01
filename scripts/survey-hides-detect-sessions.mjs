@@ -25,9 +25,11 @@
 // Costs are weighted units as in survey-wake-extract.mjs; shares are of all units in sessions.jsonl.
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { joinDuplicateAlarms, bucketCounts } from './survey-hides-d7-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const dir = arg('--in', 'data/survey-hides');
+const state = arg('--state', '/Users/work/development/simple-dispatcher/state');
 const sessions = readFileSync(join(dir, 'sessions.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const events = readFileSync(join(dir, 'events.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const byId = new Map(sessions.map((s) => [s.id, s]));
@@ -139,6 +141,17 @@ for (const a of alarms.sort((x, y) => x.alarmAt.localeCompare(y.alarmAt))) {
 const d2 = incidents.map((i) => ({ ...i, members: [...i.members], waiters: i.alarms.length, alarms: i.alarms.map((a) => ({ session: a.session.slice(0, 8), issue: a.issue, kind: a.kind, waitAt: a.waitAt.slice(0, 16), endAt: a.endAt, woken: a.woken, idleMin: a.idleMin, childStopAt: a.childStopAt, wakeLatencyMin: a.wakeLatencyMin, text: a.text })) }));
 
 // ---------- D7 duplicate launch ----------
+// LIN-3210: join each hit to the M23 `launch.duplicate` alarm (simple-dispatcher oplog) by
+// `(issue|kind, second session id)` — the alarm's `session` is the newly launched one
+// (dispatcher.js:1144/1162). A missing state dir (a transcript-only run) leaves every hit unalarmed.
+const duplicateAlarms = [];
+try {
+  for (const line of readFileSync(join(state, 'oplog.jsonl'), 'utf8').split('\n')) {
+    if (!line || !line.includes('launch.duplicate')) continue;
+    let o; try { o = JSON.parse(line); } catch { continue; }
+    if (o.event === 'launch.duplicate') duplicateAlarms.push(o);
+  }
+} catch { /* no state: no alarms to join */ }
 const launches = events.filter((e) => e.type === 'launch').map((e) => ({ ...e, s: byId.get(e.session) })).filter((e) => e.s?.steps.length);
 const groups = new Map(); for (const l of launches) { const k = `${l.issue}|${l.kind}`; (groups.get(k) || groups.set(k, []).get(k)).push(l); }
 const pairs = [];
@@ -150,17 +163,21 @@ for (const [k, ls] of groups) {
     const overlap = Math.max(0, Math.min(aEnd, Math.max(...b.s.steps)) - bStart);
     const aSet = new Set(a.s.steps.flatMap((m) => [m - 2, m - 1, m, m + 1, m + 2]));
     const concurrent = b.s.steps.filter((m) => aSet.has(m)).length;
-    if (overlap > 0 || gap <= 15) pairs.push({ concurrentMin: concurrent, issue: a.issue, kind: a.kind, repo: b.s.repo, first: a.session.slice(0, 8), second: b.session.slice(0, 8), firstAt: a.at.slice(0, 16), secondAt: b.at.slice(0, 16), gapMin: gap, overlapMin: overlap, secondUnits: b.s.units, set: a.kind === 'autopilot' || a.kind === 'custom' ? 'excluded-kind' : concurrent >= 2 ? 'hit' : 'sequential' });
+    // Parked-only: the first session was in a wait window when the second launched (not active, not terminal).
+    const firstParked = typeof stateAt(a.session, bStart) === 'object';
+    if (overlap > 0 || gap <= 15) pairs.push({ concurrentMin: concurrent, issue: a.issue, kind: a.kind, repo: b.s.repo, first: a.session.slice(0, 8), second: b.session.slice(0, 8), firstAt: a.at.slice(0, 16), secondAt: b.at.slice(0, 16), gapMin: gap, overlapMin: overlap, secondUnits: b.s.units, firstParked, set: a.kind === 'autopilot' || a.kind === 'custom' ? 'excluded-kind' : concurrent >= 2 ? 'hit' : 'sequential' });
   }
 }
-const hits7 = pairs.filter((p) => p.set === 'hit');
+const bucketedPairs = joinDuplicateAlarms(pairs, duplicateAlarms);
+const d7Buckets = bucketCounts(bucketedPairs);
+const hits7 = bucketedPairs.filter((p) => p.set === 'hit');
 
 // ---------- write ----------
 const out = {
   window: { first: sessions.map((s) => s.first).sort()[0], last: sessions.map((s) => s.last).filter(Boolean).sort().pop(), sessions: sessions.length, byRepo: count(sessions, (s) => s.repo), fleetUnits: Math.round(fleetUnits) },
   d1: { rule: '>=3 distinct sessions, same signature, within 60 min', errorsByMonthRepoClass: errMonthly, episodes: d1, episodesByClass: count(d1, (e) => e.cls) },
   d2: { rule: 'checkpoints every 30 min after a waiting burst; uncovered chain = cycle or orphan', waits: events.filter((e) => e.type === 'wait').length, waitingBursts: [...bursts.values()].flat().filter((b) => b.wait).length, alarms: alarms.length, incidentsByType: count(d2, (i) => i.type), incidentsByMonthRepo: count(d2, (i) => `${i.alarmAt.slice(0, 7)} ${i.repo} ${i.type}`), idleMinByType: d2.reduce((m, i) => ((m[i.type] = (m[i.type] || 0) + i.idleMin), m), {}), incidents: d2 },
-  d7: { rule: 'same issue and kind, spans overlap or second launch within 15 min', launches: launches.length, hits: hits7.length, sequentialPairs: pairs.filter((p) => p.set === 'sequential').length, excludedKindPairs: pairs.filter((p) => p.set === 'excluded-kind').length, hitsByMonthRepoKind: count(hits7, (p) => `${p.secondAt.slice(0, 7)} ${p.repo} ${p.kind}`), secondUnits: hits7.reduce((a, p) => a + p.secondUnits, 0), pairs },
+  d7: { rule: 'same issue and kind, spans overlap or second launch within 15 min; hits joined to launch.duplicate by (issue|kind, second session id): alarmed > alreadyEnded > parkedOnly > unalarmed', launches: launches.length, duplicateAlarms: duplicateAlarms.length, hits: hits7.length, alarmed: d7Buckets.alarmed, unalarmed: d7Buckets.unalarmed, parkedOnly: d7Buckets.parkedOnly, alreadyEnded: d7Buckets.alreadyEnded, sequentialPairs: pairs.filter((p) => p.set === 'sequential').length, excludedKindPairs: pairs.filter((p) => p.set === 'excluded-kind').length, hitsByMonthRepoKind: count(hits7, (p) => `${p.secondAt.slice(0, 7)} ${p.repo} ${p.kind}`), secondUnits: hits7.reduce((a, p) => a + p.secondUnits, 0), pairs: bucketedPairs },
 };
 writeFileSync(join(dir, 'detect-sessions.json'), JSON.stringify(out, null, 1));
-console.log(JSON.stringify({ window: out.window, d1: { episodes: d1.length, byClass: out.d1.episodesByClass }, d2: { alarms: alarms.length, incidents: out.d2.incidentsByType, idle: out.d2.idleMinByType }, d7: { hits: hits7.length, excluded: pairs.length - hits7.length, units: out.d7.secondUnits } }, null, 1));
+console.log(JSON.stringify({ window: out.window, d1: { episodes: d1.length, byClass: out.d1.episodesByClass }, d2: { alarms: alarms.length, incidents: out.d2.incidentsByType, idle: out.d2.idleMinByType }, d7: { hits: hits7.length, buckets: d7Buckets, excluded: pairs.length - hits7.length, units: out.d7.secondUnits } }, null, 1));

@@ -3,6 +3,13 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does the engine's rewrite of a template change what review catches?** `harbour/prompt-kinds.md` found that the
+  recommender writes each worker prompt itself, its own text 25–68% of the handwritten template's. The code-appended gates
+  survive, but the review template's regression step (`git log` over the changed files) is in about 1% of written reviews,
+  and the instruction to write or read the `### Plan Review Verdict` header the tree routes on is in 70% of written
+  plan-reviews and 36% of written plans, against every template (`survey-check-13.md`). A per-step fixture eval answers it:
+  the same frozen tickets run with the written body and with the template body, three runs per arm (the menu's M33),
+  scored on faults found, verdict headers written and weighted tokens. (Claude, 2026-10-01; narrowed by survey-check-13)
 - **Do the steady-base menu's cost factors overlap as its stack arithmetic assumes?**
   `harbour/steady-base-menu.md` multiplied savings across four factors (mechanical supervision, legs that need not run,
   tokens per session, which changes get the full process) on the assumption that each later factor's share is spread

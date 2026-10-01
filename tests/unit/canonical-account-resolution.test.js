@@ -20,6 +20,8 @@ import vm from 'node:vm';
 import { MangoClient } from '@jkershaw/mangodb';
 import { AccountStore } from '../../lib/account-store.js';
 import { UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from '../../lib/workspace-token-resolver.js';
+import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/superseded-selection.js';
+import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { CREDENTIAL_SOURCES, fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
 import { workspaceTokenCacheKey as realWorkspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
@@ -179,7 +181,7 @@ describe('resolveWorkspaceAccess canonicalization wiring (LIN-2234, Block B — 
     const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
     const resolveIdx = body.indexOf('accountStore.resolveCanonicalAccountId(');
     assert.ok(resolveIdx >= 0);
-    for (const marker of ['workspaceTokenCacheKey(', 'selectOwnerWorkspaceToken(', 'ownerCredentialStore.get(', 'classifyWorkspaceFailure(', 'refreshOwnerWorkspaceToken(']) {
+    for (const marker of ['workspaceTokenCacheKey(', 'selectOwnerWorkspaceTokenExcludingSuperseded(', 'ownerCredentialStore.get(', 'classifyWorkspaceFailure(', 'refreshOwnerWorkspaceToken(']) {
       const idx = body.indexOf(marker);
       assert.ok(idx >= 0, `sanity check failed: ${marker} not found inside resolveWorkspaceAccess`);
       assert.ok(resolveIdx < idx, `resolveCanonicalAccountId must precede ${marker} — every downstream consumer must inherit the canonical id`);
@@ -219,10 +221,26 @@ describe('resolveWorkspaceAccess canonicalization wiring (LIN-2234, Block B — 
 // attemptSuspectCredentialRefresh).
 // ---------------------------------------------------------------------------
 
-async function runResolveWorkspaceAccess({ urlKey, ownerAccountId, sessions, accountStore, source = SERVER_SRC, cacheKeyCalls = [] }) {
+async function runResolveWorkspaceAccess({
+  urlKey, ownerAccountId, sessions, accountStore, source = SERVER_SRC, cacheKeyCalls = [],
+  // LIN-3186 wiring tests inject the production collaborators directly:
+  // a stateful cache, the real registry under test, and a scripted
+  // `attemptSuspectCredentialRefresh`. Every default is the pre-LIN-3186
+  // behaviour, so Blocks B/C and the M1-M3 mutation checks are unchanged.
+  workspaceTokenCache = { get: () => undefined, set: () => true },
+  rejectedCredentialRegistry = createRejectedCredentialRegistry(),
+  attemptSuspectCredentialRefresh = async () => null,
+  connectionAccess = { resolveConnectionBackedAccess: async () => null },
+}) {
   const context = vm.createContext({
     UNSCOPED, TOKEN_REFRESH_BUFFER_MS,
     selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution,
+    // LIN-3186: the real selection wrapper + a real registry, matching
+    // server.js's production wiring. The extracted body no longer calls the
+    // bare selector, so both names must be in scope (as connectionAccess was
+    // added for LIN-3124 PR3 C).
+    selectOwnerWorkspaceTokenExcludingSuperseded,
+    rejectedCredentialRegistry,
     CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS,
     accountStore,
     workspaceTokenCacheKey: (urlKey, ownerAccountId) => {
@@ -230,15 +248,15 @@ async function runResolveWorkspaceAccess({ urlKey, ownerAccountId, sessions, acc
       return realWorkspaceTokenCacheKey(urlKey, ownerAccountId);
     },
     sessionsCollection: { find: () => ({ toArray: async () => sessions }) },
-    workspaceTokenCache: { get: () => undefined, set: () => true },
+    workspaceTokenCache,
     ownerCredentialStore: { get: async () => null },
     refreshOnResolveGate: { shouldAttempt: () => false },
     credentialLifecycleEventStore: { recordEvent: async () => {} },
-    attemptSuspectCredentialRefresh: async () => null,
+    attemptSuspectCredentialRefresh,
     // LIN-3124 PR3 checkpoint C: the connection-first arm's free identifier.
     // Returning null (no connections) makes the slice take the unchanged
     // legacy scan, which is what this harness characterizes.
-    connectionAccess: { resolveConnectionBackedAccess: async () => null },
+    connectionAccess,
     console: { log() {}, warn() {}, error() {} },
     process: { env: {} },
   });
@@ -354,5 +372,168 @@ describe('LIN-2271 mutation-check: the chokepoint assertions above must actually
     const result = await runResolveWorkspaceAccess({ urlKey: 'acme', ownerAccountId: merged._id, sessions, accountStore: store, source: mutated, cacheKeyCalls });
     assert.equal(result.reason, 'ok', 'sanity: the return value alone does NOT catch reordering — this is why Block B\'s text-order witness must stay');
     assert.equal(cacheKeyCalls[0], merged._id, 'workspaceTokenCacheKey must be shown observing the STALE (merged) owner under this mutation — the cache key is now derived before canonicalization runs, so it is keyed by the id the caller passed in, not the canonical id; this is exactly what a return-value-only assertion cannot see');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3186 wiring (PR #1696 review): the REAL production body — not a
+// hand-mirrored resolve flow — must record the supersession at BOTH accept()
+// sites and must select through the wrapper WITH the live registry. The review
+// found that stripping either (mutations G and H) left the whole suite green:
+// the lib modules were pinned, but nothing proved server.js connected them.
+// The two mutation tests below assert the failure mode the positive test
+// catches, so removing the wiring cannot pass silently.
+// ---------------------------------------------------------------------------
+
+const WIRING_URL_KEY = 'acme-3186-wiring';
+const WIRING_ACCOUNT = 'acct-3186-wiring';
+
+/** A cache whose state survives the call (unlike the Block C stub). */
+function statefulWorkspaceTokenCache() {
+  const store = new Map();
+  return {
+    get: key => store.get(key),
+    set: (key, value) => { store.set(key, value); return true; },
+    clear: () => store.clear(),
+  };
+}
+
+function wiringSessions() {
+  const now = Date.now();
+  return [
+    { _id: 'sid-d', session: { accountId: WIRING_ACCOUNT, workspaces: [
+      { urlKey: WIRING_URL_KEY, provider: 'linear', accessToken: 'dead-D', tokenExpiresAt: now + 7_200_000 },
+    ] } },
+    { _id: 'sid-e', session: { accountId: WIRING_ACCOUNT, workspaces: [
+      { urlKey: WIRING_URL_KEY, provider: 'linear', accessToken: 'good-E', tokenExpiresAt: now + 3_600_000 },
+    ] } },
+  ];
+}
+
+/**
+ * Drives the real server.js resolveWorkspaceAccess body twice. Call 1: D (dead,
+ * latest expiry) is suspect and the adopter stub returns G, so the call adopts
+ * it and must record the supersession. Then the cache is cleared and the stub
+ * stops adopting, so call 2 rescans: the wrapper must now exclude D and serve
+ * E. Returns the supersession state observed immediately after call 1 (which
+ * is what distinguishes the wiring from the mutation that drops it).
+ */
+async function driveWiringResolves({ source = SERVER_SRC, registry, cache, seedCache = false }) {
+  const fpD = fingerprintCredential('dead-D');
+  const fpG = fingerprintCredential('good-G');
+  const sessions = wiringSessions();
+  // `seedCache` pre-loads the 30s cache with suspect D, so call 1 takes the
+  // CACHE-HIT arm (server.js:2450) instead of the session-scan arm. That is the
+  // branch the incident loop actually goes through: request 1 scans D and
+  // serves it, the 401 marks D suspect, and request 2 is a cache hit on D that
+  // adopts G there.
+  if (seedCache) {
+    cache.set(realWorkspaceTokenCacheKey(WIRING_URL_KEY, WIRING_ACCOUNT), {
+      token: 'dead-D', expiresAt: Date.now() + 3_600_000, provider: 'linear', scope: 'dead-D',
+    });
+  }
+  let shouldAdopt = true;
+  const attempt = async ({ fingerprint }) => {
+    if (!shouldAdopt || fingerprint !== fpD) return null;
+    return {
+      token: 'good-G',
+      provider: 'linear',
+      expiresAt: Date.now() + 3_600_000,
+      scope: 'good-G',
+      credentialFingerprint: fpG,
+      adoptSource: 'durable-adopt',
+    };
+  };
+  const deps = () => ({
+    urlKey: WIRING_URL_KEY,
+    ownerAccountId: WIRING_ACCOUNT,
+    sessions,
+    accountStore: { resolveCanonicalAccountId: async id => id },
+    workspaceTokenCache: cache,
+    rejectedCredentialRegistry: registry,
+    attemptSuspectCredentialRefresh: attempt,
+    source,
+  });
+
+  const first = await runResolveWorkspaceAccess(deps());
+  const supersededAfterFirst = registry.isSuperseded(fpD);
+
+  cache.clear();
+  shouldAdopt = false;
+  const second = await runResolveWorkspaceAccess(deps());
+
+  return { first, second, supersededAfterFirst, fpD, fpG };
+}
+
+describe('LIN-3186 wiring — the real resolveWorkspaceAccess records supersession and excludes it', () => {
+  test('call 1 records the supersession at accept(); after a cache clear call 2 serves E, not D', async () => {
+    const registry = createRejectedCredentialRegistry();
+    registry.markSuspect(fingerprintCredential('dead-D'));
+    const cache = statefulWorkspaceTokenCache();
+
+    const { first, second, supersededAfterFirst } = await driveWiringResolves({ registry, cache });
+
+    assert.equal(first.token, 'good-G', 'the latest-expiry dead D is adopted away on the first resolve');
+    assert.equal(supersededAfterFirst, true, 'server.js accept() must record the supersession (mutation G leaves this false)');
+    assert.equal(second.token, 'good-E', 'once D is superseded the real server body must select E — not re-serve D (mutation H re-serves D)');
+    assert.notEqual(second.token, 'dead-D');
+  });
+
+  test('mutation G — both accept() sites one-arg: the supersession is NOT recorded, D is re-selected', async () => {
+    const mutated = mutateServerSrc(body => body.replaceAll(
+      ', { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource }',
+      ''
+    ));
+    const registry = createRejectedCredentialRegistry();
+    registry.markSuspect(fingerprintCredential('dead-D'));
+    const cache = statefulWorkspaceTokenCache();
+    const { supersededAfterFirst, second } = await driveWiringResolves({ source: mutated, registry, cache });
+    assert.equal(supersededAfterFirst, false, 'sanity: one-arg accept() records no supersession');
+    assert.equal(second.token, 'dead-D', 'without the supersession the dead credential is re-selected — the positive test fails here');
+  });
+
+  test('mutation H — wrapper called with a null registry: the exclusion is skipped, D is re-selected', async () => {
+    const mutated = mutateServerSrc(body => body.replace(
+      'selectOwnerWorkspaceTokenExcludingSuperseded(sessions, urlKey, ownerAccountId, rejectedCredentialRegistry)',
+      'selectOwnerWorkspaceTokenExcludingSuperseded(sessions, urlKey, ownerAccountId, null)'
+    ));
+    const registry = createRejectedCredentialRegistry();
+    registry.markSuspect(fingerprintCredential('dead-D'));
+    const cache = statefulWorkspaceTokenCache();
+    const { supersededAfterFirst, second } = await driveWiringResolves({ source: mutated, registry, cache });
+    assert.equal(supersededAfterFirst, true, 'sanity: the registry itself still records the supersession');
+    assert.equal(second.token, 'dead-D', 'with a null registry the wrapper cannot exclude the superseded row — the positive test fails here');
+  });
+
+  // LIN-3186 re-review gate item 1: the session-scan variant above starts on an
+  // empty cache, so it only ever exercises accept() at server.js:2490. The
+  // CACHE-HIT site (server.js:2450) is the one the incident loop actually takes,
+  // and stripping its supersession argument alone (mutation G1) left every
+  // credential suite green. These two tests pin that site explicitly.
+  test('cache-hit arm: call 1 adopts through the 30s cache and records the supersession; after a cache clear call 2 serves E, not D', async () => {
+    const registry = createRejectedCredentialRegistry();
+    registry.markSuspect(fingerprintCredential('dead-D'));
+    const cache = statefulWorkspaceTokenCache();
+
+    const { first, second, supersededAfterFirst } = await driveWiringResolves({ registry, cache, seedCache: true });
+
+    assert.equal(first.token, 'good-G', 'the pre-seeded suspect D is adopted away on the cache-hit arm');
+    assert.equal(first.source, CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, 'call 1 came through the refresh-on-resolve return of the cache-hit branch');
+    assert.equal(supersededAfterFirst, true, 'server.js:2450 accept() must record the supersession (mutation G1 leaves this false)');
+    assert.equal(second.token, 'good-E', 'once D is superseded the real server body must select E — not re-serve D (mutation H re-serves D)');
+    assert.notEqual(second.token, 'dead-D');
+  });
+
+  test('mutation G1 — only the cache-hit accept() site stripped to one-arg: the supersession is NOT recorded, D is re-selected', async () => {
+    const mutated = mutateServerSrc(body => body.replace(
+      'rejectedCredentialRegistry.accept(cachedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });',
+      'rejectedCredentialRegistry.accept(cachedFingerprint);'
+    ));
+    const registry = createRejectedCredentialRegistry();
+    registry.markSuspect(fingerprintCredential('dead-D'));
+    const cache = statefulWorkspaceTokenCache();
+    const { supersededAfterFirst, second } = await driveWiringResolves({ source: mutated, registry, cache, seedCache: true });
+    assert.equal(supersededAfterFirst, false, 'sanity: the cache-hit one-arg accept() records no supersession');
+    assert.equal(second.token, 'dead-D', 'without the cache-hit supersession the dead credential is re-selected — the cache-hit positive test fails here');
   });
 });

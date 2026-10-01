@@ -76,6 +76,12 @@ import { buildTaskCost } from '../../lib/task-cost.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
 import { DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS } from '../../lib/consumer-poll-warning.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+// LIN-3211: the guard is read off the namespace, so its absence at HEAD fails
+// only the LIN-3211 tests rather than the whole file's import.
+import * as runnerKit from '../../lib/runner-kit/runner.mjs';
+import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+import { attachProxyContext } from '../../lib/proxy-preamble.js';
+import { buildCollectiveParticipantPrompt } from '../../lib/prompts/collective-participant.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FIXTURE = join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent.jsonl');
@@ -272,6 +278,131 @@ describe('pollDecision (order: other consumer, harness, attribution, halt, token
   test('preConfirmDecision is pollDecision without the /prompt read (what `wait` uses)', () => {
     assert.equal(preConfirmDecision(item(), ctx({ promptRead: undefined })).decision, 'take');
     assert.equal(preConfirmDecision(item({ dispatchedBy: STRANGER }), ctx()).decision, 'leave');
+  });
+});
+
+// LIN-3211: a runner-taken item never carries a token in prose. Every fixture
+// prompt comes from a real emitter, with a real minted token, so the guard is
+// tested against what Harbour actually writes rather than a copy of it.
+describe('credentialInProseRefusal and preConfirmDecision (LIN-3211: no credential in prose)', () => {
+  const BASE_URL = 'http://localhost:3001';
+  const TOKEN_LINE_RE = /curl -X POST -H "Authorization: Bearer ([A-Za-z0-9_-]{43})" \S+\/api\/proxy\/token/;
+  let dbDir, client, tokens;
+  const f = {};
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'rk-3211-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+    tokens = new ProxyTokenStore({ collection: client.db('lin3211').collection('proxy_tokens') });
+    // Emitter 1 (lib/proxy-preamble.js): what the session route attached for the
+    // rung's harness:null item on HEAD, and for a claude-code item.
+    f.prose = await attachProxyContext({ proxyTokenStore: tokens, urlKey: 'acme', baseUrl: BASE_URL, prompt: 'do the step', harness: null, createdBy: OWNER });
+    f.mcp = await attachProxyContext({ proxyTokenStore: tokens, urlKey: 'acme', baseUrl: BASE_URL, prompt: 'do the step', harness: 'claude-code', createdBy: OWNER });
+    // Emitter 4 (lib/prompts/collective-participant.js), with its own real mint.
+    f.collectiveToken = (await tokens.createToken('acme', { kind: 'bootstrap', scope: 'readWrite', label: 'collective', createdBy: OWNER })).token;
+    f.collective = buildCollectiveParticipantPrompt({
+      channel: '#Collective', nick: 'alpha', yapBaseUrl: 'https://yap.test', proxyBaseUrl: BASE_URL, proxyToken: f.collectiveToken
+    });
+    // Emitters 2 and 3 (public/common.js buildBlock, public/proxy.js
+    // buildAgentPrompt) are closures inside browser IIFEs, so no vm sandbox
+    // reaches them cheaply. Their curl line is rendered here from a literal, and
+    // the drift test below pins that literal to the source line.
+    f.clientToken = (await tokens.createToken('acme', { kind: 'bootstrap', scope: 'readWrite', label: 'copy', createdBy: OWNER })).token;
+    f.commonCopy = `do the step\n\n## Workspace API access\n\nFirst, exchange your single-use bootstrap token for a working token:\n\n  curl -X POST -H "Authorization: Bearer ${f.clientToken}" ${BASE_URL}/api/proxy/token\n`;
+    f.settingsCopy = `First, exchange your single-use bootstrap token for a working token:\n\ncurl -X POST -H "Authorization: Bearer ${f.clientToken}" ${BASE_URL}/api/proxy/token\n`;
+  });
+  after(async () => {
+    if (client?.close) await client.close();
+    rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  test('the fixtures are what the emitters really write (preconditions)', () => {
+    // Prose branch: token in the text, no structured field ("one credential, one channel").
+    assert.match(f.prose.prompt, TOKEN_LINE_RE);
+    assert.equal(f.prose.bootstrapToken, null);
+    // MCP branch: structured field, no token and no exchange line in the text.
+    assert.equal(typeof f.mcp.bootstrapToken, 'string');
+    assert.ok(!f.mcp.prompt.includes(f.mcp.bootstrapToken));
+    assert.doesNotMatch(f.mcp.prompt, /api\/proxy\/token/);
+    assert.match(f.collective, TOKEN_LINE_RE);
+    // A real bootstrap is randomBytes(32).toString('base64url'): 43 characters, no prefix (lib/proxy-tokens.js:208–209).
+    for (const t of [f.prose.prompt.match(TOKEN_LINE_RE)[1], f.mcp.bootstrapToken, f.collectiveToken, f.clientToken]) {
+      assert.match(t, /^[A-Za-z0-9_-]{43}$/);
+    }
+  });
+
+  test('drift: the client emitters still write the exchange curl line these literals copy', () => {
+    const common = readFileSync(join(ROOT, 'public', 'common.js'), 'utf8');
+    const proxy = readFileSync(join(ROOT, 'public', 'proxy.js'), 'utf8');
+    assert.ok(common.includes('curl -X POST -H "Authorization: Bearer ${token}" ${baseUrl}/api/proxy/token'), 'public/common.js buildBlock changed: update f.commonCopy');
+    assert.ok(proxy.includes('curl -X POST -H "Authorization: Bearer ${token}" ${tokenUrl}'), 'public/proxy.js buildAgentPrompt changed: update f.settingsCopy');
+    assert.ok(proxy.includes('const tokenUrl = `${baseUrl}/api/proxy/token`;'));
+  });
+
+  test('credentialInProseRefusal is exported from the runner kit', () => {
+    assert.equal(typeof runnerKit.credentialInProseRefusal, 'function');
+  });
+
+  // [name, item builder, expected decision]
+  const rows = [
+    ['prose curl line (attachProxyContext, harness null), no bootstrapToken → leave',
+      () => item({ prompt: f.prose.prompt, bootstrapToken: f.prose.bootstrapToken }), 'leave'],
+    ['prose curl line AND bootstrapToken set (a pasted copy block on a claude-code item) → leave',
+      () => item({ harness: 'claude-code', prompt: f.prose.prompt, bootstrapToken: f.mcp.bootstrapToken }), 'leave'],
+    ['Collective participant prompt (its Harbour bootstrap) → leave',
+      () => item({ kind: 'collective', prompt: f.collective, bootstrapToken: null }), 'leave'],
+    ['ProxyToggle copy/download block (public/common.js) pasted into a prompt → leave',
+      () => item({ prompt: f.commonCopy, bootstrapToken: null }), 'leave'],
+    ['Settings copy (public/proxy.js) pasted into a prompt → leave',
+      () => item({ prompt: f.settingsCopy, bootstrapToken: null }), 'leave'],
+    ['MCP block (attachProxyContext, claude-code) with bootstrapToken → take',
+      () => item({ harness: 'claude-code', prompt: f.mcp.prompt, bootstrapToken: f.mcp.bootstrapToken }), 'take'],
+    ['no access block at all → take',
+      () => item({ prompt: 'do the step', bootstrapToken: null }), 'take'],
+    ['an abort row (no prompt) → take path unchanged',
+      () => item({ abort: true, abortTo: K, prompt: null, bootstrapToken: null }), 'take'],
+    ['a non-Harbour Bearer that is not 43 characters → take',
+      () => item({ prompt: 'call it:\n  curl -X POST -H "Authorization: Bearer sk-abc123" https://api.example.com/api/proxy/token\n' }), 'take']
+  ];
+
+  for (const [name, build, want] of rows) {
+    test(`credentialInProseRefusal: ${name}`, () => {
+      assert.equal(typeof runnerKit.credentialInProseRefusal, 'function', 'credentialInProseRefusal is not exported');
+      assert.equal(Boolean(runnerKit.credentialInProseRefusal(build())), want === 'leave');
+    });
+    test(`preConfirmDecision: ${name}`, () => {
+      const d = preConfirmDecision(build(), ctx());
+      assert.equal(d.decision, want);
+      if (want === 'leave') assert.equal(d.reason, 'credential-in-prose');
+    });
+  }
+
+  test('pollDecision leaves it too (poll uses the same pre-confirm step)', () => {
+    const it = item({ prompt: f.prose.prompt });
+    const d = pollDecision(it, ctx({ promptRead: { id: X, prompt: f.prose.prompt, followUpTo: null } }));
+    assert.deepEqual({ decision: d.decision, reason: d.reason }, { decision: 'leave', reason: 'credential-in-prose' });
+  });
+
+  test('placed after owner attribution and before halt', () => {
+    assert.equal(preConfirmDecision(item({ prompt: f.prose.prompt, dispatchedBy: STRANGER }), ctx()).reason, 'not-owner');
+    assert.equal(preConfirmDecision(item({ prompt: f.prose.prompt }), ctx({ halt: { mode: 'stop' } })).reason, 'credential-in-prose');
+  });
+
+  test('the decision never contains the token or the exchange line', () => {
+    const cases = [
+      [item({ prompt: f.prose.prompt }), f.prose.prompt.match(TOKEN_LINE_RE)[1]],
+      [item({ harness: 'claude-code', prompt: f.prose.prompt, bootstrapToken: f.mcp.bootstrapToken }), f.mcp.bootstrapToken],
+      [item({ kind: 'collective', prompt: f.collective }), f.collectiveToken]
+    ];
+    for (const [it, token] of cases) {
+      const d = preConfirmDecision(it, ctx());
+      assert.equal(d.reason, 'credential-in-prose');
+      const text = JSON.stringify(d);
+      assert.ok(!text.includes(token), 'decision carries the token');
+      assert.ok(!text.includes(f.prose.prompt.match(TOKEN_LINE_RE)[1]), 'decision carries a token');
+      assert.doesNotMatch(text, /api\/proxy\/token/);
+    }
   });
 });
 
@@ -601,6 +732,108 @@ describe('sumTranscriptUsage and [usage] (NB5: the realised model)', () => {
   test('the realised model wins over the item\'s requested one', () => {
     const msg = usageMessage(sumTranscriptUsage(lines), { requestedModel: 'claude-sonnet-5-5' });
     assert.equal(parseUsage([{ kind: 'usage', message: msg }]).model, 'claude-opus-5-5');
+  });
+});
+
+describe('sumTranscriptUsage on the LIN-3098 witness subagent (LIN-3212)', () => {
+  // Redacted copy of the real agent-a010f7d2462c56e56.jsonl behind the witness's `output 8`.
+  const lines = readFileSync(join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent-report.jsonl'), 'utf8').split('\n');
+  const assistant = lines.filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant');
+
+  test('reproduces the witness [usage] exactly', () => {
+    assert.deepEqual(sumTranscriptUsage(lines), {
+      harness: 'claude-code',
+      model: 'claude-opus-5-5',
+      inputTokens: 4,
+      outputTokens: 8,
+      cacheCreationInputTokens: 28668,
+      cacheCreation1hInputTokens: 0,
+      cacheReadInputTokens: 26344
+    });
+  });
+
+  test('every line is an unfinished (message_start) snapshot, and repeats are identical', () => {
+    // No line ever got its final usage (stop_reason stays null), so the transcript
+    // itself under-records output; no per-id fold (first, last or max) can recover it.
+    assert.ok(assistant.every((e) => e.message.stop_reason === null));
+    const usageById = new Map();
+    for (const e of assistant) {
+      const usage = JSON.stringify(e.message.usage);
+      if (usageById.has(e.message.id)) assert.equal(usage, usageById.get(e.message.id));
+      else usageById.set(e.message.id, usage);
+    }
+    assert.equal(usageById.size, 2);
+  });
+});
+
+describe('sumTranscriptUsage folds repeated snapshots per message.id (LIN-3212)', () => {
+  // Redacted copy of a real subagent transcript (agent-a71d290649df73567.jsonl,
+  // Claude Code 2.1.286, this host). Shape A: the report message is written across
+  // several lines sharing one message.id while the streamed usage grows
+  // (`output_tokens` 4 → 4 → 535). Keeping the FIRST snapshot under-counts it.
+  const lines = readFileSync(join(ROOT, 'tests', 'fixtures', 'runner-kit', 'subagent-streamed.jsonl'), 'utf8').split('\n');
+  const assistant = lines.filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant');
+
+  test('keeps the largest snapshot per repeated message.id, not the first', () => {
+    assert.deepEqual(sumTranscriptUsage(lines), {
+      harness: 'claude-code',
+      model: 'claude-sonnet-5-5',
+      inputTokens: 6,
+      outputTokens: 1108,
+      cacheCreationInputTokens: 11490,
+      cacheCreation1hInputTokens: 0,
+      cacheReadInputTokens: 66045
+    });
+  });
+
+  test('the fixture really is shape A: a repeated id whose later snapshot is larger', () => {
+    const byId = new Map();
+    for (const e of assistant) {
+      if (!e.message.id) continue;
+      if (!byId.has(e.message.id)) byId.set(e.message.id, []);
+      byId.get(e.message.id).push(e.message.usage.output_tokens);
+    }
+    const growing = [...byId.values()].find((outs) => new Set(outs).size > 1);
+    assert.ok(growing, 'expected at least one message.id with differing snapshots');
+    assert.equal(growing[0], 4); // first-wins would record this
+    assert.equal(Math.max(...growing), 535); // max-per-id records this
+  });
+
+  test('takes the MAX of each field, not the last snapshot, and a line with no id is its own message', () => {
+    // Synthetic (review 2363ff88, ledger items 3 and 4): the real fixture is
+    // monotonic, so last-wins passes it. Here msg_a's fields peak on different
+    // snapshots, so first-wins, last-wins and max all disagree.
+    const line = (id, [input, output, cacheCreation, cacheCreation1h, cacheRead]) => JSON.stringify({
+      type: 'assistant',
+      message: {
+        ...(id ? { id } : {}),
+        model: 'claude-sonnet-5-5',
+        usage: {
+          input_tokens: input,
+          output_tokens: output,
+          cache_creation_input_tokens: cacheCreation,
+          cache_creation: { ephemeral_1h_input_tokens: cacheCreation1h },
+          cache_read_input_tokens: cacheRead
+        }
+      }
+    });
+    const u = sumTranscriptUsage([
+      line('msg_a', [10, 4, 500, 200, 1000]),
+      line('msg_a', [12, 300, 500, 200, 900]),
+      line('msg_a', [11, 250, 0, 0, 1200]), // later and lower on input, output and cache creation
+      line('msg_b', [3, 50, 0, 0, 100]),
+      line(null, [2, 7, 0, 0, 0]),
+      line(null, [2, 7, 0, 0, 0]) // identical, but no id: a second message, not a repeat
+    ]);
+    assert.deepEqual(u, {
+      harness: 'claude-code',
+      model: 'claude-sonnet-5-5',
+      inputTokens: 12 + 3 + 2 + 2,
+      outputTokens: 300 + 50 + 7 + 7,
+      cacheCreationInputTokens: 500,
+      cacheCreation1hInputTokens: 200,
+      cacheReadInputTokens: 1200 + 100
+    });
   });
 });
 
