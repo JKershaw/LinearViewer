@@ -93,5 +93,20 @@ export default defineConfig({
       stdout: 'pipe',
       stderr: 'pipe',
     },
+    {
+      // LIN-3239 free-tier twin: OPENROUTER_FREE_TIER_KEY set so the ENV-KEY
+      // free tier — and its per-account run gate + `GET .../dispatch/quota`
+      // read — is reachable. The default 3001 server leaves the key empty, and
+      // many specs assert that "no AI configured" state, so the free-tier run
+      // contract gets its own origin (like the held-GitHub twin above) with an
+      // isolated MangoDB dir. Free-tier sessions that want a paid key seed
+      // `openRouterConnected` on top, exactly as on 3001.
+      command: `${UNCONFIGURED_ENV} OPENROUTER_FREE_TIER_KEY=test-free-tier-key PORT=3003 HARBOUR_DATA_DIR=./test-results/free-tier-e2e-data node server.js`,
+      url: 'http://localhost:3003',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
   ],
 });

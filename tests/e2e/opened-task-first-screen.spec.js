@@ -240,19 +240,20 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(seen).toEqual([]);
     });
 
-    test('free-tier exhausted (429): disabled primary with quota message, zero recommend requests', async ({ page, seedLocal, localWorkerUrlKey }) => {
-      const seen = recommendSpy(page);
+    test('free-tier session: the retired daily prompt quota no longer disables the ✦ primary (LIN-3239)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      // The old assertion here (an exhausted daily prompt quota disabled the
+      // primary and sent zero recommend requests) pinned behaviour LIN-3239
+      // deliberately removes: prompts are unlimited, so the primary stays
+      // enabled for a free-tier session. The run limit lives on the ladder, not
+      // on the prompt controls (pinned in free-tier.spec.js on the free-tier twin).
       await seedLocal(workspaceApiLocalSeed, { freeTierEnabled: true });
-      // Pre-fill usage to the daily limit before loading the screen.
-      await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${localWorkerUrlKey}`);
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
 
       const component = page.locator('.prompt-section').first();
-      await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/limit|quota/i);
-      await clickDisabledWithoutSpend(page, component);
-      expect(seen).toEqual([]);
+      await expect(component.locator('[data-testid="opened-task-go"]')).toBeEnabled();
+      await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toHaveCount(0);
     });
   });
 
