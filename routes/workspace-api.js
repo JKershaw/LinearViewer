@@ -665,6 +665,19 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const stepper = variant === 'stepper'
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
+    // Run boundary (LIN-3246 / LIN-2949 P1b): optional `?stopAt=pr`. Query params
+    // are always strings, so blank/whitespace-only is ABSENT, not an error — the
+    // same rule maxTasks follows on the general twin below. Only the literal 'pr'
+    // is valid; any other non-blank value is a 400, matching the dispatch route's
+    // contract (`routes/dispatch.js`).
+    let stopAt = null
+    if (typeof req.query.stopAt === 'string' && req.query.stopAt.trim() !== '') {
+      if (req.query.stopAt.trim() !== 'pr') {
+        return badRequest.json(res, "stopAt must be 'pr'")
+      }
+      stopAt = 'pr'
+    }
+
     try {
       // Use mock data in test mode
       if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
@@ -679,6 +692,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           issue: { identifier, title: mockIssue.title },
           mode,
           variant,
+          stopAt,
           standalone: true
         })
         return sendPromptResult(req, res, {
@@ -705,6 +719,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         issue: { identifier: issue.identifier, title: issue.title },
         mode,
         variant,
+        stopAt,
         standalone: true,
         // LIN-2804: mirrors the identical generatePrompt pattern already at
         // lines 948/1299/1388 in this file — issueProvider is the actually

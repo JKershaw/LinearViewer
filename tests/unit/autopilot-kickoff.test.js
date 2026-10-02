@@ -1076,3 +1076,69 @@ describe('buildAutopilotKickoff (standalone mode, LIN-1117)', () => {
     assert.ok(text.includes('?wait=50'));
   });
 });
+
+// LIN-3246 / LIN-2949 P1b: the kickoff-side boundary. `stopAt: 'pr'` replaces the
+// shared finish-line text (the WRITE mode wording and the "dispatch the close"
+// section, both carried by standard AND stepper because they live in the shared
+// body) with a shorter stop block. P1a owns the row fact, seam guard and relay;
+// a stepped close-out beat is a plain `custom` dispatch no seam can classify, so
+// the stepped bound lives here in the words.
+describe('buildAutopilotKickoff (stopAt boundary — LIN-3246 / LIN-2949 P1b)', () => {
+  const issue = { identifier: 'LIN-3246', title: 'Bound the run to the PR' };
+
+  test('omitted/null stopAt is byte-identical to the default (no drift) for both variants', () => {
+    for (const variant of ['standard', 'stepper']) {
+      const bare = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, variant });
+      assert.strictEqual(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, variant, stopAt: null }), bare);
+      assert.strictEqual(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, variant, stopAt: undefined }), bare);
+    }
+    assert.strictEqual(
+      buildAutopilotKickoff({ baseUrl: BASE_URL }),
+      buildAutopilotKickoff({ baseUrl: BASE_URL, stopAt: null })
+    );
+  });
+
+  test('an unknown stopAt value is ignored — same builder idiom as mode/variant', () => {
+    // `mode`/`variant` treat any unrecognised value as the default rather than
+    // throwing, so an unknown `stopAt` must be ignored too (not switch on the block).
+    const bare = buildAutopilotKickoff({ baseUrl: BASE_URL, issue });
+    for (const bad of ['merge', 'PR', 'close-out', '']) {
+      assert.strictEqual(buildAutopilotKickoff({ baseUrl: BASE_URL, issue, stopAt: bad }), bare,
+        `stopAt: ${JSON.stringify(bad)} must not switch on the stop block`);
+    }
+  });
+
+  for (const variant of ['standard', 'stepper']) {
+    test(`stopAt:'pr' (${variant}) replaces the finish-line text with the stop block`, () => {
+      const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, variant, stopAt: 'pr' });
+      const flat = text.replace(/\s+/g, ' ');
+      // The stop block, carried by both variants because it lives in the shared body.
+      assert.ok(flat.includes("## The finish line: stop at the PR — close-out is the person's to send"));
+      assert.ok(text.includes('ready for close-out'));
+      assert.ok(text.includes("close-out is the **person's** to send"));
+      assert.ok(text.includes('Never dispatch `close-out` and never merge'));
+      assert.ok(flat.includes('including as a stepped beat'),
+        'the stepped-beat bound must be stated (N2: no seam can classify a custom close-out beat)');
+      assert.ok(text.includes('**Mode: WRITE, stop at the PR.**'), 'the mode block carries the bound too');
+      // The close-out dispatch instruction and merge-gated wording are gone.
+      assert.ok(!text.includes('dispatch the `close-out` step'), 'must not tell the run to dispatch close-out');
+      assert.ok(!text.includes('WRITE, merge-gated'), 'the merge-gated mode wording is replaced');
+      assert.ok(!text.includes('The merge and the close aren'), 'the dispatch-the-close section is replaced');
+    });
+
+    test(`stopAt:'pr' (${variant}) is not longer than the default output`, () => {
+      const def = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, variant });
+      const stop = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, variant, stopAt: 'pr' });
+      assert.ok(Buffer.byteLength(stop) < Buffer.byteLength(def),
+        `stop-at-PR (${Buffer.byteLength(stop)} bytes) must be shorter than the default (${Buffer.byteLength(def)} bytes)`);
+    });
+  }
+
+  test("stopAt:'pr' keeps the declared scope budgets, without the open-ended claim", () => {
+    const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, stopAt: 'pr', maxTasks: 5, maxSessionsPerTask: 2 });
+    assert.ok(text.includes('This run also covers **up to 5 distinct tasks**'));
+    assert.ok(text.includes('Separately, any ONE task in this run may take at most **2 worker sessions**'));
+    // A PR-bounded run has a finish line, so the open-ended sentence must not survive.
+    assert.ok(!text.includes('has no finish line — it runs until it needs you.'));
+  });
+});

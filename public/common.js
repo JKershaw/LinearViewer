@@ -697,13 +697,14 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {number} [opts.maxTasks]                  Task-budget scope bound (LIN-1737/LIN-1751); blank/omitted sends no maxTasks, so the run stays unbounded exactly as before this field existed
  * @param {number} [opts.maxSessionsPerTask]         Sibling per-task session bound (LIN-2934); blank/omitted sends nothing, same optional pass-through as maxTasks
  * @param {string} [opts.entryRung]                LIN-2942: the ladder rung this dispatch was pressed from ('run-step' | 'run-task'); the server records the mode, linked to the created item. Blank/omitted sends nothing
+ * @param {string} [opts.stopAt]                    LIN-3246: the run boundary ('pr') the ladder's own autopilot run declares; forwarded to the server as the validated `stopAt` body field (only 'pr', only on a fresh autopilot dispatch). Blank/omitted sends nothing, so every other launcher is unchanged.
  * @param {string} [opts.composedRunMarker]         LIN-2775 Area 8: the scoped structural marker for a composed-run dispatch (a real agent brief, not a raw pressed-option label) — activates routes/dispatch.js's terminal-anchor guard server-side. Blank/omitted sends nothing, so an ordinary dispatch is completely unaffected.
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -756,6 +757,10 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   if (composedRunMarker) payload.composedRunMarker = composedRunMarker;
   // LIN-2942: truthy gate — only the opened task's ladder sends a rung.
   if (entryRung) payload.entryRung = entryRung;
+  // LIN-3246: truthy gate, like entryRung — only the ladder's own autopilot run
+  // sends the boundary; the server validates it (only 'pr', fresh autopilot
+  // dispatch), and every other launcher sends nothing and is unchanged.
+  if (stopAt) payload.stopAt = stopAt;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.
@@ -1479,11 +1484,15 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  *   issue-scoped kickoff has no budget concept, so this is a no-op there.
  * @param {number} [opts.maxSessionsPerTask]    Sibling per-task session bound (LIN-2934):
  *   `?maxSessionsPerTask=<n>` query param, same goal-scoped-only pass-through as maxTasks.
+ * @param {string} [opts.stopAt]                Run boundary (LIN-3246): `?stopAt=pr` query param on the
+ *   ISSUE-scoped kickoff only — the ladder's own autopilot run declares it, and the boundary needs a
+ *   single task, so it is a no-op on the goal-scoped branch like maxTasks is there. Blank/omitted
+ *   sends nothing, so every other launcher is byte-identical.
  * @param {AbortSignal} [opts.signal]           Passed through to the fetch
  * @param {boolean} [opts.on401=false]          Passed through to window.api
  * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
  */
-window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, bindingScope, maxTasks, maxSessionsPerTask, signal, on401 = false } = {}) {
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, bindingScope, maxTasks, maxSessionsPerTask, stopAt, signal, on401 = false } = {}) {
   if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
 
   let url;
@@ -1496,6 +1505,8 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
     if (variant) params.set('variant', variant);
     if (source) params.set('source', source);
     if (bindingScope) params.set('bindingScope', bindingScope);
+    // LIN-3246: the run boundary, issue-scoped only. Blank/omitted sends nothing.
+    if (stopAt) params.set('stopAt', stopAt);
     const issueQuery = params.toString() ? `?${params.toString()}` : '';
     url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt/${encodeURIComponent(issueId)}${issueQuery}`;
   } else {
