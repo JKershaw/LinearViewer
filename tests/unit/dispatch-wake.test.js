@@ -19,7 +19,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildWakeFollowUp } from '../../lib/dispatch-wake.js';
+import { buildWakeFollowUp, classifyWake, wakeFingerprint } from '../../lib/dispatch-wake.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
@@ -1284,3 +1284,105 @@ describe('buildWakeFollowUp / addFeedback — LIN-2121 issue-scoped wake rows', 
       'the wake does not leak into an unrelated issue-scoped read');
   });
 });
+
+// ── LIN-3257 (M1 shadow): the pure classifier ─────────────────────────────────
+// classifyWake is read-only data for the shadow tally. It never suppresses a
+// wake; these cases pin each classification class the ticket names.
+
+describe('classifyWake — LIN-3257 shadow classes', () => {
+  test('terminal markers are never candidates: false/terminal', () => {
+    for (const marker of ['done', 'complete', 'failed', 'aborted']) {
+      assert.deepEqual(classifyWake({ marker, message: '[x] finished' }), { wouldSkip: false, reason: 'terminal' });
+    }
+  });
+
+  test('[blocked] is never a candidate: false/blocked', () => {
+    assert.deepEqual(classifyWake({ marker: 'blocked', message: '[blocked] waiting on a human' }), { wouldSkip: false, reason: 'blocked' });
+  });
+
+  test('a terminal is classified terminal even when person-originated (class order)', () => {
+    assert.deepEqual(
+      classifyWake({ marker: 'done', personOriginated: true, message: '[done] x' }),
+      { wouldSkip: false, reason: 'terminal' }
+    );
+  });
+
+  test('a person-originated pause is never a candidate: false/person', () => {
+    assert.deepEqual(
+      classifyWake({
+        marker: 'pending',
+        personOriginated: true,
+        message: '[pending] waiting on LIN-1',
+        prior: { marker: 'pending', refs: ['LIN-1'], text: '[pending] waiting on lin-#' }
+      }),
+      { wouldSkip: false, reason: 'person' }
+    );
+  });
+
+  test('the first pause from a child is never a candidate: false/first-pause', () => {
+    assert.deepEqual(
+      classifyWake({ marker: 'pending', message: '[pending] waiting on LIN-1', prior: null }),
+      { wouldSkip: false, reason: 'first-pause' }
+    );
+    // A terminal wake in between resets the repeat state: the next pause is first.
+    assert.deepEqual(
+      classifyWake({
+        marker: 'pending',
+        message: '[pending] waiting on LIN-1',
+        prior: { marker: 'done', refs: ['LIN-1'], text: '[done] shipped' }
+      }),
+      { wouldSkip: false, reason: 'first-pause' }
+    );
+  });
+
+  test('a changed awaited target is never a candidate: false/target-changed', () => {
+    const prior = { marker: 'pending', refs: ['LIN-3257'], text: '[pending] waiting on lin-#' };
+    // Different ref, same prose.
+    assert.deepEqual(
+      classifyWake({ marker: 'pending', message: '[pending] waiting on LIN-3258', prior }),
+      { wouldSkip: false, reason: 'target-changed' }
+    );
+    // A new grandchild id is a different ref too.
+    assert.deepEqual(
+      classifyWake({
+        marker: 'pending',
+        message: '[pending] waiting on child 11111111-1111-1111-1111-111111111111',
+        prior
+      }),
+      { wouldSkip: false, reason: 'target-changed' }
+    );
+  });
+
+  test('an empty/unparseable message never marks: false/target-changed', () => {
+    const prior = { marker: 'pending', refs: [], text: '' };
+    assert.deepEqual(classifyWake({ marker: 'pending', message: '', prior }), { wouldSkip: false, reason: 'target-changed' });
+    assert.deepEqual(classifyWake({ marker: 'pending', message: '   ', prior }), { wouldSkip: false, reason: 'target-changed' });
+  });
+
+  test('a repeat pause with the same refs is a candidate: true/repeat-same-target', () => {
+    const message = '[pending] still waiting on LIN-3257 (step 2)';
+    const prior = { marker: 'pending', refs: ['LIN-3257'], text: '[pending] still waiting on lin-# (step #)' };
+    assert.deepEqual(classifyWake({ marker: 'pending', message, prior }), { wouldSkip: true, reason: 'repeat-same-target' });
+  });
+
+  test('a repeat pause with no refs and digits aside is a candidate: true/repeat-same-message', () => {
+    const prior = { marker: 'pending', refs: [], text: '[pending] not done - waiting # min' };
+    assert.deepEqual(
+      classifyWake({ marker: 'pending', message: '[pending] Not done - waiting 15 min', prior }),
+      { wouldSkip: true, reason: 'repeat-same-message' }
+    );
+  });
+
+  test('digits do not merge distinct refs: LIN-3257 vs LIN-3258 are target-changed', () => {
+    const prior = { marker: 'pending', refs: ['LIN-3257'], text: 'waiting on lin-#' };
+    assert.equal(classifyWake({ marker: 'pending', message: 'waiting on LIN-3258', prior }).wouldSkip, false);
+    assert.equal(classifyWake({ marker: 'pending', message: 'waiting on LIN-3258', prior }).reason, 'target-changed');
+  });
+
+  test('wakeFingerprint extracts LIN refs, UUIDs and #PRs, and normalizes digits', () => {
+    const fp = wakeFingerprint('waiting on LIN-3257, dispatch 11111111-2222-3333-4444-555555555555 and #42 after 15 min');
+    assert.deepEqual(fp.refs, ['#42', '11111111-2222-3333-4444-555555555555', 'LIN-3257'].sort());
+    assert.equal(fp.text, 'waiting on lin-#, dispatch #-#-#-#-# and ## after # min');
+  });
+});
+

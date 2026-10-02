@@ -2486,6 +2486,8 @@ Notes:
 
 **`maxTasks` / `maxSessionsPerTask` / `repo` (LIN-2975 / LIN-2934).** `maxTasks` and its sibling `maxSessionsPerTask` are the scope bounds this dispatch declared, `null` when unbounded — see the task-budget-exhausted responses under [Enqueue a Dispatch](#enqueue-a-dispatch). Both live on the run row only: nothing copies them onto the workers a budgeted run fans out, so a worker's own row reads `maxTasks: null`/`maxSessionsPerTask: null` regardless of its run's budget — to find the bound a worker is running against, read the worker's `sessionId` and then `GET /api/proxy/dispatch/{that id}`. `repo` is the validated/normalized repo basename this item was queued against, `null` for the workspace's default folder. `maxTasks`/`maxSessionsPerTask` are also on `GET /api/proxy/dispatch` (list) below, so verifying a run's own budget stamping doesn't require a per-row detail read; `repo` is not on the list — **verify stamping with this endpoint, never assume a field is `null` because you didn't check it.**
 
+**`wakeShadow` — the read-only shadow verdict (LIN-3257, M1 shadow).** Every watch response carries `wakeShadow`, which is `null` on every non-wake row and, on a `kind: "wake"` row, either `null` (no shadow record) or `{ "wouldSkip": true|false, "reason": "..." }`. This is a **measurement, not a control**: the classifier runs when Harbour mints the wake, and **nothing suppresses any wake** — delivery is byte-identical, and no code path reads `wouldSkip` to hold a wake back. `wouldSkip: true` means the wake looks like a repeat "still waiting" relay the classifier *would* skip if suppression were ever switched on (`reason` is `repeat-same-target` or `repeat-same-message`); the other reasons (`terminal`, `blocked`, `person`, `first-pause`, `target-changed`) are all non-candidates for a future skip. Read the aggregate at `GET /api/proxy/wake-shadow` below.
+
 #### Read a Dispatch's Prompt
 
 ```
@@ -2546,6 +2548,32 @@ Because `status` is derived last-wins over the merged, timestamp-sorted lineage,
 **Not on the wire: the fossil `bookkeeping` stamp (LIN-2633/LIN-2653).** A dispatch history row can carry a `bookkeeping: {at, by, reason}` stamp, written by the operator-run fossil pass (`docs/fossil-bookkeeping-pass.md`) to retire a long-dead row. It is **deliberately absent from both proxy dispatch surfaces** — this list endpoint and `GET /api/proxy/dispatch/{id}` each build their response from an explicit field allowlist, and neither includes it. The absence is a decision, not an oversight: nothing in the agent-facing contract needs the stamp, so exposing it would widen a wire contract for no consumer. Do not "fix" it by adding the field. Note also what the stamp does **not** do — it never changes `status`, so a stamped row still reports `taken` (or its lineage-derived terminal) here exactly as it did before being stamped. The stamp is visible internally on the Loop record, in the observer census (where it moves the row to the `resolved` lane), and on the session-authenticated `GET /workspace/:urlKey/api/dispatch/history`, which returns the store's history projection wholesale.
 
 Note for aggregating consumers: `feedbackCount` is no longer additive across rows in the same response. Rows in one lineage report *overlapping* counts — each covers its own feedback plus every lineage entry timestamped at or after its own `dispatchedAt` — so summing across listed rows double-counts the shared entries. Note that overlapping is not identical: because the merge is forward-only, a later-dispatched row inherits a strict subset of what an earlier sibling sees, so its `feedbackCount` can legitimately be *lower*, and two rows of the same lineage can report different `status`/`completedAt` (a still-running follow-up reads `taken`/`null` while its finished parent reads `done`). What does hold for paging is that several rows of one lineage can share a terminal status, so `?status=done&limit=20` can be filled largely by a single lineage rather than 20 distinct ones.
+
+#### Read the Wake-Shadow Tally
+
+```
+GET /api/proxy/wake-shadow
+GET /api/proxy/wake-shadow?days=30
+```
+
+**Read-only, LIN-3257 (M1 shadow).** Returns the per-day tally of Harbour's shadow wake classification: how many wakes were minted, how many the classifier *would* skip, and the breakdown by reason. This is the evidence surface for a later decision about suppression — **nothing is suppressed today**; every wake is delivered exactly as before. Read scope is sufficient; the read is workspace-scoped like every sibling.
+
+`days` defaults to `7` and is clamped to `[1, 31]`. Only UTC days that actually carry wakes appear in `days`, oldest first.
+
+```json
+{
+  "days": [
+    { "day": "2026-10-01", "minted": 42, "wouldSkip": 15, "byReason": { "repeat-same-message": 12, "repeat-same-target": 3, "terminal": 18, "first-pause": 9 } },
+    { "day": "2026-10-02", "minted": 30, "wouldSkip": 11, "byReason": { "repeat-same-message": 9, "target-changed": 2, "blocked": 6, "first-pause": 4 } }
+  ],
+  "totals": { "minted": 72, "wouldSkip": 26, "share": 0.361, "byReason": { "repeat-same-message": 21, "repeat-same-target": 3, "target-changed": 2, "terminal": 18, "blocked": 6, "first-pause": 13 } }
+}
+```
+
+- `share` is `wouldSkip / minted` (0 when nothing was minted); it is the headline number the finish-line sample interprets by hand. The tally counts what the classifier's rule would mark, **not** whether the parent demonstrably did nothing next — that verification is the later hand-sample, not this endpoint.
+- The reason vocabulary is closed: `repeat-same-target` and `repeat-same-message` are the two `wouldSkip: true` classes; `terminal`, `blocked`, `person`, `first-pause` and `target-changed` are never candidates.
+- The per-wake verdict is also exposed as the `wakeShadow` field on `GET /api/proxy/dispatch/{id}` above.
+- When no shadow store is wired the endpoint returns the same shape with empty `days` and zeroed `totals` — a no-op degrade, never an error.
 
 #### Operator Halt (LIN-2994 Decision 4)
 
