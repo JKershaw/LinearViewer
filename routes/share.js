@@ -26,24 +26,34 @@
  * limit without bound.
  *
  * Provider coverage carry-forward (approving verdict (b), Session B): a
- * `kind: 'parent'` share must be REFUSED at create when the workspace's
- * provider declares `ui.subtasks: false` (`github`, `github-projects` always
- * emit `parent: null`) — such a share would otherwise always be empty. Label
- * shares work on every provider. The create route (and that refusal) lands in
- * LIN-3244 / Session B, so it is not implemented here.
+ * `kind: 'parent'` share is REFUSED at create when the workspace's provider
+ * declares `ui.subtasks: false` (`github`, `github-projects` always emit
+ * `parent: null`) — such a share would otherwise always be empty. Label shares
+ * work on every provider. The owner create/list/revoke routes live below the
+ * public route (LIN-3244 / Session B): all three are owner-gated, create is
+ * rate-limited and snapshots synchronously before persisting, and list never
+ * returns the token.
  */
 
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { createHash } from 'node:crypto';
+import { badRequest, jsonError } from '../lib/errors.js';
 import { buildShareSnapshot } from '../lib/share-snapshot.js';
 import { isWellFormedShareToken } from '../lib/share-store.js';
 import { renderSharePage } from '../lib/render-share.js';
+import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 
 export const SNAPSHOT_TTL_MS = 60_000;
 export const MIN_REFRESH_INTERVAL_MS = 60_000;
 export const FAILURE_BACKOFF_MS = 300_000;
 export const SHARE_REFRESH_TIMEOUT_MS = 50_000;
 export const READ_LIMIT_MAX = 120;
+// Owner share creation: 5 per 15 minutes per IP, shaped like
+// `tokenCreationLimiter` (routes/dispatch.js). A share mints a capability and
+// spends a provider read, so it is rarer and more expensive than a read.
+export const CREATE_LIMIT_MAX = 5;
+export const CREATE_WINDOW_MS = 15 * 60 * 1000;
 
 function defaultSkip() {
   return process.env.NODE_ENV === 'test';
@@ -51,27 +61,105 @@ function defaultSkip() {
 
 /**
  * Build the share limiters. Exported as a factory (shaped like
- * `feedbackLimiter` in routes/dispatch.js) so the 429 test can construct its
- * own isolated limiter instance with a small `max` and `skip: () => false`.
+ * `feedbackLimiter` in routes/dispatch.js) so the 429 tests can construct their
+ * own isolated limiter instances with a small `max` and `skip: () => false`.
  *
- * @param {{windowMs?: number, max?: number, skip?: Function}} [opts]
- * @returns {{read: Function}}
+ * `max` overrides BOTH limiters' ceiling (the test knob the plan's "same for
+ * create" uses); `createMax` overrides only creation. With no override the
+ * defaults are 120 reads/min and 5 creates/15 min.
+ *
+ * @param {{windowMs?: number, createWindowMs?: number, max?: number, createMax?: number, skip?: Function}} [opts]
+ * @returns {{read: Function, create: Function}}
  */
-export function createShareLimiters({ windowMs = 60 * 1000, max = READ_LIMIT_MAX, skip = defaultSkip } = {}) {
+export function createShareLimiters({
+  windowMs = 60 * 1000,
+  createWindowMs = CREATE_WINDOW_MS,
+  max,
+  createMax,
+  skip = defaultSkip
+} = {}) {
+  const readMax = max ?? READ_LIMIT_MAX;
+  const createLimit = createMax ?? max ?? CREATE_LIMIT_MAX;
   return {
     read: rateLimit({
       windowMs,
-      max,
+      max: readMax,
       standardHeaders: true,
       legacyHeaders: false,
       message: { error: 'Too many share requests, please try again later' },
+      skip
+    }),
+    create: rateLimit({
+      windowMs: createWindowMs,
+      max: createLimit,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too many share creation requests, please try again later' },
       skip
     })
   };
 }
 
-// The default limiter: 120 reads/minute per IP, skipped under NODE_ENV=test.
+// The default limiters: 120 reads/minute and 5 creates/15 minutes per IP,
+// both skipped under NODE_ENV=test.
 export const shareReadLimiter = createShareLimiters().read;
+export const shareCreationLimiter = createShareLimiters().create;
+
+const SUBJECT_KINDS = ['parent', 'label'];
+
+/**
+ * Validate the create body's subject. `id` is the provider-native collection
+ * key: for a parent it is the parent issue's `id` (the SAME value
+ * `fetchProjects` emits as `issue.parent.id` — L9), for a label it is the label
+ * name. It is stored verbatim, never resolved or transformed.
+ *
+ * @param {unknown} subject
+ * @returns {boolean}
+ */
+function isValidSubjectInput(subject) {
+  return Boolean(
+    subject &&
+    typeof subject === 'object' &&
+    SUBJECT_KINDS.includes(subject.kind) &&
+    typeof subject.id === 'string' &&
+    subject.id.trim().length > 0
+  );
+}
+
+/**
+ * The opaque management id for a share, derived from its stored `_id` (the
+ * token hash) with a domain-separated one-way function. The list and revoke
+ * routes key on this so the stored token hash is NEVER returned or accepted
+ * from a client (LIN-3244: "list never returns the token or hash"); it is
+ * non-reversible and cannot be turned into a working `/s/` link.
+ */
+export function publicShareId(tokenHash) {
+  return createHash('sha256').update(`share-management:${tokenHash}`).digest('hex');
+}
+
+/**
+ * The list projection. Deliberately omits the raw token (never stored) and the
+ * stored `tokenHash`; `id` is the derived opaque management id used by revoke.
+ */
+function shareListItem(record) {
+  return {
+    id: publicShareId(record._id),
+    kind: record.subject.kind,
+    subjectId: record.subject.id,
+    includeDescriptions: record.includeDescriptions,
+    createdAt: record.createdAt,
+    revokedAt: record.revokedAt
+  };
+}
+
+function ownerRefusalResponse(res, refusal, workspace) {
+  console.warn(`Share management refused: ${refusal.code} (urlKey=${workspace.urlKey}) — LIN-3244`);
+  return jsonError(res, refusal.status, refusal.error, {
+    code: refusal.code,
+    category: refusal.category,
+    retryable: refusal.retryable
+  });
+}
 
 function serve(res, record, stale) {
   return res.status(200).type('html').send(renderSharePage({
@@ -87,11 +175,23 @@ function serve(res, record, stale) {
  * @param {import('../lib/share-store.js').ShareStore} deps.shareStore
  * @param {(urlKey: string, ownerAccountId: string) => Promise<{reason: string, issues: Object[]|null}>} deps.readOwnerIssues
  * @param {(args: {workspaceId?: string, accountId?: string}) => Promise<{status: string}>} deps.workspaceOwnerCheck
+ * @param {Function} [deps.workspaceFromUrl] - session/workspace middleware for the owner routes; when absent (Session A unit apps) the owner surface is not mounted
+ * @param {(workspace: Object) => Object} [deps.getProviderForWorkspace] - resolves the workspace provider for the parent-share `ui.subtasks` check
  * @param {(promise: Promise, ms: number) => Promise} deps.withTimeout - injected from routes/proxy.js (LIN-3158 timer fix)
  * @param {Function} [deps.readLimiter]
+ * @param {Function} [deps.createLimiter]
  * @returns {import('express').Router}
  */
-export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerCheck, withTimeout, readLimiter = shareReadLimiter } = {}) {
+export function createShareRoutes({
+  shareStore,
+  readOwnerIssues,
+  workspaceOwnerCheck,
+  workspaceFromUrl,
+  getProviderForWorkspace,
+  withTimeout,
+  readLimiter = shareReadLimiter,
+  createLimiter = shareCreationLimiter
+} = {}) {
   const router = Router();
 
   // Per-token single-flight for refreshes (closure state, one map per router).
@@ -232,6 +332,155 @@ export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerC
     if (record.snapshot != null) return serve(res, record, true);
     return res.status(503).end();                              // row 7
   });
+
+  // =========================================================================
+  // Owner management surface (LIN-3244, Session B of LIN-3073)
+  //
+  // GET/POST /workspace/:urlKey/shares and POST .../shares/:id/revoke. All
+  // three run behind `workspaceFromUrl` and the shared owner-mint refusal gate
+  // FIRST, before any validation, provider read or mint (F7, mirroring
+  // routes/dispatch.js's token mint). Create is additionally rate-limited.
+  // =========================================================================
+  if (typeof workspaceFromUrl === 'function') {
+    const ownerRefusal = (req) => resolveOwnerMintRefusal({
+      ownerCheck: workspaceOwnerCheck,
+      workspaceId: req.workspace.id,
+      accountId: req.session?.accountId,
+      subject: 'a share link'
+    });
+
+    // Create: refusal gate → subject validation → provider capability → first
+    // snapshot synchronously → persist. A refused or unsupported request mints
+    // nothing; a failed first read persists nothing.
+    router.post('/workspace/:urlKey/shares', createLimiter, workspaceFromUrl, async (req, res) => {
+      const { workspace } = req;
+      const refusal = await ownerRefusal(req);
+      if (refusal) return ownerRefusalResponse(res, refusal, workspace);
+
+      const { subject, includeDescriptions } = req.body || {};
+      if (!isValidSubjectInput(subject)) {
+        return badRequest.json(res, 'subject must be { kind: "parent"|"label", id }');
+      }
+      // L9: `id` is the provider-native key. For a parent it is the parent
+      // issue's `id`, the exact value `fetchProjects` emits as `issue.parent.id`
+      // (Linear: the issue UUID), so the snapshot's `parent.id === subject.id`
+      // membership test matches. The form lets the owner type the human
+      // identifier (`LIN-3057`) OR the id; a parent input is resolved below
+      // against the issue set this request already fetched, using the codebase's
+      // existing id-or-identifier idiom (routes/proxy.js:163,
+      // routes/workspace-api.js:2196). No new resolver route is added.
+      const normalized = { type: 'collection', kind: subject.kind, id: subject.id.trim() };
+
+      // Approving verdict (b): refuse a parent share when the provider cannot
+      // represent subtasks — `github`/`github-projects` declare `ui.subtasks:
+      // false` and always emit `parent: null`, so such a share would be empty.
+      // Label shares work on every provider.
+      if (normalized.kind === 'parent') {
+        let provider;
+        try {
+          provider = getProviderForWorkspace?.(workspace);
+        } catch {
+          provider = null;
+        }
+        if (provider?.ui?.subtasks === false) {
+          return jsonError(res, 422,
+            'This workspace\'s provider has no subtasks, so a parent share would always be empty. Share a label instead.',
+            { code: 'PARENT_SHARES_UNSUPPORTED' });
+        }
+      }
+
+      let outcome;
+      try {
+        outcome = await readOwnerIssues(workspace.urlKey, req.session.accountId);
+      } catch {
+        outcome = { reason: 'refresh_error', issues: null };
+      }
+      if (outcome == null || outcome.issues == null || outcome.reason !== 'ok') {
+        return jsonError(res, 503, 'Could not read the collection to share; nothing was created. Try again.',
+          { code: 'SHARE_SNAPSHOT_UNAVAILABLE', reason: outcome?.reason ?? 'refresh_error' });
+      }
+
+      // L9 (cont.): map a parent's human identifier to its provider-native id.
+      // A value that matches no issue is kept verbatim — it may already be the
+      // provider id of a parent that is not in this set (e.g. archived).
+      if (normalized.kind === 'parent') {
+        const needle = normalized.id.toLowerCase();
+        const parent = outcome.issues.find(i =>
+          i.id === normalized.id || (i.identifier || '').toLowerCase() === needle);
+        if (parent) normalized.id = parent.id;
+      }
+
+      let created;
+      try {
+        const snapshot = buildShareSnapshot({
+          subject: normalized,
+          issues: outcome.issues,
+          includeDescriptions: includeDescriptions === true
+        });
+        created = await shareStore.create({
+          urlKey: workspace.urlKey,
+          workspaceId: workspace.id,
+          ownerAccountId: req.session.accountId,
+          subject: normalized,
+          includeDescriptions: includeDescriptions === true
+        });
+        await shareStore.saveSnapshot(created.record.tokenHash, snapshot, { at: new Date() });
+      } catch (err) {
+        console.error('Share creation error:', err.message);
+        return jsonError(res, 500, 'Failed to create share link');
+      }
+
+      // The token is returned exactly once; the list never carries it.
+      return res.status(201).json({ token: created.token, url: `/s/${created.token}` });
+    });
+
+    // List: refusal gate → metadata only. No raw token (never stored) and no
+    // `tokenHash` field; `id` is the opaque record key used by revoke.
+    router.get('/workspace/:urlKey/shares', workspaceFromUrl, async (req, res) => {
+      const { workspace } = req;
+      const refusal = await ownerRefusal(req);
+      if (refusal) return ownerRefusalResponse(res, refusal, workspace);
+
+      try {
+        const rows = await shareStore.listByUrlKey(workspace.urlKey);
+        return res.json({ shares: rows.map(shareListItem) });
+      } catch (err) {
+        console.error('Share list error:', err.message);
+        return jsonError(res, 500, 'Failed to list share links');
+      }
+    });
+
+    // Revoke: refusal gate → resolve the derived id WITHIN this workspace (a
+    // share in another workspace is never even considered, so cross-workspace
+    // revoke is refused) → revoke by record id.
+    router.post('/workspace/:urlKey/shares/:id/revoke', workspaceFromUrl, async (req, res) => {
+      const { workspace } = req;
+      const refusal = await ownerRefusal(req);
+      if (refusal) return ownerRefusalResponse(res, refusal, workspace);
+
+      const { id } = req.params;
+      let record;
+      try {
+        const rows = await shareStore.listByUrlKey(workspace.urlKey);
+        record = rows.find(r => publicShareId(r._id) === id);
+      } catch (err) {
+        console.error('Share revoke read error:', err.message);
+        return jsonError(res, 503, 'Share store unavailable');
+      }
+      if (!record) {
+        return jsonError(res, 404, 'Share link not found');
+      }
+
+      try {
+        const revoked = await shareStore.revokeById(record._id, workspace.urlKey);
+        if (!revoked) return jsonError(res, 404, 'Share link not found');
+        return res.json({ success: true, share: shareListItem(revoked) });
+      } catch (err) {
+        console.error('Share revoke error:', err.message);
+        return jsonError(res, 500, 'Failed to revoke share link');
+      }
+    });
+  }
 
   return router;
 }

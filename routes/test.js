@@ -33,6 +33,9 @@ import { defaultJiraSeed, JIRA_WORKSPACE_URL_KEY, JIRA_SITE } from '../tests/fix
 import { establishAccount } from '../lib/account-session.js';
 import { respondToAccountConflict } from '../lib/account-conflict.js';
 import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection-credential.js';
+import { buildShareSnapshot } from '../lib/share-snapshot.js';
+import { publicShareId } from './share.js';
+import { testMockData } from '../tests/fixtures/mock-data.js';
 
 /**
  * Create test routes with required dependencies.
@@ -56,7 +59,7 @@ import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, shareStore = null, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -693,6 +696,53 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       const urlKey = req.query.urlKey || 'test-workspace';
       const created = await dispatchPresetsStore.createCustom(urlKey, req.body || {});
       res.json(created);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Test-only share seed (LIN-3244, Session B of LIN-3073). Creates a share
+  // through the REAL ShareStore + buildShareSnapshot path, so `/s/<token>`
+  // renders exactly as production does. Call `/test/set-session` first: the
+  // session account becomes the share owner (the owner edge /test/set-session
+  // established is what the public route's owner check reads). Body:
+  //   { subject: { kind: 'parent'|'label', id }, includeDescriptions?, issues? }
+  // `issues` overrides the default Linear mock set (for exclusion tests); a
+  // parent `id` may be the human identifier and is resolved like the owner
+  // route does. Returns { token, url, subject, snapshot }.
+  router.post('/test/seed-share', async (req, res) => {
+    try {
+      if (!shareStore) return res.status(503).json({ error: 'no share store' });
+      const urlKey = req.query.urlKey || req.body?.urlKey || 'test-workspace';
+      const workspace = getWorkspaceByUrlKey(req.session, urlKey);
+      if (!workspace) return res.status(404).json({ error: 'workspace not found' });
+      const ownerAccountId = req.session.accountId;
+      if (!ownerAccountId) return res.status(400).json({ error: 'no session account' });
+
+      const body = req.body || {};
+      const subject = body.subject || { kind: 'parent', id: 'issue-1' };
+      if (!subject || (subject.kind !== 'parent' && subject.kind !== 'label') || typeof subject.id !== 'string' || !subject.id.trim()) {
+        return res.status(400).json({ error: 'subject must be { kind: "parent"|"label", id }' });
+      }
+      const issues = Array.isArray(body.issues) ? body.issues : testMockData.issues;
+      const includeDescriptions = body.includeDescriptions === true;
+      const normalized = { type: 'collection', kind: subject.kind, id: subject.id.trim() };
+      if (normalized.kind === 'parent') {
+        const needle = normalized.id.toLowerCase();
+        const parent = issues.find(i => i.id === normalized.id || (i.identifier || '').toLowerCase() === needle);
+        if (parent) normalized.id = parent.id;
+      }
+
+      const snapshot = buildShareSnapshot({ subject: normalized, issues, includeDescriptions });
+      const { token, record } = await shareStore.create({
+        urlKey: workspace.urlKey,
+        workspaceId: workspace.id,
+        ownerAccountId,
+        subject: normalized,
+        includeDescriptions
+      });
+      await shareStore.saveSnapshot(record.tokenHash, snapshot, { at: new Date() });
+      res.json({ token, url: `/s/${token}`, id: publicShareId(record._id), subject: normalized, snapshot });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
