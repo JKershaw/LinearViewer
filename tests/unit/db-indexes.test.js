@@ -156,6 +156,18 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the funnel-events first-per-account index, not a TTL (LIN-2952)', () => {
+    // FunnelEventStore.firstPerAccount reads {step, accountId} sorted by `at`
+    // oldest first; the `step` prefix also serves the instance-wide aggregate
+    // read. The log is lifetime-retained, so it may not be a TTL.
+    const spec = INDEX_SPECS.find(s =>
+      s.collection === 'funnel-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ step: 1, accountId: 1, at: 1 })
+    );
+    assert.ok(spec, 'funnel-events must have a {step:1, accountId:1, at:1} index');
+    assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
+  });
+
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
     // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
     // last-CHANGED — updatedAt only moves on a genuine transition, so an
