@@ -2545,9 +2545,9 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options
     // (D16/LIN-1448), and an arm result is never cached under the owner-blind
     // key. Falls through to the scan when no authorized Connection matches.
     if (ownerAccountId !== UNSCOPED) {
-      const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions });
+      const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions, intent: options?.intent, selector: options?.selector });
       if (arm?.result) {
-        if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
+        if (!bypassTokenCache && arm.result.token) workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
         return arm.result;
       }
       connectionSummary = arm?.connectionSummary || null;

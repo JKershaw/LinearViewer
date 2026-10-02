@@ -110,8 +110,8 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
       invocations.push(...filtered.map(call => ({ file, call })));
     }
     assert.ok(invocations.length >= 10, `expected at least 10 resolveProviderAccess call sites across ${proxyRouteFiles.join(', ')}, found ${invocations.length}`);
-    const missingReq = invocations.filter(({ call }) => !/,\s*req\)$/.test(call));
-    assert.deepEqual(missingReq, [], `every resolveProviderAccess(...) call must end in ", req)" so the chokepoint can stamp — offenders: ${JSON.stringify(missingReq)}`);
+    const missingReq = invocations.filter(({ call }) => !/,\s*req[,)]/.test(call));
+    assert.deepEqual(missingReq, [], `every resolveProviderAccess(...) call must pass \`req\` as the third argument so the chokepoint can stamp — offenders: ${JSON.stringify(missingReq)}`);
   });
 
   test('each of the 9 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites destructures `provider` (LIN-2044) — the manual per-site stamp is gone because resolveProviderAccess now stamps internally, proven by the chokepoint test above', () => {
@@ -129,7 +129,7 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     // LIN-679 Stage 6 (LIN-2540) — three-way split, part 3 of 3, closing: the
     // last direct site (group I recommend-and-dispatch) moved to
     // routes/proxy-dispatch.js, so routes/proxy.js now has 0.
-    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
+    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req, \{ intent: [^}]*\}\);/g;
     const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
     const kickoffMatches = PROXY_KICKOFF_SRC.match(pattern) || [];
     const dispatchMatches = PROXY_DISPATCH_SRC.match(pattern) || [];
@@ -182,12 +182,16 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
   function assertOrderingGuard(source, expectedCount, label) {
     const resolveIdx = [];
     let cursor = 0;
-    const needle = 'const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);';
+    // The call now carries a 4th `{ intent: BINDING_INTENT.* }` argument
+    // (LIN-3241 F); match the stable prefix up to that argument and locate the
+    // statement terminator, so the gap after the WHOLE resolve statement is
+    // still the thing asserted.
+    const prefix = 'const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req,';
     while (true) {
-      const idx = source.indexOf(needle, cursor);
+      const idx = source.indexOf(prefix, cursor);
       if (idx === -1) break;
       resolveIdx.push(idx);
-      cursor = idx + needle.length;
+      cursor = idx + prefix.length;
     }
     assert.equal(resolveIdx.length, expectedCount, `expected ${expectedCount} direct sites in ${label}, found ${resolveIdx.length}`);
 
@@ -195,11 +199,13 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
       // Bounded by the NEXT resolve site (or EOF) rather than a fixed char
       // count, so a comment of any length between the resolve call and its
       // guard can't produce a false "guard not found".
+      const stmtEnd = source.indexOf(';', idx);
+      assert.ok(stmtEnd > idx, `resolve site has no statement terminator in ${label} (offset ${idx})`);
       const nextResolveIdx = resolveIdx.find(other => other > idx) ?? source.length;
-      const window = source.slice(idx, Math.min(idx + 400, nextResolveIdx));
+      const window = source.slice(stmtEnd + 1, Math.min(stmtEnd + 400, nextResolveIdx));
       const guardIdx = window.indexOf('if (!accessToken)');
       assert.ok(guardIdx >= 0, `no !accessToken guard found shortly after the resolve site in ${label} (offset ${idx})`);
-      const between = window.slice(needle.length, guardIdx);
+      const between = window.slice(0, guardIdx);
       const strippedOfComments = between.replace(/\/\/[^\n]*/g, '').trim();
       assert.equal(strippedOfComments, '',
         `unexpected non-comment code between the resolve call and its !accessToken guard in ${label} (offset ${idx}): ${JSON.stringify(between)}`);

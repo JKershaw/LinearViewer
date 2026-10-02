@@ -23,11 +23,17 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createConnectionAccess } from '../../lib/connection-credential.js';
-import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
+import { fingerprintCredential, CREDENTIAL_SOURCES } from '../../lib/credential-diagnostics.js';
+import { workspaceTokenCacheKey, workspaceTokenCacheBypasses } from '../../lib/workspace-token-cache.js';
+import { UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from '../../lib/workspace-token-resolver.js';
+import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/superseded-selection.js';
+import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
+import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -166,12 +172,12 @@ describe('(B) server.js resolveWorkspaceAccess wires the bypass through the real
       'the cache read must be short-circuited to undefined when bypassing'
     );
     const setLines = body.split('\n').filter(l => l.includes('workspaceTokenCache.set(cacheKey'));
-    const guardedSetLines = body.split('\n').filter(l => l.includes('if (!bypassTokenCache) workspaceTokenCache.set(cacheKey'));
+    const guardedSetLines = body.split('\n').filter(l => /if \(!bypassTokenCache[^)]*\) workspaceTokenCache\.set\(cacheKey/.test(l));
     assert.ok(setLines.length > 0, 'expected cache writes inside resolveWorkspaceAccess');
     assert.equal(
       guardedSetLines.length,
       setLines.length,
-      'every cache write must be guarded by `if (!bypassTokenCache)`: an ISSUE/selector resolution must perform no get and no set'
+      'every cache write must be guarded by `if (!bypassTokenCache…)`: an ISSUE/selector resolution must perform no get and no set'
     );
   });
 });
@@ -270,3 +276,318 @@ describe('(D) the dispatch referent guard surfaces a refusal before isDanglingRe
   });
 });
 
+// ---------------------------------------------------------------------------
+// (E) selector validation: the connection-first arm picks the NAMED binding
+// ---------------------------------------------------------------------------
+
+describe('(E) the connection arm resolves the binding by intent/selector (slice-1 resolvers, never re-created)', () => {
+  function armAccess(overrides = {}) {
+    return createConnectionAccess({
+      connectionStore: { readConnectionsByReferent: async () => [githubConnection()] },
+      ownerCredentialStore: { getByConnection: async () => null },
+      refreshConnection: async () => null,
+      resolveCanonicalAccountId: async (id) => id,
+      selectOwnerSessionRow: () => twoRepoOwnerRow(),
+      normalizeProvider: (ws) => ws?.provider || 'linear',
+      fingerprintCredential,
+      gate: { shouldAttempt: () => true },
+      lifecycleEventStore: { recordEvent: async () => {} },
+      bufferMs: BUFFER,
+      ...overrides,
+    });
+  }
+  const call = (access, intent, selector) =>
+    access.resolveConnectionBackedAccess({ urlKey: 'acme', ownerAccountId: 'acct', sessions: [], intent, selector });
+
+  test('ISSUE + selector repoB selects repoB, not the active repoA', async () => {
+    const out = await call(armAccess(), 'ISSUE', { source: 'github', bindingScope: REPO_B });
+    assert.deepEqual(out.result.scope, { token: 'tok-a', repo: REPO_B });
+    assert.equal(out.result.provider, 'github');
+  });
+
+  test('ISSUE without a selector on the two-binding workspace refuses BINDING_REQUIRED (never matches[0])', async () => {
+    const out = await call(armAccess(), 'ISSUE', undefined);
+    assert.equal(out.result.token, null);
+    assert.equal(out.result.reason, 'binding_required');
+    assert.equal(out.result.provider, 'github');
+    assert.deepEqual(out.result.bindings, [REPO_A, REPO_B]);
+  });
+
+  test('ISSUE + unknown selector refuses UNKNOWN_BINDING', async () => {
+    const out = await call(armAccess(), 'ISSUE', { source: 'github', bindingScope: 'octo/ghost' });
+    assert.equal(out.result.token, null);
+    assert.equal(out.result.reason, 'unknown_binding');
+    assert.deepEqual(out.result.bindings, [REPO_A, REPO_B]);
+  });
+
+  test('WORKSPACE without a selector serves the explicit default (active repoA), never refusing for ambiguity', async () => {
+    const out = await call(armAccess(), 'WORKSPACE', undefined);
+    assert.deepEqual(out.result.scope, { token: 'tok-a', repo: REPO_A });
+  });
+
+  test('CREATE without a selector serves the explicit default (active repoA)', async () => {
+    const out = await call(armAccess(), 'CREATE', undefined);
+    assert.deepEqual(out.result.scope, { token: 'tok-a', repo: REPO_A });
+  });
+
+  test('a selector naming another owner\'s binding is UNKNOWN_BINDING (bindings are the owner workspace\'s own)', async () => {
+    const out = await call(armAccess(), 'ISSUE', { source: 'github', bindingScope: 'someone-else/repo' });
+    assert.equal(out.result.reason, 'unknown_binding');
+  });
+
+  test('B1: the selector is selection-only — the credential comes from the Connection, and bindingScope never becomes token/fingerprint', async () => {
+    const CRAFTED = 'looks-like-a-token';
+    const binding = { provider: 'github', scope: CRAFTED, connectionId: CONNECTION_ID };
+    const ownerRow = {
+      session: { workspaces: [{
+        urlKey: 'acme', provider: 'github', bindings: [binding],
+        activeBinding: { provider: 'github', scope: CRAFTED },
+      }] },
+      workspaceIndex: 0,
+    };
+    const out = await call(armAccess({ selectOwnerSessionRow: () => ownerRow }), 'ISSUE', { source: 'github', bindingScope: CRAFTED });
+
+    assert.deepEqual(out.result.scope, { token: 'tok-a', repo: CRAFTED }, 'the structured scope pairs the Connection credential with the selected repo');
+    assert.equal(out.result.token, 'tok-a', 'the token is the Connection credential, never the selector');
+    assert.notEqual(out.result.token, CRAFTED);
+    assert.equal(out.result.credentialFingerprint, fingerprintCredential(out.result.scope));
+    assert.notEqual(out.result.credentialFingerprint, CRAFTED);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (B behavioural) the real resolveWorkspaceAccess body, vm-executed
+// ---------------------------------------------------------------------------
+
+function stripSrcComments(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+}
+
+function extractResolveBody(src) {
+  const start = src.indexOf('async function resolveWorkspaceAccess');
+  assert.ok(start >= 0, 'async function resolveWorkspaceAccess not found in server.js');
+  const end = src.indexOf('\n}', start);
+  assert.ok(end >= 0, "could not find resolveWorkspaceAccess's top-level closing brace");
+  return src.slice(start, end + 2);
+}
+
+function makeSpyCache() {
+  return {
+    gets: [],
+    sets: [],
+    get(key) { this.gets.push(key); return undefined; },
+    set(key, value) { this.sets.push({ key, value }); return true; },
+  };
+}
+
+/** Execute the REAL server.js resolveWorkspaceAccess body with injected collaborators. */
+function makeVmResolver({ sessions = [], connectionAccess = { resolveConnectionBackedAccess: async () => null }, cache = makeSpyCache() } = {}) {
+  const context = vm.createContext({
+    UNSCOPED, TOKEN_REFRESH_BUFFER_MS,
+    selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution,
+    selectOwnerWorkspaceTokenExcludingSuperseded,
+    rejectedCredentialRegistry: createRejectedCredentialRegistry(),
+    CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS,
+    accountStore: { resolveCanonicalAccountId: async (id) => id },
+    workspaceTokenCacheKey,
+    workspaceTokenCacheBypasses,
+    sessionsCollection: { find: () => ({ toArray: async () => sessions }) },
+    workspaceTokenCache: cache,
+    ownerCredentialStore: { get: async () => null },
+    refreshOnResolveGate: { shouldAttempt: () => false },
+    credentialLifecycleEventStore: { recordEvent: async () => {} },
+    attemptSuspectCredentialRefresh: async () => null,
+    connectionAccess,
+    console: { log() {}, warn() {}, error() {} },
+    process: { env: {} },
+  });
+  const script = extractResolveBody(SERVER_SRC) + '\nresolveWorkspaceAccess';
+  const fn = vm.runInContext(script, context);
+  return { fn, cache };
+}
+
+function legacyLinearSessions() {
+  return [{
+    _id: 'sid-1',
+    session: {
+      accountId: 'acct',
+      workspaces: [{ urlKey: 'acme', provider: 'linear', accessToken: 'lin-token', tokenExpiresAt: Date.now() + 10_000_000 }],
+    },
+  }];
+}
+
+describe('(B behavioural) ISSUE/selector resolutions make zero cache calls; no-selector CREATE/WORKSPACE use only the base key', () => {
+  test('ISSUE intent (no selector) performs no workspaceTokenCache get and no set', async () => {
+    const { fn, cache } = makeVmResolver({ sessions: legacyLinearSessions() });
+    const result = await fn('acme', 'acct', { intent: 'ISSUE' });
+
+    assert.equal(result.token, 'lin-token', 'the ISSUE resolution still resolves a token — only the CACHE is bypassed');
+    assert.deepEqual(cache.gets, [], 'no cache get on an ISSUE resolution');
+    assert.deepEqual(cache.sets, [], 'no cache set on an ISSUE resolution');
+  });
+
+  test('a selector-bearing WORKSPACE resolution performs no cache get and no set', async () => {
+    const { fn, cache } = makeVmResolver({ sessions: legacyLinearSessions() });
+    await fn('acme', 'acct', { intent: 'WORKSPACE', selector: { source: 'linear', bindingScope: 'org-1' } });
+
+    assert.deepEqual(cache.gets, []);
+    assert.deepEqual(cache.sets, []);
+  });
+
+  test('a no-selector WORKSPACE resolution does get/set the BASE key, and only that key', async () => {
+    const { fn, cache } = makeVmResolver({ sessions: legacyLinearSessions() });
+    const result = await fn('acme', 'acct', { intent: 'WORKSPACE' });
+    const baseKey = workspaceTokenCacheKey('acme', 'acct');
+
+    assert.equal(result.token, 'lin-token');
+    assert.deepEqual(cache.gets, [baseKey], 'exactly one get, the base (urlKey, owner) key');
+    assert.deepEqual(cache.sets.map(s => s.key), [baseKey], 'exactly one set, the base key — no new key variant');
+  });
+
+  test('a no-selector CREATE resolution does get/set the BASE key, and only that key', async () => {
+    const { fn, cache } = makeVmResolver({ sessions: legacyLinearSessions() });
+    await fn('acme', 'acct', { intent: 'CREATE' });
+
+    assert.deepEqual(cache.gets, [workspaceTokenCacheKey('acme', 'acct')]);
+    assert.deepEqual(cache.sets.map(s => s.key), [workspaceTokenCacheKey('acme', 'acct')]);
+  });
+
+  test('absent options (a non-proxy caller) keeps caching the base key', async () => {
+    const { fn, cache } = makeVmResolver({ sessions: legacyLinearSessions() });
+    await fn('acme', 'acct');
+    assert.deepEqual(cache.gets, [workspaceTokenCacheKey('acme', 'acct')]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Acceptance witness (b): GET /api/proxy/issues/:id?source=github&bindingScope=repoB
+// ---------------------------------------------------------------------------
+
+function buildAcceptanceApp() {
+  const calls = [];
+  const ownerRow = twoRepoOwnerRow();
+  const ownerSession = {
+    accountId: 'acct-owner',
+    workspaces: ownerRow.session.workspaces,
+  };
+  const connectionAccess = createConnectionAccess({
+    connectionStore: { readConnectionsByReferent: async () => [githubConnection()] },
+    ownerCredentialStore: { getByConnection: async () => null },
+    refreshConnection: async () => null,
+    resolveCanonicalAccountId: async (id) => id,
+    selectOwnerSessionRow: () => ownerRow,
+    normalizeProvider: (ws) => ws?.provider || 'linear',
+    fingerprintCredential,
+    gate: { shouldAttempt: () => true },
+    lifecycleEventStore: { recordEvent: async () => {} },
+    bufferMs: BUFFER,
+  });
+  const { fn } = makeVmResolver({ sessions: [{ _id: 'sid', session: ownerSession }], connectionAccess });
+
+  const provider = {
+    name: 'github',
+    supports: () => true,
+    issueDetail: async (scope, issueId) => {
+      calls.push(scope);
+      return { id: issueId, identifier: 'GB-1', title: 'repoB', description: 'REPO_B_MARKER', state: { name: 'Todo', type: 'unstarted' } };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
+    proxyTokenStore: {
+      mintGrantBootstrap: async () => ({ token: 'b', kind: 'bootstrap', scope: 'readWrite' }),
+      createToken: async () => ({ token: 'b', kind: 'bootstrap', scope: 'readWrite' }),
+      validateToken: async () => ({
+        grants: ['dispatch'], workspaceId: 'ws-acme', tokenId: 't1', urlKey: 'acme',
+        label: 'test', scope: 'readWrite', createdBy: 'acct',
+      }),
+    },
+    proxyEventStore: { recordEvent: async () => {} },
+    resolveWorkspaceAccess: fn,
+    getWorkspaceAccessToken: async () => null,
+    getWorkspaceOpenRouterKey: async () => null,
+    agentStatusStore: {},
+    recapCacheStore: { get: async () => null, set: async () => {} },
+    briefCacheStore: { get: async () => null, set: async () => {} },
+    dispatchQueueStore: { getGrantDeclaration: async () => ({ state: 'none' }), addItem: async () => ({ _id: 'd' }) },
+    workspaceFromUrl: (req, res, next) => next(),
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    provider,
+  }));
+  return { app, calls };
+}
+describe('LIN-3241 acceptance witness (b) — proxy issue read honours the issue\'s own binding', () => {
+  test('?source=github&bindingScope=repoB asks repoB with call scope {repo:repoB}', async () => {
+    const { app, calls } = buildAcceptanceApp();
+    const res = await callProxy(app, 'GET', `/api/proxy/issues/1?source=github&bindingScope=${encodeURIComponent(REPO_B)}`);
+
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(calls.map(c => c.repo), [REPO_B], 'the provider saw only repoB');
+    assert.equal(calls[0].token, 'tok-a', 'the token is the Connection credential');
+  });
+
+  test('without a selector on the two-binding workspace: 422 BINDING_REQUIRED and ZERO provider calls', async () => {
+    const { app, calls } = buildAcceptanceApp();
+    const res = await callProxy(app, 'GET', '/api/proxy/issues/1');
+
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'BINDING_REQUIRED');
+    assert.deepEqual(res.body.bindings, [REPO_A, REPO_B]);
+    assert.equal(calls.length, 0, 'no provider call on a refusal');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (F) census pin — all 37 resolveProviderAccess call sites declare a literal
+// ---------------------------------------------------------------------------
+
+describe('(F) census pin — every resolveProviderAccess call site declares a literal BINDING_INTENT.*', () => {
+  const FILES = [
+    'proxy-reads.js', 'proxy-writes.js', 'proxy-compute.js', 'proxy-dispatch.js',
+    'proxy-kickoff.js', 'proxy-flight-companion.js', 'proxy.js',
+  ];
+  function callSites() {
+    const sites = [];
+    for (const file of FILES) {
+      const src = stripSrcComments(readFileSync(join(__dirname, '../../routes', file), 'utf8'));
+      for (const line of src.split('\n')) {
+        if (line.includes('resolveProviderAccess(') && !line.includes('function resolveProviderAccess')) {
+          sites.push({ file, line: line.slice(line.indexOf('resolveProviderAccess(')) });
+        }
+      }
+    }
+    return sites;
+  }
+  const sites = callSites();
+
+  test('there are exactly 37 call sites', () => {
+    assert.equal(sites.length, 37, JSON.stringify(sites.map(s => s.file)));
+  });
+
+  test('every site passes a literal BINDING_INTENT.* (the dispatch site a ternary of two)', () => {
+    for (const { file, line } of sites) {
+      assert.match(line, /BINDING_INTENT\.(ISSUE|CREATE|WORKSPACE)/, `${file}: no literal intent in "${line.trim()}"`);
+      if (!line.includes('issueIdentifier ?')) {
+        const literals = line.match(/BINDING_INTENT\.(ISSUE|CREATE|WORKSPACE)/g) || [];
+        assert.equal(literals.length, 1, `${file}: expected exactly one literal: "${line.trim()}"`);
+        assert.match(line, /\{ intent: BINDING_INTENT\./, `${file}: the literal must be the intent option: "${line.trim()}"`);
+      }
+    }
+    const conditional = sites.filter(s => s.line.includes('issueIdentifier ?'));
+    assert.equal(conditional.length, 1, 'exactly one conditional dispatch call site');
+    assert.match(conditional[0].line, /BINDING_INTENT\.ISSUE\s*:\s*BINDING_INTENT\.WORKSPACE/);
+  });
+
+  test('the effective intent counts match the plan table (ISSUE 21, CREATE 1, WORKSPACE 15)', () => {
+    let issue = 0, create = 0, workspace = 0;
+    for (const { line } of sites) {
+      if (line.includes('issueIdentifier ?')) { issue++; continue; }
+      if (/BINDING_INTENT\.ISSUE/.test(line)) issue++;
+      else if (/BINDING_INTENT\.CREATE/.test(line)) create++;
+      else workspace++;
+    }
+    assert.deepEqual({ issue, create, workspace }, { issue: 21, create: 1, workspace: 15 });
+  });
+});

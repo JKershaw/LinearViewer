@@ -84,7 +84,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { UUID_REGEX, isValidIssueId, bindingRefusalResponse } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, bindingRefusalResponse, BINDING_INTENT } from '../lib/workspace.js';
 import {
   parseSourceNamespace,
   resolveStateRef,
@@ -287,13 +287,27 @@ const proxyTokenCreationLimiter = rateLimit({
 // never depends on a test fixture. Only consulted under NODE_ENV==='test'.
 const TEST_LOCAL_URL_KEY = 'local-workspace';
 
-// LIN-3241 (B): the three declared resolver intents. A missing or unrecognised
+// LIN-3241 (B/F): the three declared resolver intents. A missing or unrecognised
 // intent fails closed as ISSUE — a route that forgets to declare cannot silently
-// guess on an issue read. Beat 3 moves the literals to `BINDING_INTENT` in
-// lib/workspace.js and pins every call site to a literal `BINDING_INTENT.*`.
-const DECLARED_BINDING_INTENTS = new Set(['ISSUE', 'CREATE', 'WORKSPACE']);
+// guess on an issue read. Every call site passes a literal `BINDING_INTENT.*`
+// (pinned by tests/unit/lin-3126-proxy-selector.test.js's census).
+const DECLARED_BINDING_INTENTS = new Set(Object.values(BINDING_INTENT));
 function normalizeBindingIntent(intent) {
-  return DECLARED_BINDING_INTENTS.has(intent) ? intent : 'ISSUE';
+  return DECLARED_BINDING_INTENTS.has(intent) ? intent : BINDING_INTENT.ISSUE;
+}
+
+/**
+ * The ISSUE selector is read from the request query (`source`, `bindingScope`),
+ * the row-stamp fields slice 1 forwards from the client. WORKSPACE never reads a
+ * selector; CREATE takes one only from the declared options, so neither gains an
+ * input surface here. Absent both query fields, the selector is undefined and
+ * {@link selectIssueBinding} applies its no-selector ambiguity rule.
+ */
+function issueSelectorFromQuery(req) {
+  const source = req?.query?.source;
+  const bindingScope = req?.query?.bindingScope;
+  if (source === undefined && bindingScope === undefined) return undefined;
+  return { source, bindingScope };
 }
 
 // LIN-1175: fail-closed 503 message for a claude-code dispatch whose out-of-band
@@ -693,13 +707,16 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       }
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
-    // LIN-3241 (B): the intent is threaded to the resolver so ISSUE/selector
-    // resolutions can bypass workspaceTokenCache. A missing or unrecognised
-    // intent fails closed as ISSUE. Until the call sites pass an explicit
-    // BINDING_INTENT.* (the intent-plumbing beat), every proxy resolution is
-    // ISSUE and therefore uncached — the intended, conservative interim state.
+    // LIN-3241 (B/F): the intent is threaded to the resolver so ISSUE/selector
+    // resolutions can bypass workspaceTokenCache and select the named binding.
+    // A missing or unrecognised intent fails closed as ISSUE. The ISSUE selector
+    // comes from the request query; other intents use the declared options
+    // selector (WORKSPACE ignores it).
     const intentResolved = normalizeBindingIntent(intent);
-    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint, bindings } = await resolveWorkspaceAccess(urlKey, ownerAccountId, { intent: intentResolved, selector });
+    const effectiveSelector = selector !== undefined
+      ? selector
+      : (intentResolved === BINDING_INTENT.ISSUE ? issueSelectorFromQuery(req) : undefined);
+    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint, bindings } = await resolveWorkspaceAccess(urlKey, ownerAccountId, { intent: intentResolved, selector: effectiveSelector });
     if (req && (reason === 'binding_required' || reason === 'unknown_binding')) {
       // The refusal's public detail rides on `req` for workspaceUnavailable (and
       // the dispatch referent guard) to translate into the 422 envelope. It is
@@ -1434,7 +1451,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // neutral-degrade contract.
     let requiresTeam = false;
     try {
-      const { provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       declaredDisplayName = declaredProviderDisplayName(req);
       isDeclaredLinear = req.resolvedProvider?.declared === 'linear';
       requiresTeam = provider.createFields().includes('teamId');

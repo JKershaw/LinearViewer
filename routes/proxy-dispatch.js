@@ -21,7 +21,7 @@ import { validateDispatchRepo, UNKNOWN_REPO_CODE } from '../lib/dispatch-repo-gu
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
-import { isValidIssueId, UUID_REGEX } from '../lib/workspace.js';
+import { isValidIssueId, UUID_REGEX, BINDING_INTENT } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
@@ -389,7 +389,7 @@ export function createDispatchRoutes({
       // blocked by either guard.
       let providerAccess = null;
       if (!isAbort && (issueIdentifier || repo)) {
-        providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+        providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: issueIdentifier ? BINDING_INTENT.ISSUE : BINDING_INTENT.WORKSPACE });
       }
 
       if (!isAbort && issueIdentifier) {
@@ -893,7 +893,7 @@ export function createDispatchRoutes({
         : !explicitOptOut;
 
       // Recommendation preconditions — identical to GET /recommend.
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
