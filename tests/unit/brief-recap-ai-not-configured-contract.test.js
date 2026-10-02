@@ -199,7 +199,7 @@ for (const S of SECTIONS) {
 
     assert.equal(status, 503, 'unconfigured AI is a 503');
     assert.deepEqual(body, { error: S.message, code: 'AI_NOT_CONFIGURED' },
-      'the exact wire body public/{brief,recap}.js isAiNotConfigured() matches');
+      'the exact coded wire body the 503 contract pins');
   });
 
   test(`POST ${S.name}: the cache-not-configured 503 on the same route stays UNCODED`, async () => {
