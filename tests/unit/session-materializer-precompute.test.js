@@ -107,6 +107,10 @@ describe('server.js wiring census (review M9)', () => {
       /observationMaterializer\.precomputeSessionSummary\s*=\s*createMaterializerPrecompute\(/,
       'unwiring the hook (M9) must turn this red'
     );
-    assert.match(SERVER_SRC, /\bprecomputeRunParagraph\b/, 'the run-paragraph precompute must be threaded into the composition');
+    assert.match(
+      SERVER_SRC,
+      /createMaterializerPrecompute\(\{[^}]*\bprecomputeRunParagraph\b[^}]*\}\)/,
+      'the run-paragraph precompute must be threaded into the composition call itself (M9b)'
+    );
   });
 });

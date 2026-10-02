@@ -19,7 +19,7 @@ import {
 } from '../../lib/run-paragraph.js';
 
 function step(overrides = {}) {
-  return {
+  const s = {
     lineageId: 'l',
     kind: 'plan',
     status: 'done',
@@ -34,6 +34,20 @@ function step(overrides = {}) {
     cost: {},
     ...overrides
   };
+  // The gate reads a step's loops, so carry the real `buildRunView` shape: a
+  // step's `loops` hold every loop of its lineage, ended or not.
+  if (!s.loops || s.loops.length === 0) {
+    s.loops = [{
+      loopId: `${s.lineageId}-l0`,
+      lineageId: s.lineageId,
+      kind: s.kind,
+      terminalStatus: s.terminalStatus,
+      iteration: s.iteration,
+      telemetry: {},
+      feedback: []
+    }];
+  }
+  return s;
 }
 
 function runningView() {

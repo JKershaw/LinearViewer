@@ -20,13 +20,13 @@ const URL_KEY = 'ws-hook';
 const RUN_ID = 'run-1';
 
 /** A minimal reconstructed session whose loops drive `buildRunView`. */
-function makeSession({ sessionId = RUN_ID, steps = [] } = {}) {
+function makeSession({ sessionId = RUN_ID, steps = [], loops } = {}) {
   return {
     sessionId,
     seedIssue: 'LIN-1',
     dispatchedAt: '2026-10-02T10:00:00.000Z',
     completedAt: null,
-    loops: steps.map((s, i) => ({
+    loops: loops || steps.map((s, i) => ({
       loopId: `${sessionId}-l${i}`,
       lineageId: `${sessionId}-l${i}`,
       kind: s.kind,
@@ -36,6 +36,32 @@ function makeSession({ sessionId = RUN_ID, steps = [] } = {}) {
       feedback: s.feedback ?? []
     }))
   };
+}
+
+/** One lineage: a failed loop, then a follow-up re-dispatch of the same step. */
+function followUpLineage(terminalStatus = null) {
+  const lineageId = `${RUN_ID}-lineage-impl`;
+  return [
+    {
+      loopId: `${RUN_ID}-l0`,
+      lineageId,
+      kind: 'implementation',
+      terminalStatus: 'failed',
+      iteration: 1,
+      telemetry: {},
+      feedback: []
+    },
+    {
+      loopId: `${RUN_ID}-l1`,
+      lineageId,
+      kind: 'implementation',
+      terminalStatus,
+      followUpTo: `${RUN_ID}-l0`,
+      iteration: 2,
+      telemetry: {},
+      feedback: []
+    }
+  ];
 }
 
 function makeRig({ isTerminal = () => false, generateParagraph } = {}) {
@@ -135,6 +161,19 @@ describe('run-paragraph precompute', () => {
 
     await hook(URL_KEY, makeSession({ steps: [{ ...running, feedback: [] }] }), { apiKey: 'k' });
     assert.equal(calls.length, 1, 'the waiting toggle is not an ended step → no regeneration');
+  });
+
+  test('a follow-up starting on an already-ended step makes ZERO calls, then ending makes exactly ONE', async () => {
+    const { calls, hook } = makeRig();
+
+    await hook(URL_KEY, makeSession({ loops: followUpLineage(null).slice(0, 1) }), { apiKey: 'k' });
+    assert.equal(calls.length, 1, 'the failed step end triggers one call');
+
+    await hook(URL_KEY, makeSession({ loops: followUpLineage(null) }), { apiKey: 'k' });
+    assert.equal(calls.length, 1, 'a follow-up starting on the ended step is a start → no regeneration');
+
+    await hook(URL_KEY, makeSession({ loops: followUpLineage('done') }), { apiKey: 'k' });
+    assert.equal(calls.length, 2, 'the follow-up ending is a new ended loop → exactly one regeneration');
   });
 
   test('a session turning terminal writes final: true (and does not regenerate again)', async () => {
