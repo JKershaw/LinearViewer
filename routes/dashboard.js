@@ -53,6 +53,7 @@ import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
+import { readRunEvidence } from '../lib/run-evidence.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -570,7 +571,12 @@ export function createDashboardRoutes({
   // observation page handler's try/catch to see a throwing render call
   // injects a stub here instead, same narrow-DI pattern as that file's
   // `chatClient`/`createToolCatalog`.
-  renderObservationPage = renderObservationPageImpl
+  renderObservationPage = renderObservationPageImpl,
+  // LIN-3247: the run-evidence reader for the temporary session-page mount.
+  // Default null -> the mount is skipped entirely, so an unwired test (and every
+  // existing session-page assertion) sees no provider I/O and no page change.
+  // server.js injects the real `lib/run-evidence.js` reader.
+  readRunEvidence: readRunEvidenceFn = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -1217,8 +1223,16 @@ export function createDashboardRoutes({
         ? await runProposalsStore.list(workspace.urlKey, sessionId)
         : [];
 
+      // LIN-3247: the evidence fragment mounted at the top of the session page,
+      // guarded to the ONE seam LIN-2948 will lift out. Skipped when the reader
+      // is not wired (tests, and any deployment without the module), and
+      // fail-open: a read error renders no evidence rather than a broken page.
+      const runEvidence = (readRunEvidenceFn && session.seedIssue)
+        ? await readSessionRunEvidence(readRunEvidenceFn, workspace, session, anchorIssueTitle)
+        : null;
+
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence },
         pageOptions
       );
       res.send(html);
@@ -1350,6 +1364,49 @@ export function createDashboardRoutes({
     } catch (err) {
       console.error('Session page credential-health read failed:', err.message);
       return {};
+    }
+  }
+
+  /**
+   * Build the run-evidence model for the session page (LIN-3247). The provider
+   * read is delegated to the injected `readRunEvidence` (lib/run-evidence.js)
+   * so the page route stays free of the reader's internals and tests can skip
+   * it. Fail-open: any error renders no evidence, never a broken page.
+   *
+   * `[evidence]` telemetry URLs from the session's runs are passed as the
+   * corroborating source only — the reader never lets them be the sole PR-URL
+   * source (S1).
+   *
+   * @param {Function} reader
+   * @param {Object} workspace
+   * @param {Object} session
+   * @param {string|null} anchorIssueTitle
+   * @returns {Promise<Object|null>}
+   */
+  async function readSessionRunEvidence(reader, workspace, session, anchorIssueTitle) {
+    try {
+      const evidenceUrls = [];
+      const loops = Array.isArray(session.loops) ? session.loops : [];
+      for (const loop of loops) {
+        const feedback = Array.isArray(loop && loop.feedback) ? loop.feedback : [];
+        for (const entry of feedback) {
+          if (entry && entry.url && typeof entry.message === 'string' && entry.message.startsWith('[evidence]')) {
+            evidenceUrls.push(entry.url);
+          }
+        }
+      }
+      const { provider, callScope } = resolveIssueBinding(workspace, null);
+      return await reader({
+        issueIdentifier: session.seedIssue,
+        provider,
+        callScope,
+        viewerIsOwner: true,
+        evidenceUrls,
+        asked: anchorIssueTitle || session.seedIssue
+      });
+    } catch (err) {
+      console.error('Session page run-evidence read failed:', err.message);
+      return null;
     }
   }
 

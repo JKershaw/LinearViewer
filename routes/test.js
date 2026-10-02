@@ -36,6 +36,7 @@ import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection
 import { buildShareSnapshot } from '../lib/share-snapshot.js';
 import { publicShareId } from './share.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
+import { primeFailOpenPrStatus, clearFailOpenPrStatus } from '../lib/github-pr-status.js';
 
 /**
  * Create test routes with required dependencies.
@@ -1885,6 +1886,24 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // LIN-3247: prime the run-evidence fail-open PR-status cache so the session
+  // page can be exercised hermetically (no live GitHub read). Body:
+  // `{ repo, number, readable, state?, merged?, headSha?, checks?, reason? }`.
+  router.post('/test/seed-pr-status', (req, res) => {
+    const { repo, number, readable, state = null, merged = false, headSha = null, checks = [], reason = 'not checked' } = req.body || {};
+    if (!repo || number === undefined) return res.status(400).json({ error: 'repo and number are required' });
+    const value = readable
+      ? { repo, readable: true, number: Number(number), state, merged: !!merged, head: { ref: null, sha: headSha }, ref: headSha, checks }
+      : { repo, readable: false, state: 'unknown', reason };
+    primeFailOpenPrStatus({ repo, number, value });
+    res.json({ ok: true });
+  });
+
+  router.get('/test/clear-pr-status', (req, res) => {
+    clearFailOpenPrStatus();
+    res.json({ ok: true });
   });
 
   return router;

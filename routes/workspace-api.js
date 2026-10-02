@@ -52,6 +52,7 @@ import { generateBrief } from '../lib/brief.js';
 import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
 import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
+import { readRunEvidence } from '../lib/run-evidence.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { scanBasisHashFromContext, dueBasisHashFromContext, dueChanged, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
@@ -350,9 +351,10 @@ function sendBindingRefusal(res, refusal) {
  * @param {Object} [options.sessionsFeedCache] - Shared SWR cache for the rulings/sessions feed (LIN-2755); null → uncached deployment, invalidation is a no-op
  * @param {Object} [options.ownerCredentialStore] - Durable owner-credential store (LIN-2933); null → the comment route's one-shot auth-recovery is disabled, not a hard dependency
  * @param {Function} [options.adoptConnectionCredential] - LIN-3124 PR3 (D7): connection-keyed adopt read (injected; protected module imports no connection seam)
+ * @param {Object} [options.runEvidence] - LIN-3247 test seam for the run-evidence route: optional `{ resolveProvider, viewerIsOwner, readPrStatus, githubFetch }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -4428,6 +4430,45 @@ ${goal}`
     } catch (error) {
       console.error('OpenRouter model catalog endpoint error:', error);
       res.json({ models: [] });
+    }
+  });
+
+  /**
+   * Run evidence (LIN-3247, P2 of LIN-2949). The data half of the page seam:
+   * returns `{ state, evidence, ledger, closeOut }` for a run's issue. The PR
+   * URL comes from the run's OWN tracker comments (newest first), restricted to
+   * the workspace repo allowlist; the live PR state comes from the shared
+   * fail-open reader (never throws — unreadable → `state: 'unknown'`). This
+   * fabricates nothing: `deriveCloseOutState` and the press are P3.
+   *
+   * @route GET /workspace/:urlKey/api/run-evidence/:issueIdentifier
+   */
+  router.get('/workspace/:urlKey/api/run-evidence/:issueIdentifier', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { issueIdentifier } = req.params;
+
+    if (!issueIdentifier || issueIdentifier.length > 100) {
+      return badRequest.json(res, 'Invalid issue identifier');
+    }
+
+    const resolveProvider = (runEvidence && runEvidence.resolveProvider) || resolveIssueBinding;
+    const viewerIsOwner = (runEvidence && runEvidence.viewerIsOwner) || (() => true);
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+
+    try {
+      const { provider, callScope } = resolveProvider(workspace, requestedSource);
+      const model = await readRunEvidence({
+        issueIdentifier,
+        provider,
+        callScope,
+        viewerIsOwner: viewerIsOwner(req),
+        readPrStatus: (runEvidence && runEvidence.readPrStatus) || undefined,
+        githubFetch: (runEvidence && runEvidence.githubFetch) || null,
+      });
+      res.json({ state: model.state, evidence: model.evidence, ledger: model.ledger, closeOut: model.closeOut });
+    } catch (error) {
+      console.error('Run evidence error:', error);
+      jsonError(res, 500, 'Failed to build run evidence', { message: error.message });
     }
   });
 
