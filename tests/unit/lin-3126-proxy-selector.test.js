@@ -230,7 +230,10 @@ async function callProxy(app, method, path, body) {
       opts.body = JSON.stringify(body);
     }
     const res = await fetch(`http://127.0.0.1:${port}${path}`, opts);
-    return { status: res.status, body: await res.json() };
+    const text = await res.text();
+    let parsed = null;
+    try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
+    return { status: res.status, body: parsed, text };
   } finally {
     await new Promise(resolve => server.close(resolve));
   }
@@ -589,5 +592,132 @@ describe('(F) census pin — every resolveProviderAccess call site declares a li
       else workspace++;
     }
     assert.deepEqual({ issue, create, workspace }, { issue: 21, create: 1, workspace: 15 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workspace-level no-selector HTTP matrix (the plan's 15 WORKSPACE sites)
+// ---------------------------------------------------------------------------
+
+function permissiveGitHubProvider() {
+  return {
+    name: 'github',
+    supports: (cap) => cap !== 'fetchAttachment',
+    createFields: () => [],
+    viewer: async () => ({ id: 'u1' }),
+    fetchTeams: async () => [],
+    projects: async () => [],
+    fetchProjectsList: async () => [{ content: 'repo=octo/repoA' }],
+    fetchProjects: async () => ({ projects: [], issues: [] }),
+    issues: async () => ({ nodes: [], pageInfo: {} }),
+    search: async () => [],
+    states: async () => [],
+    labels: async () => [],
+    cycles: async () => [],
+    cycleDetail: async () => ({ id: 'cyc-1' }),
+    issueDetail: async () => null,
+    relations: async () => null,
+  };
+}
+
+/** A proxy app whose resolver is the REAL vm-executed resolveWorkspaceAccess over the real arm, recording each resolution. */
+function buildWorkspaceMatrixApp(provider = permissiveGitHubProvider()) {
+  const recorded = [];
+  const ownerRow = twoRepoOwnerRow();
+  const ownerSession = { accountId: 'acct', workspaces: ownerRow.session.workspaces };
+  const connectionAccess = createConnectionAccess({
+    connectionStore: { readConnectionsByReferent: async () => [githubConnection()] },
+    ownerCredentialStore: { getByConnection: async () => null },
+    refreshConnection: async () => null,
+    resolveCanonicalAccountId: async (id) => id,
+    selectOwnerSessionRow: () => ownerRow,
+    normalizeProvider: (ws) => ws?.provider || 'linear',
+    fingerprintCredential,
+    gate: { shouldAttempt: () => true },
+    lifecycleEventStore: { recordEvent: async () => {} },
+    bufferMs: BUFFER,
+  });
+  const { fn } = makeVmResolver({ sessions: [{ _id: 'sid', session: ownerSession }], connectionAccess });
+  const resolveWorkspaceAccess = async (urlKey, ownerAccountId, options) => {
+    const result = await fn(urlKey, ownerAccountId, options);
+    recorded.push({ options, result });
+    return result;
+  };
+  const captured = {};
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
+    proxyTokenStore: {
+      mintGrantBootstrap: async () => ({ token: 'b', kind: 'bootstrap', scope: 'readWrite' }),
+      createToken: async () => ({ token: 'b', kind: 'bootstrap', scope: 'readWrite' }),
+      validateToken: async () => ({
+        grants: ['dispatch'], workspaceId: 'ws-acme', tokenId: 't1', urlKey: 'acme',
+        label: 'test', scope: 'readWrite', createdBy: 'acct',
+      }),
+    },
+    proxyEventStore: { recordEvent: async () => {} },
+    resolveWorkspaceAccess,
+    getWorkspaceAccessToken: async () => null,
+    getWorkspaceOpenRouterKey: async () => null,
+    agentStatusStore: {},
+    recapCacheStore: { get: async () => null, set: async () => {} },
+    briefCacheStore: { get: async () => null, set: async () => {} },
+    dispatchQueueStore: {
+      getGrantDeclaration: async () => ({ state: 'none' }),
+      addItem: async (urlKey, item) => { captured.item = item; return { _id: 'disp-1', ...item }; },
+    },
+    workspaceFromUrl: (req, res, next) => next(),
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    provider,
+  }));
+  return { app, recorded, captured };
+}
+
+describe('LIN-3241 matrix — every WORKSPACE-intent route with no selector serves the explicit default and never refuses', () => {
+  // One row per WORKSPACE-intent site that the existing proxy harness can drive
+  // end-to-end. `expected` is the route's normal status.
+  const ROWS = [
+    ['GET', '/api/proxy/me', 200],
+    ['GET', '/api/proxy/teams', 200],
+    ['GET', '/api/proxy/projects', 200],
+    ['GET', '/api/proxy/known-repos', 200],
+    ['GET', '/api/proxy/issues', 200],
+    ['GET', '/api/proxy/search?q=x', 200],
+    ['GET', '/api/proxy/states/LIN', 200],
+    ['GET', '/api/proxy/labels', 200],
+    ['GET', '/api/proxy/cycles', 200],
+    ['GET', '/api/proxy/cycles/00000000-0000-0000-0000-000000000000', 200],
+    ['GET', '/api/proxy/stack', 200],
+    ['GET', '/api/proxy/instructions', 200],
+    // The repo-only dispatch takes the WORKSPACE branch of the conditional site.
+    ['POST', '/api/proxy/dispatch', 201, { prompt: 'run me', repo: REPO_A }],
+    // Flight Companion turn: resolveProviderAccess runs before the message-length
+    // guard, so a >2000-char message is the cheapest branch that exercises the
+    // site without the turn core. Its "normal status" is 400.
+    ['POST', '/api/proxy/flight-companion/turn', 400, { message: 'x'.repeat(2001) }],
+  ];
+
+  for (const [method, path, expected, body] of ROWS) {
+    test(`${method} ${path} -> ${expected}, resolver intent WORKSPACE, default repoA, no binding refusal`, async () => {
+      const { app, recorded } = buildWorkspaceMatrixApp();
+      const res = await callProxy(app, method, path, body);
+
+      assert.equal(res.status, expected, JSON.stringify(res.body));
+      assert.notEqual(res.body?.code, 'BINDING_REQUIRED', 'a WORKSPACE route must never refuse for ambiguity');
+      assert.notEqual(res.body?.code, 'UNKNOWN_BINDING');
+      const resolution = recorded.at(-1);
+      assert.ok(resolution, 'the resolver must have been invoked');
+      assert.equal(resolution.options?.intent, 'WORKSPACE', 'the route must declare the WORKSPACE intent');
+      assert.deepEqual(resolution.result?.scope, { token: 'tok-a', repo: REPO_A }, 'the route serves the explicit default (active repoA)');
+    });
+  }
+
+  test('a bindingScope query on a WORKSPACE route is ignored (it never reads a selector)', async () => {
+    const { app, recorded } = buildWorkspaceMatrixApp();
+    const res = await callProxy(app, 'GET', `/api/proxy/teams?source=github&bindingScope=${encodeURIComponent(REPO_B)}`);
+
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(recorded.at(-1).options.selector, undefined, 'WORKSPACE must not read a selector from the query');
+    assert.deepEqual(recorded.at(-1).result.scope, { token: 'tok-a', repo: REPO_A });
   });
 });
