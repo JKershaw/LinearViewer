@@ -29,12 +29,21 @@
  *     set and the (dynamic-aware) import-graph edge set.
  *
  * Allowed-module-set sizes (vs 323): `binding-writers` owner 9,
- * `test-token-guards` boundary-reach 128, `urlkey-lookups` 128,
- * `off-session-readers` 128, `workspace-edge-writers` 128,
- * `raw-accesstoken-writers` 128, `held-marker-emitters` caller==importer
- * (6 callers / 3 importers). The 128-reach surfaces do NOT separate at module
- * granularity — their separating axis is the per-occurrence function-shape rule;
- * this is stated rather than papered over.
+ * `off-session-readers` owner 7, `workspace-edge-writers` owner 20,
+ * `test-token-guards` boundary-reach 128 (NODE_ENV shape is the separator),
+ * `urlkey-lookups` boundary-reach 128 (lookup shape is the separator),
+ * `raw-accesstoken-writers` boundary-reach 128 (expiry-pair shape is the
+ * separator), `held-marker-emitters` caller==importer (6 callers / 3 importers).
+ *
+ * RESIDUALS (plan rev 4 §Strategy option (3), stated not hidden):
+ *   - `binding-writers`: the owner set includes the defining module
+ *     (lib/workspace.js), so a fresh in-function call INSIDE the definer is
+ *     permitted. New-site class not caught: a new linkProvider/upsertWorkspace
+ *     call inside an owner module. Bound: the non-owner modules (the reviewer's
+ *     realistic offender) ARE caught, verified by an in-function witness.
+ *   - `off-session-readers` / `workspace-edge-writers` / `urlkey-lookups` /
+ *     `test-token-guards` / `raw-accesstoken-writers`: NO residual — their
+ *     in-function plant is caught by the owner set or the occurrence shape.
  *
  * Run with: node --test tests/unit/lin-3124-pr1-count-pins.test.js
  */
@@ -55,6 +64,13 @@ function total(sources, re) {
 function withLine(sources, rel, line) {
   const m = new Map(sources);
   m.set(rel, `${m.get(rel)}\n${line}\n`);
+  return m;
+}
+
+/** Append an in-function offender (a fresh `function zz() { … }`) to `rel`. */
+function withFunction(sources, rel, line) {
+  const m = new Map(sources);
+  m.set(rel, `${m.get(rel)}\nfunction zz() {\n  ${line.trim()}\n}\n`);
   return m;
 }
 
@@ -216,15 +232,49 @@ function expiryPaired(site) {
   return /\.tokenExpiresAt\s*=/.test(win);
 }
 
+/** The nearest preceding line at lower indentation that opens a block. */
+function enclosingBlockOpener(site) {
+  const lines = site.src.split('\n');
+  const indentOf = (s) => { const m = s.match(/^[ \t]*/); return m ? m[0].length : 0; };
+  const k = indentOf(lines[site.lineIndex] || '');
+  for (let j = site.lineIndex - 1; j >= 0; j--) {
+    if (indentOf(lines[j]) < k && /[{(]\s*$/.test(lines[j].trim())) return lines[j];
+  }
+  return null;
+}
+
 /**
- * EXPLICITLY DERIVED owner set: the defining module(s) of `symbols` plus the
- * modules that directly import any of them. No hand-listed allowlist.
+ * A hand-rolled `w.urlKey === urlKey` comparison is only a workspace *lookup*
+ * when it sits in a `.find`/`.findIndex`/`.map`/`.some`/`.filter` callback (on
+ * the same statement line) or inside a `for (...)` loop. A bare comparison in
+ * an arbitrary function is the class this surface bounds.
  */
-function derivedOwnerSet(graph, symbols) {
+function lookupShaped(site) {
+  if (/\.(find|findIndex|map|some|filter)\(/.test(site.line)) return true;
+  const opener = enclosingBlockOpener(site);
+  return opener ? /\.(find|findIndex|map|some|filter)\(|for\s*\(/.test(opener) : false;
+}
+
+/** Matches `sym` as a destructured parameter/default dep (not a `sym(` call or `sym.x`). */
+function injectedDepRe(sym) {
+  return new RegExp(`(?:[,(]\\s*\\{[^}\\n]*\\b${sym}\\b[^}\\n]*\\}|(?:^|[,{\\s])${sym}\\s*[,}=])`, 'm');
+}
+
+/**
+ * EXPLICITLY DERIVED owner set: the defining module(s) of `symbols`, the
+ * modules that directly import any of them, and the modules that receive any
+ * `receiverSymbols` entry as an injected dependency (a destructured parameter
+ * or default). No hand-listed allowlist.
+ */
+function derivedOwnerSet(sources, graph, symbols, receiverSymbols = []) {
   const owner = new Set();
   for (const sym of symbols) {
     for (const imp of graph.directImportersOf(sym)) owner.add(imp);
     for (const p of graph.paths()) if (graph.exportedNamesOf(p).includes(sym)) owner.add(p);
+  }
+  for (const rs of receiverSymbols) {
+    const re = injectedDepRe(rs);
+    for (const [rel, src] of sources) if (re.test(src)) owner.add(rel);
   }
   return owner;
 }
@@ -253,8 +303,6 @@ function callerImporterOffenders(sources, re, symbols, definers = [], graph = bu
 // The surfaces
 // ---------------------------------------------------------------------------
 
-const ACCOUNT_SURFACE = ['AccountStore', 'AccountWorkspaceStore', 'establishAccount', 'linkProvider', 'upsertWorkspace', 'getWorkspaceCallScope'];
-
 const PINS = [
   {
     id: 'test-token-guards',
@@ -276,6 +324,7 @@ const PINS = [
     re: /w\??\.urlKey === urlKey/g,
     relation: 'boundary',
     surface: ['getWorkspaceCallScope'],
+    shape: 'lookup',
     plant: 'if (w.urlKey === urlKey) {}\n',
     count: countUrlKeyLookups,
     plus: (s) => countUrlKeyLookups(withLine(s, 'lib/workspace.js', 'if (w.urlKey === urlKey) {}')),
@@ -295,13 +344,17 @@ const PINS = [
   {
     id: 'off-session-readers',
     // scanner matches owner-session selector CALLS; the definer file is excluded
-    // (its own definitions are not readers). Occurrence-level relation: the
-    // module must reach the credential entry AND the call must be inside a body.
+    // (its own definitions are not readers). Owner set = the selector definer,
+    // the modules that import the selectors, and the modules that receive a
+    // selector as an injected dep — the connection-access / connection-credential
+    // arms pass `selectOwnerSessionRow` in, so `directImportersOf` alone misses
+    // them. A fresh call in a non-owner module (even inside a function) fails.
     label: 'off-session raw-session credential readers',
     sources: REAL,
     re: /(selectOwnerWorkspaceToken|selectOwnerWorkspaceRow|selectExpiredOwnerRow|selectOwnerSessionRow|selectAllOwnerSessionRows)\(/g,
-    relation: 'boundary',
-    surface: ['linkProvider'],
+    relation: 'owner',
+    ownerSymbols: ['selectOwnerWorkspaceToken', 'selectOwnerWorkspaceRow', 'selectExpiredOwnerRow', 'selectOwnerSessionRow', 'selectAllOwnerSessionRows'],
+    receiverSymbols: ['selectOwnerWorkspaceToken', 'selectOwnerWorkspaceRow', 'selectExpiredOwnerRow', 'selectOwnerSessionRow', 'selectAllOwnerSessionRows'],
     excludeFiles: ['lib/workspace-token-resolver.js'],
     plant: 'const r = selectOwnerSessionRow(s, u, o);\n',
     count: countOffSessionReaders,
@@ -311,15 +364,16 @@ const PINS = [
   {
     id: 'binding-writers',
     // scanner matches linkProvider/upsertWorkspace CALLS. Owner set = the
-    // defining module (lib/workspace.js) plus direct importers; the definer's
-    // own legitimate calls are the reason the occurrence also has to sit in a
-    // function body (a fresh top-level call there must still fail).
+    // defining module (lib/workspace.js) plus direct importers. RESIDUAL: a
+    // fresh call INSIDE the defining module is permitted (the definer is a
+    // trusted owner); the in-function witness plants in a non-owner module.
     label: 'binding writers (linkProvider + upsertWorkspace)',
     sources: REAL,
     re: /(^|[^a-zA-Z])(linkProvider|upsertWorkspace)\(/g,
     relation: 'owner',
     ownerSymbols: ['linkProvider', 'upsertWorkspace'],
     excludeLine: /function\s+(linkProvider|upsertWorkspace)/,
+    inFunctionModule: 'lib/account-store.js',
     plant: "linkProvider(ws, 'x', 'y', {});\n",
     count: countBindingWriters,
     plus: (s) => countBindingWriters(withLine(withLine(s, 'lib/workspace.js', "linkProvider(ws, 'x', 'y', {});"), 'lib/workspace.js', 'upsertWorkspace(sess, w);')),
@@ -328,13 +382,15 @@ const PINS = [
   {
     id: 'workspace-edge-writers',
     // scanner matches bindAccountToWorkspace CALLS; the method definition is
-    // excluded. Occurrence-level relation: the module must reach the account
-    // set AND the call must be inside a body.
+    // excluded. Owner set = the AccountWorkspaceStore definer, its importers,
+    // and the modules that receive an `accountWorkspaceStore` dep. A fresh call
+    // in a non-owner module (even inside a function) fails.
     label: 'account<->workspace edge writers (bindAccountToWorkspace)',
     sources: REAL,
     re: /(^|[^a-zA-Z])bindAccountToWorkspace\(/g,
-    relation: 'boundary',
-    surface: ACCOUNT_SURFACE,
+    relation: 'owner',
+    ownerSymbols: ['AccountWorkspaceStore', 'AccountStore'],
+    receiverSymbols: ['accountWorkspaceStore'],
     excludeLine: /(function|async)\s+bindAccountToWorkspace/,
     plant: "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');\n",
     count: countWorkspaceEdgeWriters,
@@ -379,7 +435,7 @@ function relationOffenders(pin, sources) {
   const graph = buildImportGraph(sources);
   if (pin.relation === 'providerAuth') return [];
   if (pin.relation === 'callerImporter') return callerImporterOffenders(sources, pin.re, pin.surface, pin.definers || [], graph);
-  const owner = pin.relation === 'owner' ? derivedOwnerSet(graph, pin.ownerSymbols) : null;
+  const owner = pin.relation === 'owner' ? derivedOwnerSet(sources, graph, pin.ownerSymbols, pin.receiverSymbols || []) : null;
   const out = [];
   for (const s of scanSites(sources, pin.re, pin)) {
     if (pin.relation === 'owner') {
@@ -390,6 +446,7 @@ function relationOffenders(pin, sources) {
     if (s.depth === 0) out.push(`${s.rel}: occurrence at module top level (not inside a function body)`);
     if (pin.shape === 'nodeEnv' && !nodeEnvGated(s)) out.push(`${s.rel}: test-token guard not gated by process.env.NODE_ENV === 'test'`);
     if (pin.shape === 'expiryPair' && !expiryPaired(s)) out.push(`${s.rel}: .accessToken write without its .tokenExpiresAt companion`);
+    if (pin.shape === 'lookup' && !lookupShaped(s)) out.push(`${s.rel}: urlKey comparison is not part of a workspace lookup`);
   }
   return out;
 }
@@ -414,6 +471,19 @@ describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3
         assert.ok(
           off.some((m) => m.startsWith('lib/workspace.js')),
           `${pin.id}: the planted top-level site in an already-reached module must fail, got ${JSON.stringify(off)}`
+        );
+      });
+
+      test(`pin ${pin.id}: WITNESS — a planted IN-FUNCTION new ${pin.label} site fails it`, () => {
+        // The corrective's point: the red must not come purely from the plant
+        // being at module top level. This plants the same line inside a fresh
+        // `function zz() { … }`; the occurrence-level relation must still fail.
+        const rel = pin.inFunctionModule || 'lib/workspace.js';
+        const planted = withFunction(pin.sources, rel, pin.plant);
+        const off = relationOffenders(pin, planted);
+        assert.ok(
+          off.some((m) => m.startsWith(rel)),
+          `${pin.id}: the planted in-function site in an already-reached module must fail, got ${JSON.stringify(off)}`
         );
       });
     }
@@ -441,6 +511,17 @@ describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3
     const planted = withLine(pin.sources, 'lib/workspace.js', 'upsertWorkspace(sess, w);\n');
     const off = relationOffenders(pin, planted);
     assert.ok(off.some((m) => m.startsWith('lib/workspace.js')), `expected the upsert plant, got ${JSON.stringify(off)}`);
+  });
+
+  test('pin binding-writers: RESIDUAL (stated bound) — a fresh call INSIDE the defining module is permitted', () => {
+    // The owner set includes lib/workspace.js (the definer), so a new
+    // in-function call there is NOT caught. Stated residual for this surface:
+    // a new linkProvider/upsertWorkspace call inside an owner module (including
+    // the definer) rides the owner-set relation; the non-owner in-function
+    // witness above is the class this surface bounds. Plan rev 4 §Strategy (3).
+    const pin = PINS.find((p) => p.id === 'binding-writers');
+    const planted = withFunction(pin.sources, 'lib/workspace.js', "linkProvider(ws, 'x', 'y', {});");
+    assert.deepEqual(relationOffenders(pin, planted), [], 'the definer is a trusted owner; a fresh in-function call there is not caught');
   });
 
   test('pin held-marker-emitters: WITNESS — a removed call with its import left behind fails', () => {
