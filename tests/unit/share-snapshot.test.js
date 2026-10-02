@@ -71,6 +71,41 @@ describe('share-snapshot', () => {
     assert.strictEqual(on.items[0].description, 'SENTINEL-DESC');
   });
 
+  test('parent share carries the parent description only with the opt-in on', () => {
+    const subject = { type: 'collection', kind: 'parent', id: PARENT_ID };
+    const list = [issue({ id: PARENT_ID, identifier: 'LIN-1', title: 'The parent', description: 'PARENT-BODY', parent: null })];
+
+    const on = buildShareSnapshot({ subject, issues: list, includeDescriptions: true });
+    assert.strictEqual(on.description, 'PARENT-BODY');
+
+    const off = buildShareSnapshot({ subject, issues: list, includeDescriptions: false });
+    assert.strictEqual('description' in off, false, 'no parent description key when the opt-in is off');
+    assert.ok(!JSON.stringify(off).includes('PARENT-BODY'));
+  });
+
+  test('parent description defaults to empty string when the parent is not in the set', () => {
+    const snap = buildShareSnapshot({
+      subject: { type: 'collection', kind: 'parent', id: PARENT_ID },
+      issues: [issue({ id: 'child', parent: { id: PARENT_ID } })],
+      includeDescriptions: true
+    });
+    assert.strictEqual(snap.description, '');
+  });
+
+  test('label share never carries a parent description, even with the opt-in on', () => {
+    const parent = issue({ id: PARENT_ID, identifier: 'LIN-1', title: 'p', description: 'PARENT-BODY', parent: null, labels: { nodes: [{ name: 'feature' }] } });
+    const member = issue({ id: 'm', identifier: 'LIN-2', title: 'm', description: 'CHILD-BODY', parent: null, labels: { nodes: [{ name: 'bug' }] } });
+
+    const snap = buildShareSnapshot({
+      subject: { type: 'collection', kind: 'label', id: 'bug' },
+      issues: [parent, member],
+      includeDescriptions: true
+    });
+
+    assert.strictEqual('description' in snap, false, 'label shares have no parent description');
+    assert.ok(!JSON.stringify(snap).includes('PARENT-BODY'));
+  });
+
   test('hides canceled and duplicate members but keeps completed', () => {
     const subject = { type: 'collection', kind: 'parent', id: PARENT_ID };
     const snap = buildShareSnapshot({

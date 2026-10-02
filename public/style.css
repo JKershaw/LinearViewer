@@ -4358,3 +4358,71 @@ a.context-node:hover { border-color: var(--fg); background: var(--bg); }
 .opened-task-setup-runner-link:hover {
   text-decoration: underline;
 }
+
+/* Public share page (LIN-3073): read-only, nav-less `/s/<token>` document. */
+.share-content {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.share-title {
+  font-family: var(--font-content);
+  font-size: 1.5rem;
+  margin: 0 0 0.75rem;
+}
+
+.share-description {
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+  white-space: pre-wrap;
+}
+
+.share-stale {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.share-empty {
+  color: var(--muted);
+}
+
+.share-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.share-task {
+  border-top: 1px solid var(--line);
+  padding: 0.5rem 0;
+}
+
+.task-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.task-identifier {
+  font-family: var(--font-structural);
+  color: var(--muted);
+}
+
+.task-title {
+  color: var(--text);
+}
+
+.task-priority,
+.task-updated {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.task-description {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  white-space: pre-wrap;
+}

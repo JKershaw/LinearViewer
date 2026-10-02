@@ -59,6 +59,30 @@ describe('renderTaskRow', () => {
     assert.ok(!row.includes('<script>alert(1)</script>'));
     assert.ok(!row.includes('<b>ID</b>'));
   });
+
+  test('renders priority as the plain-text label from the shared vocabulary', () => {
+    const row = renderTaskRow({ state: 'unstarted', identifier: 'LIN-2', title: 'A task', priority: 2 });
+    assert.match(row, /class="task-priority"[^>]*>High<\/span>/);
+    assert.ok(!row.includes('<svg'), 'priority is plain text, not an icon');
+  });
+
+  test('renders last-updated as a <time datetime> with the date', () => {
+    const row = renderTaskRow({ state: 'unstarted', identifier: 'LIN-2', title: 'A task', updatedAt: '2026-10-02T00:00:00.000Z' });
+    assert.match(row, /<time class="task-updated" datetime="2026-10-02T00:00:00\.000Z">2026-10-02<\/time>/);
+  });
+
+  test('omits priority and last-updated when absent or invalid', () => {
+    const row = renderTaskRow({ state: 'unstarted', identifier: 'LIN-2', title: 'A task', priority: null, updatedAt: null });
+    assert.ok(!row.includes('task-priority'));
+    assert.ok(!row.includes('<time'));
+    const bad = renderTaskRow({ state: 'unstarted', identifier: 'LIN-3', title: 'B', updatedAt: 'not-a-date' });
+    assert.ok(!bad.includes('<time'), 'an unparseable date renders no <time>');
+  });
+
+  test('separates the identifier and title spans with whitespace', () => {
+    const row = renderTaskRow({ state: 'started', identifier: 'LIN-2', title: 'A task' });
+    assert.match(row, /task-identifier">LIN-2<\/span>\s+<span class="task-title">A task<\/span>/);
+  });
 });
 
 describe('renderSharePage', () => {
@@ -114,6 +138,30 @@ describe('renderSharePage', () => {
     assert.ok(on.includes('<p class="task-description">'), 'description block when on');
     assert.ok(on.includes('&lt;script&gt;bad()&lt;/script&gt;'), 'description is escaped');
     assert.ok(!on.includes('<script>bad()</script>'));
+  });
+
+  test('renders the parent description escaped under the title, only when opted in', () => {
+    const snap = { title: 'Parent', description: '<script>bad()</script>', items: [{ identifier: 'LIN-1', title: 'A', state: { type: 'todo' } }] };
+
+    const off = renderSharePage({ snapshot: snap, includeDescriptions: false });
+    assert.ok(!off.includes('share-description'), 'no parent description when off');
+    assert.ok(!off.includes('bad()'));
+
+    const on = renderSharePage({ snapshot: snap, includeDescriptions: true });
+    assert.ok(on.includes('<p class="share-description">'), 'parent description block when on');
+    assert.ok(on.includes('&lt;script&gt;bad()&lt;/script&gt;'), 'parent description is escaped');
+    assert.ok(!on.includes('<script>bad()</script>'));
+  });
+
+  test('passes priority and last-updated through to each row', () => {
+    const html = renderSharePage({
+      snapshot: {
+        title: 'T',
+        items: [{ identifier: 'LIN-1', title: 'A', state: { type: 'started' }, priority: 1, updatedAt: '2026-10-02T00:00:00.000Z' }]
+      }
+    });
+    assert.match(html, /class="task-priority"[^>]*>Urgent<\/span>/);
+    assert.match(html, /<time class="task-updated" datetime="2026-10-02T00:00:00\.000Z">2026-10-02<\/time>/);
   });
 
   test('renders an empty collection without rows', () => {
