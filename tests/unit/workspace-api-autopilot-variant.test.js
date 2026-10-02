@@ -12,7 +12,7 @@
  * The endpoints run their test-token mock branch, so no provider is needed.
  */
 
-import { test, before } from 'node:test';
+import { test, before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
@@ -171,5 +171,59 @@ test('general: a bogus variant is a byte-identical standard stack-walk response'
     assert.ok(bogus.body.prompt.includes('**Stamp every dispatch with your session id — and check which one you actually have.**'));
     assert.ok(bogus.body.prompt.includes('overrides this value with the true dispatch id'));
     assert.doesNotMatch(bogus.body.prompt, /STEPPER/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue-scoped endpoint: ?stopAt= (LIN-3246 / LIN-2949 P1b)
+// ---------------------------------------------------------------------------
+// The kickoff-side boundary: the ladder's own autopilot run passes `stopAt=pr`
+// so its prompt stops after review Approve and reports the PR as ready for
+// close-out. Only 'pr' is valid; blank is absent; any other value is a 400,
+// following the general twin's blank-is-absent query-param rule.
+describe('issue-scoped autopilot-prompt route — stopAt (LIN-3246)', () => {
+  test('no stopAt → the unchanged finish line (still tells the run to dispatch the close)', async () => {
+    const app = buildApp();
+    const { status, body } = await request(app, `/workspace/test-workspace/api/autopilot-prompt/${MOCK_ISSUE.id}`);
+    assert.equal(status, 200);
+    assert.ok(body.prompt.includes("## The finish line: dispatch the close, don't merge inline"));
+    assert.ok(body.prompt.includes('dispatch the `close-out` step'));
+    assert.ok(!body.prompt.includes('including as a stepped beat'));
+  });
+
+  for (const variant of ['standard', 'stepper']) {
+    test(`?stopAt=pr (${variant}) → the stop block, and the prompt is not longer than the default`, async () => {
+      await withServer(buildApp(), async (get) => {
+        const variantQuery = variant === 'stepper' ? '&variant=stepper' : '';
+        const base = await get(`/workspace/test-workspace/api/autopilot-prompt/${MOCK_ISSUE.id}${variantQuery ? `?variant=stepper` : ''}`);
+        const stop = await get(`/workspace/test-workspace/api/autopilot-prompt/${MOCK_ISSUE.id}?stopAt=pr${variantQuery}`);
+        assert.equal(stop.status, 200);
+        assert.match(stop.body.prompt, /stop at the PR/);
+        assert.match(stop.body.prompt, /including as a stepped beat/);
+        assert.match(stop.body.prompt, /ready for close-out/);
+        assert.doesNotMatch(stop.body.prompt, /dispatch the `close-out` step/);
+        assert.ok(Buffer.byteLength(stop.body.prompt) < Buffer.byteLength(base.body.prompt),
+          'the stop-at-PR prompt must be shorter than the default');
+      });
+    });
+  }
+
+  test('blank/whitespace-only ?stopAt= is treated as ABSENT, not an error', async () => {
+    for (const raw of ['', encodeURIComponent('   ')]) {
+      const app = buildApp();
+      const { status, body } = await request(app, `/workspace/test-workspace/api/autopilot-prompt/${MOCK_ISSUE.id}?stopAt=${raw}`);
+      assert.equal(status, 200);
+      assert.ok(body.prompt.includes("## The finish line: dispatch the close, don't merge inline"));
+      assert.ok(!body.prompt.includes('including as a stepped beat'));
+    }
+  });
+
+  test('an invalid ?stopAt= is rejected 400 with the dispatch route\'s shared error text', async () => {
+    for (const bad of ['merge', 'PR', 'close-out']) {
+      const app = buildApp();
+      const { status, body } = await request(app, `/workspace/test-workspace/api/autopilot-prompt/${MOCK_ISSUE.id}?stopAt=${bad}`);
+      assert.equal(status, 400);
+      assert.equal(body.error, "stopAt must be 'pr'");
+    }
   });
 });

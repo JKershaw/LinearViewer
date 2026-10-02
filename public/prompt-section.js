@@ -635,6 +635,9 @@
             variant,
             source: issue.source || undefined,
             bindingScope: issue.bindingScope || undefined,
+            // LIN-3246: the ladder's own autopilot run is bounded to the PR —
+            // close-out is the person's to send. Every other launcher omits it.
+            stopAt: 'pr',
             signal: ac.signal,
             on401: false
           });
@@ -969,7 +972,10 @@
           proxyForce: !!(state.result && state.result.proxyForce) || btn.dataset.proxyForce === 'runner',
           // LIN-2942: the rung this dispatch was taken on; the server records it,
           // linked to the created item.
-          entryRung: isAutopilotResult() ? 'run-task' : 'run-step'
+          entryRung: isAutopilotResult() ? 'run-task' : 'run-step',
+          // LIN-3246: the ladder's own autopilot run declares the PR boundary on
+          // the row too (the server validates it); a run-step dispatch does not.
+          stopAt: isAutopilotResult() ? 'pr' : undefined
         });
         btn.textContent = '\u2713';
       } catch (error) {

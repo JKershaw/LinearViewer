@@ -100,4 +100,27 @@ describe('fetchAutopilotKickoff — issue-scoped URL construction (LIN-1904)', (
     const url = await callFetchAutopilotKickoff({ urlKey: 'ws', issueId: 'issue-1', maxSessionsPerTask: 10 });
     assert.equal(url, '/workspace/ws/api/autopilot-prompt/issue-1');
   });
+
+  // LIN-3246: the ladder's own autopilot run adds `stopAt=pr` to the ISSUE-scoped
+  // kickoff URL (the boundary needs a single task). It is a no-op on the
+  // goal-scoped branch, like maxTasks is there.
+  test('stopAt:pr adds `?stopAt=pr` on the issue-scoped URL', async () => {
+    const url = await callFetchAutopilotKickoff({ urlKey: 'ws', issueId: 'issue-1', stopAt: 'pr' });
+    assert.equal(url, '/workspace/ws/api/autopilot-prompt/issue-1?stopAt=pr');
+  });
+
+  test('stopAt joins variant and source with `&`, in that order', async () => {
+    const url = await callFetchAutopilotKickoff({ urlKey: 'ws', issueId: 'issue-1', variant: 'stepper', source: 'github', stopAt: 'pr' });
+    assert.equal(url, '/workspace/ws/api/autopilot-prompt/issue-1?variant=stepper&source=github&stopAt=pr');
+  });
+
+  test('omitted stopAt leaves the issue-scoped URL byte-identical (no query string)', async () => {
+    const url = await callFetchAutopilotKickoff({ urlKey: 'ws', issueId: 'issue-1' });
+    assert.equal(url, '/workspace/ws/api/autopilot-prompt/issue-1');
+  });
+
+  test('stopAt is a no-op on the goal-scoped branch', async () => {
+    const url = await callFetchAutopilotKickoff({ urlKey: 'ws', goal: 'ship it', stopAt: 'pr' });
+    assert.equal(url, '/workspace/ws/api/autopilot-prompt?goal=ship+it');
+  });
 });

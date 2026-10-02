@@ -44,13 +44,13 @@ function makeContainer() {
 }
 
 function loadPromptSection({ copyFails = false, recordFails = false, recordThrowsSync = false } = {}) {
-  const calls = { records: [], dispatch: [], fetch: [] };
+  const calls = { records: [], dispatch: [], fetch: [], autopilotFetch: [] };
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
     stripCodeBlockWrapper: (s) => s,
     renderMarkdown: (s) => String(s == null ? '' : s),
     api: async () => ({ prompt: 'TEMPLATE PROMPT', promptName: 'Template' }),
-    fetchAutopilotKickoff: async () => ({ prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }),
+    fetchAutopilotKickoff: async (args) => { calls.autopilotFetch.push(args); return { prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }; },
     ProxyToggle: {
       maybeAppend: async (raw) => {
         if (copyFails) throw new Error('a driver copy is refused for a non-owner');
@@ -258,5 +258,43 @@ describe('LIN-2942 client hooks in PromptSection', () => {
     await m.container.click({ action: 'setup', rung: 'run-task', setupNeeds: 'proxy' });
     await flush();
     assert.equal(m.calls.records[0].body.surface, null);
+  });
+});
+
+// LIN-3246 / LIN-2949 P1b: the ladder's own autopilot run ("run the whole task"
+// and "Autopilot · stepped") declares the PR boundary on BOTH the kickoff fetch
+// and the dispatch. Every other ladder path (run-this-step, copy) sends nothing.
+describe('LIN-3246 stopAt — the ladder declares the PR boundary', () => {
+  for (const label of ['__autopilot__', '__autopilot_stepper__']) {
+    test(`${label}: the kickoff fetch and the dispatch both pass stopAt:'pr'`, async () => {
+      const m = await withResult(label);
+      assert.equal(m.calls.autopilotFetch.length, 1);
+      assert.equal(m.calls.autopilotFetch[0].stopAt, 'pr');
+      await m.container.click({ action: 'dispatch', target: 'cli' });
+      await flush();
+      assert.equal(m.calls.dispatch.length, 1);
+      assert.equal(m.calls.dispatch[0].stopAt, 'pr');
+      assert.equal(m.calls.dispatch[0].entryRung, 'run-task');
+    });
+  }
+
+  test('run this step (a template result): no stopAt on the fetch or the dispatch', async () => {
+    const m = await withResult('implementation');
+    assert.equal(m.calls.autopilotFetch.length, 0, 'a template result never hits the autopilot kickoff');
+    await m.container.click({ action: 'run-step', rung: 'run-step', target: 'cli' });
+    await flush();
+    assert.equal(m.calls.dispatch.length, 1);
+    assert.equal(m.calls.dispatch[0].entryRung, 'run-step');
+    assert.equal(m.calls.dispatch[0].stopAt, undefined);
+  });
+
+  test('copy/download never dispatch, so stopAt never reaches the dispatch seam', async () => {
+    for (const label of ['implementation', '__autopilot__']) {
+      const m = await withResult(label);
+      await m.container.click({ action: 'copy' });
+      await m.container.click({ action: 'download' });
+      await flush();
+      assert.equal(m.calls.dispatch.length, 0, `${label}: copy/download never dispatch`);
+    }
   });
 });
