@@ -491,6 +491,22 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     );
   });
 
+  test('R3: every aggregate dep read propagates, not only accountStore', async () => {
+    const w = freshWorld();
+    const rejecting = { find: () => ({ toArray: async () => { throw new Error('boom'); } }) };
+    const worlds = [
+      { accountWorkspaceStore: { collection: rejecting } },
+      { dispatchHistory: rejecting },
+      { taskModeStore: { countByEntryRung: async () => { throw new Error('boom'); } } }
+    ];
+    for (const overrides of worlds) {
+      await assert.rejects(
+        collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), ...overrides }),
+        /boom/
+      );
+    }
+  });
+
   test('R4: the aggregate dispatch read is projected to predicate + feedback-link fields only', async () => {
     const w = freshWorld();
     const seen = [];
@@ -583,6 +599,21 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
     assert.equal(result.steps.prOpened.state, 'reached');
     assert.equal(result.steps.prOpened.count, 0, 'a non-PR URL is not PR-opened evidence');
+  });
+
+  test('an abort row carrying PR evidence is not PR opened — route and aggregate', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000), {
+      abort: true,
+      feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/pull/9', timestamp: PAST(500) }]
+    }));
+
+    const aggregate = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(aggregate.steps.prOpened.count, 0, 'an abort row is not a PR-opened row in the aggregate');
+
+    const route = await stepsForAccountGroup({ accountIds: [a._id], ...aggDeps(w) });
+    assert.equal(route.steps.prOpened.state, 'not-reached');
   });
 
   test('carries counts and labels only — no account id, workspace key, issue id or PR url', async () => {

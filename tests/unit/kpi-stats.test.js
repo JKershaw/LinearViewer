@@ -1993,4 +1993,11 @@ describe('LIN-2952 — milestoneFunnel aggregate key', () => {
       /boom/
     );
   });
+
+  test('L2: collectKpiStats requires the milestoneFunnelDeps object', async () => {
+    await assert.rejects(
+      collectKpiStats(buildCollections(), { now: NOW }),
+      /milestoneFunnelDeps is required/
+    );
+  });
 });
