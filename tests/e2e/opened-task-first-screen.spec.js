@@ -544,7 +544,7 @@ test.describe('LIN-2942 — the ladder records its mode', () => {
     expect(mode.entry).toMatchObject({ rung: 'run-task', ready: false });
     expect(mode.taken).toMatchObject({ rung: 'copy' });
     expect(mode.furthest).toBe('run-task');
-    expect(mode.coverage).toEqual({ surfaces: ['swipe'] });
+    expect(mode.coverage).toEqual({ surfaces: ['swipe', 'home'] });
 
     // Another task has no mode for this account.
     const other = await readMode(page, localWorkerUrlKey, 'TEST-404');

@@ -986,7 +986,12 @@
           entryRung: isAutopilotResult() ? 'run-task' : 'run-step',
           // LIN-3246: the ladder's own autopilot run declares the PR boundary on
           // the row too (the server validates it); a run-step dispatch does not.
-          stopAt: isAutopilotResult() ? 'pr' : undefined
+          stopAt: isAutopilotResult() ? 'pr' : undefined,
+          // LIN-2944 P1 (handover d610edd0): which opened-task surface this came
+          // from, so Home (`home`) and Swipe (`swipe`) dispatches are
+          // distinguishable in the task-mode log. The server validates it against
+          // SURFACES and records it in place of null.
+          surface: opts.surface || undefined
         });
         btn.textContent = '\u2713';
       } catch (error) {

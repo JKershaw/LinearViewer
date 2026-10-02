@@ -168,6 +168,35 @@ describe('LIN-2942 — session dispatch route, entryRung', () => {
     assert.equal(store.calls[0].rung, 'run-task');
   });
 
+  test('a dispatch records the surface it was pressed from (LIN-2944 P1)', async () => {
+    const store = recordingTaskModeStore();
+    const res = await call(buildDispatchApp({ taskModeStore: store }), 'post', DISPATCH_PATH, { ...TASK_BODY, entryRung: 'run-step', surface: 'home' });
+    assert.equal(res.status, 201, res.text);
+    assert.equal(store.calls.length, 1);
+    assert.equal(store.calls[0].surface, 'home', 'the route records the caller surface, not null');
+  });
+
+  test('an unknown surface is a 400 and nothing is created or recorded', async () => {
+    const store = recordingTaskModeStore();
+    const captured = {};
+    const res = await call(buildDispatchApp({ taskModeStore: store, captured }), 'post', DISPATCH_PATH, { ...TASK_BODY, entryRung: 'run-step', surface: 'mobile' });
+    assert.equal(res.status, 400, res.text);
+    assert.match(res.body.error, /surface must be one of: swipe, home/);
+    assert.equal((captured.items || []).length, 0, 'nothing enqueued');
+    assert.equal(store.calls.length, 0, 'nothing recorded');
+  });
+
+  test('an absent or null surface still dispatches and records null (other callers)', async () => {
+    for (const surface of [undefined, null]) {
+      const store = recordingTaskModeStore();
+      const body = { ...TASK_BODY, entryRung: 'run-step' };
+      if (surface !== undefined) body.surface = surface;
+      const res = await call(buildDispatchApp({ taskModeStore: store }), 'post', DISPATCH_PATH, body);
+      assert.equal(res.status, 201, res.text);
+      assert.equal(store.calls[0].surface, null);
+    }
+  });
+
   test('the event lands in a real store, readable as the task\'s mode', async () => {
     const harness = createMangoTmpdir('lin-2942-dispatch-');
     await harness.connect();
@@ -344,7 +373,7 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
     assert.equal(res.body.taken.rung, 'copy');
     assert.equal(res.body.furthest, 'run-task');
     assert.equal(res.body.events.length, 2);
-    assert.deepEqual(res.body.coverage, { surfaces: ['swipe'] });
+    assert.deepEqual(res.body.coverage, { surfaces: ['swipe', 'home'] });
   });
 
   test('GET spans the canonical account\'s merge group and nobody else', async () => {
@@ -386,6 +415,6 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
   test('GET for a task with no events returns the empty mode', async () => {
     const res = await call(buildTaskModeApp({ taskModeStore: store }), 'get', `${TASK_MODE_PATH}/LIN-404`);
     assert.equal(res.status, 200, res.text);
-    assert.deepEqual(res.body, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe'] } });
+    assert.deepEqual(res.body, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home'] } });
   });
 });

@@ -44,7 +44,7 @@ import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
-import { DISPATCH_RUNGS } from '../lib/task-mode-store.js';
+import { DISPATCH_RUNGS, SURFACES } from '../lib/task-mode-store.js';
 import { resolveChatCredential, buildRunGate } from '../lib/chat-request.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
 
@@ -244,7 +244,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -428,6 +428,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         if (!issueIdentifier) {
           return badRequest.json(res, 'stopAt requires issueIdentifier');
         }
+      }
+
+      // LIN-2944 P1 (handover d610edd0): the opened-task surface a ladder press
+      // came from, recorded on the mode event. Optional — every other dispatch
+      // caller (periodical / Setup Prompt / dispatch page / autopilot kickoff)
+      // sends no surface, and it records null. Out of vocabulary ⇒ 400.
+      const hasSurface = surface !== undefined && surface !== null;
+      if (hasSurface && !SURFACES.includes(surface)) {
+        return badRequest.json(res, `surface must be one of: ${SURFACES.join(', ')}`);
       }
 
       // Reject local target from non-localhost requests
@@ -731,7 +740,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
             needs: null,
             act: 'dispatch',
             dispatchId: item._id,
-            surface: null
+            // LIN-2944 P1: the caller's validated surface, or null for the other
+            // dispatch callers that pass none.
+            surface: hasSurface ? surface : null
           })).catch(err => console.error('Failed to record task-mode dispatch event:', err));
         } catch (err) {
           console.error('Failed to record task-mode dispatch event:', err);
