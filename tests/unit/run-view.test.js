@@ -138,10 +138,40 @@ describe('run-view: progress over the fixed spine', () => {
     assert.ok(afterRework >= last);
     last = afterRework;
 
-    const withReview = [...reworked, stage('review')];
+    // A rework genuinely in flight (not yet done) must not drop the finished
+    // predecessor's count either.
+    const reworkRunning = [...withImpl, loop({ loopId: 'impl-2', lineageId: 'loop-implementation', kind: 'implementation', followUpTo: 'loop-implementation', terminalStatus: null })];
+    const afterRunningRework = buildRunView(session(reworkRunning)).progress.reached;
+    assert.equal(afterRunningRework, 2, 'an in-flight rework never lowers the finished count');
+    assert.ok(afterRunningRework >= last);
+    last = afterRunningRework;
+
+    const withReview = [...reworkRunning, stage('review')];
     const afterReview = buildRunView(session(withReview)).progress.reached;
     assert.equal(afterReview, 3);
     assert.ok(afterReview >= last);
+  });
+
+  test('F1: a rework follow-up of implementation still running reads 2 of 4, not 1 of 4', () => {
+    const view = buildRunView(session([
+      stage('plan'),
+      stage('implementation'),
+      loop({ loopId: 'impl-2', lineageId: 'loop-implementation', kind: 'implementation', followUpTo: 'loop-implementation', terminalStatus: null }),
+    ]));
+    assert.equal(view.progress.reached, 2);
+    assert.equal(view.progress.label, '2 of 4 stages');
+  });
+
+  test('F1: a single-lineage stepped run with a running close-out reads 3 of 4, not 0 of 4', () => {
+    const view = buildRunView(session([
+      loop({ loopId: 'l1', lineageId: 'L', kind: 'plan' }),
+      loop({ loopId: 'l2', lineageId: 'L', kind: 'implementation', followUpTo: 'l1' }),
+      loop({ loopId: 'l3', lineageId: 'L', kind: 'review', followUpTo: 'l2' }),
+      loop({ loopId: 'l4', lineageId: 'L', kind: 'close-out', followUpTo: 'l3', terminalStatus: null }),
+    ]));
+    assert.equal(view.progress.reached, 3);
+    assert.equal(view.progress.label, '3 of 4 stages');
+    assert.equal(view.next, 'close-out');
   });
 
   test('C3: a terminal run whose last spine step is a finished review reads 3 of 4, next close-out', () => {
@@ -307,8 +337,10 @@ describe('run-view: time', () => {
     const view = buildRunView(session([
       stage('plan', { telemetry: { runtime: { ms: 1500 }, metrics: [] } }),
       stage('implementation', { telemetry: { runtime: { ms: 2500 }, metrics: [] } }),
+      // A still-running loop's reported runtime counts too (not only finished loops).
+      loop({ loopId: 'review', kind: 'review', terminalStatus: null, telemetry: { runtime: { ms: 500 }, metrics: [] } }),
     ]));
-    assert.equal(view.time.activeMs, 4000);
+    assert.equal(view.time.activeMs, 4500);
   });
 
   test('wall clock runs against now while open; against completedAt once finished', () => {
@@ -357,7 +389,7 @@ describe('run-view: waiting clock', () => {
         feedback: [
           { kind: 'status', message: '[blocked] need your call', timestamp: '2026-07-20T10:05:00.000Z' },
           { kind: 'decision-answer', message: '{"decision_id":"d1"}', timestamp: '2026-07-20T10:07:00.000Z' },
-          { kind: 'decision-withdrawn', message: '{"decision_id":"d1"}', timestamp: '2026-07-20T10:08:00.000Z' },
+          { kind: 'decision-withdrawn', message: '[done] withdrawn {"decision_id":"d1"}', timestamp: '2026-07-20T10:08:00.000Z' },
           { kind: 'decision-withdrawal-reversed', message: '{"decision_id":"d1"}', timestamp: '2026-07-20T10:09:00.000Z' },
           { kind: 'usage', message: '[usage] {"costUsd":1}', timestamp: '2026-07-20T10:05:02.000Z' },
         ],
