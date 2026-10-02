@@ -2,17 +2,22 @@
  * LIN-3124 PR1 (G) — credential-surface boundary relations (T5).
  *
  * LIN-3219 A3 (LIN-3201 M19): the nine hardcoded `expected` baselines are gone.
- * Each credential surface is now guarded by a RELATION over source, not a
- * literal that every bump has to repair:
- *   - every site of the surface lies in a module that reaches the surface's
- *     credential entry through the import graph (`reaches`), and
- *   - the surface's scanner finds at least one site (`> 0`, so it never passes
- *     on a zero surface), and
- *   - the +1 / −1 planted offenders are kept as sensitivity witnesses: they
- *     must still move the scanner.
- * `provider-auth-edges` is import-edge-shaped, so it is guarded by a true
- * derived-set equality between the source regex edge set and the import-graph
- * edge set (which is dynamic-`import()`-aware), with a dynamic witness.
+ * Each surface is guarded by a RELATION that can FAIL, with an in-test planted
+ * offender per surface proving it is not vacuous. The scanner-moves checks are
+ * kept only as auxiliary sensitivity tests (they are not the witnesses).
+ *
+ * Relation kinds (plan rev 4 §Strategy option (1)/(2)):
+ *   - `boundary`: every site of the surface lies in a module that reaches the
+ *     surface's credential entry through the import graph (`reaches`). The entry
+ *     symbol is deliberately DIFFERENT from what the scanner matches, so a
+ *     planted site in a module that does not import the credential path fails.
+ *   - `callerImporter`: derived-set equality between the modules that CALL the
+ *     symbols and the modules that IMPORT them (via `directImportersOf`). Used
+ *     for `held-marker-emitters`, whose scanner matches its boundary symbol
+ *     itself (a `reaches` boundary would be vacuous there).
+ *   - `provider-auth-edges` is import-edge-shaped: a true derived-set equality
+ *     between the source regex edge set and the (dynamic-aware) import-graph
+ *     edge set, with a dynamic `import()` witness.
  *
  * Run with: node --test tests/unit/lin-3124-pr1-count-pins.test.js
  */
@@ -54,7 +59,7 @@ function withoutFirstMatch(sources, re, fileRe = null) {
 }
 
 // ---------------------------------------------------------------------------
-// Count functions
+// Count functions (the scanners)
 // ---------------------------------------------------------------------------
 
 const countTestTokenGuards = (s) => total(s, /accessToken === 'test-token'/g);
@@ -110,92 +115,8 @@ function countHeldMarkerEmitters(sources) {
 }
 
 // ---------------------------------------------------------------------------
-// The surfaces: scanner + +1/−1 plants + the credential boundary (a symbol the
-// site module must reach, derived from the import graph — never a file list).
+// Relations (each returns the list of offenders; empty when clean)
 // ---------------------------------------------------------------------------
-
-const PINS = [
-  {
-    id: 'test-token-guards',
-    label: "accessToken === 'test-token' guards",
-    sources: RAW,
-    re: /accessToken === 'test-token'/g,
-    surface: ['linkProvider'],
-    count: countTestTokenGuards,
-    plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),
-    minus: (s) => countTestTokenGuards(withoutFirstMatch(s, /accessToken === 'test-token'/)),
-  },
-  {
-    id: 'urlkey-lookups',
-    label: 'hand-rolled `w.urlKey === urlKey` lookups',
-    sources: REAL,
-    re: /w\??\.urlKey === urlKey/g,
-    surface: ['getWorkspaceCallScope'],
-    count: countUrlKeyLookups,
-    plus: (s) => countUrlKeyLookups(withLine(s, 'lib/workspace.js', 'if (w.urlKey === urlKey) {}')),
-    minus: (s) => countUrlKeyLookups(withoutFirstMatch(s, /w\??\.urlKey === urlKey/)),
-  },
-  {
-    id: 'provider-auth-edges',
-    label: 'upward provider index.js -> routes/*-auth import edges (LIN-675)',
-    sources: REAL,
-    re: /^import .*routes\/[a-z-]*auth/gm,
-    surface: null, // guarded by the derived-set equality below
-    count: countProviderAuthEdges,
-    plus: (s) => countProviderAuthEdges(withLine(s, 'lib/providers/local/index.js', "import '../routes/auth.js';")),
-    minus: (s) => countProviderAuthEdges(withoutFirstMatch(s, /^import .*routes\/[a-z-]*auth/, /^lib\/providers\/[^/]+\/index\.js$/)),
-  },
-  {
-    id: 'off-session-readers',
-    label: 'off-session raw-session credential readers',
-    sources: REAL,
-    re: /(selectOwnerWorkspaceToken|selectOwnerWorkspaceRow|selectExpiredOwnerRow|selectOwnerSessionRow|selectAllOwnerSessionRows)\(/g,
-    surface: ['linkProvider'],
-    count: countOffSessionReaders,
-    plus: (s) => countOffSessionReaders(withLine(s, 'lib/workspace.js', 'const r = selectOwnerSessionRow(s, u, o);')),
-    minus: (s) => countOffSessionReaders(withoutFirstMatch(s, /select(OwnerSessionRow|OwnerWorkspaceRow|ExpiredOwnerRow|OwnerWorkspaceToken|AllOwnerSessionRows)\(/, /^(?!lib\/workspace-token-resolver\.js).*/)),
-  },
-  {
-    id: 'binding-writers',
-    label: 'binding writers (linkProvider + upsertWorkspace)',
-    sources: REAL,
-    re: /(^|[^a-zA-Z])(linkProvider|upsertWorkspace)\(/g,
-    surface: ['linkProvider'],
-    count: countBindingWriters,
-    plus: (s) => countBindingWriters(withLine(withLine(s, 'lib/workspace.js', "linkProvider(ws, 'x', 'y', {});"), 'lib/workspace.js', 'upsertWorkspace(sess, w);')),
-    minus: (s) => countBindingWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])linkProvider\(/, /^(?!lib\/workspace\.js).*/)),
-  },
-  {
-    id: 'workspace-edge-writers',
-    label: 'account<->workspace edge writers (bindAccountToWorkspace)',
-    sources: REAL,
-    re: /(^|[^a-zA-Z])bindAccountToWorkspace\(/g,
-    surface: ['AccountStore', 'AccountWorkspaceStore', 'establishAccount', 'linkProvider', 'upsertWorkspace', 'getWorkspaceCallScope'],
-    count: countWorkspaceEdgeWriters,
-    plus: (s) => countWorkspaceEdgeWriters(withLine(s, 'lib/workspace.js', "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');")),
-    minus: (s) => countWorkspaceEdgeWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])bindAccountToWorkspace\(/, /^(?!lib\/account-workspace-store\.js).*/)),
-  },
-  {
-    id: 'raw-accesstoken-writers',
-    label: 'raw .accessToken assignments',
-    sources: REAL,
-    re: /\.accessToken *=[^=]/g,
-    surface: ['getWorkspaceCallScope'],
-    count: countRawAccessTokenWriters,
-    plus: (s) => countRawAccessTokenWriters(withLine(s, 'lib/workspace.js', "ws.accessToken = 'x';")),
-    minus: (s) => countRawAccessTokenWriters(withoutFirstMatch(s, /\.accessToken *=[^=]/)),
-  },
-  {
-    id: 'held-marker-emitters',
-    label: 'explicit held-entry marker emitters (LIN-3125 F1)',
-    sources: REAL,
-    re: /(^|[^.\w])withHeldMarker\(/g,
-    surface: ['withHeldMarker'],
-    count: countHeldMarkerEmitters,
-    plus: (s) => countHeldMarkerEmitters(withLine(s, 'lib/workspace.js', "const u = withHeldMarker('/auth/github', p);")),
-    minus: (s) => countHeldMarkerEmitters(withoutFirstMatch(s, /(^|[^.\w])withHeldMarker\(/, /^(?!lib\/held-connection-entry\.js).*/)),
-  },
-];
 
 /** The set of files in a source map containing a match of `re`. */
 function filesMatching(sources, re) {
@@ -205,30 +126,202 @@ function filesMatching(sources, re) {
   return [...out].sort();
 }
 
+/**
+ * Boundary rule: every site module must reach one of the surface's credential
+ * entry symbols. `symbols` are DELIBERATELY not the symbols the scanner matches,
+ * so the relation is falsifiable: a planted site in a module that does not
+ * import the credential path fails.
+ */
+function boundaryOffenders(sources, re, symbols, graph = buildImportGraph(sources)) {
+  return filesMatching(sources, re)
+    .filter((f) => !symbols.some((sym) => graph.reaches(f, sym)))
+    .map((f) => `${f}: site outside the ${symbols.join('|')} credential boundary`);
+}
+
+/**
+ * Derived-set equality: the modules that CALL the surface symbols equal the
+ * modules that IMPORT them. Used where the scanner matches the boundary symbol
+ * itself (a `reaches` boundary would be vacuous). `definers` are excluded from
+ * the caller set (a defining module legitimately holds the symbol without
+ * importing it). Both directions offend: a caller without an import, and an
+ * import without a caller.
+ */
+function callerImporterOffenders(sources, re, symbols, definers = [], graph = buildImportGraph(sources)) {
+  const callers = filesMatching(sources, re).filter((f) => !definers.includes(f)).sort();
+  const importers = [...new Set(symbols.flatMap((sym) => graph.directImportersOf(sym)))].sort();
+  const v = [];
+  for (const f of callers) if (!importers.includes(f)) v.push(`${f}: calls ${symbols.join('|')} but does not import it`);
+  for (const f of importers) if (!callers.includes(f)) v.push(`${f}: imports ${symbols.join('|')} but does not call it`);
+  return v;
+}
+
+// ---------------------------------------------------------------------------
+// The surfaces
+// ---------------------------------------------------------------------------
+
+const PINS = [
+  {
+    id: 'test-token-guards',
+    label: "accessToken === 'test-token' guards",
+    sources: RAW,
+    re: /accessToken === 'test-token'/g,
+    relation: 'boundary',
+    // scanner matches a property comparison; boundary entry is the credential
+    // entry symbol — different symbol, so the relation is falsifiable.
+    surface: ['linkProvider'],
+    plant: "const g = w.accessToken === 'test-token';\n",
+    count: countTestTokenGuards,
+    plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),
+    minus: (s) => countTestTokenGuards(withoutFirstMatch(s, /accessToken === 'test-token'/)),
+  },
+  {
+    id: 'urlkey-lookups',
+    label: 'hand-rolled `w.urlKey === urlKey` lookups',
+    sources: REAL,
+    re: /w\??\.urlKey === urlKey/g,
+    relation: 'boundary',
+    surface: ['getWorkspaceCallScope'],
+    plant: 'if (w.urlKey === urlKey) {}\n',
+    count: countUrlKeyLookups,
+    plus: (s) => countUrlKeyLookups(withLine(s, 'lib/workspace.js', 'if (w.urlKey === urlKey) {}')),
+    minus: (s) => countUrlKeyLookups(withoutFirstMatch(s, /w\??\.urlKey === urlKey/)),
+  },
+  {
+    id: 'provider-auth-edges',
+    label: 'upward provider index.js -> routes/*-auth import edges (LIN-675)',
+    sources: REAL,
+    re: /^import .*routes\/[a-z-]*auth/gm,
+    relation: 'providerAuth', // derived-set equality, handled in its own describe
+    surface: null,
+    count: countProviderAuthEdges,
+    plus: (s) => countProviderAuthEdges(withLine(s, 'lib/providers/local/index.js', "import '../routes/auth.js';")),
+    minus: (s) => countProviderAuthEdges(withoutFirstMatch(s, /^import .*routes\/[a-z-]*auth/, /^lib\/providers\/[^/]+\/index\.js$/)),
+  },
+  {
+    id: 'off-session-readers',
+    // scanner matches owner-session selector CALLS; boundary entry is the
+    // credential entry (different symbol), so a planted call in a module that
+    // does not import the credential path fails.
+    label: 'off-session raw-session credential readers',
+    sources: REAL,
+    re: /(selectOwnerWorkspaceToken|selectOwnerWorkspaceRow|selectExpiredOwnerRow|selectOwnerSessionRow|selectAllOwnerSessionRows)\(/g,
+    relation: 'boundary',
+    surface: ['linkProvider'],
+    plant: 'const r = selectOwnerSessionRow(s, u, o);\n',
+    count: countOffSessionReaders,
+    plus: (s) => countOffSessionReaders(withLine(s, 'lib/workspace.js', 'const r = selectOwnerSessionRow(s, u, o);')),
+    minus: (s) => countOffSessionReaders(withoutFirstMatch(s, /select(OwnerSessionRow|OwnerWorkspaceRow|ExpiredOwnerRow|OwnerWorkspaceToken|AllOwnerSessionRows)\(/, /^(?!lib\/workspace-token-resolver\.js).*/)),
+  },
+  {
+    id: 'binding-writers',
+    // scanner matches linkProvider/upsertWorkspace CALLS; boundary entry is the
+    // account<->workspace edge writer (a different symbol the files reach), so
+    // the relation is not the scanner's own symbol.
+    label: 'binding writers (linkProvider + upsertWorkspace)',
+    sources: REAL,
+    re: /(^|[^a-zA-Z])(linkProvider|upsertWorkspace)\(/g,
+    relation: 'boundary',
+    surface: ['readBindingCredential'],
+    plant: "linkProvider(ws, 'x', 'y', {});\n",
+    count: countBindingWriters,
+    plus: (s) => countBindingWriters(withLine(withLine(s, 'lib/workspace.js', "linkProvider(ws, 'x', 'y', {});"), 'lib/workspace.js', 'upsertWorkspace(sess, w);')),
+    minus: (s) => countBindingWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])linkProvider\(/, /^(?!lib\/workspace\.js).*/)),
+  },
+  {
+    id: 'workspace-edge-writers',
+    label: 'account<->workspace edge writers (bindAccountToWorkspace)',
+    sources: REAL,
+    re: /(^|[^a-zA-Z])bindAccountToWorkspace\(/g,
+    relation: 'boundary',
+    surface: ['AccountStore', 'AccountWorkspaceStore', 'establishAccount', 'linkProvider', 'upsertWorkspace', 'getWorkspaceCallScope'],
+    plant: "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');\n",
+    count: countWorkspaceEdgeWriters,
+    plus: (s) => countWorkspaceEdgeWriters(withLine(s, 'lib/workspace.js', "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');")),
+    minus: (s) => countWorkspaceEdgeWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])bindAccountToWorkspace\(/, /^(?!lib\/account-workspace-store\.js).*/)),
+  },
+  {
+    id: 'raw-accesstoken-writers',
+    label: 'raw .accessToken assignments',
+    sources: REAL,
+    re: /\.accessToken *=[^=]/g,
+    relation: 'boundary',
+    surface: ['getWorkspaceCallScope'],
+    plant: "ws.accessToken = 'x';\n",
+    count: countRawAccessTokenWriters,
+    plus: (s) => countRawAccessTokenWriters(withLine(s, 'lib/workspace.js', "ws.accessToken = 'x';")),
+    minus: (s) => countRawAccessTokenWriters(withoutFirstMatch(s, /\.accessToken *=[^=]/)),
+  },
+  {
+    id: 'held-marker-emitters',
+    // scanner matches withHeldMarker CALLS (the boundary symbol itself), so a
+    // `reaches` boundary would be vacuous; use caller==importer equality instead.
+    label: 'explicit held-entry marker emitters (LIN-3125 F1)',
+    sources: REAL,
+    re: /(^|[^.\w])withHeldMarker\(/g,
+    relation: 'callerImporter',
+    surface: ['withHeldMarker'],
+    definers: ['lib/held-connection-entry.js'],
+    plant: "const u = withHeldMarker('/auth/github', p);\n",
+    count: countHeldMarkerEmitters,
+    plus: (s) => countHeldMarkerEmitters(withLine(s, 'lib/workspace.js', "const u = withHeldMarker('/auth/github', p);")),
+    minus: (s) => countHeldMarkerEmitters(withoutFirstMatch(s, /(^|[^.\w])withHeldMarker\(/, /^(?!lib\/held-connection-entry\.js).*/)),
+  },
+];
+
+/** Run a pin's relation over a source map (the thing the witnesses assert on). */
+function relationOffenders(pin, sources) {
+  const graph = buildImportGraph(sources);
+  if (pin.relation === 'boundary') return boundaryOffenders(sources, pin.re, pin.surface, graph);
+  if (pin.relation === 'callerImporter') return callerImporterOffenders(sources, pin.re, pin.surface, pin.definers || [], graph);
+  return [];
+}
+
 describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3)', () => {
   for (const pin of PINS) {
-    test(`pin ${pin.id}: every ${pin.label} site lies in the credential surface`, () => {
+    test(`pin ${pin.id}: every ${pin.label} site satisfies the ${pin.relation} relation`, () => {
       const files = filesMatching(pin.sources, pin.re);
       assert.ok(files.length > 0, `${pin.id}: a zero-finding scan would be vacuous`);
       const base = pin.count(pin.sources);
-      const n = typeof base === 'number' ? base : base.total;
-      assert.ok(n > 0, `${pin.id}: the scanner must find at least one site`);
-      if (pin.surface) {
-        // Boundary rule: each site module must reach the surface's credential
-        // entry (a symbol derived from the import graph — no file allow-list).
-        const outside = files.filter((f) => !pin.surface.some((sym) => GRAPH.reaches(f, sym)));
-        assert.deepEqual(outside, [], `${pin.id}: sites outside the ${pin.surface.join('|')} credential boundary: ${outside.join(', ')}`);
-      }
+      assert.ok((typeof base === 'number' ? base : base.total) > 0, `${pin.id}: the scanner must find at least one site`);
+      assert.deepEqual(relationOffenders(pin, pin.sources), [], `${pin.id}: relation offenders`);
     });
 
-    test(`pin ${pin.id}: the scanner moves on a planted +1 site (kept sensitivity witness)`, () => {
+    if (pin.relation !== 'providerAuth') {
+      test(`pin ${pin.id}: WITNESS — a planted new ${pin.label} site outside the relation fails it`, () => {
+        const planted = new Map([...pin.sources, [`lib/zz-plant-${pin.id}.js`, pin.plant]]);
+        const off = relationOffenders(pin, planted);
+        assert.ok(off.length > 0, `${pin.id}: the planted offender must fail the relation, got none`);
+        assert.ok(
+          off.some((m) => m.includes(`lib/zz-plant-${pin.id}.js`)),
+          `${pin.id}: expected lib/zz-plant-${pin.id}.js in the offenders, got ${JSON.stringify(off)}`
+        );
+      });
+    }
+
+    test(`pin ${pin.id}: the scanner moves on a planted +1 site (auxiliary sensitivity)`, () => {
       assert.notDeepEqual(pin.plus(pin.sources), pin.count(pin.sources), `${pin.id} +1 plant did not move the scanner`);
     });
 
-    test(`pin ${pin.id}: the scanner moves on a planted −1 site (kept sensitivity witness)`, () => {
+    test(`pin ${pin.id}: the scanner moves on a planted −1 site (auxiliary sensitivity)`, () => {
       assert.notDeepEqual(pin.minus(pin.sources), pin.count(pin.sources), `${pin.id} −1 plant did not move the scanner`);
     });
   }
+
+  // The −1 relation witness exists where the relation is caller==importer
+  // (removing a call while its import remains MUST fail). For the boundary
+  // surfaces a removed site is not relation-expressible without a count: the
+  // boundary guards which modules may hold a site, not how many each holds.
+  // What covers removal there: the auxiliary sensitivity test above (the
+  // scanner moves) plus the `> 0` floor (emptying the class fails). See notes
+  // §17; plan rev 4 §Strategy option (3) (deletion only with a cited witness).
+  test('pin held-marker-emitters: WITNESS — a removed call with its import left behind fails', () => {
+    const pin = PINS.find((p) => p.id === 'held-marker-emitters');
+    const rel = 'lib/render-settings.js';
+    const planted = new Map(pin.sources);
+    planted.set(rel, planted.get(rel).replaceAll('withHeldMarker(', 'notHeldMarker('));
+    const off = callerImporterOffenders(planted, pin.re, pin.surface, pin.definers, buildImportGraph(planted));
+    assert.ok(off.some((m) => m.includes(rel) && m.includes('imports')), `expected an import-without-call offender for ${rel}, got ${JSON.stringify(off)}`);
+  });
 });
 
 describe('LIN-3124 PR1 T5 — provider-auth edges: derived-set equality (regex vs import-graph)', () => {
@@ -243,7 +336,7 @@ describe('LIN-3124 PR1 T5 — provider-auth edges: derived-set equality (regex v
     assert.deepEqual(textual, derived, 'the textual and import-graph provider->auth edge sets must agree');
   });
 
-  test('witness: a DYNAMIC provider -> routes/*-auth import is caught by the graph and missed by the regex', () => {
+  test('WITNESS: a DYNAMIC provider -> routes/*-auth import is caught by the graph and missed by the regex', () => {
     // The reviewer's LIN-3232 failure mode: `await import('../routes/x-auth.js')`
     // in a provider index.js. The source regex requires a static `^import `, so
     // it misses the edge; the (extended) import graph sees it — the derived-set
