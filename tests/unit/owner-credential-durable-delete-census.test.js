@@ -74,7 +74,12 @@ function read(relPath) {
 // server.js's unlink route legitimately revokes a partition with no cache
 // eviction at all — the guard, not the eviction, is the per-occurrence contract.
 const DURABLE_DELETE_RE = /\bownerCredentialStore\.delete(All)?\(/g;
-const DURABLE_GUARD_RE = /if \(isDefinitiveRevocation\(|if \(bindingRemoved\)|if \(removedWorkspace && deleteDurable\)|if \(ownerCredentialStore\)/;
+// Review `dfa3e1c3` finding #3: the DI null-check `if (ownerCredentialStore)` is
+// the codebase's own idiom for calling the store, not a teardown guard, so it is
+// NOT accepted here. A delete is accepted on a semantic guard OR because it is
+// written alongside the token-cache eviction (the LIN-1523 contract).
+const DURABLE_GUARD_RE = /if \(isDefinitiveRevocation\(|if \(bindingRemoved\)|if \(removedWorkspace && deleteDurable\)/;
+const EVICT_ABOVE_RE = /(evictWorkspaceTokenPair\(evictWorkspaceToken|evictAllWorkspaceTokens\(evictWorkspaceToken)/;
 
 function productionSources() {
   return new Map([
@@ -95,10 +100,13 @@ function matchPositions(source, re) {
 }
 
 /**
- * PER-OCCURRENCE relation: every durable-delete occurrence must sit on a
- * guarded teardown statement. The guard is looked for on the delete's own line
- * and the few lines above it, so a multi-line `if (...)` is seen but an
- * unguarded append is not. Returns `file:line` offenders.
+ * PER-OCCURRENCE relation: every durable-delete occurrence must either sit on a
+ * semantic teardown guard (definitive revocation / actual unlink / deleteDurable)
+ * OR be written alongside the token-cache eviction in the preceding window (the
+ * LIN-1523 "deleted alongside the eviction" contract, which the two
+ * routes/workspace.js sites satisfy with `evictWorkspaceTokenPair` 3–6 lines
+ * above). The `if (ownerCredentialStore)` DI null-check is deliberately not
+ * accepted. Returns `file:line` offenders.
  */
 function unguardedDurableDeletes(sources) {
   const offenders = [];
@@ -107,7 +115,7 @@ function unguardedDurableDeletes(sources) {
     lines.forEach((line, i) => {
       if (!/\bownerCredentialStore\.delete(All)?\(/.test(line)) return;
       const window = lines.slice(Math.max(0, i - 6), i + 1).join('\n');
-      if (!DURABLE_GUARD_RE.test(window)) offenders.push(`${rel}:${i + 1}`);
+      if (!DURABLE_GUARD_RE.test(window) && !EVICT_ABOVE_RE.test(window)) offenders.push(`${rel}:${i + 1}`);
     });
   }
   return offenders;
@@ -134,6 +142,19 @@ describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete per-occu
     assert.ok(
       unguardedDurableDeletes(planted).some((o) => o.startsWith('routes/workspace.js:')),
       'the planted unguarded durable delete in an already-compliant module must be an offender'
+    );
+  });
+
+  test('WITNESS: the IDIOMATIC shape `if (ownerCredentialStore) await …delete(` with no eviction/guard fails', () => {
+    // Review `dfa3e1c3` finding #3 (M7b/M7c): the DI null-check idiom must not
+    // count as a guard. Planted at the end of routes/workspace.js, with no
+    // semantic guard and no eviction above it.
+    const sources = productionSources();
+    const planted = new Map(sources);
+    planted.set('routes/workspace.js', `${sources.get('routes/workspace.js')}\nasync function _extra(ownerCredentialStore, accountId, urlKey) {\n  if (ownerCredentialStore) await ownerCredentialStore.delete(accountId, urlKey, 'linear');\n}\n`);
+    assert.ok(
+      unguardedDurableDeletes(planted).some((o) => o.startsWith('routes/workspace.js:')),
+      'the idiomatic null-check delete with no guard/eviction must be an offender'
     );
   });
 

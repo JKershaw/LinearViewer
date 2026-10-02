@@ -29,10 +29,10 @@ function read(relPath) {
 // also evicts somewhere") accepted a new unguarded teardown in a module that
 // already carried an eviction elsewhere. The production corpus (server.js plus
 // every route except the routes/test.js harness) is scanned so that EVERY
-// `session.destroy(` / `removeWorkspace(` occurrence must be covered by a
-// token-cache eviction between its neighbouring teardown occurrences — the
-// per-site server.js shape, generalised. A fresh teardown next to an existing
-// eviction no longer rides on the module's other sites.
+// `session.destroy(` occurrence must be PRECEDED by a token-cache eviction
+// (the server.js per-site shape, generalised) and every `removeWorkspace(`
+// occurrence must be paired with one (the two server.js removal sites evict
+// after the removal — the hoisted LIN-1518 eviction; that site is the carve-out).
 const DESTROY_RE = /\bsession\.destroy\(/g;
 const REMOVE_RE = /\bremoveWorkspace\((?!\))/g;
 const EVICT_RE = /(evictWorkspaceTokenPair\(evictWorkspaceToken|evictAllWorkspaceTokens\(evictWorkspaceToken)/g;
@@ -56,21 +56,28 @@ function matchPositions(source, re) {
 }
 
 /**
- * PER-OCCURRENCE relation: every teardown occurrence (a `session.destroy(` or a
- * `removeWorkspace(`) must have an eviction occurrence in the region bounded by
- * its neighbouring teardown occurrences. One eviction therefore cannot silently
- * cover a fresh teardown with none of its own, and a new teardown appended
- * anywhere in an already-evicting module has no eviction in its own region.
+ * PER-OCCURRENCE relation. For a `session.destroy(` occurrence the eviction must
+ * PRECEDE it, within `(prevTeardown, pos)` — generalising the server.js per-site
+ * rule (review `dfa3e1c3` finding #2: a two-sided window let a new destroy placed
+ * before an existing eviction pass). `removeWorkspace(` is the one carve-out: the
+ * two server.js removal sites (ensureValidToken, handleWorkspaceRemoval) evict
+ * AFTER the removal — the hoisted LIN-1518 eviction covers both arms — so a
+ * removal may be covered by an eviction in `(pos, nextTeardown)` as well. A
+ * removal appended past every eviction still fails.
  */
 function teardownEvictionOffenders(sources) {
   const offenders = [];
   for (const [rel, src] of sources) {
-    const teardowns = [...matchPositions(src, DESTROY_RE), ...matchPositions(src, REMOVE_RE)].sort((a, b) => a - b);
+    const destroys = matchPositions(src, DESTROY_RE);
+    const removes = matchPositions(src, REMOVE_RE);
+    const teardowns = [...destroys, ...removes].sort((a, b) => a - b);
     const evictions = matchPositions(src, EVICT_RE);
     teardowns.forEach((pos, i) => {
       const prev = i === 0 ? -1 : teardowns[i - 1];
       const next = i + 1 < teardowns.length ? teardowns[i + 1] : src.length + 1;
-      if (!evictions.some((e) => e > prev && e < next)) offenders.push(`${rel}@${pos}`);
+      const preceded = evictions.some((e) => e > prev && e < pos);
+      const removalCarveOut = removes.includes(pos) && evictions.some((e) => e > pos && e < next);
+      if (!preceded && !removalCarveOut) offenders.push(`${rel}@${pos}`);
     });
   }
   return offenders;
@@ -93,6 +100,19 @@ describe('LIN-1507 witness D(ii) — session.destroy/removeWorkspace per-occurre
     assert.ok(
       teardownEvictionOffenders(planted).some((o) => o.startsWith('routes/auth.js@')),
       'the planted unguarded destroy in an already-evicting module must be an offender'
+    );
+  });
+
+  test('WITNESS: a new session.destroy( planted BEFORE the existing eviction fails (order-dependent)', () => {
+    // Review `dfa3e1c3` finding #2: a two-sided window let a destroy placed
+    // before an existing eviction pass. Insert at the TOP of routes/auth.js,
+    // before /logout's eviction.
+    const sources = productionSources();
+    const planted = new Map(sources);
+    planted.set('routes/auth.js', `function _x(req) { req.session.destroy(() => {}); }\n${sources.get('routes/auth.js')}`);
+    assert.ok(
+      teardownEvictionOffenders(planted).some((o) => o.startsWith('routes/auth.js@')),
+      'a destroy before the only eviction must be an offender'
     );
   });
 

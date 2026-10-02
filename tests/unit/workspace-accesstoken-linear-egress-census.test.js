@@ -289,7 +289,7 @@ describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
     assert.deepEqual(outside, [], `resolveWorkspaceAccess( outside the chokepoint at offsets ${JSON.stringify(outside)}`);
   });
 
-  test('every getWorkspaceAccessToken( hydration read is balanced by a fetchIssueContext( consumption, per call site', () => {
+  test('every getWorkspaceAccessToken( hydration read is balanced by a fetchIssueContext( consumption, per-file read vs fetchIssueContext( balance', () => {
     // PER CALL SITE (LIN-3219 A3): the file-level "mentions the injected dep"
     // rule accepted a fresh hydration read. Each hydration read must now be
     // consumed by a fetchIssueContext( in the same file; the DI pass-through
