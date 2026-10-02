@@ -18,14 +18,18 @@
  *       non-object argument FAILS the pin rather than being skipped;
  *   (c) extracts the argument object's DEPTH-1 keys (string- and nesting-aware,
  *       so a nested `{ proxyTokenStore }` never satisfies it) and asserts
- *       `proxyTokenStore` is one of them;
- *   (d) counts every call site so the `=== 10` check covers the whole surface.
+ *       `proxyTokenStore` is one of them.
+ *
+ * LIN-3219 A3 retired the `calls.length === 10` head-count (no bump source); the
+ * `missing === []` relation carries the rule, and planted-offender witnesses
+ * (a call missing the depth-1 key; a nested depth-2 mention) keep the scanner
+ * from passing on zero findings.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -141,39 +145,69 @@ function topLevelKeys(interior) {
   return keys;
 }
 
+/**
+ * The real production files under routes/ and lib/, as `{file, src}` with
+ * repo-relative paths.
+ */
+function realFiles() {
+  return [...walk(join(REPO, 'routes')), ...walk(join(REPO, 'lib'))]
+    .map((full) => ({ file: relative(REPO, full), src: readFileSync(full, 'utf8') }));
+}
+
+/**
+ * Scan a file set for `createDispatchItem(` call sites and report, per call,
+ * whether its argument object literal carries a DEPTH-1 `proxyTokenStore` key.
+ * Pure over `{file, src}` so a planted offender can be fed without the tree.
+ */
+function scanProxyTokenStoreKeys(files) {
+  const calls = [];
+  for (const { file, src } of files) {
+    const code = blankComments(src);
+    for (const m of code.matchAll(/createDispatchItem\s*\(/g)) {
+      // Exclude the factory definition (preceded by `function`).
+      if (/function\s+$/.test(code.slice(Math.max(0, m.index - 40), m.index))) continue;
+
+      const openParen = m.index + m[0].length - 1;
+      const closeParen = matchBracket(code, openParen);
+      assert.ok(closeParen !== -1, `${file}: unbalanced parens at a createDispatchItem call`);
+
+      const argText = code.slice(openParen + 1, closeParen);
+      const firstNonSpace = argText.search(/\S/);
+      assert.ok(
+        firstNonSpace !== -1 && argText[firstNonSpace] === '{',
+        `${file}: createDispatchItem argument must be an object literal, got "${argText.trim().slice(0, 50)}"`
+      );
+
+      const openBrace = openParen + 1 + firstNonSpace;
+      const closeBrace = matchBracket(code, openBrace);
+      assert.ok(closeBrace !== -1, `${file}: unbalanced braces in a createDispatchItem argument`);
+
+      const keys = topLevelKeys(code.slice(openBrace + 1, closeBrace));
+      calls.push({ file, hasProxyTokenStore: keys.includes('proxyTokenStore') });
+    }
+  }
+  return calls;
+}
+
 describe('LIN-3130 L2 — every createDispatchItem call threads proxyTokenStore as a direct key', () => {
   test('all call sites pass proxyTokenStore at depth 1 of the argument object literal', () => {
-    const files = [...walk(join(REPO, 'routes')), ...walk(join(REPO, 'lib'))];
-    const calls = [];
-
-    for (const file of files) {
-      const code = blankComments(readFileSync(file, 'utf8'));
-      for (const m of code.matchAll(/createDispatchItem\s*\(/g)) {
-        // Exclude the factory definition (preceded by `function`).
-        if (/function\s+$/.test(code.slice(Math.max(0, m.index - 40), m.index))) continue;
-
-        const openParen = m.index + m[0].length - 1;
-        const closeParen = matchBracket(code, openParen);
-        assert.ok(closeParen !== -1, `${file}: unbalanced parens at a createDispatchItem call`);
-
-        const argText = code.slice(openParen + 1, closeParen);
-        const firstNonSpace = argText.search(/\S/);
-        assert.ok(
-          firstNonSpace !== -1 && argText[firstNonSpace] === '{',
-          `${file}: createDispatchItem argument must be an object literal, got "${argText.trim().slice(0, 50)}"`
-        );
-
-        const openBrace = openParen + 1 + firstNonSpace;
-        const closeBrace = matchBracket(code, openBrace);
-        assert.ok(closeBrace !== -1, `${file}: unbalanced braces in a createDispatchItem argument`);
-
-        const keys = topLevelKeys(code.slice(openBrace + 1, closeBrace));
-        calls.push({ file: file.slice(REPO.length + 1), hasProxyTokenStore: keys.includes('proxyTokenStore') });
-      }
-    }
-
+    const calls = scanProxyTokenStoreKeys(realFiles());
     const missing = calls.filter((c) => !c.hasProxyTokenStore).map((c) => c.file);
     assert.deepEqual(missing, [], `createDispatchItem call sites missing a depth-1 proxyTokenStore key: ${missing.join(', ')}`);
-    assert.equal(calls.length, 10, `expected 10 createDispatchItem call sites (definition excluded), found ${calls.length}`);
+  });
+
+  test('witness: a planted call missing a depth-1 proxyTokenStore key fails (non-vacuous)', () => {
+    const planted = [...realFiles(), { file: 'routes/proxy-new.js', src: 'await createDispatchItem({ store, fields: { prompt } });\n' }];
+    const missing = scanProxyTokenStoreKeys(planted).filter((c) => !c.hasProxyTokenStore).map((c) => c.file);
+    assert.ok(missing.includes('routes/proxy-new.js'), `expected routes/proxy-new.js flagged, got ${JSON.stringify(missing)}`);
+  });
+
+  test('witness: a NESTED proxyTokenStore (depth-2) does not satisfy the pin', () => {
+    const planted = [...realFiles(), {
+      file: 'routes/proxy-nested.js',
+      src: 'await createDispatchItem({ store, finalizePrompt: () => attachProxyContext({ proxyTokenStore }), fields: { prompt } });\n'
+    }];
+    const missing = scanProxyTokenStoreKeys(planted).filter((c) => !c.hasProxyTokenStore).map((c) => c.file);
+    assert.ok(missing.includes('routes/proxy-nested.js'), `expected routes/proxy-nested.js flagged, got ${JSON.stringify(missing)}`);
   });
 });

@@ -5,9 +5,13 @@
  * which holds the dispatch grant; an unforced one is the grant-less toggle
  * path. This census keeps that class closed:
  *  C5a every `maybeAppend(` / `maybeAppendProxyBlock(` caller in public/ is
- *      listed; `driver-forced` sites pass the literal `true`,
- *      `driver-conditional` sites pass a variable whose derivation is pinned
- *      right above the call, and no listed site passes `false`;
+ *      listed; `driver-forced` sites pass the literal `true` AND keep their
+ *      multiplicity (`count`) — a duplicate unconditional forced line must
+ *      still fail (LIN-3219 carry-a3 constraint 1). `driver-conditional` sites
+ *      pass a variable whose derivation is pinned right above EACH occurrence
+ *      (their multiplicity is relaxed to "found at least once": the
+ *      per-occurrence derivation check carries them), and no listed site
+ *      passes `false`;
  *  C5b `getOrCreateToken(` has exactly one caller, inside `maybeAppend`;
  *  C5c the forced-container emitters (`data-proxy-force="true"`,
  *      `proxyForce: true`, the `"runner"` rung) are listed;
@@ -52,19 +56,19 @@ function codeLines(files) {
 
 const COPY_SITES = [
   {
-    file: 'public/app.js', class: 'driver-conditional', count: 1,
+    file: 'public/app.js', class: 'driver-conditional',
     call: 'textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey, { force: forceProxy })',
     derivation: "const forceProxy = promptContainer.dataset.proxyForce === 'true'",
     reason: 'home/issue Autopilot and periodical "+ Autopilot" copy (render.js data-proxy-force containers)'
   },
   {
-    file: 'public/app.js', class: 'driver-conditional', count: 1,
+    file: 'public/app.js', class: 'driver-conditional',
     call: 'textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey, { force: forceProxy })',
     derivation: "const forceProxy = promptContainer.dataset.proxyForce === 'true'",
     reason: 'the same containers, download'
   },
   {
-    file: 'public/prompt-section.js', class: 'driver-conditional', count: 2,
+    file: 'public/prompt-section.js', class: 'driver-conditional',
     call: 'const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });',
     derivation: 'const force = !!(state.result && state.result.proxyForce);',
     reason: 'prompt-section Autopilot result copy and download (proxyForce set only on the autopilot entry)'
@@ -114,8 +118,16 @@ function scanCopyCallers(files, table = COPY_SITES) {
     }
   }
   for (const site of table) {
-    if ((seen.get(site) || 0) !== site.count) {
-      offenders.push({ kind: 'stale', file: site.file, text: site.call, expected: site.count, found: seen.get(site) || 0 });
+    const found = seen.get(site) || 0;
+    // carry-a3 (constraint 1): `driver-forced` rows keep the MULTIPLICITY check
+    // — each is a single unconditional driver-copy mint, and `expr === 'true'`
+    // passes trivially for a duplicate, so `count` is the only thing that stops
+    // a second `maybeAppend(…, { force: true })` line (a dispatch-grant token).
+    // `driver-conditional` rows are relaxed to "found at least once": every
+    // occurrence is still checked individually against its derivation above.
+    const ok = site.class === 'driver-forced' ? found === site.count : found >= 1;
+    if (!ok) {
+      offenders.push({ kind: 'stale', file: site.file, call: site.call, expected: site.class === 'driver-forced' ? site.count : '>=1', found });
     }
   }
   return offenders;
@@ -224,6 +236,24 @@ describe('LIN-3136 C5a — every copy caller is listed and forced correctly', ()
       'text = await window.ProxyToggle.maybeAppend(text, urlKey, { force: true });',
       'text = await window.ProxyToggle.maybeAppend(text, urlKey, { force: false });');
     assert.ok(scanCopyCallers(flipped, table).some(o => o.kind === 'force-false'));
+  });
+
+  test('carry-a3 (1): a DUPLICATE driver-forced maybeAppend line fails', () => {
+    // The reviewer's witness (135e6c79 §5a): a second unconditional
+    // `maybeAppend(…, { force: true })` in public/flight-companion.js. The
+    // per-occurrence `expr === 'true'` check passes it trivially; only the
+    // forced-row multiplicity catches it.
+    const dup = 'text = await window.ProxyToggle.maybeAppend(text, urlKey, { force: true });';
+    const planted = replaceIn(SOURCES, 'public/flight-companion.js', dup, `${dup}\n${dup}`);
+    assert.ok(
+      planted.find(f => f.file === 'public/flight-companion.js').src.includes(`${dup}\n${dup}`),
+      'the duplicate line was actually planted'
+    );
+    const offenders = scanCopyCallers(planted);
+    assert.ok(
+      offenders.some(o => o.kind === 'stale' && o.file === 'public/flight-companion.js' && o.expected === 1 && o.found === 2),
+      `expected a forced-row multiplicity offender, got ${JSON.stringify(offenders)}`
+    );
   });
 
   test('mutation: a driver-forced site passing a variable fails', () => {

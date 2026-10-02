@@ -506,11 +506,18 @@ const replaceOnce = (needle, replacement) => (src) => {
 const POST_DISPATCH_GATE = "          if (isFollowUp) {\n            return provisionResumeCredential({";
 
 describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields, no spread', () => {
-  test('10 calls; the 6 follow-up-carrying ones are exactly the Class F set; every fields is inline, spread-free', () => {
+  test('the 6 follow-up-carrying calls are exactly the Class F set; every fields is inline, spread-free', () => {
     const calls = scanDispatchCalls(PRODUCTION);
-    assert.equal(calls.length, 10);
     assert.deepEqual(calls.filter(c => c.carriesFollowUpTo).map(callKey).sort(), FOLLOWUP_SITES.map(s => s.key).sort());
     assert.deepEqual(censusC2(PRODUCTION), []);
+  });
+
+  test('mutation (extra non-follow-up call): a new unlisted createDispatchItem fails (i)', () => {
+    // The removed `calls.length === 10` literal is carried by the derived sets:
+    // FOLLOWUP_SITES above and the NON_FOLLOWUP_CALLS roster inside censusC2.
+    // A planted extra non-follow-up call is unlisted, so (i) still fails.
+    const mutated = [...PRODUCTION, { file: 'routes/new-launch.js', src: "router.post('/api/new-launch', async (req, res) => {\n  await createDispatchItem({ store, fields: { prompt } });\n});" }];
+    assert.ok(censusC2(mutated).some(m => m.startsWith('(i) unlisted createDispatchItem call:')));
   });
 
   test('mutation 5: a new unlisted follow-up createDispatchItem fails (i)', () => {
