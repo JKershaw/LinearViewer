@@ -1144,3 +1144,17 @@ describe('task-edit link (LIN-1565)', () => {
     assert.ok(!html.includes('edit-issue-form'), 'no inline edit form');
   });
 });
+
+// =============================================================================
+// Home script list (LIN-2944 P1 addendum 9 / N1 M10)
+// =============================================================================
+// Home must load the shared opened-task component script. Dropping
+// /prompt-section.js from the list left all unit tests green (surviving M10).
+describe('Home script list (LIN-2944 P1)', () => {
+  test('signed-in pages load /prompt-section.js before /app.js', () => {
+    const trees = [{ project: { id: 'p1', name: 'P' }, incomplete: [], completed: [], completedCount: 0 }];
+    const authed = renderPage(trees, [], [], 'Org', { urlKey: 'ws', workspaces: [{ urlKey: 'ws', provider: 'linear' }] });
+    assert.ok(authed.includes('/prompt-section.js'), 'signed-in page loads the shared component');
+    assert.ok(authed.indexOf('/prompt-section.js') < authed.indexOf('/app.js'), 'loaded before app.js mounts it');
+  });
+});

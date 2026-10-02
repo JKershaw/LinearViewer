@@ -586,3 +586,55 @@ test.describe('LIN-2944 P1 — Home top-task mark', () => {
     expect(homeSection).toBe('project');
   });
 });
+
+// =============================================================================
+// LIN-2944 P1 R1/R2 — the Home first screen end to end.
+//
+// Landing on Home, the marked top task's Prompts section opens by default (R2),
+// so the flow is: open the top row → ✦ next step → copy (3 clicks). The ✦ primary
+// is click-gated, so there is zero recommend spend before the click. This witness
+// kills M18 (the Home mount passes why: []) and a mutant where the top task's
+// Prompts section stays collapsed.
+// =============================================================================
+
+test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
+  test('top task shows why + Go, streams a TEST-13 prompt with reasoning, and copies in 3 clicks with no spend before Go', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+
+    const spend = recommendSpy(page);
+    let clicks = 0;
+    const click = async (locator) => { clicks += 1; await locator.click(); };
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const topRow = page.locator('[data-top-task="1"]');
+    await expect(topRow).toHaveCount(1);
+
+    // Click 1: open the marked top row. Its Prompts section is open by default (R2).
+    await click(topRow);
+    const component = page.locator('.prompt-section').first();
+    await expect(component).toBeVisible();
+    await expect(component.locator('[data-testid="opened-task-why"]')).toContainText('bug');
+    const go = component.locator('[data-testid="opened-task-go"]');
+    await expect(go).toBeVisible();
+    await expect(go).toBeEnabled();
+
+    // Zero recommend spend before the click.
+    expect(spend).toEqual([]);
+
+    // Click 2: ✦ next step streams a tailored prompt with visible reasoning.
+    await click(go);
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
+    await expect(component.locator('[data-testid="opened-task-reasoning"]')).toBeVisible();
+    await expect(component.locator('[data-prompt-body]')).toContainText('TEST-13');
+
+    // Click 3: copy the prompt.
+    await click(component.locator('.swipe-prompt-copy'));
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip).toContain('TEST-13');
+
+    expect(clicks).toBe(3);
+  });
+});

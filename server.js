@@ -1691,7 +1691,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     customPrompts,
     showSource,
     truncated,
-    topTaskId: homeTopTask ? homeTopTask.id : null,
+    topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
     topTaskWhy: homeTopTask ? homeTopTask.why : []
   });
   return res.send(html);
@@ -3046,7 +3046,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       isLocalhost,
       showSource,
       truncated,
-      topTaskId: homeTopTask ? homeTopTask.id : null,
+      topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
       topTaskWhy: homeTopTask ? homeTopTask.why : []
     });
     res.send(html);

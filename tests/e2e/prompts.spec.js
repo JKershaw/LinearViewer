@@ -17,7 +17,14 @@ const CODE_REVIEW_ISSUE_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 async function openTaskPrompts(page, containerSelector, issueId) {
   await page.locator(`${containerSelector} .line[data-id="${issueId}"]`).first().click();
   const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
-  await details.locator('.detail-toggle[data-toggle="prompts"]').click();
+  const toggle = details.locator('.detail-toggle[data-toggle="prompts"]');
+  await toggle.waitFor({ state: 'visible' });
+  // The marked top task's Prompts section opens by default (LIN-2944 P1 R2);
+  // only toggle it open when it is still closed (every other row).
+  const content = details.locator('.detail-content[data-content="prompts"]');
+  if (!(await content.isVisible().catch(() => false))) {
+    await toggle.click();
+  }
   const component = details.locator('.prompt-section');
   await expect(component).toBeVisible();
   return component;

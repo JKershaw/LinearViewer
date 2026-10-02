@@ -188,9 +188,11 @@ test.describe('Detail Section Toggles', () => {
   });
 
   test('Prompts toggle shows/hides prompt buttons', async ({ page }) => {
-    // Find and expand an issue
+    // Find and expand a NON-top issue: the marked top task's Prompts section
+    // opens by default (LIN-2944 P1 R2), so this pins the collapsed default on
+    // every other row.
     const project = page.locator('.project').first();
-    const issueLine = project.locator('.line.expandable').first();
+    const issueLine = project.locator('.line.expandable:not([data-top-task="1"])').first();
     await issueLine.click();
 
     const issueId = await issueLine.getAttribute('data-id');
@@ -214,9 +216,9 @@ test.describe('Detail Section Toggles', () => {
   });
 
   test('Details and Prompts toggles work independently', async ({ page }) => {
-    // Find and expand an issue
+    // A non-top issue (the top task's Prompts opens by default per R2).
     const project = page.locator('.project').first();
-    const issueLine = project.locator('.line.expandable').first();
+    const issueLine = project.locator('.line.expandable:not([data-top-task="1"])').first();
     await issueLine.click();
 
     const issueId = await issueLine.getAttribute('data-id');

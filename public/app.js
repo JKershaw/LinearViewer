@@ -343,8 +343,9 @@ function mountHomePromptSections(root) {
       // LIN-2942: where the ladder press happened, carried on its mode record.
       surface: 'home',
       // LIN-2944 F3: only the ordering pipeline's front card advertises a
-      // ranking reason; every other opened task renders no why line.
-      why: id === page.topTaskId ? (page.topTaskWhy || []) : [],
+      // ranking reason; every other opened task renders no why line. N2: match on
+      // the binding-aware node key, not the raw id.
+      why: el.dataset.nodeKey === page.topTaskId ? (page.topTaskWhy || []) : [],
       hasAI: page.hasAI,
       aiState: page.aiState,
       freeTier: page.freeTier,
@@ -361,7 +362,24 @@ function mountHomePromptSections(root) {
       // issue in In Progress AND its project tree gets disjoint panel ids.
       idPrefix: el.dataset.instanceKey || `home-${id}`
     })
+    // LIN-2944 P1 R2: the marked top task's Prompts section opens by default, so
+    // the Home flow is open the top row → ✦ next step → copy (3 clicks). Other
+    // rows stay collapsed. The ✦ primary is still click-gated, so this spends
+    // nothing.
+    if (el.dataset.nodeKey === page.topTaskId) {
+      expandPromptsSection(el)
+    }
   })
+}
+
+/** Expand a detail fragment's Prompts disclosure (R2) without a click. */
+function expandPromptsSection(mountEl) {
+  const details = mountEl.closest('.details')
+  const toggle = details?.querySelector('.detail-toggle[data-toggle="prompts"]')
+  const content = details?.querySelector('.detail-content[data-content="prompts"]')
+  if (!toggle || !content) return
+  content.classList.remove('hidden')
+  toggle.textContent = toggle.textContent.replace('\u25B6', '\u25BC')
 }
 
 /** Tear down any mounted opened-task component under `root` (before re-fetch). */
@@ -1026,7 +1044,7 @@ function initPrompts() {
     // LIN-191: Ignore clicks on disabled buttons
     if (copyBtn.disabled) return
 
-    const promptContainer = copyBtn.closest('.prompt-container, .recommend-prompt')
+    const promptContainer = copyBtn.closest('.prompt-container')
     const promptText = promptContainer?.querySelector('.prompt-text')
     if (!promptText) return
 
@@ -1072,7 +1090,7 @@ function initPrompts() {
 
     if (downloadBtn.disabled) return
 
-    const promptContainer = downloadBtn.closest('.prompt-container, .recommend-prompt')
+    const promptContainer = downloadBtn.closest('.prompt-container')
     const promptText = promptContainer?.querySelector('.prompt-text')
     if (!promptText) return
 
@@ -1117,7 +1135,7 @@ function initPrompts() {
     // LIN-191: Ignore clicks on disabled buttons
     if (dispatchBtn.disabled) return
 
-    const promptContainer = dispatchBtn.closest('.prompt-container, .recommend-prompt')
+    const promptContainer = dispatchBtn.closest('.prompt-container')
     const promptText = promptContainer?.querySelector('.prompt-text')
     const promptNameEl = promptContainer?.querySelector('.prompt-name')
     if (!promptText) return
@@ -1130,13 +1148,11 @@ function initPrompts() {
     const target = dispatchBtn.dataset.target || 'cli'
     const originalLabel = dispatchBtn.textContent
 
-    // Get issue ID and workspace URL key. Each prompt-container variant anchors
-    // its issue on a different data attribute (standard prompts use
-    // data-prompt-for; autopilot uses its own), so check them all before
-    // falling back to the recommend container's wrapper.
-    const issueId = promptContainer.dataset.promptFor ||
-      promptContainer.dataset.autopilotFor ||
-      promptContainer.closest('[data-recommend-for]')?.dataset.recommendFor
+    // Get issue ID and workspace URL key. The surviving page-wide containers
+    // are the periodical Mint / Mint+Autopilot and Setup Prompt rows, which are
+    // issue-less (`renderPromptContainer` emits no `data-prompt-for`), so a
+    // missing id resolves to `issueless: true` below.
+    const issueId = promptContainer.dataset.promptFor
     const urlKey = promptContainer.dataset.urlKey ||
       promptContainer.closest('[data-url-key]')?.dataset.urlKey
 

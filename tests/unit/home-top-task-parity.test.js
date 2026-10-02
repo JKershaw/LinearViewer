@@ -14,6 +14,7 @@ import assert from 'node:assert';
 import { renderPage } from '../../lib/render.js';
 import { renderSwipePage, orderIssuesForSwipe } from '../../lib/render-swipe.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import { nodeKey } from '../../lib/tree.js';
 // Side-effect import: the Linear provider self-registers so getProviderForWorkspace
 // resolves for the workspace below (same idiom as tests/unit/render.test.js).
 import '../../lib/providers/linear/index.js';
@@ -87,7 +88,7 @@ describe('Home/Swipe top-task parity (LIN-2944 P1 F3)', () => {
 
     const homeHtml = renderPage(data.projectTrees, data.inProgressTrees, data.recentActivityTrees, 'Org', {
       urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: {},
-      topTaskId: ordered[0].id, topTaskWhy: ordered[0].why
+      topTaskId: nodeKey(ordered[0]), topTaskWhy: ordered[0].why
     });
     const marked = markedTop(homeHtml);
 
@@ -101,7 +102,7 @@ describe('Home/Swipe top-task parity (LIN-2944 P1 F3)', () => {
     const ordered = orderIssuesForSwipe(data);
     const homeHtml = renderPage(data.projectTrees, data.inProgressTrees, data.recentActivityTrees, 'Org', {
       urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: {},
-      topTaskId: ordered[0].id, topTaskWhy: ordered[0].why
+      topTaskId: nodeKey(ordered[0]), topTaskWhy: ordered[0].why
     });
     assert.equal((homeHtml.match(/data-top-task="1"/g) || []).length, 1, 'exactly one mark');
     assert.equal(markedTop(homeHtml).section, 'in-progress', 'the mark is on the In Progress occurrence');
@@ -126,7 +127,7 @@ describe('Home/Swipe top-task parity (LIN-2944 P1 F3)', () => {
 
     const homeHtml = renderPage(data.projectTrees, data.inProgressTrees, data.recentActivityTrees, 'Org', {
       urlKey: 'ws', workspaces: [WORKSPACE], featureFlags: {},
-      topTaskId: ordered[0].id, topTaskWhy: ordered[0].why
+      topTaskId: nodeKey(ordered[0]), topTaskWhy: ordered[0].why
     });
     const marked = markedTop(homeHtml);
     assert.ok(marked, 'Home marks the top task');
@@ -214,5 +215,38 @@ describe('page-level options embedded for Home (LIN-2944 P1 addendum 9)', () => 
   test('landing pages emit no Home prompt options (byte-identical, no prompt UI)', () => {
     const html = renderPage([], [], [], 'Org', { isLanding: true });
     assert.ok(!html.includes('__HOME_PROMPT_OPTS__'), 'no embedded options on landing');
+  });
+});
+
+// =============================================================================
+// LIN-2944 P1 N2 — the top-task match is binding-aware, not id-only.
+// =============================================================================
+describe('LIN-2944 P1 N2: the top-task match is binding-aware', () => {
+  test("with repoA#1 and repoB#1 sharing an id, only the top card's binding row is marked", () => {
+    const shared = {
+      id: 'dupe-1', identifier: 'X-1', title: 'Shared', priority: 1,
+      state: { type: 'started', name: 'In Progress' },
+      labels: { nodes: [{ name: 'bug' }] }, relations: { nodes: [] }
+    };
+    const a = { ...shared, source: 'repoA' };
+    const b = { ...shared, source: 'repoB' };
+    const trees = [
+      { project: { id: 'pa', name: 'Repo A' }, incomplete: [{ issue: a, children: [], depth: 0 }], completed: [], completedCount: 0 },
+      { project: { id: 'pb', name: 'Repo B' }, incomplete: [{ issue: b, children: [], depth: 0 }], completed: [], completedCount: 0 }
+    ];
+    const ordered = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees: [], recentActivityTrees: [] });
+    const top = ordered.find(c => c.source === 'repoB');
+    assert.ok(top, 'repoB card is present');
+
+    const html = renderPage(trees, [], [], 'Org', {
+      urlKey: 'ws', workspaces: [{ urlKey: 'ws', name: 'WS', provider: 'linear' }], featureFlags: {},
+      topTaskId: nodeKey(top), topTaskWhy: top.why
+    });
+
+    assert.equal((html.match(/data-top-task="1"/g) || []).length, 1, 'exactly one row is marked');
+    const idx = html.indexOf('data-top-task="1"');
+    const before = html.slice(0, idx);
+    assert.ok(before.lastIndexOf('Repo B') > before.lastIndexOf('Repo A'),
+      "the mark is on repoB's row, not repoA's same-id row");
   });
 });
