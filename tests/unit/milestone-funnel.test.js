@@ -336,6 +336,16 @@ describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
     assert.equal(steps.prOpened.state, STEP_STATES.NO_SIGNAL);
   });
 
+  test('R2: an instrumented merge-click read that throws is no-signal, never not-reached', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const throwing = new FunnelEventStore({ collection: { find: () => { throw new Error('db down'); } } });
+
+    const { steps } = await readSteps(w, [a._id], { funnelEventStore: throwing, instrumentedSteps: ['merge-clicked'] });
+    assert.equal(steps.mergeClicked.state, STEP_STATES.NO_SIGNAL);
+    assert.equal(steps.mergeClicked.at, null);
+  });
+
   test('an empty group reads every un-instrumented step as not-reached (merge-click no-signal)', async () => {
     const w = freshWorld();
     const { steps } = await readSteps(w, []);
@@ -385,6 +395,18 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     const noDispatch = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchQueue: null, dispatchHistory: null });
     assert.equal(noDispatch.steps.firstGo.state, 'no-signal');
     assert.equal(noDispatch.steps.firstGo.count, null);
+  });
+
+  test('R2: an instrumented merge-click read that throws is no-signal, never count 0', async () => {
+    const w = freshWorld();
+    await w.accountStore.createAccount();
+    const throwing = new FunnelEventStore({ collection: { find: () => { throw new Error('db down'); } } });
+
+    const result = await collectMilestoneFunnel({
+      since: WINDOW_START, ...aggDeps(w), funnelEventStore: throwing, instrumentedSteps: ['merge-clicked']
+    });
+    assert.equal(result.steps.mergeClicked.state, 'no-signal');
+    assert.equal(result.steps.mergeClicked.count, null);
   });
 
   test('G1a: continuations never inflate firstGo — a world of follow-up/worker/cascade/wake rows counts 0', async () => {

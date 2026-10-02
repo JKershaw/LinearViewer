@@ -5,7 +5,8 @@
  *
  * Covers the append-only record contract and the first-per-account read on a
  * real MangoDB engine: the frozen vocabulary, server-side time stamping,
- * vocabulary rejection with no write, non-throwing writes and reads, and the
+ * vocabulary rejection with no write, non-throwing writes, surfaced read
+ * failures, and the
  * per-step / per-group / windowed first-event semantics. Holds identifiers and
  * app-defined labels only.
  */
@@ -156,8 +157,8 @@ describe('FunnelEventStore.firstPerAccount', () => {
     assert.ok(new Date(rows[0].at).getTime() >= cutoff.getTime(), 'the returned time is the in-window event');
   });
 
-  test('a failing collection never throws: returns []', async () => {
+  test('a failing collection surfaces the read failure (rejects), never a false []', async () => {
     const failing = new FunnelEventStore({ collection: { find: () => { throw new Error('db down'); } } });
-    assert.deepStrictEqual(await failing.firstPerAccount({ step: 'merge-clicked' }), []);
+    await assert.rejects(failing.firstPerAccount({ step: 'merge-clicked' }), /db down/);
   });
 });

@@ -27,6 +27,7 @@ import { foldTaskMode } from '../lib/task-mode-store.js';
  * @param {Object} deps.dispatchQueue - 'dispatch-queue' collection
  * @param {Object} deps.dispatchHistory - 'dispatch-history' collection
  * @param {import('../lib/funnel-event-store.js').FunnelEventStore} deps.funnelEventStore
+ * @param {readonly string[]} [deps.instrumentedSteps] - test seam; defaults to the INSTRUMENTED_STEPS code constant
  * @param {Function} deps.workspaceFromUrl
  */
 export function createMilestoneFunnelRoutes({
@@ -36,6 +37,7 @@ export function createMilestoneFunnelRoutes({
   dispatchQueue,
   dispatchHistory,
   funnelEventStore,
+  instrumentedSteps,
   workspaceFromUrl
 }) {
   const router = Router();
@@ -54,7 +56,8 @@ export function createMilestoneFunnelRoutes({
         accountWorkspaceStore,
         dispatchQueue,
         dispatchHistory,
-        funnelEventStore
+        funnelEventStore,
+        instrumentedSteps
       });
       const mode = foldTaskMode(await taskModeStore.listForAccount(accountIds));
       return res.json({ accountId, urlKey: req.workspace.urlKey, steps, outOfOrder, mode });

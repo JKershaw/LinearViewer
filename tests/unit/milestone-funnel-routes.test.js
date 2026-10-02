@@ -49,7 +49,7 @@ function freshWorld() {
   };
 }
 
-function buildApp(w, session = { accountId: 'acct-1' }) {
+function buildApp(w, session = { accountId: 'acct-1' }, overrides = {}) {
   const app = express();
   app.use(express.json());
   app.use(createMilestoneFunnelRoutes({
@@ -59,6 +59,7 @@ function buildApp(w, session = { accountId: 'acct-1' }) {
     dispatchQueue: w.dispatchQueue,
     dispatchHistory: w.dispatchHistory,
     funnelEventStore: w.funnelEventStore,
+    ...overrides,
     workspaceFromUrl: stubWorkspaceFromUrl(session)
   }));
   return app;
@@ -139,6 +140,17 @@ describe('LIN-2952 — GET /workspace/:urlKey/api/milestone-funnel', () => {
     const res = await call(buildApp(w, { accountId: merged._id }), 'get', PATH);
     assert.equal(res.status, 200, res.text);
     assert.equal(res.body.steps.firstGo.at, goAt.toISOString());
+  });
+
+  test('R2: an instrumented merge-click read that throws is no-signal, not not-reached', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const res = await call(buildApp(w, { accountId: a._id }, {
+      funnelEventStore: new FunnelEventStore({ collection: { find: () => { throw new Error('db down'); } } }),
+      instrumentedSteps: ['merge-clicked']
+    }), 'get', PATH);
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.body.steps.mergeClicked.state, 'no-signal');
   });
 
   test('narrows to the session account when canonicalization throws (corrupt chain)', async () => {
