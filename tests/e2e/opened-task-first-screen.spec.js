@@ -665,6 +665,16 @@ test.describe('LIN-2944 P2 — no AI spend when Brief/Recap open', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
 
+    // The 3001 server's data dir persists across runs, so a prior run may have
+    // cached this task's brief/recap. Clear both so the open below is genuinely
+    // the `missing` state (the state P2 makes non-spending).
+    const topId = await page.evaluate(() => window.__SWIPE_DATA__.issues[0].id);
+    const topIdentifier = (await page.locator('.swipe-card-identifier').first().textContent()).trim();
+    for (const issueId of [topId, topIdentifier]) {
+      await page.request.get(`/test/clear-brief-cache?urlKey=${localWorkerUrlKey}&issueId=${encodeURIComponent(issueId)}`);
+      await page.request.get(`/test/clear-recap-cache?urlKey=${localWorkerUrlKey}&issueId=${encodeURIComponent(issueId)}`);
+    }
+
     await page.locator('.swipe-accordion-header[data-accordion="brief"]').first().click();
     await page.locator('.swipe-accordion-header[data-accordion="recap"]').first().click();
 
