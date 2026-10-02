@@ -53,6 +53,7 @@ describe('deriveCloseOutState — truth table', () => {
       review: approve(),
       runnerReady: true,
       owner: true,
+      stopAt: 'pr',
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.READY);
     assert.strictEqual(state.ready, true);
@@ -69,9 +70,25 @@ describe('deriveCloseOutState — truth table', () => {
       review: approve(),
       runnerReady: true,
       owner: true,
+      stopAt: 'pr',
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.READY);
     assert.strictEqual(state.headMoved, true);
+  });
+
+  test('a non-stop-at-PR run is never ready, however the PR reads', () => {
+    const state = deriveCloseOutState({
+      prs: [pr(41)],
+      prStatuses: [openStatus()],
+      review: approve(),
+      runnerReady: true,
+      owner: true,
+      stopAt: null,
+    });
+    assert.strictEqual(state.status, CLOSE_OUT_STATUS.NOT_READY);
+    assert.strictEqual(state.pressable, false);
+    assert.strictEqual(state.reason, 'not-stop-at-run');
+    assert.match(state.setupCopy, /set up/);
   });
 
   test('many open PRs are never ready (per-PR state, task stays open)', () => {
@@ -151,6 +168,7 @@ describe('deriveCloseOutState — truth table', () => {
       review: approve('request-changes'),
       runnerReady: true,
       owner: true,
+      stopAt: 'pr',
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.NOT_READY);
     assert.strictEqual(state.pressable, false);
@@ -166,6 +184,7 @@ describe('deriveCloseOutState — truth table', () => {
       review: approve(),
       runnerReady: false,
       owner: true,
+      stopAt: 'pr',
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.NOT_READY);
     assert.match(state.setupCopy, /set up/);
