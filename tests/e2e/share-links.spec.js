@@ -112,6 +112,26 @@ test.describe('Share link — guest view (LIN-3244)', () => {
     await guest.close();
   });
 
+  test('a label share shows task descriptions but never a parent description', async ({ page, browser, workerUrlKey }) => {
+    await createSession(page, { urlKey: workerUrlKey });
+    const issues = [
+      // A parent-looking issue with a description but NOT carrying the label.
+      { id: 'p-1', identifier: 'PAR-1', title: 'Parent', description: 'Parent body', state: { type: 'started' }, priority: 0, updatedAt: '2026-01-01T00:00:00Z', labels: { nodes: [{ name: 'feature' }] } },
+      { id: 'c-1', identifier: 'BUG-1', title: 'Bug task', description: 'Bug body', state: { type: 'started' }, priority: 3, updatedAt: '2026-01-03T00:00:00Z', labels: { nodes: [{ name: 'bug' }] } }
+    ];
+    const seeded = await seedShare(page.request, workerUrlKey, { subject: { kind: 'label', id: 'bug' }, includeDescriptions: true, issues });
+
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    expect((await guestPage.goto(`/s/${seeded.token}`)).status()).toBe(200);
+
+    await expect(guestPage.locator('.share-description')).toHaveCount(0);
+    await expect(guestPage.locator('.task-description')).toHaveText('Bug body');
+    await expect(guestPage.locator('time.task-updated')).toHaveText('2026-01-03');
+
+    await guest.close();
+  });
+
   test('a parent share lists only the live children — canceled and duplicate are absent', async ({ page, browser, workerUrlKey }) => {
     await createSession(page, { urlKey: workerUrlKey });
     const issues = [
