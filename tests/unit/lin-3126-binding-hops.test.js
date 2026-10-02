@@ -17,8 +17,9 @@ import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   REPO_A, REPO_B, installGitHubProvider, makeTwoRepoWorkspace, makeSingleRepoWorkspace,
-  buildTaskChatApp, buildTaskEditApp, buildWorkspaceApiApp, withServer,
+  makeMixedProviderWorkspace, buildTaskChatApp, buildTaskEditApp, buildWorkspaceApiApp, withServer,
 } from './lin-3126-harness.js';
+import { setFetchImpl } from '../../lib/openrouter.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -128,5 +129,80 @@ describe('LIN-3240 F3/M8 — /api/context reaches the issue\'s own binding', () 
     assert.equal(status, 200);
     const reads = calls.filter(c => c.method === 'fetchProjects');
     assert.deepEqual(reads.map(c => c.scope.repo), [REPO_A]);
+  });
+});
+
+/**
+ * LIN-3240 review R1 / LIN-2371 — the task-chat persona must name the ROW's
+ * declared provider, not the workspace's active one, on a mixed-provider
+ * workspace.
+ *
+ * This is a BEHAVIOUR witness, not a source-text grep (`lin-2371-…` pins the
+ * derivation text, which stayed green while the value was always
+ * `workspace.provider`). It drives the real POST handler end to end: the
+ * provider context fetch, the real `buildTaskChatMessages`, and the real
+ * `streamChat` — intercepted at the module's own `setFetchImpl` seam (LIN-1848)
+ * so the OUTGOING system message is the observable. A non-tool-capable model id
+ * keeps the turn on the plain streaming branch. Mutation (R1-orphan): make
+ * `declaredSource` always `workspace.provider` → the GitHub row names Linear →
+ * red.
+ */
+function openRouterSseResponse() {
+  const sse = [
+    `data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: null }] })}\n\n`,
+    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`,
+    'data: [DONE]\n\n',
+  ].join('');
+  return {
+    ok: true,
+    status: 200,
+    // Non-streaming shape too, so the witness holds regardless of whether the
+    // process has a proxy env set (`useStreaming` in lib/openrouter.js).
+    json: async () => ({ model: 'test/plain-model', choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }], usage: {} }),
+    text: async () => sse,
+    body: new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode(sse)); controller.close(); },
+    }),
+  };
+}
+
+async function drivePersonaTurn(query) {
+  const captured = [];
+  setFetchImpl(async (url, opts) => {
+    captured.push({ url, body: JSON.parse(opts.body) });
+    return openRouterSseResponse();
+  });
+  try {
+    const app = buildTaskChatApp({
+      workspace: makeMixedProviderWorkspace(),
+      sessionOverrides: { openRouterApiKey: 'test-key' },
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({ modelId: 'test/plain-model' }) },
+    });
+    const res = await withServer(app, ({ post }) =>
+      post(`/workspace/acme/api/task-chat/1${query}`, { question: 'where do you stand?' }));
+    const system = captured[0]?.body?.messages?.find(m => m.role === 'system')?.content || '';
+    return { res, system, captured };
+  } finally {
+    setFetchImpl(null);
+  }
+}
+
+describe('LIN-3240 R1 — task-chat persona names the row\'s declared provider', () => {
+  test('a mixed-provider workspace + ?source=github gets a GitHub-named persona', async () => {
+    installGitHubProvider({ repoIssues: { [REPO_B]: ISSUE_B } });
+    const { res, system } = await drivePersonaTurn('?source=github&bindingScope=octo%2FrepoB');
+
+    assert.notEqual(res.status, 422, 'the Github row must resolve, not refuse');
+    assert.match(system, /^You ARE a single GitHub Issues task, speaking for yourself/,
+      'the persona must name the row\'s actual provider, not the Linear-active workspace');
+    assert.doesNotMatch(system, /single Linear task/, 'the workspace provider must not leak onto a foreign row');
+  });
+
+  test('an unmatched / absent source falls back to the workspace provider', async () => {
+    installGitHubProvider({ repoIssues: { [REPO_B]: ISSUE_B } });
+    const { system } = await drivePersonaTurn('');
+
+    assert.match(system, /^You ARE a single Linear task, speaking for yourself/,
+      'with no selector the persona names the workspace provider');
   });
 });

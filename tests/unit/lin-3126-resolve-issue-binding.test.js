@@ -308,6 +308,33 @@ describe('LIN-3240 resolveDefaultBinding', () => {
     assert.equal(resolved.error, undefined);
   });
 
+  // LIN-3240 review L3 / F8d: the F8(a) fixture above is single-provider, so
+  // "sole binding" and "default binding" coincide and deleting the sole-binding
+  // branch (F8d) survived. This MIXED-provider case separates them: the default
+  // is Linear (active marker), while the non-default GitHub provider has exactly
+  // one binding — a source-only `github` must resolve to THAT binding, not the
+  // Linear default. Deleting the branch → red.
+  test('F8(a) mixed-provider: source-only naming a NON-default provider with a sole binding resolves to that binding', () => {
+    const gh = registerProvider({ name: 'github', ui: {}, supports: () => true });
+    const bindings = [
+      { provider: 'linear', scope: 'org-1', connectionId: 'conn-l' },
+      { provider: 'github', scope: REPO_A, connectionId: 'conn-g' },
+    ];
+    setBindingCredential(bindings[0], { token: 'lin-tok' });
+    setBindingCredential(bindings[1], { installationId: '99', token: 'tok-a' });
+    const ws = {
+      id: 'ws-1', provider: 'linear', bindings,
+      activeBinding: { provider: 'linear', scope: 'org-1' },
+    };
+    setWorkspaceCredential(ws, { token: 'lin-tok' });
+
+    const resolved = resolveDefaultBinding(ws, { source: 'github' });
+    assert.equal(resolved.error, undefined);
+    assert.equal(resolved.provider, gh, 'must be the named provider, not the Linear default');
+    assert.deepEqual(resolved.callScope, { token: 'tok-a', repo: REPO_A },
+      'must resolve to the GitHub sole binding, NOT the Linear default');
+  });
+
   test('F8(b): source-only names a provider with >1 bindings → the default binding, never an ambiguity refusal', () => {
     const { ws } = twoRepoConnectionWorkspace();
     const resolved = resolveDefaultBinding(ws, { source: 'github' });

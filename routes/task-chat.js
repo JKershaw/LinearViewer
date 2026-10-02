@@ -388,9 +388,17 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
   router.post('/workspace/:urlKey/api/task-chat/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
+    // LIN-3240 (review R1): the DECLARED source, restored. This was dropped when
+    // the selector moved inline, leaving the LIN-2371 persona block below reading
+    // an undeclared `requestedSource` behind `typeof` — which silently yielded
+    // `undefined`, so the persona always named `workspace.provider` on a
+    // mixed-provider workspace (the exact false-provider class LIN-2371 fixed).
+    // Declared here from the SAME query field the selector consumes, so the
+    // persona names the row's actual provider.
+    const requestedSource = typeof req.query.source === 'string' && req.query.source ? req.query.source : null;
     // LIN-3240: row tier — the issue's OWN binding, strict (`source`+`bindingScope`).
     const issueBinding = resolveIssueBinding(workspace, {
-      source: typeof req.query.source === 'string' && req.query.source ? req.query.source : undefined,
+      source: requestedSource ?? undefined,
       bindingScope: typeof req.query.bindingScope === 'string' && req.query.bindingScope ? req.query.bindingScope : undefined,
     });
     if (issueBinding.error) {

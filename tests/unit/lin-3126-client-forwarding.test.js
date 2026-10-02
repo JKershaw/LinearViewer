@@ -301,3 +301,98 @@ describe('LIN-3240 render-task-edit form stamp', () => {
     assert.ok(html.includes('data-source="github" data-binding-scope="octo/repoB"'));
   });
 });
+
+// ---------------------------------------------------------------------------
+// public/task-chat.js — L2 prefill of `bindingScope` onto the turn POST URL.
+//
+// The reviewer's F2c mutation (`var prefillBindingScope = '';`) survived the
+// suite because nothing exercised the client read. This evaluates the WHOLE
+// shipped IIFE in a minimal DOM sandbox (so the real
+// `var prefillBindingScope = data.defaultBindingScope || '';` init line runs,
+// and mutating it is fatal) and captures the URL the send() turn POSTs. Not a
+// source-text grep.
+// ---------------------------------------------------------------------------
+const TASK_CHAT_CLIENT_SRC = read('public/task-chat.js');
+
+function fakeClientEl() {
+  const el = {
+    value: '',
+    innerHTML: '',
+    textContent: '',
+    disabled: false,
+    scrollTop: 0,
+    scrollHeight: 0,
+    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    addEventListener(type, fn) { el._handlers = el._handlers || {}; el._handlers[type] = fn; },
+    removeEventListener() {},
+    focus() {},
+    querySelector() { return null; },
+    closest() { return {}; },
+    setAttribute() {},
+    getAttribute() { return null; },
+  };
+  return el;
+}
+
+/** Load the real public/task-chat.js and return a way to drive one send(). */
+function loadTaskChatClient(data) {
+  const captured = [];
+  const idInput = fakeClientEl();
+  idInput.value = data.defaultTask || '';
+  const questionInput = fakeClientEl();
+  questionInput.value = 'a question';
+  const sendBtn = fakeClientEl();
+  const transcript = fakeClientEl();
+  const bodyEl = fakeClientEl();
+
+  const window = {
+    __TASK_CHAT_DATA__: data,
+    ChatUI: {
+      appendMessage: () => ({ querySelector: () => bodyEl }),
+      appendNote: () => {},
+      renderMarkdownText: () => {},
+      isPinnedToBottom: () => true,
+      toolBreadcrumbLabel: () => '',
+    },
+    api: async () => ({}),
+    escapeHtml: (s) => String(s == null ? '' : s),
+    toast: () => {},
+  };
+  const sandbox = {
+    window,
+    document: {
+      getElementById: (id) => ({
+        'task-chat-id': idInput,
+        'task-chat-question': questionInput,
+        'task-chat-send': sendBtn,
+        'task-chat-transcript': transcript,
+      }[id] || null),
+    },
+    // Never settles: the synchronous URL build has already run by then, and no
+    // SSE/ChatUI machinery is needed downstream.
+    fetch: (url) => { captured.push(url); return new Promise(() => {}); },
+    readSSEStream: () => {},
+    console,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(TASK_CHAT_CLIENT_SRC, sandbox, { filename: 'task-chat.js-client' });
+  return { captured, send: () => sendBtn._handlers.click() };
+}
+
+describe('LIN-3240 L2 — the task-chat client prefill sends bindingScope (kills F2c)', () => {
+  test('defaultBindingScope set → the turn POST carries source AND bindingScope', () => {
+    const { captured, send } = loadTaskChatClient({
+      urlKey: 'acme', defaultTask: 'GB-1', defaultSource: 'github', defaultBindingScope: 'octo/repoB',
+    });
+    send();
+    assert.equal(captured[0], '/workspace/acme/api/task-chat/GB-1?source=github&bindingScope=octo%2FrepoB');
+  });
+
+  test('defaultBindingScope absent → the turn POST stays byte-identical (source only)', () => {
+    const { captured, send } = loadTaskChatClient({
+      urlKey: 'acme', defaultTask: 'GB-1', defaultSource: 'github',
+    });
+    send();
+    assert.equal(captured[0], '/workspace/acme/api/task-chat/GB-1?source=github');
+  });
+});

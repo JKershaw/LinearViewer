@@ -31,7 +31,7 @@ export function installGitHubProvider({ repoIssues = {}, supportsRecommendation 
   };
   const provider = registerProvider({
     name: 'github',
-    ui: { inlineCreate: true, inlineEdit: true },
+    ui: { inlineCreate: true, inlineEdit: true, displayName: 'GitHub Issues' },
     supports: (cap) => (cap === 'fetchRecommendationContext' ? supportsRecommendation : true),
     createFields: () => createFields,
     apiWriteFields: () => [],
@@ -115,6 +115,37 @@ export function makeSingleRepoWorkspace({ scope = REPO_A, connectionId = 'conn-1
     provider: 'github',
     bindings: [binding],
     activeBinding: { provider: 'github', scope },
+  };
+}
+
+/**
+ * A MIXED-provider connection-backed workspace: a fixture default provider
+ * (display name "Linear") is active, and a single GitHub binding (`REPO_B`)
+ * rides beside it — review R1's "Linear-active + a GitHub binding" shape. This
+ * is where naming `workspace.provider` on a GitHub row asserts the wrong
+ * provider, so the LIN-2371 persona witness can catch it. The default provider
+ * is a local fixture (not the real Linear client) so an absent-selector turn
+ * never touches the network; the GitHub fake is registered by
+ * {@link installGitHubProvider}.
+ */
+export function makeMixedProviderWorkspace({ githubScope = REPO_B } = {}) {
+  registerProvider({
+    name: 'linear-fixture',
+    ui: { displayName: 'Linear' },
+    supports: () => true,
+    fetchRecommendationContext: async (scope, issueId) => ({ issue: { id: issueId }, comments: [] }),
+  });
+  const bindings = [
+    { provider: 'linear-fixture', scope: 'linear-scope', connectionId: 'conn-l' },
+    { provider: 'github', scope: githubScope, connectionId: 'conn-g' },
+  ];
+  setBindingCredential(bindings[0], { token: 'tok-linear' });
+  setBindingCredential(bindings[1], { installationId: '99', token: 'tok-gh' });
+  return {
+    urlKey: 'acme',
+    provider: 'linear-fixture',
+    bindings,
+    activeBinding: { provider: 'linear-fixture', scope: 'linear-scope' },
   };
 }
 
