@@ -110,6 +110,7 @@ import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
 import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning, isEmailSignInAvailable, resolvePromptStepMode } from './lib/email-availability.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
+import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
@@ -2190,7 +2191,11 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore }))
+
+// Task-mode routes (LIN-2942): the ladder's client-side press record and the
+// per-account per-task mode read.
+app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions

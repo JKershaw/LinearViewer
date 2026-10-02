@@ -13,7 +13,7 @@
 import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import {
-  TaskModeStore, RUNGS, ACTS, NEEDS, SURFACES, RUNG_ACTS, INSTRUMENTED_SURFACES, validateTaskModeEvent
+  TaskModeStore, RUNGS, ACTS, NEEDS, SURFACES, RUNG_ACTS, INSTRUMENTED_SURFACES, DISPATCH_RUNGS, CLIENT_ACTS, validateTaskModeEvent
 } from '../../lib/task-mode-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
@@ -46,6 +46,9 @@ describe('vocabulary', () => {
       assert.ok(Object.isFrozen(list));
     }
     assert.deepStrictEqual(Object.keys(RUNG_ACTS), [...RUNGS]);
+    assert.deepStrictEqual([...DISPATCH_RUNGS], ['run-step', 'run-task']);
+    assert.deepStrictEqual([...CLIENT_ACTS], ['press', 'copy']);
+    assert.ok(Object.isFrozen(DISPATCH_RUNGS) && Object.isFrozen(CLIENT_ACTS));
   });
 
   test('validateTaskModeEvent accepts every mapped press and act', () => {
@@ -83,6 +86,7 @@ describe('vocabulary', () => {
       'missing issueIdentifier': copyAct({ issueIdentifier: null }),
       'non-string issueId': copyAct({ issueId: 42 }),
       'oversized identifier': copyAct({ issueIdentifier: 'x'.repeat(201) }),
+      'control characters in an identifier': copyAct({ issueIdentifier: 'LIN-42\n' }),
     };
     for (const [name, event] of Object.entries(cases)) {
       assert.strictEqual(typeof validateTaskModeEvent(event), 'string', name);
