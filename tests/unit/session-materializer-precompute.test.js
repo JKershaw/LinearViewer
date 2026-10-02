@@ -113,4 +113,12 @@ describe('server.js wiring census (review M9)', () => {
       'the run-paragraph precompute must be threaded into the composition call itself (M9b)'
     );
   });
+
+  test('server.js threads the paragraph store into createDashboardRoutes (review MR / L1)', () => {
+    assert.match(
+      SERVER_SRC,
+      /createDashboardRoutes\(\{[^}]*\brunParagraphStore\b[^}]*\}\)/,
+      'removing runParagraphStore from the createDashboardRoutes call (MR) must turn this red'
+    );
+  });
 });

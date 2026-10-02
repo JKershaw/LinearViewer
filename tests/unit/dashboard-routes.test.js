@@ -4265,6 +4265,16 @@ describe('GET /observation/session/:sessionId — stored run paragraph, read-onl
     assert.ok(!html.includes('aria-hidden="true" data-testid="session-paragraph-text"'), 'the filled slot is not hidden');
   });
 
+  test('a hit HTML-escapes the stored paragraph so model text cannot inject (review MRt3 / L2)', async () => {
+    const store = trappingStore({ inputHash: 'current', paragraph: '<b>x</b>', model: 'small-tier', final: false });
+    const res = await driveSessionPage(paragraphRouter(store));
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.ok(html.includes('&lt;b&gt;x&lt;/b&gt;'), 'the stored paragraph text is HTML-escaped on the page');
+    assert.ok(!html.includes('<b>x</b>'), 'the raw model HTML must not be injected');
+  });
+
   test('a stale hit renders the stored paragraph and never regenerates', async () => {
     // The stored inputHash differs from what the live view would hash — the route
     // is READ ONLY, so it serves the stored paragraph rather than generating.
