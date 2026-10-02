@@ -8,7 +8,7 @@
  * zero provider reads when throttled, and the 429 limiter — via a real Express
  * app on 127.0.0.1 with a fake store + injected seams (no provider, no Mongo).
  */
-import { test, describe } from 'node:test';
+import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createShareRoutes, createShareLimiters, FAILURE_BACKOFF_MS, SHARE_REFRESH_TIMEOUT_MS } from '../../routes/share.js';
@@ -132,7 +132,7 @@ describe('GET /s/:token — owner/revocation matrix', () => {
     assert.equal(reads, 0, 'a fresh snapshot never reads the provider');
   });
 
-  test('row 6: stale snapshot + failed refresh serves last-good "as of" (PROVISIONAL)', async () => {
+  test('row 6: stale snapshot + failed refresh serves last-good "as of"', async () => {
     const staleAt = new Date(Date.now() - 120_000);
     const store = makeStore(baseRecord({ snapshotAt: staleAt }));
     let reads = 0;
@@ -320,5 +320,171 @@ describe('GET /s/:token — backoff, timeout and store-write failure', () => {
     assert.equal(res.status, 200);
     assert.ok(res.body.includes('OLD'));
   });
+
+  test('saveSnapshot throws on a stale snapshot: bounded reads, then a 2nd read after the window', async () => {
+    const now = Date.now();
+    mock.timers.enable({ apis: ['Date'], now });
+    try {
+      const store = makeStore(baseRecord({ snapshotAt: new Date(now - 120_000) }));
+      store.saveSnapshot = async () => { throw new Error('mongo down'); };
+      let reads = 0;
+      const app = buildApp({ store, readOwnerIssues: async () => { reads++; return { reason: 'ok', issues: [] }; } });
+
+      for (let i = 0; i < 10; i++) {
+        const res = await request(app, `/s/${TOKEN}`);
+        assert.equal(res.status, 200, `GET ${i + 1} serves last-good`);
+        assert.ok(res.body.includes('OLD'));
+      }
+      assert.equal(reads, 1, 'ten sequential write failures perform only one provider read');
+
+      mock.timers.tick(301_000);
+      assert.equal((await request(app, `/s/${TOKEN}`)).status, 200);
+      assert.equal(reads, 2, 'past FAILURE_BACKOFF_MS a retry is allowed');
+      assert.equal((await request(app, `/s/${TOKEN}`)).status, 200);
+      assert.equal(reads, 2, 'the retry re-arms the backoff');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  test('saveSnapshot throws on a null snapshot: 503, 1 read', async () => {
+    const now = Date.now();
+    mock.timers.enable({ apis: ['Date'], now });
+    try {
+      const store = makeStore(baseRecord({ snapshot: null, snapshotAt: null }));
+      store.saveSnapshot = async () => { throw new Error('mongo down'); };
+      let reads = 0;
+      const app = buildApp({ store, readOwnerIssues: async () => { reads++; return { reason: 'ok', issues: [] }; } });
+
+      for (let i = 0; i < 10; i++) {
+        const res = await request(app, `/s/${TOKEN}`);
+        assert.equal(res.status, 503, `GET ${i + 1} has no content to serve`);
+        assert.equal(res.body, '');
+      }
+      assert.equal(reads, 1, 'ten sequential write failures perform only one provider read');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  test('buildShareSnapshot throws, on both stale and null snapshots', async () => {
+    const now = Date.now();
+    mock.timers.enable({ apis: ['Date'], now });
+    try {
+      const badSubject = { type: 'collection', kind: 'bogus', id: 'x' };
+
+      const staleStore = makeStore(baseRecord({ subject: badSubject, snapshotAt: new Date(now - 120_000) }));
+      let staleReads = 0;
+      const staleApp = buildApp({ store: staleStore, readOwnerIssues: async () => { staleReads++; return { reason: 'ok', issues: [] }; } });
+      for (let i = 0; i < 10; i++) {
+        const res = await request(staleApp, `/s/${TOKEN}`);
+        assert.equal(res.status, 200);
+        assert.ok(res.body.includes('OLD'));
+      }
+      assert.equal(staleReads, 1, 'a throwing build on a stale snapshot is bounded to one read');
+
+      const nullStore = makeStore(baseRecord({ subject: badSubject, snapshot: null, snapshotAt: null }));
+      let nullReads = 0;
+      const nullApp = buildApp({ store: nullStore, readOwnerIssues: async () => { nullReads++; return { reason: 'ok', issues: [] }; } });
+      for (let i = 0; i < 10; i++) {
+        const res = await request(nullApp, `/s/${TOKEN}`);
+        assert.equal(res.status, 503);
+      }
+      assert.equal(nullReads, 1, 'a throwing build on a null snapshot is bounded to one read');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+
+  test('concurrent GETs on a null snapshot while the read is in flight: both 200, 1 read', async () => {
+    const store = makeStore(baseRecord({ snapshot: null, snapshotAt: null }));
+    let reads = 0;
+    const app = buildApp({
+      store,
+      readOwnerIssues: async () => {
+        reads++;
+        await new Promise(resolve => setTimeout(resolve, 30));
+        return { reason: 'ok', issues: [{ identifier: 'LIN-9', title: 'New', state: { type: 'started' }, priority: 0, updatedAt: 'x', labels: [{ name: 'bug' }] }] };
+      }
+    });
+    const [a, b] = await Promise.all([request(app, `/s/${TOKEN}`), request(app, `/s/${TOKEN}`)]);
+    assert.equal(a.status, 200, 'the winner serves the refreshed snapshot');
+    assert.equal(b.status, 200, 'the joiner joins the in-flight refresh instead of 503');
+    assert.equal(reads, 1, 'both concurrent requests share one refresh');
+  });
 });
 
+describe('LIN-3255 review: success must not read as failure', () => {
+  // Interleaving: A getByToken -> A owner -> A due -> A refresh (stamp, read starts)
+  //   -> B getByToken (pre-save record) -> B owner check (held)
+  //   -> A read resolves, saveSnapshot succeeds, inflight cleared, A responds
+  //   -> B owner check released -> B due: inflight empty, Map stamp > B's record.snapshotAt
+  for (const kind of ['null', 'stale']) {
+    test(`a GET holding a pre-save record, checking due after the winner succeeded, does not back off (${kind} snapshot)`, async () => {
+      const store = makeStore(baseRecord(kind === 'null'
+        ? { snapshot: null, snapshotAt: null }
+        : { snapshotAt: new Date(Date.now() - 120_000) }));
+      let releaseRead, bRecordRead, aDone;
+      const readGate = new Promise(r => { releaseRead = r; });
+      const bHasRecord = new Promise(r => { bRecordRead = r; });
+      const aFinished = new Promise(r => { aDone = r; });
+      const getByToken = store.getByToken.bind(store);
+      store.getByToken = async () => {
+        const rec = await getByToken();
+        if (store.calls.getByToken === 2) bRecordRead();
+        return rec;
+      };
+      let ownerCalls = 0;
+      let reads = 0;
+      const app = buildApp({
+        store,
+        workspaceOwnerCheck: async () => { if (++ownerCalls === 2) await aFinished; return { status: 'owner' }; },
+        readOwnerIssues: async () => {
+          reads++;
+          await readGate;
+          return { reason: 'ok', issues: [{ identifier: 'LIN-9', title: 'New', state: { type: 'started' }, priority: 0, updatedAt: 'x', labels: [{ name: 'bug' }] }] };
+        }
+      });
+      const server = app.listen(0, '127.0.0.1');
+      try {
+        await new Promise(resolve => server.once('listening', resolve));
+        const url = `http://127.0.0.1:${server.address().port}/s/${TOKEN}`;
+        const get = () => fetch(url).then(async r => ({ status: r.status, body: await r.text() }));
+        const a = get();
+        while (reads === 0) await new Promise(r => setImmediate(r));   // A is in its read
+        const b = get();
+        await bHasRecord;                                              // B holds the pre-save record
+        releaseRead();
+        const aRes = await a;
+        aDone();
+        const bRes = await b;
+        assert.equal(aRes.status, 200);
+        assert.ok(aRes.body.includes('New'));
+        assert.equal(bRes.status, 200, 'B must not 503 / back off after a SUCCESS');
+        assert.ok(!bRes.body.includes('OLD'), 'B must not serve last-good after a SUCCESS');
+      } finally {
+        await new Promise(resolve => server.close(resolve));
+      }
+    });
+  }
+
+  test('60s post-success interval is unchanged by the in-process stamp', async () => {
+    const now = Date.now();
+    mock.timers.enable({ apis: ['Date'], now });
+    try {
+      const store = makeStore(baseRecord({ snapshotAt: new Date(now - 120_000) }));
+      let reads = 0;
+      const app = buildApp({ store, readOwnerIssues: async () => { reads++; return { reason: 'ok', issues: [] }; } });
+      assert.equal((await request(app, `/s/${TOKEN}`)).status, 200);
+      assert.equal(reads, 1);
+      mock.timers.tick(30_000);
+      await request(app, `/s/${TOKEN}`);
+      assert.equal(reads, 1, 'inside 60s: fresh, no read');
+      mock.timers.tick(31_000);
+      assert.equal((await request(app, `/s/${TOKEN}`)).status, 200);
+      assert.equal(reads, 2, 'past 60s after a success: refresh is due (not the 300s backoff)');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+});
