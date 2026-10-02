@@ -856,12 +856,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     const result = { enabled, source, model, modelName: getModelDisplayName(model) }
 
-    // Include free tier usage info when applicable
-    if (source === 'free') {
-      const usage = await freeTierStore.getUsage(workspace.urlKey)
-      result.freeTier = usage
-    }
-
     res.json(result)
   })
 
@@ -994,17 +988,6 @@ ${goal}`
           repo: parseRepoFromDescription(mockRecommendProject?.content)
         }
 
-        // Include free tier metadata in test mode
-        if (testIsFreeTier) {
-          const usage = await freeTierStore.getUsage(workspace.urlKey)
-          result.freeTier = {
-            used: true,
-            remaining: usage.remaining,
-            limit: usage.limit,
-            resetsAt: usage.resetsAt
-          }
-        }
-
         keepalive.stop();
         return keepalive.send(200, result)
       }
@@ -1062,17 +1045,6 @@ ${goal}`
         deferredVia,
         deferTruncated,
         deferStopReason
-      }
-
-      // Include free tier metadata
-      if (surfaceFreeTier) {
-        const usage = await freeTierStore.getUsage(workspace.urlKey)
-        result.freeTier = {
-          used: true,
-          remaining: usage.remaining,
-          limit: usage.limit,
-          resetsAt: usage.resetsAt
-        }
       }
 
       keepalive.stop();
@@ -1230,10 +1202,6 @@ ${goal}`
           issueUrl: terminal.url, repo: parseRepoFromDescription(termProject?.content),
           identifier: idOf(terminal), deferredVia, deferTruncated: false
         };
-        if (testIsFreeTier) {
-          const usage = await freeTierStore.getUsage(workspace.urlKey);
-          doneData.freeTier = { used: true, remaining: usage.remaining, limit: usage.limit, resetsAt: usage.resetsAt };
-        }
         sendSSE(res, 'done', doneData);
         res.end();
         return;
@@ -1271,16 +1239,6 @@ ${goal}`
         issueUrl: mockIssue.url,
         repo: parseRepoFromDescription(mockProject?.content)
       };
-
-      if (testIsFreeTier) {
-        const usage = await freeTierStore.getUsage(workspace.urlKey);
-        doneData.freeTier = {
-          used: true,
-          remaining: usage.remaining,
-          limit: usage.limit,
-          resetsAt: usage.resetsAt
-        };
-      }
 
       sendSSE(res, 'done', doneData);
       res.end();
@@ -1407,10 +1365,6 @@ ${goal}`
         if (closed) return;
 
         const metadata = { issueUrl: rec.issueUrl, repo: rec.repo, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason };
-        if (surfaceFreeTier) {
-          const usage = await freeTierStore.getUsage(workspace.urlKey);
-          metadata.freeTier = { used: true, remaining: usage.remaining, limit: usage.limit, resetsAt: usage.resetsAt };
-        }
 
         if (rec.recommendedAction === 'defer' || !rec.prompt) {
           // Abnormal stop (depth/cycle/unresolved/timeout) — surface, don't ship a defer.
@@ -1432,16 +1386,6 @@ ${goal}`
         issueUrl: issue.url,
         repo: parseRepoFromDescription(project?.description)
       };
-
-      if (surfaceFreeTier) {
-        const usage = await freeTierStore.getUsage(workspace.urlKey);
-        metadata.freeTier = {
-          used: true,
-          remaining: usage.remaining,
-          limit: usage.limit,
-          resetsAt: usage.resetsAt
-        };
-      }
 
       // AI mock (local session) leaf fast-path: emit the same SSE phase/delta/done
       // sequence the real token stream would, split into 2 chunks per section so

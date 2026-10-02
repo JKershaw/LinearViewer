@@ -386,9 +386,9 @@ test.describe('classifyBulkScanResult — skipped quota, fast 429 + its global-h
     let calls = 0;
     const postScan = async () => {
       calls++;
-      const err = new Error('Free tier daily limit reached');
+      const err = new Error('Service busy, try again later');
       err.status = 429;
-      err.body = { freeTier: { used: true, remaining: 0, limit: 20, resetsAt: '2026-09-07T00:00:00.000Z' } };
+      err.body = { freeTier: { used: true, remaining: 0, limit: 50, resetsAt: '2026-09-07T13:00:00.000Z' } };
       throw err;
     };
     const sandbox = makeSandbox(postScan);

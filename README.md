@@ -155,7 +155,7 @@ MONGODB_URI=mongodb://localhost:27017  # Optional: uses file-based storage if no
 # OpenRouter (optional, enables AI features)
 OPENROUTER_API_KEY=your-openrouter-key
 OPENROUTER_REDIRECT_URI=http://localhost:3000/auth/openrouter/callback
-OPENROUTER_FREE_TIER_KEY=server-key-for-free-tier  # Optional: enables rate-limited free prompts
+OPENROUTER_FREE_TIER_KEY=server-key-for-free-tier  # Optional: enables free-tier access (runs per day per account)
 ```
 
 ### 3. Install and Run

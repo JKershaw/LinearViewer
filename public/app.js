@@ -1591,22 +1591,6 @@ function initFeatureToggles() {
 // ==========================================================================
 
 /**
- * Update the footer AI status with free tier remaining count
- * @param {Object} freeTier - Free tier usage data
- */
-function updateFooterFreeTier(freeTier) {
-  const footerStatus = document.querySelector('.footer-ai-status[data-ai-source="free"]')
-  if (!footerStatus) return
-
-  footerStatus.textContent = `ai: \u25cf free (${freeTier.remaining}/${freeTier.limit})`
-  if (freeTier.remaining === 0) {
-    footerStatus.classList.remove('free')
-    footerStatus.classList.add('disconnected')
-    footerStatus.title = 'Free tier: daily limit reached'
-  }
-}
-
-/**
  * Fill the footer model indicator with the workspace's configured LLM model.
  * @param {string} modelName - Friendly model name (e.g. 'GPT-5.4 Mini')
  */
@@ -1799,16 +1783,16 @@ function getUrlKeyFromFooter() {
 
 /**
  * Initialize footer AI status on page load.
- * Fetches the recommend/status endpoint and updates the footer: the free tier
- * remaining count (when applicable) and the workspace's configured model name.
- * Also populates the settings page free tier usage display.
+ * Fetches the recommend/status endpoint for the workspace's configured model
+ * name, and (when the settings usage slot is present) S1's own-counts run-quota
+ * endpoint for the free tier's runs-per-day allowance (LIN-3239). The retired
+ * daily prompt quota is never shown.
  */
 async function initFreeTierStatus() {
   // Check for any element the status fetch can populate
-  const footerStatus = document.querySelector('.footer-ai-status[data-ai-source="free"]')
   const settingsUsage = document.querySelector('[data-free-tier-usage]')
   const modelEl = document.querySelector('[data-ai-model]')
-  if (!footerStatus && !settingsUsage && !modelEl) return
+  if (!settingsUsage && !modelEl) return
 
   // Get urlKey from footer link or current page URL
   let urlKey = getUrlKeyFromFooter()
@@ -1818,20 +1802,28 @@ async function initFreeTierStatus() {
   }
   if (!urlKey) return
 
+  // on401:false — a background status fetch must not bounce the page to /logout.
   try {
-    // on401:false — a background status fetch must not bounce the page to /logout.
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/recommend/status`, { on401: false })
-    if (!data) return
-    if (data.modelName) updateFooterModel(data.modelName)
-    if (data.freeTier) {
-      if (footerStatus) updateFooterFreeTier(data.freeTier)
-      if (settingsUsage) {
-        settingsUsage.textContent = `${data.freeTier.remaining} of ${data.freeTier.limit} daily prompts remaining`
-      }
+    if (data && data.modelName) updateFooterModel(data.modelName)
+  } catch (e) {
+    // Silently fail - the model indicator shows its default
+  }
+
+  if (!settingsUsage) return
+  try {
+    // LIN-3239: the allowance is runs per account per UTC day, read from the
+    // session account's own quota (never instance-wide). `limited:false` (not
+    // free tier, or no attributable account) means no daily run cap.
+    const quota = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/dispatch/quota`, { on401: false })
+    if (quota && quota.limited && quota.runsUsed != null
+      && typeof quota.remaining === 'number' && typeof quota.limit === 'number') {
+      settingsUsage.textContent = `${quota.remaining} of ${quota.limit} runs left today`
+    } else {
+      settingsUsage.textContent = 'No daily run limit'
     }
   } catch (e) {
-    // Silently fail - elements will show defaults
-    if (settingsUsage) settingsUsage.textContent = 'Unable to load usage'
+    settingsUsage.textContent = 'Unable to load usage'
   }
 }
 

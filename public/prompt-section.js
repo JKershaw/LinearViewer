@@ -164,13 +164,12 @@
 
   /**
    * Why the ✦ primary action is disabled, in plain words — or null when it can
-   * run. Distinguishes the three states addendum 5 requires: AI off by the
-   * person's choice, unconfigured (no OpenRouter), and free-tier exhausted
-   * (429/quota). The action is SHOWN in every state, never hidden (F9).
+   * run. Distinguishes the states addendum 5 requires: AI off by the person's
+   * choice, and unconfigured (no OpenRouter). The prompt action is NOT gated by
+   * the run allowance (LIN-3239): prompts are unlimited, so only run rungs carry
+   * the run-limit state. The action is SHOWN in every state, never hidden (F9).
    */
   function primaryDisabledReason(opts, state) {
-    if (state.quotaExhausted) return 'daily free-tier limit reached \u00b7 resets at midnight UTC';
-    if (state.quotaChecking) return 'checking free-tier allowance\u2026';
     if (opts.aiState === 'off') return 'AI suggestions are off \u00b7 turn on in settings';
     if (opts.aiState === 'unconfigured') return 'needs OpenRouter';
     if (opts.aiState === 'ready') return null;
@@ -243,6 +242,16 @@
     const needsPrompt = (rung, text) => (streaming
       ? `<button class="opened-task-rung opened-task-rung--pending" data-rung="${rung}" disabled title="a prompt is generating">${text} <span class="opened-task-setup">generating\u2026</span></button>`
       : `<button class="opened-task-rung opened-task-rung--setup" data-rung="${rung}" data-action="setup" data-setup-needs="prompt" title="generate a prompt first">${text} <span class="opened-task-setup">\u25CB set up \u203A</span></button>`);
+    // LIN-3239: the caller's own run allowance, read from GET /api/dispatch/quota
+    // at load. It gates ONLY the run rungs (run this step / run the whole task);
+    // copy and ✦ generation are never gated by it. `runsUsed` null means the
+    // count was unreadable — nothing to show, and no limit to claim.
+    const quota = state.runQuota;
+    const quotaKnown = !!(quota && quota.runsUsed != null
+      && typeof quota.remaining === 'number' && typeof quota.limit === 'number');
+    const runsExhausted = quotaKnown && quota.remaining <= 0;
+    const runLimitTitle = 'daily run limit reached \u00b7 resets at midnight UTC';
+    const runLimited = (rung, text) => `<button class="opened-task-rung opened-task-rung--setup" data-rung="${rung}" disabled title="${runLimitTitle}">${text} <span class="opened-task-setup">${runLimitTitle}</span></button>`;
     const rungs = [];
     // copy: with no prompt there is nothing to copy, and generating on a press
     // labelled "copy" would spend AI behind a non-AI label. So the idle rung is
@@ -259,17 +268,28 @@
       // LIN-3098 N3: where a runner was set up in this browser (and proxy is on),
       // THIS rung alone forces workspace API access onto its dispatch, so the
       // runner's subagent can reach Harbour. Every other caller is unchanged.
-      const force = opts.proxyEnabled && runnerMarkerSet(opts.urlKey) ? ' data-proxy-force="runner"' : '';
-      rungs.push(`<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli"${force}>run this step</button>`);
+      if (runsExhausted) {
+        rungs.push(runLimited('run-step', 'run this step'));
+      } else {
+        const force = opts.proxyEnabled && runnerMarkerSet(opts.urlKey) ? ' data-proxy-force="runner"' : '';
+        rungs.push(`<button class="opened-task-rung opened-task-rung--ready" data-rung="run-step" data-action="run-step" data-target="cli"${force}>run this step</button>`);
+      }
     } else if (opts.dispatchEnabled) {
       rungs.push(needsPrompt('run-step', 'run this step'));
     } else {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="dispatch">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
     if (opts.proxyEnabled && opts.hasAutopilot) {
-      rungs.push('<button class="opened-task-rung opened-task-rung--ready" data-rung="run-task" data-prompt="__autopilot__">run the whole task</button>');
+      rungs.push(runsExhausted
+        ? runLimited('run-task', 'run the whole task')
+        : '<button class="opened-task-rung opened-task-rung--ready" data-rung="run-task" data-prompt="__autopilot__">run the whole task</button>');
     } else {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-task" data-action="setup" data-setup-needs="proxy">run the whole task <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
+    }
+    // The allowance sits beside the run rungs it governs — shown only when the
+    // count was readable, so it never invents a number (LIN-3239).
+    if (quotaKnown) {
+      rungs.push(`<span class="opened-task-run-quota" data-testid="opened-task-run-quota" data-runs-remaining="${quota.remaining}" data-runs-limit="${quota.limit}">${quota.remaining} of ${quota.limit} runs left today</span>`);
     }
     // "run on my machine ›" is not a rung: since S4b it sits on the card that
     // opens the task (runnerLinkHtml), so it is not repeated here.
@@ -484,11 +504,10 @@
       activeLabelName: null,
       error: null,
       setupNotice: null,
-      // Load-time free-tier signal (addendum 5). Only fetched when the caller
-      // marks the workspace as free-tier, so ordinary units never hit the
-      // network here.
-      quotaChecking: false,
-      quotaExhausted: false
+      // Load-time run allowance (LIN-3239). Only fetched when the caller marks
+      // the workspace as free-tier, so ordinary units never hit the network
+      // here. `null` until the read resolves; it gates ONLY the run rungs.
+      runQuota: null
     };
     let abortController = null;
     let destroyed = false;
@@ -1010,28 +1029,27 @@
     container.addEventListener('click', handleClick);
     render();
 
-    // Addendum 5: the free-tier-exhausted state must be known at load. The
-    // authoritative quota signal is the EXISTING GET /api/recommend/status
-    // endpoint (routes/workspace-api.js), whose `freeTier` block (remaining/limit)
-    // is the same one app.js's footer already consumes. It is a read, never a
-    // spend. Only consulted when the caller marks the workspace free-tier, so
-    // other consumers/units never touch the network from init.
+    // LIN-3239: the caller's run allowance must be known at load so the ladder
+    // can show "N of <limit> runs left today" before Go and disable only the run
+    // rungs at zero. The authoritative read is S1's GET /api/dispatch/quota
+    // (routes/dispatch.js) — the session account's own merge-group counts, never
+    // instance-wide. It is a read, never a spend. Only consulted when the caller
+    // marks the workspace free-tier, so other consumers/units never touch the
+    // network from init.
     if (opts.freeTier) {
-      state.quotaChecking = true;
-      render();
-      const statusPrefix = opts.urlKey ? `/workspace/${encodeURIComponent(opts.urlKey)}` : '';
+      const quotaPrefix = opts.urlKey ? `/workspace/${encodeURIComponent(opts.urlKey)}` : '';
       Promise.resolve()
-        .then(() => window.api(`${statusPrefix}/api/recommend/status`, { on401: false }))
+        .then(() => window.api(`${quotaPrefix}/api/dispatch/quota`, { on401: false }))
         .then((data) => {
           if (destroyed) return;
-          state.quotaChecking = false;
-          const ft = data && data.freeTier;
-          state.quotaExhausted = !!(ft && typeof ft.remaining === 'number' && ft.remaining <= 0);
+          if (data && data.limited && data.runsUsed != null
+            && typeof data.remaining === 'number' && typeof data.limit === 'number') {
+            state.runQuota = { remaining: data.remaining, limit: data.limit, runsUsed: data.runsUsed };
+          }
           render();
         })
         .catch(() => {
           if (destroyed) return;
-          state.quotaChecking = false;
           render();
         });
     }

@@ -230,7 +230,8 @@ describe('render-observation: third due-tab disclaimer â€” bulk-scan (LIN-2706 Â
     assert.doesNotMatch(html('oauth'), /id="obs-due-bulk-quota-note"/, 'a paid OAuth key: no quota note');
     assert.doesNotMatch(html('env'), /id="obs-due-bulk-quota-note"/, 'a paid env key: no quota note');
     assert.match(html('free'), /id="obs-due-bulk-quota-note"/, 'free tier: the quota note must render');
-    assert.match(html('free'), /daily\/hourly free quota/, 'the quota note must name the quota, not just repeat the dollar disclaimer');
+    assert.match(html('free'), /hourly free quota/, 'the quota note must name the quota, not just repeat the dollar disclaimer');
+    assert.doesNotMatch(html('free'), /daily\/hourly|daily free quota|daily prompt/, 'the retired daily prompt quota must not be named (LIN-3239)');
   });
 
   test('the two budget gates are disclosed as separate sentences, never merged into one', () => {

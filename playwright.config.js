@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 // freshly generated, PEM-valid App key.
 const { privateKey: heldKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const HELD_GITHUB_PEM = heldKey.export({ type: 'pkcs1', format: 'pem' });
-const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN=';
+const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN=';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -88,6 +88,21 @@ export default defineConfig({
       // MangoDB dir. The twin opts into this origin via `test.use({ baseURL })`.
       command: `${UNCONFIGURED_ENV} PORT=3002 HARBOUR_DATA_DIR=./test-results/held-e2e-data GITHUB_CLIENT_ID=test-held-client GITHUB_CLIENT_SECRET=test-held-secret GITHUB_APP_ID=424242 GITHUB_APP_SLUG=held-test-app GITHUB_APP_PRIVATE_KEY='${HELD_GITHUB_PEM}' node server.js`,
       url: 'http://localhost:3002',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      // LIN-3239 free-tier twin: OPENROUTER_FREE_TIER_KEY set so the ENV-KEY
+      // free tier — and its per-account run gate + `GET .../dispatch/quota`
+      // read — is reachable. The default 3001 server leaves the key empty, and
+      // many specs assert that "no AI configured" state, so the free-tier run
+      // contract gets its own origin (like the held-GitHub twin above) with an
+      // isolated MangoDB dir. Free-tier sessions that want a paid key seed
+      // `openRouterConnected` on top, exactly as on 3001.
+      command: `${UNCONFIGURED_ENV} OPENROUTER_FREE_TIER_KEY=test-free-tier-key PORT=3003 HARBOUR_DATA_DIR=./test-results/free-tier-e2e-data node server.js`,
+      url: 'http://localhost:3003',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
       stdout: 'pipe',

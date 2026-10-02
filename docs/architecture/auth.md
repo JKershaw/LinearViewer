@@ -148,16 +148,17 @@ auto-login (`lib/pat-session.js`) skips it. Connecting GitHub from `/account` re
 `github:<userId>` container (the LIN-2802 fresh-container gate requires an existing
 workspace). Workspaces don't follow a person to a new device yet (follow-up behind LIN-2149).
 
-### Free Tier (Rate-Limited)
+### Free Tier (Run-Limited)
 
-When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection get limited free prompts:
+When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection get a free allowance of fresh **runs per account per UTC day**. Prompts themselves are unlimited.
 
 - API key source priority: user OAuth > env key > free tier key > none
-- Per-workspace daily limit: 20 prompts (resets at midnight UTC)
-- Global hourly limit: 50 prompts across all workspaces
+- Per-account daily limit: `FREE_TIER_RUN_LIMIT` fresh runs per UTC day (default 10, resets at midnight UTC); the count is read by `GET /workspace/:urlKey/api/dispatch/quota`, and a run-gate denial is a `RUN_LIMIT_REACHED` 429 carrying `freeTier.used: true` + `runsUsed`
+- Prompts are never refused for a person's daily usage. The only prompt refusal is the global hourly safety net (`Service busy, try again later`, 50/hour across all workspaces), which resets at the top of the next UTC hour
+- Per-workspace prompt counts are still recorded best-effort for the KPI chart, but they never refuse a prompt
 - Uses atomic check-and-increment (`tryUse()`) to prevent race conditions
-- Footer shows `ai: ● free (N/20)` status; settings page shows usage info
-- Returns 429 with usage metadata when limits exceeded
+- Settings shows `N of L runs left today`; the Go ladder shows the run allowance before Go and disables only the run rungs at 0 (copy and generation stay enabled)
+- Returns 429 with usage metadata when a limit is exceeded
 - Free-tier calls are **clamped to one model**, ignoring the workspace preference and any
   per-request override, so a free user can never bill an arbitrary/expensive model against
   the operator's shared key (LIN-513). The clamp lives in the `forceDefault` branches of

@@ -20,6 +20,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { FreeTierStore } from '../../lib/free-tier-store.js';
@@ -72,6 +73,71 @@ async function call(app, method, path, body) {
 }
 
 const FRESH = { prompt: 'run me', kind: 'implementation' };
+
+/**
+ * The THIRD surface (LIN-3239): render the shared opened-task ladder against
+ * the exact `GET .../dispatch/quota` body, so the client's displayed run count
+ * is proven to agree with the route's read. Minimal vm sandbox — the ladder
+ * render only needs the `window.api` quota read to resolve.
+ */
+async function renderLadderQuota(quotaBody) {
+  const src = readFileSync(new URL('../../public/prompt-section.js', import.meta.url), 'utf8');
+  const window = {
+    escapeHtml: (s) => (s == null ? '' : String(s)),
+    stripCodeBlockWrapper: (s) => s,
+    renderMarkdown: (s) => String(s == null ? '' : s),
+    api: async (url) => (String(url).endsWith('/api/dispatch/quota') ? quotaBody : { prompt: 'P', promptName: 'T' }),
+    ProxyToggle: { maybeAppend: async (raw) => raw },
+    renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
+    readDispatchExecControls: () => ({}),
+    dispatchPrompt: async () => ({ item: { id: 'disp-1' } }),
+    isPinnedToBottom: () => false,
+    toast: () => {},
+    fetchAutopilotKickoff: async () => ({ prompt: 'A', promptName: 'A', kind: 'autopilot' })
+  };
+  const sandbox = {
+    window,
+    AbortController,
+    URLSearchParams,
+    TextDecoder,
+    TextEncoder,
+    Blob: class {},
+    URL: { createObjectURL: () => '', revokeObjectURL: () => {} },
+    document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
+    requestAnimationFrame: (cb) => { cb(); return 1; },
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    navigator: { clipboard: { writeText: async () => {} } },
+    fetch: async () => ({ ok: false, status: 500, json: async () => ({}) })
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);
+  const container = {
+    innerHTML: '', dataset: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    setAttribute() {}, getAttribute() { return null; }, querySelector() { return null; },
+    contains() { return true; }, addEventListener() {}, removeEventListener() {}
+  };
+  window.PromptSection.init(container, {
+    urlKey: 'acme',
+    issue: { id: 'i-1', identifier: 'A-1', title: 'A task' },
+    surface: 'swipe',
+    hasAI: true,
+    aiState: 'ready',
+    freeTier: true,
+    hasAutopilot: true,
+    dispatchEnabled: true,
+    proxyEnabled: true,
+    isLocalhost: false,
+    customPrompts: [],
+    defaultPromptKeys: [],
+    morePromptKeys: [],
+    promptMeta: {}
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  return container.innerHTML;
+}
 
 describe('LIN-3238 — session dispatch lane runs the gate and relays', () => {
   test('an exhausted free-tier account is refused 429 with the body and Retry-After', async () => {
@@ -199,7 +265,7 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
   });
 });
 
-describe('LIN-3238 — three-surface agreement (S1: factory gate + quota read)', () => {
+describe('LIN-3238 — three-surface agreement (factory gate + quota read + ladder)', () => {
   test('the factory gate and the quota read agree on the caller\'s run count', async () => {
     // One FreeTierStore over one seeded dispatch count drives both surfaces.
     const dispatchStore = { countFreshRunsSince: async () => 10 };
@@ -215,5 +281,19 @@ describe('LIN-3238 — three-surface agreement (S1: factory gate + quota read)',
     assert.equal(quota.body.limit, post.body.freeTier.limit);
     assert.equal(quota.body.remaining, post.body.freeTier.remaining);
     assert.equal(quota.body.resetsAt, post.body.freeTier.resetsAt);
+  });
+
+  test('the ladder (third surface) displays the quota read\'s own numbers (LIN-3239)', async () => {
+    // A different count so the assertion cannot pass on a coincidental default.
+    const dispatchStore = { countFreshRunsSince: async () => 7 };
+    const freeTierStore = new FreeTierStore({ collection: {}, dispatchStore, runLimit: 10 });
+
+    const quota = await call(buildApp({ freeTierStore }), 'get', `${PATH}/quota`);
+    assert.equal(quota.status, 200, JSON.stringify(quota.body));
+
+    const html = await renderLadderQuota(quota.body);
+    assert.match(html, new RegExp(`data-runs-remaining="${quota.body.remaining}"`), 'the ladder shows the quota read\'s remaining');
+    assert.match(html, new RegExp(`data-runs-limit="${quota.body.limit}"`), 'the ladder shows the quota read\'s limit');
+    assert.match(html, new RegExp(`${quota.body.remaining} of ${quota.body.limit} runs left today`), 'the human-readable ladder count agrees');
   });
 });

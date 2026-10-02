@@ -1054,6 +1054,15 @@ describe('renderSettingsPage — OpenRouter unattended-use consent (LIN-2412)', 
     assert.match(html, /data-testid="settings-openrouter-consent-notice"/);
   });
 
+  test('free tier: the usage slot is the runs-per-day allowance, not a daily prompt quota (LIN-3239)', () => {
+    const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'free' });
+    // The attribute path is kept (app.js fills it); only the content changed.
+    assert.match(html, /data-free-tier-status/);
+    assert.match(html, /data-free-tier-usage/);
+    assert.match(html, /runs:/, 'the slot is labelled as the run allowance');
+    assert.doesNotMatch(html, /daily prompt|prompts remaining/, 'no daily prompt quota wording');
+  });
+
   test('env source: no consent affordance and no blast-radius notice — there is no per-account durable key to consent for', () => {
     const html = renderSettingsPage('Acme', { ...BASE, openRouterSource: 'env' });
     assert.doesNotMatch(html, /data-testid="settings-openrouter-consent-status"/);

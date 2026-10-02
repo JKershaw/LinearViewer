@@ -13,10 +13,10 @@ MONGODB_URI             MongoDB connection string (optional, uses file storage i
 MONGODB_TEST_URI        Test-only: real MongoDB for tests/unit/mongo-smoke.test.js (LIN-1337). NOT a runtime var. Deliberately separate from MONGODB_URI so a developer's production URI can't be hit by the suite's concurrency probes. Unset locally skips the suite explicitly; CI sets it via a mongo:8.0 service container and hard-fails if missing
 OPENROUTER_API_KEY      Server-side OpenRouter API key (optional, users can connect via OAuth)
 OPENROUTER_REDIRECT_URI Callback URL for OpenRouter OAuth (optional, defaults to /auth/openrouter/callback)
-OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables rate-limited free prompts)
+OPENROUTER_FREE_TIER_KEY Server-side API key for free tier users (optional, enables free-tier access: runs per day per account, prompts unlimited)
 OPENROUTER_FREE_TIER_MODEL  Model free-tier requests are clamped to (optional, default openai/gpt-5.4-mini). Must be a curated AVAILABLE_MODELS id; anything else is ignored (warned at startup) and the free tier stays on the default. Free-tier only — does not move the default for workspaces with no stored model preference
-FREE_TIER_DAILY_LIMIT   Per-workspace daily free-prompt limit (optional, default 20)
-FREE_TIER_HOURLY_LIMIT  Global hourly free-prompt limit across all workspaces (optional, default 50)
+FREE_TIER_RUN_LIMIT   Max fresh runs per account per UTC day on the free tier (optional, default 10)
+FREE_TIER_HOURLY_LIMIT  Global hourly free-prompt limit across all workspaces — the service safety net (optional, default 50)
 GITHUB_CLIENT_ID        GitHub App user-to-server OAuth client ID (required for GitHub login/binding)
 GITHUB_CLIENT_SECRET    GitHub App user-to-server OAuth client secret (required for GitHub login/binding)
 GITHUB_APP_ID           GitHub App ID, used to sign the App JWT (required for GitHub login/binding)

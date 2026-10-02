@@ -246,27 +246,28 @@ test.describe('Streaming AI Recommendations - Free Tier', () => {
     await page.goto(`/test/clear-free-tier?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('includes free tier metadata in done event', async ({ page, localWorkerUrlKey }) => {
+  test('the done event carries no retired daily prompt quota (LIN-3239)', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
       `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
-    const text = await response.text();
-    const events = parseSSE(text);
+    expect(response.status()).toBe(200);
+    const events = parseSSE(await response.text());
 
     const doneEvent = events.find(e => e.type === 'done');
     expect(doneEvent).toBeDefined();
-    expect(doneEvent.data.freeTier).toBeDefined();
-    expect(doneEvent.data.freeTier.remaining).toBeDefined();
-    expect(doneEvent.data.freeTier.limit).toBe(5);
+    // The per-workspace daily prompt quota is retired; prompts are unlimited and
+    // the done event no longer carries a 200-response `freeTier` meter.
+    expect(doneEvent.data.freeTier).toBeUndefined();
   });
 
-  test('returns 429 when rate limited', async ({ page, localWorkerUrlKey }) => {
+  test('a pre-filled daily count does not refuse the stream (daily quota retired)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${localWorkerUrlKey}`);
 
     const response = await page.request.get(
       `/workspace/${localWorkerUrlKey}/api/recommend/${BLOCKED_ISSUE_ID}/stream`
     );
-    expect(response.status()).toBe(429);
+    // The old per-workspace daily cap (5) no longer refuses prompts.
+    expect(response.status()).toBe(200);
   });
 });
 
