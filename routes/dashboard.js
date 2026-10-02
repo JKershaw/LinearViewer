@@ -484,6 +484,7 @@ function deriveFeedStatusLine(children) {
  * @param {Object}   [deps.observationMaterializer]    - materializer used to backfill a workspace on a read-miss (LIN-623)
  * @param {Object}   deps.runSummaryCacheStore     - run-summary cache store
  * @param {Object}   deps.sessionSummaryCacheStore - session-summary cache store (LIN-592)
+ * @param {Object}   [deps.runParagraphStore]      - durable run-paragraph store (LIN-3253); the run page READS it only and never generates. Default null → no paragraph renders.
  * @param {Object}   deps.freeTierStore            - free-tier usage store (rate limit)
  * @param {Function} deps.getWorkspaceAccessToken  - (urlKey) → token (lazy hydration only)
  * @param {Function} deps.fetchIssueContext        - (token, identifier) → issue context (lazy hydration)
@@ -504,6 +505,10 @@ export function createDashboardRoutes({
   observationMaterializer = null,
   runSummaryCacheStore,
   sessionSummaryCacheStore,
+  // Durable run-paragraph store (LIN-3253, LIN-2948 S3). Read ONLY by the run
+  // page — the page route must never generate. Default null → the slot renders
+  // empty, the same graceful degrade as the other unwired page caches.
+  runParagraphStore = null,
   // Brief/recap caches are per-issue (keyed by issue UUID); the per-session page
   // (LIN-1003) joins them onto a session by distinct loop.issueId. They are NOT
   // otherwise reachable in this router — the observation feed never reads issue
@@ -1231,8 +1236,14 @@ export function createDashboardRoutes({
         ? await readSessionRunEvidence(readRunEvidenceFn, workspace, session, anchorIssueTitle)
         : null;
 
+      // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
+      // generation. A miss — or an unwired store — renders nothing.
+      const runParagraph = runParagraphStore
+        ? ((await runParagraphStore.get(workspace.urlKey, sessionId))?.paragraph || null)
+        : null;
+
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph },
         pageOptions
       );
       res.send(html);

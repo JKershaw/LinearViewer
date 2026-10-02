@@ -708,6 +708,15 @@
   color: var(--muted);
 }
 .sess-paragraph-slot:empty { display: none; }
+/* LIN-3253 (S3): the stored paragraph S1 reserved the slot for. */
+.sess-paragraph {
+  font-family: var(--font-content);
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0 0 var(--space-4);
+  max-width: 70ch;
+}
+.sess-paragraph-text { margin: 0; }
 .sess-step { margin-bottom: var(--space-4); }
 .sess-step-summary {
   font-family: var(--font-content);

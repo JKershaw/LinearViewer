@@ -72,8 +72,10 @@ import { createObserverPassRun } from './lib/observer-pass.js'
 import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
-import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
-import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
+import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
+import { RunParagraphStore } from './lib/run-paragraph-store.js'
+import { createRunParagraphPrecompute } from './lib/run-paragraph-hook.js'
+import { createSessionSummaryPrecompute, createMaterializerPrecompute } from './lib/session-materializer-precompute.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
@@ -453,38 +455,40 @@ const sessionSummaryCacheStore = new SessionSummaryCacheStore({
   collection: sessionSummaryCacheCollection
 })
 
-// Background session-summary precompute (LIN-632). Late-wired into the observation
-// materializer now that both the summary cache and the run-summary cache exist:
-// whenever a session is (re)materialized AND is terminal, generate its one-sentence
-// rollup ahead of time so the first user click is a cache hit. This runs at WRITE
-// time with NO user session, so it resolves an OpenRouter key server-side
-// (OPENROUTER_API_KEY → free-tier) and SKIPS cleanly when neither is configured —
-// never blocking, never throwing into the read-model write it rode in on.
-observationMaterializer.precomputeSessionSummary = async (urlKey, session) => {
-  if (!sessionSummaryCacheStore || !session?.sessionId) return;
-  if (process.env.NODE_ENV === 'test') return;       // tests stay offline (no LLM)
-  if (!sessionIsTerminal(session)) return;            // only terminal sessions are cacheable
-  const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
-  if (!apiKey) return;                                // no server-side key → skip gracefully
+// Run paragraph store (LIN-3253, LIN-2948 S3): the durable home for the one
+// plain-language paragraph per run, keyed `${urlKey}:${runId}`. NO TTL —
+// dispatch evidence is lifetime-retained (LIN-3163), so the paragraph must
+// outlive the 7- and 30-day caches. Modelled on the session-summary cache minus
+// the TTL; the `{urlKey, runId}` pair is a declared unique index.
+const runParagraphCollection = db.collection('run-paragraph')
+const runParagraphStore = new RunParagraphStore({
+  collection: runParagraphCollection
+})
+const precomputeRunParagraph = createRunParagraphPrecompute({
+  runParagraphStore,
+  isTerminal: sessionIsTerminal
+})
 
-  // Skip if a fresh summary for this exact input is already cached.
-  const inputHash = hashSession(session)
-  const cached = await sessionSummaryCacheStore.get(urlKey, session.sessionId)
-  if (cached && cached.inputHash === inputHash) return
+// Background session-summary precompute (LIN-632) plus the run-paragraph
+// precompute (LIN-3253). Late-wired into the observation materializer once the
+// stores exist: whenever a session is (re)materialized, generate its run
+// paragraph (step end or close-out, gated on inputHash), and — for a terminal
+// session — its one-sentence rollup ahead of time so the first user click is a
+// cache hit. This runs at WRITE time with NO user session, so it resolves an
+// OpenRouter key server-side (OPENROUTER_API_KEY → free-tier) and SKIPS cleanly
+// when neither is configured — never blocking, never throwing into the read-model
+// write it rode in on. The composition itself lives in
+// lib/session-materializer-precompute.js so it is testable (review R2).
+const precomputeSessionSummary = createSessionSummaryPrecompute({
+  sessionSummaryStore: sessionSummaryCacheStore,
+  isTerminal: sessionIsTerminal,
+  runSummaryStore: runSummaryCacheStore
+})
 
-  // Gather already-cached child run-summary outcomes for richer context — never
-  // generate per child (the one-LLM-call cost contract).
-  const childOutcomes = {}
-  if (runSummaryCacheStore) {
-    for (const loop of childLoops(session)) {
-      const c = await runSummaryCacheStore.get(urlKey, loop.loopId)
-      if (c?.summary?.outcome) childOutcomes[loop.loopId] = c.summary.outcome
-    }
-  }
-
-  const { summary, model } = await generateSessionSummary(session, { apiKey, model: DEFAULT_SESSION_SUMMARY_MODEL, childOutcomes })
-  await sessionSummaryCacheStore.put(urlKey, session.sessionId, { inputHash, summary, model })
-}
+observationMaterializer.precomputeSessionSummary = createMaterializerPrecompute({
+  precomputeRunParagraph,
+  precomputeSessionSummary
+})
 
 // Brief cache: AI-generated current-state task briefs, keyed on context hash
 const briefCacheCollection = db.collection('brief-cache')
@@ -2873,7 +2877,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the

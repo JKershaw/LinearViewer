@@ -18,6 +18,7 @@ import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriv
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
+import { InMemoryRunParagraphStore } from '../../lib/run-paragraph-store.js';
 import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
@@ -112,7 +113,7 @@ function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } 
   return { req, res };
 }
 
-function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, issues, observationSessionsStore } = {}) {
+function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore } = {}) {
   const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
@@ -121,6 +122,7 @@ function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheSto
     observationSessionsStore: observationSessionsStore || null,
     runSummaryCacheStore: runSummaryCacheStore || new InMemoryRunSummaryCacheStore(),
     sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
+    runParagraphStore: runParagraphStore || new InMemoryRunParagraphStore(),
     freeTierStore: { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
     // Default touched-task state is NOT done, so the LIN-1258 bounded feed
@@ -4183,6 +4185,113 @@ describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', 
     assert.match(html, /data-testid="session-seed-title"[^>]*>Title LIN-900</);
     assert.match(html, /data-testid="session-title"[^>]*>Title LIN-900</);
     assert.match(html, /data-testid="session-run-id"[^>]*>Run sess-ctx</);
+  });
+});
+
+describe('GET /observation/session/:sessionId — stored run paragraph, read-only (LIN-3253 S3)', () => {
+  function paragraphWorkspace() {
+    return {
+      'ws-a': {
+        live: [],
+        history: [
+          autopilotHistoryItem('sess-para', 'LIN-3253'),
+          workerHistoryItem('w-para', 'LIN-3254', 'sess-para')
+        ],
+        agentStatus: [agentStatusDone('sess-para', 'LIN-3253'), agentStatusDone('w-para', 'LIN-3254')]
+      }
+    };
+  }
+
+  function paragraphRouter(runParagraphStore) {
+    const { dispatchQueueStore, agentStatusStore } = makeStores(paragraphWorkspace());
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      runParagraphStore,
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({})
+    });
+  }
+
+  function driveSessionPage(router) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-para' }
+    });
+    return handler(req, res).then(() => res);
+  }
+
+  // The store is the ONLY seam the route has. `get` serves the stored doc; `put`
+  // THROWS, so any generation/write on the page path fails the test loudly.
+  function trappingStore(doc) {
+    return {
+      gets: [],
+      puts: 0,
+      async get(urlKey, runId) { this.gets.push({ urlKey, runId }); return doc; },
+      async put() { this.puts++; throw new Error('the run-page route must never generate or write the paragraph'); }
+    };
+  }
+
+  test('a miss renders the empty, hidden slot and never writes (no generation)', async () => {
+    const store = trappingStore(null);
+    const res = await driveSessionPage(paragraphRouter(store));
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.deepEqual(store.gets, [{ urlKey: 'ws-a', runId: 'sess-para' }], 'one read for this urlKey:runId');
+    assert.equal(store.puts, 0, 'a miss writes nothing');
+    assert.match(html, /data-testid="session-paragraph"[^>]*aria-hidden="true"/, 'empty slot stays hidden');
+    assert.ok(!html.includes('session-paragraph-text'), 'no paragraph text on a miss');
+  });
+
+  test('a hit renders the stored paragraph text and still writes nothing', async () => {
+    const store = trappingStore({ inputHash: 'current', paragraph: 'STORED-PARA-BODY', model: 'small-tier', final: false });
+    const res = await driveSessionPage(paragraphRouter(store));
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.equal(store.puts, 0, 'a hit still never writes');
+    assert.ok(html.includes('data-testid="session-paragraph-text"'), 'the paragraph slot rendered text');
+    assert.ok(html.includes('STORED-PARA-BODY'), 'the stored paragraph text is on the page');
+    assert.ok(!html.includes('aria-hidden="true" data-testid="session-paragraph-text"'), 'the filled slot is not hidden');
+  });
+
+  test('a hit HTML-escapes the stored paragraph so model text cannot inject (review MRt3 / L2)', async () => {
+    const store = trappingStore({ inputHash: 'current', paragraph: '<b>x</b>', model: 'small-tier', final: false });
+    const res = await driveSessionPage(paragraphRouter(store));
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.ok(html.includes('&lt;b&gt;x&lt;/b&gt;'), 'the stored paragraph text is HTML-escaped on the page');
+    assert.ok(!html.includes('<b>x</b>'), 'the raw model HTML must not be injected');
+  });
+
+  test('a stale hit renders the stored paragraph and never regenerates', async () => {
+    // The stored inputHash differs from what the live view would hash — the route
+    // is READ ONLY, so it serves the stored paragraph rather than generating.
+    const store = trappingStore({ inputHash: 'STALE-HASH', paragraph: 'STALE-PARA-BODY', model: 'small-tier', final: false });
+    const res = await driveSessionPage(paragraphRouter(store));
+
+    assert.equal(res.statusCode, 200);
+    const html = res.sentBody;
+    assert.equal(store.puts, 0, 'a stale hit regenerates nothing');
+    assert.ok(html.includes('STALE-PARA-BODY'), 'the stored (stale) paragraph is served');
+  });
+
+  test('the run-page route module never imports or calls the generator', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../../routes/dashboard.js', import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /run-paragraph(?:-hook)?\.js/, 'no generator/hook module import in the route');
+    assert.doesNotMatch(src, /generateRunParagraph/, 'no generator call in the route');
   });
 });
 
