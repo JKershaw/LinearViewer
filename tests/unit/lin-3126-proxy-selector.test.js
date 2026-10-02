@@ -543,6 +543,107 @@ describe('LIN-3241 acceptance witness (b) — proxy issue read honours the issue
 });
 
 // ---------------------------------------------------------------------------
+// (F1) post-logout: no owner session row must keep the pre-PR arm path
+//
+// Review F1: every proxy call now carries an intent, so the arm always ran a
+// slice-1 selection against `ownerWorkspace`. With no owner session row
+// (logout/session expiry while a 48h proxy token is still live) the selection
+// fell through and the arm returned null BEFORE reading any Connection, so
+// every proxy route regressed to 503 `owner_signed_out`. The plan says "absent
+// means unchanged behaviour"; the D12 headless arm is documented as "today's
+// post-logout behaviour". So a null `ownerWorkspace` keeps the pre-PR arm path.
+// ---------------------------------------------------------------------------
+
+function linearNoOwnerConnectionAccess() {
+  const EXPIRES_AT = Date.now() + 3_600_000;
+  return createConnectionAccess({
+    connectionStore: {
+      readConnectionsByReferent: async () => [{
+        _id: 'acct::linear::org',
+        accountId: 'acct',
+        provider: 'linear',
+        unitId: 'org',
+        credentials: { token: 'lin-tok', tokenExpiresAt: EXPIRES_AT },
+        referents: [],
+      }],
+    },
+    ownerCredentialStore: { getByConnection: async () => null },
+    refreshConnection: async () => null,
+    resolveCanonicalAccountId: async (id) => id,
+    selectOwnerSessionRow: () => null,
+    normalizeProvider: (ws) => ws?.provider || 'linear',
+    fingerprintCredential,
+    gate: { shouldAttempt: () => true },
+    lifecycleEventStore: { recordEvent: async () => {} },
+    bufferMs: BUFFER,
+  });
+}
+
+describe('(F1) no owner session row — the arm keeps the pre-PR path (served from the Connection)', () => {
+  for (const intent of ['WORKSPACE', 'CREATE', 'ISSUE']) {
+    test(`intent ${intent} with no owner row still serves the live Connection (not owner_signed_out)`, async () => {
+      const { fn } = makeVmResolver({ connectionAccess: linearNoOwnerConnectionAccess(), sessions: [] });
+      const baseline = await fn('acme', 'acct');
+      const result = await fn('acme', 'acct', { intent });
+
+      assert.equal(result.token, 'lin-tok', 'the live Connection credential is served, as before the PR');
+      assert.notEqual(result.reason, 'owner_signed_out');
+      assert.deepEqual(result, baseline, `intent ${intent} must be byte-identical to the pre-PR absent-options result`);
+    });
+  }
+
+  test('absent options (the pre-PR baseline) is unchanged', async () => {
+    const { fn } = makeVmResolver({ connectionAccess: linearNoOwnerConnectionAccess(), sessions: [] });
+    const result = await fn('acme', 'acct');
+    assert.equal(result.token, 'lin-tok');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (F3) refreshConnectionForSuspect projects the binding scope, never unitId
+//
+// Review F3: `refreshConnectionForSuspect` called `connectionResolveResult`
+// with no `bindingScope`, so it fell back to `connection.unitId` — the GitHub
+// App installation id. The recovered credential feeds
+// `resolveWorkspaceAccess`'s cache-hit `recovered` path, which re-sets the base
+// key for no-selector CREATE/WORKSPACE, so a suspect recovery could serve
+// `repo: <installationId>` for the TTL. It must project the owner binding's
+// scope (via `bindingScopeForConnection` + the owner workspace) instead.
+// ---------------------------------------------------------------------------
+
+function githubSuspectAccess({ ownerRow }) {
+  return createConnectionAccess({
+    connectionStore: { readConnectionsByReferent: async () => [githubConnection()] },
+    ownerCredentialStore: { getByConnection: async () => null },
+    refreshConnection: async () => ({ token: 'tok-new', expiresAt: future(), provider: 'github' }),
+    resolveCanonicalAccountId: async (id) => id,
+    selectOwnerSessionRow: () => ownerRow ?? null,
+    normalizeProvider: (ws) => ws?.provider || 'linear',
+    fingerprintCredential,
+    gate: { shouldAttempt: () => true },
+    lifecycleEventStore: { recordEvent: async () => {} },
+    bufferMs: BUFFER,
+  });
+}
+
+describe('(F3) refreshConnectionForSuspect projects the binding scope, never the installation id', () => {
+  test('GitHub suspect recovery returns the binding repo, not connection.unitId', async () => {
+    const row = twoRepoOwnerRow();
+    const access = githubSuspectAccess({ ownerRow: row });
+    const out = await access.refreshConnectionForSuspect({
+      urlKey: 'acme',
+      ownerAccountId: 'acct',
+      provider: 'github',
+      loadSessions: async () => [{ _id: 'sid', session: { workspaces: row.session.workspaces } }],
+    });
+
+    assert.equal(out.token, 'tok-new');
+    assert.deepEqual(out.scope, { token: 'tok-new', repo: REPO_A });
+    assert.notEqual(out.scope.repo, INSTALLATION_ID, 'a recovered GitHub credential must not regress to the installation id');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // (F) census pin — all 37 resolveProviderAccess call sites declare a literal
 // ---------------------------------------------------------------------------
 
