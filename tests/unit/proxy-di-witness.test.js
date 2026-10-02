@@ -174,6 +174,16 @@ describe('Half A: mount-completeness census against the real repo', () => {
   // stage has to bump. Unlike the `missingFromMount`/`extraInMount` detector
   // above, an exported-but-not-mounted factory or a mounted-but-not-exported one
   // fails here directly.
+  //
+  // STATED BOUND (LIN-3218 close-out, review ledger M1c): the "mounted" side below
+  // is a textual match on `router.use(<name>({` against the composer source, and
+  // it is comment-blind — a `// router.use(createFooRoutes({` that has been
+  // commented out still matches, so a factory whose mount is commented out is NOT
+  // detected here. This is a stated bound, not a behavioural probe. In practice the
+  // Half B reach probes and the endpoint-inventory witness catch most such drops,
+  // but a sub-router with no reach probe (e.g. createRulingsRoutes, tracked as a
+  // follow-up) would survive. Closing the hole would need comment-stripping from
+  // `composerSource` plus an in-file planted witness; the bound is stated instead.
   function deriveFactoryMountSets(modules) {
     const graph = buildImportGraph(modules);
     const composerPath = 'routes/proxy.js';

@@ -139,7 +139,10 @@ describe('assertion 3: DUPLICATE_DISPATCH named consistently across the three so
   // constant, and EVERY quoted / named DUPLICATE literal across the three
   // sources must equal it. A stray or misspelt spelling (e.g.
   // DUPLICATE_DISPATCH_OLD) fails; a bare-token match can no longer pass by
-  // accidentally containing the right substring.
+  // accidentally containing the right substring. LIN-3218 close-out (review
+  // ledger M6b): the token charset includes digits (`[A-Z0-9_]`), so a
+  // digit-bearing stray such as `DUPLICATE_DISPATCH_V2` is visible and fails
+  // rather than being silently skipped by the matcher.
   const CODE = DUPLICATE_DISPATCH_CODE;
 
   test('lib/dispatch-factory.js exports DUPLICATE_DISPATCH_CODE and every quoted DUPLICATE literal equals it', () => {
@@ -148,7 +151,7 @@ describe('assertion 3: DUPLICATE_DISPATCH named consistently across the three so
       new RegExp(`DUPLICATE_DISPATCH_CODE\\s*=\\s*'${CODE}'`),
       `the exported constant must be the authoritative quoted literal '${CODE}'`
     );
-    const quoted = [...factorySource.matchAll(/'DUPLICATE[A-Z_]*'/g)].map((m) => m[0].slice(1, -1));
+    const quoted = [...factorySource.matchAll(/'DUPLICATE[A-Z0-9_]*'/g)].map((m) => m[0].slice(1, -1));
     assert.ok(quoted.length > 0, 'the factory must quote the code at least once');
     for (const token of quoted) {
       assert.equal(
@@ -159,7 +162,7 @@ describe('assertion 3: DUPLICATE_DISPATCH named consistently across the three so
   });
 
   test('every DUPLICATE token named in docs/passage-runner-prompt.md equals the exported constant', () => {
-    const tokens = docsSource.match(/DUPLICATE[A-Z_]*/g) || [];
+    const tokens = docsSource.match(/DUPLICATE[A-Z0-9_]*/g) || [];
     assert.ok(tokens.length > 0, 'the runner doc must name the code');
     for (const token of tokens) {
       assert.equal(
@@ -170,7 +173,7 @@ describe('assertion 3: DUPLICATE_DISPATCH named consistently across the three so
   });
 
   test('every DUPLICATE token named in docs/proxy-integration.md equals the exported constant', () => {
-    const tokens = integrationSource.match(/DUPLICATE[A-Z_]*/g) || [];
+    const tokens = integrationSource.match(/DUPLICATE[A-Z0-9_]*/g) || [];
     assert.ok(tokens.length > 0, 'the integration doc must name the code');
     for (const token of tokens) {
       assert.equal(
@@ -229,6 +232,13 @@ describe('assertion 5: /dispatch status enum — every occurrence parses to the 
         return canonical >= 2 && !allTerminal;
       });
   }
+
+  // STATED BOUND (LIN-3218 close-out, review ledger B1/B2): the selection rule
+  // above needs at least two canonical members, so a prose copy that is DELETED
+  // outright, or renamed wholesale to a vocabulary with fewer than two canonical
+  // members (e.g. `pending|running`), is not detected as an enum-shaped run at
+  // all. B1 (a deleted docs enum copy) was caught by the retired exact-count pin;
+  // this derived relation states the bound rather than re-pinning a number.
 
   test('routes/proxy.js carries no dispatch status enum copy (the LIN-2245 move holds)', () => {
     assert.deepEqual(
