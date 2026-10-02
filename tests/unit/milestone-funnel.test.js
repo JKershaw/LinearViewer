@@ -477,6 +477,78 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     }
   });
 
+  test('M2: an aggregate abort row is not a first Go', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const b = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(6000), { abort: true }));
+    await w.dispatchHistory.insertOne(dispatchRow(b._id, PAST(1000)));
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.firstGo.state, 'reached');
+    assert.equal(result.steps.firstGo.count, 1, 'the abort row is not a Go press');
+  });
+
+  test('M3: an out-of-window dispatch is excluded from the aggregate', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const b = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000)));
+    await w.dispatchHistory.insertOne(dispatchRow(b._id, PAST(31 * 24 * 60 * 60 * 1000)));
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.firstGo.state, 'reached');
+    assert.equal(result.steps.firstGo.count, 1, 'only the in-window dispatch counts');
+  });
+
+  test('M4: an out-of-window account is excluded from aggregate login', async () => {
+    const w = freshWorld();
+    await w.accountStore.createAccount();
+    const old = await w.accountStore.createAccount();
+    await w.accountStore.collection.updateOne({ _id: old._id }, { $set: { createdAt: PAST(31 * 24 * 60 * 60 * 1000) } });
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.login.state, 'reached');
+    assert.equal(result.steps.login.count, 1, 'only the in-window account counted');
+  });
+
+  test('M5: an out-of-window membership edge is excluded from aggregate connected', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const b = await w.accountStore.createAccount();
+    await w.accountWorkspaceStore.bindAccountToWorkspace(a._id, 'ws-1');
+    await w.accountWorkspaceStore.bindAccountToWorkspace(b._id, 'ws-1');
+    await w.accountWorkspaceStore.collection.updateOne({ accountId: b._id }, { $set: { createdAt: PAST(31 * 24 * 60 * 60 * 1000) } });
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.connected.state, 'reached');
+    assert.equal(result.steps.connected.count, 1, 'only the in-window edge counted');
+  });
+
+  test('M6: a non-evidence entry with a PR URL does not count as PR opened', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000), {
+      feedback: [{ kind: 'status', url: 'https://github.com/o/r/pull/9', timestamp: PAST(500) }]
+    }));
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.prOpened.state, 'reached');
+    assert.equal(result.steps.prOpened.count, 0, 'a non-evidence entry is not PR-opened evidence');
+  });
+
+  test('M7: an evidence entry with a non-PR URL does not count as PR opened', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000), {
+      feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/issues/5', timestamp: PAST(500) }]
+    }));
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.prOpened.state, 'reached');
+    assert.equal(result.steps.prOpened.count, 0, 'a non-PR URL is not PR-opened evidence');
+  });
+
   test('carries counts and labels only — no account id, workspace key, issue id or PR url', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();

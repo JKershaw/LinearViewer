@@ -142,6 +142,22 @@ describe('LIN-2952 — GET /workspace/:urlKey/api/milestone-funnel', () => {
     assert.equal(res.body.steps.firstGo.at, goAt.toISOString());
   });
 
+  test('M13: login takes the earliest createdAt across the merge group, not the first account', async () => {
+    const w = freshWorld();
+    const canonical = await w.accountStore.createAccount();
+    const merged = await w.accountStore.createAccount();
+    assert.equal((await w.accountStore.mergeAccounts(canonical._id, merged._id)).ok, true);
+    // Canonical (first in the group) is LATER; the merged-away account is earlier.
+    const canonicalAt = PAST(1000);
+    const mergedAt = PAST(5000);
+    await w.accountStore.collection.updateOne({ _id: canonical._id }, { $set: { createdAt: canonicalAt } });
+    await w.accountStore.collection.updateOne({ _id: merged._id }, { $set: { createdAt: mergedAt } });
+
+    const res = await call(buildApp(w, { accountId: canonical._id }), 'get', PATH);
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.body.steps.login.at, mergedAt.toISOString(), 'the group\'s EARLIEST createdAt wins');
+  });
+
   test('R2: an instrumented merge-click read that throws is no-signal, not not-reached', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
