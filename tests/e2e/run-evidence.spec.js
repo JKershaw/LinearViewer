@@ -129,10 +129,10 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     const mount = page.locator('[data-testid="run-evidence-mount"]');
     await expect(mount).toBeVisible();
 
-    // Mounted at the top: the evidence block precedes the Overview section.
+    // Mounted at the top: the evidence block precedes the run-header section.
     const mountBox = await mount.boundingBox();
-    const overviewBox = await page.locator('.sess-overview').boundingBox();
-    expect(mountBox.y).toBeLessThan(overviewBox.y);
+    const headerBox = await page.locator('.sess-run-header').boundingBox();
+    expect(mountBox.y).toBeLessThan(headerBox.y);
 
     // No straggler waiting/parked flags above it — a finished run is finished.
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
