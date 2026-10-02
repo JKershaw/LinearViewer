@@ -698,13 +698,14 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {number} [opts.maxSessionsPerTask]         Sibling per-task session bound (LIN-2934); blank/omitted sends nothing, same optional pass-through as maxTasks
  * @param {string} [opts.entryRung]                LIN-2942: the ladder rung this dispatch was pressed from ('run-step' | 'run-task'); the server records the mode, linked to the created item. Blank/omitted sends nothing
  * @param {string} [opts.stopAt]                    LIN-3246: the run boundary ('pr') the ladder's own autopilot run declares; forwarded to the server as the validated `stopAt` body field (only 'pr', only on a fresh autopilot dispatch). Blank/omitted sends nothing, so every other launcher is unchanged.
+ * @param {string} [opts.surface]                  LIN-2944 P1: the opened-task surface this dispatch came from ('home' | 'swipe'); the server records it on the mode event. Blank/omitted sends nothing (the route records null)
  * @param {string} [opts.composedRunMarker]         LIN-2775 Area 8: the scoped structural marker for a composed-run dispatch (a real agent brief, not a raw pressed-option label) — activates routes/dispatch.js's terminal-anchor guard server-side. Blank/omitted sends nothing, so an ordinary dispatch is completely unaffected.
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt, surface } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -761,6 +762,11 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // sends the boundary; the server validates it (only 'pr', fresh autopilot
   // dispatch), and every other launcher sends nothing and is unchanged.
   if (stopAt) payload.stopAt = stopAt;
+  // LIN-2944 P1 (handover d610edd0): the opened-task surface the ladder press
+  // came from ('home' | 'swipe'), forwarded so the dispatch route records it.
+  // Omitted by every other caller (periodical / Setup Prompt / dispatch page /
+  // autopilot kickoff), for which the route records null.
+  if (surface) payload.surface = surface;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.

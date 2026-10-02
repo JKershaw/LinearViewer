@@ -144,7 +144,6 @@ function scanMintCallers(files) {
 const EMITTERS = [
   { file: 'lib/render.js', snippet: `const proxyForceAttr = proxyForce ? ' data-proxy-force="true"' : ''`, class: 'copy-container', reason: 'the attribute write, gated by the proxyForce option' },
   { file: 'lib/render.js', snippet: 'proxyForce: true', class: 'copy-container', reason: 'its sole proxyForce:true caller: the periodical "+ Autopilot" variant' },
-  { file: 'lib/render.js', snippet: 'class="autopilot-container prompt-container hidden"', class: 'copy-container', reason: 'the home/issue Autopilot container literal' },
   { file: 'public/prompt-section.js', snippet: "kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true", class: 'copy-container', reason: 'the Autopilot result entry' },
   { file: 'public/prompt-section.js', snippet: `' data-proxy-force="runner"'`, class: 'dispatch-rung', reason: 'LIN-3098 N3 run-step rung: dispatch only, never reaches maybeAppend' },
   { file: 'public/next-run.js', snippet: 'proxyForce: true,', class: 'dispatch', reason: 'next-run autopilot dispatch: server-side mint' }

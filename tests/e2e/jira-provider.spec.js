@@ -235,8 +235,11 @@ test.describe('LIN-1890 — a Jira-only session on an OAuth binding', () => {
     await row.click();
     await page.locator('[data-toggle="details"]').first().click();
     await page.locator('[data-toggle="prompts"]').first().click();
-    await page.locator('[data-label="implementation"]').first().click();
-    await expect(page.locator('.prompt-text').first()).toContainText('Jira task in progress');
+    // LIN-2944 P1: the opened task is the shared PromptSection component.
+    const component = page.locator('.prompt-section').first();
+    await expect(component).toBeVisible();
+    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="implementation"]').click();
+    await expect(component.locator('[data-prompt-body]')).toContainText('Jira task in progress');
   });
 
   test('the detail surface stays provider-aware for a Jira-only session', async ({ page }) => {

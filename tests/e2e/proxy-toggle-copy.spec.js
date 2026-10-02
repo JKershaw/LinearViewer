@@ -27,11 +27,16 @@ async function selectDashboardPrompt(page) {
   await taskLine.click();
   const details = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"]`);
   await details.locator('.detail-toggle[data-toggle="prompts"]').click();
-  await page.locator(`.in-progress-items .more-toggle[data-issue-id="${BLOCKED_ISSUE_ID}"]`).click();
-  await page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`).click();
-  const container = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-  await expect(container.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-  return container;
+  const component = details.locator('.prompt-section');
+  await expect(component).toBeVisible();
+  // Pick the "blocked" template from "other prompts" (reveal the more-group first).
+  const other = component.locator('[data-testid="other-prompts"]');
+  if (!(await other.locator('.swipe-prompt-btn[data-prompt="blocked"]').isVisible().catch(() => false))) {
+    await other.locator('[data-prompt="__more__"]').click();
+  }
+  await other.locator('.swipe-prompt-btn[data-prompt="blocked"]').click();
+  await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+  return component;
 }
 
 /** Reveal a preexisting (template) prompt on the swipe view. */
@@ -70,8 +75,8 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
     // per-button class — so injected buttons inherit it automatically.
     await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
 
-    await container.locator('.prompt-copy').click();
-    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+    await container.locator('.swipe-prompt-copy').click();
+    await expect(container.locator('.swipe-prompt-copy')).toHaveText('copied!');
 
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toContain(PROXY_MARKER);
@@ -91,8 +96,8 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
 
     const container = await selectDashboardPrompt(page);
     await container.locator('.prompt-proxy-toggle').click();
-    await container.locator('.prompt-copy').click();
-    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+    await container.locator('.swipe-prompt-copy').click();
+    await expect(container.locator('.swipe-prompt-copy')).toHaveText('copied!');
 
     expect(bodies).toEqual([{ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }]);
     const clip = await page.evaluate(() => navigator.clipboard.readText());
@@ -108,8 +113,8 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
 
     const container = await selectDashboardPrompt(page);
     // Leave +proxy off (default).
-    await container.locator('.prompt-copy').click();
-    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+    await container.locator('.swipe-prompt-copy').click();
+    await expect(container.locator('.swipe-prompt-copy')).toHaveText('copied!');
 
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip.length).toBeGreaterThan(0);
@@ -129,7 +134,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
     // Seed the clipboard so we can prove nothing was written on failure.
     await page.evaluate(() => navigator.clipboard.writeText('__SENTINEL__'));
 
-    const copyBtn = container.locator('.prompt-copy');
+    const copyBtn = container.locator('.swipe-prompt-copy');
     await copyBtn.click();
 
     // The toggle still shows active, but the copy must report failure...
@@ -175,7 +180,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
       return m && m[1];
     };
 
-    const copyBtn = container.locator('.prompt-copy');
+    const copyBtn = container.locator('.swipe-prompt-copy');
 
     await copyBtn.click();
     await expect(copyBtn).toHaveText('copied!');
@@ -291,8 +296,8 @@ test.describe('+proxy gate — flag-off surface never injects (LIN-525 #2)', () 
     // No +proxy button renders when the feature is off.
     await expect(container.locator('.prompt-proxy-toggle')).toHaveCount(0);
 
-    await container.locator('.prompt-copy').click();
-    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+    await container.locator('.swipe-prompt-copy').click();
+    await expect(container.locator('.swipe-prompt-copy')).toHaveText('copied!');
 
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip.length).toBeGreaterThan(0);

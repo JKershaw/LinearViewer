@@ -42,7 +42,7 @@ async function setSession(page) {
   // /fixture:LIN-3136
 }
 
-/** Open the home task's Autopilot container and wait for its kickoff to load. */
+/** Open the home task's shared component and load the Autopilot kickoff. */
 async function revealHomeAutopilot(page) {
   await page.goto(`/workspace/${URL_KEY}/`);
   await page.waitForLoadState('networkidle');
@@ -51,11 +51,13 @@ async function revealHomeAutopilot(page) {
   await taskLine.click();
   const details = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"]`);
   await details.locator('.detail-toggle[data-toggle="prompts"]').click();
+  const component = details.locator('.prompt-section');
+  await expect(component).toBeVisible();
 
-  await page.locator(`.in-progress-items .autopilot-btn[data-issue-id="${BLOCKED_ISSUE_ID}"]`).first().click();
-  const container = page.locator(`.in-progress-items .autopilot-container[data-autopilot-for="${BLOCKED_ISSUE_ID}"]`);
-  await expect(container.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-  return container;
+  // LIN-2944 P1: the Autopilot kickoff is the ladder's "run the whole task" rung.
+  await component.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').click();
+  await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+  return component;
 }
 
 /** Open the Swipe Autopilot result and wait for it to render fresh. */
@@ -144,8 +146,8 @@ test.describe('LIN-3079 home Autopilot — proxy forced with toggle OFF', () => 
     await setSession(page);
 
     const container = await revealHomeAutopilot(page);
-    await container.locator('.prompt-copy').click();
-    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+    await container.locator('.swipe-prompt-copy').click();
+    await expect(container.locator('.swipe-prompt-copy')).toHaveText('copied!');
 
     await assertClipboardHasProxyBlock(page);
   });
@@ -156,7 +158,7 @@ test.describe('LIN-3079 home Autopilot — proxy forced with toggle OFF', () => 
     const container = await revealHomeAutopilot(page);
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      container.locator('.prompt-download').click(),
+      container.locator('.swipe-prompt-download').click(),
     ]);
     await assertDownloadedFileHasProxyBlock(download);
   });
@@ -168,10 +170,10 @@ test.describe('LIN-3079 home Autopilot — proxy forced with toggle OFF', () => 
     const container = await revealHomeAutopilot(page);
     const captured = captureDispatchBody(page);
 
-    await container.locator('.dispatch-disclosure').click();
-    const dispatchBtn = container.locator('.prompt-dispatch[data-target="cli"]');
+    await container.locator('.swipe-prompt-dispatch-toggle').click();
+    const dispatchBtn = container.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
-    await expect(dispatchBtn).toHaveText('dispatched!', { timeout: 10000 });
+    await expect(dispatchBtn).toHaveText('\u2713', { timeout: 10000 });
 
     expect(captured.body).toBeTruthy();
     expect(captured.body.attachProxy).toBe(true);
@@ -481,8 +483,8 @@ test.describe('LIN-3136 forced Autopilot copy — the owner-only driver copy', (
     const bodies = captureMintBodies(page);
 
     const container = await revealHomeAutopilot(page);
-    await container.locator('.prompt-copy').click();
-    await expect(container.locator('.prompt-copy')).toHaveText('copied!');
+    await container.locator('.swipe-prompt-copy').click();
+    await expect(container.locator('.swipe-prompt-copy')).toHaveText('copied!');
 
     expect(bodies).toEqual([{ purpose: 'driver' }]);
     const clip = await page.evaluate(() => navigator.clipboard.readText());
@@ -497,8 +499,8 @@ test.describe('LIN-3136 forced Autopilot copy — the owner-only driver copy', (
       const container = await revealHomeAutopilot(page);
       await page.evaluate(() => navigator.clipboard.writeText('__SENTINEL__'));
 
-      await container.locator('.prompt-copy').click();
-      await expect(container.locator('.prompt-copy')).toHaveText('failed');
+      await container.locator('.swipe-prompt-copy').click();
+      await expect(container.locator('.swipe-prompt-copy')).toHaveText('failed');
       await expect(page.locator('.toast-error')).toContainText(
         "Only this workspace's owner can copy a prompt that can queue work on their machine."
       );

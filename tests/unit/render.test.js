@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderLabels, renderDisplayLabels, renderPage, renderDetailsContent } from '../../lib/render.js';
+import { renderDisplayLabels, renderPage, renderDetailsContent } from '../../lib/render.js';
 import { PERIODICALS_PROJECT_ID, NO_PROJECT_ID, buildInProgressForest } from '../../lib/tree.js';
 import { testMockPeriodicalsTree } from '../fixtures/mock-data.js';
 // Side-effect import: the Linear provider self-registers on load, so getProvider
@@ -27,222 +27,71 @@ import '../../lib/providers/github-projects/index.js';
 import '../../lib/providers/jira/index.js';
 
 // =============================================================================
-// renderLabels Tests
+// renderDisplayLabels Tests
 // =============================================================================
+//
+// `renderDisplayLabels` is still live (Home's Details metadata, the periodicals
+// path). These cases were lost when the dead `renderLabels` combiner was removed
+// (LIN-2944 P1 addendum 7); restored unchanged against `renderDisplayLabels`.
 
-describe('renderLabels', () => {
-  describe('regular labels', () => {
-    // These exercise the display-label text in isolation. Prompt buttons now
-    // render for every issue (including completed), so they use
-    // renderDisplayLabels() rather than renderLabels() to avoid the prompt HTML.
-    test('renders regular label as plain text', () => {
-      const issue = {
-        id: 'issue-1',
-        labels: { nodes: [{ name: 'feature' }] },
-        state: { type: 'completed' }
-      };
-      const result = renderDisplayLabels(issue);
-      assert.strictEqual(result, 'feature');
-    });
-
-    test('renders multiple regular labels comma-separated', () => {
-      const issue = {
-        id: 'issue-1',
-        labels: { nodes: [{ name: 'feature' }, { name: 'priority' }] },
-        state: { type: 'completed' }
-      };
-      const result = renderDisplayLabels(issue);
-      assert.ok(result.includes('feature'));
-      assert.ok(result.includes('priority'));
-      // Labels are comma-separated in renderDisplayLabels
-      assert.strictEqual(result, 'feature, priority');
-    });
-
-    test('returns empty string for no labels', () => {
-      const issue = {
-        id: 'issue-1',
-        labels: { nodes: [] },
-        state: { type: 'completed' }
-      };
-      const result = renderDisplayLabels(issue);
-      assert.strictEqual(result, '');
-    });
-
-    test('handles missing labels gracefully', () => {
-      const issue = {
-        id: 'issue-1',
-        labels: null,
-        state: { type: 'completed' }
-      };
-      const result = renderDisplayLabels(issue);
-      assert.strictEqual(result, '');
-    });
+describe('renderDisplayLabels', () => {
+  test('renders regular label as plain text', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: { nodes: [{ name: 'feature' }] },
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), 'feature');
   });
 
-  describe('promptable labels', () => {
-    test('renders blocked as clickable link', () => {
-      const issue = {
-        id: 'issue-789',
-        labels: { nodes: [{ name: 'blocked' }] },
-        state: { type: 'started' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('<a href="#"'));
-      assert.ok(result.includes('class="label-prompt"'));
-      assert.ok(result.includes('data-issue-id="issue-789"'));
-      assert.ok(result.includes('data-label="blocked"'));
-      assert.ok(result.includes('>blocked</a>'));
-    });
-
-    test('renders bug as clickable link', () => {
-      const issue = {
-        id: 'issue-bug',
-        labels: { nodes: [{ name: 'bug' }] },
-        state: { type: 'started' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('class="label-prompt"'));
-      assert.ok(result.includes('data-label="bug"'));
-    });
-
-    test('mixes promptable and regular labels correctly', () => {
-      const issue = {
-        id: 'issue-mix',
-        labels: { nodes: [{ name: 'blocked' }, { name: 'feature' }] },
-        state: { type: 'started' }
-      };
-      const result = renderLabels(issue);
-      // blocked should be a link (behind "more")
-      assert.ok(result.includes('data-label="blocked"'));
-      // feature should be plain text (not a link)
-      assert.ok(result.includes('feature'));
-      assert.ok(!result.includes('data-label="feature"'));
-    });
+  test('renders multiple regular labels comma-separated', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: { nodes: [{ name: 'feature' }, { name: 'priority' }] },
+      state: { type: 'completed' }
+    };
+    const result = renderDisplayLabels(issue);
+    assert.ok(result.includes('feature'));
+    assert.ok(result.includes('priority'));
+    assert.strictEqual(result, 'feature, priority');
   });
 
-  describe('default prompt buttons', () => {
-    test('shows default prompts for actionable issues', () => {
-      const issue = {
-        id: 'issue-ready',
-        labels: { nodes: [] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('data-label="look-into"'));
-      assert.ok(result.includes('data-label="research"'));
-      assert.ok(result.includes('data-label="plan"'));
-      assert.ok(result.includes('data-label="implementation"'));
-    });
-
-    test('shows same prompts regardless of issue state (started)', () => {
-      const issue = {
-        id: 'issue-started',
-        labels: { nodes: [] },
-        state: { type: 'started' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('data-label="plan"'));
-      assert.ok(result.includes('data-label="research"'));
-    });
-
-    test('shows prompts for completed issue (e.g. for a retro look-back)', () => {
-      const issue = {
-        id: 'issue-done',
-        labels: { nodes: [] },
-        state: { type: 'completed' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('data-label="plan"'));
-      assert.ok(result.includes('data-label="look-into"'));
-      // retro lives behind "more" and should be reachable on a finished task
-      assert.ok(result.includes('data-label="retro"'));
-    });
-
-    test('shows same prompts even with preparing label', () => {
-      const issue = {
-        id: 'issue-prework',
-        labels: { nodes: [{ name: 'preparing' }] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('preparing'));
-      assert.ok(result.includes('data-label="plan"'));
-    });
-
-    test('plan appears once even if plan label exists', () => {
-      const issue = {
-        id: 'issue-plan',
-        labels: { nodes: [{ name: 'plan' }] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      const planMatches = result.match(/data-label="plan"/g);
-      assert.strictEqual(planMatches?.length, 1, 'Should only have one plan link');
-    });
-
-    test('uses short button labels for defaults', () => {
-      const issue = {
-        id: 'issue-labels',
-        labels: { nodes: [] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(result.includes('>look into</a>'));
-      assert.ok(result.includes('>research</a>'));
-      assert.ok(result.includes('>plan</a>'));
-      assert.ok(result.includes('>implement</a>'));
-    });
+  test('returns empty string for no labels', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: { nodes: [] },
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), '');
   });
 
-  describe('HTML escaping', () => {
-    test('escapes HTML in label names', () => {
-      const issue = {
-        id: 'issue-xss',
-        labels: { nodes: [{ name: '<script>alert("xss")</script>' }] },
-        state: { type: 'completed' }
-      };
-      const result = renderLabels(issue);
-      assert.ok(!result.includes('<script>'));
-      assert.ok(result.includes('&lt;script&gt;'));
-    });
-
-    test('escapes HTML in promptable label names in data-label attribute', () => {
-      // Verifies that label names containing special characters are escaped
-      // in the data-label attribute (though this shouldn't happen in practice)
-      const issue = {
-        id: 'issue-test',
-        labels: { nodes: [{ name: 'blocked' }] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      // The escapeHtml function is called on label.name for data-label
-      assert.ok(result.includes('data-label="blocked"'));
-    });
+  test('handles missing labels gracefully', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: null,
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), '');
   });
 
-  describe('edge cases', () => {
-    test('handles undefined labels nodes', () => {
-      const issue = {
-        id: 'issue-undef',
-        labels: {},
-        state: { type: 'completed' }
-      };
-      // No display labels to show; prompt buttons still render regardless of state
-      assert.strictEqual(renderDisplayLabels(issue), '');
-    });
+  test('handles an empty labels object', () => {
+    const issue = {
+      id: 'issue-undef',
+      labels: {},
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), '');
+  });
 
-    test('handles issue with only regular labels and eligible state', () => {
-      const issue = {
-        id: 'issue-eligible',
-        labels: { nodes: [{ name: 'feature' }] },
-        state: { type: 'backlog' }
-      };
-      const result = renderLabels(issue);
-      // Should have feature as text, plus default prompt buttons
-      assert.ok(result.includes('feature'));
-      assert.ok(result.includes('data-label="plan"'));
-      assert.ok(result.includes('data-label="look-into"'));
-    });
+  test('escapes HTML in label names', () => {
+    const issue = {
+      id: 'issue-xss',
+      labels: { nodes: [{ name: '<script>alert("xss")</script>' }] },
+      state: { type: 'completed' }
+    };
+    const result = renderDisplayLabels(issue);
+    assert.ok(!result.includes('<script>'));
+    assert.ok(result.includes('&lt;script&gt;'));
   });
 });
 
@@ -1084,20 +933,16 @@ describe('Recent activity section', () => {
 });
 
 // =============================================================================
-// Per-render-instance dispatch panel ids (LIN-732)
+// Per-render-instance mount key (LIN-732 / LIN-2944 P1)
 // =============================================================================
 //
-// The same issue can be rendered in two sections at once (In Progress + its
-// project tree). The dispatch disclosure resolves its panel via aria-controls →
-// getElementById, which only matches the FIRST element with that id — so a panel
-// id keyed on issue id alone makes the second appearance's "Dispatch ▾" target
-// the first's panel and look broken. The fix folds `section` into the panel ids.
-//
-// LIN-1137: the server now renders placeholder divs (data-disclosure-prefix)
-// instead of the actual panels; initDispatchDisclosures() in common.js replaces
-// them client-side. The prefix values (not the final panel ids) are what assert
-// uniqueness.
-describe('Per-render-instance dispatch panel ids (LIN-732)', () => {
+// The same issue can render in two sections at once (In Progress + its project
+// tree). Home's opened-task mount carries the per-render instance key
+// (`data-instance-key`); `public/app.js` passes it to `PromptSection.init` as the
+// dispatch-disclosure `idPrefix`, so the two appearances get disjoint panel ids.
+// The truth condition is unchanged (LIN-732); the carrier moved from the
+// server-rendered disclosure placeholder to the shared component's mount.
+describe('Per-render-instance mount key (LIN-732)', () => {
   const issue = {
     id: 'i1', identifier: 'STB-1', title: 'A task',
     state: { type: 'started' }, labels: { nodes: [] }
@@ -1105,73 +950,57 @@ describe('Per-render-instance dispatch panel ids (LIN-732)', () => {
   const flags = { dispatch: true, proxy: true };
   const opts = (section) => ({ isLanding: false, urlKey: 'ws', featureFlags: flags, section });
 
-  test('no section ⇒ prefix keyed on issue id (byte-identical to pre-LIN-732)', () => {
+  test('renders exactly one opened-task mount for the signed-in detail fragment', () => {
     const html = renderDetailsContent(issue, opts(''));
-    assert.ok(html.includes('data-disclosure-prefix="prompt-options-i1"'), 'prompt placeholder keyed on issue id');
-    assert.ok(html.includes('data-disclosure-prefix="recommend-options-i1"'), 'recommend placeholder keyed on issue id');
-    assert.ok(html.includes('data-disclosure-prefix="autopilot-options-i1"'), 'autopilot placeholder keyed on issue id');
+    assert.equal((html.match(/data-prompt-mount="1"/g) || []).length, 1, 'exactly one mount');
+    assert.ok(html.includes('data-issue-id="i1"'), 'mount carries the issue id');
   });
 
-  test('section is folded into every dispatch placeholder prefix', () => {
+  test('no section ⇒ instance key is the bare issue id', () => {
+    const html = renderDetailsContent(issue, opts(''));
+    assert.ok(html.includes('data-instance-key="i1"'), 'instance key keyed on issue id');
+  });
+
+  test('section is folded into the instance key', () => {
     const html = renderDetailsContent(issue, opts('in-progress'));
-    assert.ok(html.includes('data-disclosure-prefix="prompt-options-in-progress-i1"'), 'prompt placeholder namespaced by section');
-    assert.ok(html.includes('data-disclosure-prefix="recommend-options-in-progress-i1"'), 'recommend placeholder namespaced by section');
-    assert.ok(html.includes('data-disclosure-prefix="autopilot-options-in-progress-i1"'), 'autopilot placeholder namespaced by section');
-    assert.ok(!html.includes('data-disclosure-prefix="prompt-options-i1"'), 'no bare issue-id placeholder prefix remains');
+    assert.ok(html.includes('data-instance-key="in-progress-i1"'), 'instance key namespaced by section');
+    assert.ok(!html.includes('data-instance-key="i1"'), 'no bare issue-id key remains');
   });
 
-  test('two sections yield disjoint placeholder prefixes for the same issue (no DOM collision)', () => {
-    const ids = (section) => {
-      const html = renderDetailsContent(issue, opts(section));
-      return [...html.matchAll(/data-disclosure-prefix="((?:prompt|recommend|autopilot)-options-[^"]+)"/g)].map(m => m[1]);
-    };
-    const inProgress = ids('in-progress');
-    const project = ids('project');
-    assert.equal(inProgress.length, 3, 'three dispatch placeholders per render instance');
-    const overlap = inProgress.filter(id => project.includes(id));
-    assert.deepEqual(overlap, [], 'In Progress and project appearances share no placeholder prefix');
-  });
-
-  test('every placeholder prefix in the render output is unique', () => {
-    const html = renderDetailsContent(issue, opts('in-progress'));
-    const prefixes = [...html.matchAll(/data-disclosure-prefix="([^"]+)"/g)].map(m => m[1]);
-    assert.equal(new Set(prefixes).size, prefixes.length, 'all placeholder prefixes are unique');
+  test('two sections yield disjoint instance keys for the same issue (no DOM collision)', () => {
+    const key = (section) => (renderDetailsContent(issue, opts(section)).match(/data-instance-key="([^"]+)"/) || [])[1];
+    assert.ok(key('in-progress'), 'In Progress mount found');
+    assert.ok(key('project'), 'project mount found');
+    assert.notEqual(key('in-progress'), key('project'), 'the two appearances share no instance key');
   });
 });
 
 // =============================================================================
-// Stepper Autopilot sibling button (LIN-836)
+// Home has no second opened-task renderer (LIN-2944 P1 addendum 7)
 // =============================================================================
 //
-// The proxy-gated Autopilot affordance grew a SECOND button for the stepper
-// variant (LIN-791). The classic anchor stays untouched (implicit `standard`);
-// the sibling carries data-variant="stepper", which app.js reads and forwards
-// as `?variant=stepper` on the kickoff fetch.
-describe('Stepper Autopilot sibling button (LIN-836)', () => {
+// The inline renderer (prompt buttons, recommend + Autopilot containers) is
+// retired; the detail fragment mounts the shared `PromptSection` instead.
+describe('Home retires its inline opened-task renderer (LIN-2944 P1)', () => {
   const issue = {
     id: 'i1', identifier: 'STB-1', title: 'A task',
     state: { type: 'started' }, labels: { nodes: [] }
   };
-  const render = (proxy) => renderDetailsContent(issue, {
-    isLanding: false, urlKey: 'ws', featureFlags: { proxy }
+  const provider = { name: 'jira', ui: { displayName: 'Jira' } };
+  const render = (flags = {}) => renderDetailsContent(issue, { isLanding: false, urlKey: 'ws', provider, featureFlags: flags });
+
+  test('emits the shared-component mount and no legacy opened-task markup', () => {
+    const html = render({ dispatch: true, proxy: true });
+    assert.ok(html.includes('data-prompt-mount="1"'), 'shared component mount present');
+    for (const legacy of ['label-prompt', 'suggest-btn', 'autopilot-btn', 'recommend-container', 'autopilot-container', 'data-disclosure-prefix']) {
+      assert.ok(!html.includes(legacy), `no legacy "${legacy}" markup remains`);
+    }
   });
 
-  test('proxy on ⇒ both the classic and the stepper anchor render', () => {
-    const html = render(true);
-    // Classic button unchanged (no data-variant marker).
-    assert.ok(html.includes('class="label-prompt autopilot-btn" data-issue-id="i1" title='),
-      'classic autopilot anchor still present, carries no variant');
-    // Stepper sibling: same class + gate, data-variant="stepper", visible label.
-    assert.ok(html.includes('data-variant="stepper"'), 'stepper sibling carries the variant marker');
-    assert.ok(html.includes('>Autopilot · stepped</a>'), 'stepper sibling shows the stepped label');
-    // Exactly two autopilot launch anchors, not more.
-    assert.equal((html.match(/class="label-prompt autopilot-btn"/g) || []).length, 2);
-  });
-
-  test('proxy off ⇒ neither autopilot anchor renders (same gate as the classic button)', () => {
-    const html = render(false);
-    assert.ok(!html.includes('autopilot-btn'), 'no autopilot launch anchors without the proxy flag');
-    assert.ok(!html.includes('data-variant="stepper"'), 'no stepper sibling without the proxy flag');
+  test('the mount threads the resolved provider source and url key (LIN-1904/LIN-1910)', () => {
+    const html = render({});
+    assert.ok(html.includes('data-source="jira"'), 'provider name stamped as data-source');
+    assert.ok(html.includes('data-url-key="ws"'), 'workspace url key stamped');
   });
 });
 
@@ -1313,5 +1142,19 @@ describe('task-edit link (LIN-1565)', () => {
     assert.ok(!html.includes('data-inline-edit'), 'no inline edit form markup');
     assert.ok(!html.includes('edit-issue-trigger'), 'no inline edit toggle');
     assert.ok(!html.includes('edit-issue-form'), 'no inline edit form');
+  });
+});
+
+// =============================================================================
+// Home script list (LIN-2944 P1 addendum 9 / N1 M10)
+// =============================================================================
+// Home must load the shared opened-task component script. Dropping
+// /prompt-section.js from the list left all unit tests green (surviving M10).
+describe('Home script list (LIN-2944 P1)', () => {
+  test('signed-in pages load /prompt-section.js before /app.js', () => {
+    const trees = [{ project: { id: 'p1', name: 'P' }, incomplete: [], completed: [], completedCount: 0 }];
+    const authed = renderPage(trees, [], [], 'Org', { urlKey: 'ws', workspaces: [{ urlKey: 'ws', provider: 'linear' }] });
+    assert.ok(authed.includes('/prompt-section.js'), 'signed-in page loads the shared component');
+    assert.ok(authed.indexOf('/prompt-section.js') < authed.indexOf('/app.js'), 'loaded before app.js mounts it');
   });
 });

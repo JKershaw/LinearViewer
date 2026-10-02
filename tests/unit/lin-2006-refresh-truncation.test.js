@@ -33,6 +33,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
+import { nodeKey } from '../../lib/tree.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -47,7 +48,7 @@ function sliceRenderDashboardAfterRefresh() {
   return SERVER_SRC.slice(startIdx, endIdx);
 }
 
-async function runRenderDashboardAfterRefresh({ fetchResult }) {
+async function runRenderDashboardAfterRefresh({ fetchResult, topTask = null }) {
   const calls = { renderPageOptions: null };
 
   const workspace = { id: 'ws-1', urlKey: 'acme' };
@@ -61,6 +62,11 @@ async function runRenderDashboardAfterRefresh({ fetchResult }) {
     customPromptsStore: { list: async () => [] },
     getDeployInfo: () => ({}),
     fetchAndPrepareProjects: async () => fetchResult,
+    // LIN-2944 P1: the render tail derives Home's top task over the fetched trees
+    // via the shared ordering helper. Defaults to no top task; a test can pass one.
+    orderIssuesForSwipe: () => (topTask ? [topTask] : []),
+    // The route keys the top task with the shared binding-aware `nodeKey`.
+    nodeKey,
     renderPage: (trees, inProgressTrees, recentActivityTrees, organizationName, options) => {
       calls.renderPageOptions = options;
       return '<html/>';
@@ -158,6 +164,10 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     userPreferencesStore: { setSelectedTeam: async () => {}, getSelectedTeam: async () => null },
     customPromptsStore: { list: async () => [] },
     fetchAndPrepareProjects: async () => fetchResult,
+    // LIN-2944 P1: the route derives Home's top task over the fetched trees via
+    // the shared ordering helper; this suite pins `truncated`, so stub an empty
+    // order (no top task).
+    orderIssuesForSwipe: () => [],
     renderPage: (trees, inProgressTrees, recentActivityTrees, organizationName, options) => {
       calls.renderPageCallCount++;
       calls.renderPageOptions = options;
@@ -210,4 +220,20 @@ test('the primary dashboard route (GET /workspace/:urlKey/) threads truncated:fa
   });
   assert.equal(calls.renderPageCallCount, 1);
   assert.equal(calls.renderPageOptions.truncated, false, 'an untruncated read must not spuriously show the notice on the primary dashboard route');
+});
+
+// LIN-2944 P1 N1 (M12): the refresh route threads Home's top task (id + why)
+// into renderPage, exactly like the primary route. Deleting topTaskId/topTaskWhy
+// from that call left every unit and e2e green (surviving mutant M12).
+test('renderDashboardAfterRefresh threads the top task id + why into renderPage (LIN-2944 P1 N1)', async () => {
+  const topTask = { id: 'dupe-1', source: 'repoB', why: ['bug'] };
+  const calls = await runRenderDashboardAfterRefresh({
+    fetchResult: {
+      trees: [], inProgressTrees: [], recentActivityTrees: [], organizationName: 'acme',
+      teams: [], selectedTeamId: null, showSource: false, truncated: false
+    },
+    topTask
+  });
+  assert.equal(calls.renderPageOptions.topTaskId, nodeKey(topTask), 'the top task key reaches renderPage');
+  assert.deepEqual(calls.renderPageOptions.topTaskWhy, ['bug'], 'the why reaches renderPage');
 });

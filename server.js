@@ -135,7 +135,7 @@ import { renderSettingsPage } from './lib/render-settings.js'
 import { renderPromptsPage } from './lib/render-prompts.js'
 import { renderCustomPromptsPage } from './lib/render-custom-prompts.js'
 import { renderDispatchPage } from './lib/render-dispatch.js'
-import { renderSwipePage } from './lib/render-swipe.js'
+import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
@@ -1681,6 +1681,9 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
   // Pass urlKey so the periodicals group renders consistently after a token
   // refresh, matching the primary dashboard route (LIN-341).
   const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
+  // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
+  // `orderIssuesForSwipe` is pure and adds no provider call.
+  const homeTopTask = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees })[0] || null;
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
@@ -1697,7 +1700,9 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     featureFlags: getFeatureFlags(session),
     customPrompts,
     showSource,
-    truncated
+    truncated,
+    topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
+    topTaskWhy: homeTopTask ? homeTopTask.why : []
   });
   return res.send(html);
 }
@@ -3034,6 +3039,10 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
 
     const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
     const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
+    // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
+    // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
+    // the trees Home shows are already filtered, so the top task is too.
+    const homeTopTask = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees })[0] || null;
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
@@ -3053,7 +3062,9 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       customPrompts,
       isLocalhost,
       showSource,
-      truncated
+      truncated,
+      topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
+      topTaskWhy: homeTopTask ? homeTopTask.why : []
     });
     res.send(html);
   } catch (error) {

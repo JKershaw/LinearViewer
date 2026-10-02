@@ -212,67 +212,77 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   // =========================================================================
-  // LIN-172: Prompt buttons toggle affects UI visibility
+  // LIN-172 / LIN-2944 F9: the promptButtons toggle hides the TEMPLATES only
   // =========================================================================
 
-  test('prompts section is hidden when promptButtons is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('promptButtons off hides the templates but keeps the ✦ primary', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { promptButtons: false } });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Expand an issue to see its details
-    await page.locator('.line[data-id]').first().click();
-    await page.waitForTimeout(200);
+    // Expand an issue and open its Prompts section (the section still renders;
+    // F9 shows the ✦ primary rather than hiding the surface).
+    await page.locator('.in-progress-items .line.expandable').first().click();
+    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
+    const component = page.locator('.in-progress-items .prompt-section').first();
+    await expect(component).toBeVisible();
 
-    // Prompts toggle should not exist in any detail section
-    await expect(page.locator('[data-toggle="prompts"]')).toHaveCount(0);
+    // Templates are gone; the primary remains.
+    await expect(component.locator('[data-testid="other-prompts"]')).toHaveCount(0);
+    await expect(component.locator('[data-testid="opened-task-go"]')).toBeVisible();
   });
 
   test('prompts section is visible by default (promptButtons on)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Expand an issue to see its details
-    await page.locator('.line[data-id]').first().click();
-    await page.waitForTimeout(200);
-
-    // Prompts toggle should exist in expanded detail section
-    await expect(page.locator('[data-toggle="prompts"]')).not.toHaveCount(0);
+    await page.locator('.in-progress-items .line.expandable').first().click();
+    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
+    const component = page.locator('.in-progress-items .prompt-section').first();
+    await expect(component).toBeVisible();
+    await expect(component.locator('[data-testid="other-prompts"]')).toBeVisible();
   });
 
   // =========================================================================
-  // LIN-171: AI recommendations toggle affects UI visibility
+  // LIN-171 / LIN-2944 F9: aiRecommendations disables the ✦ primary, never hides it
   // =========================================================================
 
-  test('AI suggest button is hidden when aiRecommendations is off', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('aiRecommendations off disables the ✦ primary with a reason and spends nothing', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { aiRecommendations: false } });
 
+    const recommendSpend = [];
+    page.on('request', (req) => {
+      const p = new URL(req.url()).pathname;
+      if (p.includes('/api/recommend/') && !p.endsWith('/api/recommend/status')) recommendSpend.push(req.url());
+    });
+
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Expand an issue to see its details
-    await page.locator('.line[data-id]').first().click();
-    await page.waitForTimeout(200);
+    await page.locator('.in-progress-items .line.expandable').first().click();
+    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
+    const component = page.locator('.in-progress-items .prompt-section').first();
 
-    // AI suggest button should not exist
-    await expect(page.locator('.suggest-btn')).toHaveCount(0);
+    const go = component.locator('[data-testid="opened-task-go"]');
+    await expect(go).toBeDisabled();
+    await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/AI suggestions are off/i);
 
-    // Recommendation container should not exist
-    await expect(page.locator('.recommend-container')).toHaveCount(0);
+    // A disabled button never fires a click; force-dispatch to be sure and assert
+    // the request counter stays empty (the zero-spend guarantee).
+    await go.click({ force: true }).catch(() => {});
+    await page.waitForTimeout(300);
+    expect(recommendSpend).toEqual([]);
   });
 
-  test('AI suggest button is visible by default (aiRecommendations on)', async ({ page, localWorkerUrlKey }) => {
+  test('the ✦ primary is shown when aiRecommendations is on (default)', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Expand an issue to see its details
-    await page.locator('.line[data-id]').first().click();
-    await page.waitForTimeout(200);
-
-    // AI suggest button should exist (when openRouterSource is configured in test)
-    // Recommendation container should exist
-    await expect(page.locator('.recommend-container')).not.toHaveCount(0);
+    await page.locator('.in-progress-items .line.expandable').first().click();
+    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
+    const go = page.locator('.in-progress-items .prompt-section [data-testid="opened-task-go"]').first();
+    await expect(go).toBeVisible();
   });
 
   // =========================================================================
@@ -486,17 +496,22 @@ test.describe('Feature Toggle Settings', () => {
     await expect(page.locator('.prompt-proxy-toggle')).toHaveCount(0);
   });
 
-  test('proxy toggle button rendered in prompt containers when proxy feature is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('proxy toggle button rendered in the opened-task component when proxy feature is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { proxy: true } });
 
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // LIN-442: prompt containers (and their +proxy toggle) now live in the lazy
-    // detail block, fetched on first expand — so expand an issue, then the
-    // toggle is present in the DOM (inside the hidden prompt container).
-    await page.locator('.line.expandable').first().click();
-    await expect(page.locator('.prompt-proxy-toggle').first()).toBeAttached();
+    // Expand an in-progress issue and open its Prompts section (the shared
+    // component mounts there), then pick a default template so the action cluster
+    // — which owns the +proxy toggle — renders.
+    await page.locator('.in-progress-items .line.expandable').first().click();
+    await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
+    const component = page.locator('.in-progress-items .prompt-section').first();
+    await expect(component).toBeVisible();
+    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh');
+    await expect(component.locator('.prompt-proxy-toggle')).toBeAttached();
   });
 
   test('proxy toggle button appears on dispatch page when proxy is on', async ({ page, seedLocal, localWorkerUrlKey }) => {

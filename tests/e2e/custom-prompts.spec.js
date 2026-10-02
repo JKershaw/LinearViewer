@@ -355,7 +355,7 @@ test.describe('Custom Prompts on Dashboard', () => {
     await page.request.get(`/test/clear-custom-prompts?urlKey=${localWorkerUrlKey}`);
   });
 
-  test('custom prompt buttons appear as default buttons on dashboard', async ({ page, localWorkerUrlKey }) => {
+  test('custom prompt templates appear under "other prompts" on the dashboard', async ({ page, localWorkerUrlKey }) => {
     // Create a custom prompt via API
     await page.request.post(`/workspace/${localWorkerUrlKey}/api/prompts/custom`, {
       data: { name: 'My Dashboard Prompt', template: 'Analyze {{title}}' }
@@ -372,12 +372,15 @@ test.describe('Custom Prompts on Dashboard', () => {
     const issueId = await issueLine.getAttribute('data-id');
     const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
 
-    // Expand Prompts section
-    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-    await promptsToggle.click();
+    // Expand Prompts section; the shared component owns the templates.
+    await details.locator('.detail-toggle[data-toggle="prompts"]').click();
+    const component = details.locator('.prompt-section');
+    await expect(component).toBeVisible();
 
-    // Custom prompt button should be visible without needing to click "more"
-    const customBtn = page.locator(`.in-progress-items .custom-prompt-btn[data-issue-id="${issueId}"]`);
+    // Custom prompts live under "other prompts", behind the more toggle.
+    const other = component.locator('[data-testid="other-prompts"]');
+    await other.locator('[data-prompt="__more__"]').click();
+    const customBtn = other.locator('.swipe-prompt-btn.custom-prompt-btn');
     await expect(customBtn).toBeVisible();
     await expect(customBtn).toHaveText('My Dashboard Prompt');
   });
@@ -401,26 +404,22 @@ test.describe('Custom Prompts on Dashboard', () => {
     const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
 
     // Expand Prompts section
-    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-    await promptsToggle.click();
+    await details.locator('.detail-toggle[data-toggle="prompts"]').click();
+    const component = details.locator('.prompt-section');
+    await expect(component).toBeVisible();
 
-    // Click the custom prompt button (visible by default, no need to click "more")
-    const customBtn = details.locator(`.label-prompt[data-label="custom:${prompt.id}"]`);
-    await customBtn.click();
+    // Reveal the custom prompt under "other prompts" and click it.
+    const other = component.locator('[data-testid="other-prompts"]');
+    await other.locator('[data-prompt="__more__"]').click();
+    await other.locator(`.swipe-prompt-btn[data-prompt="custom:${prompt.id}"]`).click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh');
 
-    // Wait for prompt to load in container
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${issueId}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    // Verify the prompt name shows
-    await expect(promptContainer.locator('.prompt-name')).toHaveText('Title Prompt');
-
-    // Verify variable substitution happened (contains "Work on:")
-    await expect(promptContainer.locator('.prompt-text')).toContainText('Work on:');
+    // Verify the prompt name and variable substitution.
+    await expect(component.locator('.swipe-prompt-name')).toHaveText('Title Prompt');
+    await expect(component.locator('[data-prompt-body]')).toContainText('Work on:');
   });
 
-  test('no custom prompt buttons when none exist', async ({ page, localWorkerUrlKey }) => {
+  test('no custom prompt templates when none exist', async ({ page, localWorkerUrlKey }) => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
@@ -432,12 +431,12 @@ test.describe('Custom Prompts on Dashboard', () => {
     const details = page.locator(`.in-progress-items .details[data-details-for="${issueId}"]`);
 
     // Expand Prompts section
-    const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-    await promptsToggle.click();
+    await details.locator('.detail-toggle[data-toggle="prompts"]').click();
+    const component = details.locator('.prompt-section');
+    await expect(component).toBeVisible();
 
-    // No custom prompt buttons should exist (they render as default buttons now)
-    const customBtns = page.locator(`.in-progress-items .custom-prompt-btn[data-issue-id="${issueId}"]`);
-    await expect(customBtns).toHaveCount(0);
+    // No custom prompt templates should exist.
+    await expect(component.locator('.swipe-prompt-btn.custom-prompt-btn')).toHaveCount(0);
   });
 });
 

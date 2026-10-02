@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
-import { RUNGS, NEEDS, validateTaskModeEvent } from '../../lib/task-mode-store.js';
+import { RUNGS, NEEDS, SURFACES, validateTaskModeEvent } from '../../lib/task-mode-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
@@ -156,6 +156,34 @@ describe('LIN-2942 vocabulary drift pin', () => {
     assert.deepEqual([...rungs].sort(), [...RUNGS].sort());
     assert.deepEqual([...needs].sort(), [...NEEDS].sort());
   });
+});
+
+describe('LIN-2944 P1: SURFACES drift pin', () => {
+  test('SURFACES is exactly the surface values PromptSection.init callers pass', () => {
+    // The store's SURFACES vocabulary must match the `surface:` values the
+    // PromptSection.init call sites pass (public/swipe.js, public/app.js), so a
+    // caller cannot start reporting a surface the route would reject (or the
+    // route accept one no caller sends). Mirrors the RUNGS/NEEDS pin above.
+    const values = new Set();
+    for (const file of ['../../public/swipe.js', '../../public/app.js']) {
+      const src = readFileSync(join(__dirname, file), 'utf8');
+      for (const m of src.matchAll(/surface:\s*'([a-z]+)'/g)) values.add(m[1]);
+    }
+    assert.deepEqual([...values].sort(), [...SURFACES].sort());
+  });
+});
+
+describe('LIN-2944 P1: handleDispatch threads the mount surface', () => {
+  for (const surface of ['swipe', 'home']) {
+    test(`a dispatch from a ${surface} mount passes surface: ${surface}`, async () => {
+      const m = await withResult('implementation', { surface });
+      await m.container.click({ action: 'run-step', rung: 'run-step', target: 'cli' });
+      await flush();
+      assert.equal(m.calls.dispatch.length, 1);
+      assert.equal(m.calls.dispatch[0].surface, surface, 'surface matches the mount');
+      assert.equal(m.calls.dispatch[0].entryRung, 'run-step', 'entryRung still rides along');
+    });
+  }
 });
 
 describe('LIN-2942 client hooks in PromptSection', () => {

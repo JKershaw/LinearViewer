@@ -285,111 +285,62 @@ async function expandPromptsSection(page, containerSelector, issueId) {
 
 test.describe('Streaming AI Recommendations - UI', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // AI suggest button requires OpenRouter to be configured.
+    // The ✦ primary requires OpenRouter to be configured.
     await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
-  test('streams AI suggestion and shows final content', async ({ page }) => {
-    // Expand the blocked issue
-    const taskLine = page.locator(
-      '.in-progress-items .line:has-text("Blocked on external API")'
-    );
-    await taskLine.click();
-
-    // Expand Prompts section
+  /** Expand the blocked issue's Prompts section and press ✦ next step. */
+  async function pressGo(page) {
+    await page.locator('.in-progress-items .line:has-text("Blocked on external API")').click();
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
+    await expect(component).toBeVisible();
+    await component.locator('[data-testid="opened-task-go"]').click();
+    return component;
+  }
 
-    // Click suggest button
-    const suggestBtn = page.locator(
-      `.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`
-    );
-    await suggestBtn.click();
+  test('streams AI suggestion and shows final content', async ({ page }) => {
+    const component = await pressGo(page);
 
-    // Recommendation container should become visible
-    const recommendContainer = page.locator(
-      `.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`
-    );
-    await expect(recommendContainer).toBeVisible();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+    await expect(component.locator('[data-prompt-body]')).toContainText('Help me with task', { timeout: 10000 });
 
-    // Wait for prompt to appear (streaming completes)
-    const promptSection = recommendContainer.locator('.recommend-prompt');
-    await expect(promptSection).toBeVisible({ timeout: 10000 });
-
-    const promptText = recommendContainer.locator('.prompt-text');
-    await expect(promptText).toContainText('Help me with task', { timeout: 10000 });
-
-    // Reasoning should be populated (hidden by default after streaming)
-    const toggleBtn = recommendContainer.locator('.reasoning-toggle');
-    await expect(toggleBtn).toBeVisible();
-    await toggleBtn.click();
-
-    const reasoning = recommendContainer.locator('.recommend-reasoning');
+    // LIN-2944 reverses LIN-70: reasoning stays VISIBLE by default.
+    const reasoning = component.locator('[data-testid="opened-task-reasoning"]');
     await expect(reasoning).toBeVisible();
-    // LIN-357: reasoning is the generic overview now (blocked label abolished); assert it streamed.
     await expect(reasoning).not.toBeEmpty();
   });
 
-  test('shows phase indicator during streaming', async ({ page }) => {
-    // Expand the blocked issue
-    const taskLine = page.locator(
-      '.in-progress-items .line:has-text("Blocked on external API")'
-    );
-    await taskLine.click();
+  test('shows the generating phase while the stream is held', async ({ page }) => {
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    await page.route('**/api/recommend/*/stream*', async (route) => {
+      await held;
+      await route.continue();
+    });
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const component = await pressGo(page);
+    await expect(component).toHaveAttribute('data-phase', 'generating');
+    await expect(component.locator('[data-prompt-body]')).toContainText('Loading');
 
-    // Click suggest button
-    const suggestBtn = page.locator(
-      `.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`
-    );
-    await suggestBtn.click();
-
-    // Phase indicator should appear during streaming
-    const recommendContainer = page.locator(
-      `.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`
-    );
-    await expect(recommendContainer).toBeVisible();
-
-    // After streaming completes, phase indicator should be hidden
-    const phaseIndicator = recommendContainer.locator('.streaming-phase');
-    const promptText = recommendContainer.locator('.prompt-text');
-    await expect(promptText).toContainText('Help me with task', { timeout: 10000 });
-    await expect(phaseIndicator).toBeHidden();
+    release();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
   });
 
-  test('copy button works with streamed content', async ({ page }) => {
-    // Expand the blocked issue
-    const taskLine = page.locator(
-      '.in-progress-items .line:has-text("Blocked on external API")'
-    );
-    await taskLine.click();
+  test('copy button copies the streamed content', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const component = await pressGo(page);
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+    await expect(component.locator('[data-prompt-body]')).toContainText('Help me with task');
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click suggest and wait for streaming to complete
-    const suggestBtn = page.locator(
-      `.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`
-    );
-    await suggestBtn.click();
-
-    const recommendContainer = page.locator(
-      `.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`
-    );
-    const promptText = recommendContainer.locator('.prompt-text');
-    await expect(promptText).toContainText('Help me with task', { timeout: 10000 });
-
-    // Verify rawPrompt is set for copy
-    const rawPrompt = await promptText.getAttribute('data-raw-prompt');
-    expect(rawPrompt).toBeTruthy();
-    expect(rawPrompt).toContain('Help me with task');
+    await component.locator('.swipe-prompt-copy').click();
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip).toContain('Help me with task');
   });
 
-  test('LIN-191: dispatch and copy buttons disabled during streaming, enabled after', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Re-setup with dispatch enabled
+  test('LIN-191: no actionable copy/dispatch until the prompt is ready', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, {
       openRouterConnected: true,
       features: { dispatch: true },
@@ -397,62 +348,54 @@ test.describe('Streaming AI Recommendations - UI', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Expand the blocked issue
-    const taskLine = page.locator(
-      '.in-progress-items .line:has-text("Blocked on external API")'
-    );
-    await taskLine.click();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    await page.route('**/api/recommend/*/stream*', async (route) => {
+      await held;
+      await route.continue();
+    });
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const component = await pressGo(page);
+    await expect(component).toHaveAttribute('data-phase', 'generating');
+    // While generating there is no actionable copy affordance.
+    await expect(component.locator('.swipe-prompt-copy')).toHaveCount(0);
 
-    // Click suggest button
-    const suggestBtn = page.locator(
-      `.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`
-    );
-    await suggestBtn.click();
-
-    // Wait for streaming to complete
-    const recommendContainer = page.locator(
-      `.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`
-    );
-    const promptSection = recommendContainer.locator('.recommend-prompt');
-    const promptText = recommendContainer.locator('.prompt-text');
-    await expect(promptText).toContainText('Help me with task', { timeout: 10000 });
-
-    // After streaming completes, buttons should be enabled
-    const copyBtn = promptSection.locator('.prompt-copy');
-    await expect(copyBtn).toBeEnabled();
-
-    const dispatchBtn = promptSection.locator('.prompt-dispatch').first();
-    await expect(dispatchBtn).toBeEnabled();
+    release();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+    await expect(component.locator('.swipe-prompt-copy')).toBeEnabled();
+    await expect(component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]')).toBeEnabled();
   });
 
-  test('dismiss button works during streaming', async ({ page }) => {
-    // Expand the blocked issue
-    const taskLine = page.locator(
-      '.in-progress-items .line:has-text("Blocked on external API")'
-    );
-    await taskLine.click();
+  test('↻ change cancels an in-flight stream back to idle', async ({ page }) => {
+    // Gate the shared reader: emit the reasoning, then hold until the test acts.
+    await page.evaluate(() => {
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      window.__releaseStream = () => release();
+      window.readSSEStream = async (response, onEvent) => {
+        if (response.body) response.body.cancel().catch(() => {});
+        onEvent('message', { phase: 'reasoning' });
+        onEvent('message', { section: 'reasoning', content: 'Working it out.\n' });
+        await gate;
+      };
+    });
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const component = await pressGo(page);
+    await expect(component).toHaveClass(/streaming/);
+    // Mid-stream the reasoning streams INTO the body ([data-prompt-body]).
+    await expect(component.locator('[data-prompt-body]')).toContainText('Working it out');
 
-    // Click suggest
-    const suggestBtn = page.locator(
-      `.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`
-    );
-    await suggestBtn.click();
+    // ↻ change mid-stream aborts the request and returns to idle.
+    await component.locator('[data-action="change"]').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'idle');
+    await expect(component).not.toHaveClass(/streaming/);
+  });
 
-    const recommendContainer = page.locator(
-      `.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`
-    );
-    await expect(recommendContainer).toBeVisible();
+  test('↻ change dismisses the generated prompt back to idle', async ({ page }) => {
+    const component = await pressGo(page);
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
 
-    // Dismiss
-    const dismissBtn = recommendContainer.locator('.recommend-close');
-    await dismissBtn.click();
-
-    await expect(recommendContainer).toBeHidden();
+    await component.locator('[data-action="change"]').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'idle');
   });
 });
