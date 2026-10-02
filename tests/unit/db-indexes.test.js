@@ -21,6 +21,7 @@ import { ProxyEventStore } from '../../lib/proxy-events.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
+import { ShareStore } from '../../lib/share-store.js';
 import { recordingCollection } from '../fixtures/mango-tmpdir.js';
 
 // Collections the audit deliberately left on the auto `_id` index.
@@ -392,25 +393,31 @@ describe('db-indexes', () => {
     // decides it: the index key must be the list's sort key with `urlKey:1`
     // prepended. Change a list's sort or its index spec without the other and
     // this fails — the exact drift that produced the production blocking sort.
+    // The four A2/B paged lists all declare a `urlKey:1,timestamp:-1` key (the
+    // issue-scoped llm-call-log successor is excluded by the `issueIdentifier`
+    // guard). The share list (LIN-3243) is the same rule with a `createdAt`
+    // primary key — kept as its own `match` so the four existing predicates are
+    // unchanged.
+    const pagedListSpec = (collection) => (s) =>
+      s.collection === collection &&
+      s.keySpec.urlKey === 1 &&
+      s.keySpec.timestamp === -1 &&
+      s.keySpec.issueIdentifier === undefined;
     const cases = [
-      { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listEvents('parity-ws', { limit: 5, offset: 0 }) },
-      { collection: 'prompt-traces', make: c => new PromptTraceStore({ collection: c }), list: s => s.listTraces('parity-ws', { limit: 5, offset: 0 }) },
-      { collection: 'llm-call-log', make: c => new LlmCallLogStore({ collection: c }), list: s => s.listCalls('parity-ws', { limit: 5, offset: 0 }) },
-      { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }) }
+      { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listEvents('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('proxy-events') },
+      { collection: 'prompt-traces', make: c => new PromptTraceStore({ collection: c }), list: s => s.listTraces('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('prompt-traces') },
+      { collection: 'llm-call-log', make: c => new LlmCallLogStore({ collection: c }), list: s => s.listCalls('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('llm-call-log') },
+      { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('foreman-status') },
+      { collection: 'shares', make: c => new ShareStore({ collection: c }), list: s => s.listByUrlKey('parity-ws'), match: s => s.collection === 'shares' && s.keySpec.urlKey === 1 && s.keySpec.createdAt === -1 }
     ];
-    for (const { collection, make, list } of cases) {
+    for (const { collection, make, list, match } of cases) {
       const recorded = recordingCollection(freshDb().collection(collection));
       await list(make(recorded));
       const cursor = recorded.__record.cursors.at(-1);
       assert.ok(cursor, `${collection}: the paged list issued a find()`);
       assert.strictEqual(cursor.sorts.length, 1, `${collection}: exactly one sort must be pushed into the cursor`);
-      const spec = INDEX_SPECS.find(s =>
-        s.collection === collection &&
-        s.keySpec.urlKey === 1 &&
-        s.keySpec.timestamp === -1 &&
-        s.keySpec.issueIdentifier === undefined
-      );
-      assert.ok(spec, `${collection}: a urlKey+timestamp paged-list index must be declared`);
+      const spec = INDEX_SPECS.find(match);
+      assert.ok(spec, `${collection}: a urlKey-prefixed paged-list index must be declared`);
       // Compare ORDERED key entries, not deep equality: a compound index is
       // defined by key order, and `assert.deepStrictEqual` on objects ignores
       // insertion order, so `{urlKey,timestamp,_id}` would equal
