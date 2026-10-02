@@ -1333,7 +1333,7 @@ test.describe('Custom Prompt Dispatch', () => {
     await dispatchBtn.click();
 
     // Should show "✓" feedback
-    await expect(dispatchBtn).toHaveText('✓');
+    await expect(dispatchBtn).toHaveText('dispatched!');
 
     // Textarea should be cleared
     await expect(textarea).toHaveValue('');
@@ -1358,7 +1358,7 @@ test.describe('Custom Prompt Dispatch', () => {
     await webBtn.click();
 
     // Should show feedback
-    await expect(webBtn).toContainText('✓');
+    await expect(webBtn).toContainText('dispatched!');
 
     // Verify target is "web" via API
     const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
@@ -1379,7 +1379,7 @@ test.describe('Custom Prompt Dispatch', () => {
     await dashBtn.click();
 
     // Should show feedback
-    await expect(dashBtn).toContainText('✓');
+    await expect(dashBtn).toContainText('dispatched!');
 
     // Verify target is "dash" via API
     const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
@@ -1419,7 +1419,7 @@ test.describe('Custom Prompt Dispatch', () => {
     const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
 
-    await expect(dispatchBtn).toHaveText('✓');
+    await expect(dispatchBtn).toHaveText('dispatched!');
 
     // Verify prompt is literally "/plan"
     const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
@@ -1437,7 +1437,7 @@ test.describe('Custom Prompt Dispatch', () => {
     await textarea.fill('First custom prompt');
     const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
-    await expect(dispatchBtn).toHaveText('✓');
+    await expect(dispatchBtn).toHaveText('dispatched!');
 
     // Wait for recents to render (async update after dispatch)
     const recentItem = page.locator('.dispatch-recents-container .queue-recent-item');
