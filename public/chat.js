@@ -336,13 +336,17 @@
       }
       if (name === 'send_follow_up') {
         // LIN-1073 review: this is the catalog's one WRITE tool — the generic
-        // fallback below would hide a real side effect (a queued dispatch
-        // follow-up) behind an anonymous tool name, so it must always name the
-        // session it targeted and a snippet of what was sent.
+        // fallback below would hide a real side effect behind an anonymous
+        // tool name, so it always names the session it targeted and a snippet
+        // of the prompt. LIN-3254: the wording must stay NEUTRAL ("follow-up
+        // to session X") because a run-scoped turn only PROPOSES — nothing has
+        // been sent at call time. The verdict belongs on the settled frame: the
+        // 'proposed' phase below for a proposal; the route's own 'queued'
+        // result for an executed follow-up.
         if (!args.sessionId) return name;
         var prompt = typeof args.prompt === 'string' ? args.prompt.trim() : '';
         var snippet = prompt ? ': "' + (prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt) + '"' : '';
-        return 'sent a follow-up to session ' + args.sessionId + snippet;
+        return 'follow-up to session ' + args.sessionId + snippet;
       }
       // Flight Companion catalog (LIN-2632) — same discipline as send_follow_up
       // above: name the specifics available on the call, never just the tool.
@@ -367,6 +371,11 @@
     }
     if (data.phase === 'error') {
       return name + ' failed: ' + (data.error || 'unknown error');
+    }
+    if (data.phase === 'proposed') {
+      // LIN-3254: a run-scoped turn proposes instead of acting — say so, never
+      // reuse the 'call' frame's "sent a follow-up" wording (nothing was sent).
+      return name === 'send_follow_up' ? 'proposed a follow-up' : name + ' proposed';
     }
     if (data.phase === 'cap') {
       return 'reached the tool-lookup limit';

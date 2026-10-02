@@ -198,7 +198,7 @@
         var head = run.querySelector('[data-testid="session-run-toggle"]');
         if (!head) return;
         run.addEventListener('click', function (e) {
-          if (e.target.closest('button, a[href], textarea, .chat-composer, .sess-inline-reply')) return;
+          if (e.target.closest('button, a[href], textarea, .chat-composer, .sess-inline-reply, .sess-proposals')) return;
           toggleRun(run, head);
         });
         head.addEventListener('keydown', function (e) {
@@ -410,12 +410,64 @@
     }
   }
 
+  // ── Run proposals (LIN-3254): Apply / Decline ─────────────────────────────
+  // Each pending row posts to the run-proposal endpoint and, on success, swaps
+  // its buttons for a quiet one-line state in place. window.api throws on a
+  // non-2xx, so a refused/failed apply (which the server reverts to proposed)
+  // re-enables the buttons and shows a short error.
+  function settleProposal(row, action) {
+    var actions = row.querySelector('.sess-proposal-actions');
+    if (actions) {
+      actions.innerHTML = '<span class="sess-proposal-state" data-testid="session-proposal-state">'
+        + (action === 'apply' ? 'applied' : 'declined') + '</span>';
+    }
+    row.setAttribute('data-proposal-status', action === 'apply' ? 'applied' : 'declined');
+  }
+
+  function initProposals() {
+    var blocks = document.querySelectorAll('[data-testid="session-proposals"]');
+    for (var i = 0; i < blocks.length; i++) {
+      (function (block) {
+        var urlKey = block.dataset.urlKey || '';
+        block.addEventListener('click', function (e) {
+          var btn = e.target.closest ? e.target.closest('button[data-proposal-action]') : null;
+          if (!btn) return;
+          e.preventDefault();
+          var row = btn.closest('[data-testid="session-proposal"]');
+          if (!row) return;
+          var action = btn.getAttribute('data-proposal-action');
+          var runId = row.dataset.runId || '';
+          var id = row.dataset.proposalId || '';
+          var buttons = row.querySelectorAll('button');
+          for (var b = 0; b < buttons.length; b++) buttons[b].disabled = true;
+          window.api(
+            '/workspace/' + encodeURIComponent(urlKey) + '/api/run/'
+              + encodeURIComponent(runId) + '/proposals/' + encodeURIComponent(id) + '/' + action,
+            { method: 'POST', body: JSON.stringify({}) }
+          ).then(function () {
+            settleProposal(row, action);
+          }).catch(function (err) {
+            for (var b2 = 0; b2 < buttons.length; b2++) buttons[b2].disabled = false;
+            var note = row.querySelector('.sess-proposal-error');
+            if (!note) {
+              note = document.createElement('span');
+              note.className = 'sess-proposal-error';
+              row.appendChild(note);
+            }
+            note.textContent = 'could not ' + action + ': ' + ((err && err.message) || 'failed');
+          });
+        });
+      })(blocks[i]);
+    }
+  }
+
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     // Per-run transcripts must render before toggle init so content is visible.
     renderRunTranscripts();
     initRunToggles();
     initInlineReplies();
+    initProposals();
     initContextWidgets();
     tickClocks();
     setInterval(tickClocks, 1000);

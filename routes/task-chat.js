@@ -21,8 +21,10 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
-import { createChatToolCatalog } from '../lib/chat-tools.js';
+import { createChatToolCatalog, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
+import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
+import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveIssueBinding, bindingRefusalResponse, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
@@ -232,9 +234,16 @@ function buildMockAnswer(context, question, related) {
  * @param {Object}   [deps.shelvedRulingsStore] - LIN-2966: the shelved-rulings
  *   input to the same tool, so a deliberately shelved decision does not
  *   resurface in the chat.
+ * @param {Object}   [deps.runProposalsStore] - LIN-3254: durable store for
+ *   proposals a run-scoped chat turn makes (never executes). Required for a
+ *   run-scoped turn; ordinary chats never touch it.
+ * @param {Object}   [deps.chatClient] - LIN-3254: the `{ streamChat,
+ *   streamChatWithTools }` pair the turn core drives. Defaults to the real
+ *   `lib/openrouter.js` client; tests inject a tool-calling fake so the
+ *   route's real (non-mockAi) run-scoped propose path is pinned end to end.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -260,6 +269,9 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // re-resolved source-only (422). Absent/empty keeps the unstamped page
       // byte-identical.
       const rawBindingScope = typeof req.query.bindingScope === 'string' ? req.query.bindingScope.trim().slice(0, 200) : '';
+      // LIN-3254: a run-scoped chat carries the run id (a UUID). Malformed or
+      // absent is simply "not run-scoped" — the page behaves exactly as today.
+      const rawRun = typeof req.query.run === 'string' && UUID_REGEX.test(req.query.run.trim()) ? req.query.run.trim() : '';
       const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
       // Saved chats require a user identity (accountId). Absent only for a
       // genuinely anonymous session — local/GitHub sessions carry an accountId
@@ -267,7 +279,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // explicit empty-state and omits the save affordance when it is (LIN-1008).
       const savedChatsAvailable = !!req.session.accountId;
       const html = renderTaskChatPage(
-        { defaultTask: rawTask, defaultSource: rawSource, defaultBindingScope: rawBindingScope, aiConfigured, savedChatsAvailable },
+        { defaultTask: rawTask, defaultSource: rawSource, defaultBindingScope: rawBindingScope, defaultRun: rawRun, aiConfigured, savedChatsAvailable },
         {
           deployInfo: getDeployInfo(),
           urlKey: workspace.urlKey,
@@ -433,6 +445,14 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       return res.status(400).json({ error: `question must be ${MAX_QUESTION_LENGTH} characters or fewer` });
     }
 
+    // LIN-3254: a run-scoped chat carries a UUID `runId` in the turn body. The
+    // shape is validated here (a malformed one never reaches the AI checks),
+    // and the run's session is confirmed to belong to THIS workspace below.
+    const rawRunId = typeof req.body?.runId === 'string' ? req.body.runId.trim() : '';
+    if (rawRunId && !UUID_REGEX.test(rawRunId)) {
+      return res.status(400).json({ error: 'runId must be a UUID' });
+    }
+
     // `isTestMode` gates the DATA mock; `mockAi` additionally fires the AI mock
     // for local-provider sessions. The AI-config + free-tier guards key off
     // `mockAi` so a mocked session isn't 503'd for lacking an OpenRouter key.
@@ -481,6 +501,42 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       return res.status(502).json({ error: 'Failed to load the task' });
     }
 
+    // LIN-3254: a run-scoped turn proposes instead of acting. Confirm the run's
+    // session belongs to THIS workspace — a cross-workspace run id is refused,
+    // never proposed to. Ordinary chats (no runId) skip all of this.
+    const runScoped = !!rawRunId;
+    if (runScoped) {
+      if (!dispatchQueueStore || !agentStatusStore || !runProposalsStore) {
+        return res.status(503).json({ error: 'Run-scoped chat is not configured for this workspace' });
+      }
+      try {
+        const sessions = await getSessionsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore });
+        if (!sessions.some(s => s.sessionId === rawRunId)) {
+          return res.status(404).json({ error: `Run ${rawRunId} not found in this workspace` });
+        }
+      } catch (error) {
+        console.error('Task chat run lookup error:', error);
+        return res.status(502).json({ error: 'Failed to load the run' });
+      }
+    }
+
+    // Persist exactly one proposal for a proposed follow-up, recording it under
+    // the lineage tail the follow-up would land on. A store rejection (e.g. a
+    // secret-scan hit) throws and surfaces as a tool-error breadcrumb in chat.
+    const persistProposal = async (proposal) => {
+      const sessions = await getSessionsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore });
+      const session = sessions.find(s => s.sessionId === proposal.sessionId);
+      if (!session) throw new Error(`Session ${proposal.sessionId} not found`);
+      let stepLoopId = null;
+      try { ({ followUpTo: stepLoopId } = deriveFollowUpDispatch(session)); } catch { stepLoopId = null; }
+      await runProposalsStore.create({
+        urlKey: workspace.urlKey,
+        runId: proposal.sessionId,
+        stepLoopId,
+        prompt: proposal.prompt,
+      });
+    };
+
     // Start SSE.
     res.set({
       'Content-Type': 'text/event-stream',
@@ -497,8 +553,21 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         const followUp = buildMockFollowUpTrigger(question);
         const related = followUp ? null : buildMockToolReference(context);
         if (followUp) {
-          sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'send_follow_up', arguments: followUp });
-          sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'send_follow_up', result: `queued a follow-up to session ${followUp.sessionId}` });
+          // LIN-3254: a run-scoped turn proposes instead of queueing — emit the
+          // same "proposed" shape the real propose-mode tool returns, persist
+          // one proposal, and dispatch nothing.
+          const proposal = runScoped ? { sessionId: rawRunId, prompt: followUp.prompt } : followUp;
+          sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'send_follow_up', arguments: { sessionId: proposal.sessionId, prompt: proposal.prompt } });
+          if (runScoped) {
+            try {
+              await persistProposal(proposal);
+              sendSSE(res, 'tool', { phase: 'proposed', iteration: 1, name: 'send_follow_up', result: `proposed a follow-up to session ${proposal.sessionId}` });
+            } catch (err) {
+              sendSSE(res, 'tool', { phase: 'error', iteration: 1, name: 'send_follow_up', error: err.message });
+            }
+          } else {
+            sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'send_follow_up', result: `queued a follow-up to session ${followUp.sessionId}` });
+          }
         } else if (related) {
           sendSSE(res, 'tool', { phase: 'call', iteration: 1, name: 'lookup_task', arguments: { issueId: related.identifier } });
           sendSSE(res, 'tool', { phase: 'result', iteration: 1, name: 'lookup_task', result: `${related.identifier} — ${related.title}` });
@@ -577,6 +646,9 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       await runAgentTurn({
         workspace,
         turnKind: 'user-initiated',
+        // LIN-3254: a run-scoped turn proposes (and persists via onProposal);
+        // an ordinary chat keeps today's execute posture.
+        ...(runScoped ? { followUpMode: 'propose', onProposal: persistProposal } : {}),
         message: question.trim(),
         history: safeHistory,
         apiKey: apiKeyToUse,
@@ -588,7 +660,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         allowPlaybookWrite: false,
         onEvent,
         deps: {
-          chatClient: { streamChat, streamChatWithTools },
+          chatClient: chatClient || { streamChat, streamChatWithTools },
           createToolCatalog: createChatToolCatalog,
           // Bound to the SAME row binding (issueProvider/issueCallScope,
           // resolved above at :336) the context fetch used above — not the

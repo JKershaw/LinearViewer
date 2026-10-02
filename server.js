@@ -82,6 +82,7 @@ import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
+import { RunProposalsStore } from './lib/run-proposals-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { TaskModeStore } from './lib/task-mode-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
@@ -553,6 +554,14 @@ const harbourCommentsStore = new HarbourCommentsStore({
 const savedChatsCollection = db.collection('saved-chats')
 const savedChatStore = new SavedChatStore({
   collection: savedChatsCollection
+})
+
+// Run proposals (LIN-3254): durable, no-TTL proposals a run-scoped chat turn
+// made about one run, scoped {urlKey, runId}. Session-auth only, like saved
+// chats above — content-bearing and never on the proxy or /kpis surfaces.
+const runProposalsCollection = db.collection('run-proposals')
+const runProposalsStore = new RunProposalsStore({
+  collection: runProposalsCollection
 })
 
 // LLM call log (LIN-418): per-call metadata (model, provider, tokens, cost, time).
@@ -2836,14 +2845,14 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
 // `list_pending_decisions` chat tool the same way createFlightCompanionRoutes
 // already does below (LIN-2617) — Task Chat now builds its catalog through the
 // same createChatToolCatalog call the turn core makes for every surface.
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore }))
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore }))
 
 // Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
 // the inline edit form formerly hidden inside a tree row's Details panel. No
