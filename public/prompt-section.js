@@ -185,8 +185,9 @@
    * The ladder beside the primary: copy \u2192 run this step \u2192 run the whole
    * task. A rung not yet enabled is SHOWN as "\u25CB set up \u203A", never hidden,
    * and keyed on `featureFlags.dispatch` / `featureFlags.proxy`. Pressing a
-   * not-yet-enabled rung says what it needs (recording that press is LIN-2942,
-   * deliberately out of P0).
+   * not-yet-enabled rung says what it needs, and the press is recorded as a
+   * mode event (LIN-2942); `data-rung` / `data-setup-needs` are that record's
+   * vocabulary (lib/task-mode-store.js, pinned by a unit test).
    */
   // LIN-3098 S4: the runner setup page, where an owner makes their own Claude
   // Code session this workspace's runner.
@@ -240,8 +241,8 @@
     }
     if (opts.dispatchEnabled && hasResult) {
       // Enabled run-step: dispatches the current prompt through the SAME path the
-      // dispatch disclosure uses (window.dispatchPrompt, default target cli). The
-      // press is not recorded (LIN-2942).
+      // dispatch disclosure uses (window.dispatchPrompt, default target cli). Its
+      // mode is recorded server-side from the dispatch's `entryRung` (LIN-2942).
       // LIN-3098 N3: where a runner was set up in this browser (and proxy is on),
       // THIS rung alone forces workspace API access onto its dispatch, so the
       // runner's subagent can reach Harbour. Every other caller is unchanged.
@@ -538,6 +539,37 @@
       render();
     }
 
+    // LIN-2942: record which way the task was taken, fire-and-forget. The
+    // server stamps the account and time; a failed record never blocks or
+    // alters the press. The client never records a dispatch — the dispatch
+    // route does, from `entryRung`, once the item exists.
+    function recordTaskMode(evt) {
+      try {
+        if (!opts.urlKey || !issue.identifier) return;
+        fetch(`/workspace/${encodeURIComponent(opts.urlKey)}/api/task-mode`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...evt,
+            surface: opts.surface || null,
+            issueId: issueId || null,
+            issueIdentifier: issue.identifier
+          }),
+          keepalive: true
+        }).catch(() => {});
+      } catch {
+        // ignored: recording is a measurement, never part of the press
+      }
+    }
+
+    // The rung an act on the current result belongs to: an autopilot result is
+    // "run the whole task"; any other result is copied ("copy") or dispatched
+    // ("run this step").
+    function isAutopilotResult() {
+      const label = state.result && state.result.label;
+      return label === '__autopilot__' || label === '__autopilot_stepper__';
+    }
+
     async function fetchPrompt(label) {
       if (abortController) abortController.abort();
       abortController = new AbortController();
@@ -761,13 +793,18 @@
       }
 
       if (promptLabel) {
+        // LIN-2942: fetching the kickoff is the "run the whole task" press. A
+        // template or ✦ next-step fetch is looking, not taking: not recorded.
+        if (promptLabel === '__autopilot__' || promptLabel === '__autopilot_stepper__') {
+          recordTaskMode({ rung: 'run-task', ready: true, needs: null, act: 'press' });
+        }
         fetchPrompt(promptLabel);
         return;
       }
 
       if (action === 'setup') {
-        // A not-yet-enabled rung says what it needs. It does NOT spend and does
-        // NOT record the press — recording is LIN-2942, out of P0.
+        // A not-yet-enabled rung says what it needs. It does NOT spend; the press
+        // is recorded as intent (LIN-2942), and nothing is dispatched.
         // N4: the press writes ONLY the notice slot, never a full render(), so
         // it cannot rebuild the prompt body — above all the streamed text while
         // the ✦ stream is in flight (the stream paints the body directly).
@@ -780,6 +817,7 @@
         state.setupNoticeLink = needs === 'dispatch' || needs === 'proxy' ? runnerSetupHref(opts) : null;
         const slot = container.querySelector('[data-setup-notice-slot]');
         if (slot) slot.innerHTML = setupNoticeHtml(state.setupNotice, state.setupNoticeLink);
+        recordTaskMode({ rung: btn.dataset.rung, ready: false, needs, act: 'press' });
         return;
       }
 
@@ -836,6 +874,7 @@
         const force = !!(state.result && state.result.proxyForce);
         const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
         await navigator.clipboard.writeText(text);
+        recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy' });
         btn.textContent = 'copied!';
         btn.classList.add('copied');
         setTimeout(() => {
@@ -863,6 +902,7 @@
         const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
         const filename = buildPromptFilename(issue.identifier, (state.result && state.result.name) || 'prompt');
         downloadMarkdown(text, filename);
+        recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy' });
         btn.textContent = 'saved!';
         btn.classList.add('copied');
         setTimeout(() => {
@@ -910,7 +950,10 @@
           // LIN-3079: server-side attach forced for the autopilot result only.
           // LIN-3098 N3: or by the run-step rung, when a runner was set up in
           // this browser (only that rung carries data-proxy-force="runner").
-          proxyForce: !!(state.result && state.result.proxyForce) || btn.dataset.proxyForce === 'runner'
+          proxyForce: !!(state.result && state.result.proxyForce) || btn.dataset.proxyForce === 'runner',
+          // LIN-2942: the rung this dispatch was taken on; the server records it,
+          // linked to the created item.
+          entryRung: isAutopilotResult() ? 'run-task' : 'run-step'
         });
         btn.textContent = '\u2713';
       } catch (error) {

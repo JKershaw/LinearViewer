@@ -83,6 +83,7 @@ import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
+import { TaskModeStore } from './lib/task-mode-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
@@ -109,6 +110,7 @@ import { MagicLinkStore, MAGIC_LINK_COLLECTION } from './lib/email-auth.js'
 import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLinkOrigin, resolveEmailLinkOriginWarning, isEmailSignInAvailable, resolvePromptStepMode } from './lib/email-availability.js'
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
+import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
@@ -647,6 +649,13 @@ const connectionStore = new ConnectionStore({ collection: connectionsCollection 
 const credentialLifecycleEventsCollection = db.collection('credential-lifecycle-events')
 const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collection: credentialLifecycleEventsCollection })
 
+// Task-mode events (LIN-2942): append-only record of which ladder rung a person
+// took a task on (copy / run this step / run the whole task), per account per
+// task, for the milestone-5 funnel. A measurement, never a gate — run limits
+// count dispatch rows, not these.
+const taskModeEventsCollection = db.collection('task-mode-events')
+const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection })
+
 // Durable observer-instance state (LIN-2129, P1-2 of the LIN-2114 observer-harness
 // epic). One current, versioned state document per observer instance, advanced by
 // a monotonic-rev compare-and-set (shaped on ownerCredentialStore's CAS above) —
@@ -901,7 +910,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore }))
 }
 
 // =============================================================================
@@ -2182,7 +2191,11 @@ function workspaceFromUrl(req, res, next) {
 }
 
 // Mount dispatch routes (requires workspaceFromUrl middleware)
-app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache }))
+app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, workspaceOwnerCheck, getWorkspaceAccessToken, fetchIssueContext, workspaceHaltStore, sessionsFeedCache, taskModeStore }))
+
+// Task-mode routes (LIN-2942): the ladder's client-side press record and the
+// per-account per-task mode read.
+app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions

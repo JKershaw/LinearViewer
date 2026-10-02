@@ -141,6 +141,20 @@ describe('db-indexes', () => {
     assert.ok(hasIt, 'foreman-status must have a {urlKey:1, dispatchId:1} index');
   });
 
+  test('declares the task-mode-events per-task and time indexes, neither a TTL (LIN-2942)', () => {
+    // getTaskMode reads {accountId: {$in: group}, urlKey, issueIdentifier}
+    // sorted by `at`; countByEntryRung reads the whole log sorted by `at`.
+    // The log is lifetime-retained, so neither may be a TTL.
+    for (const keySpec of [{ accountId: 1, urlKey: 1, issueIdentifier: 1, at: 1 }, { at: 1 }]) {
+      const spec = INDEX_SPECS.find(s =>
+        s.collection === 'task-mode-events' &&
+        JSON.stringify(s.keySpec) === JSON.stringify(keySpec)
+      );
+      assert.ok(spec, `task-mode-events must have a ${JSON.stringify(keySpec)} index`);
+      assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
+    }
+  });
+
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
     // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
     // last-CHANGED — updatedAt only moves on a genuine transition, so an

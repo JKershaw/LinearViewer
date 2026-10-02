@@ -44,6 +44,7 @@ import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
+import { DISPATCH_RUNGS } from '../lib/task-mode-store.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -145,7 +146,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null }) {
   const router = Router();
 
   // =========================================================================
@@ -241,7 +242,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -385,6 +386,24 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return badRequest.json(res, 'attachProxy must be a boolean');
       }
       const wantProxyContext = attachProxy === true && !isAbort;
+
+      // Ladder entry rung (LIN-2942): which rung of the opened task's ladder
+      // this dispatch was pressed from. Optional; absent/null ⇒ no mode event
+      // and the route behaves exactly as without it. Only a fresh dispatch for
+      // a task is a ladder press, so a modifier that could never be recorded is
+      // rejected rather than silently dropped (the cascade/abortTo precedent).
+      const hasEntryRung = entryRung !== undefined && entryRung !== null;
+      if (hasEntryRung) {
+        if (!DISPATCH_RUNGS.includes(entryRung)) {
+          return badRequest.json(res, `entryRung must be one of: ${DISPATCH_RUNGS.join(', ')}`);
+        }
+        if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
+          return badRequest.json(res, 'entryRung is only valid on a fresh dispatch (not abort, cascade or followUpTo)');
+        }
+        if (!issueIdentifier) {
+          return badRequest.json(res, 'entryRung requires issueIdentifier');
+        }
+      }
 
       // Reject local target from non-localhost requests
       if (target === 'local') {
@@ -654,6 +673,29 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           maxSessionsPerTask: maxSessionsPerTask ?? null
         }
       });
+
+      // LIN-2942: the item exists, so record the ladder press that created it,
+      // linked by dispatchId. Fire-and-forget: a failed record never fails or
+      // delays the dispatch, and the response is the same with or without it.
+      // Only a session account can be attributed; without one nothing is recorded.
+      if (hasEntryRung && taskModeStore && req.session?.accountId) {
+        try {
+          Promise.resolve(taskModeStore.record({
+            accountId: req.session.accountId,
+            urlKey: workspace.urlKey,
+            issueId: issueId || null,
+            issueIdentifier,
+            rung: entryRung,
+            ready: true,
+            needs: null,
+            act: 'dispatch',
+            dispatchId: item._id,
+            surface: null
+          })).catch(err => console.error('Failed to record task-mode dispatch event:', err));
+        } catch (err) {
+          console.error('Failed to record task-mode dispatch event:', err);
+        }
+      }
 
       // Spawn a Harbour OS Claude session when target is 'local' (the API value
       // 'local' is preserved for backward compatibility; user-facing surfaces
