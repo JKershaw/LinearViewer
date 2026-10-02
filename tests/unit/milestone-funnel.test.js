@@ -455,6 +455,28 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     );
   });
 
+  test('R4: the aggregate dispatch read is projected to predicate + feedback-link fields only', async () => {
+    const w = freshWorld();
+    const seen = [];
+    const recording = () => ({
+      find(_filter, options) { seen.push(options?.projection ?? null); return { toArray: async () => [] }; }
+    });
+
+    await collectMilestoneFunnel({
+      since: WINDOW_START, ...aggDeps(w), dispatchQueue: recording(), dispatchHistory: recording()
+    });
+
+    assert.ok(seen.length >= 1, 'the aggregate read the dispatch collections');
+    for (const projection of seen) {
+      assert.equal(projection.prompt, undefined, 'prompt must never be projected');
+      assert.equal(projection['feedback.message'], undefined, 'the raw feedback body must never be projected');
+      assert.equal(projection.dispatchedBy, 1);
+      assert.equal(projection.dispatchedAt, 1);
+      assert.equal(projection['feedback.kind'], 1);
+      assert.equal(projection['feedback.url'], 1);
+    }
+  });
+
   test('carries counts and labels only — no account id, workspace key, issue id or PR url', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
