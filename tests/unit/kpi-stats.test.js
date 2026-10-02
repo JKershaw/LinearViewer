@@ -1983,12 +1983,14 @@ describe('LIN-2952 — milestoneFunnel aggregate key', () => {
     assert.deepStrictEqual(Object.keys(stats.milestoneFunnel.steps).sort(), ['connected', 'firstGo', 'login', 'mergeClicked', 'prOpened']);
   });
 
-  test('a missing dep degrades every step to no-signal — never a crash', async () => {
-    const stats = await collectKpiStats(buildCollections(), { now: NOW });
-    for (const key of ['login', 'connected', 'firstGo', 'prOpened', 'mergeClicked']) {
-      assert.strictEqual(stats.milestoneFunnel.steps[key].state, 'no-signal', `${key} must be no-signal`);
-      assert.strictEqual(stats.milestoneFunnel.steps[key].count, null);
-    }
-    assert.strictEqual(stats.milestoneFunnel.mode, null);
+  test('R3: a throwing milestone dep propagates — collectKpiStats rejects (LIN-3002)', async () => {
+    const throwingAccountStore = { collection: { find() { throw new Error('boom'); } } };
+    await assert.rejects(
+      collectKpiStats(buildCollections(), {
+        now: NOW,
+        milestoneFunnelDeps: { ...NO_MILESTONE_FUNNEL_DEPS, accountStore: throwingAccountStore }
+      }),
+      /boom/
+    );
   });
 });

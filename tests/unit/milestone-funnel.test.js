@@ -438,13 +438,21 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     assert.equal(copy.notReady, 1, 'the not-ready subset is published alongside the entry count');
   });
 
-  test('a missing dep degrades to no-signal, never a crash', async () => {
-    const result = await collectMilestoneFunnel({ since: WINDOW_START });
+  test('R3: an absent dep is no-signal, but a throwing dep propagates — no quiet degrade', async () => {
+    const w = freshWorld();
+
+    const absent = await collectMilestoneFunnel({ since: WINDOW_START });
     for (const key of ['login', 'connected', 'firstGo', 'prOpened', 'mergeClicked']) {
-      assert.equal(result.steps[key].state, STEP_STATES.NO_SIGNAL, `${key} must be no-signal`);
-      assert.equal(result.steps[key].count, null);
+      assert.equal(absent.steps[key].state, STEP_STATES.NO_SIGNAL, `${key} must be no-signal`);
+      assert.equal(absent.steps[key].count, null);
     }
-    assert.equal(result.mode, null);
+    assert.equal(absent.mode, null);
+
+    const throwing = { collection: { find() { throw new Error('boom'); } } };
+    await assert.rejects(
+      collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), accountStore: throwing }),
+      /boom/
+    );
   });
 
   test('carries counts and labels only — no account id, workspace key, issue id or PR url', async () => {
