@@ -26,12 +26,14 @@ import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cach
 const URL_KEY = 'acme';
 const RUN_ID = '11111111-2222-4333-8444-555555555555';
 const OTHER_RUN_ID = '99999999-8888-4777-8666-555555555555';
+const TAIL_ID = '22222222-3333-4444-8555-666666666666';
 const T_DISPATCHED = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+const T_TAIL = new Date(Date.now() - 45 * 60 * 1000).toISOString();
 const T_DONE = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
 // ── Stores ───────────────────────────────────────────────────────────────────
 
-function historyRow({ id = RUN_ID, target = 'cli', issueIdentifier = 'TEST-1' } = {}) {
+function historyRow({ id = RUN_ID, target = 'cli', issueIdentifier = 'TEST-1', ...overrides } = {}) {
   return {
     id,
     promptName: 'implementation',
@@ -49,7 +51,24 @@ function historyRow({ id = RUN_ID, target = 'cli', issueIdentifier = 'TEST-1' } 
     resolvedAt: T_DONE,
     kind: 'autopilot',
     feedback: [{ message: '[done] Task completed in 8s', timestamp: T_DONE }],
+    ...overrides,
   };
+}
+
+// A second loop in the SAME lineage as RUN_ID: it carries the anchor's
+// sessionId (explicit attachment, lib/pipeline-loops.js pass 1) and the
+// anchor's rootItemId (so `lineageId` matches), and it is the more recently
+// dispatched loop — the lineage TAIL. `kind` is not 'autopilot' so it never
+// becomes a competing session anchor.
+function tailRow(overrides = {}) {
+  return historyRow({
+    id: TAIL_ID,
+    sessionId: RUN_ID,
+    rootItemId: RUN_ID,
+    kind: 'implementation',
+    dispatchedAt: T_TAIL,
+    ...overrides,
+  });
 }
 
 function makeDispatchStore(rows) {
@@ -168,6 +187,24 @@ describe('LIN-3254 — run proposal Apply', () => {
     assert.ok(row.decidedAt);
   });
 
+  test('dispatches to the lineage TAIL when it differs from the run id (RC3)', async () => {
+    // Two loops in one lineage: the anchor is RUN_ID, the tail is TAIL_ID.
+    // Apply must target the tail (deriveFollowUpDispatch(session).followUpTo),
+    // never assume the run/session id. Mutation M8 (`followUpTo = sessionId`
+    // in dispatchSessionFollowUp) leaves this RED.
+    const { store: dispatchStore, addItemCalls } = makeDispatchStore([historyRow(), tailRow()]);
+    const runProposalsStore = new RunProposalsStore({ collection: createMockCollection() });
+    const proposal = await runProposalsStore.create({ urlKey: URL_KEY, runId: RUN_ID, stepLoopId: TAIL_ID, prompt: 'advance the tail' });
+
+    const res = await post(buildApp({ dispatchStore, runProposalsStore }), proposalPath(RUN_ID, proposal.id, 'apply'));
+
+    assert.strictEqual(res.status, 200, JSON.stringify(res.body));
+    assert.strictEqual(addItemCalls.length, 1);
+    assert.notStrictEqual(addItemCalls[0].item.followUpTo, RUN_ID, 'the run id is not the tail');
+    assert.strictEqual(addItemCalls[0].item.followUpTo, TAIL_ID, 'followUpTo is the lineage tail');
+    assert.strictEqual(addItemCalls[0].item.prompt, 'advance the tail');
+  });
+
   test('is compare-and-set: a double POST dispatches exactly once', async () => {
     const { store: dispatchStore, addItemCalls } = makeDispatchStore([historyRow()]);
     const runProposalsStore = new RunProposalsStore({ collection: createMockCollection() });
@@ -253,10 +290,18 @@ describe('LIN-3254 — run proposal Apply', () => {
     const runProposalsStore = new RunProposalsStore({ collection: createMockCollection() });
     const proposal = await runProposalsStore.create({ urlKey: URL_KEY, runId: OTHER_RUN_ID, prompt: 'x' });
 
+    // Prove "before claiming": count every CAS attempt. The route's own
+    // session lookup must 404 first, so `apply` is never reached — otherwise
+    // the helper would 404 after the claim and this counter would read 1.
+    const originalApply = runProposalsStore.apply.bind(runProposalsStore);
+    let applyCalls = 0;
+    runProposalsStore.apply = async (...args) => { applyCalls++; return originalApply(...args); };
+
     const res = await post(buildApp({ dispatchStore, runProposalsStore }), proposalPath(OTHER_RUN_ID, proposal.id, 'apply'));
 
     assert.strictEqual(res.status, 404);
     assert.strictEqual(addItemCalls.length, 0);
+    assert.strictEqual(applyCalls, 0, 'the cross-workspace run is refused before the proposal is claimed');
     assert.strictEqual((await runProposalsStore.get(URL_KEY, OTHER_RUN_ID, proposal.id)).status, 'proposed');
   });
 });
@@ -346,6 +391,39 @@ describe('LIN-3254 — run page proposal block', () => {
     const html = renderProposals([declined], true);
     const lastStep = html.slice(html.lastIndexOf('data-testid="session-step"'));
     assert.ok(lastStep.includes('data-proposal-id="p3"'), 'the unmatched proposal renders under the last step');
+  });
+
+  test('a pending proposal renders OUTSIDE the collapsed run body (nit)', () => {
+    // A single-run step's card is collapsed by default and `.sess-run-body` is
+    // display:none until expanded, so a pending proposal must not live inside
+    // it. It renders in the always-visible canReply-gated region instead. One
+    // loop only, so the only `session-run-body` in the page is this run's own.
+    const session = {
+      sessionId: RUN_ID,
+      seedIssue: 'TEST-1',
+      tasksTouched: ['TEST-1'],
+      dispatchedAt: T_DISPATCHED,
+      completedAt: T_DONE,
+      telemetry: { runtime: { ms: 60000 }, metrics: [], producedArtifacts: [] },
+      loops: [{
+        loopId: 'loop-1', issueIdentifier: 'TEST-1', issueId: 'uuid-1', issueTitle: 'Seed task',
+        iteration: 1, kind: 'autopilot', dispatchedAt: T_DISPATCHED,
+        terminalStatus: 'done', terminalCompletedAt: T_DONE, feedback: [], telemetry: null,
+      }],
+    };
+    const html = renderSessionPage({
+      session,
+      sessionId: RUN_ID,
+      urlKey: URL_KEY,
+      issueContext: [],
+      canReply: true,
+      proposals: [{ id: 'p1', runId: RUN_ID, stepLoopId: 'loop-1', prompt: 'add a test', status: 'proposed' }],
+    });
+    const propIdx = html.indexOf('data-testid="session-proposals"');
+    const bodyIdx = html.indexOf('data-testid="session-run-body"');
+    assert.ok(propIdx !== -1, 'the proposal block renders');
+    assert.ok(bodyIdx !== -1, 'the run still has a collapsible body (the reply box)');
+    assert.ok(propIdx < bodyIdx, 'the proposal block is not hidden inside the collapsed run body');
   });
 
   test('guest mode (canReply false) hides the proposal block exactly as it hides reply boxes', () => {

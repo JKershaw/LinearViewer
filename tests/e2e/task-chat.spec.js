@@ -135,16 +135,20 @@ test.describe('Task Chat Page (experimental)', () => {
     });
 
     test('renders a session-specific breadcrumb for the send_follow_up write tool (LIN-1073)', async ({ page }) => {
-      // Review gap: the write tool's ONLY visible safety property is the
-      // breadcrumb naming which session it sent a follow-up to — a generic
-      // "↳ send_follow_up" would hide the side effect from the reader.
+      // Review gap: the write tool's only visible safety property is the
+      // breadcrumb naming which session it targeted and the prompt — a generic
+      // "↳ send_follow_up" would hide the side effect from the reader. LIN-3254
+      // RC1: the call frame is neutral ("follow-up to session …", never
+      // "sent"), because a run-scoped turn only proposes; the session + prompt
+      // are what must stay pinned here.
       await page.locator('#task-chat-id').fill('TEST-1');
       await page.locator('#task-chat-question').fill('Please send a follow-up to unwedge this.');
       await page.locator('#task-chat-send').click();
 
       const breadcrumb = page.locator('.task-chat-tool');
-      await expect(breadcrumb).toContainText('sent a follow-up to session mock-session-1', { timeout: 5000 });
+      await expect(breadcrumb).toContainText('follow-up to session mock-session-1', { timeout: 5000 });
       await expect(breadcrumb).toContainText('Please post a status update');
+      await expect(breadcrumb).not.toContainText('sent a follow-up');
     });
 
     test('reset clears the conversation', async ({ page }) => {

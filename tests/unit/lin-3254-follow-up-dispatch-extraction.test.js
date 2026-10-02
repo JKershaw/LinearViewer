@@ -42,6 +42,20 @@ function historyItem({ id, target }) {
   };
 }
 
+// A second loop in `anchorId`'s lineage: sessionId + rootItemId both point at
+// the anchor, and it dispatches LATER, so it is the lineage tail. `kind` is not
+// 'autopilot' so it never becomes its own session anchor.
+function lineageTailItem(anchorId, tailId) {
+  return {
+    ...historyItem({ id: tailId, target: 'cli' }),
+    sessionId: anchorId,
+    rootItemId: anchorId,
+    kind: 'implementation',
+    dispatchedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    resolvedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+  };
+}
+
 function makeStores({ history = [], anchorStatus = null, grantDeclaration = async () => ({ state: 'none' }) } = {}) {
   const addItemCalls = [];
   const dispatchQueueStore = {
@@ -134,6 +148,23 @@ describe('dispatchSessionFollowUp — the extracted composition', () => {
     assert.strictEqual(item.prompt, 'next beat');
     assert.strictEqual(item.dispatchedBy, 'u1');
     assert.ok('harness' in item, 'the factory owns the harness field');
+  });
+
+  test('enqueues to the lineage TAIL when it differs from the anchor sessionId (RC3)', async () => {
+    // Anchor 'sess-done' plus a later loop sharing its lineage. The helper must
+    // use deriveFollowUpDispatch(session).followUpTo (the tail), not the
+    // sessionId it was handed. Mutation M8 (`followUpTo = sessionId`) is RED here.
+    const stores = makeStores({
+      history: [historyItem({ id: 'sess-done', target: 'cli' }), lineageTailItem('sess-done', 'tail-loop')],
+    });
+
+    const outcome = await dispatchSessionFollowUp(helperOptions(stores));
+
+    assert.strictEqual(outcome.status, 200);
+    assert.strictEqual(stores.addItemCalls.length, 1);
+    const { item } = stores.addItemCalls[0];
+    assert.notStrictEqual(item.followUpTo, 'sess-done', 'the anchor sessionId is not the tail');
+    assert.strictEqual(item.followUpTo, 'tail-loop', 'followUpTo is the lineage tail');
   });
 
   test('an unknown sessionId is a 404 envelope, nothing enqueued', async () => {

@@ -198,7 +198,7 @@
         var head = run.querySelector('[data-testid="session-run-toggle"]');
         if (!head) return;
         run.addEventListener('click', function (e) {
-          if (e.target.closest('button, a[href], textarea, .chat-composer, .sess-inline-reply')) return;
+          if (e.target.closest('button, a[href], textarea, .chat-composer, .sess-inline-reply, .sess-proposals')) return;
           toggleRun(run, head);
         });
         head.addEventListener('keydown', function (e) {

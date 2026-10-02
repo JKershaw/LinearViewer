@@ -2662,17 +2662,26 @@ describe('window.ChatUI.toolBreadcrumbLabel (LIN-2632) — lifted from task-chat
     );
   });
 
-  test('send_follow_up: unchanged from task-chat.js, including the write-tool snippet', () => {
+  test('send_follow_up: the call frame is NEUTRAL and names the write-tool snippet (LIN-3254)', () => {
     const ChatUI = loadChatUI();
-    assert.equal(
-      ChatUI.toolBreadcrumbLabel({
-        phase: 'call', name: 'send_follow_up', arguments: { sessionId: 'sess-1', prompt: 'keep going' }
-      }),
-      'sent a follow-up to session sess-1: "keep going"'
-    );
+    const call = ChatUI.toolBreadcrumbLabel({
+      phase: 'call', name: 'send_follow_up', arguments: { sessionId: 'sess-1', prompt: 'keep going' }
+    });
+    assert.equal(call, 'follow-up to session sess-1: "keep going"');
+    // RC1: the call frame must not claim the follow-up was SENT — a run-scoped
+    // turn only proposes, so only the settled frame may carry the verdict.
+    assert.ok(!/sent/i.test(call), 'the pending call frame never says "sent"');
     assert.equal(
       ChatUI.toolBreadcrumbLabel({ phase: 'call', name: 'send_follow_up', arguments: {} }),
       'send_follow_up'
+    );
+  });
+
+  test('send_follow_up: the settled proposed frame carries the verdict (LIN-3254)', () => {
+    const ChatUI = loadChatUI();
+    assert.equal(
+      ChatUI.toolBreadcrumbLabel({ phase: 'proposed', name: 'send_follow_up', result: 'proposed a follow-up to session sess-1' }),
+      'proposed a follow-up'
     );
   });
 

@@ -19,7 +19,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { runAgentTurn } from '../../lib/agent-turn.js';
 import { createChatToolCatalog } from '../../lib/chat-tools.js';
-import { makeSingleRepoWorkspace, buildTaskChatApp, withServer, REPO_A } from './lin-3126-harness.js';
+import { makeSingleRepoWorkspace, buildTaskChatApp, withServer, installGitHubProvider, REPO_A } from './lin-3126-harness.js';
 
 const URL_KEY = 'acme';
 const RUN_ID = '11111111-2222-4333-8444-555555555555';
@@ -243,5 +243,57 @@ describe('LIN-3254 — run-scoped task-chat turn (mockAi branch)', () => {
     assert.strictEqual(status, 404);
     assert.match(body.error, /not found in this workspace/);
     assert.strictEqual(runProposalsStore.created.length, 0);
+  });
+});
+
+// ── The route (REAL AI path) ─────────────────────────────────────────────────
+//
+// RC2: the mockAi branch above is one path; the real run-scoped turn is the one
+// that runs in production. Inject a tool-calling chat client and drive the real
+// turn core through the route: the route must spread `followUpMode: 'propose'`
+// + `onProposal`, so the catalog returns a proposal (never dispatches) and the
+// route persists exactly one row. Mutation M5 (drop that spread) leaves this
+// RED while the rest of the suite stays green.
+
+function realAiWorkspace() {
+  installGitHubProvider();
+  return { ...makeSingleRepoWorkspace(), accessToken: 'live-token' };
+}
+
+describe('LIN-3254 — run-scoped task-chat turn (REAL AI path)', () => {
+  test('a tool-calling run-scoped turn proposes — dispatches nothing and persists one proposal', async () => {
+    const stores = makeSessionStores({ sessionId: RUN_ID });
+    const runProposalsStore = fakeRunProposalsStore();
+    const app = buildTaskChatApp({
+      workspace: realAiWorkspace(),
+      ...makeRouteDeps(stores),
+      runProposalsStore,
+      sessionOverrides: { openRouterApiKey: 'sk-test' },
+      freeTierStore: { tryUse: async () => ({ allowed: true }) },
+      chatClient: {
+        async streamChat() { throw new Error('streamChat must not be used for a tool-capable turn'); },
+        async streamChatWithTools(_messages, options, onEvent) {
+          const raw = await options.executeTool({
+            id: 'call-1', name: 'send_follow_up', arguments: { sessionId: RUN_ID, prompt: 'do the next thing' },
+          });
+          assert.strictEqual(raw.proposed, true, 'the catalog is in propose mode');
+          onEvent('tool', { phase: 'result', iteration: 1, id: 'call-1', name: 'send_follow_up', result: raw });
+          onEvent('done', {});
+        },
+      },
+    });
+
+    const { status, text } = await withServer(app, ({ post }) =>
+      post(`/workspace/${URL_KEY}/api/task-chat/TEST-1`, {
+        question: 'please follow up on this',
+        runId: RUN_ID,
+      }));
+
+    assert.strictEqual(status, 200);
+    assert.strictEqual(stores.addItemCalls.length, 0, 'the real run-scoped path dispatches nothing');
+    assert.strictEqual(runProposalsStore.created.length, 1, 'exactly one proposal persisted');
+    assert.strictEqual(runProposalsStore.created[0].runId, RUN_ID);
+    assert.strictEqual(runProposalsStore.created[0].prompt, 'do the next thing');
+    assert.ok(text.includes('"phase":"proposed"'), 'the stream reports the proposed result, not a queued one');
   });
 });

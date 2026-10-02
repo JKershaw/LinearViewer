@@ -237,9 +237,13 @@ function buildMockAnswer(context, question, related) {
  * @param {Object}   [deps.runProposalsStore] - LIN-3254: durable store for
  *   proposals a run-scoped chat turn makes (never executes). Required for a
  *   run-scoped turn; ordinary chats never touch it.
+ * @param {Object}   [deps.chatClient] - LIN-3254: the `{ streamChat,
+ *   streamChatWithTools }` pair the turn core drives. Defaults to the real
+ *   `lib/openrouter.js` client; tests inject a tool-calling fake so the
+ *   route's real (non-mockAi) run-scoped propose path is pinned end to end.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -656,7 +660,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
         allowPlaybookWrite: false,
         onEvent,
         deps: {
-          chatClient: { streamChat, streamChatWithTools },
+          chatClient: chatClient || { streamChat, streamChatWithTools },
           createToolCatalog: createChatToolCatalog,
           // Bound to the SAME row binding (issueProvider/issueCallScope,
           // resolved above at :336) the context fetch used above — not the
