@@ -46,7 +46,7 @@ import {
   MAX_NAME_LENGTH,
   DANGEROUS_CHARS_REGEX,
 } from '../lib/issue-write-validation.js';
-import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE } from '../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE, CLOSE_OUT_IS_THE_PERSONS_CODE } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
@@ -858,12 +858,19 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * `DUPLICATE_DISPATCH` so a caller branching on 409 bodies can tell the two
    * refusals apart.
    *
+   * It ALSO relays the run-boundary refusal (LIN-3245 / LIN-2949 P1a) carried on
+   * `err.closeOutRefusal` — `{ code: CLOSE_OUT_IS_THE_PERSONS, sessionId }` —
+   * through the same `jsonError`/keepalive paths and `logEvent` note. The two
+   * are sibling branches, never merged, so a caller still branches on `code`.
+   * The helper's name stays (renaming every call site buys nothing): it now
+   * relays both refusal tags.
+   *
    * Wired at the same call sites `refuseIfDuplicateDispatch` is (LIN-1751
    * deliberately matches that existing coverage rather than closing its gap —
    * see the plan): every route that checks the duplicate guard on its
    * `createDispatchItem` catch also checks this one.
    *
-   * @param {*} err - the caught error (a non-budget error passes straight through)
+   * @param {*} err - the caught error (any other error passes straight through)
    * @param {import('express').Request} req
    * @param {import('express').Response} res
    * @param {string} endpoint - audit-log endpoint tag
@@ -871,7 +878,21 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * @returns {boolean} true if a refusal was sent (caller returns early)
    */
   function refuseIfBudgetExhausted(err, req, res, endpoint, keepalive = null) {
-    if (!err || !err.budgetExhausted) return false;
+    if (!err) return false;
+    // Run-boundary refusal (LIN-3245 / LIN-2949 P1a): a fresh close-out dispatch
+    // for a `stopAt: 'pr'` run gets a 409 on the SAME relay paths as a budget
+    // refusal, with its own code on the durable proxy-event note.
+    if (err.closeOutRefusal) {
+      const refusal = err.closeOutRefusal;
+      logEvent(req, endpoint, 409, `${CLOSE_OUT_IS_THE_PERSONS_CODE} ${refusal.sessionId}`);
+      if (keepalive) {
+        keepalive.send(409, { error: err.message, ...refusal });
+      } else {
+        jsonError(res, 409, err.message, refusal);
+      }
+      return true;
+    }
+    if (!err.budgetExhausted) return false;
     const refusal = err.budgetExhausted;
     // LIN-2934 (F1): additive bound discriminator on the durable proxy-event
     // note, so a BUDGET_EXHAUSTED refusal's server-written record distinguishes

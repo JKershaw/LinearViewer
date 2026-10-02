@@ -823,6 +823,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (err && err.budgetExhausted) {
         return jsonError(res, 409, err.message, err.budgetExhausted);
       }
+      // Run-boundary refusal (LIN-3245 / LIN-2949 P1a): a fresh close-out
+      // dispatch for a `stopAt: 'pr'` run. Sibling of the budget relay above,
+      // distinct code (CLOSE_OUT_IS_THE_PERSONS) so a caller branching on 409
+      // bodies can tell it apart. No `Retry-After` — nothing clears on a timer.
+      if (err && err.closeOutRefusal) {
+        return jsonError(res, 409, err.message, err.closeOutRefusal);
+      }
       // Proxy-context attach failure (LIN-1162): a requested `attachProxy:true`
       // could not mint/append its block. Surface it (503, transient — mirrors the
       // client's old token-rate-limit message) rather than the generic 500, and

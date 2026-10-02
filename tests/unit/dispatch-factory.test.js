@@ -1356,6 +1356,67 @@ describe('createDispatchItem — task-budget guard, refusals (LIN-1751)', () => 
   });
 });
 
+describe('createDispatchItem — run-boundary seam guard (LIN-3245)', () => {
+  test('a fresh close-out for a stopAt:pr run is refused with CLOSE_OUT_IS_THE_PERSONS', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const err = await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1' } }).then(() => null, e => e);
+    assert.ok(err, 'expected a refusal');
+    assert.equal(err.status, 409);
+    assert.equal(err.closeOutRefusal.code, 'CLOSE_OUT_IS_THE_PERSONS');
+    assert.equal(err.closeOutRefusal.sessionId, 'run-1');
+    assert.ok(!err.budgetExhausted, 'the run-boundary refusal never overloads budgetExhausted');
+    assert.equal(store.captured.item, undefined, 'no row is created on refusal');
+  });
+
+  test('the run row is read ONCE — shared with the budget guard, never twice', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1' } }).catch(() => {});
+    assert.equal(store.getItemStatusCalls, 1);
+  });
+
+  test('a run row with stopAt null admits the close-out (dormant default)', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: null } } });
+    const item = await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1' } });
+    assert.equal(item.kind, 'close-out');
+  });
+
+  test('a close-out for a run row with no stopAt field at all is admitted', async () => {
+    const store = budgetStore({ runs: { 'run-1': {} } });
+    const item = await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1' } });
+    assert.equal(item.kind, 'close-out');
+  });
+
+  test('a close-out whose run row cannot be resolved (no row) is admitted', async () => {
+    const store = budgetStore({ runs: {} });
+    const item = await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1' } });
+    assert.equal(item.kind, 'close-out');
+  });
+
+  test('a close-out with no sessionId (the person\u2019s press) is admitted and never reads a run row', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const item = await freshDispatch(store, { kind: 'close-out', fields: {} });
+    assert.equal(item.kind, 'close-out');
+    assert.equal(store.getItemStatusCalls, 0, 'nothing keys the guard — skip the read entirely');
+  });
+
+  test('a review dispatch for a stopAt:pr run is admitted (only close-out is the boundary)', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const item = await freshDispatch(store, { kind: 'review', fields: { sessionId: 'run-1' } });
+    assert.equal(item.kind, 'review');
+  });
+
+  test('a fresh close-out also past its budget refuses with BUDGET_EXHAUSTED — budget guard keeps precedence', async () => {
+    const store = budgetStore({
+      runs: { 'run-1': { stopAt: 'pr', maxTasks: 1 } },
+      countResult: { count: 1, alreadyCounted: false }
+    });
+    const err = await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1' } }).then(() => null, e => e);
+    assert.ok(err, 'expected a refusal');
+    assert.equal(err.budgetExhausted?.code, 'BUDGET_EXHAUSTED', 'sequenced after the budget guard');
+    assert.ok(!err.closeOutRefusal);
+  });
+});
+
 describe('createDispatchItem — budgetPosition snapshot (LIN-2934)', () => {
   test('budgetPosition is absent (not just null) when no budget is declared', async () => {
     const store = budgetStore({ runs: { 'run-1': {} } });
