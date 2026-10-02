@@ -35,9 +35,17 @@ import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/supersed
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { bindingRefusalResponse, BINDING_INTENT } from '../../lib/workspace.js';
+
+// The proxy limiter is a process-global module-scope instance (60/min) that
+// skips only when NODE_ENV==='test'. The ISSUE inverse row drives all 21 sites
+// twice, so the whole file must run with the limiter skipped, as the other
+// proxy route tests do.
+process.env.NODE_ENV = 'test';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
+const PROXY_SRC = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 
 const REPO_A = 'octo/repoA';
 const REPO_B = 'octo/repoB';
@@ -644,6 +652,214 @@ describe('(F3) refreshConnectionForSuspect projects the binding scope, never the
 });
 
 // ---------------------------------------------------------------------------
+// (F2/M12) two-connection filter — the selected binding's OWN Connection credential
+//
+// Review M12: dropping `connections.filter(c => c._id === targetBinding.connectionId)`
+// survived every test. On a workspace with bindings on two DIFFERENT
+// Connections, selecting the binding on Y must serve Y's credential. The filter
+// is load-bearing: without it `selectBestConnection` picks by expiry (X here),
+// pairing X's token with Y's repo.
+// ---------------------------------------------------------------------------
+
+describe('(F2/M12) a selector on the second Connection uses that Connection\'s credential, never the other', () => {
+  const X = 'acct::github::instX';
+  const Y = 'acct::github::instY';
+
+  function twoConnectionAccess() {
+    return createConnectionAccess({
+      connectionStore: {
+        readConnectionsByReferent: async () => [
+          { _id: X, accountId: 'acct', provider: 'github', unitId: 'instX', credentials: { token: 'tok-x', installationId: 'instX', tokenExpiresAt: Date.now() + 7_200_000 }, referents: [] },
+          { _id: Y, accountId: 'acct', provider: 'github', unitId: 'instY', credentials: { token: 'tok-y', installationId: 'instY', tokenExpiresAt: Date.now() + 3_600_000 }, referents: [] },
+        ],
+      },
+      ownerCredentialStore: { getByConnection: async () => null },
+      refreshConnection: async () => null,
+      resolveCanonicalAccountId: async (id) => id,
+      selectOwnerSessionRow: () => ({
+        session: {
+          workspaces: [{
+            urlKey: 'acme',
+            provider: 'github',
+            bindings: [
+              { provider: 'github', scope: REPO_A, connectionId: X },
+              { provider: 'github', scope: REPO_B, connectionId: Y },
+            ],
+            activeBinding: { provider: 'github', scope: REPO_A },
+          }],
+        },
+        workspaceIndex: 0,
+      }),
+      normalizeProvider: (ws) => ws?.provider || 'linear',
+      fingerprintCredential,
+      gate: { shouldAttempt: () => true },
+      lifecycleEventStore: { recordEvent: async () => {} },
+      bufferMs: BUFFER,
+    });
+  }
+
+  test('ISSUE + repoB selects Y and pairs repoB with tok-y, never the later-expiring tok-x', async () => {
+    const out = await twoConnectionAccess().resolveConnectionBackedAccess({
+      urlKey: 'acme', ownerAccountId: 'acct', sessions: [], intent: 'ISSUE',
+      selector: { source: 'github', bindingScope: REPO_B },
+    });
+    assert.deepEqual(out.result.scope, { token: 'tok-y', repo: REPO_B });
+    assert.equal(out.result.token, 'tok-y');
+  });
+
+  test('ISSUE + repoA selects X and pairs repoA with tok-x', async () => {
+    const out = await twoConnectionAccess().resolveConnectionBackedAccess({
+      urlKey: 'acme', ownerAccountId: 'acct', sessions: [], intent: 'ISSUE',
+      selector: { source: 'github', bindingScope: REPO_A },
+    });
+    assert.deepEqual(out.result.scope, { token: 'tok-x', repo: REPO_A });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (F2/M5) seam-level undeclared-intent guard — routes/proxy.js normalizeBindingIntent
+//
+// Review M5: `normalizeBindingIntent` defaulting to WORKSPACE instead of ISSUE
+// survived every test. This runs the REAL `normalizeBindingIntent`,
+// `resolveProviderAccess` and `workspaceUnavailable` bodies (vm, the same
+// technique as the server.js resolveBody harness) with no intent / an
+// unrecognised one on a two-binding workspace, and asserts the seam classifies
+// it as ISSUE -> binding_required -> the 422 envelope with zero provider client
+// calls. Under the M5 default it would instead resolve the default binding
+// (repoA) and leak through.
+// ---------------------------------------------------------------------------
+
+describe('(F2/M5) undeclared intent fails closed as ISSUE at the seam, 422 with zero client calls', () => {
+  /** Blank out comments and string/template bodies, preserving offsets, so braces/parens can be counted. */
+  function maskNonCode(src) {
+    const out = src.split('');
+    let mode = null;
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+      const next = src[i + 1];
+      if (mode === 'line') { if (ch === '\n') mode = null; else out[i] = ' '; continue; }
+      if (mode === 'block') { out[i] = ' '; if (ch === '*' && next === '/') { out[i + 1] = ' '; mode = null; i++; } continue; }
+      if (mode) {
+        out[i] = ' ';
+        if (ch === '\\') { out[i + 1] = ' '; i++; continue; }
+        if ((mode === 'single' && ch === "'") || (mode === 'double' && ch === '"') || (mode === 'template' && ch === '`')) mode = null;
+        continue;
+      }
+      if (ch === '/' && next === '/') { out[i] = ' '; mode = 'line'; continue; }
+      if (ch === '/' && next === '*') { out[i] = ' '; mode = 'block'; continue; }
+      if (ch === "'") { out[i] = ' '; mode = 'single'; continue; }
+      if (ch === '"') { out[i] = ' '; mode = 'double'; continue; }
+      if (ch === '`') { out[i] = ' '; mode = 'template'; continue; }
+    }
+    return out.join('');
+  }
+
+  function extractFunctionSource(src, signature) {
+    const start = src.indexOf(signature);
+    assert.ok(start >= 0, `${signature} not found in routes/proxy.js`);
+    const masked = maskNonCode(src);
+    // Scan the parameter list, then brace-match the body (the signature may
+    // destructure, e.g. `(urlKey, owner, req, { intent, selector } = {})`).
+    let i = masked.indexOf('(', start);
+    let paren = 0;
+    for (; i < masked.length; i++) {
+      if (masked[i] === '(') paren++;
+      else if (masked[i] === ')') { paren--; if (paren === 0) { i++; break; } }
+    }
+    i = masked.indexOf('{', i);
+    let depth = 0;
+    for (; i < masked.length; i++) {
+      if (masked[i] === '{') depth++;
+      else if (masked[i] === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+    }
+    throw new Error(`unbalanced braces for ${signature}`);
+  }
+
+  function makeSeam() {
+    const resolverCalls = [];
+    const clientCalls = [];
+    const resolutionRecords = [];
+    const provider = {
+      name: 'github',
+      ui: { displayName: 'GitHub' },
+      issueDetail: async (...args) => { clientCalls.push({ method: 'issueDetail', args }); return null; },
+    };
+    const resolveWorkspaceAccess = async (urlKey, ownerAccountId, options) => {
+      resolverCalls.push(options);
+      if (options.intent === 'ISSUE' && !options.selector) {
+        return { token: null, reason: 'binding_required', provider: 'github', bindings: [REPO_A, REPO_B], credentialFingerprint: null };
+      }
+      return { token: 'tok-a', scope: { token: 'tok-a', repo: REPO_A }, reason: 'ok', provider: 'github', credentialFingerprint: 'fp' };
+    };
+    const stripped = PROXY_SRC;
+    const context = vm.createContext({
+      BINDING_INTENT,
+      DECLARED_BINDING_INTENTS: new Set(Object.values(BINDING_INTENT)),
+      TEST_LOCAL_URL_KEY: 'test-workspace',
+      localProvider: { name: 'local', ui: {} },
+      issueSelectorFromQuery: () => undefined,
+      resolveWorkspaceAccess,
+      injectedProvider: null,
+      getProviderForWorkspace: () => provider,
+      recordCredentialResolution: (...args) => resolutionRecords.push(args),
+      bindingRefusalResponse,
+      logEvent: () => {},
+      workspaceUnavailableEnvelope: () => ({}),
+      console: { log() {}, warn() {}, error() {} },
+      process: { env: {} },
+    });
+    const script = [
+      extractFunctionSource(stripped, 'function normalizeBindingIntent'),
+      extractFunctionSource(stripped, 'function workspaceUnavailable'),
+      extractFunctionSource(stripped, 'async function resolveProviderAccess'),
+      '({ normalizeBindingIntent, resolveProviderAccess, workspaceUnavailable })',
+    ].join('\n');
+    const seam = vm.runInContext(script, context);
+    return { ...seam, resolverCalls, clientCalls, resolutionRecords };
+  }
+
+  function fakeRes() {
+    const out = { status: null, body: null };
+    return {
+      out,
+      status(code) { out.status = code; return this; },
+      json(body) { out.body = body; return this; },
+    };
+  }
+
+  for (const [label, options] of [['no intent (undefined)', {}], ['an unrecognised intent', { intent: 'WAT' }]]) {
+    test(`${label} on the two-binding workspace -> 422 BINDING_REQUIRED, zero client calls`, async () => {
+      const seam = makeSeam();
+      const req = { proxyUrlKey: 'acme', proxyCreatedBy: 'acct', query: {} };
+      const res = fakeRes();
+
+      const result = await seam.resolveProviderAccess('acme', 'acct', req, options);
+
+      assert.equal(seam.resolverCalls[0].intent, 'ISSUE', 'the seam must default a missing/unrecognised intent to ISSUE');
+      assert.equal(result.reason, 'binding_required');
+      assert.equal(result.token, null);
+      assert.equal(result.provider.name, 'github');
+
+      seam.workspaceUnavailable(req, res, '/api/proxy/me', result.reason);
+      assert.equal(res.out.status, 422);
+      assert.equal(res.out.body.code, 'BINDING_REQUIRED');
+      assert.deepEqual(res.out.body.bindings, [REPO_A, REPO_B]);
+      assert.deepEqual(seam.clientCalls, [], 'a refusal must reach no provider client call');
+      assert.equal(seam.resolutionRecords[0]?.[2]?.credential, null, 'a refusal records no credential');
+    });
+  }
+
+  test('a recognised WORKSPACE intent still serves the default binding (control)', async () => {
+    const seam = makeSeam();
+    const req = { proxyUrlKey: 'acme', proxyCreatedBy: 'acct', query: {} };
+    const result = await seam.resolveProviderAccess('acme', 'acct', req, { intent: 'WORKSPACE' });
+    assert.equal(result.reason, 'ok');
+    assert.deepEqual(result.token, { token: 'tok-a', repo: REPO_A });
+    assert.equal(seam.resolverCalls[0].intent, 'WORKSPACE');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // (F) census pin — all 37 resolveProviderAccess call sites declare a literal
 // ---------------------------------------------------------------------------
 
@@ -652,13 +868,47 @@ describe('(F) census pin — every resolveProviderAccess call site declares a li
     'proxy-reads.js', 'proxy-writes.js', 'proxy-compute.js', 'proxy-dispatch.js',
     'proxy-kickoff.js', 'proxy-flight-companion.js', 'proxy.js',
   ];
+  const ROUTE_RE = /(?:router|app)\.(get|post|patch|put|delete|all)\(/;
+  const FN_RE = /(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/;
+
+  /** First quoted path (array routes: the first alias) or identifier after the `(`. */
+  function firstArgToken(lines, i, rest) {
+    let candidate = rest;
+    let j = i;
+    while (!candidate.trim() && j + 1 < lines.length) { j++; candidate = lines[j]; }
+    const quoted = candidate.match(/['"]([^'"]+)['"]/);
+    if (quoted) return quoted[1];
+    const ident = candidate.trim().match(/^([A-Za-z0-9_$]+)/);
+    return ident ? ident[1] : '?';
+  }
+
+  /**
+   * Each site is keyed by its ENCLOSING route (method + first path) or named
+   * helper, plus an occurrence index — not by line number, so the pin survives
+   * unrelated edits above it while still distinguishing the two call sites in
+   * the `/attachments/:id` route and the `applyDescriptionEdit` helper.
+   */
   function callSites() {
     const sites = [];
     for (const file of FILES) {
       const src = stripSrcComments(readFileSync(join(__dirname, '../../routes', file), 'utf8'));
-      for (const line of src.split('\n')) {
+      const lines = src.split('\n');
+      let context = null;
+      const counts = new Map();
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const routeMatch = line.match(ROUTE_RE);
+        if (routeMatch) {
+          const at = line.indexOf(routeMatch[0]) + routeMatch[0].length;
+          context = `${routeMatch[1].toUpperCase()} ${firstArgToken(lines, i, line.slice(at))}`;
+          continue;
+        }
+        const fnMatch = line.match(FN_RE);
+        if (fnMatch) { context = `fn:${fnMatch[1]}`; continue; }
         if (line.includes('resolveProviderAccess(') && !line.includes('function resolveProviderAccess')) {
-          sites.push({ file, line: line.slice(line.indexOf('resolveProviderAccess(')) });
+          const n = (counts.get(context) || 0) + 1;
+          counts.set(context, n);
+          sites.push({ file, line: line.slice(line.indexOf('resolveProviderAccess(')), key: `${file}::${context}#${n}` });
         }
       }
     }
@@ -693,6 +943,60 @@ describe('(F) census pin — every resolveProviderAccess call site declares a li
       else workspace++;
     }
     assert.deepEqual({ issue, create, workspace }, { issue: 21, create: 1, workspace: 15 });
+  });
+
+  // The plan's call-site table, keyed by (file, enclosing endpoint/helper). A
+  // count-only pin cannot catch a count-preserving swap of two sites' intents
+  // (review M8c: PATCH issue ISSUE->WORKSPACE AND attachments WORKSPACE->ISSUE);
+  // this explicit table does, because each key's intent is checked individually.
+  // `CONDITIONAL` is the one dispatch site whose intent is `issueIdentifier ?`.
+  const EXPECTED_INTENTS = {
+    'proxy-reads.js::GET /api/proxy/me#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/teams#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/projects#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/known-repos#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/issues#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/issues/:issueId#1': 'ISSUE',
+    'proxy-reads.js::GET /api/proxy/search#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/states/:teamId#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/labels#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/cycles#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/cycles/:cycleId#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/issues/:issueId/relations#1': 'ISSUE',
+    'proxy-reads.js::GET /api/proxy/attachments/:id#1': 'WORKSPACE',
+    'proxy-reads.js::GET /api/proxy/attachments/:id#2': 'WORKSPACE',
+    'proxy-writes.js::POST /api/proxy/issues#1': 'CREATE',
+    'proxy-writes.js::PATCH /api/proxy/issues/:issueId#1': 'ISSUE',
+    'proxy-writes.js::fn:applyDescriptionEdit#1': 'ISSUE',
+    'proxy-writes.js::POST /api/proxy/issues/:issueId/comments#1': 'ISSUE',
+    'proxy-writes.js::DELETE /api/proxy/issues/:issueId/comments/:commentId#1': 'ISSUE',
+    'proxy-writes.js::PATCH /api/proxy/issues/:issueId/comments/:commentId#1': 'ISSUE',
+    'proxy-writes.js::POST /api/proxy/issues/:issueId/attachments#1': 'ISSUE',
+    'proxy-writes.js::POST /api/proxy/issues/:issueId/relations#1': 'ISSUE',
+    'proxy-writes.js::DELETE /api/proxy/issues/:issueId/relations/:relationId#1': 'ISSUE',
+    'proxy-writes.js::POST /api/proxy/issues/:issueId/labels#1': 'ISSUE',
+    'proxy-writes.js::DELETE /api/proxy/issues/:issueId/labels/:labelId#1': 'ISSUE',
+    'proxy-compute.js::GET /api/proxy/stack#1': 'WORKSPACE',
+    'proxy-compute.js::GET /api/proxy/issues/:identifier/prompt/:templateKey#1': 'ISSUE',
+    'proxy-compute.js::GET /api/proxy/issues/:identifier/recommend#1': 'ISSUE',
+    'proxy-compute.js::GET /api/proxy/issues/:identifier/recap#1': 'ISSUE',
+    'proxy-compute.js::POST /api/proxy/recap/:identifier#1': 'ISSUE',
+    'proxy-compute.js::GET /api/proxy/issues/:identifier/brief#1': 'ISSUE',
+    'proxy-compute.js::POST /api/proxy/brief/:identifier#1': 'ISSUE',
+    'proxy-dispatch.js::POST /api/proxy/dispatch#1': 'CONDITIONAL',
+    'proxy-dispatch.js::POST /api/proxy/recommend-and-dispatch#1': 'ISSUE',
+    'proxy-kickoff.js::POST /api/proxy/autopilot/kickoff#1': 'ISSUE',
+    'proxy-flight-companion.js::POST ENDPOINT#1': 'WORKSPACE',
+    'proxy.js::GET /api/proxy/instructions#1': 'WORKSPACE',
+  };
+
+  test('every site\'s (file, endpoint) maps to the plan table intent', () => {
+    const actual = {};
+    for (const { key, line } of sites) {
+      if (line.includes('issueIdentifier ?')) { actual[key] = 'CONDITIONAL'; continue; }
+      actual[key] = (line.match(/BINDING_INTENT\.(ISSUE|CREATE|WORKSPACE)/) || [])[1];
+    }
+    assert.deepEqual(actual, EXPECTED_INTENTS, 'per-(file, endpoint) intents must match the plan call-site table');
   });
 });
 
@@ -821,4 +1125,139 @@ describe('LIN-3241 matrix — every WORKSPACE-intent route with no selector serv
     assert.equal(recorded.at(-1).options.selector, undefined, 'WORKSPACE must not read a selector from the query');
     assert.deepEqual(recorded.at(-1).result.scope, { token: 'tok-a', repo: REPO_A });
   });
+});
+
+// ---------------------------------------------------------------------------
+// Inverse row — every ISSUE-intent site (all 21), driven end to end
+//
+// Plan §5: with no selector on the two-binding workspace each ISSUE site must
+// refuse 422 BINDING_REQUIRED with zero client calls; with `source`+`bindingScope`
+// = repoB it must ask repoB. Keyed by the SAME (file, endpoint) descriptors as
+// the census table above, so a new ISSUE site without a row fails loudly here.
+// ---------------------------------------------------------------------------
+
+/** A permissive GitHub provider that RECORDS every method call, so a refusal's zero-client-call property is checkable. */
+function recordingGitHubProvider(clientCalls) {
+  const base = { ui: { displayName: 'GitHub', name: 'github' }, ...permissiveGitHubProvider() };
+  return new Proxy(base, {
+    get(target, prop, receiver) {
+      if (prop in target) {
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value === 'function') {
+          return (...args) => { clientCalls.push({ method: prop, args }); return value.apply(target, args); };
+        }
+        return value;
+      }
+      if (typeof prop === 'string') {
+        return (...args) => { clientCalls.push({ method: prop, args }); return Promise.resolve(null); };
+      }
+      return undefined;
+    },
+  });
+}
+
+function buildIssueMatrixApp() {
+  const recorded = [];
+  const clientCalls = [];
+  const ownerRow = twoRepoOwnerRow();
+  const ownerSession = { accountId: 'acct', workspaces: ownerRow.session.workspaces };
+  const connectionAccess = createConnectionAccess({
+    connectionStore: { readConnectionsByReferent: async () => [githubConnection()] },
+    ownerCredentialStore: { getByConnection: async () => null },
+    refreshConnection: async () => null,
+    resolveCanonicalAccountId: async (id) => id,
+    selectOwnerSessionRow: () => ownerRow,
+    normalizeProvider: (ws) => ws?.provider || 'linear',
+    fingerprintCredential,
+    gate: { shouldAttempt: () => true },
+    lifecycleEventStore: { recordEvent: async () => {} },
+    bufferMs: BUFFER,
+  });
+  const { fn } = makeVmResolver({ sessions: [{ _id: 'sid', session: ownerSession }], connectionAccess });
+  const resolveWorkspaceAccess = async (urlKey, ownerAccountId, options) => {
+    const result = await fn(urlKey, ownerAccountId, options);
+    recorded.push({ options, result });
+    return result;
+  };
+  const app = express();
+  app.use(express.json());
+  app.use(createProxyRoutes({
+    proxyTokenStore: {
+      mintGrantBootstrap: async () => ({ token: 'b', kind: 'bootstrap', scope: 'readWrite' }),
+      createToken: async () => ({ token: 'b', kind: 'bootstrap', scope: 'readWrite' }),
+      validateToken: async () => ({
+        grants: ['dispatch'], workspaceId: 'ws-acme', tokenId: 't1', urlKey: 'acme',
+        label: 'test', scope: 'readWrite', createdBy: 'acct',
+      }),
+    },
+    proxyEventStore: { recordEvent: async () => {} },
+    resolveWorkspaceAccess,
+    getWorkspaceAccessToken: async () => null,
+    getWorkspaceOpenRouterKey: async () => null,
+    agentStatusStore: {},
+    recapCacheStore: { get: async () => null, set: async () => {} },
+    briefCacheStore: { get: async () => null, set: async () => {} },
+    dispatchQueueStore: { getGrantDeclaration: async () => ({ state: 'none' }), addItem: async () => ({ _id: 'd' }) },
+    workspaceFromUrl: (req, res, next) => next(),
+    freeTierStore: { tryUse: async () => ({ allowed: true }) },
+    provider: recordingGitHubProvider(clientCalls),
+  }));
+  return { app, recorded, clientCalls };
+}
+
+describe('LIN-3241 inverse row — every ISSUE-intent site refuses without a selector and honours repoB with one', () => {
+  // One row per ISSUE-intent census key. `applyDescriptionEdit` is one site
+  // reached by two routes; it is driven through `/description/append`.
+  const ROWS = [
+    ['proxy-reads.js::GET /api/proxy/issues/:issueId#1', 'GET', '/api/proxy/issues/1'],
+    ['proxy-reads.js::GET /api/proxy/issues/:issueId/relations#1', 'GET', '/api/proxy/issues/1/relations'],
+    ['proxy-writes.js::PATCH /api/proxy/issues/:issueId#1', 'PATCH', '/api/proxy/issues/1', { title: 'x' }],
+    ['proxy-writes.js::fn:applyDescriptionEdit#1', 'POST', '/api/proxy/issues/1/description/append', { block: 'x' }],
+    ['proxy-writes.js::POST /api/proxy/issues/:issueId/comments#1', 'POST', '/api/proxy/issues/1/comments', { body: 'x' }],
+    ['proxy-writes.js::DELETE /api/proxy/issues/:issueId/comments/:commentId#1', 'DELETE', '/api/proxy/issues/1/comments/c1'],
+    ['proxy-writes.js::PATCH /api/proxy/issues/:issueId/comments/:commentId#1', 'PATCH', '/api/proxy/issues/1/comments/c1', { body: 'x' }],
+    ['proxy-writes.js::POST /api/proxy/issues/:issueId/attachments#1', 'POST', '/api/proxy/issues/1/attachments', { image: 'x' }],
+    ['proxy-writes.js::POST /api/proxy/issues/:issueId/relations#1', 'POST', '/api/proxy/issues/1/relations', { relatedIssueId: '2' }],
+    ['proxy-writes.js::DELETE /api/proxy/issues/:issueId/relations/:relationId#1', 'DELETE', '/api/proxy/issues/1/relations/r1'],
+    ['proxy-writes.js::POST /api/proxy/issues/:issueId/labels#1', 'POST', '/api/proxy/issues/1/labels', { labelId: 'l1' }],
+    ['proxy-writes.js::DELETE /api/proxy/issues/:issueId/labels/:labelId#1', 'DELETE', '/api/proxy/issues/1/labels/l1'],
+    ['proxy-compute.js::GET /api/proxy/issues/:identifier/prompt/:templateKey#1', 'GET', '/api/proxy/issues/1/prompt/plan'],
+    ['proxy-compute.js::GET /api/proxy/issues/:identifier/recommend#1', 'GET', '/api/proxy/issues/1/recommend'],
+    ['proxy-compute.js::GET /api/proxy/issues/:identifier/recap#1', 'GET', '/api/proxy/issues/1/recap'],
+    ['proxy-compute.js::POST /api/proxy/recap/:identifier#1', 'POST', '/api/proxy/recap/1', {}],
+    ['proxy-compute.js::GET /api/proxy/issues/:identifier/brief#1', 'GET', '/api/proxy/issues/1/brief'],
+    ['proxy-compute.js::POST /api/proxy/brief/:identifier#1', 'POST', '/api/proxy/brief/1', {}],
+    ['proxy-dispatch.js::POST /api/proxy/dispatch#1', 'POST', '/api/proxy/dispatch', { prompt: 'run me', issueIdentifier: 'GB-1' }],
+    ['proxy-dispatch.js::POST /api/proxy/recommend-and-dispatch#1', 'POST', '/api/proxy/recommend-and-dispatch', { issueIdentifier: 'GB-1' }],
+    ['proxy-kickoff.js::POST /api/proxy/autopilot/kickoff#1', 'POST', '/api/proxy/autopilot/kickoff', { issueIdentifier: 'GB-1' }],
+  ];
+
+  test('the row set is exactly the 21 ISSUE-intent census keys', () => {
+    const KEYS = new Set(ROWS.map(r => r[0]));
+    assert.equal(ROWS.length, 21);
+    assert.equal(KEYS.size, 21, 'each ISSUE site has exactly one row');
+  });
+
+  for (const [key, method, path, body] of ROWS) {
+    test(`${method} ${path} — ${key}`, async () => {
+      // No selector: refuse 422 BINDING_REQUIRED with zero client calls.
+      const refused = buildIssueMatrixApp();
+      const resNone = await callProxy(refused.app, method, path, body);
+      assert.equal(resNone.status, 422, `${key}: expected 422, got ${resNone.status} ${JSON.stringify(resNone.body)}`);
+      assert.equal(resNone.body?.code, 'BINDING_REQUIRED', `${key}: ${JSON.stringify(resNone.body)}`);
+      assert.deepEqual(resNone.body?.bindings, [REPO_A, REPO_B], `${key}`);
+      assert.equal(refused.clientCalls.length, 0, `${key}: a refusal must make zero provider client calls`);
+      assert.equal(refused.recorded.at(-1)?.options?.intent, 'ISSUE', `${key}: the route must declare the ISSUE intent`);
+      assert.equal(refused.recorded.at(-1)?.result?.reason, 'binding_required', `${key}`);
+
+      // Selector repoB: the route resolves the named binding (repoB).
+      const selected = buildIssueMatrixApp();
+      const query = `?source=github&bindingScope=${encodeURIComponent(REPO_B)}`;
+      await callProxy(selected.app, method, path + query, body);
+      const resolution = selected.recorded.at(-1);
+      assert.equal(resolution?.options?.intent, 'ISSUE', `${key}`);
+      assert.equal(resolution?.options?.selector?.bindingScope, REPO_B, `${key}: the query selector must reach the resolver`);
+      assert.deepEqual(resolution?.result?.scope, { token: 'tok-a', repo: REPO_B }, `${key}: served with call scope repoB`);
+    });
+  }
 });
